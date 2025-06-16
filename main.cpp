@@ -1,6 +1,15 @@
 #include<Windows.h>
 
+#include<chrono> //時間を扱うライブラリ
 #include<cstdint>
+#include<filesystem> //ファイルやディレクトリに関する操作を行うライブラリ
+#include<fstream> //ファイルにかいたり読んだりするライブラリ
+
+void Log(std::ostream& os, const std::string& message)
+{
+	os << message << std::endl;
+	OutputDebugStringA(message.c_str()); //出力ウィンドウに文字を出力
+}
 
 //ウィンドウプロシージャ
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
@@ -22,6 +31,32 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
 //Windowsアプリでのエントリーポイント(main関数)
 int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 {
+	//ログファイル関係
+	//ログのディレクトリを用意
+	std::filesystem::create_directories("logs");
+
+	//現在時刻を取得(UTC時刻)
+	std::chrono::system_clock::time_point now = std::chrono::system_clock::now();
+
+	//ログファイルの名前にコンマ何秒はいらないため、削って秒にする
+	std::chrono::time_point<std::chrono::system_clock, std::chrono::seconds>
+	nowSecound = std::chrono::time_point_cast<std::chrono::seconds>(now);
+
+	//日本時間(PCの設定時間に変換)
+	std::chrono::zoned_time localTime{ std::chrono::current_zone(), nowSecound };
+
+	//formatを使って年月日_時分秒の形式にする
+	std::string datString = std::format("{:%Y%m%d_%H%M%S}", localTime);
+
+	//時刻を使ってファイル名を決定
+	std::string logFilePath = std::string("logs/") + datString + ".log";
+
+	//ファイルを作って書き込み準備
+	std::ofstream logStream(logFilePath);
+
+	
+
+	//ウィンドウ関係
 	WNDCLASS wc{};
 
 	//ウィンドウプロシージャ
@@ -81,8 +116,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 		}
 	}
 
-	//ウィンドウプロシージャ
-	wc.lpfnWndProc = WindowProc;
+	Log(logStream, "Application terminating.");
+
 	//出力ウィンドウへの文字出力
 	OutputDebugStringA("Hello, DirextX!\n");
 
