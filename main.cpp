@@ -3,7 +3,15 @@
 #include<chrono> //時間を扱うライブラリ
 #include<cstdint>
 #include<filesystem> //ファイルやディレクトリに関する操作を行うライブラリ
+#include<format> //文字列のフォーマットを行うライブラリ
 #include<fstream> //ファイルにかいたり読んだりするライブラリ
+#include<string> //文字列を扱うライブラリ
+
+//string->wstring変換
+std::wstring ConvertString(const std::string& str);
+
+//wstring->string変換
+std::string ConverString(const std::wstring& str);
 
 void Log(std::ostream& os, const std::string& message)
 {
@@ -117,6 +125,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	}
 
 	Log(logStream, "Application terminating.");
+	
 
 	//出力ウィンドウへの文字出力
 	OutputDebugStringA("Hello, DirextX!\n");
