@@ -7,6 +7,13 @@
 #include<fstream> //ファイルにかいたり読んだりするライブラリ
 #include<string> //文字列を扱うライブラリ
 
+#include<d3d12.h>
+#include<dxgi1_6.h>
+#include<cassert>
+
+#pragma comment(lib,"d3d12.lib")
+#pragma comment(lib,"dxgi.lib")
+
 std::wstring ConvertString(const std::string& str)
 {
 	if (str.empty())
@@ -135,6 +142,79 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 
 	//ウィンドウを表示する
 	ShowWindow(hwnd, SW_SHOW);
+
+	//DXGIファクトリーの生成
+	IDXGIFactory7* dxgiFactory = nullptr;
+	//HRESULTはWindoes系のエラーコード
+	//関数が成功したか同課をSUCCEEDEDマクロで判断する
+	HRESULT hr = CreateDXGIFactory(IID_PPV_ARGS(&dxgiFactory));
+
+	assert(SUCCEEDED(hr));
+
+	//使用するアダプタ用の変数。最初にnullptrを入れる
+	IDXGIAdapter4* useAdapter = nullptr;
+
+	//いい順にアダプタを頼む
+	for (UINT i = 0; dxgiFactory->EnumAdapterByGpuPreference(i,
+		DXGI_GPU_PREFERENCE_HIGH_PERFORMANCE, IID_PPV_ARGS(&useAdapter)) != DXGI_ERROR_NOT_FOUND; ++i)
+	{
+
+		//アダプターの情報を取得する
+		DXGI_ADAPTER_DESC3 adapterDesc{};
+		hr = useAdapter->GetDesc3(&adapterDesc);
+		assert(SUCCEEDED(hr));//ここで止まった場合一大事
+
+		//ソフトウェアアダプタでなければ採用する
+		if (!(adapterDesc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE))
+		{
+			Log(logStream, std::format("Using adapter: {}\n", ConvertString(adapterDesc.Description)));
+			break;
+		}
+		useAdapter = nullptr; //ソフトウェアアダプタの場合は見なかったことにするためしないのでnullptr
+	}
+
+	//アダプターが見つからなかった場合はエラー
+	assert(useAdapter != nullptr);
+
+	ID3D12Device* device = nullptr;
+
+	//機能レベルとログの出力用の文字列
+	D3D_FEATURE_LEVEL featureLevels[] = {
+		D3D_FEATURE_LEVEL_12_2,
+		D3D_FEATURE_LEVEL_12_1,
+		D3D_FEATURE_LEVEL_12_0,
+	};
+
+	const char* featureLevelNames[] = {
+		"12.2",
+		"12.1",
+		"12.0",
+	};
+
+	//機能レベルを順に試していく
+	for (size_t i = 0; i < _countof(featureLevels); ++i)
+	{
+		//採用したアダプタでデバイスを作成
+		hr = D3D12CreateDevice(
+			useAdapter, //アダプタ
+			featureLevels[i], //機能レベル
+			IID_PPV_ARGS(&device) //デバイスのポインタ
+		);
+
+		//指定した昨日レベルでデバイスが生成できたか確認
+		if (SUCCEEDED(hr))
+		{
+			//生成出来たのでログ出力を行う
+			Log(logStream, std::format("Feature Level: {}\n", featureLevelNames[i]));
+			break; //ループを抜ける
+		}
+
+	
+	}
+
+	//デバイスの生成に失敗し起動できない
+	assert(device != nullptr);
+	Log(logStream, std::format("Complete create D3D12Device!"));//初期起動完了のLogを出す
 
 	MSG msg{};
 	//ウィンドウのxボタンが押されるまでループ
