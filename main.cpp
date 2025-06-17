@@ -251,10 +251,48 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	assert(device != nullptr);
 	Log(logStream, std::format("Complete create D3D12Device!"));//初期起動完了のLogを出す
 
+	//コマンドキューの生成
+	ID3D12CommandQueue* commandQueue = nullptr;
+	D3D12_COMMAND_QUEUE_DESC commandQueueDesc{};
+	hr = device->CreateCommandQueue(&commandQueueDesc, IID_PPV_ARGS(&commandQueue));
+
+	//コマンドキューの生成に失敗した場合はエラー
+	assert(SUCCEEDED(hr));
+
+	//コマンドアロケーターを生成する
+	ID3D12CommandAllocator* commandAllocator = nullptr;
+	hr = device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&commandAllocator));
+
+	//コマンドアロケーターの生成に失敗した場合はエラー
+	assert(SUCCEEDED(hr));
+
+	//コマンドリストの生成
+	ID3D12GraphicsCommandList* commandList = nullptr;
+	hr = device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, commandAllocator, nullptr, IID_PPV_ARGS(&commandList));
+
+	//コマンドリストの生成に失敗した場合はエラー
+	assert(SUCCEEDED(hr));
+
+	//スワップチェーンを生成する
+	IDXGISwapChain4* swapChain = nullptr;
+	DXGI_SWAP_CHAIN_DESC1 swapChainDesc{};
+	swapChainDesc.Width = kClientWidth; //ウィンドウの幅
+	swapChainDesc.Height = kClientHeight; //ウィンドウの高さ
+	swapChainDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM; //色の形式
+	swapChainDesc.SampleDesc.Count = 1; //マルチサンプルしない
+	swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT; //レンダリングターゲットとして使用
+	swapChainDesc.BufferCount = 2; //ダブルバッファリング
+	swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD; //モニターに映ったら描画を破棄
+
+	//コマンドキュー、ウィンドウハンドル、設定を渡して生成する
+	hr = dxgiFactory->CreateSwapChainForHwnd(commandQueue, hwnd, &swapChainDesc, nullptr, nullptr, reinterpret_cast<IDXGISwapChain1**>(&swapChain));
+	//スワップチェーンの生成に失敗した場合はエラー
+	assert(SUCCEEDED(hr));
+
+
 	MSG msg{};
 
-	uint32_t* p = nullptr;
-	*p = 100;
+	
 	//ウィンドウのxボタンが押されるまでループ
 	while (msg.message != WM_QUIT)
 	{
