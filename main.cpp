@@ -6,6 +6,7 @@
 #include<format> //文字列のフォーマットを行うライブラリ
 #include<fstream> //ファイルにかいたり読んだりするライブラリ
 #include<string> //文字列を扱うライブラリ
+#include<strsafe.h>
 
 #include<d3d12.h>
 #include<dxgi1_6.h>
@@ -13,6 +14,10 @@
 
 #pragma comment(lib,"d3d12.lib")
 #pragma comment(lib,"dxgi.lib")
+
+//Debug用
+#include<dbghelp.h>
+#pragma comment(lib,"Dbghelp.lib")
 
 std::wstring ConvertString(const std::string& str)
 {
@@ -71,9 +76,39 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
 	return DefWindowProc(hwnd, msg, wparam, lparam);
 }
 
+static LONG WINAPI ExportDump(EXCEPTION_POINTERS* exception)
+{
+	//時刻を取得して、時刻を名前に入れたファイルを作成。Dumpsディレクトリ以下に出力
+	SYSTEMTIME time;
+	GetSystemTime(&time);
+	wchar_t filePath[MAX_PATH] = { 0 };
+	CreateDirectory(L"./Dumps", nullptr);
+	StringCchPrintfW(filePath, MAX_PATH, L"./Dumps/%04d-%02d%02d-%02d%02d.dmp", time.wYear, time.wMonth, time.wDay, time.wHour, time.wMinute);
+	HANDLE dumpFileHandle = CreateFile(filePath, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_WRITE | FILE_SHARE_READ, 0, CREATE_ALWAYS, 0, 0);
+
+	//processId(このexeのId)とクラッシュ(例外)の発生したthreadIdを取得
+	DWORD processId = GetCurrentProcessId();
+	DWORD threadId = GetCurrentThreadId();
+
+	//設定情報を入力
+	MINIDUMP_EXCEPTION_INFORMATION minidumpInformation{};
+	minidumpInformation.ThreadId = threadId; //クラッシュしたスレッドのID
+	minidumpInformation.ExceptionPointers = exception; //例外情報
+	minidumpInformation.ClientPointers = TRUE; //クライアントポインタを使用する
+
+	//Dumpの出力を行う。MiniDumpNormalは最小限の情報を出力する
+	MiniDumpWriteDump(GetCurrentProcess(), processId, dumpFileHandle, MiniDumpNormal, &minidumpInformation, nullptr, nullptr);
+
+	//ほかに関連付けられているSEH例外ハンドラがあったら実行。通常時はプロセスを終了
+	return EXCEPTION_EXECUTE_HANDLER;
+}
+
 //Windowsアプリでのエントリーポイント(main関数)
 int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 {
+	//誰も補足しなかった場合に(Unhandled)、補足する関数を登録
+	SetUnhandledExceptionFilter(ExportDump);
+
 	//ログファイル関係
 	//ログのディレクトリを用意
 	std::filesystem::create_directories("logs");
@@ -217,6 +252,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	Log(logStream, std::format("Complete create D3D12Device!"));//初期起動完了のLogを出す
 
 	MSG msg{};
+
+	uint32_t* p = nullptr;
+	*p = 100;
 	//ウィンドウのxボタンが押されるまでループ
 	while (msg.message != WM_QUIT)
 	{
