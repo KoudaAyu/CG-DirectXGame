@@ -23,6 +23,10 @@
 #include <dxgidebug.h>
 #pragma comment(lib, "dxguid.lib")
 
+//DXCの初期化
+#include<dxcapi.h>
+#pragma comment(lib, "dxcapi.lib")
+
 std::wstring ConvertString(const std::string& str)
 {
 	if (str.empty())
@@ -387,6 +391,70 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	HANDLE fenceEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
 	//フェンスイベントの生成に失敗した場合はエラー
 	assert(fenceEvent != nullptr);
+
+	//dxcCompilerを初期化
+	IDxcUtils* dxcUtils = nullptr;
+	IDxcCompiler3* dxcCompiler = nullptr;
+	hr = DxcCreateInstance(CLSID_DxcUtils, IID_PPV_ARGS(&dxcUtils));
+	assert(SUCCEEDED(hr));
+	hr = DxcCreateInstance(CLSID_DxcCompiler, IID_PPV_ARGS(&dxcCompiler));
+	assert(SUCCEEDED(hr));
+
+	//現時点ではincludeしないが、includeに対応する為の設定を行う
+	IDxcIncludeHandler* includeHandler = nullptr;
+	hr = dxcUtils->CreateDefaultIncludeHandler(&includeHandler);
+	assert(SUCCEEDED(hr));
+
+	IDxcBlob* CompileShader(
+		//CompilerするShaderファイルへのパス
+		const std::wstring& filePath,
+		//Compilerに使用するProfile
+		const wchar_t* profile,
+		//初期化で生成したもの3つ
+		IDxcUtils* dxcUtils,
+		IDxcCompiler3* dxcCompiler,
+		IDxcIncludeHandler* includeHandler) 
+	{
+		//これからシェーダーをコンパイルする旨をログに出す
+		Log(ConversrSrring(std::format(L"Begin CompileShader, path{},profile:{}\n", filePath, profile)));
+		//hlslファイルを読み込む
+		IDxcBlobEncoding* shaderScore = nullptr;
+		HRESULT hr = decUtils->LoadFile(filePath.c_str(), nullptr, &shaderScore);
+		//ファイルの読み込みに失敗した場合はエラー
+		assert(SUCCEEDED(hr));
+		//読み込んだファイルの内容を設定する
+		DxBuffer shaderSourceBuffer;
+		shaderSourceBuffer.Ptr = shaderScore->GetBufferPointer();
+		shaderSourceBuffer.Size = shaderScore->GetBufferSize();
+		shaderSourceBuffer.Encoding = DXC_CP_UTF8;//UTF8の文字コードである事を通知する
+
+		LPCWSTR arguments[] = {
+			filePath.c_str(), //コンパイルするファイルのパス
+			L"-E", L"main", //エントリーポイントの指定。基本的にmain以外にはしない
+			L"-T", profile, //ShaderProfileの設定
+			L"-Zi",L"Qembed_debug",
+			L"-Od", //最適化を行わない
+			L"-Zpr", //メモリレイアウトは行優先
+		};
+
+		//実際にShaderをコンパイルする
+		IDxcResult* shaderResult = nullptr;
+		hr = dxCompiler->Compile(
+			&shaderSourceBuffer, //コンパイルするシェーダーの内容
+			arguments, //コンパイル時の引数
+			_countof(arguments), //引数の数
+			includeHandler, //includeハンドラ
+			IID_PPV_ARGS(&shaderResult) //結果を受け取るポインタ
+		);
+
+	
+		
+	}
+
+
+	//コンパイルに失敗した場合はエラー
+	assert(SUCCEEDED(hr));
+
 
 	//ウィンドウのxボタンが押されるまでループ
 	while (msg.message != WM_QUIT)
