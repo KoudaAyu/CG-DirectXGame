@@ -175,6 +175,17 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 		nullptr //追加のパラメータ
 	);
 
+#ifdef _DEBUG
+	ID3D12Debug1* debugController = nullptr;
+
+	if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debugController))))
+	{
+		//デバックレイヤーを有効化する
+		debugController->EnableDebugLayer();
+		//更にGPU側でもチェックを行うようにする
+		debugController->SetEnableGPUBasedValidation(TRUE);
+	}
+#endif
 	//ウィンドウを表示する
 	ShowWindow(hwnd, SW_SHOW);
 
@@ -250,6 +261,42 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	//デバイスの生成に失敗し起動できない
 	assert(device != nullptr);
 	Log(logStream, std::format("Complete create D3D12Device!"));//初期起動完了のLogを出す
+
+#ifdef _DEBUG
+	ID3D12InfoQueue* infoQueue = nullptr;
+	if (SUCCEEDED(device->QueryInterface(IID_PPV_ARGS(&infoQueue))))
+	{
+		//重大なエラーの時に止まる
+		infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_CORRUPTION, true);
+	
+		//エラーの時に止まる
+		infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_ERROR, true);
+
+		//警告時に止まる
+		infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_WARNING, true);
+
+		
+
+		//抑制するメッセージのID
+		D3D12_MESSAGE_ID denyIds[] =
+		{
+			D3D12_MESSAGE_ID_RESOURCE_BARRIER_MISMATCHING_COMMAND_LIST_TYPE
+		};
+
+		D3D12_MESSAGE_SEVERITY serverities[] = { D3D12_MESSAGE_SEVERITY_INFO };
+		D3D12_INFO_QUEUE_FILTER filter{};
+		filter.DenyList.NumIDs = _countof(denyIds); //抑制するメッセージの数
+		filter.DenyList.pIDList = denyIds; //抑制するメッセージのID
+		filter.DenyList.NumSeverities = _countof(serverities); //抑制するメッセージの重要度の数
+		filter.DenyList.pSeverityList = serverities; //抑制するメッセージの重要度
+
+		infoQueue->PushStorageFilter(&filter); //フィルターを適用する
+
+		//解放
+		infoQueue->Release();
+	}
+#endif
+
 
 	//コマンドキューの生成
 	ID3D12CommandQueue* commandQueue = nullptr;
