@@ -19,6 +19,10 @@
 #include<dbghelp.h>
 #pragma comment(lib,"Dbghelp.lib")
 
+//ReportLiveObjects
+#include <dxgidebug.h>
+#pragma comment(lib, "dxguid.lib")
+
 std::wstring ConvertString(const std::string& str)
 {
 	if (str.empty())
@@ -477,6 +481,37 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 
 	//出力ウィンドウへの文字出力
 	OutputDebugStringA("Hello, DirextX!\n");
+
+	//解放処理
+	CloseHandle(fenceEvent); //フェンスイベントの解放
+	fence->Release(); //フェンスの解放
+	rtvDescriptorHeap->Release(); //ディスクリプタヒープの解放
+	swapChainResources[0]->Release(); //スワップチェーンのリソースの解放
+	swapChainResources[1]->Release(); //スワップチェーンのリソースの解放
+	swapChain->Release(); //スワップチェーンの解放
+	commandList->Release(); //コマンドリストの解放
+	commandAllocator->Release(); //コマンドアロケーターの解放
+	commandQueue->Release(); //コマンドキューの解放
+	device->Release(); //デバイスの解放
+	useAdapter->Release(); //アダプターの解放
+	dxgiFactory->Release(); //DXGIファクトリーの解放
+
+#ifdef _DEBUG
+	debugController->Release(); //デバッグコントローラーの解放
+#endif
+
+	CloseWindow(hwnd); //ウィンドウの解放
+
+
+	//リソースリークチェック
+	IDXGIDebug1* debug;
+	if (SUCCEEDED(DXGIGetDebugInterface1(0, IID_PPV_ARGS(&debug))))
+	{
+		debug->ReportLiveObjects(DXGI_DEBUG_ALL, DXGI_DEBUG_RLO_ALL);
+		debug->ReportLiveObjects(DXGI_DEBUG_APP, DXGI_DEBUG_RLO_ALL);
+		debug->ReportLiveObjects(DXGI_DEBUG_D3D12, DXGI_DEBUG_RLO_ALL);
+		debug->Release();
+	}
 
 	return 0;
 }
