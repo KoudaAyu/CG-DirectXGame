@@ -1,4 +1,4 @@
-struct VertecShaderOutPut
+struct VertecShaderOutput
 {
     float32_t4 posision : SV_POSITION;
 };
