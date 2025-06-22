@@ -194,6 +194,38 @@ IDxcBlob* CompileShader(
 	return shaderBlob; //コンパイルしたShaderのバイナリを返す
 }
 
+ID3D12Resource* CreateBufferResource(ID3D12Device* device, size_t sizeInBytes)
+{
+	// 頂点リソース用のヒープの設定
+	D3D12_HEAP_PROPERTIES uploadHeapProperties{};
+	uploadHeapProperties.Type = D3D12_HEAP_TYPE_UPLOAD; // アップロード用のヒープ
+
+	// 頂点リソースの設定（今回は汎用的なバッファとして設定）
+	D3D12_RESOURCE_DESC resourceDesc{};
+	resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER; // バッファ
+	resourceDesc.Width = sizeInBytes; // 指定されたサイズ
+	// バッファの場合はこれらを1にする決まり
+	resourceDesc.Height = 1;
+	resourceDesc.DepthOrArraySize = 1;
+	resourceDesc.MipLevels = 1;
+	resourceDesc.SampleDesc.Count = 1;
+	resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR; // 行優先
+
+	ID3D12Resource* bufferResource = nullptr;
+	HRESULT hr = device->CreateCommittedResource(
+		&uploadHeapProperties,
+		D3D12_HEAP_FLAG_NONE,
+		&resourceDesc,
+		D3D12_RESOURCE_STATE_GENERIC_READ, // データ書き込み用なのでREAD
+		nullptr,
+		IID_PPV_ARGS(&bufferResource));
+	assert(SUCCEEDED(hr)); // 失敗したらassertで止める
+
+	return bufferResource;
+}
+
+
+
 
 //Windowsアプリでのエントリーポイント(main関数)
 int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
@@ -493,6 +525,18 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	D3D12_ROOT_SIGNATURE_DESC descriptionRootSignature{};
 	descriptionRootSignature.Flags =
 		D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT; //入力アセンブラーでの使用を許可
+	//RootParemeter生成。複数設定できるので配列。今回は結果1つだけなので長さ1の配列
+	D3D12_ROOT_PARAMETER rootParameters[1] = {};
+	rootParameters[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;//CBVを使う
+	rootParameters[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL; //PixelShaderで使う
+	rootParameters[0].Descriptor.ShaderRegister = 0; //レジスタ番号0とバインド。b0の0と一致
+	descriptionRootSignature.pParameters = rootParameters; //ルートパラメーター配列へのポインタ
+	descriptionRootSignature.NumParameters = _countof(rootParameters);//配列の長さ
+
+	
+	//rootParameters[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+
+
 
 	//シリアライズしてバイナリにする
 	ID3DBlob* signatureBlob = nullptr;
@@ -573,25 +617,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	//パイプラインステートの生成に失敗した場合はエラー
 	assert(SUCCEEDED(hr));
 
-	//頂点リソース用のヒープの設定
-	D3D12_HEAP_PROPERTIES uploadHeapProperties{};
-	uploadHeapProperties.Type = D3D12_HEAP_TYPE_UPLOAD; //アップロード用のヒープ
-	//頂点リソースの設定
-	D3D12_RESOURCE_DESC vertexResourceDesc{};
-	vertexResourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER; //バッファ
-	vertexResourceDesc.Width = sizeof(VertexShaderInput) * 3; //頂点の数 * 頂点のサイズ
-	//バッファの場合はこれらを1にする決まり
-	vertexResourceDesc.Height = 1; //高さは1
-	vertexResourceDesc.DepthOrArraySize = 1; //深さは1
-	vertexResourceDesc.MipLevels = 1; //ミップレベルは1
-	vertexResourceDesc.SampleDesc.Count = 1; //マルチサンプルしない
-	//バッファの場合はこれにする決まりである
-	vertexResourceDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR; //行優先
-	//実際に頂点リソースを生成する
-	ID3D12Resource* vertexResource = nullptr;
-	hr = device->CreateCommittedResource(&uploadHeapProperties, D3D12_HEAP_FLAG_NONE,
-		&vertexResourceDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&vertexResource));
-	assert(SUCCEEDED(hr));
+	ID3D12Resource* vertexResource = CreateBufferResource(device, sizeof(VertexShaderInput) * 3);
 
 	//頂点バッファビューを生成する
 	D3D12_VERTEX_BUFFER_VIEW vertexBufferView{};
@@ -634,6 +660,18 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	scissorRect.top = 0; //左上のY座標
 	scissorRect.bottom = kClientHeight; //右下のY座標
 
+
+	//マテリアル用のリソースを作る
+	ID3D12Resource* materialResource = CreateBufferResource(device, sizeof(VertexShaderInput));
+	//マテリアルにデータを書き込む
+	VertexShaderInput* materialDate = nullptr;
+	//書き込む為のアドレス取得
+	materialResource->Map(0, nullptr, reinterpret_cast<void**>(&materialDate));
+	VertexShaderInput temp{};
+	temp.position = DirectX::XMFLOAT4(1.0f, 0.0f, 0.0f, 1.0f);
+	*materialDate = temp;
+
+	materialResource->Unmap(0, nullptr);
 
 	//ウィンドウのxボタンが押されるまでループ
 	while (msg.message != WM_QUIT)
@@ -682,6 +720,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 			commandList->IASetVertexBuffers(0, 1, &vertexBufferView);
 			//形状を設定。PSOに設定しているものとは異なるが、同じものを設定と考えれば良い
 			commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+			//マテリアルCBufferの場所を指定
+			commandList->SetGraphicsRootConstantBufferView(0, materialResource->GetGPUVirtualAddress());
+			
+
 			//描画(DrawCall/ドローコール)。3頂点で1つのインスタンス。
 			commandList->DrawInstanced(3, 1, 0, 0);
 
@@ -753,6 +795,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	rootSignature->Release(); //ルートシグネチャの解放
 	pixilShaderBlob->Release(); //ピクセルシェーダーの解放
 	vertexShaderBlob->Release(); //頂点シェーダーの解放
+	materialResource->Release();
 
 	CloseHandle(fenceEvent); //フェンスイベントの解放
 	fence->Release(); //フェンスの解放
