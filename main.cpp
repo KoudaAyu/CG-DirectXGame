@@ -29,11 +29,240 @@
 
 #include <DirectXMath.h>
 
-// ★修正：VertexShaderInput 構造体の定義
-struct VertexShaderInput
+#include<cmath>
+
+struct Vector3
 {
-	DirectX::XMFLOAT4 position; // float32_t4 を DirectX::XMFLOAT4 に変更
+	float x;
+	float y;
+	float z;
 };
+
+struct Transform
+{
+	Vector3 scale;
+	Vector3 rotate;
+	Vector3 translate;
+};
+
+struct Vector4
+{
+	float x;
+	float y;
+	float z;
+	float w;
+};
+
+struct Matrix4x4
+{
+	float m[4][4];
+};
+
+struct Vertex
+{
+	Vector4 position;
+};
+
+Matrix4x4 MakeIdentity4x4()
+{
+	return {
+		{
+			{1, 0, 0, 0},
+			{0, 1, 0, 0},
+			{0, 0, 1, 0},
+			{0, 0, 0, 1}
+		}
+	};
+}
+
+Matrix4x4 Multiply(Matrix4x4 m1, Matrix4x4 m2)
+{
+	Matrix4x4 result;
+
+	result.m[0][0] = m1.m[0][0] * m2.m[0][0] + m1.m[0][1] * m2.m[1][0] + m1.m[0][2] * m2.m[2][0] + m1.m[0][3] * m2.m[3][0];
+	result.m[0][1] = m1.m[0][0] * m2.m[0][1] + m1.m[0][1] * m2.m[1][1] + m1.m[0][2] * m2.m[2][1] + m1.m[0][3] * m2.m[3][1];
+	result.m[0][2] = m1.m[0][0] * m2.m[0][2] + m1.m[0][1] * m2.m[1][2] + m1.m[0][2] * m2.m[2][2] + m1.m[0][3] * m2.m[3][2];
+	result.m[0][3] = m1.m[0][0] * m2.m[0][3] + m1.m[0][1] * m2.m[1][3] + m1.m[0][2] * m2.m[2][3] + m1.m[0][3] * m2.m[3][3];
+
+	result.m[1][0] = m1.m[1][0] * m2.m[0][0] + m1.m[1][1] * m2.m[1][0] + m1.m[1][2] * m2.m[2][0] + m1.m[1][3] * m2.m[3][0];
+	result.m[1][1] = m1.m[1][0] * m2.m[0][1] + m1.m[1][1] * m2.m[1][1] + m1.m[1][2] * m2.m[2][1] + m1.m[1][3] * m2.m[3][1];
+	result.m[1][2] = m1.m[1][0] * m2.m[0][2] + m1.m[1][1] * m2.m[1][2] + m1.m[1][2] * m2.m[2][2] + m1.m[1][3] * m2.m[3][2];
+	result.m[1][3] = m1.m[1][0] * m2.m[0][3] + m1.m[1][1] * m2.m[1][3] + m1.m[1][2] * m2.m[2][3] + m1.m[1][3] * m2.m[3][3];
+
+	result.m[2][0] = m1.m[2][0] * m2.m[0][0] + m1.m[2][1] * m2.m[1][0] + m1.m[2][2] * m2.m[2][0] + m1.m[2][3] * m2.m[3][0];
+	result.m[2][1] = m1.m[2][0] * m2.m[0][1] + m1.m[2][1] * m2.m[1][1] + m1.m[2][2] * m2.m[2][1] + m1.m[2][3] * m2.m[3][1];
+	result.m[2][2] = m1.m[2][0] * m2.m[0][2] + m1.m[2][1] * m2.m[1][2] + m1.m[2][2] * m2.m[2][2] + m1.m[2][3] * m2.m[3][2];
+	result.m[2][3] = m1.m[2][0] * m2.m[0][3] + m1.m[2][1] * m2.m[1][3] + m1.m[2][2] * m2.m[2][3] + m1.m[2][3] * m2.m[3][3];
+
+	result.m[3][0] = m1.m[3][0] * m2.m[0][0] + m1.m[3][1] * m2.m[1][0] + m1.m[3][2] * m2.m[2][0] + m1.m[3][3] * m2.m[3][0];
+	result.m[3][1] = m1.m[3][0] * m2.m[0][1] + m1.m[3][1] * m2.m[1][1] + m1.m[3][2] * m2.m[2][1] + m1.m[3][3] * m2.m[3][1];
+	result.m[3][2] = m1.m[3][0] * m2.m[0][2] + m1.m[3][1] * m2.m[1][2] + m1.m[3][2] * m2.m[2][2] + m1.m[3][3] * m2.m[3][2];
+	result.m[3][3] = m1.m[3][0] * m2.m[0][3] + m1.m[3][1] * m2.m[1][3] + m1.m[3][2] * m2.m[2][3] + m1.m[3][3] * m2.m[3][3];
+
+	return result;
+}
+
+Matrix4x4 MakeScaleMatrix(const Vector3& scale)
+{
+	Matrix4x4 result;
+	for (int i = 0; i < 4; i++)
+	{
+		for (int j = 0; j < 4; j++)
+		{
+			if (i == j)
+			{
+				if (i == 0)
+				{
+					result.m[i][j] = scale.x;
+				}
+				else if (i == 1)
+				{
+					result.m[i][j] = scale.y;
+				}
+				else if (i == 2)
+				{
+					result.m[i][j] = scale.z;
+				}
+				else
+				{
+					result.m[i][j] = 1.0f;
+				}
+			}
+			else
+			{
+				result.m[i][j] = 0.0f;
+			}
+		}
+	}
+
+	return result;
+}
+
+Matrix4x4 MakeRotateXMatrix(float radian)
+{
+	Matrix4x4 result;
+	result.m[0][0] = 1.0f;
+	result.m[0][1] = 0.0f;
+	result.m[0][2] = 0.0f;
+	result.m[0][3] = 0.0f;
+
+	result.m[1][0] = 0.0f;
+	result.m[1][1] = std::cos(radian);
+	result.m[1][2] = std::sin(radian);
+	result.m[1][3] = 0.0f;
+
+	result.m[2][0] = 0.0f;
+	result.m[2][1] = -std::sin(radian);
+	result.m[2][2] = std::cos(radian);
+	result.m[2][3] = 0.0f;
+
+	result.m[3][0] = 0.0f;
+	result.m[3][1] = 0.0f;
+	result.m[3][2] = 0.0f;
+	result.m[3][3] = 1.0f;
+
+	return result;
+}
+
+Matrix4x4 MakeRotateYMatrix(float radian)
+{
+	Matrix4x4 result;
+	result.m[0][0] = std::cos(radian);
+	result.m[0][1] = 0.0f;
+	result.m[0][2] = -std::sin(radian);
+	result.m[0][3] = 0.0f;
+
+	result.m[1][0] = 0.0f;
+	result.m[1][1] = 1.0f;
+	result.m[1][2] = 0.0f;
+	result.m[1][3] = 0.0f;
+
+	result.m[2][0] = std::sin(radian);
+	result.m[2][1] = 0.0f;
+	result.m[2][2] = std::cos(radian);
+	result.m[2][3] = 0.0f;
+
+	result.m[3][0] = 0.0f;
+	result.m[3][1] = 0.0f;
+	result.m[3][2] = 0.0f;
+	result.m[3][3] = 1.0f;
+
+	return result;
+}
+
+Matrix4x4 MakeRotateZMatrix(float radian)
+{
+	Matrix4x4 result;
+	result.m[0][0] = std::cos(radian);
+	result.m[0][1] = std::sin(radian);
+	result.m[0][2] = 0.0f;
+	result.m[0][3] = 0.0f;
+
+	result.m[1][0] = -std::sin(radian);
+	result.m[1][1] = std::cos(radian);
+	result.m[1][2] = 0.0f;
+	result.m[1][3] = 0.0f;
+
+	result.m[2][0] = 0.0f;
+	result.m[2][1] = 0.0f;
+	result.m[2][2] = 1.0f;
+	result.m[2][3] = 0.0f;
+
+	result.m[3][0] = 0.0f;
+	result.m[3][1] = 0.0f;
+	result.m[3][2] = 0.0f;
+	result.m[3][3] = 1.0f;
+
+	return result;
+}
+
+// 平行移動行列を作成
+Matrix4x4 MakeTranslateMatrix(const Vector3& translate)
+{
+	Matrix4x4 result = {};
+
+	for (int i = 0; i < 4; i++)
+	{
+		for (int j = 0; j < 4; j++)
+		{
+			if (i == j)
+			{
+				result.m[i][j] = 1.0f;
+			}
+			else if (i == 3)
+			{
+				if (j == 0)
+				{
+					result.m[i][j] = translate.x;
+				}
+				else if (j == 1)
+				{
+					result.m[i][j] = translate.y;
+				}
+				else if (j == 2)
+				{
+					result.m[i][j] = translate.z;
+				}
+			}
+		}
+	}
+
+	return result;
+}
+
+Matrix4x4 MakeAffineMatrix(const Vector3& scale, const Vector3& rotate, const Vector3& translate)
+{
+	Matrix4x4 S = MakeScaleMatrix(scale);
+
+	Matrix4x4 R = Multiply(MakeRotateXMatrix(rotate.x), Multiply(MakeRotateYMatrix(rotate.y), MakeRotateZMatrix(rotate.z)));
+
+	Matrix4x4 T = MakeTranslateMatrix(translate);
+
+	Matrix4x4 SR = Multiply(S, R);
+	Matrix4x4 SRT = Multiply(SR, T);
+
+	return SRT;
+}
 
 std::wstring ConvertString(const std::string& str)
 {
@@ -525,16 +754,20 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	D3D12_ROOT_SIGNATURE_DESC descriptionRootSignature{};
 	descriptionRootSignature.Flags =
 		D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT; //入力アセンブラーでの使用を許可
-	//RootParemeter生成。複数設定できるので配列。今回は結果1つだけなので長さ1の配列
-	D3D12_ROOT_PARAMETER rootParameters[1] = {};
+	//RootParemeter生成PuxelShaderのMaterialとVertexShaderのTransform
+	D3D12_ROOT_PARAMETER rootParameters[2] = {};
 	rootParameters[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;//CBVを使う
 	rootParameters[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL; //PixelShaderで使う
 	rootParameters[0].Descriptor.ShaderRegister = 0; //レジスタ番号0とバインド。b0の0と一致
+	rootParameters[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+	rootParameters[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;//VertexShaderで使える
+	rootParameters[1].Descriptor.ShaderRegister = 0;//レジスタ番号0を使用
+
 	descriptionRootSignature.pParameters = rootParameters; //ルートパラメーター配列へのポインタ
 	descriptionRootSignature.NumParameters = _countof(rootParameters);//配列の長さ
 
-	
-	//rootParameters[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+
+
 
 
 
@@ -613,32 +846,32 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 
 	assert(vertexShaderBlob && "頂点シェーダーの読み込み失敗！");
 	assert(pixilShaderBlob && "ピクセルシェーダーの読み込み失敗！");
-	
+
 	//パイプラインステートの生成に失敗した場合はエラー
 	assert(SUCCEEDED(hr));
 
-	ID3D12Resource* vertexResource = CreateBufferResource(device, sizeof(VertexShaderInput) * 3);
+	ID3D12Resource* vertexResource = CreateBufferResource(device, sizeof(Vector4) * 3);
 
 	//頂点バッファビューを生成する
 	D3D12_VERTEX_BUFFER_VIEW vertexBufferView{};
 	//リソースの先頭のアドレスから使う
 	vertexBufferView.BufferLocation = vertexResource->GetGPUVirtualAddress();
 	//使用するリソースサイズは頂点1つ分のサイズ
-	vertexBufferView.SizeInBytes = sizeof(VertexShaderInput) * 3;
+	vertexBufferView.SizeInBytes = sizeof(Vector4) * 3;
 	//1頂点当たりのサイズ
-	vertexBufferView.StrideInBytes = sizeof(VertexShaderInput);
+	vertexBufferView.StrideInBytes = sizeof(Vector4);
 
 	//頂点リソースにデータを書き込む
-	VertexShaderInput* vertexDate = nullptr;
+	Vertex* vertexData = nullptr;
 	//書き込むためのアドレスを取得
-	vertexResource->Map(0, nullptr, reinterpret_cast<void**>(&vertexDate));
+	vertexResource->Map(0, nullptr, reinterpret_cast<void**>(&vertexData));
 
-	//左下
-	vertexDate[0].position = { -0.5f, -0.5f, 0.0f, 1.0f };
-	//上
-	vertexDate[1].position = { 0.0f, 0.5f, 0.0f, 1.0f };
-	//右下
-	vertexDate[2].position = { 0.5f, -0.5f, 0.0f, 1.0f };
+	// 左下
+	vertexData[0].position = { -0.5f, -0.5f, 0.0f, 1.0f };
+	// 上
+	vertexData[1].position = { 0.0f,  0.5f, 0.0f, 1.0f };
+	// 右下
+	vertexData[2].position = { 0.5f, -0.5f, 0.0f, 1.0f };
 
 	vertexResource->Unmap(0, nullptr);
 
@@ -662,16 +895,34 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 
 
 	//マテリアル用のリソースを作る
-	ID3D12Resource* materialResource = CreateBufferResource(device, sizeof(VertexShaderInput));
+	ID3D12Resource* materialResource = CreateBufferResource(device, sizeof(Vector4));
 	//マテリアルにデータを書き込む
-	VertexShaderInput* materialDate = nullptr;
+	Vector4* materialDate = nullptr;
 	//書き込む為のアドレス取得
 	materialResource->Map(0, nullptr, reinterpret_cast<void**>(&materialDate));
-	VertexShaderInput temp{};
-	temp.position = DirectX::XMFLOAT4(1.0f, 0.0f, 0.0f, 1.0f);
+	// データを設定（赤色 RGBA: 1,0,0,1）
+	Vector4 temp{};
+	temp.x = 1.0f;
+	temp.y = 0.0f;
+	temp.z = 0.0f;
+	temp.w = 1.0f;
 	*materialDate = temp;
 
 	materialResource->Unmap(0, nullptr);
+
+	//WVP用のリソースを作る。　Matrix4x4 1つのサイズを用意する
+	ID3D12Resource* wvpResource = CreateBufferResource(device, sizeof(Matrix4x4));
+	//データを書き込む
+	Matrix4x4* wvpData = nullptr;
+	//書き込む為のアドレス取得
+	wvpResource->Map(0, nullptr, reinterpret_cast<void**>(&wvpData));
+	//単位行列を書き込む
+	*wvpData = MakeIdentity4x4();
+
+	wvpResource->Unmap(0, nullptr);
+
+	//Transform変数を作る
+	Transform transform = { {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };
 
 	//ウィンドウのxボタンが押されるまでループ
 	while (msg.message != WM_QUIT)
@@ -685,6 +936,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 		else
 		{
 			//ゲームの処理
+			transform.rotate.y += 0.03f;
+			Matrix4x4 worldMatrix = MakeAffineMatrix(transform.scale, transform.rotate, transform.translate);
+			*wvpData = worldMatrix;
+
 
 			//これから書き込むバックバッファのインデックスを取得する
 			UINT backBufferIndex = swapChain->GetCurrentBackBufferIndex();
@@ -722,7 +977,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 			commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 			//マテリアルCBufferの場所を指定
 			commandList->SetGraphicsRootConstantBufferView(0, materialResource->GetGPUVirtualAddress());
-			
+			//wvp用のCBufferの場所を設定
+			commandList->SetGraphicsRootConstantBufferView(1, wvpResource->GetGPUVirtualAddress());
+
 
 			//描画(DrawCall/ドローコール)。3頂点で1つのインスタンス。
 			commandList->DrawInstanced(3, 1, 0, 0);
@@ -796,6 +1053,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	pixilShaderBlob->Release(); //ピクセルシェーダーの解放
 	vertexShaderBlob->Release(); //頂点シェーダーの解放
 	materialResource->Release();
+	wvpResource->Release();
 
 	CloseHandle(fenceEvent); //フェンスイベントの解放
 	fence->Release(); //フェンスの解放
