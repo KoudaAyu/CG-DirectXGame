@@ -74,7 +74,7 @@ struct Matrix4x4
 struct VertexData
 {
 	Vector4 position;
-	/*Vector2 texcoord;*/
+	Vector2 texcoord;
 };
 
 Matrix4x4 MakeIdentity4x4()
@@ -1018,15 +1018,15 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	assert(SUCCEEDED(hr));
 
 	//InputLayer
-	D3D12_INPUT_ELEMENT_DESC inputElementDescs[1] = {};
+	D3D12_INPUT_ELEMENT_DESC inputElementDescs[2] = {};
 	inputElementDescs[0].SemanticName = "POSITION"; //セマンティック名
 	inputElementDescs[0].SemanticIndex = 0; //セマンティックインデックス
 	inputElementDescs[0].Format = DXGI_FORMAT_R32G32B32A32_FLOAT; //頂点のフォーマット
 	inputElementDescs[0].AlignedByteOffset = D3D12_APPEND_ALIGNED_ELEMENT;
-	//inputElementDescs[1].SemanticName = "TEXCOORD";
-	//inputElementDescs[1].SemanticIndex = 0;
-	//inputElementDescs[1].Format = DXGI_FORMAT_R32G32_FLOAT;
-	//inputElementDescs[1].AlignedByteOffset = D3D12_APPEND_ALIGNED_ELEMENT;
+	inputElementDescs[1].SemanticName = "TEXCOORD";
+	inputElementDescs[1].SemanticIndex = 0;
+	inputElementDescs[1].Format = DXGI_FORMAT_R32G32_FLOAT;
+	inputElementDescs[1].AlignedByteOffset = D3D12_APPEND_ALIGNED_ELEMENT;
 
 	D3D12_INPUT_LAYOUT_DESC inputLayoutDesc{};
 	inputLayoutDesc.pInputElementDescs = inputElementDescs; //入力要素の配列
@@ -1082,16 +1082,16 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	//パイプラインステートの生成に失敗した場合はエラー
 	assert(SUCCEEDED(hr));
 
-	ID3D12Resource* vertexResource = CreateBufferResource(device, sizeof(Vector4) * 3);
+	ID3D12Resource* vertexResource = CreateBufferResource(device, sizeof(VertexData) * 3);
 
 	//頂点バッファビューを生成する
 	D3D12_VERTEX_BUFFER_VIEW vertexBufferView{};
 	//リソースの先頭のアドレスから使う
 	vertexBufferView.BufferLocation = vertexResource->GetGPUVirtualAddress();
 	//使用するリソースサイズは頂点1つ分のサイズ
-	vertexBufferView.SizeInBytes = sizeof(Vector4) * 3;
+	vertexBufferView.SizeInBytes = sizeof(VertexData) * 3;
 	//1頂点当たりのサイズ
-	vertexBufferView.StrideInBytes = sizeof(Vector4);
+	vertexBufferView.StrideInBytes = sizeof(VertexData);
 
 	//頂点リソースにデータを書き込む
 	VertexData* vertexData = nullptr;
@@ -1100,13 +1100,13 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	
 	// 左下
 	vertexData[0].position = { -0.5f, -0.5f, 0.0f, 1.0f };
-	//vertexData[0].texcoord = { 0.0f,1.0f };
+	vertexData[0].texcoord = { 0.0f,1.0f };
 	// 上
 	vertexData[1].position = { 0.0f,  0.5f, 0.0f, 1.0f };
-	/*vertexData[1].texcoord = { 0.5f,0.0f };*/
+	vertexData[1].texcoord = { 0.5f,0.0f };
 	// 右下
 	vertexData[2].position = { 0.5f, -0.5f, 0.0f, 1.0f };
-	/*vertexData[2].texcoord = { 1.0f,1.0f };*/
+	vertexData[2].texcoord = { 1.0f,1.0f };
 
 	vertexResource->Unmap(0, nullptr);
 
