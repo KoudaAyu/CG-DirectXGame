@@ -6,6 +6,8 @@ struct TransformationMatrix
 };
 ConstantBuffer<TransformationMatrix> gTransformationMatrix : register(b0);
 
+
+
 //struct VertecShaderOutput
 //{
 //    float32_t4 posision : SV_POSITION;
