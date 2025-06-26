@@ -1407,6 +1407,11 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	materialResource->Release();
 	wvpResource->Release();
 
+	
+	if (dxcUtils) { dxcUtils->Release(); dxcUtils = nullptr; }
+	if (dxcCompiler) { dxcCompiler->Release(); dxcCompiler = nullptr; }
+	if (includeHandler) { includeHandler->Release(); includeHandler = nullptr; }
+
 	textureResource->Release();
 	srvDescriptorHeap->Release();
 
