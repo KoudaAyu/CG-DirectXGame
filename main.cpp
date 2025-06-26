@@ -1200,7 +1200,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 
 	Transform cameraTransform = { {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, -5.0f} }; // 追加
 
-	float fovY = 0.45f;  // 60度
+	float fovY = 0.45f;  // 資料通り
 	float aspectRatio = static_cast<float>(kClientWidth) / static_cast<float>(kClientHeight);
 	float nearZ = 0.1f;
 	float farZ = 100.0f;
