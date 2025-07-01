@@ -35,6 +35,10 @@
 #include<cmath>
 #include "externals/DirectXTex/DirectXTex.h"
 
+//Textureの転送
+#include"externals/DirectXTex/d3dx12.h"
+#include<>
+
 //Imgui使用のため
 #include"externals/imgui/imgui.h"
 #include"externals/imgui/imgui_impl_dx12.h"
@@ -651,8 +655,10 @@ ID3D12Resource* CreateTextureResource(ID3D12Device* device, const DirectX::TexMe
 	//2. 利用するHeapの設定
 	D3D12_HEAP_PROPERTIES heapProperties{};
 	heapProperties.Type = D3D12_HEAP_TYPE_DEFAULT;//細かい設定を行う
+
 	//heapProperties.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_WRITE_BACK;//WriteBackポリシーでCPUアクセス可能
 	//heapProperties.MemoryPoolPreference = D3D12_MEMORY_POOL_L0;//プロセッサの近くに配列
+
 
 	//3. Resourceを生成する
 	ID3D12Resource* resource = nullptr;
@@ -666,6 +672,7 @@ ID3D12Resource* CreateTextureResource(ID3D12Device* device, const DirectX::TexMe
 	assert(SUCCEEDED(hr));
 	return resource;
 }
+
 
 ID3D12Resource* CreateDepthStencilTextureResource(ID3D12Device* device, int32_t width, int32_t height)
 {
@@ -722,6 +729,7 @@ void UploadTextureData(ID3D12Resource* texture, const DirectX::ScratchImage& mip
 		assert(SUCCEEDED(hr));
 	}
 }
+
 
 
 
