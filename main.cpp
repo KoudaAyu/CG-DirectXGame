@@ -1266,7 +1266,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 
 	//Transform変数を作る
 	Transform transform = { {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };
-	Transform transform1 = { {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };
+	Transform transform1 = { {1.0f,1.0f,1.0f},{1.0f,1.0f,0.0f},{0.0f,0.0f,0.0f} };
 
 	Transform cameraTransform = { {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, -5.0f} }; // 追加
 
@@ -1275,37 +1275,24 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	float nearZ = 0.1f;
 	float farZ = 100.0f;
 
-	//Textureを読んで転送する
-	DirectX::ScratchImage mipImages = LoadTexture("./Resources/uvChecker.png");
-	const DirectX::TexMetadata& metadata = mipImages.GetMetadata();
-	ID3D12Resource* textureResource = CreateTextureResource(device, metadata);
-	//DepthStecilTextureをウィンドウのサイズで生成
+	static const char* textureFiles[] = {
+	"resources/monsterBALL.png",
+	"resources/images.png",
+	"resources/uvChecker.png"
+	};
+	static const int textureCount = IM_ARRAYSIZE(textureFiles);
+
+	ID3D12Resource* textureResources[textureCount] = {};
+	D3D12_CPU_DESCRIPTOR_HANDLE textureSrvHandlesCPU[textureCount] = {};
+	D3D12_GPU_DESCRIPTOR_HANDLE textureSrvHandlesGPU[textureCount] = {};
+
+	UINT descriptorSize = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+
+	// SRVヒープの先頭を取得
+	D3D12_CPU_DESCRIPTOR_HANDLE srvHandleCPU = srvDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
+	D3D12_GPU_DESCRIPTOR_HANDLE srvHandleGPU = srvDescriptorHeap->GetGPUDescriptorHandleForHeapStart();
+
 	ID3D12Resource* depthStencilResource = CreateDepthStencilTextureResource(device, kClientWidth, kClientHeight);
-
-	//DSVの設定
-	D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc{};
-	dsvDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;//Format。基本的にはResourceに合わせる
-	dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;//2dTexture
-	//DSVHeapの先頭にDSVを作る
-	device->CreateDepthStencilView(depthStencilResource, &dsvDesc, dsvDescriptorHeap->GetCPUDescriptorHandleForHeapStart());
-
-	UploadTextureData(textureResource, mipImages);
-
-	//metaDataを基にSRVの設定
-	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
-	srvDesc.Format = metadata.format;
-	srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;//2Dテクスチャ
-	srvDesc.Texture2D.MipLevels = UINT(metadata.mipLevels);
-
-	//SRVを生成するDescriptorHeapの場所を決める
-	D3D12_CPU_DESCRIPTOR_HANDLE textureSrvHandleCPU = srvDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
-	D3D12_GPU_DESCRIPTOR_HANDLE textureSrvHandleGPU = srvDescriptorHeap->GetGPUDescriptorHandleForHeapStart();
-	//先頭はImGuiに使用しているためその次を使う
-	textureSrvHandleCPU.ptr += device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-	textureSrvHandleGPU.ptr += device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-	//SRVの生成
-	device->CreateShaderResourceView(textureResource, &srvDesc, textureSrvHandleCPU);
 
 	//Imguiの初期化
 	IMGUI_CHECKVERSION();
@@ -1319,6 +1306,49 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 		srvDescriptorHeap,
 		srvDescriptorHeap->GetCPUDescriptorHandleForHeapStart(),
 		srvDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
+
+	srvHandleCPU.ptr += descriptorSize;
+	srvHandleGPU.ptr += descriptorSize;
+	
+	for (int i = 0; i < textureCount; ++i)
+	{
+		DirectX::ScratchImage mipImages = LoadTexture(textureFiles[i]);
+		const DirectX::TexMetadata& metadata = mipImages.GetMetadata();
+
+		textureResources[i] = CreateTextureResource(device, metadata);
+		UploadTextureData(textureResources[i], mipImages);
+
+		// SRV作成
+		D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
+		srvDesc.Format = metadata.format;
+		srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+		srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+		srvDesc.Texture2D.MipLevels = static_cast<UINT>(metadata.mipLevels);
+
+		// それぞれの位置にSRVを作る
+		device->CreateShaderResourceView(textureResources[i], &srvDesc, srvHandleCPU);
+
+		textureSrvHandlesCPU[i] = srvHandleCPU;
+		textureSrvHandlesGPU[i] = srvHandleGPU;
+
+		srvHandleCPU.ptr += descriptorSize;
+		srvHandleGPU.ptr += descriptorSize;
+
+		////SRVの生成
+		//device->CreateShaderResourceView(textureResources[textureCount], &srvDesc, textureSrvHandlesCPU[textureCount]);
+	}
+
+	//DSVの設定
+	D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc{};
+	dsvDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT; //フォーマット(Resourceと合わせる)
+	dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D; //2Dテクスチャとして書き込む
+	//DSVHeapの先頭にDSVを作成
+	device->CreateDepthStencilView(depthStencilResource, &dsvDesc,
+		dsvDescriptorHeap->GetCPUDescriptorHandleForHeapStart());
+	D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = dsvDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
+
+	int count = 0;
+	
 
 	//ウィンドウのxボタンが押されるまでループ
 	while (msg.message != WM_QUIT)
@@ -1387,9 +1417,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 					if (ImGui::CollapsingHeader("Texture"))
 					{
 						static const char* textureNames[] = {
-							"resources/checkerboard.png",
 							"resources/monsterBALL.png",
-							"resources/uniChecker.png"
+							"resources/images.png",
+							"resources/uvChecker.png"
 						};
 						static int selectedTextureIndex = 0;
 
@@ -1403,13 +1433,16 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 								bool isSelected = (selectedTextureIndex == i);
 								if (ImGui::Selectable(textureNames[i], isSelected))
 									selectedTextureIndex = i;
+								
 								if (isSelected)
 									ImGui::SetItemDefaultFocus();
 							}
 							ImGui::EndCombo();
+							count = selectedTextureIndex;
 						}
 
 						ImGui::Text("Selected: %s", textureNames[selectedTextureIndex]);
+						
 					}
 				}
 			}
@@ -1484,16 +1517,16 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 			//wvp用のCBufferの場所を設定
 			commandList->SetGraphicsRootConstantBufferView(1, wvpResource->GetGPUVirtualAddress());
 			//SRVのDescriptorTableの先頭を設定
-			commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU);
-			//描画(DrawCall/ドローコール)。3頂点で1つのインスタンス。
+			
+			// SRVのDescriptorTableを設定 (1番目のテクスチャ、インデックス0)
+			commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandlesGPU[count]);
 			commandList->DrawInstanced(3, 1, 0, 0);
 
 			commandList->SetGraphicsRootConstantBufferView(0, materialResource->GetGPUVirtualAddress());
 			//wvp用のCBufferの場所を設定
 			commandList->SetGraphicsRootConstantBufferView(1, wvpResource1->GetGPUVirtualAddress());
 			//SRVのDescriptorTableの先頭を設定
-			commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU);
-			//描画(DrawCall/ドローコール)。3頂点で1つのインスタンス。
+			commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandlesGPU[count]);
 			commandList->DrawInstanced(3, 1, 0, 0);
 
 			//実際のcommandListのImGuiの描画コマンドを積む
@@ -1585,11 +1618,24 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	if (dxcCompiler) { dxcCompiler->Release(); dxcCompiler = nullptr; }
 	if (includeHandler) { includeHandler->Release(); includeHandler = nullptr; }
 
-	textureResource->Release();
+	//textureResource->Release();//
 	depthStencilResource->Release();
 	srvDescriptorHeap->Release();
 	dsvDescriptorHeap->Release();
 
+	for (int i = 0; i < textureCount; ++i)
+	{
+		if (textureResources[i])
+		{
+			textureResources[i]->Release(); // 各テクスチャの解放
+			textureResources[i] = nullptr;
+		}
+	}
+	if (wvpResource1)
+	{
+		wvpResource1->Release();
+		wvpResource1 = nullptr;
+	}
 
 	CloseHandle(fenceEvent); //フェンスイベントの解放
 	fence->Release(); //フェンスの解放
