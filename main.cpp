@@ -42,6 +42,8 @@
 
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lParam);
 
+
+
 struct Vector2
 {
 	float x;
@@ -1217,46 +1219,29 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	//パイプラインステートの生成に失敗した場合はエラー
 	assert(SUCCEEDED(hr));
 
-	//三角形用の頂点Resource
-	ID3D12Resource* vertexResource = CreateBufferResource(device, sizeof(VertexData) * 6);
-	
 
-	//三角形用頂点バッファビューを生成する
-	D3D12_VERTEX_BUFFER_VIEW vertexBufferView{};
-	//リソースの先頭のアドレスから使う
-	vertexBufferView.BufferLocation = vertexResource->GetGPUVirtualAddress();
-	//使用するリソースサイズは頂点1つ分のサイズ
-	vertexBufferView.SizeInBytes = sizeof(VertexData) * 6;
-	//1頂点当たりのサイズ
-	vertexBufferView.StrideInBytes = sizeof(VertexData);
-	
-
-	//頂点リソースにデータを書き込む
 	VertexData* vertexData = nullptr;
-	//書き込むためのアドレスを取得
-	vertexResource->Map(0, nullptr, reinterpret_cast<void**>(&vertexData));
+	//球体
+	const uint32_t kSubdivision = 16;//16分割
+	//経度分割1つ分の角度
+	const float kLonEvery = DirectX::XM_2PI  / float(kSubdivision);
+	//緯度分割1つ分の角度
+	const float kLatEvery = DirectX::XM_2PI / float(kSubdivision);
+	//経度のほうに分割
+	for (uint32_t latIndex = 0; latIndex < kSubdivision; ++latIndex)
+	{
+		float lat = -DirectX::XM_PIDIV2 + kLatEvery * latIndex;
+		//経度の方向に分割しながら線を描く
+		for (uint32_t lonIndex = 0; lonIndex < kSubdivision; ++lonIndex)
+		{
+			uint32_t start = (latIndex + kSubdivision + lonIndex) * 6;
+			float lon = lonIndex * kLonEvery;
+			//頂点データに入力する。基準点a
+			vertexData[start].position.x = cos(lat) * cos(lon);
+		}
+	}
 
-	// 左下
-	vertexData[0].position = { -0.5f, -0.5f, 0.0f, 1.0f };
-	vertexData[0].texcoord = { 0.0f,1.0f };
-	// 上
-	vertexData[1].position = { 0.0f,  0.5f, 0.0f, 1.0f };
-	vertexData[1].texcoord = { 0.5f,0.0f };
-	// 右下
-	vertexData[2].position = { 0.5f, -0.5f, 0.0f, 1.0f };
-	vertexData[2].texcoord = { 1.0f,1.0f };
-
-	// 左下2
-	vertexData[3].position = { -0.5f, -0.5f, 0.5f, 1.0f };
-	vertexData[3].texcoord = { 0.0f,1.0f };
-	// 上2
-	vertexData[4].position = { 0.0f,  0.0f, 0.0f, 1.0f };
-	vertexData[4].texcoord = { 0.5f,0.0f };
-	// 右下2
-	vertexData[5].position = { 0.5f, -0.5f, -0.5f, 1.0f };
-	vertexData[5].texcoord = { 1.0f,1.0f };
-
-	vertexResource->Unmap(0, nullptr);
+	
 
 	//Sprite用の頂点Resource
 	ID3D12Resource* vertexResourceSprite = CreateBufferResource(device, sizeof(VertexData) * 6);
@@ -1476,24 +1461,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 			commandList->SetDescriptorHeaps(1, descriptorHeap);
 
 
-			//コマンドを積む
-			commandList->RSSetViewports(1, &viewport); //ビューポートを設定
-			commandList->RSSetScissorRects(1, &scissorRect); //シザー矩形を設定
-			//RootSignatureを設定。PSOに設定しているけれど別途設定が必要
-			commandList->SetGraphicsRootSignature(rootSignature);
-			commandList->SetPipelineState(graphicPipelineState); //パイプラインステートを設定
-			commandList->IASetVertexBuffers(0, 1, &vertexBufferView);
-			//形状を設定。PSOに設定しているものとは異なるが、同じものを設定と考えれば良い
-			commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-			//マテリアルCBufferの場所を指定
-			commandList->SetGraphicsRootConstantBufferView(0, materialResource->GetGPUVirtualAddress());
-			//wvp用のCBufferの場所を設定
-			commandList->SetGraphicsRootConstantBufferView(1, wvpResource->GetGPUVirtualAddress());
-			//SRVのDescriptorTableの先頭を設定
-			commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU);
-			//描画(DrawCall/ドローコール)。3頂点で1つのインスタンス。
-			commandList->DrawInstanced(6, 1, 0, 0);
-
 
 		
 			//コマンドを積む
@@ -1586,7 +1553,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	OutputDebugStringA("Hello, DirextX!\n");
 
 	//解放処理
-	vertexResource->Release(); //頂点リソースの解放
+
 	
 	graphicPipelineState->Release(); //パイプラインステートの解放
 	signatureBlob->Release(); //ルートシグネチャのシリアライズの解放
