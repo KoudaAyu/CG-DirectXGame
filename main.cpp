@@ -27,6 +27,10 @@
 #include<dxcapi.h>
 #pragma comment(lib, "dxcompiler.lib")
 
+//Textureの転送
+#include"externals/DirectXTex/d3dx12.h"
+#include<vector>
+
 #include <DirectXMath.h>
 #include<cmath>
 #include "externals/DirectXTex/DirectXTex.h"
@@ -651,8 +655,10 @@ ID3D12Resource* CreateTextureResource(ID3D12Device* device, const DirectX::TexMe
 	//2. 利用するHeapの設定
 	D3D12_HEAP_PROPERTIES heapProperties{};
 	heapProperties.Type = D3D12_HEAP_TYPE_DEFAULT;//細かい設定を行う
-	heapProperties.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_WRITE_BACK;//WriteBackポリシーでCPUアクセス可能
-	heapProperties.MemoryPoolPreference = D3D12_MEMORY_POOL_L0;//プロセッサの近くに配列
+
+	//heapProperties.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_WRITE_BACK;//WriteBackポリシーでCPUアクセス可能
+	//heapProperties.MemoryPoolPreference = D3D12_MEMORY_POOL_L0;//プロセッサの近くに配列
+
 
 	//3. Resourceを生成する
 	ID3D12Resource* resource = nullptr;
@@ -703,27 +709,47 @@ ID3D12Resource* CreateDepthStencilTextureResource(ID3D12Device* device, int32_t 
 	return resource;
 }
 
-void UploadTextureData(ID3D12Resource* texture, const DirectX::ScratchImage& mipImages)
-{
-	//Meta情報を所得
-	const DirectX::TexMetadata& metadata = mipImages.GetMetadata();
-	//全MipMapについて
-	for (size_t mipLevel = 0; mipLevel < metadata.mipLevels; ++mipLevel)
-	{
-		//MipMapLevelを指定して各Imageを取得
-		const DirectX::Image* img = mipImages.GetImage(mipLevel, 0, 0);
-		//Textureに転送
-		HRESULT hr = texture->WriteToSubresource(
-			UINT(mipLevel),
-			nullptr,//全領域へコピー
-			img->pixels,//元データアドレス
-			UINT(img->rowPitch),//1ラインサイズ
-			UINT(img->slicePitch)//1枚サイズ
-		);
-		assert(SUCCEEDED(hr));
-	}
-}
+//void UploadTextureData(ID3D12Resource* texture, const DirectX::ScratchImage& mipImages)
+//{
+//	//Meta情報を所得
+//	const DirectX::TexMetadata& metadata = mipImages.GetMetadata();
+//	//全MipMapについて
+//	for (size_t mipLevel = 0; mipLevel < metadata.mipLevels; ++mipLevel)
+//	{
+//		//MipMapLevelを指定して各Imageを取得
+//		const DirectX::Image* img = mipImages.GetImage(mipLevel, 0, 0);
+//		//Textureに転送
+//		HRESULT hr = texture->WriteToSubresource(
+//			UINT(mipLevel),
+//			nullptr,//全領域へコピー
+//			img->pixels,//元データアドレス
+//			UINT(img->rowPitch),//1ラインサイズ
+//			UINT(img->slicePitch)//1枚サイズ
+//		);
+//		assert(SUCCEEDED(hr));
+//	}
+//}
 
+[[nodiscard]]
+ID3D12Resource* UploadTextureData(ID3D12Resource* texture, const DirectX::ScratchImage& mipImages, ID3D12Device* device,
+	ID3D12GraphicsCommandList* commandList)
+{
+	std::vector<D3D12_SUBRESOURCE_DATA> subresources;
+	DirectX::PrepareUpload(device, mipImages.GetImages(), mipImages.GetImageCount(), mipImages.GetMetadata(), subresources);
+	uint64_t intermediateSize = GetRequiredIntermediateSize(texture, 0, UINT(subresources.size()));
+	ID3D12Resource* intermediateResource = CreateBufferResource(device, intermediateSize);
+	UpdateSubresources(commandList, texture, intermediateResource, 0, 0, UINT(subresources.size()), subresources.data());
+	//textureへの転送後は利用できるよう、D3D12_RESOURCE_STATE_DESTからD3D12_RESOURCE_STATE_GENERIC_READへResourceStateを変更する
+	D3D12_RESOURCE_BARRIER barrier{};
+	barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+	barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+	barrier.Transition.pResource = texture;
+	barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+	barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
+	barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_GENERIC_READ;
+	commandList->ResourceBarrier(1, &barrier);
+	return intermediateResource;
+}
 
 
 
@@ -1288,17 +1314,33 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	};
 	static const int textureCount = IM_ARRAYSIZE(textureFiles);
 
-	ID3D12Resource* textureResources[textureCount] = {};
-	D3D12_CPU_DESCRIPTOR_HANDLE textureSrvHandlesCPU[textureCount] = {};
-	D3D12_GPU_DESCRIPTOR_HANDLE textureSrvHandlesGPU[textureCount] = {};
 
-	UINT descriptorSize = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+	//DSVの設定
+	D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc{};
+	dsvDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;//Format。基本的にはResourceに合わせる
+	dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;//2dTexture
+	//DSVHeapの先頭にDSVを作る
+	device->CreateDepthStencilView(depthStencilResource, &dsvDesc, dsvDescriptorHeap->GetCPUDescriptorHandleForHeapStart());
 
-	// SRVヒープの先頭を取得
-	D3D12_CPU_DESCRIPTOR_HANDLE srvHandleCPU = srvDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
-	D3D12_GPU_DESCRIPTOR_HANDLE srvHandleGPU = srvDescriptorHeap->GetGPUDescriptorHandleForHeapStart();
+	/*UploadTextureData(textureResource, mipImages);*/
+	ID3D12Resource* intermediateResource = UploadTextureData(textureResource, mipImages, device, commandList);
 
-	ID3D12Resource* depthStencilResource = CreateDepthStencilTextureResource(device, kClientWidth, kClientHeight);
+	//metaDataを基にSRVの設定
+	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
+	srvDesc.Format = metadata.format;
+	srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;//2Dテクスチャ
+	srvDesc.Texture2D.MipLevels = UINT(metadata.mipLevels);
+
+	//SRVを生成するDescriptorHeapの場所を決める
+	D3D12_CPU_DESCRIPTOR_HANDLE textureSrvHandleCPU = srvDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
+	D3D12_GPU_DESCRIPTOR_HANDLE textureSrvHandleGPU = srvDescriptorHeap->GetGPUDescriptorHandleForHeapStart();
+	//先頭はImGuiに使用しているためその次を使う
+	textureSrvHandleCPU.ptr += device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+	textureSrvHandleGPU.ptr += device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+	//SRVの生成
+	device->CreateShaderResourceView(textureResource, &srvDesc, textureSrvHandleCPU);
+
 
 	//Imguiの初期化
 	IMGUI_CHECKVERSION();
@@ -1546,6 +1588,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 			commandList->ResourceBarrier(1, &barrier);
 
 
+
 			//コマンドリストの内容を下記率させる。すべてのコマンドを積んでからCloseする
 			hr = commandList->Close();
 			//コマンドリストのCloseに失敗した場合はエラー
@@ -1624,24 +1667,13 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	if (dxcCompiler) { dxcCompiler->Release(); dxcCompiler = nullptr; }
 	if (includeHandler) { includeHandler->Release(); includeHandler = nullptr; }
 
-	//textureResource->Release();//
-	depthStencilResource->Release();
-	srvDescriptorHeap->Release();
-	dsvDescriptorHeap->Release();
 
-	for (int i = 0; i < textureCount; ++i)
-	{
-		if (textureResources[i])
-		{
-			textureResources[i]->Release(); // 各テクスチャの解放
-			textureResources[i] = nullptr;
-		}
-	}
-	if (wvpResource1)
-	{
-		wvpResource1->Release();
-		wvpResource1 = nullptr;
-	}
+	textureResource->Release();
+	intermediateResource->Release();
+
+
+
+
 
 	CloseHandle(fenceEvent); //フェンスイベントの解放
 	fence->Release(); //フェンスの解放
