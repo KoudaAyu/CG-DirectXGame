@@ -406,6 +406,26 @@ Matrix4x4 MakePerspectiveFovMatrix(float fovY, float aspectRatio, float nearZ, f
 	return result;
 }
 
+Matrix4x4 MakeOrthographicMatrix(float left, float top, float right, float bottom, float nearZ, float farZ)
+{
+	Matrix4x4 mat = {};
+
+	float width = right - left;
+	float height = bottom - top;
+	float depth = farZ - nearZ;
+
+	mat.m[0][0] = 2.0f / width;
+	mat.m[1][1] = -2.0f / height;           // Y軸反転
+	mat.m[2][2] = 1.0f / depth;
+	mat.m[3][0] = -(right + left) / width;
+	mat.m[3][1] = (top + bottom) / height;  // Y軸反転に合わせる
+	mat.m[3][2] = nearZ / depth;
+	mat.m[3][3] = 1.0f;
+
+	return mat;
+}
+
+
 std::wstring ConvertString(const std::string& str)
 {
 	if (str.empty())
@@ -1149,17 +1169,17 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 		L"vs_6_0", dxcUtils, dxcCompiler, includeHandler, &logStream);
 	assert(vertexShaderBlob != nullptr);
 
-	IDxcBlob* pixilShaderBlob = CompileShader(L"Object3D.PS.hlsl",
+	IDxcBlob* pixelShaderBlob = CompileShader(L"Object3D.PS.hlsl",
 		L"ps_6_0", dxcUtils, dxcCompiler, includeHandler, &logStream);
-	assert(pixilShaderBlob != nullptr);
+	assert(pixelShaderBlob != nullptr);
 
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC graphicPipelineStateDesc{};
 	graphicPipelineStateDesc.pRootSignature = rootSignature; //ルートシグネチャ
 	graphicPipelineStateDesc.InputLayout = inputLayoutDesc; //入力レイアウト
 	graphicPipelineStateDesc.VS = { vertexShaderBlob->GetBufferPointer(),
 	vertexShaderBlob->GetBufferSize() }; //頂点シェーダーの設定
-	graphicPipelineStateDesc.PS = { pixilShaderBlob->GetBufferPointer(),
-		pixilShaderBlob->GetBufferSize() }; //ピクセルシェーダーの設定
+	graphicPipelineStateDesc.PS = { pixelShaderBlob->GetBufferPointer(),
+		pixelShaderBlob->GetBufferSize() }; //ピクセルシェーダーの設定
 	graphicPipelineStateDesc.BlendState = blendDesc; //ブレンドステートの設定
 	graphicPipelineStateDesc.RasterizerState = rasterizerDesc; //ラスタライザーステートの設定
 	//書き込むRTVの情報
@@ -1192,14 +1212,16 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 		IID_PPV_ARGS(&graphicPipelineState));
 
 	assert(vertexShaderBlob && "頂点シェーダーの読み込み失敗！");
-	assert(pixilShaderBlob && "ピクセルシェーダーの読み込み失敗！");
+	assert(pixelShaderBlob && "ピクセルシェーダーの読み込み失敗！");
 
 	//パイプラインステートの生成に失敗した場合はエラー
 	assert(SUCCEEDED(hr));
 
+	//三角形用の頂点Resource
 	ID3D12Resource* vertexResource = CreateBufferResource(device, sizeof(VertexData) * 6);
+	
 
-	//頂点バッファビューを生成する
+	//三角形用頂点バッファビューを生成する
 	D3D12_VERTEX_BUFFER_VIEW vertexBufferView{};
 	//リソースの先頭のアドレスから使う
 	vertexBufferView.BufferLocation = vertexResource->GetGPUVirtualAddress();
@@ -1207,6 +1229,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	vertexBufferView.SizeInBytes = sizeof(VertexData) * 6;
 	//1頂点当たりのサイズ
 	vertexBufferView.StrideInBytes = sizeof(VertexData);
+	
 
 	//頂点リソースにデータを書き込む
 	VertexData* vertexData = nullptr;
@@ -1234,6 +1257,36 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	vertexData[5].texcoord = { 1.0f,1.0f };
 
 	vertexResource->Unmap(0, nullptr);
+
+	//Sprite用の頂点Resource
+	ID3D12Resource* vertexResourceSprite = CreateBufferResource(device, sizeof(VertexData) * 6);
+	//頂点バッファビューを生成する
+	D3D12_VERTEX_BUFFER_VIEW vertexBufferViewSprite{};
+	//リソースの先頭のアドレスから使う
+	vertexBufferViewSprite.BufferLocation = vertexResourceSprite->GetGPUVirtualAddress();
+	//使用するリソースのサイズは頂点6つ分のサイズ
+	vertexBufferViewSprite.SizeInBytes = sizeof(VertexData) * 6;
+	//1頂点当たりのサイズ
+	vertexBufferViewSprite.StrideInBytes = sizeof(VertexData);
+
+	//Sprite用
+	VertexData* vertexDataSprite = nullptr;
+	vertexResourceSprite->Map(0, nullptr, reinterpret_cast<void**>(&vertexDataSprite));
+	//一枚目の三角形
+	vertexDataSprite[0].position = { 0.0f,360.0f,0.0f,1.0f };//左下
+	vertexDataSprite[0].texcoord = { 0.0f,1.0f };
+	vertexDataSprite[1].position = { 0.0f,0.0f,0.0f,1.0f };//左上
+	vertexDataSprite[1].texcoord = { 0.0f,0.0f };
+	vertexDataSprite[2].position = { 640.0f,360.0f,0.0f,1.0f };//右下
+	vertexDataSprite[2].texcoord = { 1.0f,1.0f };
+
+	//二枚目の三角形
+	vertexDataSprite[3].position = { 0.0f,0.0f,0.0f,1.0f };//左上
+	vertexDataSprite[3].texcoord = { 0.0f,0.0f };
+	vertexDataSprite[4].position = { 640.0f,0.0f,0.0f,1.0f };//右上
+	vertexDataSprite[4].texcoord = { 1.0f,0.0f };
+	vertexDataSprite[5].position = { 640.0f,360.0f,0.0f,1.0f };//右下
+	vertexDataSprite[5].texcoord = { 1.0f,1.0f };
 
 	//ビューポート
 	D3D12_VIEWPORT viewport{};
@@ -1278,13 +1331,24 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	wvpResource->Map(0, nullptr, reinterpret_cast<void**>(&wvpData));
 	//単位行列を書き込む
 	*wvpData = MakeIdentity4x4();
-
 	wvpResource->Unmap(0, nullptr);
+
+	//Sprite用のTransformationMatrix用のリソースを作る
+	ID3D12Resource* transformationMatrixResourceSprite = CreateBufferResource(device, sizeof(Matrix4x4));
+	//データを書き込む
+	Matrix4x4* transformationMatrixDataSprite = nullptr;
+	//書き込むためのアドレス取得
+	transformationMatrixResourceSprite->Map(0, nullptr, reinterpret_cast<void**>(&transformationMatrixDataSprite));
+	//単位行列を書き込んでおく
+	*transformationMatrixDataSprite = MakeIdentity4x4();
+	transformationMatrixResourceSprite->Unmap(0, nullptr);
 
 	//Transform変数を作る
 	Transform transform = { {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };
+	//Sprite用
+	Transform transformSprite{ {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };
 
-	Transform cameraTransform = { {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, -5.0f} }; // 追加
+	Transform cameraTransform = { {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, -5.0f} };
 
 	float fovY = 0.45f;  // 資料通り
 	float aspectRatio = static_cast<float>(kClientWidth) / static_cast<float>(kClientHeight);
@@ -1363,6 +1427,14 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 			Matrix4x4 worldViewProjectMatrix = Multiply(worldMatrix, Multiply(viewMatrix, projectionMatrix));
 			*wvpData = worldViewProjectMatrix;
 
+			//Sprite用のworldViewProjectMatrix
+			Matrix4x4 worldMatrixSprite = MakeAffineMatrix(transformSprite.scale, transformSprite.rotate, transformSprite.translate);
+			Matrix4x4 viewMatrixSprite = MakeIdentity4x4();
+			Matrix4x4 projectionMatrixSprite = MakeOrthographicMatrix(0.0f, 0.0f, float(kClientWidth), float(kClientHeight), 0.0f, 100.0f);
+			Matrix4x4 worldViewProjectionmatrixSprite = Multiply(worldMatrixSprite, Multiply(viewMatrixSprite, projectionMatrixSprite));
+			*transformationMatrixDataSprite = worldViewProjectionmatrixSprite;
+			
+
 			//開発用UIの処理、実際に開発用のUIを出す場合はここをゲーム固有の処理に置き換え
 			ImGui::ShowDemoWindow();
 
@@ -1419,8 +1491,27 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 			commandList->SetGraphicsRootConstantBufferView(1, wvpResource->GetGPUVirtualAddress());
 			//SRVのDescriptorTableの先頭を設定
 			commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU);
+			//描画(DrawCall/ドローコール)。3頂点で1つのインスタンス。
+			commandList->DrawInstanced(6, 1, 0, 0);
 
 
+		
+			//コマンドを積む
+			commandList->RSSetViewports(1, &viewport); //ビューポートを設定
+			commandList->RSSetScissorRects(1, &scissorRect); //シザー矩形を設定
+			//RootSignatureを設定。PSOに設定しているけれど別途設定が必要
+			commandList->SetGraphicsRootSignature(rootSignature);
+			commandList->SetPipelineState(graphicPipelineState); //パイプラインステートを設定
+			//Spriteの描画
+			commandList->IASetVertexBuffers(0, 1, &vertexBufferViewSprite);//VBVを設定
+			//形状を設定。PSOに設定しているものとは異なるが、同じものを設定と考えれば良い
+			commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+			//マテリアルCBufferの場所を指定
+			commandList->SetGraphicsRootConstantBufferView(0, materialResource->GetGPUVirtualAddress());
+			//TransformationMatrixCBufferの場所を特定
+			commandList->SetGraphicsRootConstantBufferView(1, transformationMatrixResourceSprite->GetGPUVirtualAddress());
+			//SRVのDescriptorTableの先頭を設定
+			commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU);
 			//描画(DrawCall/ドローコール)。3頂点で1つのインスタンス。
 			commandList->DrawInstanced(6, 1, 0, 0);
 
@@ -1496,6 +1587,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 
 	//解放処理
 	vertexResource->Release(); //頂点リソースの解放
+	
 	graphicPipelineState->Release(); //パイプラインステートの解放
 	signatureBlob->Release(); //ルートシグネチャのシリアライズの解放
 	if (errorBlob)
@@ -1503,7 +1595,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 		errorBlob->Release(); //エラーメッセージの解放
 	}
 	rootSignature->Release(); //ルートシグネチャの解放
-	pixilShaderBlob->Release(); //ピクセルシェーダーの解放
+	pixelShaderBlob->Release(); //ピクセルシェーダーの解放
 	vertexShaderBlob->Release(); //頂点シェーダーの解放
 	materialResource->Release();
 	wvpResource->Release();
@@ -1514,6 +1606,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	if (includeHandler) { includeHandler->Release(); includeHandler = nullptr; }
 
 	textureResource->Release();
+	vertexResourceSprite->Release();
+	transformationMatrixResourceSprite->Release();
 	intermediateResource->Release();
 	depthStencilResource->Release();
 	srvDescriptorHeap->Release();
@@ -1529,10 +1623,11 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	commandList->Release(); //コマンドリストの解放
 	commandAllocator->Release(); //コマンドアロケーターの解放
 	commandQueue->Release(); //コマンドキューの解放
-	device->Release(); //デバイスの解放
+	
 	useAdapter->Release(); //アダプターの解放
 	dxgiFactory->Release(); //DXGIファクトリーの解放
 
+	device->Release(); //デバイスの解放
 #ifdef _DEBUG
 	debugController->Release(); //デバッグコントローラーの解放
 #endif
