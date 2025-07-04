@@ -1232,11 +1232,11 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	VertexData* vertexData = nullptr;
 
 	//球体
-	const uint32_t kSubdivision = 32;//16分割
+	const uint32_t kSubdivision = 16;//16分割
 	//経度分割1つ分の角度
 	const float kLonEvery = DirectX::XM_2PI / float(kSubdivision);
-	//緯度分割1つ分の角度
-	const float kLatEvery = DirectX::XM_2PI / float(kSubdivision); // 資料の通り、PIではなく2PI
+	// 緯度分割1つ分の角度
+	const float kLatEvery = DirectX::XM_PI / float(kSubdivision); // ここを修正！
 
 	vertexData = new VertexData[kSubdivision * kSubdivision * 6];
 
@@ -1262,10 +1262,12 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 			uint32_t start = (latIndex * kSubdivision + lonIndex) * 6;
 
 			// テクスチャ座標の正規化された値 (UとV) を事前に計算
-			float u_current = static_cast<float>(lonIndex) / static_cast<float>(kSubdivision);
-			float v_current = static_cast<float>(latIndex) / static_cast<float>(kSubdivision);
-			float u_next = static_cast<float>(lonIndex + 1) / static_cast<float>(kSubdivision);
-			float v_next = static_cast<float>(latIndex + 1) / static_cast<float>(kSubdivision);
+
+			float u_current = 1.0f - static_cast<float>(lonIndex) / static_cast<float>(kSubdivision);
+			float v_current = 1.0f - static_cast<float>(latIndex) / static_cast<float>(kSubdivision);
+			float u_next = 1.0f - static_cast<float>(lonIndex + 1) / static_cast<float>(kSubdivision);
+			float v_next = 1.0f - static_cast<float>(latIndex + 1) / static_cast<float>(kSubdivision);
+
 
 
 			// -----------------------------------------------------------
@@ -1334,7 +1336,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	vertexBufferViewSphere.BufferLocation = vertexResourceSphere->GetGPUVirtualAddress();
 	vertexBufferViewSphere.SizeInBytes = sizeof(VertexData) * kVertexCount;
 	vertexBufferViewSphere.StrideInBytes = sizeof(VertexData);
-
 
 	//Sprite用の頂点Resource
 	ID3D12Resource* vertexResourceSprite = CreateBufferResource(device, sizeof(VertexData) * 6);
@@ -1418,6 +1419,15 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	wvpResource->Unmap(0, nullptr);
 	wvpResource1->Unmap(0, nullptr);
 
+
+	ID3D12Resource* transformationMatrixResourceSphere = CreateBufferResource(device, sizeof(Matrix4x4));
+
+	// データを書き込むためのポインタを取得
+	Matrix4x4* transformationMatrixDataSphere = nullptr;
+	transformationMatrixResourceSphere->Map(0, nullptr, reinterpret_cast<void**>(&transformationMatrixDataSphere));
+	*transformationMatrixDataSphere = MakeIdentity4x4();
+	// 書き込みが完了したので、マップを解除
+	transformationMatrixResourceSphere->Unmap(0, nullptr);
 
 	ID3D12Resource* transformationMatrixResourceSphere = CreateBufferResource(device, sizeof(Matrix4x4));
 
@@ -1567,7 +1577,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 
 			//ゲームの処理
 
-			transformSphere.rotate.y += 0.03f;
+			transformSphere.rotate.y += 0.01f;
 			Matrix4x4 worldMatrix = MakeAffineMatrix(transformSphere.scale, transformSphere.rotate, transformSphere.translate);
 
 			Matrix4x4 cameraMatrix = MakeAffineMatrix(cameraTransform.scale, cameraTransform.rotate, cameraTransform.translate);
@@ -1731,7 +1741,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 			//SRVのDescriptorTableの先頭を設定
 			commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU);
 			//描画(DrawCall/ドローコール)。3頂点で1つのインスタンス。
-			commandList->DrawInstanced(6144, 1, 0, 0);
+
+			commandList->DrawInstanced(1536, 1, 0, 0);
 
 
 
@@ -1828,6 +1839,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	OutputDebugStringA("Hello, DirextX!\n");
 
 	//解放処理
+
 
 	graphicPipelineState->Release(); //パイプラインステートの解放
 	signatureBlob->Release(); //ルートシグネチャのシリアライズの解放
