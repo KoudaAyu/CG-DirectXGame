@@ -1222,12 +1222,11 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	VertexData* vertexData = nullptr;
 
 	//球体
-	const uint32_t kSubdivision = 32;//16分割
+	const uint32_t kSubdivision = 16;//16分割
 	//経度分割1つ分の角度
 	const float kLonEvery = DirectX::XM_2PI / float(kSubdivision);
-	//緯度分割1つ分の角度
-	const float kLatEvery = DirectX::XM_2PI / float(kSubdivision); // 資料の通り、PIではなく2PI
-
+	// 緯度分割1つ分の角度
+	const float kLatEvery = DirectX::XM_PI / float(kSubdivision); // ここを修正！
 	vertexData = new VertexData[kSubdivision * kSubdivision * 6];
 
 	//経度のほうに分割
@@ -1252,10 +1251,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 			uint32_t start = (latIndex * kSubdivision + lonIndex) * 6;
 
 			// テクスチャ座標の正規化された値 (UとV) を事前に計算
-			float u_current = static_cast<float>(lonIndex) / static_cast<float>(kSubdivision);
-			float v_current = static_cast<float>(latIndex) / static_cast<float>(kSubdivision);
-			float u_next = static_cast<float>(lonIndex + 1) / static_cast<float>(kSubdivision);
-			float v_next = static_cast<float>(latIndex + 1) / static_cast<float>(kSubdivision);
+			float u_current = 1.0f - static_cast<float>(lonIndex) / static_cast<float>(kSubdivision);
+			float v_current = 1.0f - static_cast<float>(latIndex) / static_cast<float>(kSubdivision);
+			float u_next = 1.0f - static_cast<float>(lonIndex + 1) / static_cast<float>(kSubdivision);
+			float v_next = 1.0f - static_cast<float>(latIndex + 1) / static_cast<float>(kSubdivision);
 
 
 			// -----------------------------------------------------------
@@ -1436,7 +1435,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	float farZ = 100.0f;
 
 	//Textureを読んで転送する
-	DirectX::ScratchImage mipImages = LoadTexture("./Resources/monsterBall.png");
+	DirectX::ScratchImage mipImages = LoadTexture("./Resources/uvChecker.png");
 	const DirectX::TexMetadata& metadata = mipImages.GetMetadata();
 	ID3D12Resource* textureResource = CreateTextureResource(device, metadata);
 	//DepthStecilTextureをウィンドウのサイズで生成
@@ -1498,7 +1497,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 			ImGui::NewFrame();
 
 			//ゲームの処理
-			transformSphere.rotate.y += 0.03f;
+			transformSphere.rotate.y += 0.01f;
 			Matrix4x4 worldMatrix = MakeAffineMatrix(transformSphere.scale, transformSphere.rotate, transformSphere.translate);
 			Matrix4x4 cameraMatrix = MakeAffineMatrix(cameraTransform.scale, cameraTransform.rotate, cameraTransform.translate);
 			Matrix4x4 viewMatrix = Inverse(cameraMatrix);
@@ -1575,7 +1574,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 			//SRVのDescriptorTableの先頭を設定
 			commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU);
 			//描画(DrawCall/ドローコール)。3頂点で1つのインスタンス。
-			commandList->DrawInstanced(6144, 1, 0, 0);
+			commandList->DrawInstanced(1536, 1, 0, 0);
 
 
 			//コマンドを積む
