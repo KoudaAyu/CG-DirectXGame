@@ -84,6 +84,13 @@ struct VertexData
 	Vector3 normal;
 };
 
+struct Material
+{
+	Vector4 color;
+	int32_t enableLighting;
+};
+
+
 
 Matrix4x4 MakeIdentity4x4()
 {
@@ -1479,6 +1486,14 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 
 	materialResource->Unmap(0, nullptr);
 
+	ID3D12Resource* materialResourceSprite = CreateBufferResource(device, sizeof(Material));
+	Material* materialDataSprite = nullptr;
+	materialResourceSprite->Map(0, nullptr, reinterpret_cast<void**>(&materialDataSprite));
+	materialDataSprite->color = { 1.0f, 1.0f, 1.0f, 1.0f }; // 白（テクスチャ色をそのまま出す用）
+	materialDataSprite->enableLighting = false;
+	materialResourceSprite->Unmap(0, nullptr);
+
+
 	//WVP用のリソースを作る。　Matrix4x4 1つのサイズを用意する
 	ID3D12Resource* wvpResource = CreateBufferResource(device, sizeof(Matrix4x4));
 	//データを書き込む
@@ -1693,7 +1708,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 			//形状を設定。PSOに設定しているものとは異なるが、同じものを設定と考えれば良い
 			commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 			//マテリアルCBufferの場所を指定
-			commandList->SetGraphicsRootConstantBufferView(0, materialResource->GetGPUVirtualAddress());
+			commandList->SetGraphicsRootConstantBufferView(0, materialResourceSprite->GetGPUVirtualAddress());
 			//TransformationMatrixCBufferの場所を特定
 			commandList->SetGraphicsRootConstantBufferView(1, transformationMatrixResourceSphere->GetGPUVirtualAddress());
 			//SRVのDescriptorTableの先頭を設定
@@ -1813,9 +1828,11 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 
 	textureResource->Release();
 	textureResource2->Release();
+
 	vertexResourceSprite->Release();
 	vertexResourceSphere->Release();
 
+	materialResourceSprite->Release();
 
 	transformationMatrixResourceSprite->Release();
 	transformationMatrixResourceSphere->Release();
