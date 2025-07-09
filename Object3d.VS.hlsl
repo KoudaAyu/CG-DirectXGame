@@ -3,15 +3,9 @@
 struct TransformationMatrix
 {
     float32_t4x4 WVP;
+    float32_t4x4 World;
 };
-ConstantBuffer<TransformationMatrix> gTransformationMatrix : register(b0);
-
-
-
-//struct VertecShaderOutput
-//{
-//    float32_t4 posision : SV_POSITION;
-//};
+ConstantBuffer<TransformationMatrix> gTransformationMatrix : register(b1);
 
 struct VertecShederInput
 {
@@ -20,11 +14,20 @@ struct VertecShederInput
     float32_t3 normal : NORMAL0;
 };
 
+//struct TransformMatrix
+//{
+//    float32_t4x4 WVP;
+    
+//};
+
+
+    
 VertexShaderOutput main(VertecShederInput input)
 {
     VertexShaderOutput output;
     output.position = mul(input.position, gTransformationMatrix.WVP);
     output.texcoord = input.texcoord;
+    output.normal = normalize(mul(input.normal, (float32_t3x3) gTransformationMatrix.World));
     return output;
 }
 
