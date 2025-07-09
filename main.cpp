@@ -90,6 +90,12 @@ struct Material
 	int32_t enableLighting;
 };
 
+struct TransformMatrix
+{
+	Matrix4x4 WVP;
+	Matrix4x4 World;
+
+};
 
 
 Matrix4x4 MakeIdentity4x4()
@@ -1495,32 +1501,34 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 
 
 	//WVP用のリソースを作る。　Matrix4x4 1つのサイズを用意する
-	ID3D12Resource* wvpResource = CreateBufferResource(device, sizeof(Matrix4x4));
+	ID3D12Resource* wvpResource = CreateBufferResource(device, sizeof(TransformMatrix));
 	//データを書き込む
-	Matrix4x4* wvpData = nullptr;
+	TransformMatrix* wvpData = nullptr;
 	//書き込む為のアドレス取得
 	wvpResource->Map(0, nullptr, reinterpret_cast<void**>(&wvpData));
 	//単位行列を書き込む
-	*wvpData = MakeIdentity4x4();
-	wvpResource->Unmap(0, nullptr);
+	wvpData->World = MakeIdentity4x4();
+	wvpData->WVP = MakeIdentity4x4();
 
-	ID3D12Resource* transformationMatrixResourceSphere = CreateBufferResource(device, sizeof(Matrix4x4));
+	ID3D12Resource* transformationMatrixResourceSphere = CreateBufferResource(device, sizeof(TransformMatrix));
 
 	// データを書き込むためのポインタを取得
-	Matrix4x4* transformationMatrixDataSphere = nullptr;
+	TransformMatrix* transformationMatrixDataSphere = nullptr;
 	transformationMatrixResourceSphere->Map(0, nullptr, reinterpret_cast<void**>(&transformationMatrixDataSphere));
-	*transformationMatrixDataSphere = MakeIdentity4x4();
+	transformationMatrixDataSphere->WVP = MakeIdentity4x4();
+	transformationMatrixDataSphere->World = MakeIdentity4x4();
 	// 書き込みが完了したので、マップを解除
 	transformationMatrixResourceSphere->Unmap(0, nullptr);
 
 	//Sprite用のTransformationMatrix用のリソースを作る
-	ID3D12Resource* transformationMatrixResourceSprite = CreateBufferResource(device, sizeof(Matrix4x4));
+	ID3D12Resource* transformationMatrixResourceSprite = CreateBufferResource(device, sizeof(TransformMatrix));
 	//データを書き込む
-	Matrix4x4* transformationMatrixDataSprite = nullptr;
+	TransformMatrix* transformationMatrixDataSprite = nullptr;
 	//書き込むためのアドレス取得
 	transformationMatrixResourceSprite->Map(0, nullptr, reinterpret_cast<void**>(&transformationMatrixDataSprite));
 	//単位行列を書き込んでおく
-	*transformationMatrixDataSprite = MakeIdentity4x4();
+	transformationMatrixDataSprite->WVP = MakeIdentity4x4();
+	transformationMatrixDataSprite->World = MakeIdentity4x4();
 	transformationMatrixResourceSprite->Unmap(0, nullptr);
 
 	//Transform変数を作る
@@ -1638,14 +1646,16 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 			Matrix4x4 projectionMatrix = MakePerspectiveFovMatrix(fovY, aspectRatio, nearZ, farZ);
 			//WVPMatrixを作る
 			Matrix4x4 worldViewProjectMatrix = Multiply(worldMatrix, Multiply(viewMatrix, projectionMatrix));
-			*transformationMatrixDataSphere = worldViewProjectMatrix;
+			transformationMatrixDataSphere->WVP = worldViewProjectMatrix;
+			transformationMatrixDataSphere->World = worldMatrix;
 
 			//Sprite用のworldViewProjectMatrix
 			Matrix4x4 worldMatrixSprite = MakeAffineMatrix(transformSprite.scale, transformSprite.rotate, transformSprite.translate);
 			Matrix4x4 viewMatrixSprite = MakeIdentity4x4();
 			Matrix4x4 projectionMatrixSprite = MakeOrthographicMatrix(0.0f, 0.0f, float(kClientWidth), float(kClientHeight), 0.0f, 100.0f);
 			Matrix4x4 worldViewProjectionmatrixSprite = Multiply(worldMatrixSprite, Multiply(viewMatrixSprite, projectionMatrixSprite));
-			*transformationMatrixDataSprite = worldViewProjectionmatrixSprite;
+			transformationMatrixDataSprite->WVP = worldViewProjectionmatrixSprite;
+			transformationMatrixDataSprite->World = worldMatrixSprite;
 
 
 			//開発用UIの処理、実際に開発用のUIを出す場合はここをゲーム固有の処理に置き換え
