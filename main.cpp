@@ -774,6 +774,20 @@ ID3D12Resource* UploadTextureData(ID3D12Resource* texture, const DirectX::Scratc
 }
 
 
+D3D12_CPU_DESCRIPTOR_HANDLE GetCPUDescroptorHandle(ID3D12DescriptorHeap* descriptorHeap,uint32_t descriptorSize,uint32_t index)
+{
+	D3D12_CPU_DESCRIPTOR_HANDLE handleCPU = descriptorHeap->GetCPUDescriptorHandleForHeapStart();
+	handleCPU.ptr += (descriptorSize * index);
+	return handleCPU;
+}
+
+D3D12_GPU_DESCRIPTOR_HANDLE GetGPUDescriptorHandle(ID3D12DescriptorHeap* descriptorHeap, uint32_t descriptorSize, uint32_t index)
+{
+	D3D12_GPU_DESCRIPTOR_HANDLE handleGPU = descriptorHeap->GetGPUDescriptorHandleForHeapStart();
+	handleGPU.ptr += (descriptorSize * index);
+	return handleGPU;
+}
+
 
 //Windowsアプリでのエントリーポイント(main関数)
 int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
@@ -1236,92 +1250,157 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	//経度分割1つ分の角度
 	const float kLonEvery = DirectX::XM_2PI / float(kSubdivision);
 	// 緯度分割1つ分の角度
-	const float kLatEvery = DirectX::XM_PI / float(kSubdivision); // ここを修正！
 
+	const float kLatEvery = DirectX::XM_PI / float(kSubdivision); 
 	vertexData = new VertexData[kSubdivision * kSubdivision * 6];
 
-	//経度のほうに分割
+	
+
 	for (uint32_t latIndex = 0; latIndex < kSubdivision; ++latIndex)
 	{
-		// 緯度の計算
-		// lat と currentLat が同じ値を計算しているので、どちらか一方を使用します。
-		// ここでは currentLat に統一します。
-		float currentLat = -DirectX::XM_PIDIV2 + kLatEvery * latIndex;
-		float nextLat = -DirectX::XM_PIDIV2 + kLatEvery * (latIndex + 1); // latIndex + 1 の緯度
+		float lat = -DirectX::XM_PIDIV2 + kLatEvery * latIndex;
+		float latStep = kLatEvery;
 
-		//経度の方向に分割しながら線を描く
 		for (uint32_t lonIndex = 0; lonIndex < kSubdivision; ++lonIndex)
 		{
-			// 経度の計算
-			// lon と currentLon が同じ値を計算しているので、どちらか一方を使用します。
-			// ここでは currentLon に統一します。
-			float currentLon = lonIndex * kLonEvery;
-			float nextLon = (lonIndex + 1) * kLonEvery; // lonIndex + 1 の経度
-
-			// start インデックスは資料の通りそのまま使用
 			uint32_t start = (latIndex * kSubdivision + lonIndex) * 6;
 
-			// テクスチャ座標の正規化された値 (UとV) を事前に計算
+			float lon = lonIndex * kLonEvery;
+			float lonStep = kLonEvery;
+			//A
+			vertexData[start].position.x = cos(lat) * cos(lon);
+			vertexData[start].position.y = sin(lat);
+			vertexData[start].position.z = cos(lat) * sin(lon);
 
-			float u_current = 1.0f - static_cast<float>(lonIndex) / static_cast<float>(kSubdivision);
-			float v_current = 1.0f - static_cast<float>(latIndex) / static_cast<float>(kSubdivision);
-			float u_next = 1.0f - static_cast<float>(lonIndex + 1) / static_cast<float>(kSubdivision);
-			float v_next = 1.0f - static_cast<float>(latIndex + 1) / static_cast<float>(kSubdivision);
-
-
-
-			// -----------------------------------------------------------
-			// 頂点0 (P0: 左下) 
-			vertexData[start].position.x = cos(currentLat) * cos(currentLon);
-			vertexData[start].position.y = sin(currentLat);
-			vertexData[start].position.z = cos(currentLat) * sin(currentLon);
 			vertexData[start].position.w = 1.0f;
-			vertexData[start].texcoord.x = u_current;
-			vertexData[start].texcoord.y = v_current;
+			vertexData[start].texcoord.x = float(lonIndex) / float(kSubdivision);
+			vertexData[start].texcoord.y = 1.0f - float(latIndex) / float(kSubdivision);
 
-			// -----------------------------------------------------------
-			// 残りの5頂点 (P1, P2, P1_shared, P3, P2_shared)
-			// 三角形1の2番目の頂点 (P1: 右下)
-			vertexData[start + 1].position.x = cos(currentLat) * cos(nextLon);
-			vertexData[start + 1].position.y = sin(currentLat);
-			vertexData[start + 1].position.z = cos(currentLat) * sin(nextLon);
+			//B
+			vertexData[start + 1].position.x = cos(lat + latStep) * cos(lon);
+			vertexData[start + 1].position.y = sin(lat + latStep);
+			vertexData[start + 1].position.z = cos(lat + latStep) * sin(lon);
 			vertexData[start + 1].position.w = 1.0f;
-			vertexData[start + 1].texcoord.x = u_next;
-			vertexData[start + 1].texcoord.y = v_current;
+			vertexData[start + 1].texcoord.x = float(lonIndex) / float(kSubdivision);
+			vertexData[start + 1].texcoord.y = 1.0f - float(latIndex + 1) / float(kSubdivision);
 
-			// 三角形1の3番目の頂点 (P2: 左上)
-			vertexData[start + 2].position.x = cos(nextLat) * cos(currentLon);
-			vertexData[start + 2].position.y = sin(nextLat);
-			vertexData[start + 2].position.z = cos(nextLat) * sin(currentLon);
+			//C
+			vertexData[start + 2].position.x = cos(lat) * cos(lon + lonStep);
+			vertexData[start + 2].position.y = sin(lat);
+			vertexData[start + 2].position.z = cos(lat) * sin(lon + lonStep);
 			vertexData[start + 2].position.w = 1.0f;
-			vertexData[start + 2].texcoord.x = u_current;
-			vertexData[start + 2].texcoord.y = v_next;
+			vertexData[start + 2].texcoord.x = float(lonIndex + 1) / float(kSubdivision);
+			vertexData[start + 2].texcoord.y = 1.0f - float(latIndex) / float(kSubdivision);
+			
 
-			// 2番目の三角形の1番目の頂点 (P1: 右下) - 頂点1と共有
-			vertexData[start + 3].position.x = cos(currentLat) * cos(nextLon);
-			vertexData[start + 3].position.y = sin(currentLat);
-			vertexData[start + 3].position.z = cos(currentLat) * sin(nextLon);
-			vertexData[start + 3].position.w = 1.0f;
-			vertexData[start + 3].texcoord.x = u_next;
-			vertexData[start + 3].texcoord.y = v_current;
-
-			// 2番目の三角形の2番目の頂点 (P3: 右上)
-			vertexData[start + 4].position.x = cos(nextLat) * cos(nextLon);
-			vertexData[start + 4].position.y = sin(nextLat);
-			vertexData[start + 4].position.z = cos(nextLat) * sin(nextLon);
-			vertexData[start + 4].position.w = 1.0f;
-			vertexData[start + 4].texcoord.x = u_next;
-			vertexData[start + 4].texcoord.y = v_next;
-
-			// 2番目の三角形の3番目の頂点 (P2: 左上) - 頂点2と共有
-			vertexData[start + 5].position.x = cos(nextLat) * cos(currentLon);
-			vertexData[start + 5].position.y = sin(nextLat);
-			vertexData[start + 5].position.z = cos(nextLat) * sin(currentLon);
+			//D
+			vertexData[start + 5].position.x = cos(lat + latStep) * cos(lon + lonStep);
+			vertexData[start + 5].position.y = sin(lat + latStep);
+			vertexData[start + 5].position.z = cos(lat + latStep) * sin(lon + lonStep);
 			vertexData[start + 5].position.w = 1.0f;
-			vertexData[start + 5].texcoord.x = u_current;
-			vertexData[start + 5].texcoord.y = v_next;
+			vertexData[start + 5].texcoord.x = float(lonIndex + 1) / float(kSubdivision);
+			vertexData[start + 5].texcoord.y = 1.0f - float(latIndex + 1) / float(kSubdivision);
+
+
+			//E = B
+			vertexData[start + 4].position.x = cos(lat + latStep) * cos(lon);
+			vertexData[start + 4].position.y = sin(lat + latStep);
+			vertexData[start + 4].position.z = cos(lat + latStep) * sin(lon);
+			vertexData[start + 4].position.w = 1.0f;
+			vertexData[start + 4].texcoord.x = float(lonIndex) / float(kSubdivision);
+			vertexData[start + 4].texcoord.y = 1.0f - float(latIndex + 1) / float(kSubdivision);
+
+			//F = C
+			vertexData[start + 3].position.x = cos(lat) * cos(lon + lonStep);
+			vertexData[start + 3].position.y = sin(lat);
+			vertexData[start + 3].position.z = cos(lat) * sin(lon + lonStep);
+			vertexData[start + 3].position.w = 1.0f;
+			vertexData[start + 3].texcoord.x = float(lonIndex + 1) / float(kSubdivision);
+			vertexData[start + 3].texcoord.y = 1.0f - float(latIndex) / float(kSubdivision);
+		
 		}
 	}
+
+	//経度のほうに分割
+	//for (uint32_t latIndex = 0; latIndex < kSubdivision; ++latIndex)
+	//{
+	//	// 緯度の計算
+	//	// lat と currentLat が同じ値を計算しているので、どちらか一方を使用します。
+	//	// ここでは currentLat に統一します。
+	//	float currentLat = -DirectX::XM_PIDIV2 + kLatEvery * latIndex;
+	//	float nextLat = -DirectX::XM_PIDIV2 + kLatEvery * (latIndex + 1); // latIndex + 1 の緯度
+
+	//	//経度の方向に分割しながら線を描く
+	//	for (uint32_t lonIndex = 0; lonIndex < kSubdivision; ++lonIndex)
+	//	{
+	//		// 経度の計算
+	//		// lon と currentLon が同じ値を計算しているので、どちらか一方を使用します。
+	//		// ここでは currentLon に統一します。
+	//		float currentLon = lonIndex * kLonEvery;
+	//		float nextLon = (lonIndex + 1) * kLonEvery; // lonIndex + 1 の経度
+
+	//		// start インデックスは資料の通りそのまま使用
+	//		uint32_t start = (latIndex * kSubdivision + lonIndex) * 6;
+
+	//		// テクスチャ座標の正規化された値 (UとV) を事前に計算
+	//		float u_current = static_cast<float>(lonIndex) / static_cast<float>(kSubdivision);
+	//		float v_current = 1.0f - static_cast<float>(latIndex) / static_cast<float>(kSubdivision);
+	//		float u_next = static_cast<float>(lonIndex + 1) / static_cast<float>(kSubdivision);
+	//		float v_next = 1.0f - static_cast<float>(latIndex + 1) / static_cast<float>(kSubdivision);
+
+
+	//		// -----------------------------------------------------------
+	//		// 頂点0 (P0: 左下) 
+	//		vertexData[start].position.x = cos(currentLat) * cos(currentLon);
+	//		vertexData[start].position.y = sin(currentLat);
+	//		vertexData[start].position.z = cos(currentLat) * sin(currentLon);
+	//		vertexData[start].position.w = 1.0f;
+	//		vertexData[start].texcoord.x = u_current;
+	//		vertexData[start].texcoord.y = v_current;
+
+	//		// -----------------------------------------------------------
+	//		// 残りの5頂点 (P1, P2, P1_shared, P3, P2_shared)
+	//		// 三角形1の2番目の頂点 (P1: 右下)
+	//		vertexData[start + 1].position.x = cos(currentLat) * cos(nextLon);
+	//		vertexData[start + 1].position.y = sin(currentLat);
+	//		vertexData[start + 1].position.z = cos(currentLat) * sin(nextLon);
+	//		vertexData[start + 1].position.w = 1.0f;
+	//		vertexData[start + 1].texcoord.x = u_next;
+	//		vertexData[start + 1].texcoord.y = v_current;
+
+	//		// 三角形1の3番目の頂点 (P2: 左上)
+	//		vertexData[start + 2].position.x = cos(nextLat) * cos(currentLon);
+	//		vertexData[start + 2].position.y = sin(nextLat);
+	//		vertexData[start + 2].position.z = cos(nextLat) * sin(currentLon);
+	//		vertexData[start + 2].position.w = 1.0f;
+	//		vertexData[start + 2].texcoord.x = u_current;
+	//		vertexData[start + 2].texcoord.y = v_next;
+
+	//		// 2番目の三角形の1番目の頂点 (P1: 右下) - 頂点1と共有
+	//		vertexData[start + 3].position.x = cos(currentLat) * cos(nextLon);
+	//		vertexData[start + 3].position.y = sin(currentLat);
+	//		vertexData[start + 3].position.z = cos(currentLat) * sin(nextLon);
+	//		vertexData[start + 3].position.w = 1.0f;
+	//		vertexData[start + 3].texcoord.x = u_next;
+	//		vertexData[start + 3].texcoord.y = v_current;
+
+	//		// 2番目の三角形の2番目の頂点 (P3: 右上)
+	//		vertexData[start + 4].position.x = cos(nextLat) * cos(nextLon);
+	//		vertexData[start + 4].position.y = sin(nextLat);
+	//		vertexData[start + 4].position.z = cos(nextLat) * sin(nextLon);
+	//		vertexData[start + 4].position.w = 1.0f;
+	//		vertexData[start + 4].texcoord.x = u_next;
+	//		vertexData[start + 4].texcoord.y = v_next;
+
+	//		// 2番目の三角形の3番目の頂点 (P2: 左上) - 頂点2と共有
+	//		vertexData[start + 5].position.x = cos(nextLat) * cos(currentLon);
+	//		vertexData[start + 5].position.y = sin(nextLat);
+	//		vertexData[start + 5].position.z = cos(nextLat) * sin(currentLon);
+	//		vertexData[start + 5].position.w = 1.0f;
+	//		vertexData[start + 5].texcoord.x = u_current;
+	//		vertexData[start + 5].texcoord.y = v_next;
+	//	}
+	//}
 
 	// --- GPUバッファに転送 ---
 	const uint32_t kVertexCount = kSubdivision * kSubdivision * 6;
@@ -1501,6 +1580,11 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	textureSrvHandleGPU.ptr += device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 	//SRVの生成
 	device->CreateShaderResourceView(textureResource, &srvDesc, textureSrvHandleCPU);
+
+	//DescriptorSizeを取得しておく
+	const uint32_t descriptorSizeSRV = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+	const uint32_t descriptorSizeRTV = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+	const uint32_t descriptorSizeDSV = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
 
 
 	//Imguiの初期化
