@@ -774,7 +774,8 @@ ID3D12Resource* UploadTextureData(ID3D12Resource* texture, const DirectX::Scratc
 }
 
 
-D3D12_CPU_DESCRIPTOR_HANDLE GetCPUDescroptorHandle(ID3D12DescriptorHeap* descriptorHeap,uint32_t descriptorSize,uint32_t index)
+D3D12_CPU_DESCRIPTOR_HANDLE GetCPUDescroptorHandle(ID3D12DescriptorHeap* descriptorHeap, uint32_t descriptorSize, uint32_t index)
+
 {
 	D3D12_CPU_DESCRIPTOR_HANDLE handleCPU = descriptorHeap->GetCPUDescriptorHandleForHeapStart();
 	handleCPU.ptr += (descriptorSize * index);
@@ -1251,10 +1252,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	const float kLonEvery = DirectX::XM_2PI / float(kSubdivision);
 	// 緯度分割1つ分の角度
 
-	const float kLatEvery = DirectX::XM_PI / float(kSubdivision); 
+	const float kLatEvery = DirectX::XM_PI / float(kSubdivision);
 	vertexData = new VertexData[kSubdivision * kSubdivision * 6];
 
-	
+
 
 	for (uint32_t latIndex = 0; latIndex < kSubdivision; ++latIndex)
 	{
@@ -1291,7 +1292,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 			vertexData[start + 2].position.w = 1.0f;
 			vertexData[start + 2].texcoord.x = float(lonIndex + 1) / float(kSubdivision);
 			vertexData[start + 2].texcoord.y = 1.0f - float(latIndex) / float(kSubdivision);
-			
+
 
 			//D
 			vertexData[start + 5].position.x = cos(lat + latStep) * cos(lon + lonStep);
@@ -1310,6 +1311,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 			vertexData[start + 4].texcoord.x = float(lonIndex) / float(kSubdivision);
 			vertexData[start + 4].texcoord.y = 1.0f - float(latIndex + 1) / float(kSubdivision);
 
+
 			//F = C
 			vertexData[start + 3].position.x = cos(lat) * cos(lon + lonStep);
 			vertexData[start + 3].position.y = sin(lat);
@@ -1317,7 +1319,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 			vertexData[start + 3].position.w = 1.0f;
 			vertexData[start + 3].texcoord.x = float(lonIndex + 1) / float(kSubdivision);
 			vertexData[start + 3].texcoord.y = 1.0f - float(latIndex) / float(kSubdivision);
-		
+
 		}
 	}
 
@@ -1555,6 +1557,11 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	ID3D12Resource* depthStencilResource = CreateDepthStencilTextureResource(device, kClientWidth, kClientHeight);
 
 
+	//2枚目のTextureを読んで転送する
+	DirectX::ScratchImage mipImages2 = LoadTexture("./Resources/monsterBall.png");
+	const DirectX::TexMetadata& metadata2 = mipImages2.GetMetadata();
+	ID3D12Resource* textureResource2 = CreateTextureResource(device, metadata2);
+
 	//DSVの設定
 	D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc{};
 	dsvDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;//Format。基本的にはResourceに合わせる
@@ -1564,6 +1571,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 
 	/*UploadTextureData(textureResource, mipImages);*/
 	ID3D12Resource* intermediateResource = UploadTextureData(textureResource, mipImages, device, commandList);
+	ID3D12Resource* intermediateResource2 = UploadTextureData(textureResource2, mipImages2, device, commandList);
 
 	//metaDataを基にSRVの設定
 	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
@@ -1572,14 +1580,37 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;//2Dテクスチャ
 	srvDesc.Texture2D.MipLevels = UINT(metadata.mipLevels);
 
+	//二つ目。metaDataを基にSRVの設定
+	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc2{};
+	srvDesc2.Format = metadata2.format;
+	srvDesc2.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+	srvDesc2.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;//2Dテクスチャ
+	srvDesc2.Texture2D.MipLevels = UINT(metadata2.mipLevels);
+
+	//DescriptorSizeを取得しておく
+	const uint32_t descriptorSizeSRV = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+	const uint32_t descriptorSizeRTV = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+	const uint32_t descriptorSizeDSV = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
+
 	//SRVを生成するDescriptorHeapの場所を決める
 	D3D12_CPU_DESCRIPTOR_HANDLE textureSrvHandleCPU = srvDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
 	D3D12_GPU_DESCRIPTOR_HANDLE textureSrvHandleGPU = srvDescriptorHeap->GetGPUDescriptorHandleForHeapStart();
+
+	D3D12_CPU_DESCRIPTOR_HANDLE textureSrvHandleCPU2 = GetCPUDescroptorHandle(srvDescriptorHeap, descriptorSizeSRV, 2);
+	D3D12_GPU_DESCRIPTOR_HANDLE textureSrvHandleGPU2 = GetGPUDescriptorHandle(srvDescriptorHeap, descriptorSizeSRV, 2);
+
+
 	//先頭はImGuiに使用しているためその次を使う
 	textureSrvHandleCPU.ptr += device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 	textureSrvHandleGPU.ptr += device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 	//SRVの生成
 	device->CreateShaderResourceView(textureResource, &srvDesc, textureSrvHandleCPU);
+	//2つ目
+	device->CreateShaderResourceView(textureResource2, &srvDesc2, textureSrvHandleCPU2);
+
+	//SRVの切り替え
+	bool useMonsterBall = true;
+
 
 	//DescriptorSizeを取得しておく
 	const uint32_t descriptorSizeSRV = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
@@ -1685,88 +1716,12 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 			ImGui::ShowDemoWindow();
 
 			ImGui::Begin("Windows");
-			// マテリアルの色を保持する静的変数を定義（初期値はマテリアルの現在の色と合わせると良い）
-			static float triangleColor[4] = { materialDate->x, materialDate->y, materialDate->z, materialDate->w }; //
-
-			// ImGui::ColorEdit4で色選択ウィジェットを表示
-			// "Triangle Color"はUIに表示されるラベル、triangleColorはfloatの配列へのポインタ
-			ImGui::ColorEdit4("Color", triangleColor);
-
-			// ImGuiで変更された色をmaterialDataにコピー
-			materialDate->x = triangleColor[0];
-			materialDate->y = triangleColor[1];
-			materialDate->z = triangleColor[2];
-			materialDate->w = triangleColor[3];
-
-			ImGui::Separator(); // 区切り線を入れると見やすい
-
-			if (ImGui::CollapsingHeader("Object")) // 「Object」という折り畳み可能なヘッダー
-			{
-				// Translate
-				ImGui::Text("Translate");
-				ImGui::DragFloat3("##Translate", &transform.translate.x, 0.01f); // ## を使うとラベルが非表示になる
-
-				// Rotate (角度ではなくラジアンで操作するのが一般的ですが、ここでは直接floatを編集)
-				ImGui::Text("Rotate");
-				ImGui::DragFloat3("##Rotate", &transform.rotate.x, 0.01f); // x, y, z をまとめて編集
-
-				// Scale
-				ImGui::Text("Scale");
-				ImGui::DragFloat3("##Scale", &transform.scale.x, 0.01f);
-
-				if (ImGui::CollapsingHeader("Material")) // Material という折り畳み可能なヘッダーを Object の中にネスト
-				{
-					if (ImGui::CollapsingHeader("Texture"))
-					{
-						static const char* textureNames[] = {
-							"resources/monsterBALL.png",
-							"resources/images.png",
-							"resources/uvChecker.png"
-						};
-						static int selectedTextureIndex = 0;
-
-						const char* currentTexture = textureNames[selectedTextureIndex];
-
-						// ラベルに##でユニークIDを付けるのが安全
-						if (ImGui::BeginCombo("Texture##1", currentTexture))
-						{
-							for (int i = 0; i < IM_ARRAYSIZE(textureNames); ++i)
-							{
-								bool isSelected = (selectedTextureIndex == i);
-								if (ImGui::Selectable(textureNames[i], isSelected))
-									selectedTextureIndex = i;
-								
-								if (isSelected)
-									ImGui::SetItemDefaultFocus();
-							}
-							ImGui::EndCombo();
-							count = selectedTextureIndex;
-						}
-
-						ImGui::Text("Selected: %s", textureNames[selectedTextureIndex]);
-						
-					}
-				}
-			}
-
-			if (ImGui::CollapsingHeader("Object1")) // 「Object」という折り畳み可能なヘッダー
-			{
-				// Translate
-				ImGui::Text("Translate");
-				ImGui::DragFloat3("##Translate1", &transform1.translate.x, 0.01f); // ## を使うとラベルが非表示になる
-
-				// Rotate (角度ではなくラジアンで操作するのが一般的ですが、ここでは直接floatを編集)
-				ImGui::Text("Rotate");
-				ImGui::DragFloat3("##Rotate1", &transform1.rotate.x, 0.01f); // x, y, z をまとめて編集
-
-				// Scale
-				ImGui::Text("Scale");
-				ImGui::DragFloat3("##Scale1", &transform1.scale.x, 0.01f);
 
 
-			}
+			ImGui::Checkbox("useMonsterBall", &useMonsterBall);
 
 			ImGui::End();
+
 			//ImGui内部コマンドを生成する
 			ImGui::Render();
 
@@ -1823,7 +1778,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 			//TransformationMatrixCBufferの場所を特定
 			commandList->SetGraphicsRootConstantBufferView(1, transformationMatrixResourceSphere->GetGPUVirtualAddress());
 			//SRVのDescriptorTableの先頭を設定
-			commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU);
+			commandList->SetGraphicsRootDescriptorTable(2, useMonsterBall ? textureSrvHandleGPU2 : textureSrvHandleGPU);
 			//描画(DrawCall/ドローコール)。3頂点で1つのインスタンス。
 
 			commandList->DrawInstanced(1536, 1, 0, 0);
@@ -1944,6 +1899,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 
 
 	textureResource->Release();
+	textureResource2->Release();
 	vertexResourceSprite->Release();
 	vertexResourceSphere->Release();
 
@@ -1952,7 +1908,11 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	transformationMatrixResourceSphere->Release();
 	intermediateResource->Release();
 
+	intermediateResource2->Release();
 
+	depthStencilResource->Release();
+	srvDescriptorHeap->Release();
+	dsvDescriptorHeap->Release();
 
 
 
