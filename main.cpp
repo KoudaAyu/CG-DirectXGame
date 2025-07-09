@@ -81,7 +81,9 @@ struct VertexData
 {
 	Vector4 position;
 	Vector2 texcoord;
+	Vector3 normal;
 };
+
 
 Matrix4x4 MakeIdentity4x4()
 {
@@ -1154,7 +1156,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 
 
 	//InputLayer
-	D3D12_INPUT_ELEMENT_DESC inputElementDescs[2] = {};
+	D3D12_INPUT_ELEMENT_DESC inputElementDescs[3] = {};
 	inputElementDescs[0].SemanticName = "POSITION"; //セマンティック名
 	inputElementDescs[0].SemanticIndex = 0; //セマンティックインデックス
 	inputElementDescs[0].Format = DXGI_FORMAT_R32G32B32A32_FLOAT; //頂点のフォーマット
@@ -1163,6 +1165,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	inputElementDescs[1].SemanticIndex = 0;
 	inputElementDescs[1].Format = DXGI_FORMAT_R32G32_FLOAT;
 	inputElementDescs[1].AlignedByteOffset = D3D12_APPEND_ALIGNED_ELEMENT;
+	inputElementDescs[2].SemanticName = "NORMAL";
+	inputElementDescs[2].SemanticIndex = 0;
+	inputElementDescs[2].Format = DXGI_FORMAT_R32G32B32_FLOAT;
+	inputElementDescs[2].AlignedByteOffset = D3D12_APPEND_ALIGNED_ELEMENT;
 
 	D3D12_INPUT_LAYOUT_DESC inputLayoutDesc{};
 	inputLayoutDesc.pInputElementDescs = inputElementDescs; //入力要素の配列
@@ -1252,58 +1258,62 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 
 		for (uint32_t lonIndex = 0; lonIndex < kSubdivision; ++lonIndex)
 		{
-			uint32_t start = (latIndex * kSubdivision + lonIndex) * 6;
+			uint32_t index = (latIndex * kSubdivision + lonIndex) * 6;
 			float lon = lonIndex * kLonEvery;
 			float lonStep = kLonEvery;
 			//A
-			vertexData[start].position.x = cos(lat) * cos(lon);
-			vertexData[start].position.y = sin(lat);
-			vertexData[start].position.z = cos(lat) * sin(lon);
-			vertexData[start].position.w = 1.0f;
-			vertexData[start].texcoord.x = float(lonIndex) / float(kSubdivision);
-			vertexData[start].texcoord.y = 1.0f - float(latIndex) / float(kSubdivision);
+			vertexData[index].position.x = cos(lat) * cos(lon);
+			vertexData[index].position.y = sin(lat);
+			vertexData[index].position.z = cos(lat) * sin(lon);
+			vertexData[index].position.w = 1.0f;
+			vertexData[index].texcoord.x = float(lonIndex) / float(kSubdivision);
+			vertexData[index].texcoord.y = 1.0f - float(latIndex) / float(kSubdivision);
+
+			vertexData[index].normal.x = vertexData[index].position.x;
+			vertexData[index].normal.y = vertexData[index].position.y;
+			vertexData[index].normal.z = vertexData[index].position.z;
 
 			//B
-			vertexData[start + 1].position.x = cos(lat + latStep) * cos(lon);
-			vertexData[start + 1].position.y = sin(lat + latStep);
-			vertexData[start + 1].position.z = cos(lat + latStep) * sin(lon);
-			vertexData[start + 1].position.w = 1.0f;
-			vertexData[start + 1].texcoord.x = float(lonIndex) / float(kSubdivision);
-			vertexData[start + 1].texcoord.y = 1.0f - float(latIndex + 1) / float(kSubdivision);
+			vertexData[index + 1].position.x = cos(lat + latStep) * cos(lon);
+			vertexData[index + 1].position.y = sin(lat + latStep);
+			vertexData[index + 1].position.z = cos(lat + latStep) * sin(lon);
+			vertexData[index + 1].position.w = 1.0f;
+			vertexData[index + 1].texcoord.x = float(lonIndex) / float(kSubdivision);
+			vertexData[index + 1].texcoord.y = 1.0f - float(latIndex + 1) / float(kSubdivision);
 
 			//C
-			vertexData[start + 2].position.x = cos(lat) * cos(lon + lonStep);
-			vertexData[start + 2].position.y = sin(lat);
-			vertexData[start + 2].position.z = cos(lat) * sin(lon + lonStep);
-			vertexData[start + 2].position.w = 1.0f;
-			vertexData[start + 2].texcoord.x = float(lonIndex + 1) / float(kSubdivision);
-			vertexData[start + 2].texcoord.y = 1.0f - float(latIndex) / float(kSubdivision);
+			vertexData[index + 2].position.x = cos(lat) * cos(lon + lonStep);
+			vertexData[index + 2].position.y = sin(lat);
+			vertexData[index + 2].position.z = cos(lat) * sin(lon + lonStep);
+			vertexData[index + 2].position.w = 1.0f;
+			vertexData[index + 2].texcoord.x = float(lonIndex + 1) / float(kSubdivision);
+			vertexData[index + 2].texcoord.y = 1.0f - float(latIndex) / float(kSubdivision);
 
 
 			//D
-			vertexData[start + 5].position.x = cos(lat + latStep) * cos(lon + lonStep);
-			vertexData[start + 5].position.y = sin(lat + latStep);
-			vertexData[start + 5].position.z = cos(lat + latStep) * sin(lon + lonStep);
-			vertexData[start + 5].position.w = 1.0f;
-			vertexData[start + 5].texcoord.x = float(lonIndex + 1) / float(kSubdivision);
-			vertexData[start + 5].texcoord.y = 1.0f - float(latIndex + 1) / float(kSubdivision);
+			vertexData[index + 5].position.x = cos(lat + latStep) * cos(lon + lonStep);
+			vertexData[index + 5].position.y = sin(lat + latStep);
+			vertexData[index + 5].position.z = cos(lat + latStep) * sin(lon + lonStep);
+			vertexData[index + 5].position.w = 1.0f;
+			vertexData[index + 5].texcoord.x = float(lonIndex + 1) / float(kSubdivision);
+			vertexData[index + 5].texcoord.y = 1.0f - float(latIndex + 1) / float(kSubdivision);
 
 
 			//E = B
-			vertexData[start + 4].position.x = cos(lat + latStep) * cos(lon);
-			vertexData[start + 4].position.y = sin(lat + latStep);
-			vertexData[start + 4].position.z = cos(lat + latStep) * sin(lon);
-			vertexData[start + 4].position.w = 1.0f;
-			vertexData[start + 4].texcoord.x = float(lonIndex) / float(kSubdivision);
-			vertexData[start + 4].texcoord.y = 1.0f - float(latIndex + 1) / float(kSubdivision);
+			vertexData[index + 4].position.x = cos(lat + latStep) * cos(lon);
+			vertexData[index + 4].position.y = sin(lat + latStep);
+			vertexData[index + 4].position.z = cos(lat + latStep) * sin(lon);
+			vertexData[index + 4].position.w = 1.0f;
+			vertexData[index + 4].texcoord.x = float(lonIndex) / float(kSubdivision);
+			vertexData[index + 4].texcoord.y = 1.0f - float(latIndex + 1) / float(kSubdivision);
 
 			//F = C
-			vertexData[start + 3].position.x = cos(lat) * cos(lon + lonStep);
-			vertexData[start + 3].position.y = sin(lat);
-			vertexData[start + 3].position.z = cos(lat) * sin(lon + lonStep);
-			vertexData[start + 3].position.w = 1.0f;
-			vertexData[start + 3].texcoord.x = float(lonIndex + 1) / float(kSubdivision);
-			vertexData[start + 3].texcoord.y = 1.0f - float(latIndex) / float(kSubdivision);
+			vertexData[index + 3].position.x = cos(lat) * cos(lon + lonStep);
+			vertexData[index + 3].position.y = sin(lat);
+			vertexData[index + 3].position.z = cos(lat) * sin(lon + lonStep);
+			vertexData[index + 3].position.w = 1.0f;
+			vertexData[index + 3].texcoord.x = float(lonIndex + 1) / float(kSubdivision);
+			vertexData[index + 3].texcoord.y = 1.0f - float(latIndex) / float(kSubdivision);
 
 		}
 	}
@@ -1420,6 +1430,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	//一枚目の三角形
 	vertexDataSprite[0].position = { 0.0f,360.0f,0.0f,1.0f };//左下
 	vertexDataSprite[0].texcoord = { 0.0f,1.0f };
+	vertexDataSprite[0].normal = { 0.0f,0.0f,-1.0f };
 	vertexDataSprite[1].position = { 0.0f,0.0f,0.0f,1.0f };//左上
 	vertexDataSprite[1].texcoord = { 0.0f,0.0f };
 	vertexDataSprite[2].position = { 640.0f,360.0f,0.0f,1.0f };//右下
