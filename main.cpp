@@ -1252,6 +1252,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	vertexShaderBlob->Release(); //頂点シェーダーの解放
 	materialResource->Release();
 	wvpResource->Release();
+	srvDescriptorHeap->Release();
 
 	CloseHandle(fenceEvent); //フェンスイベントの解放
 	fence->Release(); //フェンスの解放
@@ -1265,6 +1266,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	device->Release(); //デバイスの解放
 	useAdapter->Release(); //アダプターの解放
 	dxgiFactory->Release(); //DXGIファクトリーの解放
+
 
 #ifdef _DEBUG
 	debugController->Release(); //デバッグコントローラーの解放
