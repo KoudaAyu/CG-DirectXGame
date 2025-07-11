@@ -90,11 +90,18 @@ struct Material
 	int32_t enableLighting;
 };
 
-struct TransformMatrix
+struct TransformationMatrix
 {
 	Matrix4x4 WVP;
 	Matrix4x4 World;
 
+};
+
+struct DirectionalLight
+{
+	Vector4 color;
+	Vector3 direction;
+	float intensity;
 };
 
 
@@ -1097,30 +1104,28 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 		D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT; //入力アセンブラーでの使用を許可
 
 
-	D3D12_DESCRIPTOR_RANGE descriptorRange[2] = {};
+	D3D12_DESCRIPTOR_RANGE descriptorRange[1] = {};
 
 	// SRV: t3, t4
 	descriptorRange[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-	descriptorRange[0].NumDescriptors = 2;
+	descriptorRange[0].NumDescriptors = 1;
 	descriptorRange[0].BaseShaderRegister = 3;
 	descriptorRange[0].RegisterSpace = 0;
 	descriptorRange[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
 	// CBV: b0, b1, b2
-	descriptorRange[1].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
-	descriptorRange[1].NumDescriptors = 3;
-	descriptorRange[1].BaseShaderRegister = 2;
-	descriptorRange[1].RegisterSpace = 1;
-	descriptorRange[1].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+	//descriptorRange[1].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
+	//descriptorRange[1].NumDescriptors = 3;
+	//descriptorRange[1].BaseShaderRegister = 2;
+	//descriptorRange[1].RegisterSpace = 1;
+	//descriptorRange[1].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
 
 	//RootParemeter生成PuxelShaderのMaterialとVertexShaderのTransform
-	D3D12_ROOT_PARAMETER rootParameters[3] = {};
+	D3D12_ROOT_PARAMETER rootParameters[4] = {};
 	rootParameters[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;//CBVを使う
 	rootParameters[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL; //PixelShaderで使う
 	rootParameters[0].Descriptor.ShaderRegister = 0; //レジスタ番号0とバインド。b0の0と一致
-
-
 
 	rootParameters[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
 	rootParameters[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;//VertexShaderで使える
@@ -1130,6 +1135,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	rootParameters[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;//PixelShaderで使う
 	rootParameters[2].DescriptorTable.pDescriptorRanges = descriptorRange;//Tableの中身の配列を指定
 	rootParameters[2].DescriptorTable.NumDescriptorRanges = _countof(descriptorRange);//Tableで管理する数
+
+	rootParameters[3].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+	rootParameters[3].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+	rootParameters[3].Descriptor.ShaderRegister = 1;
 
 	descriptionRootSignature.pParameters = rootParameters; //ルートパラメーター配列へのポインタ
 	descriptionRootSignature.NumParameters = _countof(rootParameters);//配列の長さ
@@ -1492,6 +1501,20 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 
 	materialResource->Unmap(0, nullptr);
 
+	ID3D12Resource* directionalLight = CreateBufferResource(device, sizeof(DirectionalLight));
+
+	// MapしてGPUリソースのCPU側の書き込み可能ポインタを取得する
+	DirectionalLight* directionalLightData = nullptr;
+	directionalLight->Map(0, nullptr, reinterpret_cast<void**>(&directionalLightData));
+
+	// directionalLightDataに値を書き込む
+	directionalLightData->color = { 1.0f, 1.0f, 1.0f, 1.0f };
+	directionalLightData->direction = { 0.0f, -1.0f, 0.0f };
+	directionalLightData->intensity = 1.0f;
+
+	// 書き込み完了後はUnmapを呼ぶ
+	directionalLight->Unmap(0, nullptr);
+
 	ID3D12Resource* materialResourceSprite = CreateBufferResource(device, sizeof(Material));
 	Material* materialDataSprite = nullptr;
 	materialResourceSprite->Map(0, nullptr, reinterpret_cast<void**>(&materialDataSprite));
@@ -1501,19 +1524,19 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 
 
 	//WVP用のリソースを作る。　Matrix4x4 1つのサイズを用意する
-	ID3D12Resource* wvpResource = CreateBufferResource(device, sizeof(TransformMatrix));
+	ID3D12Resource* wvpResource = CreateBufferResource(device, sizeof(TransformationMatrix));
 	//データを書き込む
-	TransformMatrix* wvpData = nullptr;
+	TransformationMatrix* wvpData = nullptr;
 	//書き込む為のアドレス取得
 	wvpResource->Map(0, nullptr, reinterpret_cast<void**>(&wvpData));
 	//単位行列を書き込む
 	wvpData->World = MakeIdentity4x4();
 	wvpData->WVP = MakeIdentity4x4();
 
-	ID3D12Resource* transformationMatrixResourceSphere = CreateBufferResource(device, sizeof(TransformMatrix));
+	ID3D12Resource* transformationMatrixResourceSphere = CreateBufferResource(device, sizeof(TransformationMatrix));
 
 	// データを書き込むためのポインタを取得
-	TransformMatrix* transformationMatrixDataSphere = nullptr;
+	TransformationMatrix* transformationMatrixDataSphere = nullptr;
 	transformationMatrixResourceSphere->Map(0, nullptr, reinterpret_cast<void**>(&transformationMatrixDataSphere));
 	transformationMatrixDataSphere->WVP = MakeIdentity4x4();
 	transformationMatrixDataSphere->World = MakeIdentity4x4();
@@ -1521,9 +1544,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	transformationMatrixResourceSphere->Unmap(0, nullptr);
 
 	//Sprite用のTransformationMatrix用のリソースを作る
-	ID3D12Resource* transformationMatrixResourceSprite = CreateBufferResource(device, sizeof(TransformMatrix));
+	ID3D12Resource* transformationMatrixResourceSprite = CreateBufferResource(device, sizeof(TransformationMatrix));
 	//データを書き込む
-	TransformMatrix* transformationMatrixDataSprite = nullptr;
+	TransformationMatrix* transformationMatrixDataSprite = nullptr;
 	//書き込むためのアドレス取得
 	transformationMatrixResourceSprite->Map(0, nullptr, reinterpret_cast<void**>(&transformationMatrixDataSprite));
 	//単位行列を書き込んでおく
@@ -1569,6 +1592,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	/*UploadTextureData(textureResource, mipImages);*/
 	ID3D12Resource* intermediateResource = UploadTextureData(textureResource, mipImages, device, commandList);
 	ID3D12Resource* intermediateResource2 = UploadTextureData(textureResource2, mipImages2, device, commandList);
+
+
 
 	//metaDataを基にSRVの設定
 	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
@@ -1723,6 +1748,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 			commandList->SetGraphicsRootConstantBufferView(1, transformationMatrixResourceSphere->GetGPUVirtualAddress());
 			//SRVのDescriptorTableの先頭を設定
 			commandList->SetGraphicsRootDescriptorTable(2, useMonsterBall ? textureSrvHandleGPU2 : textureSrvHandleGPU);
+
+			commandList->SetGraphicsRootConstantBufferView(3, directionalLight->GetGPUVirtualAddress());
 			//描画(DrawCall/ドローコール)。3頂点で1つのインスタンス。
 			commandList->DrawInstanced(1536, 1, 0, 0);
 
@@ -1743,6 +1770,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 			commandList->SetGraphicsRootConstantBufferView(1, transformationMatrixResourceSprite->GetGPUVirtualAddress());
 			//SRVのDescriptorTableの先頭を設定
 			commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU);
+
+			commandList->SetGraphicsRootConstantBufferView(3, directionalLight->GetGPUVirtualAddress());
+
 			//描画(DrawCall/ドローコール)。3頂点で1つのインスタンス。
 			commandList->DrawInstanced(6, 1, 0, 0);
 
