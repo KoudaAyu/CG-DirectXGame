@@ -1527,6 +1527,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	directionalLightData->direction = { 0.0f, -1.0f, 0.0f };
 	directionalLightData->intensity = 1.0f;
 
+	
+
 	// 書き込み完了後はUnmapを呼ぶ
 	directionalLight->Unmap(0, nullptr);
 
@@ -1707,7 +1709,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 			ImGui::Checkbox("LightSprite Flag", (bool*)&materialData->enableLighting);
 			ImGui::Checkbox("LightSphere Flag", (bool*)&materialDataSprite->enableLighting);
 
-			ImGui::DragFloat3("LightDirection", &directionalLightData->direction.x);
+			ImGui::DragFloat3("LightDirection", &directionalLightData->direction.x,0.01f);
 
 			ImGui::End();
 
