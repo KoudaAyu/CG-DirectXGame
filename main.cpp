@@ -1261,194 +1261,95 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	//パイプラインステートの生成に失敗した場合はエラー
 	assert(SUCCEEDED(hr));
 
-	VertexData* vertexData = nullptr;
-
 	//球体
 	const uint32_t kSubdivision = 16;//16分割
+
 	//経度分割1つ分の角度
 	const float kLonEvery = DirectX::XM_2PI / float(kSubdivision);
 	// 緯度分割1つ分の角度
 	const float kLatEvery = DirectX::XM_PI / float(kSubdivision);
-	vertexData = new VertexData[kSubdivision * kSubdivision * 6];
+	
+	VertexData* vertexData = new VertexData[(kSubdivision + 1) * (kSubdivision + 1)];
 
+	const uint32_t kVertexCount = (kSubdivision + 1) * (kSubdivision + 1);
+	const uint32_t kIndexCount = kSubdivision * kSubdivision * 6;
 
+	ID3D12Resource* vertexResourceSphere = CreateBufferResource(device, sizeof(VertexData) * kVertexCount);
+	VertexData* mappedVertex = nullptr;
+	vertexResourceSphere->Map(0, nullptr, reinterpret_cast<void**>(&mappedVertex));
+	memcpy(mappedVertex, vertexData, sizeof(VertexData)* kVertexCount);
+	vertexResourceSphere->Unmap(0, nullptr);
 
-	for (uint32_t latIndex = 0; latIndex < kSubdivision; ++latIndex)
+	for (uint32_t lat = 0; lat <= kSubdivision; ++lat)
 	{
-		float lat = -DirectX::XM_PIDIV2 + kLatEvery * latIndex;
-		float latStep = kLatEvery;
-
-		for (uint32_t lonIndex = 0; lonIndex < kSubdivision; ++lonIndex)
+		float theta = -DirectX::XM_PIDIV2 + DirectX::XM_PI * (float(lat) / kSubdivision);
+		for (uint32_t lon = 0; lon <= kSubdivision; ++lon)
 		{
-			uint32_t index = (latIndex * kSubdivision + lonIndex) * 6;
-			float lon = lonIndex * kLonEvery;
-			float lonStep = kLonEvery;
-			//A
-			vertexData[index].position.x = cos(lat) * cos(lon);
-			vertexData[index].position.y = sin(lat);
-			vertexData[index].position.z = cos(lat) * sin(lon);
-			vertexData[index].position.w = 1.0f;
-			vertexData[index].texcoord.x = float(lonIndex) / float(kSubdivision);
-			vertexData[index].texcoord.y = 1.0f - float(latIndex) / float(kSubdivision);
-
-			vertexData[index].normal.x = vertexData[index].position.x;
-			vertexData[index].normal.y = vertexData[index].position.y;
-			vertexData[index].normal.z = vertexData[index].position.z;
-
-			//B
-			vertexData[index + 1].position.x = cos(lat + latStep) * cos(lon);
-			vertexData[index + 1].position.y = sin(lat + latStep);
-			vertexData[index + 1].position.z = cos(lat + latStep) * sin(lon);
-			vertexData[index + 1].position.w = 1.0f;
-			vertexData[index + 1].texcoord.x = float(lonIndex) / float(kSubdivision);
-			vertexData[index + 1].texcoord.y = 1.0f - float(latIndex + 1) / float(kSubdivision);
-			vertexData[index + 1].normal.x = vertexData[index + 1].position.x;
-			vertexData[index + 1].normal.y = vertexData[index + 1].position.y;
-			vertexData[index + 1].normal.z = vertexData[index + 1].position.z;
-
-			//C
-			vertexData[index + 2].position.x = cos(lat) * cos(lon + lonStep);
-			vertexData[index + 2].position.y = sin(lat);
-			vertexData[index + 2].position.z = cos(lat) * sin(lon + lonStep);
-			vertexData[index + 2].position.w = 1.0f;
-			vertexData[index + 2].texcoord.x = float(lonIndex + 1) / float(kSubdivision);
-			vertexData[index + 2].texcoord.y = 1.0f - float(latIndex) / float(kSubdivision);
-			vertexData[index + 2].normal.x = vertexData[index + 2].position.x;
-			vertexData[index + 2].normal.y = vertexData[index + 2].position.y;
-			vertexData[index + 2].normal.z = vertexData[index + 2].position.z;
-
-			//D
-			vertexData[index + 5].position.x = cos(lat + latStep) * cos(lon + lonStep);
-			vertexData[index + 5].position.y = sin(lat + latStep);
-			vertexData[index + 5].position.z = cos(lat + latStep) * sin(lon + lonStep);
-			vertexData[index + 5].position.w = 1.0f;
-			vertexData[index + 5].texcoord.x = float(lonIndex + 1) / float(kSubdivision);
-			vertexData[index + 5].texcoord.y = 1.0f - float(latIndex + 1) / float(kSubdivision);
-			vertexData[index + 5].normal.x = vertexData[index + 5].position.x;
-			vertexData[index + 5].normal.y = vertexData[index + 5].position.y;
-			vertexData[index + 5].normal.z = vertexData[index + 5].position.z;
-
-
-			//E = B
-			vertexData[index + 4].position.x = cos(lat + latStep) * cos(lon);
-			vertexData[index + 4].position.y = sin(lat + latStep);
-			vertexData[index + 4].position.z = cos(lat + latStep) * sin(lon);
-			vertexData[index + 4].position.w = 1.0f;
-			vertexData[index + 4].texcoord.x = float(lonIndex) / float(kSubdivision);
-			vertexData[index + 4].texcoord.y = 1.0f - float(latIndex + 1) / float(kSubdivision);
-			vertexData[index + 4].normal.x = vertexData[index + 4].position.x;
-			vertexData[index + 4].normal.y = vertexData[index + 4].position.y;
-			vertexData[index + 4].normal.z = vertexData[index + 4].position.z;
-
-
-			//F = C
-			vertexData[index + 3].position.x = cos(lat) * cos(lon + lonStep);
-			vertexData[index + 3].position.y = sin(lat);
-			vertexData[index + 3].position.z = cos(lat) * sin(lon + lonStep);
-			vertexData[index + 3].position.w = 1.0f;
-			vertexData[index + 3].texcoord.x = float(lonIndex + 1) / float(kSubdivision);
-			vertexData[index + 3].texcoord.y = 1.0f - float(latIndex) / float(kSubdivision);
-			vertexData[index + 3].normal.x = vertexData[index + 3].position.x;
-			vertexData[index + 3].normal.y = vertexData[index + 3].position.y;
-			vertexData[index + 3].normal.z = vertexData[index + 3].position.z;
-
+			float phi = -DirectX::XM_2PI * (float(lon) / kSubdivision);
+			uint32_t idx = lat * (kSubdivision + 1) + lon;
+			vertexData[idx].position.x = cos(theta) * cos(phi);
+			vertexData[idx].position.y = sin(theta);
+			vertexData[idx].position.z = cos(theta) * sin(phi);
+			vertexData[idx].position.w = 1.0f;
+			vertexData[idx].texcoord.x = float(lon) / kSubdivision;
+			vertexData[idx].texcoord.y = 1.0f - float(lat) / kSubdivision;
+			vertexData[idx].normal = { vertexData[idx].position.x, vertexData[idx].position.y, vertexData[idx].position.z };
 		}
 	}
 
-	//経度のほうに分割
-	//for (uint32_t latIndex = 0; latIndex < kSubdivision; ++latIndex)
-	//{
-	//	// 緯度の計算
-	//	// lat と currentLat が同じ値を計算しているので、どちらか一方を使用します。
-	//	// ここでは currentLat に統一します。
-	//	float currentLat = -DirectX::XM_PIDIV2 + kLatEvery * latIndex;
-	//	float nextLat = -DirectX::XM_PIDIV2 + kLatEvery * (latIndex + 1); // latIndex + 1 の緯度
-
-	//	//経度の方向に分割しながら線を描く
-	//	for (uint32_t lonIndex = 0; lonIndex < kSubdivision; ++lonIndex)
-	//	{
-	//		// 経度の計算
-	//		// lon と currentLon が同じ値を計算しているので、どちらか一方を使用します。
-	//		// ここでは currentLon に統一します。
-	//		float currentLon = lonIndex * kLonEvery;
-	//		float nextLon = (lonIndex + 1) * kLonEvery; // lonIndex + 1 の経度
-
-	//		// start インデックスは資料の通りそのまま使用
-	//		uint32_t start = (latIndex * kSubdivision + lonIndex) * 6;
-
-	//		// テクスチャ座標の正規化された値 (UとV) を事前に計算
-	//		float u_current = static_cast<float>(lonIndex) / static_cast<float>(kSubdivision);
-	//		float v_current = 1.0f - static_cast<float>(latIndex) / static_cast<float>(kSubdivision);
-	//		float u_next = static_cast<float>(lonIndex + 1) / static_cast<float>(kSubdivision);
-	//		float v_next = 1.0f - static_cast<float>(latIndex + 1) / static_cast<float>(kSubdivision);
+	uint32_t* indexData = new uint32_t[kSubdivision * kSubdivision * 6];
+	uint32_t idx = 0;
+	for (uint32_t lat = 0; lat < kSubdivision; ++lat)
+	{
+		for (uint32_t lon = 0; lon < kSubdivision; ++lon)
+		{
+			uint32_t v0 = lat * (kSubdivision + 1) + lon;
+			uint32_t v1 = v0 + 1;
+			uint32_t v2 = v0 + (kSubdivision + 1);
+			uint32_t v3 = v2 + 1;
+			// 1枚目の三角形
+			indexData[idx++] = v0;
+			indexData[idx++] = v1;
+			indexData[idx++] = v2;
+			// 2枚目の三角形
+			indexData[idx++] = v1;
+			indexData[idx++] = v3;
+			indexData[idx++] = v2;
+		}
+	}
 
 
-	//		// -----------------------------------------------------------
-	//		// 頂点0 (P0: 左下) 
-	//		vertexData[start].position.x = cos(currentLat) * cos(currentLon);
-	//		vertexData[start].position.y = sin(currentLat);
-	//		vertexData[start].position.z = cos(currentLat) * sin(currentLon);
-	//		vertexData[start].position.w = 1.0f;
-	//		vertexData[start].texcoord.x = u_current;
-	//		vertexData[start].texcoord.y = v_current;
+	ID3D12Resource* indexResourceSphere = CreateBufferResource(device, sizeof(uint32_t) * kIndexCount);
+	uint32_t* mappedIndex = nullptr;
+	indexResourceSphere->Map(0, nullptr, reinterpret_cast<void**>(&mappedIndex));
+	memcpy(mappedIndex, indexData, sizeof(uint32_t)* kIndexCount);
+	indexResourceSphere->Unmap(0, nullptr);
 
-	//		// -----------------------------------------------------------
-	//		// 残りの5頂点 (P1, P2, P1_shared, P3, P2_shared)
-	//		// 三角形1の2番目の頂点 (P1: 右下)
-	//		vertexData[start + 1].position.x = cos(currentLat) * cos(nextLon);
-	//		vertexData[start + 1].position.y = sin(currentLat);
-	//		vertexData[start + 1].position.z = cos(currentLat) * sin(nextLon);
-	//		vertexData[start + 1].position.w = 1.0f;
-	//		vertexData[start + 1].texcoord.x = u_next;
-	//		vertexData[start + 1].texcoord.y = v_current;
+	D3D12_VERTEX_BUFFER_VIEW vertexBufferViewSphere{};
+	vertexBufferViewSphere.BufferLocation = vertexResourceSphere->GetGPUVirtualAddress();
+	vertexBufferViewSphere.SizeInBytes = sizeof(VertexData) * kVertexCount;
+	vertexBufferViewSphere.StrideInBytes = sizeof(VertexData);
 
-	//		// 三角形1の3番目の頂点 (P2: 左上)
-	//		vertexData[start + 2].position.x = cos(nextLat) * cos(currentLon);
-	//		vertexData[start + 2].position.y = sin(nextLat);
-	//		vertexData[start + 2].position.z = cos(nextLat) * sin(currentLon);
-	//		vertexData[start + 2].position.w = 1.0f;
-	//		vertexData[start + 2].texcoord.x = u_current;
-	//		vertexData[start + 2].texcoord.y = v_next;
+	D3D12_INDEX_BUFFER_VIEW indexBufferViewSphere{};
+	indexBufferViewSphere.BufferLocation = indexResourceSphere->GetGPUVirtualAddress();
+	indexBufferViewSphere.SizeInBytes = sizeof(uint32_t) * kIndexCount;
+	indexBufferViewSphere.Format = DXGI_FORMAT_R32_UINT;
 
-	//		// 2番目の三角形の1番目の頂点 (P1: 右下) - 頂点1と共有
-	//		vertexData[start + 3].position.x = cos(currentLat) * cos(nextLon);
-	//		vertexData[start + 3].position.y = sin(currentLat);
-	//		vertexData[start + 3].position.z = cos(currentLat) * sin(nextLon);
-	//		vertexData[start + 3].position.w = 1.0f;
-	//		vertexData[start + 3].texcoord.x = u_next;
-	//		vertexData[start + 3].texcoord.y = v_current;
 
-	//		// 2番目の三角形の2番目の頂点 (P3: 右上)
-	//		vertexData[start + 4].position.x = cos(nextLat) * cos(nextLon);
-	//		vertexData[start + 4].position.y = sin(nextLat);
-	//		vertexData[start + 4].position.z = cos(nextLat) * sin(nextLon);
-	//		vertexData[start + 4].position.w = 1.0f;
-	//		vertexData[start + 4].texcoord.x = u_next;
-	//		vertexData[start + 4].texcoord.y = v_next;
-
-	//		// 2番目の三角形の3番目の頂点 (P2: 左上) - 頂点2と共有
-	//		vertexData[start + 5].position.x = cos(nextLat) * cos(currentLon);
-	//		vertexData[start + 5].position.y = sin(nextLat);
-	//		vertexData[start + 5].position.z = cos(nextLat) * sin(currentLon);
-	//		vertexData[start + 5].position.w = 1.0f;
-	//		vertexData[start + 5].texcoord.x = u_current;
-	//		vertexData[start + 5].texcoord.y = v_next;
-	//	}
-	//}
-
+	
 	// --- GPUバッファに転送 ---
-	const uint32_t kVertexCount = kSubdivision * kSubdivision * 6;
-	ID3D12Resource* vertexResourceSphere = CreateBufferResource(device, sizeof(VertexData) * kVertexCount);
+	/*const uint32_t kVertexCount = kSubdivision * kSubdivision * 6;
+	ID3D12Resource* vertexResourceSphere = CreateBufferResource(device, sizeof(VertexData) * kVertexCount);*/
 
 	VertexData* mapped = nullptr;
 	vertexResourceSphere->Map(0, nullptr, reinterpret_cast<void**>(&mapped));
 	memcpy(mapped, vertexData, sizeof(VertexData) * kVertexCount);
 	vertexResourceSphere->Unmap(0, nullptr);
 
-	D3D12_VERTEX_BUFFER_VIEW vertexBufferViewSphere{};
+	/*D3D12_VERTEX_BUFFER_VIEW vertexBufferViewSphere{};
 	vertexBufferViewSphere.BufferLocation = vertexResourceSphere->GetGPUVirtualAddress();
 	vertexBufferViewSphere.SizeInBytes = sizeof(VertexData) * kVertexCount;
-	vertexBufferViewSphere.StrideInBytes = sizeof(VertexData);
+	vertexBufferViewSphere.StrideInBytes = sizeof(VertexData);*/
 
 	//Sprite用の頂点Resource
 	ID3D12Resource* vertexResourceSprite = CreateBufferResource(device, sizeof(VertexData) * 6);
@@ -1461,25 +1362,42 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	//1頂点当たりのサイズ
 	vertexBufferViewSprite.StrideInBytes = sizeof(VertexData);
 
+
+	ID3D12Resource* indexResourceSprite = CreateBufferResource(device, sizeof(uint32_t) * 6);
+	//頂点バッファービューを生成する
+	D3D12_INDEX_BUFFER_VIEW indexBufferViewSprite{};
+	//リソースの先頭アドレスから使う
+	indexBufferViewSprite.BufferLocation = indexResourceSprite->GetGPUVirtualAddress();
+	//使用するリソースのサイズは頂点6つ分のサイズ
+	indexBufferViewSprite.SizeInBytes = sizeof(uint32_t) * 6;
+	//インデックスはuint32_tとする
+	indexBufferViewSprite.Format = DXGI_FORMAT_R32_UINT;
+
+	//インデックスリソースにデータを書き込む
+	uint32_t* indexDataSprite = nullptr;
+	indexResourceSprite->Map(0, nullptr, reinterpret_cast<void**>(&indexDataSprite));
+	indexDataSprite[0] = 0; // 左下
+	indexDataSprite[1] = 1; // 左上
+	indexDataSprite[2] = 2; // 右下
+	indexDataSprite[3] = 2; // 右下
+	indexDataSprite[4] = 1; // 左上
+	indexDataSprite[5] = 3; // 右上
+
+	indexResourceSprite->Unmap(0, nullptr);
+
 	//Sprite用
 	VertexData* vertexDataSprite = nullptr;
 	vertexResourceSprite->Map(0, nullptr, reinterpret_cast<void**>(&vertexDataSprite));
 	//一枚目の三角形
-	vertexDataSprite[0].position = { 0.0f,360.0f,0.0f,1.0f };//左下
-	vertexDataSprite[0].texcoord = { 0.0f,1.0f };
-	vertexDataSprite[0].normal = { 0.0f,0.0f,-1.0f };
-	vertexDataSprite[1].position = { 0.0f,0.0f,0.0f,1.0f };//左上
-	vertexDataSprite[1].texcoord = { 0.0f,0.0f };
-	vertexDataSprite[2].position = { 640.0f,360.0f,0.0f,1.0f };//右下
-	vertexDataSprite[2].texcoord = { 1.0f,1.0f };
+	vertexDataSprite[0].position = { 0.0f,360.0f,0.0f,1.0f }; // 左下
+	vertexDataSprite[1].position = { 0.0f,0.0f,0.0f,1.0f };   // 左上
+	vertexDataSprite[2].position = { 640.0f,360.0f,0.0f,1.0f }; // 右下
+	vertexDataSprite[3].position = { 640.0f,0.0f,0.0f,1.0f };   // 右上
 
-	//二枚目の三角形
-	vertexDataSprite[3].position = { 0.0f,0.0f,0.0f,1.0f };//左上
-	vertexDataSprite[3].texcoord = { 0.0f,0.0f };
-	vertexDataSprite[4].position = { 640.0f,0.0f,0.0f,1.0f };//右上
-	vertexDataSprite[4].texcoord = { 1.0f,0.0f };
-	vertexDataSprite[5].position = { 640.0f,360.0f,0.0f,1.0f };//右下
-	vertexDataSprite[5].texcoord = { 1.0f,1.0f };
+	vertexDataSprite[0].texcoord = { 0.0f,1.0f };
+	vertexDataSprite[1].texcoord = { 0.0f,0.0f };
+	vertexDataSprite[2].texcoord = { 1.0f,1.0f };
+	vertexDataSprite[3].texcoord = { 1.0f,0.0f };
 
 	//ビューポート
 	D3D12_VIEWPORT viewport{};
@@ -1760,42 +1678,24 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 			commandList->SetGraphicsRootSignature(rootSignature);
 			commandList->SetPipelineState(graphicPipelineState); //パイプラインステートを設定
 			//Spriteの描画
-			commandList->IASetVertexBuffers(0, 1, &vertexBufferViewSphere);//VBVを設定
-			//形状を設定。PSOに設定しているものとは異なるが、同じものを設定と考えれば良い
+			commandList->IASetVertexBuffers(0, 1, &vertexBufferViewSphere);
+			commandList->IASetIndexBuffer(&indexBufferViewSphere);
 			commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-			//マテリアルCBufferの場所を指定
-			commandList->SetGraphicsRootConstantBufferView(0, materialResourceSprite->GetGPUVirtualAddress());
-			//TransformationMatrixCBufferの場所を特定
-			commandList->SetGraphicsRootConstantBufferView(1, transformationMatrixResourceSphere->GetGPUVirtualAddress());
-			//SRVのDescriptorTableの先頭を設定
-			commandList->SetGraphicsRootDescriptorTable(2, useMonsterBall ? textureSrvHandleGPU2 : textureSrvHandleGPU);
-
-			commandList->SetGraphicsRootConstantBufferView(3, directionalLight->GetGPUVirtualAddress());
-			//描画(DrawCall/ドローコール)。3頂点で1つのインスタンス。
-			commandList->DrawInstanced(1536, 1, 0, 0);
-
-
-			//コマンドを積む
-			commandList->RSSetViewports(1, &viewport); //ビューポートを設定
-			commandList->RSSetScissorRects(1, &scissorRect); //シザー矩形を設定
-			//RootSignatureを設定。PSOに設定しているけれど別途設定が必要
-			commandList->SetGraphicsRootSignature(rootSignature);
-			commandList->SetPipelineState(graphicPipelineState); //パイプラインステートを設定
-			//Spriteの描画
-			commandList->IASetVertexBuffers(0, 1, &vertexBufferViewSprite);//VBVを設定
-			//形状を設定。PSOに設定しているものとは異なるが、同じものを設定と考えれば良い
-			commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-			//マテリアルCBufferの場所を指定
 			commandList->SetGraphicsRootConstantBufferView(0, materialResource->GetGPUVirtualAddress());
-			//TransformationMatrixCBufferの場所を特定
-			commandList->SetGraphicsRootConstantBufferView(1, transformationMatrixResourceSprite->GetGPUVirtualAddress());
-			//SRVのDescriptorTableの先頭を設定
-			commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU);
-
+			commandList->SetGraphicsRootConstantBufferView(1, transformationMatrixResourceSphere->GetGPUVirtualAddress());
+			commandList->SetGraphicsRootDescriptorTable(2, useMonsterBall ? textureSrvHandleGPU2 : textureSrvHandleGPU);
 			commandList->SetGraphicsRootConstantBufferView(3, directionalLight->GetGPUVirtualAddress());
+			commandList->DrawIndexedInstanced(kIndexCount, 1, 0, 0, 0);
 
-			//描画(DrawCall/ドローコール)。3頂点で1つのインスタンス。
-			commandList->DrawInstanced(6, 1, 0, 0);
+
+			commandList->IASetVertexBuffers(0, 1, &vertexBufferViewSprite);
+			commandList->IASetIndexBuffer(&indexBufferViewSprite);
+			commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+			commandList->SetGraphicsRootConstantBufferView(0, materialResourceSprite->GetGPUVirtualAddress());
+			commandList->SetGraphicsRootConstantBufferView(1, transformationMatrixResourceSprite->GetGPUVirtualAddress());
+			commandList->SetGraphicsRootDescriptorTable(2, useMonsterBall ? textureSrvHandleGPU2 : textureSrvHandleGPU);
+			commandList->SetGraphicsRootConstantBufferView(3, directionalLight->GetGPUVirtualAddress());
+			commandList->DrawIndexedInstanced(6, 1, 0, 0, 0);
 
 			//実際のcommandListのImGuiの描画コマンドを積む
 			ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), commandList);
@@ -1886,6 +1786,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	if (dxcUtils) { dxcUtils->Release(); dxcUtils = nullptr; }
 	if (dxcCompiler) { dxcCompiler->Release(); dxcCompiler = nullptr; }
 	if (includeHandler) { includeHandler->Release(); includeHandler = nullptr; }
+
+	indexResourceSprite->Release();
 
 	textureResource->Release();
 	textureResource2->Release();
