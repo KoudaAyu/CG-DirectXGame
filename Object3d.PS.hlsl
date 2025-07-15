@@ -23,7 +23,7 @@ ConstantBuffer<DirectionalLight> gDirectionalLight : register(b1);
 // ====================================================================
 // 修正2: gTexture のレジスタを t0 から t3 に変更 (C++のルートシグネチャと一致させるため)
 // ====================================================================
-Texture2D<float32_t4> gTexture : register(t0);
+Texture2D<float32_t4> gTexture : register(t3);
 
 // ====================================================================
 // 修正3: SampleState のスペルミスを SamplerState に修正

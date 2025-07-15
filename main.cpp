@@ -1302,6 +1302,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 			vertexData[index + 1].position.w = 1.0f;
 			vertexData[index + 1].texcoord.x = float(lonIndex) / float(kSubdivision);
 			vertexData[index + 1].texcoord.y = 1.0f - float(latIndex + 1) / float(kSubdivision);
+			vertexData[index + 1].normal.x = vertexData[index + 1].position.x;
+			vertexData[index + 1].normal.y = vertexData[index + 1].position.y;
+			vertexData[index + 1].normal.z = vertexData[index + 1].position.z;
 
 			//C
 			vertexData[index + 2].position.x = cos(lat) * cos(lon + lonStep);
@@ -1310,7 +1313,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 			vertexData[index + 2].position.w = 1.0f;
 			vertexData[index + 2].texcoord.x = float(lonIndex + 1) / float(kSubdivision);
 			vertexData[index + 2].texcoord.y = 1.0f - float(latIndex) / float(kSubdivision);
-
+			vertexData[index + 2].normal.x = vertexData[index + 2].position.x;
+			vertexData[index + 2].normal.y = vertexData[index + 2].position.y;
+			vertexData[index + 2].normal.z = vertexData[index + 2].position.z;
 
 			//D
 			vertexData[index + 5].position.x = cos(lat + latStep) * cos(lon + lonStep);
@@ -1319,6 +1324,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 			vertexData[index + 5].position.w = 1.0f;
 			vertexData[index + 5].texcoord.x = float(lonIndex + 1) / float(kSubdivision);
 			vertexData[index + 5].texcoord.y = 1.0f - float(latIndex + 1) / float(kSubdivision);
+			vertexData[index + 5].normal.x = vertexData[index + 5].position.x;
+			vertexData[index + 5].normal.y = vertexData[index + 5].position.y;
+			vertexData[index + 5].normal.z = vertexData[index + 5].position.z;
 
 
 			//E = B
@@ -1328,6 +1336,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 			vertexData[index + 4].position.w = 1.0f;
 			vertexData[index + 4].texcoord.x = float(lonIndex) / float(kSubdivision);
 			vertexData[index + 4].texcoord.y = 1.0f - float(latIndex + 1) / float(kSubdivision);
+			vertexData[index + 4].normal.x = vertexData[index + 4].position.x;
+			vertexData[index + 4].normal.y = vertexData[index + 4].position.y;
+			vertexData[index + 4].normal.z = vertexData[index + 4].position.z;
+
 
 			//F = C
 			vertexData[index + 3].position.x = cos(lat) * cos(lon + lonStep);
@@ -1336,6 +1348,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 			vertexData[index + 3].position.w = 1.0f;
 			vertexData[index + 3].texcoord.x = float(lonIndex + 1) / float(kSubdivision);
 			vertexData[index + 3].texcoord.y = 1.0f - float(latIndex) / float(kSubdivision);
+			vertexData[index + 3].normal.x = vertexData[index + 3].position.x;
+			vertexData[index + 3].normal.y = vertexData[index + 3].position.y;
+			vertexData[index + 3].normal.z = vertexData[index + 3].position.z;
 
 		}
 	}
@@ -1486,19 +1501,19 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 
 
 	//マテリアル用のリソースを作る
-	ID3D12Resource* materialResource = CreateBufferResource(device, sizeof(Vector4));
+	ID3D12Resource* materialResource = CreateBufferResource(device, sizeof(Material));
 	//マテリアルにデータを書き込む
-	Vector4* materialDate = nullptr;
+	Material* materialData = nullptr;
 	//書き込む為のアドレス取得
-	materialResource->Map(0, nullptr, reinterpret_cast<void**>(&materialDate));
+	materialResource->Map(0, nullptr, reinterpret_cast<void**>(&materialData));
 	// データを設定（赤色 RGBA: 1,0,0,1）
 	Vector4 temp{};
 	temp.x = 1.0f;
 	temp.y = 1.0f;
 	temp.z = 1.0f;
 	temp.w = 1.0f;
-	*materialDate = temp;
-
+	materialData->color = temp;
+	materialData->enableLighting = false;
 	materialResource->Unmap(0, nullptr);
 
 	ID3D12Resource* directionalLight = CreateBufferResource(device, sizeof(DirectionalLight));
@@ -1689,6 +1704,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 			ImGui::Begin("Windows");
 
 			ImGui::Checkbox("useMonsterBall", &useMonsterBall);
+			ImGui::Checkbox("LightSprite Flag", (bool*)&materialData->enableLighting);
+			ImGui::Checkbox("LightSphere Flag", (bool*)&materialDataSprite->enableLighting);
+
+			ImGui::DragFloat3("LightDirection", &directionalLightData->direction.x);
 
 			ImGui::End();
 
@@ -1873,7 +1892,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	vertexResourceSphere->Release();
 
 	materialResourceSprite->Release();
-
+	directionalLight->Release();
 	transformationMatrixResourceSprite->Release();
 	transformationMatrixResourceSphere->Release();
 	intermediateResource->Release();
