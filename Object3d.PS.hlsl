@@ -1,12 +1,11 @@
 #include"Object3d.hlsli"
 
-// ====================================================================
-// 修正1: struct Material の定義を ConstantBuffer の宣言よりも前に移動
-// ====================================================================
+
 struct Material
 {
     float32_t4 color;
     int32_t enableLighting;
+    float32_t4x4 uvTransform;
 };
 
 ConstantBuffer<Material> gMaterial : register(b0);
@@ -19,15 +18,8 @@ struct DirectionalLight
 };
 ConstantBuffer<DirectionalLight> gDirectionalLight : register(b1);
 
-
-// ====================================================================
-// 修正2: gTexture のレジスタを t0 から t3 に変更 (C++のルートシグネチャと一致させるため)
-// ====================================================================
 Texture2D<float32_t4> gTexture : register(t3);
 
-// ====================================================================
-// 修正3: SampleState のスペルミスを SamplerState に修正
-// ====================================================================
 SamplerState gSample : register(s0);
 
 
@@ -39,7 +31,8 @@ struct PixelShaderOutput
 PixelShaderOutput main(VertexShaderOutput input)
 {
     PixelShaderOutput output;
-    float32_t4 textureColor = gTexture.Sample(gSample, input.texcoord);
+    float3 transformedUV = mul(float32_t4(input.texcoord,0.0f, 1.0f), gMaterial.uvTransform);
+    float32_t4 textureColor = gTexture.Sample(gSample, transformedUV.xy);
     output.color = gMaterial.color * textureColor;
     
     //hals lambert
