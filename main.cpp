@@ -1168,7 +1168,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	assert(SUCCEEDED(hr));
 
 	//スワップチェーンを生成する
-	IDXGISwapChain4* swapChain = nullptr;
+	Microsoft::WRL::ComPtr<IDXGISwapChain4> swapChain;
 	DXGI_SWAP_CHAIN_DESC1 swapChainDesc{};
 	swapChainDesc.Width = kClientWidth; //ウィンドウの幅
 	swapChainDesc.Height = kClientHeight; //ウィンドウの高さ
@@ -1179,7 +1179,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD; //モニターに映ったら描画を破棄
 
 	//コマンドキュー、ウィンドウハンドル、設定を渡して生成する
-	hr = dxgiFactory->CreateSwapChainForHwnd(commandQueue.Get(), hwnd, &swapChainDesc, nullptr, nullptr, reinterpret_cast<IDXGISwapChain1**>(&swapChain));
+	hr = dxgiFactory->CreateSwapChainForHwnd(commandQueue.Get(), hwnd, &swapChainDesc, nullptr, nullptr, reinterpret_cast<IDXGISwapChain1**>(swapChain.GetAddressOf()));
 	//スワップチェーンの生成に失敗した場合はエラー
 	assert(SUCCEEDED(hr));
 
@@ -1978,70 +1978,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	//出力ウィンドウへの文字出力
 	OutputDebugStringA("Hello, DirextX!\n");
 
-	//解放処理
+	CloseHandle(fenceEvent);
 
-
-	// === GPU 使用完了を待つ (省略していたらここで必ず待機すべき) ===
-	// WaitForGPU(); のような処理が必要
-
-	// --- GPUリソース・一時データの解放 ---
-	//graphicPipelineState->Release(); //パイプラインステートの解放
-	//signatureBlob->Release(); //ルートシグネチャのシリアライズの解放
-	//if (errorBlob)
-	//{
-	//	errorBlob->Release(); //エラーメッセージの解放
-	//}
-	//rootSignature->Release(); //ルートシグネチャの解放
-	//pixelShaderBlob->Release(); //ピクセルシェーダーの解放
-	//vertexShaderBlob->Release(); //頂点シェーダーの解放
-
-	// --- DXCコンパイラ関係 ---
-	//if (dxcUtils) { dxcUtils->Release(); dxcUtils = nullptr; }
-	//if (dxcCompiler) { dxcCompiler->Release(); dxcCompiler = nullptr; }
-	//if (includeHandler) { includeHandler->Release(); includeHandler = nullptr; }
-
-	// --- 各種GPUリソース（コメントアウトはそのまま） ---
-	//materialResource->Release();
-	//wvpResource->Release();
-	//indexResourceSprite->Release();
-	//textureResource->Release();
-	//textureResource2->Release();
-	//vertexResourceSprite->Release();
-	//vertexResourceSphere->Release();
-	//vertexResourceModel->Release();
-	//indexResourceSphere->Release();
-	//materialResourceSprite->Release();
-	//directionalLight->Release();
-	//transformationMatrixResourceSprite->Release();
-	//transformationMatrixResourceSphere->Release();
-	//intermediateResource->Release();
-	//intermediateResource2->Release();
-	//depthStencilResource->Release();
-
-	//srvDescriptorHeap->Release();
-	//dsvDescriptorHeap->Release();
-
-	// --- シンク処理関連 ---
-	//CloseHandle(fenceEvent); //フェンスイベントの解放
-	//fence->Release(); //フェンスの解放
-
-	// --- 描画コマンド関連 ---
-	//rtvDescriptorHeap->Release(); //ディスクリプタヒープの解放
-	//swapChainResources[0]->Release(); //スワップチェーンのリソースの解放
-	//swapChainResources[1]->Release(); //スワップチェーンのリソースの解放
-	//commandList->Release(); //コマンドリストの解放
-	//commandAllocator->Release(); //コマンドアロケーターの解放
-	//commandQueue->Release(); //コマンドキューの解放
-
-	// --- アダプター / ファクトリー関係 ---
-	//useAdapter->Release(); //アダプターの解放
-	//dxgiFactory->Release(); //DXGIファクトリーの解放
-
-	// --- デバイス（最後に解放） ---
-	//device->Release(); //デバイスの解放
-#ifdef _DEBUG
-	//debugController->Release(); //デバッグコントローラーの解放
-#endif
 	delete[] vertexData;
 	delete[] indexData;
 	// --- ウィンドウ解放 ---
