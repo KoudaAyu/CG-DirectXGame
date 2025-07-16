@@ -746,26 +746,7 @@ ID3D12Resource* CreateDepthStencilTextureResource(ID3D12Device* device, int32_t 
 	return resource;
 }
 
-//void UploadTextureData(ID3D12Resource* texture, const DirectX::ScratchImage& mipImages)
-//{
-//	//Meta情報を所得
-//	const DirectX::TexMetadata& metadata = mipImages.GetMetadata();
-//	//全MipMapについて
-//	for (size_t mipLevel = 0; mipLevel < metadata.mipLevels; ++mipLevel)
-//	{
-//		//MipMapLevelを指定して各Imageを取得
-//		const DirectX::Image* img = mipImages.GetImage(mipLevel, 0, 0);
-//		//Textureに転送
-//		HRESULT hr = texture->WriteToSubresource(
-//			UINT(mipLevel),
-//			nullptr,//全領域へコピー
-//			img->pixels,//元データアドレス
-//			UINT(img->rowPitch),//1ラインサイズ
-//			UINT(img->slicePitch)//1枚サイズ
-//		);
-//		assert(SUCCEEDED(hr));
-//	}
-//}
+
 
 [[nodiscard]]
 ID3D12Resource* UploadTextureData(ID3D12Resource* texture, const DirectX::ScratchImage& mipImages, ID3D12Device* device,
@@ -1113,12 +1094,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	descriptorRange[0].RegisterSpace = 0;
 	descriptorRange[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
-	// CBV: b0, b1, b2
-	//descriptorRange[1].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
-	//descriptorRange[1].NumDescriptors = 3;
-	//descriptorRange[1].BaseShaderRegister = 2;
-	//descriptorRange[1].RegisterSpace = 1;
-	//descriptorRange[1].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+	
 
 
 	//RootParemeter生成PuxelShaderのMaterialとVertexShaderのTransform
@@ -1260,71 +1236,105 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 
 	//パイプラインステートの生成に失敗した場合はエラー
 	assert(SUCCEEDED(hr));
+	
+		// 球体
+		const uint32_t kSubdivision = 16; // 16分割
 
-	//球体
-	const uint32_t kSubdivision = 16;//16分割
-
-	//経度分割1つ分の角度
+	// 経度分割1つ分の角度
 	const float kLonEvery = DirectX::XM_2PI / float(kSubdivision);
 	// 緯度分割1つ分の角度
 	const float kLatEvery = DirectX::XM_PI / float(kSubdivision);
-	
-	VertexData* vertexData = new VertexData[(kSubdivision + 1) * (kSubdivision + 1)];
 
+	// 頂点数・インデックス数
+	// 緯度方向と経度方向の両端に重複する頂点があるため、+1が必要
 	const uint32_t kVertexCount = (kSubdivision + 1) * (kSubdivision + 1);
-	const uint32_t kIndexCount = kSubdivision * kSubdivision * 6;
+	const uint32_t kIndexCount = kSubdivision * kSubdivision * 6; // 各四角形に三角形2つ、各三角形に頂点3つで 2*3=6
 
-	ID3D12Resource* vertexResourceSphere = CreateBufferResource(device, sizeof(VertexData) * kVertexCount);
-	VertexData* mappedVertex = nullptr;
-	vertexResourceSphere->Map(0, nullptr, reinterpret_cast<void**>(&mappedVertex));
-	memcpy(mappedVertex, vertexData, sizeof(VertexData)* kVertexCount);
-	vertexResourceSphere->Unmap(0, nullptr);
+	// 頂点配列を確保
+	VertexData* vertexData = new VertexData[kVertexCount];
 
+	// --- 頂点データを埋める ---
 	for (uint32_t lat = 0; lat <= kSubdivision; ++lat)
 	{
+		// 緯度 (theta): -π/2 (下端) から π/2 (上端) まで
 		float theta = -DirectX::XM_PIDIV2 + DirectX::XM_PI * (float(lat) / kSubdivision);
 		for (uint32_t lon = 0; lon <= kSubdivision; ++lon)
 		{
-			float phi = -DirectX::XM_2PI * (float(lon) / kSubdivision);
-			uint32_t idx = lat * (kSubdivision + 1) + lon;
+			// 経度 (phi): 0 (東端) から 2π (一周) まで
+			float phi = DirectX::XM_2PI * (float(lon) / kSubdivision);
+			uint32_t idx = lat * (kSubdivision + 1) + lon; // 1次元配列内のインデックス
+
+			// 球面座標からデカルト座標への変換
 			vertexData[idx].position.x = cos(theta) * cos(phi);
 			vertexData[idx].position.y = sin(theta);
 			vertexData[idx].position.z = cos(theta) * sin(phi);
-			vertexData[idx].position.w = 1.0f;
+			vertexData[idx].position.w = 1.0f; // 同次座標
+
+			// テクスチャ座標 (UV)
+			// U: 経度に比例 (0.0 から 1.0)
 			vertexData[idx].texcoord.x = float(lon) / kSubdivision;
+			// V: 緯度に比例 (1.0 から 0.0、上向きが正になるように反転)
 			vertexData[idx].texcoord.y = 1.0f - float(lat) / kSubdivision;
-			vertexData[idx].normal = { vertexData[idx].position.x, vertexData[idx].position.y, vertexData[idx].position.z };
+
+			// 法線ベクトル (原点から頂点へのベクトルがそのまま法線となる)
+			vertexData[idx].normal = {
+				vertexData[idx].position.x,
+				vertexData[idx].position.y,
+				vertexData[idx].position.z
+			};
 		}
 	}
 
-	uint32_t* indexData = new uint32_t[kSubdivision * kSubdivision * 6];
-	uint32_t idx = 0;
+
+	// --- 頂点バッファを作成・アップロード ---
+	ID3D12Resource* vertexResourceSphere = CreateBufferResource(device, sizeof(VertexData) * kVertexCount);
+	VertexData* mappedVertex = nullptr;
+	vertexResourceSphere->Map(0, nullptr, reinterpret_cast<void**>(&mappedVertex));
+	memcpy(mappedVertex, vertexData, sizeof(VertexData) * kVertexCount);
+	vertexResourceSphere->Unmap(0, nullptr);
+
+	uint32_t* indexData = new uint32_t[kIndexCount];
+	uint32_t idx = 0; // ここを元のままの変数名に戻しました
+
 	for (uint32_t lat = 0; lat < kSubdivision; ++lat)
 	{
 		for (uint32_t lon = 0; lon < kSubdivision; ++lon)
 		{
-			uint32_t v0 = lat * (kSubdivision + 1) + lon;
-			uint32_t v1 = v0 + 1;
-			uint32_t v2 = v0 + (kSubdivision + 1);
-			uint32_t v3 = v2 + 1;
-			// 1枚目の三角形
-			indexData[idx++] = v0;
-			indexData[idx++] = v1;
-			indexData[idx++] = v2;
-			// 2枚目の三角形
-			indexData[idx++] = v1;
-			indexData[idx++] = v3;
-			indexData[idx++] = v2;
+			// 四角形を構成する4つの頂点のインデックス
+			// lat, lon で定義される四角形の左上を基準とする
+			//
+			//  v0 (lat,lon) --- v1 (lat,lon+1)
+			//  |                    |
+			//  v2 (lat+1,lon) --- v3 (lat+1,lon+1)
+			//
+
+			uint32_t v0 = lat * (kSubdivision + 1) + lon;             // 左上 (A)
+			uint32_t v1 = v0 + 1;                                      // 右上 (C)
+			uint32_t v2 = v0 + (kSubdivision + 1);                     // 左下 (B)
+			uint32_t v3 = v2 + 1;                                      // 右下 (D)
+
+			// 四角形を2つの三角形で表現する
+			// 1つ目の三角形: v0, v2, v1 (A, B, C)
+			// DirectXでは通常、右手座標系で反時計回り（CCW）が表
+			indexData[idx++] = v0; // A
+			indexData[idx++] = v2; // B
+			indexData[idx++] = v1; // C
+
+			// 2つ目の三角形: v2, v3, v1 (B, D, C)
+			indexData[idx++] = v2; // B
+			indexData[idx++] = v3; // D
+			indexData[idx++] = v1; // C
 		}
 	}
 
-
+	// --- インデックスバッファを作成・アップロード ---
 	ID3D12Resource* indexResourceSphere = CreateBufferResource(device, sizeof(uint32_t) * kIndexCount);
 	uint32_t* mappedIndex = nullptr;
 	indexResourceSphere->Map(0, nullptr, reinterpret_cast<void**>(&mappedIndex));
-	memcpy(mappedIndex, indexData, sizeof(uint32_t)* kIndexCount);
+	memcpy(mappedIndex, indexData, sizeof(uint32_t) * kIndexCount);
 	indexResourceSphere->Unmap(0, nullptr);
 
+	// --- バッファビュー設定 ---
 	D3D12_VERTEX_BUFFER_VIEW vertexBufferViewSphere{};
 	vertexBufferViewSphere.BufferLocation = vertexResourceSphere->GetGPUVirtualAddress();
 	vertexBufferViewSphere.SizeInBytes = sizeof(VertexData) * kVertexCount;
@@ -1334,7 +1344,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	indexBufferViewSphere.BufferLocation = indexResourceSphere->GetGPUVirtualAddress();
 	indexBufferViewSphere.SizeInBytes = sizeof(uint32_t) * kIndexCount;
 	indexBufferViewSphere.Format = DXGI_FORMAT_R32_UINT;
-
 
 	
 	// --- GPUバッファに転送 ---
@@ -1677,7 +1686,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 			//RootSignatureを設定。PSOに設定しているけれど別途設定が必要
 			commandList->SetGraphicsRootSignature(rootSignature);
 			commandList->SetPipelineState(graphicPipelineState); //パイプラインステートを設定
-			//Spriteの描画
+			//Sphereの描画
 			commandList->IASetVertexBuffers(0, 1, &vertexBufferViewSphere);
 			commandList->IASetIndexBuffer(&indexBufferViewSphere);
 			commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
@@ -1794,7 +1803,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 
 	vertexResourceSprite->Release();
 	vertexResourceSphere->Release();
-
+	indexResourceSphere->Release();
 	materialResourceSprite->Release();
 	directionalLight->Release();
 	transformationMatrixResourceSprite->Release();
