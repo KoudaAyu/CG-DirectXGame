@@ -22,9 +22,11 @@
 #include<dbghelp.h>
 #pragma comment(lib,"Dbghelp.lib")
 
-//ファイル関係
-#include<fstream>
+//ファイル関係 / サウンド関係
 #include<sstream>
+#include <xaudio2.h>
+#pragma comment(lib, "xaudio2.lib")
+
 
 //ReportLiveObjects
 #include <dxgidebug.h>
@@ -143,6 +145,35 @@ struct D3DResourceLeakChecker
 			
 		}
 	}
+};
+
+//チャンクヘッダ
+struct ChunkHeader
+{
+	char id[4]; // チャンクID
+	uint32_t size; // チャンクのサイズ
+};
+//RIFFヘッダチャンク
+struct RiffHeader
+{
+	ChunkHeader chunk; // チャンクヘッダ
+	char type[4]; // フォーマット（"WAVE"）
+};
+
+struct FormatChunk
+{
+	ChunkHeader chunk; //fmt
+	WAVEFORMATEX fmt; // フォーマット情報
+};
+
+struct SoundData
+{
+	//波型フォーマット
+	WAVEFORMATEX wfex;
+	//バッファの先頭アドレス
+	BYTE* pBuffer;
+	//バッファのサイズ
+	unsigned int bufferSize;
 };
 
 
@@ -941,7 +972,32 @@ ModelData LoadObjFile(const std::string& directoryPath, const std::string& filen
 	return modelData;
 }
 
+SoundData DoundLoadWave(const char* filename)
+{
+	HRESULT result;
 
+	//ファイルを開く
+	std::ifstream file;
+	//.wavファイルをバイナリで開く
+	file.open(filename, std::ios_base::binary);
+	//ファイルが開けなかった
+	assert(file.is_open());
+
+	//wavデータの読み込み
+	//RIFFヘッダーの読み込み
+	RiffHeader riff;
+	file.read((char*)&riff, sizeof(riff));
+	//ファイルがRIFFかチェック
+	if (strncmp(riff.chunk.id, "RIFF", 4) != 0)
+	{
+		assert(0);
+	}
+	//タイプがWAVEかチェック
+	if (strncmp(riff.type, "WAVE", 4) != 0)
+	{
+		assert(0);
+	}
+}
 
 //Windowsアプリでのエントリーポイント(main関数)
 int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
@@ -1760,6 +1816,13 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	//Sphereの描画切り替え
 	bool drawSphere = true;
 	bool drawSprite = false;
+
+	//サウンド関係
+	Microsoft::WRL::ComPtr<IXAudio2> xAudio2;
+	IXAudio2MasteringVoice* masteringVoice ;
+	//XAudio2の初期化
+	result = XAudio2Create(&xAudio2, 0,XAUDIO2_DEFAULT_PROCESSOR);
+	result = xAudio2->CreateMasteringVoice(&masteringVoice);
 
 	//Imguiの初期化
 	IMGUI_CHECKVERSION();
