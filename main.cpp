@@ -2086,37 +2086,63 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	//解放処理
 
 
-	graphicPipelineState->Release(); //パイプラインステートの解放
-	signatureBlob->Release(); //ルートシグネチャのシリアライズの解放
+	if (graphicPipelineState)
+	{
+		graphicPipelineState->Release();
+	} //パイプラインステートの解放
+	if (signatureBlob)
+	{
+		signatureBlob->Release();
+	} //ルートシグネチャのシリアライズの解放
 	if (errorBlob)
 	{
 		errorBlob->Release(); //エラーメッセージの解放
 	}
-	rootSignature->Release(); //ルートシグネチャの解放
-	pixelShaderBlob->Release(); //ピクセルシェーダーの解放
-	vertexShaderBlob->Release(); //頂点シェーダーの解放
-	/*materialResource->Release();*/
-	/*wvpResource->Release();*/
+	if (rootSignature)
+	{
+		rootSignature->Release();
+	} //ルートシグネチャの解放
+	if (pixelShaderBlob)
+	{
+		pixelShaderBlob->Release();
+	} //ピクセルシェーダーの解放
+	if (vertexShaderBlob)
+	{
+		vertexShaderBlob->Release();
+	}//頂点シェーダーの解放
+	if (materialResource)
+	{
+		materialResource->Release();
+	}
+	if (wvpResource)
+	{
+		wvpResource->Release();
+	}
 
-
-	if (dxcUtils) { dxcUtils->Release(); dxcUtils = nullptr; }
-	if (dxcCompiler) { dxcCompiler->Release(); dxcCompiler = nullptr; }
-	if (includeHandler) { includeHandler->Release(); includeHandler = nullptr; }
+	if (dxcUtils) { 
+		dxcUtils->Release();
+	}
+	if (dxcCompiler) { 
+		dxcCompiler->Release(); 
+	}
+	if (includeHandler) { 
+		includeHandler->Release();
+	}
 
 
 	//indexResourceSprite->Release();
 
-	/*textureResource->Release();
-	textureResource2->Release();*/
+	//textureResource->Release();
+	//textureResource2->Release();
 
-	//vertexResourceSprite->Release();
-	//vertexResourceSphere->Release();
-	//vertexResourceModel->Release();
-	//indexResourceSphere->Release();
-	//materialResourceSprite->Release();
-	//directionalLight->Release();
-	//transformationMatrixResourceSprite->Release();
-	//transformationMatrixResourceSphere->Release();
+	vertexResourceSprite->Release();
+	vertexResourceSphere->Release();
+	vertexResourceModel->Release();
+	indexResourceSphere->Release();
+	materialResourceSprite->Release();
+	directionalLight->Release();
+	transformationMatrixResourceSprite->Release();
+	transformationMatrixResourceSphere->Release();
 	//intermediateResource->Release();
 	//intermediateResource2->Release();
 
@@ -2130,17 +2156,17 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	CloseHandle(fenceEvent); //フェンスイベントの解放
 	fence->Release(); //フェンスの解放
 	rtvDescriptorHeap->Release(); //ディスクリプタヒープの解放
-	//swapChainResources[0]->Release(); //スワップチェーンのリソースの解放
-	//swapChainResources[1]->Release(); //スワップチェーンのリソースの解放
+	swapChainResources[0]->Release(); //スワップチェーンのリソースの解放
+	swapChainResources[1]->Release(); //スワップチェーンのリソースの解放
 	swapChain->Release(); //スワップチェーンの解放
 	commandList->Release(); //コマンドリストの解放
 	commandAllocator->Release(); //コマンドアロケーターの解放
 	commandQueue->Release(); //コマンドキューの解放
 
 	useAdapter->Release(); //アダプターの解放
-	dxgiFactory->Release(); //DXGIファクトリーの解放
+	//dxgiFactory->Release(); //DXGIファクトリーの解放
 
-	device->Release(); //デバイスの解放
+	//device->Release(); //デバイスの解放
 #ifdef _DEBUG
 	debugController->Release(); //デバッグコントローラーの解放
 #endif
@@ -2169,6 +2195,7 @@ Microsoft::WRL::ComPtr<ID3D12DebugDevice> debugDevice;
 if (SUCCEEDED(device->QueryInterface(IID_PPV_ARGS(&debugDevice)))) {
     debugDevice->ReportLiveDeviceObjects(D3D12_RLDO_DETAIL);
 }
+debugDevice->Release();
 #endif
 
 	return 0;
