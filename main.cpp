@@ -15,6 +15,11 @@
 #pragma comment(lib,"d3d12.lib")
 #pragma comment(lib,"dxgi.lib")
 
+#define DIRECTIONPUT_VECTOR			0x0800
+#include<dinput.h>
+#pragma comment(lib, "dinput8.lib")
+#pragma comment(lib, "dxguid.lib")
+
 //Comptr
 #include<wrl.h>
 
@@ -1068,7 +1073,7 @@ void SoundPlayWave(Microsoft::WRL::ComPtr<IXAudio2>& xAudio2, const SoundData& s
 }
 
 //Windowsアプリでのエントリーポイント(main関数)
-int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 {
 	D3DResourceLeakChecker leakChecker; //リソースリークチェック用のオブジェクト
 
@@ -1906,6 +1911,22 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	//音声再生
 	SoundPlayWave(xAudio2, soundData);
 
+	//DirectInputの初期化
+	IDirectInput8* directInput = nullptr;
+	result = DirectInput8Create(hInstance, DIRECTINPUT_VERSION, IID_IDirectInput8, (void**)&directInput, nullptr);
+	assert(SUCCEEDED(hr));
+	//キーボードデバイスの生成
+	IDirectInputDevice8* keyboard = nullptr;
+	result = directInput->CreateDevice(GUID_SysKeyboard, &keyboard,NULL);
+	assert(SUCCEEDED(hr));
+	//入力データ形式のセット
+	result = keyboard->SetDataFormat(&c_dfDIKeyboard);//標準形式
+	assert(SUCCEEDED(hr));
+	//排他制御レベルのセット
+	result = keyboard->SetCooperativeLevel(hwnd, DISCL_BACKGROUND | DISCL_NONEXCLUSIVE | DISCL_NOWINKEY);
+	assert(SUCCEEDED(hr));
+	
+
 	//Imguiの初期化
 	IMGUI_CHECKVERSION();
 	ImGui::CreateContext();
@@ -1984,7 +2005,16 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 			//ImGui内部コマンドを生成する
 			ImGui::Render();
 
+			//キーボード情報の取得開始
+			keyboard->Acquire();
+			//全キーの入力状態を取得する
+			BYTE key[256] = {};
+			keyboard->GetDeviceState(sizeof(key), key);
 
+			if (key[DIK_0])
+			{
+				OutputDebugStringA("Hit 0\n");
+			}
 
 			//これから書き込むバックバッファのインデックスを取得する
 			UINT backBufferIndex = swapChain->GetCurrentBackBufferIndex();
