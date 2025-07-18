@@ -22,9 +22,11 @@
 #include<dbghelp.h>
 #pragma comment(lib,"Dbghelp.lib")
 
-//ファイル関係
-#include<fstream>
+//ファイル関係 / サウンド関係
 #include<sstream>
+#include <xaudio2.h>
+#pragma comment(lib, "xaudio2.lib")
+
 
 //ReportLiveObjects
 #include <dxgidebug.h>
@@ -140,9 +142,38 @@ struct D3DResourceLeakChecker
 			debug->ReportLiveObjects(DXGI_DEBUG_ALL, DXGI_DEBUG_RLO_ALL);
 			debug->ReportLiveObjects(DXGI_DEBUG_APP, DXGI_DEBUG_RLO_ALL);
 			debug->ReportLiveObjects(DXGI_DEBUG_D3D12, DXGI_DEBUG_RLO_ALL);
-			
+
 		}
 	}
+};
+
+//チャンクヘッダ
+struct ChunkHeader
+{
+	char id[4]; // チャンクID
+	uint32_t size; // チャンクのサイズ
+};
+//RIFFヘッダチャンク
+struct RiffHeader
+{
+	ChunkHeader chunk; // チャンクヘッダ
+	char type[4]; // フォーマット（"WAVE"）
+};
+
+struct FormatChunk
+{
+	ChunkHeader chunk; //fmt
+	WAVEFORMATEX fmt; // フォーマット情報
+};
+
+struct SoundData
+{
+	//波型フォーマット
+	WAVEFORMATEX wfex;
+	//バッファの先頭アドレス
+	BYTE* pBuffer;
+	//バッファのサイズ
+	unsigned int bufferSize;
 };
 
 
@@ -650,7 +681,7 @@ Microsoft::WRL::ComPtr<IDxcBlob> CompileShader(
 	//Shaderのコンパイルに成功したので、ログに出力する
 	Log(*logStream, ConvertString(std::format(L"Complete CompileShader, path{},profile:{}\n", filePath, profile)));
 
-	
+
 	return shaderBlob; //コンパイルしたShaderのバイナリを返す
 }
 
@@ -941,7 +972,100 @@ ModelData LoadObjFile(const std::string& directoryPath, const std::string& filen
 	return modelData;
 }
 
+SoundData SoundLoadWave(const char* filename)
+{
+	/*HRESULT result;*/
 
+	//ファイルを開く
+	std::ifstream file;
+	//.wavファイルをバイナリで開く
+	file.open(filename, std::ios_base::binary);
+	//ファイルが開けなかった
+	assert(file.is_open());
+
+	//wavデータの読み込み
+	//RIFFヘッダーの読み込み
+	RiffHeader riff;
+	file.read((char*)&riff, sizeof(riff));
+	//ファイルがRIFFかチェック
+	if (strncmp(riff.chunk.id, "RIFF", 4) != 0)
+	{
+		assert(0);
+	}
+	//タイプがWAVEかチェック
+	if (strncmp(riff.type, "WAVE", 4) != 0)
+	{
+		assert(0);
+	}
+	//Formatチャンクの読み込み
+	FormatChunk format = {};
+	//チャンクヘッダーの読み込み
+	file.read((char*)&format, sizeof(ChunkHeader));
+	if (strncmp(format.chunk.id, "fmt ", 4) != 0) // "fmt" の後にスペースを追加
+	{
+		assert(0);
+	}
+	//チャンク本体の読み込み
+	assert(format.chunk.size <= sizeof(format.fmt));
+	file.read((char*)&format.fmt, format.chunk.size);
+	//Dataチャンクの読み込み
+	ChunkHeader data;
+	file.read((char*)&data, sizeof(data));
+	//JUNKチャンクを検出した場合
+	if (strncmp(data.id, "JUNK", 4) == 0)
+	{
+		//読み取り位置をJUNKチャンクの終わりまで進める
+		file.seekg(data.size, std::ios_base::cur);
+		//再度読み込み
+		file.read((char*)&data, sizeof(data));
+	}
+	if (strncmp(data.id, "data", 4) != 0)
+	{
+		assert(0);
+	}
+	//Dataチャンクのデータ部(波形データ)の読み込み
+	char* pBuffer = new char[data.size];
+	file.read(pBuffer, data.size);
+	//Waveファイルを閉じる
+	file.close();
+
+	//returnする為の音声データ
+	SoundData soundData = {};
+	soundData.wfex = format.fmt; //Waveフォーマット情報をセット
+	soundData.pBuffer = reinterpret_cast<BYTE*>(pBuffer);
+	soundData.bufferSize = data.size;
+
+	return soundData;
+}
+
+void SoundUnload(SoundData* soundData)
+{
+	//バッファのメモリを解放
+	delete soundData->pBuffer;
+	soundData->pBuffer = 0;
+	soundData->bufferSize = 0;
+	soundData->wfex = {};
+}
+
+void SoundPlayWave(Microsoft::WRL::ComPtr<IXAudio2>& xAudio2, const SoundData& soundData)
+{
+	HRESULT result;
+
+	//波形フォーマットを元にSourceVoiceの生成
+	IXAudio2SourceVoice* pSourceVoice = nullptr;
+	result = xAudio2->CreateSourceVoice(&pSourceVoice, &soundData.wfex);
+	assert(SUCCEEDED(result)); //SourceVoiceの生成に失敗したら停止
+
+	//再生する波形データの設定
+	XAUDIO2_BUFFER buf{};
+	buf.pAudioData = soundData.pBuffer;
+	buf.AudioBytes = soundData.bufferSize;
+	buf.Flags = XAUDIO2_END_OF_STREAM;
+
+	//波形データの再生
+	result = pSourceVoice->SubmitSourceBuffer(&buf);
+	result = pSourceVoice->Start();
+}
 
 //Windowsアプリでのエントリーポイント(main関数)
 int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
@@ -1211,11 +1335,11 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	D3D12_CPU_DESCRIPTOR_HANDLE rtvHandles[2];
 	//まず1つ目を作る。1つ目は最初のところ。こちらで場所指定する必要あり
 	rtvHandles[0] = rtvStartHandle;
-	device->CreateRenderTargetView(swapChainResources[0].Get() , &rtvDesc, rtvHandles[0]);
+	device->CreateRenderTargetView(swapChainResources[0].Get(), &rtvDesc, rtvHandles[0]);
 	//2つ目は1つ目の後ろに作る
 	rtvHandles[1].ptr = rtvHandles[0].ptr + device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 	//2つ目を作る
-	device->CreateRenderTargetView(swapChainResources[1].Get() , & rtvDesc, rtvHandles[1]);
+	device->CreateRenderTargetView(swapChainResources[1].Get(), &rtvDesc, rtvHandles[1]);
 
 
 	MSG msg{};
@@ -1761,6 +1885,27 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	bool drawSphere = true;
 	bool drawSprite = false;
 
+	//サウンド関係
+	Microsoft::WRL::ComPtr<IXAudio2> xAudio2;
+	IXAudio2MasteringVoice* masterVoice = nullptr;
+
+	// XAudio2の初期化
+	HRESULT result = XAudio2Create(&xAudio2, 0, XAUDIO2_DEFAULT_PROCESSOR);
+	if (FAILED(result))
+	{
+		assert(0 && "XAudio2Create failed");
+	}
+
+	result = xAudio2->CreateMasteringVoice(&masterVoice);
+	if (FAILED(result))
+	{
+		assert(0 && "CreateMasteringVoice failed");
+	}
+	//音声読み込み
+	SoundData soundData = SoundLoadWave("Resources/Alarm01.wav");
+	//音声再生
+	SoundPlayWave(xAudio2, soundData);
+
 	//Imguiの初期化
 	IMGUI_CHECKVERSION();
 	ImGui::CreateContext();
@@ -1870,7 +2015,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 			commandList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 
 			//描画用のDescriptorHeapの設定
-			Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> descriptorHeap[] = { srvDescriptorHeap.Get()};
+			Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> descriptorHeap[] = { srvDescriptorHeap.Get() };
 			commandList->SetDescriptorHeaps(1, descriptorHeap->GetAddressOf());
 
 			//コマンドを積む
@@ -1926,7 +2071,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 			assert(SUCCEEDED(hr));
 
 			//GUPにコマンドリストの実行を行わせる
-			ID3D12CommandList* commandLists[] = { commandList.Get()};
+			ID3D12CommandList* commandLists[] = { commandList.Get() };
 			commandQueue->ExecuteCommandLists(1, commandLists);
 			//GUPとOSに画面の交換を要求する
 			swapChain->Present(1, 0);
@@ -1979,6 +2124,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	OutputDebugStringA("Hello, DirextX!\n");
 
 	CloseHandle(fenceEvent);
+
+	xAudio2.Reset();
+	SoundUnload(&soundData);
 
 	delete[] vertexData;
 	delete[] indexData;
