@@ -311,6 +311,25 @@ Matrix4x4 MakeAffineMatrix(const Vector3& scale, const Vector3& rotate, const Ve
 	return SRT;
 }
 
+Matrix4x4 MakeAffineMatrix(const Vector3& scale, const Matrix4x4& rotateMatrix, const Vector3& translate)
+{
+	Matrix4x4 result = rotateMatrix; // 回転行列を初期値とする
+
+	// スケールを適用 (回転行列の各要素にスケールを乗算)
+	// 例えば、m[0][0] *= scale.x; m[1][1] *= scale.y; m[2][2] *= scale.z;
+	// または、先にMakeScaleMatrix(scale)を作っておき、それを回転行列にMultiplyする
+	Matrix4x4 scaleMatrix = MakeScaleMatrix(scale);
+	result = Multiply(scaleMatrix, result); // スケールを適用
+
+	// 平行移動成分を設定
+	result.m[3][0] = translate.x;
+	result.m[3][1] = translate.y;
+	result.m[3][2] = translate.z;
+	result.m[3][3] = 1.0f; // 最後の要素は1
+
+	return result;
+}
+
 Matrix4x4 MakePerspectiveFovMatrix(float fovY, float aspectRatio, float nearZ, float farZ)
 {
 	Matrix4x4 result = {}; // 全要素を0で初期化
