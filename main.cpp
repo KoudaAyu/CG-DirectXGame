@@ -2,6 +2,7 @@
 
 //自作h
 #include"DebugCamera.h"
+#include"GameScene.h"
 #include"KeyInput.h"
 #include"Matrix4x4.h"
 #include"Vector.h"
@@ -1005,9 +1006,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	descriptorRange[0].RegisterSpace = 0;
 	descriptorRange[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
-
-
-
 	//RootParemeter生成PuxelShaderのMaterialとVertexShaderのTransform
 	D3D12_ROOT_PARAMETER rootParameters[4] = {};
 	rootParameters[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;//CBVを使う
@@ -1523,6 +1521,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	DebugCamera debugCamera_;
 	debugCamera_.Initialize(hInstance, hwnd);
 
+	GameScene* gameScene = new GameScene();
+	gameScene->Initialize();
+
 
 	//Imguiの初期化
 	IMGUI_CHECKVERSION();
@@ -1747,6 +1748,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 	xAudio2.Reset();
 	SoundUnload(&soundData);
+
+	delete gameScene;
+	gameScene = nullptr;
 
 	delete[] vertexData;
 	delete[] indexData;
