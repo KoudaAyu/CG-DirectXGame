@@ -12,6 +12,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="DebugCamera.cpp" />
+    <ClCompile Include="Dx12.cpp" />
     <ClCompile Include="externals\imgui\imgui.cpp" />
     <ClCompile Include="externals\imgui\imgui_demo.cpp" />
     <ClCompile Include="externals\imgui\imgui_draw.cpp" />
@@ -23,6 +24,9 @@
     <ClCompile Include="KeyInput.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="Matrix4x4.cpp" />
+    <ClCompile Include="Sprite.cpp" />
+    <ClCompile Include="StringConverter.cpp" />
+    <ClCompile Include="Texture.cpp" />
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="Object3d.PS.hlsl">
@@ -40,6 +44,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="DebugCamera.h" />
+    <ClInclude Include="Dx12.h" />
     <ClInclude Include="externals\imgui\imconfig.h" />
     <ClInclude Include="externals\imgui\imgui.h" />
     <ClInclude Include="externals\imgui\imgui_impl_dx12.h" />
@@ -51,7 +56,13 @@
     <ClInclude Include="GameScene.h" />
     <ClInclude Include="KeyInput.h" />
     <ClInclude Include="Matrix4x4.h" />
+    <ClInclude Include="Model.h" />
+    <ClInclude Include="Sprite.h" />
+    <ClInclude Include="StringConverter.h" />
+    <ClInclude Include="Struct.h" />
+    <ClInclude Include="Texture.h" />
     <ClInclude Include="Vector.h" />
+    <ClInclude Include="Window.h" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="externals\imgui\LICENSE.txt" />
