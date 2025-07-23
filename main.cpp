@@ -5,6 +5,7 @@
 #include"KeyInput.h"
 #include"Matrix4x4.h"
 #include"Vector.h"
+#include"GameScene.h"
 
 #include<chrono> //時間を扱うライブラリ
 #include<cstdint>
