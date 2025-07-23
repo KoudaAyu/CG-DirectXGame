@@ -1524,6 +1524,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	DebugCamera debugCamera_;
 	debugCamera_.Initialize(hInstance, hwnd);
 
+	GameScene gameScene;
+	gameScene.Initialize();
+
+
+
 
 	//Imguiの初期化
 	IMGUI_CHECKVERSION();
@@ -1748,6 +1753,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 	xAudio2.Reset();
 	SoundUnload(&soundData);
+
+	delete &gameScene;
 
 	delete[] vertexData;
 	delete[] indexData;
