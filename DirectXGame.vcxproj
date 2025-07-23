@@ -23,6 +23,7 @@
     <ClCompile Include="KeyInput.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="Matrix4x4.cpp" />
+    <ClCompile Include="Sound.cpp" />
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="Object3d.PS.hlsl">
@@ -51,7 +52,9 @@
     <ClInclude Include="GameScene.h" />
     <ClInclude Include="KeyInput.h" />
     <ClInclude Include="Matrix4x4.h" />
+    <ClInclude Include="Struct.h" />
     <ClInclude Include="Vector.h" />
+    <ClInclude Include="Sound.h" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="externals\imgui\LICENSE.txt" />
