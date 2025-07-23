@@ -1754,7 +1754,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	xAudio2.Reset();
 	SoundUnload(&soundData);
 
-	delete &gameScene;
 
 	delete[] vertexData;
 	delete[] indexData;
