@@ -7,6 +7,7 @@ class DebugCamera
 {
 public: 
 	void Initialize(HINSTANCE hInstance, HWND hwnd);
+
 	void Update();
 
 	const Matrix4x4& GetViewMatrix() const { return view_matrix_; }
