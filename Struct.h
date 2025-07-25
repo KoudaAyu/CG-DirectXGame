@@ -4,6 +4,7 @@
 #include <vector>
 #include <xaudio2.h>
 
+#include"Matrix4x4.h"
 #include"Vector.h"
 
 struct VertexData
@@ -11,6 +12,14 @@ struct VertexData
 	Vector4 position;
 	Vector2 texcoord;
 	Vector3 normal;
+};
+
+struct Material
+{
+	Vector4 color;
+	int32_t enableLighting;
+	float padding[3]; // パディングを追加して16バイト境界に揃える
+	Matrix4x4 uvTransform; // UV変換行列
 };
 
 struct MaterialData

@@ -26,6 +26,7 @@
     <ClCompile Include="Matrix4x4.cpp" />
     <ClCompile Include="Model.cpp" />
     <ClCompile Include="Sound.cpp" />
+    <ClCompile Include="UVTransform.cpp" />
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="Object3d.PS.hlsl">
@@ -57,6 +58,7 @@
     <ClInclude Include="Matrix4x4.h" />
     <ClInclude Include="Model.h" />
     <ClInclude Include="Struct.h" />
+    <ClInclude Include="UVTransform.h" />
     <ClInclude Include="Vector.h" />
     <ClInclude Include="Sound.h" />
   </ItemGroup>

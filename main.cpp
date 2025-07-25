@@ -6,6 +6,7 @@
 #include"Matrix4x4.h"
 #include"Model.h"
 #include"Sound.h"
+#include"UVTransform.h"
 #include"Vector.h"
 #include"GameScene.h"
 
@@ -68,14 +69,6 @@ struct Transform
 };
 
 
-
-struct Material
-{
-	Vector4 color;
-	int32_t enableLighting;
-	float padding[3]; // パディングを追加して16バイト境界に揃える
-	Matrix4x4 uvTransform; // UV変換行列
-};
 
 struct DirectionalLight
 {
@@ -1070,22 +1063,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	scissorRect.top = 0; //左上のY座標
 	scissorRect.bottom = kClientHeight; //右下のY座標
 
-
-	//マテリアル用のリソースを作る
-	Microsoft::WRL::ComPtr<ID3D12Resource> materialResource = CreateBufferResource(device.Get(), sizeof(Material));
-	//マテリアルにデータを書き込む
-	Material* materialData = nullptr;
-	//書き込む為のアドレス取得
-	materialResource->Map(0, nullptr, reinterpret_cast<void**>(&materialData));
-	// データを設定（赤色 RGBA: 1,0,0,1）
-	Vector4 temp{};
-	temp.x = 1.0f;
-	temp.y = 1.0f;
-	temp.z = 1.0f;
-	temp.w = 1.0f;
-	materialData->color = temp;
-	materialData->enableLighting = false;
-	materialResource->Unmap(0, nullptr);
+	UVTransform uvTransforms;
+	uvTransforms.Initialize(device.Get());
+	
 
 	Microsoft::WRL::ComPtr<ID3D12Resource> directionalLight = CreateBufferResource(device.Get(), sizeof(DirectionalLight));
 
@@ -1159,8 +1139,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 		{0.0f, 0.0f, 0.0f}
 	};
 
-	//uvTransform行列の初期化
-	materialData->uvTransform = MakeIdentity4x4();
+	
 	materialDataSprite->uvTransform = MakeIdentity4x4();
 
 	float fovY = 0.45f;  // 資料通り
@@ -1311,7 +1290,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 			ImGui::Begin("Windows");
 
 			ImGui::Checkbox("useMonsterBall", &useMonsterBall);
-			ImGui::Checkbox("LightSprite Flag", (bool*)&materialData->enableLighting);
+			ImGui::Checkbox("LightSprite Flag", (bool*)& uvTransforms.GetMaterialData()->enableLighting);
 			ImGui::Checkbox("LightSphere Flag", (bool*)&materialDataSprite->enableLighting);
 
 			ImGui::Checkbox("DrawSphere", &drawSphere);
@@ -1374,7 +1353,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 			commandList->IASetVertexBuffers(0, 1, &model.GetVertexBufferView());
 			commandList->IASetIndexBuffer(&indexBufferViewSphere);
 			commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-			commandList->SetGraphicsRootConstantBufferView(0, materialResource->GetGPUVirtualAddress());
+			uvTransforms.Draw(commandList.Get());
 			commandList->SetGraphicsRootConstantBufferView(1, transformationMatrixResourceSphere->GetGPUVirtualAddress());
 			commandList->SetGraphicsRootDescriptorTable(2, useMonsterBall ? textureSrvHandleGPU2 : textureSrvHandleGPU);
 			commandList->SetGraphicsRootConstantBufferView(3, directionalLight->GetGPUVirtualAddress());
