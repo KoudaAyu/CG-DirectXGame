@@ -11,6 +11,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="AtIndex.cpp" />
     <ClCompile Include="Buffer.cpp" />
     <ClCompile Include="DebugCamera.cpp" />
     <ClCompile Include="DebugLog.cpp" />
@@ -45,6 +46,7 @@
     </FxCompile>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="AtIndex.h" />
     <ClInclude Include="Buffer.h" />
     <ClInclude Include="DebugCamera.h" />
     <ClInclude Include="externals\imgui\imconfig.h" />
