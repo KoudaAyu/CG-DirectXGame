@@ -1,6 +1,30 @@
 #pragma once
 #include <cstdint>
+#include <string>
+#include <vector>
 #include <xaudio2.h>
+
+#include"Vector.h"
+
+struct VertexData
+{
+	Vector4 position;
+	Vector2 texcoord;
+	Vector3 normal;
+};
+
+struct MaterialData
+{
+	std::string textureFilePath; // テクスチャファイルのパス
+};
+
+//objファイル関係
+struct ModelData
+{
+	std::vector<VertexData> vertices; // 頂点データ
+	MaterialData material; // マテリアルデータ
+};
+
 
 //チャンクヘッダ
 struct ChunkHeader
@@ -30,3 +54,4 @@ struct SoundData
 	//バッファのサイズ
 	unsigned int bufferSize;
 };
+
