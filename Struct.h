@@ -21,6 +21,13 @@ struct VertexData
 	Vector3 normal;
 };
 
+struct DirectionalLight
+{
+	Vector4 color;
+	Vector3 direction;
+	float intensity;
+};
+
 struct Material
 {
 	Vector4 color;

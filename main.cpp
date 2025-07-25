@@ -5,6 +5,7 @@
 #include"DebugCamera.h"
 #include"DebugLog.h"
 #include"DescriptorHeap.h"
+#include"GameScene.h"
 #include"KeyInput.h"
 #include"Matrix4x4.h"
 #include"Model.h"
@@ -12,7 +13,7 @@
 #include"StringUtil.h"
 #include"UVTransform.h"
 #include"Vector.h"
-#include"GameScene.h"
+#include"Window.h"
 
 #include<chrono> //時間を扱うライブラリ
 #include<cstdint>
@@ -65,12 +66,7 @@
 
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lParam);
 
-struct DirectionalLight
-{
-	Vector4 color;
-	Vector3 direction;
-	float intensity;
-};
+
 
 
 //リソースリークチェック
@@ -90,26 +86,26 @@ struct D3DResourceLeakChecker
 };
 
 //ウィンドウプロシージャ
-LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
-{
-	if (ImGui_ImplWin32_WndProcHandler(hwnd, msg, wparam, lparam))
-	{
-		return true;
-	}
-
-	//メッセージに応じてゲーム固有の処理を行う
-	switch (msg)
-	{
-		//ウィンドウが破棄された
-	case WM_DESTROY:
-		//アプリケーションを終了する
-		PostQuitMessage(0);
-		return 0;
-	}
-
-	//標準のメッセージ処理を行う
-	return DefWindowProc(hwnd, msg, wparam, lparam);
-}
+//LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
+//{
+//	if (ImGui_ImplWin32_WndProcHandler(hwnd, msg, wparam, lparam))
+//	{
+//		return true;
+//	}
+//
+//	//メッセージに応じてゲーム固有の処理を行う
+//	switch (msg)
+//	{
+//		//ウィンドウが破棄された
+//	case WM_DESTROY:
+//		//アプリケーションを終了する
+//		PostQuitMessage(0);
+//		return 0;
+//	}
+//
+//	//標準のメッセージ処理を行う
+//	return DefWindowProc(hwnd, msg, wparam, lparam);
+//}
 
 static LONG WINAPI ExportDump(EXCEPTION_POINTERS* exception)
 {
@@ -366,7 +362,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	WNDCLASS wc{};
 
 	//ウィンドウプロシージャ
-	wc.lpfnWndProc = WindowProc;
+	wc.lpfnWndProc = Window::WindowProc;
 
 	//ウィンドウクラス名
 	wc.lpszClassName = L"MyWindowClass";
