@@ -61,12 +61,7 @@
 
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lParam);
 
-struct Transform
-{
-	Vector3 scale;
-	Vector3 rotate;
-	Vector3 translate;
-};
+
 
 
 
@@ -1083,12 +1078,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	// 書き込み完了後はUnmapを呼ぶ
 	directionalLight->Unmap(0, nullptr);
 
-	Microsoft::WRL::ComPtr<ID3D12Resource> materialResourceSprite = CreateBufferResource(device.Get(), sizeof(Material));
-	Material* materialDataSprite = nullptr;
-	materialResourceSprite->Map(0, nullptr, reinterpret_cast<void**>(&materialDataSprite));
-	materialDataSprite->color = { 1.0f, 1.0f, 1.0f, 1.0f }; // 白（テクスチャ色をそのまま出す用）
-	materialDataSprite->enableLighting = false;
-	materialResourceSprite->Unmap(0, nullptr);
+
 
 
 	//WVP用のリソースを作る。　Matrix4x4 1つのサイズを用意する
@@ -1132,15 +1122,10 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 	Transform cameraTransform = { {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, -10.0f} };
 
-	//uvTrandform用の変数
-	Transform uvTransformSprite = {
-		{1.0f, 1.0f, 1.0f},
-		{0.0f, 0.0f, 0.0f},
-		{0.0f, 0.0f, 0.0f}
-	};
+
 
 	
-	materialDataSprite->uvTransform = MakeIdentity4x4();
+	
 
 	float fovY = 0.45f;  // 資料通り
 	float aspectRatio = static_cast<float>(kClientWidth) / static_cast<float>(kClientHeight);
@@ -1278,11 +1263,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 			transformationMatrixDataSprite->WVP = worldViewProjectionmatrixSprite;
 			transformationMatrixDataSprite->World = worldMatrixSprite;
 
-			//UVTransform用
-			Matrix4x4 uvTransformMatrix = MakeScaleMatrix(uvTransformSprite.scale);
-			uvTransformMatrix = Multiply(uvTransformMatrix, MakeRotateZMatrix(uvTransformSprite.rotate.z));
-			uvTransformMatrix = Multiply(uvTransformMatrix, MakeTranslateMatrix(uvTransformSprite.translate));
-			materialDataSprite->uvTransform = uvTransformMatrix;
+			uvTransforms.Update();
 
 			//開発用UIの処理、実際に開発用のUIを出す場合はここをゲーム固有の処理に置き換え
 			ImGui::ShowDemoWindow();
@@ -1291,7 +1272,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 			ImGui::Checkbox("useMonsterBall", &useMonsterBall);
 			ImGui::Checkbox("LightSprite Flag", (bool*)& uvTransforms.GetMaterialData()->enableLighting);
-			ImGui::Checkbox("LightSphere Flag", (bool*)&materialDataSprite->enableLighting);
+			ImGui::Checkbox("LightSphere Flag", (bool*)&uvTransforms.GetMaterialDataSprite()->enableLighting);
 
 			ImGui::Checkbox("DrawSphere", &drawSphere);
 			ImGui::Checkbox("DrawSprite", &drawSprite);
@@ -1299,9 +1280,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 			ImGui::DragFloat3("Sphere Rotate", &transformSphere.rotate.x);
 
-			ImGui::DragFloat2("UVTranslate", &uvTransformSprite.translate.x, 0.01f, -10.0f, 10.0f);
-			ImGui::DragFloat2("UVScale", &uvTransformSprite.scale.x, 0.01f, -10.0f, 10.0f);
-			ImGui::DragFloat("UVRotate", &uvTransformSprite.rotate.z, 0.01f);
+			ImGui::DragFloat2("UVTranslate", &uvTransforms.GetUVTranslateSprite().x, 0.01f, -10.0f, 10.0f);
+			ImGui::DragFloat2("UVScale", &uvTransforms.GetUVScaleSprite().x, 0.01f, -10.0f, 10.0f);
+			ImGui::DragFloat("UVRotate", &uvTransforms.GetUVRotateSprite().z, 0.01f);
 
 			ImGui::End();
 
@@ -1367,7 +1348,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 				commandList->IASetVertexBuffers(0, 1, &vertexBufferViewSprite);
 				commandList->IASetIndexBuffer(&indexBufferViewSprite);
 				commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-				commandList->SetGraphicsRootConstantBufferView(0, materialResourceSprite->GetGPUVirtualAddress());
+				uvTransforms.DrawSprite(commandList.Get());
 				commandList->SetGraphicsRootConstantBufferView(1, transformationMatrixResourceSprite->GetGPUVirtualAddress());
 				commandList->SetGraphicsRootDescriptorTable(2, useMonsterBall ? textureSrvHandleGPU2 : textureSrvHandleGPU);
 				commandList->SetGraphicsRootConstantBufferView(3, directionalLight->GetGPUVirtualAddress());
