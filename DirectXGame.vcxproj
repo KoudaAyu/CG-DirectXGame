@@ -13,6 +13,7 @@
   <ItemGroup>
     <ClCompile Include="Buffer.cpp" />
     <ClCompile Include="DebugCamera.cpp" />
+    <ClCompile Include="DebugLog.cpp" />
     <ClCompile Include="externals\imgui\imgui.cpp" />
     <ClCompile Include="externals\imgui\imgui_demo.cpp" />
     <ClCompile Include="externals\imgui\imgui_draw.cpp" />
@@ -26,6 +27,7 @@
     <ClCompile Include="Matrix4x4.cpp" />
     <ClCompile Include="Model.cpp" />
     <ClCompile Include="Sound.cpp" />
+    <ClCompile Include="StringUtil.cpp" />
     <ClCompile Include="UVTransform.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -55,8 +57,10 @@
     <ClInclude Include="externals\imgui\imstb_truetype.h" />
     <ClInclude Include="GameScene.h" />
     <ClInclude Include="KeyInput.h" />
+    <ClInclude Include="DebugLog.h" />
     <ClInclude Include="Matrix4x4.h" />
     <ClInclude Include="Model.h" />
+    <ClInclude Include="StringUtil.h" />
     <ClInclude Include="Struct.h" />
     <ClInclude Include="UVTransform.h" />
     <ClInclude Include="Vector.h" />

@@ -2,10 +2,12 @@
 
 //自作h
 #include"DebugCamera.h"
+#include"DebugLog.h"
 #include"KeyInput.h"
 #include"Matrix4x4.h"
 #include"Model.h"
 #include"Sound.h"
+#include"StringUtil.h"
 #include"UVTransform.h"
 #include"Vector.h"
 #include"GameScene.h"
@@ -61,10 +63,6 @@
 
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lParam);
 
-
-
-
-
 struct DirectionalLight
 {
 	Vector4 color;
@@ -88,50 +86,6 @@ struct D3DResourceLeakChecker
 		}
 	}
 };
-
-
-
-std::wstring ConvertString(const std::string& str)
-{
-	if (str.empty())
-	{
-		return std::wstring();
-	}
-
-	auto sizeNeeded = MultiByteToWideChar(CP_UTF8, 0, reinterpret_cast<const char*>(&str[0]), static_cast<int>(str.size()), NULL, 0);
-	if (sizeNeeded == 0)
-	{
-		return std::wstring();
-	}
-	std::wstring result(sizeNeeded, 0);
-	MultiByteToWideChar(CP_UTF8, 0, reinterpret_cast<const char*>(&str[0]), static_cast<int>(str.size()), &result[0], sizeNeeded);
-	return result;
-}
-
-std::string ConvertString(const std::wstring& str)
-{
-	if (str.empty())
-	{
-		return std::string();
-	}
-
-	auto sizeNeeded = WideCharToMultiByte(CP_UTF8, 0, str.data(), static_cast<int>(str.size()), NULL, 0, NULL, NULL);
-	if (sizeNeeded == 0)
-	{
-		return std::string();
-	}
-	std::string result(sizeNeeded, 0);
-	WideCharToMultiByte(CP_UTF8, 0, str.data(), static_cast<int>(str.size()), result.data(), sizeNeeded, NULL, NULL);
-	return result;
-}
-
-
-
-void Log(std::ostream& os, const std::string& message)
-{
-	os << message << std::endl;
-	OutputDebugStringA(message.c_str()); //出力ウィンドウに文字を出力
-}
 
 //ウィンドウプロシージャ
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
@@ -194,7 +148,7 @@ Microsoft::WRL::ComPtr<IDxcBlob> CompileShader(
 	std::ofstream* logStream)
 {
 	//これからシェーダーをコンパイルする旨をログに出す
-	Log(*logStream, ConvertString(std::format(L"Begin CompileShader, path{},profile:{}\n", filePath, profile)));
+	DebugLog::Log(*logStream, StringUtil::ConvertString(std::format(L"Begin CompileShader, path{},profile:{}\n", filePath, profile)));
 	//hlslファイルを読み込む
 	Microsoft::WRL::ComPtr<IDxcBlobEncoding> shaderScore = nullptr;
 	HRESULT hr = dxcUtils->LoadFile(filePath.c_str(), nullptr, &shaderScore);
@@ -235,7 +189,7 @@ Microsoft::WRL::ComPtr<IDxcBlob> CompileShader(
 
 	if (shaderError != nullptr && shaderError->GetStringLength() != 0)
 	{
-		Log(*logStream, shaderError->GetStringPointer());
+		DebugLog::Log(*logStream, shaderError->GetStringPointer());
 
 		//警告やエラーがあった場合は、Shaderのコンパイルに失敗したとする
 		assert(SUCCEEDED(hr));
@@ -248,40 +202,10 @@ Microsoft::WRL::ComPtr<IDxcBlob> CompileShader(
 	assert(SUCCEEDED(hr));
 
 	//Shaderのコンパイルに成功したので、ログに出力する
-	Log(*logStream, ConvertString(std::format(L"Complete CompileShader, path{},profile:{}\n", filePath, profile)));
+	DebugLog::Log(*logStream, StringUtil::ConvertString(std::format(L"Complete CompileShader, path{},profile:{}\n", filePath, profile)));
 
 
 	return shaderBlob; //コンパイルしたShaderのバイナリを返す
-}
-
-Microsoft::WRL::ComPtr<ID3D12Resource> CreateBufferResource(const Microsoft::WRL::ComPtr<ID3D12Device>& device, size_t sizeInBytes)
-{
-	// 頂点リソース用のヒープの設定
-	D3D12_HEAP_PROPERTIES uploadHeapProperties{};
-	uploadHeapProperties.Type = D3D12_HEAP_TYPE_UPLOAD; // アップロード用のヒープ
-
-	// 頂点リソースの設定（今回は汎用的なバッファとして設定）
-	D3D12_RESOURCE_DESC resourceDesc{};
-	resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER; // バッファ
-	resourceDesc.Width = sizeInBytes; // 指定されたサイズ
-	// バッファの場合はこれらを1にする決まり
-	resourceDesc.Height = 1;
-	resourceDesc.DepthOrArraySize = 1;
-	resourceDesc.MipLevels = 1;
-	resourceDesc.SampleDesc.Count = 1;
-	resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR; // 行優先
-
-	Microsoft::WRL::ComPtr<ID3D12Resource> bufferResource = nullptr;
-	HRESULT hr = device->CreateCommittedResource(
-		&uploadHeapProperties,
-		D3D12_HEAP_FLAG_NONE,
-		&resourceDesc,
-		D3D12_RESOURCE_STATE_GENERIC_READ, // データ書き込み用なのでREAD
-		nullptr,
-		IID_PPV_ARGS(&bufferResource));
-	assert(SUCCEEDED(hr)); // 失敗したらassertで止める
-
-	return bufferResource;
 }
 
 //DescriptorHeapの作成関数
@@ -303,7 +227,7 @@ DirectX::ScratchImage LoadTexture(const std::string& filePath)
 {
 	//テクスチャファイルを読み込んでプログラムで使えるようにする
 	DirectX::ScratchImage image{};
-	std::wstring filePathW = ConvertString(filePath);
+	std::wstring filePathW = StringUtil::ConvertString(filePath);
 	HRESULT hr = DirectX::LoadFromWICFile(filePathW.c_str(), DirectX::WIC_FLAGS_DEFAULT_SRGB, nullptr, image);
 	assert(SUCCEEDED(hr));
 
@@ -394,7 +318,7 @@ Microsoft::WRL::ComPtr<ID3D12Resource>UploadTextureData(Microsoft::WRL::ComPtr<I
 	std::vector<D3D12_SUBRESOURCE_DATA> subresources;
 	DirectX::PrepareUpload(device.Get(), mipImages.GetImages(), mipImages.GetImageCount(), mipImages.GetMetadata(), subresources);
 	uint64_t intermediateSize = GetRequiredIntermediateSize(texture.Get(), 0, UINT(subresources.size()));
-	Microsoft::WRL::ComPtr<ID3D12Resource> intermediateResource = CreateBufferResource(device, intermediateSize);
+	Microsoft::WRL::ComPtr<ID3D12Resource> intermediateResource = Buffer::CreateBufferResource(device, intermediateSize);
 	UpdateSubresources(commandList.Get(), texture.Get(), intermediateResource.Get(), 0, 0, UINT(subresources.size()), subresources.data());
 	//textureへの転送後は利用できるよう、D3D12_RESOURCE_STATE_DESTからD3D12_RESOURCE_STATE_GENERIC_READへResourceStateを変更する
 	D3D12_RESOURCE_BARRIER barrier{};
@@ -542,7 +466,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 		//ソフトウェアアダプタでなければ採用する
 		if (!(adapterDesc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE))
 		{
-			Log(logStream, std::format("Using adapter: {}\n", ConvertString(adapterDesc.Description)));
+			DebugLog::Log(logStream, std::format("Using adapter: {}\n", StringUtil::ConvertString(adapterDesc.Description)));
 			break;
 		}
 		useAdapter = nullptr; //ソフトウェアアダプタの場合は見なかったことにするためしないのでnullptr
@@ -580,7 +504,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 		if (SUCCEEDED(hr))
 		{
 			//生成出来たのでログ出力を行う
-			Log(logStream, std::format("Feature Level: {}\n", featureLevelNames[i]));
+			DebugLog::Log(logStream, std::format("Feature Level: {}\n", featureLevelNames[i]));
 			break; //ループを抜ける
 		}
 
@@ -589,7 +513,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 	//デバイスの生成に失敗し起動できない
 	assert(device != nullptr);
-	Log(logStream, std::format("Complete create D3D12Device!"));//初期起動完了のLogを出す
+	DebugLog::Log(logStream, std::format("Complete create D3D12Device!"));//初期起動完了のLogを出す
 
 #ifdef _DEBUG
 	ID3D12InfoQueue* infoQueue = nullptr;
@@ -788,7 +712,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 	if (FAILED(hr))
 	{
-		Log(logStream, reinterpret_cast<char*>(errorBlob->GetBufferPointer()));
+		DebugLog::Log(logStream, reinterpret_cast<char*>(errorBlob->GetBufferPointer()));
 		assert(false);
 	}
 
@@ -931,7 +855,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 
 	// --- 頂点バッファを作成・アップロード ---
-	Microsoft::WRL::ComPtr<ID3D12Resource> vertexResourceSphere = CreateBufferResource(device.Get(), sizeof(VertexData) * kVertexCount);
+	Microsoft::WRL::ComPtr<ID3D12Resource> vertexResourceSphere = Buffer::CreateBufferResource(device.Get(), sizeof(VertexData) * kVertexCount);
 	VertexData* mappedVertex = nullptr;
 	vertexResourceSphere->Map(0, nullptr, reinterpret_cast<void**>(&mappedVertex));
 	memcpy(mappedVertex, vertexData, sizeof(VertexData) * kVertexCount);
@@ -965,7 +889,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	}
 
 	// --- インデックスバッファを作成・アップロード ---
-	Microsoft::WRL::ComPtr<ID3D12Resource> indexResourceSphere = CreateBufferResource(device.Get(), sizeof(uint32_t) * kIndexCount);
+	Microsoft::WRL::ComPtr<ID3D12Resource> indexResourceSphere = Buffer::CreateBufferResource(device.Get(), sizeof(uint32_t) * kIndexCount);
 	uint32_t* mappedIndex = nullptr;
 	indexResourceSphere->Map(0, nullptr, reinterpret_cast<void**>(&mappedIndex));
 	memcpy(mappedIndex, indexData, sizeof(uint32_t) * kIndexCount);
@@ -990,7 +914,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 
 	//Sprite用の頂点Resource
-	Microsoft::WRL::ComPtr<ID3D12Resource> vertexResourceSprite = CreateBufferResource(device.Get(), sizeof(VertexData) * 6);
+	Microsoft::WRL::ComPtr<ID3D12Resource> vertexResourceSprite = Buffer::CreateBufferResource(device.Get(), sizeof(VertexData) * 6);
 	//頂点バッファビューを生成する
 	D3D12_VERTEX_BUFFER_VIEW vertexBufferViewSprite{};
 	//リソースの先頭のアドレスから使う
@@ -1001,7 +925,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	vertexBufferViewSprite.StrideInBytes = sizeof(VertexData);
 
 
-	Microsoft::WRL::ComPtr<ID3D12Resource> indexResourceSprite = CreateBufferResource(device.Get(), sizeof(uint32_t) * 6);
+	Microsoft::WRL::ComPtr<ID3D12Resource> indexResourceSprite = Buffer::CreateBufferResource(device.Get(), sizeof(uint32_t) * 6);
 	//頂点バッファービューを生成する
 	D3D12_INDEX_BUFFER_VIEW indexBufferViewSprite{};
 	//リソースの先頭アドレスから使う
@@ -1037,9 +961,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	vertexDataSprite[2].texcoord = { 1.0f,1.0f };
 	vertexDataSprite[3].texcoord = { 1.0f,0.0f };
 
-
-
-
 	//ビューポート
 	D3D12_VIEWPORT viewport{};
 	//クライアント領域のサイズと一緒にして画面全体に表示
@@ -1062,7 +983,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	uvTransforms.Initialize(device.Get());
 	
 
-	Microsoft::WRL::ComPtr<ID3D12Resource> directionalLight = CreateBufferResource(device.Get(), sizeof(DirectionalLight));
+	Microsoft::WRL::ComPtr<ID3D12Resource> directionalLight = Buffer::CreateBufferResource(device.Get(), sizeof(DirectionalLight));
 
 	// MapしてGPUリソースのCPU側の書き込み可能ポインタを取得する
 	DirectionalLight* directionalLightData = nullptr;
@@ -1073,16 +994,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	directionalLightData->direction = { 0.0f, -1.0f, 0.0f };
 	directionalLightData->intensity = 1.0f;
 
-
-
 	// 書き込み完了後はUnmapを呼ぶ
 	directionalLight->Unmap(0, nullptr);
 
-
-
-
 	//WVP用のリソースを作る。　Matrix4x4 1つのサイズを用意する
-	Microsoft::WRL::ComPtr<ID3D12Resource> wvpResource = CreateBufferResource(device.Get(), sizeof(TransformationMatrix));
+	Microsoft::WRL::ComPtr<ID3D12Resource> wvpResource = Buffer::CreateBufferResource(device.Get(), sizeof(TransformationMatrix));
 	//データを書き込む
 	TransformationMatrix* wvpData = nullptr;
 	//書き込む為のアドレス取得
@@ -1091,7 +1007,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	wvpData->World = MakeIdentity4x4();
 	wvpData->WVP = MakeIdentity4x4();
 
-	Microsoft::WRL::ComPtr<ID3D12Resource> transformationMatrixResourceSphere = CreateBufferResource(device.Get(), sizeof(TransformationMatrix));
+	Microsoft::WRL::ComPtr<ID3D12Resource> transformationMatrixResourceSphere = Buffer::CreateBufferResource(device.Get(), sizeof(TransformationMatrix));
 
 	// データを書き込むためのポインタを取得
 	TransformationMatrix* transformationMatrixDataSphere = nullptr;
@@ -1102,7 +1018,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	transformationMatrixResourceSphere->Unmap(0, nullptr);
 
 	//Sprite用のTransformationMatrix用のリソースを作る
-	Microsoft::WRL::ComPtr<ID3D12Resource> transformationMatrixResourceSprite = CreateBufferResource(device.Get(), sizeof(TransformationMatrix));
+	Microsoft::WRL::ComPtr<ID3D12Resource> transformationMatrixResourceSprite = Buffer::CreateBufferResource(device.Get(), sizeof(TransformationMatrix));
 	//データを書き込む
 	TransformationMatrix* transformationMatrixDataSprite = nullptr;
 	//書き込むためのアドレス取得
@@ -1122,10 +1038,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 	Transform cameraTransform = { {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, -10.0f} };
 
-
-
-	
-	
 
 	float fovY = 0.45f;  // 資料通り
 	float aspectRatio = static_cast<float>(kClientWidth) / static_cast<float>(kClientHeight);
@@ -1418,10 +1330,10 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	//COMの終了処理
 	CoUninitialize();
 
-	Log(logStream, "Application terminating.");
+	DebugLog::Log(logStream, "Application terminating.");
 
 	std::wstring wstringValue = L"Hello, DirectX!";
-	Log(logStream, ConvertString(std::format(L"WSTRING{}\n", wstringValue)));
+	DebugLog::Log(logStream, StringUtil::ConvertString(std::format(L"WSTRING{}\n", wstringValue)));
 
 
 	//出力ウィンドウへの文字出力
