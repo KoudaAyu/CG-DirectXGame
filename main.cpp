@@ -135,48 +135,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	DebugLog debugLog;
 	debugLog.Initialize();
 
+	Window window;
+	window.Initialize();
 
-
-	//ウィンドウ関係
-	WNDCLASS wc{};
-
-	//ウィンドウプロシージャ
-	wc.lpfnWndProc = Window::WindowProc;
-
-	//ウィンドウクラス名
-	wc.lpszClassName = L"MyWindowClass";
-
-	//インスタンスハンドル
-	wc.hInstance = GetModuleHandle(nullptr);
-
-	//カーソル
-	wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
-
-	//ウィンドウクラスを登録する
-	RegisterClass(&wc);
-
-	//クライアント領域のサイズ
-	const int32_t kClientWidth = 1280;
-	const int32_t kClientHeight = 720;
-
-	//ウィンドウサイズを表す構造体にクライアント領域を入れる
-	RECT wrc = { 0, 0, kClientWidth, kClientHeight };
-
-	//クライアント領域をもとに実際のサイズにwrcを変更してもらう
-	AdjustWindowRect(&wrc, WS_OVERLAPPEDWINDOW, FALSE);
-
-	//ウィンドウの生成
-	HWND hwnd = CreateWindow(
-		wc.lpszClassName, //ウィンドウクラス名
-		L"DirectX Window", //ウィンドウタイトル
-		WS_OVERLAPPEDWINDOW, //ウィンドウスタイル
-		CW_USEDEFAULT, CW_USEDEFAULT, //位置
-		wrc.right - wrc.left, wrc.bottom - wrc.top, //サイズ
-		nullptr, //親ウィンドウハンドル
-		nullptr, //メニューハンドル
-		wc.hInstance, //インスタンスハンドル
-		nullptr //追加のパラメータ
-	);
 
 #ifdef _DEBUG
 	Microsoft::WRL::ComPtr<ID3D12Debug1> debugController = nullptr;
@@ -190,7 +151,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	}
 #endif
 	//ウィンドウを表示する
-	ShowWindow(hwnd, SW_SHOW);
+	ShowWindow(window.GetHwnd(), SW_SHOW);
 
 	//DXGIファクトリーの生成
 	Microsoft::WRL::ComPtr<IDXGIFactory7> dxgiFactory = nullptr;
@@ -326,8 +287,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	//スワップチェーンを生成する
 	Microsoft::WRL::ComPtr<IDXGISwapChain4> swapChain;
 	DXGI_SWAP_CHAIN_DESC1 swapChainDesc{};
-	swapChainDesc.Width = kClientWidth; //ウィンドウの幅
-	swapChainDesc.Height = kClientHeight; //ウィンドウの高さ
+	swapChainDesc.Width = window.GetClientWidth(); //ウィンドウの幅
+	swapChainDesc.Height = window.GetClientHeight(); //ウィンドウの高さ
 	swapChainDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM; //色の形式
 	swapChainDesc.SampleDesc.Count = 1; //マルチサンプルしない
 	swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT; //レンダリングターゲットとして使用
@@ -335,7 +296,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD; //モニターに映ったら描画を破棄
 
 	//コマンドキュー、ウィンドウハンドル、設定を渡して生成する
-	hr = dxgiFactory->CreateSwapChainForHwnd(commandQueue.Get(), hwnd, &swapChainDesc, nullptr, nullptr, reinterpret_cast<IDXGISwapChain1**>(swapChain.GetAddressOf()));
+	hr = dxgiFactory->CreateSwapChainForHwnd(commandQueue.Get(), window.GetHwnd(), &swapChainDesc, nullptr, nullptr, reinterpret_cast<IDXGISwapChain1**>(swapChain.GetAddressOf()));
 	//スワップチェーンの生成に失敗した場合はエラー
 	assert(SUCCEEDED(hr));
 
@@ -709,8 +670,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	//ビューポート
 	D3D12_VIEWPORT viewport{};
 	//クライアント領域のサイズと一緒にして画面全体に表示
-	viewport.Width = kClientWidth;
-	viewport.Height = kClientHeight;
+	viewport.Width = static_cast<float>(window.GetClientWidth());
+	viewport.Height = static_cast<float>(window.GetClientHeight());
 	viewport.TopLeftX = 0.0f; //左上のX座標
 	viewport.TopLeftY = 0.0f; //左上のY座標
 	viewport.MinDepth = 0.0f; //最小の深度
@@ -720,9 +681,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	D3D12_RECT scissorRect{};
 	//基本的にビューポートと同じ矩形が構成されるようにする
 	scissorRect.left = 0; //左上のX座標
-	scissorRect.right = kClientWidth; //右下のX座標
+	scissorRect.right = window.GetClientWidth(); //右下のX座標
 	scissorRect.top = 0; //左上のY座標
-	scissorRect.bottom = kClientHeight; //右下のY座標
+	scissorRect.bottom = window.GetClientHeight(); //右下のY座標
 
 	UVTransform uvTransforms;
 	uvTransforms.Initialize(device.Get());
@@ -784,7 +745,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	Transform cameraTransform = { {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, -10.0f} };
 
 	float fovY = 0.45f;  // 資料通り
-	float aspectRatio = static_cast<float>(kClientWidth) / static_cast<float>(kClientHeight);
+	float aspectRatio = static_cast<float>(window.GetClientWidth()) / static_cast<float>(window.GetClientHeight());
 	float nearZ = 0.1f;
 	float farZ = 100.0f;
 
@@ -793,7 +754,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	const DirectX::TexMetadata& metadata = mipImages.GetMetadata();
 	Microsoft::WRL::ComPtr<ID3D12Resource> textureResource = Texture::CreateTextureResource(device, metadata);
 	//DepthStecilTextureをウィンドウのサイズで生成
-	Microsoft::WRL::ComPtr<ID3D12Resource> depthStencilResource = Texture::CreateDepthStencilTextureResource(device.Get(), kClientWidth, kClientHeight);
+	Microsoft::WRL::ComPtr<ID3D12Resource> depthStencilResource = Texture::CreateDepthStencilTextureResource(device.Get(), window.GetClientWidth(), window.GetClientHeight());
 
 	Model model;
 	model.Initialize(device.Get());
@@ -855,10 +816,10 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	bool drawSprite = false;
 
 	KeyInput inputManager;
-	inputManager.Initialize(hInstance, hwnd);
+	inputManager.Initialize(hInstance, window.GetHwnd());
 
 	DebugCamera debugCamera_;
-	debugCamera_.Initialize(hInstance, hwnd);
+	debugCamera_.Initialize(hInstance, window.GetHwnd());
 
 	GameScene gameScene;
 	gameScene.Initialize();
@@ -873,7 +834,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	IMGUI_CHECKVERSION();
 	ImGui::CreateContext();
 	ImGui::StyleColorsDark();
-	ImGui_ImplWin32_Init(hwnd);
+	ImGui_ImplWin32_Init(window.GetHwnd());
 	ImGui_ImplDX12_Init(
 		device.Get(),
 		swapChainDesc.BufferCount,
@@ -914,7 +875,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 			//Sprite用のworldViewProjectMatrix
 			Matrix4x4 worldMatrixSprite = MakeAffineMatrix(transformSprite.scale, transformSprite.rotate, transformSprite.translate);
 			Matrix4x4 viewMatrixSprite = MakeIdentity4x4();
-			Matrix4x4 projectionMatrixSprite = MakeOrthographicMatrix(0.0f, 0.0f, float(kClientWidth), float(kClientHeight), 0.0f, 100.0f);
+			Matrix4x4 projectionMatrixSprite = MakeOrthographicMatrix(0.0f, 0.0f, float(window.GetClientWidth()), float(window.GetClientHeight()), 0.0f, 100.0f);
 			Matrix4x4 worldViewProjectionmatrixSprite = Multiply(worldMatrixSprite, Multiply(debugCamera_.GetViewMatrix(), projectionMatrixSprite));
 			transformationMatrixDataSprite->WVP = worldViewProjectionmatrixSprite;
 			transformationMatrixDataSprite->World = worldMatrixSprite;
@@ -1094,7 +1055,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	delete[] vertexData;
 	delete[] indexData;
 	// --- ウィンドウ解放 ---
-	CloseWindow(hwnd); //ウィンドウの解放
+	CloseWindow(window.GetHwnd()); //ウィンドウの解放
 
 	return 0;
 }
