@@ -13,5 +13,8 @@ public:
 	
 	void Info(const std::string& message);
 
-	static std::ofstream logStream;
+	std::ofstream& GetStream() { return logStream; }
+
+private:
+	std::ofstream logStream;
 };

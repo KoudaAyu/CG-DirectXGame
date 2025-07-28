@@ -1,6 +1,6 @@
 #include "DebugLog.h"
 
-std::ofstream DebugLog::logStream;
+
 
 void DebugLog::Initialize()
 {
@@ -26,6 +26,7 @@ void DebugLog::Initialize()
 
 	//ファイルを作って書き込み準備
 	logStream.open(logFilePath);
+
 }
 
 void DebugLog::Log(std::ostream& os, const std::string& message)

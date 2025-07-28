@@ -132,28 +132,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 	Microsoft::WRL::ComPtr<ID3D12Device> device;
 
-	//ログファイル関係
-	//ログのディレクトリを用意
-	std::filesystem::create_directories("logs");
-
-	//現在時刻を取得(UTC時刻)
-	std::chrono::system_clock::time_point now = std::chrono::system_clock::now();
-
-	//ログファイルの名前にコンマ何秒はいらないため、削って秒にする
-	std::chrono::time_point<std::chrono::system_clock, std::chrono::seconds>
-		nowSecound = std::chrono::time_point_cast<std::chrono::seconds>(now);
-
-	//日本時間(PCの設定時間に変換)
-	std::chrono::zoned_time localTime{ std::chrono::current_zone(), nowSecound };
-
-	//formatを使って年月日_時分秒の形式にする
-	std::string datString = std::format("{:%Y%m%d_%H%M%S}", localTime);
-
-	//時刻を使ってファイル名を決定
-	std::string logFilePath = std::string("logs/") + datString + ".log";
-
-	//ファイルを作って書き込み準備
-	std::ofstream logStream(logFilePath);
+	DebugLog debugLog;
+	debugLog.Initialize();
 
 
 
@@ -236,7 +216,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 		//ソフトウェアアダプタでなければ採用する
 		if (!(adapterDesc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE))
 		{
-			DebugLog::Log(logStream, std::format("Using adapter: {}\n", StringUtil::ConvertString(adapterDesc.Description)));
+			DebugLog::Log(debugLog.GetStream(), std::format("Using adapter: {}\n", StringUtil::ConvertString(adapterDesc.Description)));
 			break;
 		}
 		useAdapter = nullptr; //ソフトウェアアダプタの場合は見なかったことにするためしないのでnullptr
@@ -274,7 +254,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 		if (SUCCEEDED(hr))
 		{
 			//生成出来たのでログ出力を行う
-			DebugLog::Log(logStream, std::format("Feature Level: {}\n", featureLevelNames[i]));
+			DebugLog::Log(debugLog.GetStream(), std::format("Feature Level: {}\n", featureLevelNames[i]));
 			break; //ループを抜ける
 		}
 
@@ -283,7 +263,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 	//デバイスの生成に失敗し起動できない
 	assert(device != nullptr);
-	DebugLog::Log(logStream, std::format("Complete create D3D12Device!"));//初期起動完了のLogを出す
+	DebugLog::Log(debugLog.GetStream(), std::format("Complete create D3D12Device!"));//初期起動完了のLogを出す
 
 #ifdef _DEBUG
 	ID3D12InfoQueue* infoQueue = nullptr;
@@ -479,7 +459,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 	if (FAILED(hr))
 	{
-		DebugLog::Log(logStream, reinterpret_cast<char*>(errorBlob->GetBufferPointer()));
+		DebugLog::Log(debugLog.GetStream(), reinterpret_cast<char*>(errorBlob->GetBufferPointer()));
 		assert(false);
 	}
 
@@ -523,11 +503,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 	//Shaderをコンパイルする
 	Microsoft::WRL::ComPtr<IDxcBlob> vertexShaderBlob = ShaderCompile::CompileShader(L"Object3D.VS.hlsl",
-		L"vs_6_0", dxcUtils.Get(), dxcCompiler, includeHandler, &logStream);
+		L"vs_6_0", dxcUtils.Get(), dxcCompiler, includeHandler, &debugLog.GetStream());
 	assert(vertexShaderBlob != nullptr);
 
 	Microsoft::WRL::ComPtr<IDxcBlob> pixelShaderBlob = ShaderCompile::CompileShader(L"Object3D.PS.hlsl",
-		L"ps_6_0", dxcUtils.Get(), dxcCompiler, includeHandler, &logStream);
+		L"ps_6_0", dxcUtils.Get(), dxcCompiler, includeHandler, &debugLog.GetStream());
 	assert(pixelShaderBlob != nullptr);
 
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC graphicPipelineStateDesc{};
@@ -1094,10 +1074,10 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	//COMの終了処理
 	CoUninitialize();
 
-	DebugLog::Log(logStream, "Application terminating.");
+	DebugLog::Log(debugLog.GetStream(), "Application terminating.");
 
 	std::wstring wstringValue = L"Hello, DirectX!";
-	DebugLog::Log(logStream, StringUtil::ConvertString(std::format(L"WSTRING{}\n", wstringValue)));
+	DebugLog::Log(debugLog.GetStream(), StringUtil::ConvertString(std::format(L"WSTRING{}\n", wstringValue)));
 
 
 	//出力ウィンドウへの文字出力

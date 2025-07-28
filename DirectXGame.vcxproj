@@ -68,6 +68,7 @@
     <ClInclude Include="Matrix4x4.h" />
     <ClInclude Include="Model.h" />
     <ClInclude Include="ShaderCompile.h" />
+    <ClInclude Include="Sprite.h" />
     <ClInclude Include="StringUtil.h" />
     <ClInclude Include="Struct.h" />
     <ClInclude Include="Texture.h" />
