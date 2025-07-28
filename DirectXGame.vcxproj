@@ -28,8 +28,10 @@
     <ClCompile Include="main.cpp" />
     <ClCompile Include="Matrix4x4.cpp" />
     <ClCompile Include="Model.cpp" />
+    <ClCompile Include="ShaderCompile.cpp" />
     <ClCompile Include="Sound.cpp" />
     <ClCompile Include="StringUtil.cpp" />
+    <ClCompile Include="Texture.cpp" />
     <ClCompile Include="UVTransform.cpp" />
     <ClCompile Include="Window.cpp" />
   </ItemGroup>
@@ -65,8 +67,10 @@
     <ClInclude Include="DebugLog.h" />
     <ClInclude Include="Matrix4x4.h" />
     <ClInclude Include="Model.h" />
+    <ClInclude Include="ShaderCompile.h" />
     <ClInclude Include="StringUtil.h" />
     <ClInclude Include="Struct.h" />
+    <ClInclude Include="Texture.h" />
     <ClInclude Include="UVTransform.h" />
     <ClInclude Include="Vector.h" />
     <ClInclude Include="Sound.h" />

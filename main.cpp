@@ -11,6 +11,8 @@
 #include"Model.h"
 #include"Sound.h"
 #include"StringUtil.h"
+#include"ShaderCompile.h"
+#include"Texture.h"
 #include"UVTransform.h"
 #include"Vector.h"
 #include"Window.h"
@@ -26,10 +28,8 @@
 #include<d3d12.h>
 #include<dxgi1_6.h>
 #include<cassert>
-
 #pragma comment(lib,"d3d12.lib")
 #pragma comment(lib,"dxgi.lib")
-
 //Comptr
 #include<wrl.h>
 
@@ -66,9 +66,6 @@
 
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lParam);
 
-
-
-
 //リソースリークチェック
 struct D3DResourceLeakChecker
 {
@@ -84,28 +81,6 @@ struct D3DResourceLeakChecker
 		}
 	}
 };
-
-//ウィンドウプロシージャ
-//LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
-//{
-//	if (ImGui_ImplWin32_WndProcHandler(hwnd, msg, wparam, lparam))
-//	{
-//		return true;
-//	}
-//
-//	//メッセージに応じてゲーム固有の処理を行う
-//	switch (msg)
-//	{
-//		//ウィンドウが破棄された
-//	case WM_DESTROY:
-//		//アプリケーションを終了する
-//		PostQuitMessage(0);
-//		return 0;
-//	}
-//
-//	//標準のメッセージ処理を行う
-//	return DefWindowProc(hwnd, msg, wparam, lparam);
-//}
 
 static LONG WINAPI ExportDump(EXCEPTION_POINTERS* exception)
 {
@@ -134,187 +109,11 @@ static LONG WINAPI ExportDump(EXCEPTION_POINTERS* exception)
 	return EXCEPTION_EXECUTE_HANDLER;
 }
 
-Microsoft::WRL::ComPtr<IDxcBlob> CompileShader(
-	//CompilerするShaderファイルへのパス
-	const std::wstring& filePath,
-	//Compilerに使用するProfile
-	const wchar_t* profile,
-	//初期化で生成したもの3つ
-	Microsoft::WRL::ComPtr<IDxcUtils> dxcUtils,
-	Microsoft::WRL::ComPtr<IDxcCompiler3> dxcCompiler,
-	Microsoft::WRL::ComPtr<IDxcIncludeHandler> includeHandler,
-	std::ofstream* logStream)
-{
-	//これからシェーダーをコンパイルする旨をログに出す
-	DebugLog::Log(*logStream, StringUtil::ConvertString(std::format(L"Begin CompileShader, path{},profile:{}\n", filePath, profile)));
-	//hlslファイルを読み込む
-	Microsoft::WRL::ComPtr<IDxcBlobEncoding> shaderScore = nullptr;
-	HRESULT hr = dxcUtils->LoadFile(filePath.c_str(), nullptr, &shaderScore);
-	//ファイルの読み込みに失敗した場合はエラー
-	assert(SUCCEEDED(hr));
-	//読み込んだファイルの内容を設定する
-	DxcBuffer shaderSourceBuffer;
-	shaderSourceBuffer.Ptr = shaderScore->GetBufferPointer();
-	shaderSourceBuffer.Size = shaderScore->GetBufferSize();
-	shaderSourceBuffer.Encoding = DXC_CP_UTF8;//UTF8の文字コードである事を通知する
-
-	LPCWSTR arguments[] = {
-		filePath.c_str(), //コンパイルするファイルのパス
-		L"-E", L"main", //エントリーポイントの指定。基本的にmain以外にはしない
-		L"-T", profile, //ShaderProfileの設定
-		L"-Zi",L"Qembed_debug",
-		L"-Od", //最適化を行わない
-		L"-Zpr", //メモリレイアウトは行優先
-	};
-
-	//実際にShaderをコンパイルする
-	Microsoft::WRL::ComPtr<IDxcResult> shaderResult = nullptr;
-	hr = dxcCompiler->Compile(
-		&shaderSourceBuffer, //コンパイルするシェーダーの内容
-		arguments, //コンパイル時の引数
-		_countof(arguments), //引数の数
-		includeHandler.Get(), //includeハンドラ
-		IID_PPV_ARGS(&shaderResult) //結果を受け取るポインタ
-	);
-
-	//警告やエラーがあった場合はログに出力し停止する
-	Microsoft::WRL::ComPtr<IDxcBlobUtf8> shaderError = nullptr;
-
-#pragma warning(push)
-#pragma warning(disable: 6387) // C6387 警告を抑制
-	shaderResult->GetOutput(DXC_OUT_ERRORS, IID_PPV_ARGS(&shaderError), nullptr);
-#pragma warning(pop)
-
-	if (shaderError != nullptr && shaderError->GetStringLength() != 0)
-	{
-		DebugLog::Log(*logStream, shaderError->GetStringPointer());
-
-		//警告やエラーがあった場合は、Shaderのコンパイルに失敗したとする
-		assert(SUCCEEDED(hr));
-	}
-
-	//コンパイルの結果から実行用のバイナリ部分を取得
-	Microsoft::WRL::ComPtr<IDxcBlob> shaderBlob = nullptr;
-	hr = shaderResult->GetOutput(DXC_OUT_OBJECT, IID_PPV_ARGS(&shaderBlob), nullptr);
-	//Shaderのコンパイルに失敗した場合はエラー
-	assert(SUCCEEDED(hr));
-
-	//Shaderのコンパイルに成功したので、ログに出力する
-	DebugLog::Log(*logStream, StringUtil::ConvertString(std::format(L"Complete CompileShader, path{},profile:{}\n", filePath, profile)));
-
-
-	return shaderBlob; //コンパイルしたShaderのバイナリを返す
-}
-
-//Textureデータを読む
-DirectX::ScratchImage LoadTexture(const std::string& filePath)
-{
-	//テクスチャファイルを読み込んでプログラムで使えるようにする
-	DirectX::ScratchImage image{};
-	std::wstring filePathW = StringUtil::ConvertString(filePath);
-	HRESULT hr = DirectX::LoadFromWICFile(filePathW.c_str(), DirectX::WIC_FLAGS_DEFAULT_SRGB, nullptr, image);
-	assert(SUCCEEDED(hr));
-
-	//ミニマップの作成
-	DirectX::ScratchImage mipImages{};
-	hr = DirectX::GenerateMipMaps(image.GetImages(), image.GetImageCount(), image.GetMetadata(),
-		DirectX::TEX_FILTER_SRGB, 0, mipImages);
-	assert(SUCCEEDED(hr));
-
-	//ミニマップ付きのデータを返す
-	return mipImages;
-}
-
-
-//TextureResourceを作る
-Microsoft::WRL::ComPtr<ID3D12Resource>CreateTextureResource(const Microsoft::WRL::ComPtr<ID3D12Device>& device, const DirectX::TexMetadata& metadata)
-{
-	//1. metadataを基にResourceの設定
-	D3D12_RESOURCE_DESC resourceDesc{};
-	resourceDesc.Width = UINT(metadata.width);//Textureの幅
-	resourceDesc.Height = UINT(metadata.height);//Textureの高さ
-	resourceDesc.MipLevels = UINT16(metadata.mipLevels);//mipmapの数
-	resourceDesc.DepthOrArraySize = UINT16(metadata.arraySize);//奥行き or 配列Textureの配列数
-	resourceDesc.Format = metadata.format;//TextureのFormat
-	resourceDesc.SampleDesc.Count = 1;//サンプリングカウント。1固定
-	resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION(metadata.dimension);//Textureの次元数。普段使っているのは2次元
-
-	//2. 利用するHeapの設定
-	D3D12_HEAP_PROPERTIES heapProperties{};
-	heapProperties.Type = D3D12_HEAP_TYPE_DEFAULT;//細かい設定を行う
-	//heapProperties.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_WRITE_BACK;//WriteBackポリシーでCPUアクセス可能
-	//heapProperties.MemoryPoolPreference = D3D12_MEMORY_POOL_L0;//プロセッサの近くに配列
-
-	//3. Resourceを生成する
-	Microsoft::WRL::ComPtr<ID3D12Resource> resource = nullptr;
-	HRESULT hr = device->CreateCommittedResource(
-		&heapProperties,//Heapの設定
-		D3D12_HEAP_FLAG_NONE,//Heapの特殊な設定
-		&resourceDesc,//Resourceの設定
-		D3D12_RESOURCE_STATE_COPY_DEST,//初回のResourceState。Textureは基本読むだけ
-		nullptr,//Clear最適値。使わないのでnullptr
-		IID_PPV_ARGS(&resource));//作成するResourceポインタへのポインタ
-	assert(SUCCEEDED(hr));
-	return resource;
-}
-
-Microsoft::WRL::ComPtr<ID3D12Resource> CreateDepthStencilTextureResource(const Microsoft::WRL::ComPtr<ID3D12Device>& device, int32_t width, int32_t height)
-{
-	//生成するResourceの設定
-	D3D12_RESOURCE_DESC resourceDesc{};
-	resourceDesc.Width = width;//Textureの幅
-	resourceDesc.Height = height;//textureの高さ
-	resourceDesc.MipLevels = 1;//mipmapの数
-	resourceDesc.DepthOrArraySize = 1;//奥行き or 配列Textureの配列数
-	resourceDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;//TextureのFormat
-	resourceDesc.SampleDesc.Count = 1;//サンプリングカウント。1固定
-	resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;//Textureの次元数。普段使っているのは2次元
-	resourceDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;//DepthStencilとして使う通知
-
-	//2. 利用するHeapの設定
-	D3D12_HEAP_PROPERTIES heapProperties{};
-	heapProperties.Type = D3D12_HEAP_TYPE_DEFAULT;//VRAM上に作る
-
-	//深度値のクリア設定
-	D3D12_CLEAR_VALUE depthClearValue{};
-	depthClearValue.DepthStencil.Depth = 1.0f;//1.0f(最大値)でクリア
-	depthClearValue.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;//フォーマット。Resourceと合わせる
-
-	//3. Resourceを生成する
-	Microsoft::WRL::ComPtr<ID3D12Resource> resource = nullptr;
-	HRESULT hr = device->CreateCommittedResource(
-		&heapProperties,//Heapの設定
-		D3D12_HEAP_FLAG_NONE,//Heapの特殊な設定
-		&resourceDesc,//Resourceの設定
-		D3D12_RESOURCE_STATE_DEPTH_WRITE,//深度値を書き込む状態にしておく
-		&depthClearValue,//Clear最適値。
-		IID_PPV_ARGS(&resource));//作成するResourceポインタへのポインタ
-	assert(SUCCEEDED(hr));
-	return resource;
-}
 
 
 
-[[nodiscard]]
-Microsoft::WRL::ComPtr<ID3D12Resource>UploadTextureData(Microsoft::WRL::ComPtr<ID3D12Resource>& texture, const DirectX::ScratchImage& mipImages, const Microsoft::WRL::ComPtr<ID3D12Device>& device,
-	Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> commandList)
-{
-	std::vector<D3D12_SUBRESOURCE_DATA> subresources;
-	DirectX::PrepareUpload(device.Get(), mipImages.GetImages(), mipImages.GetImageCount(), mipImages.GetMetadata(), subresources);
-	uint64_t intermediateSize = GetRequiredIntermediateSize(texture.Get(), 0, UINT(subresources.size()));
-	Microsoft::WRL::ComPtr<ID3D12Resource> intermediateResource = Buffer::CreateBufferResource(device, intermediateSize);
-	UpdateSubresources(commandList.Get(), texture.Get(), intermediateResource.Get(), 0, 0, UINT(subresources.size()), subresources.data());
-	//textureへの転送後は利用できるよう、D3D12_RESOURCE_STATE_DESTからD3D12_RESOURCE_STATE_GENERIC_READへResourceStateを変更する
-	D3D12_RESOURCE_BARRIER barrier{};
-	barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-	barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
-	barrier.Transition.pResource = texture.Get();
-	barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-	barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
-	barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_GENERIC_READ;
-	commandList->ResourceBarrier(1, &barrier);
-	return intermediateResource;
-}
+
+
 
 
 
@@ -723,11 +522,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	rasterizerDesc.FillMode = D3D12_FILL_MODE_SOLID;
 
 	//Shaderをコンパイルする
-	Microsoft::WRL::ComPtr<IDxcBlob> vertexShaderBlob = CompileShader(L"Object3D.VS.hlsl",
+	Microsoft::WRL::ComPtr<IDxcBlob> vertexShaderBlob = ShaderCompile::CompileShader(L"Object3D.VS.hlsl",
 		L"vs_6_0", dxcUtils.Get(), dxcCompiler, includeHandler, &logStream);
 	assert(vertexShaderBlob != nullptr);
 
-	Microsoft::WRL::ComPtr<IDxcBlob> pixelShaderBlob = CompileShader(L"Object3D.PS.hlsl",
+	Microsoft::WRL::ComPtr<IDxcBlob> pixelShaderBlob = ShaderCompile::CompileShader(L"Object3D.PS.hlsl",
 		L"ps_6_0", dxcUtils.Get(), dxcCompiler, includeHandler, &logStream);
 	assert(pixelShaderBlob != nullptr);
 
@@ -819,7 +618,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 			};
 		}
 	}
-
 
 	// --- 頂点バッファを作成・アップロード ---
 	Microsoft::WRL::ComPtr<ID3D12Resource> vertexResourceSphere = Buffer::CreateBufferResource(device.Get(), sizeof(VertexData) * kVertexCount);
@@ -1005,26 +803,25 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 	Transform cameraTransform = { {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, -10.0f} };
 
-
 	float fovY = 0.45f;  // 資料通り
 	float aspectRatio = static_cast<float>(kClientWidth) / static_cast<float>(kClientHeight);
 	float nearZ = 0.1f;
 	float farZ = 100.0f;
 
 	//Textureを読んで転送する
-	DirectX::ScratchImage mipImages = LoadTexture("./Resources/uvChecker.png");
+	DirectX::ScratchImage mipImages = Texture::LoadTexture("./Resources/uvChecker.png");
 	const DirectX::TexMetadata& metadata = mipImages.GetMetadata();
-	Microsoft::WRL::ComPtr<ID3D12Resource> textureResource = CreateTextureResource(device, metadata);
+	Microsoft::WRL::ComPtr<ID3D12Resource> textureResource = Texture::CreateTextureResource(device, metadata);
 	//DepthStecilTextureをウィンドウのサイズで生成
-	Microsoft::WRL::ComPtr<ID3D12Resource> depthStencilResource = CreateDepthStencilTextureResource(device.Get(), kClientWidth, kClientHeight);
+	Microsoft::WRL::ComPtr<ID3D12Resource> depthStencilResource = Texture::CreateDepthStencilTextureResource(device.Get(), kClientWidth, kClientHeight);
 
 	Model model;
 	model.Initialize(device.Get());
 
 	//2枚目のTextureを読んで転送する
-	DirectX::ScratchImage mipImages2 = LoadTexture(model.GetTextureFilePath());
+	DirectX::ScratchImage mipImages2 = Texture::LoadTexture(model.GetTextureFilePath());
 	const DirectX::TexMetadata& metadata2 = mipImages2.GetMetadata();
-	Microsoft::WRL::ComPtr<ID3D12Resource> textureResource2 = CreateTextureResource(device, metadata2);
+	Microsoft::WRL::ComPtr<ID3D12Resource> textureResource2 = Texture::CreateTextureResource(device, metadata2);
 
 	//DSVの設定
 	D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc{};
@@ -1034,8 +831,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	device->CreateDepthStencilView(depthStencilResource.Get(), &dsvDesc, dsvDescriptorHeap->GetCPUDescriptorHandleForHeapStart());
 
 
-	Microsoft::WRL::ComPtr<ID3D12Resource> intermediateResource = UploadTextureData(textureResource, mipImages, device.Get(), commandList);
-	Microsoft::WRL::ComPtr<ID3D12Resource> intermediateResource2 = UploadTextureData(textureResource2, mipImages2, device.Get(), commandList);
+	Microsoft::WRL::ComPtr<ID3D12Resource> intermediateResource = Texture::UploadTextureData(textureResource, mipImages, device.Get(), commandList);
+	Microsoft::WRL::ComPtr<ID3D12Resource> intermediateResource2 = Texture::UploadTextureData(textureResource2, mipImages2, device.Get(), commandList);
 
 	//metaDataを基にSRVの設定
 	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
