@@ -1,10 +1,13 @@
 #pragma once
+#include <d3d12.h>
+#include <dxgidebug.h>
 #include <fstream>
 #include <filesystem>
 #include <iostream>
 #include <windows.h>
+#include<wrl.h>
 
-class DebugLog
+class Debug
 {
 public:
 	void Initialize();
@@ -12,6 +15,8 @@ public:
 	static void Log(std::ostream& os, const std::string& message);
 	
 	void Info(const std::string& message);
+
+	void EnableDebugLayer();
 
 	std::ofstream& GetStream() { return logStream; }
 

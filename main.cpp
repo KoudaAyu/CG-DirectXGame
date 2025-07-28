@@ -132,24 +132,14 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 	Microsoft::WRL::ComPtr<ID3D12Device> device;
 
-	DebugLog debugLog;
-	debugLog.Initialize();
+	Debug debug;
+	debug.Initialize();
 
 	Window window;
 	window.Initialize();
 
+	debug.EnableDebugLayer();
 
-#ifdef _DEBUG
-	Microsoft::WRL::ComPtr<ID3D12Debug1> debugController = nullptr;
-
-	if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debugController))))
-	{
-		//デバックレイヤーを有効化する
-		debugController->EnableDebugLayer();
-		//更にGPU側でもチェックを行うようにする
-		debugController->SetEnableGPUBasedValidation(TRUE);
-	}
-#endif
 	//ウィンドウを表示する
 	ShowWindow(window.GetHwnd(), SW_SHOW);
 
@@ -177,7 +167,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 		//ソフトウェアアダプタでなければ採用する
 		if (!(adapterDesc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE))
 		{
-			DebugLog::Log(debugLog.GetStream(), std::format("Using adapter: {}\n", StringUtil::ConvertString(adapterDesc.Description)));
+			Debug::Log(debug.GetStream(), std::format("Using adapter: {}\n", StringUtil::ConvertString(adapterDesc.Description)));
 			break;
 		}
 		useAdapter = nullptr; //ソフトウェアアダプタの場合は見なかったことにするためしないのでnullptr
@@ -215,7 +205,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 		if (SUCCEEDED(hr))
 		{
 			//生成出来たのでログ出力を行う
-			DebugLog::Log(debugLog.GetStream(), std::format("Feature Level: {}\n", featureLevelNames[i]));
+			Debug::Log(debug.GetStream(), std::format("Feature Level: {}\n", featureLevelNames[i]));
 			break; //ループを抜ける
 		}
 
@@ -224,7 +214,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 	//デバイスの生成に失敗し起動できない
 	assert(device != nullptr);
-	DebugLog::Log(debugLog.GetStream(), std::format("Complete create D3D12Device!"));//初期起動完了のLogを出す
+	Debug::Log(debug.GetStream(), std::format("Complete create D3D12Device!"));//初期起動完了のLogを出す
 
 #ifdef _DEBUG
 	ID3D12InfoQueue* infoQueue = nullptr;
@@ -420,7 +410,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 	if (FAILED(hr))
 	{
-		DebugLog::Log(debugLog.GetStream(), reinterpret_cast<char*>(errorBlob->GetBufferPointer()));
+		Debug::Log(debug.GetStream(), reinterpret_cast<char*>(errorBlob->GetBufferPointer()));
 		assert(false);
 	}
 
@@ -464,11 +454,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 	//Shaderをコンパイルする
 	Microsoft::WRL::ComPtr<IDxcBlob> vertexShaderBlob = ShaderCompile::CompileShader(L"Object3D.VS.hlsl",
-		L"vs_6_0", dxcUtils.Get(), dxcCompiler, includeHandler, &debugLog.GetStream());
+		L"vs_6_0", dxcUtils.Get(), dxcCompiler, includeHandler, &debug.GetStream());
 	assert(vertexShaderBlob != nullptr);
 
 	Microsoft::WRL::ComPtr<IDxcBlob> pixelShaderBlob = ShaderCompile::CompileShader(L"Object3D.PS.hlsl",
-		L"ps_6_0", dxcUtils.Get(), dxcCompiler, includeHandler, &debugLog.GetStream());
+		L"ps_6_0", dxcUtils.Get(), dxcCompiler, includeHandler, &debug.GetStream());
 	assert(pixelShaderBlob != nullptr);
 
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC graphicPipelineStateDesc{};
@@ -1035,10 +1025,10 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	//COMの終了処理
 	CoUninitialize();
 
-	DebugLog::Log(debugLog.GetStream(), "Application terminating.");
+	Debug::Log(debug.GetStream(), "Application terminating.");
 
 	std::wstring wstringValue = L"Hello, DirectX!";
-	DebugLog::Log(debugLog.GetStream(), StringUtil::ConvertString(std::format(L"WSTRING{}\n", wstringValue)));
+	Debug::Log(debug.GetStream(), StringUtil::ConvertString(std::format(L"WSTRING{}\n", wstringValue)));
 
 
 	//出力ウィンドウへの文字出力

@@ -12,7 +12,7 @@ Microsoft::WRL::ComPtr<IDxcBlob> ShaderCompile::CompileShader(
 	std::ofstream* logStream)
 {
 	//これからシェーダーをコンパイルする旨をログに出す
-	DebugLog::Log(*logStream, StringUtil::ConvertString(std::format(L"Begin CompileShader, path{},profile:{}\n", filePath, profile)));
+	Debug::Log(*logStream, StringUtil::ConvertString(std::format(L"Begin CompileShader, path{},profile:{}\n", filePath, profile)));
 	//hlslファイルを読み込む
 	Microsoft::WRL::ComPtr<IDxcBlobEncoding> shaderScore = nullptr;
 	
@@ -54,7 +54,7 @@ Microsoft::WRL::ComPtr<IDxcBlob> ShaderCompile::CompileShader(
 
 	if (shaderError != nullptr && shaderError->GetStringLength() != 0)
 	{
-		DebugLog::Log(*logStream, shaderError->GetStringPointer());
+		Debug::Log(*logStream, shaderError->GetStringPointer());
 
 		//警告やエラーがあった場合は、Shaderのコンパイルに失敗したとする
 		assert(SUCCEEDED(hr));
@@ -67,7 +67,7 @@ Microsoft::WRL::ComPtr<IDxcBlob> ShaderCompile::CompileShader(
 	assert(SUCCEEDED(hr));
 
 	//Shaderのコンパイルに成功したので、ログに出力する
-	DebugLog::Log(*logStream, StringUtil::ConvertString(std::format(L"Complete CompileShader, path{},profile:{}\n", filePath, profile)));
+	Debug::Log(*logStream, StringUtil::ConvertString(std::format(L"Complete CompileShader, path{},profile:{}\n", filePath, profile)));
 
 
 	return shaderBlob; //コンパイルしたShaderのバイナリを返す

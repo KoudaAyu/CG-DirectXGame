@@ -2,7 +2,7 @@
 
 
 
-void DebugLog::Initialize()
+void Debug::Initialize()
 {
 	//ログファイル関係
 	//ログのディレクトリを用意
@@ -29,7 +29,7 @@ void DebugLog::Initialize()
 
 }
 
-void DebugLog::Log(std::ostream& os, const std::string& message)
+void Debug::Log(std::ostream& os, const std::string& message)
 {
 	os << message << std::endl;
 	OutputDebugStringA(message.c_str()); //出力ウィンドウに文字を出力
@@ -37,7 +37,7 @@ void DebugLog::Log(std::ostream& os, const std::string& message)
 
 
 
-void DebugLog::Info(const std::string& message)
+void Debug::Info(const std::string& message)
 {
 	if (logStream.is_open())
 	{
@@ -45,5 +45,20 @@ void DebugLog::Info(const std::string& message)
 	}
 #ifdef _DEBUG
 	OutputDebugStringA(message.c_str());
+#endif
+}
+
+void Debug::EnableDebugLayer()
+{
+#ifdef _DEBUG
+	Microsoft::WRL::ComPtr<ID3D12Debug1> debugController = nullptr;
+
+	if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debugController))))
+	{
+		//デバックレイヤーを有効化する
+		debugController->EnableDebugLayer();
+		//更にGPU側でもチェックを行うようにする
+		debugController->SetEnableGPUBasedValidation(TRUE);
+	}
 #endif
 }
