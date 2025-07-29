@@ -12,6 +12,7 @@ public:
 	void GraphicCreateDXGIFactory();
 	void SelectAdapter();
 	void SelectDevice(Microsoft::WRL::ComPtr<ID3D12Device>& device);
+	void CreateCommandQueue(Microsoft::WRL::ComPtr<ID3D12Device>& device);
 
 	static const D3D_FEATURE_LEVEL featureLevels[];
 	static const size_t featureLevelsCount;
@@ -28,6 +29,10 @@ public:
 	{
 		return useAdapter;
 	}
+	const Microsoft::WRL::ComPtr<ID3D12CommandQueue>& GetCommandQueue() const
+	{
+		return commandQueue;
+	}
 
 private:
 	HRESULT hr;
@@ -38,4 +43,7 @@ private:
 
 	//使用するアダプタ用の変数。最初にnullptrを入れる
 	Microsoft::WRL::ComPtr<IDXGIAdapter4>useAdapter = nullptr;
+
+	//コマンドキューの生成
+	Microsoft::WRL::ComPtr<ID3D12CommandQueue> commandQueue = nullptr;
 };

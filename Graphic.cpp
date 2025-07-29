@@ -63,6 +63,14 @@ void Graphic::SelectDevice(Microsoft::WRL::ComPtr<ID3D12Device>& device)
 	Debug::Log(debug.GetStream(), std::format("Complete create D3D12Device!"));//初期起動完了のLogを出す
 }
 
+void Graphic::CreateCommandQueue(Microsoft::WRL::ComPtr<ID3D12Device>& device)
+{
+	D3D12_COMMAND_QUEUE_DESC commandQueueDesc{};
+	hr = device->CreateCommandQueue(&commandQueueDesc, IID_PPV_ARGS(&commandQueue));
+	//コマンドキューの生成に失敗した場合はエラー
+	assert(SUCCEEDED(hr));
+}
+
 const D3D_FEATURE_LEVEL Graphic::featureLevels[] = {
 	D3D_FEATURE_LEVEL_12_2,
 	D3D_FEATURE_LEVEL_12_1,

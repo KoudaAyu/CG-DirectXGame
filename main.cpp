@@ -145,14 +145,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 	debug.SetupInfoQueue(device);
 
-	//コマンドキューの生成
-	Microsoft::WRL::ComPtr<ID3D12CommandQueue> commandQueue = nullptr;
-	D3D12_COMMAND_QUEUE_DESC commandQueueDesc{};
-	hr = device->CreateCommandQueue(&commandQueueDesc, IID_PPV_ARGS(&commandQueue));
-
-	//コマンドキューの生成に失敗した場合はエラー
-	assert(SUCCEEDED(hr));
-
+	graphic.CreateCommandQueue(device);
+	
 	//コマンドアロケーターを生成する
 	Microsoft::WRL::ComPtr<ID3D12CommandAllocator> commandAllocator = nullptr;
 	hr = device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&commandAllocator));
@@ -179,7 +173,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD; //モニターに映ったら描画を破棄
 
 	//コマンドキュー、ウィンドウハンドル、設定を渡して生成する
-	hr = graphic.GetDXGIFactory()->CreateSwapChainForHwnd(commandQueue.Get(), window.GetHwnd(), &swapChainDesc, nullptr, nullptr, reinterpret_cast<IDXGISwapChain1**>(swapChain.GetAddressOf()));
+	hr = graphic.GetDXGIFactory()->CreateSwapChainForHwnd(graphic.GetCommandQueue().Get(), window.GetHwnd(), &swapChainDesc, nullptr, nullptr, reinterpret_cast<IDXGISwapChain1**>(swapChain.GetAddressOf()));
 	//スワップチェーンの生成に失敗した場合はエラー
 	assert(SUCCEEDED(hr));
 
@@ -876,14 +870,14 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 			//GUPにコマンドリストの実行を行わせる
 			ID3D12CommandList* commandLists[] = { commandList.Get() };
-			commandQueue->ExecuteCommandLists(1, commandLists);
+			graphic.GetCommandQueue()->ExecuteCommandLists(1, commandLists);
 			//GUPとOSに画面の交換を要求する
 			swapChain->Present(1, 0);
 
 			//Fenceの値を更新
 			fenceValue++;
 			//GPUがここまでたどり着いたときに、Fenceの値を指定した値に代入するようにSignalを送る
-			commandQueue->Signal(fence.Get(), fenceValue);
+			graphic.GetCommandQueue()->Signal(fence.Get(), fenceValue);
 
 			//Fenceの値が指定したSignalの値にたどり着いているか確認する
 			//GetCompletedValueの初期値はFence作成時に渡した初期値
