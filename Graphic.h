@@ -13,6 +13,8 @@ public:
 	void SelectAdapter();
 	void SelectDevice(Microsoft::WRL::ComPtr<ID3D12Device>& device);
 	void CreateCommandQueue(Microsoft::WRL::ComPtr<ID3D12Device>& device);
+	void CreateCommandAllocator(Microsoft::WRL::ComPtr<ID3D12Device>& device);
+	void CreateCommandList(Microsoft::WRL::ComPtr<ID3D12Device>& device);
 
 	static const D3D_FEATURE_LEVEL featureLevels[];
 	static const size_t featureLevelsCount;
@@ -33,6 +35,14 @@ public:
 	{
 		return commandQueue;
 	}
+	const Microsoft::WRL::ComPtr<ID3D12CommandAllocator>& GetCommandAllocator() const
+	{
+		return  commandAllocator;
+	}
+	const Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList>& GetCommandList() const
+	{
+		return  commandList;
+	}
 
 private:
 	HRESULT hr;
@@ -46,4 +56,10 @@ private:
 
 	//コマンドキューの生成
 	Microsoft::WRL::ComPtr<ID3D12CommandQueue> commandQueue = nullptr;
+
+	//コマンドアロケーターを生成する
+	Microsoft::WRL::ComPtr<ID3D12CommandAllocator> commandAllocator = nullptr;
+
+	//コマンドリストの生成
+	Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> commandList = nullptr;
 };

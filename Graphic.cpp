@@ -71,6 +71,22 @@ void Graphic::CreateCommandQueue(Microsoft::WRL::ComPtr<ID3D12Device>& device)
 	assert(SUCCEEDED(hr));
 }
 
+void Graphic::CreateCommandAllocator(Microsoft::WRL::ComPtr<ID3D12Device>& device)
+{
+	hr = device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&commandAllocator));
+
+	//コマンドアロケーターの生成に失敗した場合はエラー
+	assert(SUCCEEDED(hr));
+}
+
+void Graphic::CreateCommandList(Microsoft::WRL::ComPtr<ID3D12Device>& device)
+{
+	hr = device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, commandAllocator.Get(), nullptr, IID_PPV_ARGS(&commandList));
+
+	//コマンドリストの生成に失敗した場合はエラー
+	assert(SUCCEEDED(hr));
+}
+
 const D3D_FEATURE_LEVEL Graphic::featureLevels[] = {
 	D3D_FEATURE_LEVEL_12_2,
 	D3D_FEATURE_LEVEL_12_1,

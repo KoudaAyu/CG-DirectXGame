@@ -147,19 +147,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 	graphic.CreateCommandQueue(device);
 	
-	//コマンドアロケーターを生成する
-	Microsoft::WRL::ComPtr<ID3D12CommandAllocator> commandAllocator = nullptr;
-	hr = device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&commandAllocator));
+	graphic.CreateCommandAllocator(device);
+	
+	graphic.CreateCommandList(device);
+	
 
-	//コマンドアロケーターの生成に失敗した場合はエラー
-	assert(SUCCEEDED(hr));
-
-	//コマンドリストの生成
-	Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> commandList = nullptr;
-	hr = device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, commandAllocator.Get(), nullptr, IID_PPV_ARGS(&commandList));
-
-	//コマンドリストの生成に失敗した場合はエラー
-	assert(SUCCEEDED(hr));
 
 	//スワップチェーンを生成する
 	Microsoft::WRL::ComPtr<IDXGISwapChain4> swapChain;
@@ -649,8 +641,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	device->CreateDepthStencilView(depthStencilResource.Get(), &dsvDesc, dsvDescriptorHeap->GetCPUDescriptorHandleForHeapStart());
 
 
-	Microsoft::WRL::ComPtr<ID3D12Resource> intermediateResource = Texture::UploadTextureData(textureResource, mipImages, device.Get(), commandList);
-	Microsoft::WRL::ComPtr<ID3D12Resource> intermediateResource2 = Texture::UploadTextureData(textureResource2, mipImages2, device.Get(), commandList);
+	Microsoft::WRL::ComPtr<ID3D12Resource> intermediateResource = Texture::UploadTextureData(textureResource, mipImages, device.Get(), graphic.GetCommandList());
+	Microsoft::WRL::ComPtr<ID3D12Resource> intermediateResource2 = Texture::UploadTextureData(textureResource2, mipImages2, device.Get(), graphic.GetCommandList());
 
 	//metaDataを基にSRVの設定
 	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
@@ -801,75 +793,75 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 			//遷移後のResourceState
 			barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
 			//TransitionBarrierを張る
-			commandList->ResourceBarrier(1, &barrier);
+			graphic.GetCommandList()->ResourceBarrier(1, &barrier);
 
 
 
 			//描画先のRTVとDSVを設定する
 			D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = dsvDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
-			commandList->OMSetRenderTargets(1, &rtvHandles[backBufferIndex], false, &dsvHandle);
+			graphic.GetCommandList()->OMSetRenderTargets(1, &rtvHandles[backBufferIndex], false, &dsvHandle);
 			float clearColor[] = { 0.1f,0.25f,0.5f,1.0f };//RGBAの値。青っぽい色
-			commandList->ClearRenderTargetView(rtvHandles[backBufferIndex], clearColor, 0, nullptr);
+			graphic.GetCommandList()->ClearRenderTargetView(rtvHandles[backBufferIndex], clearColor, 0, nullptr);
 
-			commandList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
+			graphic.GetCommandList()->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 
 			//描画用のDescriptorHeapの設定
 			Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> descriptorHeap[] = { srvDescriptorHeap.Get() };
-			commandList->SetDescriptorHeaps(1, descriptorHeap->GetAddressOf());
+			graphic.GetCommandList()->SetDescriptorHeaps(1, descriptorHeap->GetAddressOf());
 
 			//コマンドを積む
-			commandList->RSSetViewports(1, &viewport); //ビューポートを設定
-			commandList->RSSetScissorRects(1, &scissorRect); //シザー矩形を設定
+			graphic.GetCommandList()->RSSetViewports(1, &viewport); //ビューポートを設定
+			graphic.GetCommandList()->RSSetScissorRects(1, &scissorRect); //シザー矩形を設定
 			//RootSignatureを設定。PSOに設定しているけれど別途設定が必要
-			commandList->SetGraphicsRootSignature(rootSignature.Get());
-			commandList->SetPipelineState(graphicPipelineState.Get()); //パイプラインステートを設定
+			graphic.GetCommandList()->SetGraphicsRootSignature(rootSignature.Get());
+			graphic.GetCommandList()->SetPipelineState(graphicPipelineState.Get()); //パイプラインステートを設定
 			//Sphereの描画
 
-			commandList->IASetVertexBuffers(0, 1, &model.GetVertexBufferView());
-			commandList->IASetIndexBuffer(&indexBufferViewSphere);
-			commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-			uvTransforms.Draw(commandList.Get());
-			commandList->SetGraphicsRootConstantBufferView(1, transformationMatrixResourceSphere->GetGPUVirtualAddress());
-			commandList->SetGraphicsRootDescriptorTable(2, useMonsterBall ? textureSrvHandleGPU2 : textureSrvHandleGPU);
-			commandList->SetGraphicsRootConstantBufferView(3, directionalLight->GetGPUVirtualAddress());
+			graphic.GetCommandList()->IASetVertexBuffers(0, 1, &model.GetVertexBufferView());
+			graphic.GetCommandList()->IASetIndexBuffer(&indexBufferViewSphere);
+			graphic.GetCommandList()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+			uvTransforms.Draw(graphic.GetCommandList().Get());
+			graphic.GetCommandList()->SetGraphicsRootConstantBufferView(1, transformationMatrixResourceSphere->GetGPUVirtualAddress());
+			graphic.GetCommandList()->SetGraphicsRootDescriptorTable(2, useMonsterBall ? textureSrvHandleGPU2 : textureSrvHandleGPU);
+			graphic.GetCommandList()->SetGraphicsRootConstantBufferView(3, directionalLight->GetGPUVirtualAddress());
 			if (drawSphere)
 			{
-				model.Draw(commandList.Get());
+				model.Draw(graphic.GetCommandList().Get());
 			}
 
 			if (drawSprite)
 			{
-				commandList->IASetVertexBuffers(0, 1, &vertexBufferViewSprite);
-				commandList->IASetIndexBuffer(&indexBufferViewSprite);
-				commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-				uvTransforms.DrawSprite(commandList.Get());
-				commandList->SetGraphicsRootConstantBufferView(1, transformationMatrixResourceSprite->GetGPUVirtualAddress());
-				commandList->SetGraphicsRootDescriptorTable(2, useMonsterBall ? textureSrvHandleGPU2 : textureSrvHandleGPU);
-				commandList->SetGraphicsRootConstantBufferView(3, directionalLight->GetGPUVirtualAddress());
+				graphic.GetCommandList()->IASetVertexBuffers(0, 1, &vertexBufferViewSprite);
+				graphic.GetCommandList()->IASetIndexBuffer(&indexBufferViewSprite);
+				graphic.GetCommandList()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+				uvTransforms.DrawSprite(graphic.GetCommandList().Get());
+				graphic.GetCommandList()->SetGraphicsRootConstantBufferView(1, transformationMatrixResourceSprite->GetGPUVirtualAddress());
+				graphic.GetCommandList()->SetGraphicsRootDescriptorTable(2, useMonsterBall ? textureSrvHandleGPU2 : textureSrvHandleGPU);
+				graphic.GetCommandList()->SetGraphicsRootConstantBufferView(3, directionalLight->GetGPUVirtualAddress());
 
-				commandList->DrawIndexedInstanced(6, 1, 0, 0, 0);
+				graphic.GetCommandList()->DrawIndexedInstanced(6, 1, 0, 0, 0);
 			}
 
 
 			//実際のcommandListのImGuiの描画コマンドを積む
-			ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), commandList.Get());
+			ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), graphic.GetCommandList().Get());
 
 			//画面に描く処理は終わり画面に映すので、状態を遷移
 			//RenderTargetからPresentにする
 			barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
 			barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PRESENT;
 			//TransitionBarrierを張る
-			commandList->ResourceBarrier(1, &barrier);
+			graphic.GetCommandList()->ResourceBarrier(1, &barrier);
 
 
 
 			//コマンドリストの内容を下記率させる。すべてのコマンドを積んでからCloseする
-			hr = commandList->Close();
+			hr = graphic.GetCommandList()->Close();
 			//コマンドリストのCloseに失敗した場合はエラー
 			assert(SUCCEEDED(hr));
 
 			//GUPにコマンドリストの実行を行わせる
-			ID3D12CommandList* commandLists[] = { commandList.Get() };
+			ID3D12CommandList* commandLists[] = { graphic.GetCommandList().Get() };
 			graphic.GetCommandQueue()->ExecuteCommandLists(1, commandLists);
 			//GUPとOSに画面の交換を要求する
 			swapChain->Present(1, 0);
@@ -892,11 +884,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 
 			//次フレーム用のコマンドリストを用意
-			hr = commandAllocator->Reset();
+			hr = graphic.GetCommandAllocator()->Reset();
 			//コマンドアロケーターのリセットに失敗した場合はエラー
 			assert(SUCCEEDED(hr));
 			//コマンドリストをリセットする
-			hr = commandList->Reset(commandAllocator.Get(), nullptr);
+			hr = graphic.GetCommandList()->Reset(graphic.GetCommandAllocator().Get(), nullptr);
 			//コマンドリストのリセットに失敗した場合はエラー
 			assert(SUCCEEDED(hr));
 
@@ -923,8 +915,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 	CloseHandle(fenceEvent);
 
-	/*xAudio2.Reset();
-	SoundUnload(&soundData);*/
+	
 
 	sound.~Sound();
 
