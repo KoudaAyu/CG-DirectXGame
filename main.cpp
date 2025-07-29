@@ -111,15 +111,6 @@ static LONG WINAPI ExportDump(EXCEPTION_POINTERS* exception)
 }
 
 
-
-
-
-
-
-
-
-
-
 //Windowsアプリでのエントリーポイント(main関数)
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 {
@@ -150,79 +141,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 	graphic.SelectAdapter();
 
-	//機能レベルとログの出力用の文字列
-	D3D_FEATURE_LEVEL featureLevels[] = {
-		D3D_FEATURE_LEVEL_12_2,
-		D3D_FEATURE_LEVEL_12_1,
-		D3D_FEATURE_LEVEL_12_0,
-	};
+	graphic.SelectDevice(device);
 
-	const char* featureLevelNames[] = {
-		"12.2",
-		"12.1",
-		"12.0",
-	};
-
-	//機能レベルを順に試していく
-	for (size_t i = 0; i < _countof(featureLevels); ++i)
-	{
-		//採用したアダプタでデバイスを作成
-		hr = D3D12CreateDevice(
-			graphic.GetUseAdapter().Get(), //アダプタ
-			featureLevels[i], //機能レベル
-			IID_PPV_ARGS(&device) //デバイスのポインタ
-		);
-
-		//指定した昨日レベルでデバイスが生成できたか確認
-		if (SUCCEEDED(hr))
-		{
-			//生成出来たのでログ出力を行う
-			Debug::Log(debug.GetStream(), std::format("Feature Level: {}\n", featureLevelNames[i]));
-			break; //ループを抜ける
-		}
-
-
-	}
-
-	//デバイスの生成に失敗し起動できない
-	assert(device != nullptr);
-	Debug::Log(debug.GetStream(), std::format("Complete create D3D12Device!"));//初期起動完了のLogを出す
-
-#ifdef _DEBUG
-	ID3D12InfoQueue* infoQueue = nullptr;
-	if (SUCCEEDED(device->QueryInterface(IID_PPV_ARGS(&infoQueue))))
-	{
-		//重大なエラーの時に止まる
-		infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_CORRUPTION, true);
-
-		//エラーの時に止まる
-		infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_ERROR, true);
-
-		//警告時に止まる
-		infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_WARNING, true);
-
-
-
-		//抑制するメッセージのID
-		D3D12_MESSAGE_ID denyIds[] =
-		{
-			D3D12_MESSAGE_ID_RESOURCE_BARRIER_MISMATCHING_COMMAND_LIST_TYPE
-		};
-
-		D3D12_MESSAGE_SEVERITY serverities[] = { D3D12_MESSAGE_SEVERITY_INFO };
-		D3D12_INFO_QUEUE_FILTER filter{};
-		filter.DenyList.NumIDs = _countof(denyIds); //抑制するメッセージの数
-		filter.DenyList.pIDList = denyIds; //抑制するメッセージのID
-		filter.DenyList.NumSeverities = _countof(serverities); //抑制するメッセージの重要度の数
-		filter.DenyList.pSeverityList = serverities; //抑制するメッセージの重要度
-
-		infoQueue->PushStorageFilter(&filter); //フィルターを適用する
-
-		//解放
-		infoQueue->Release();
-	}
-#endif
-
+	debug.SetupInfoQueue(device);
 
 	//コマンドキューの生成
 	Microsoft::WRL::ComPtr<ID3D12CommandQueue> commandQueue = nullptr;

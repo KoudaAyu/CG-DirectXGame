@@ -17,6 +17,7 @@ public:
 	void Info(const std::string& message);
 
 	void EnableDebugLayer();
+	void SetupInfoQueue(Microsoft::WRL::ComPtr<ID3D12Device>& device);
 
 	std::ofstream& GetStream() { return logStream; }
 

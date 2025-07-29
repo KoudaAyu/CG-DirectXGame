@@ -11,6 +11,13 @@ class Graphic
 public:
 	void GraphicCreateDXGIFactory();
 	void SelectAdapter();
+	void SelectDevice(Microsoft::WRL::ComPtr<ID3D12Device>& device);
+
+	static const D3D_FEATURE_LEVEL featureLevels[];
+	static const size_t featureLevelsCount;
+
+	static const char* featureLevelNames[];
+	static const size_t featureLevelNamesCount;
 
 	HRESULT GetHRESULT() const { return hr; }
 	Microsoft::WRL::ComPtr<IDXGIFactory7> GetDXGIFactory() const
