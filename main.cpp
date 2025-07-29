@@ -6,6 +6,7 @@
 #include"DebugLog.h"
 #include"DescriptorHeap.h"
 #include"GameScene.h"
+#include"Graphic.h"
 #include"KeyInput.h"
 #include"Matrix4x4.h"
 #include"Model.h"
@@ -140,43 +141,14 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 	debug.EnableDebugLayer();
 
-	//ウィンドウを表示する
-	ShowWindow(window.GetHwnd(), SW_SHOW);
+	window.Show();
 
-	//DXGIファクトリーの生成
-	Microsoft::WRL::ComPtr<IDXGIFactory7> dxgiFactory = nullptr;
-	//HRESULTはWindoes系のエラーコード
-	//関数が成功したか同課をSUCCEEDEDマクロで判断する
-	HRESULT hr = CreateDXGIFactory(IID_PPV_ARGS(&dxgiFactory));
+	Graphic graphic;
+	graphic.GraphicCreateDXGIFactory();
 
-	assert(SUCCEEDED(hr));
+	HRESULT hr;
 
-	//使用するアダプタ用の変数。最初にnullptrを入れる
-	Microsoft::WRL::ComPtr<IDXGIAdapter4>useAdapter = nullptr;
-
-	//いい順にアダプタを頼む
-	for (UINT i = 0; dxgiFactory->EnumAdapterByGpuPreference(i,
-		DXGI_GPU_PREFERENCE_HIGH_PERFORMANCE, IID_PPV_ARGS(&useAdapter)) != DXGI_ERROR_NOT_FOUND; ++i)
-	{
-
-		//アダプターの情報を取得する
-		DXGI_ADAPTER_DESC3 adapterDesc{};
-		hr = useAdapter->GetDesc3(&adapterDesc);
-		assert(SUCCEEDED(hr));//ここで止まった場合一大事
-
-		//ソフトウェアアダプタでなければ採用する
-		if (!(adapterDesc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE))
-		{
-			Debug::Log(debug.GetStream(), std::format("Using adapter: {}\n", StringUtil::ConvertString(adapterDesc.Description)));
-			break;
-		}
-		useAdapter = nullptr; //ソフトウェアアダプタの場合は見なかったことにするためしないのでnullptr
-	}
-
-	//アダプターが見つからなかった場合はエラー
-	assert(useAdapter != nullptr);
-
-
+	graphic.SelectAdapter();
 
 	//機能レベルとログの出力用の文字列
 	D3D_FEATURE_LEVEL featureLevels[] = {
@@ -196,7 +168,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	{
 		//採用したアダプタでデバイスを作成
 		hr = D3D12CreateDevice(
-			useAdapter.Get(), //アダプタ
+			graphic.GetUseAdapter().Get(), //アダプタ
 			featureLevels[i], //機能レベル
 			IID_PPV_ARGS(&device) //デバイスのポインタ
 		);
@@ -286,7 +258,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD; //モニターに映ったら描画を破棄
 
 	//コマンドキュー、ウィンドウハンドル、設定を渡して生成する
-	hr = dxgiFactory->CreateSwapChainForHwnd(commandQueue.Get(), window.GetHwnd(), &swapChainDesc, nullptr, nullptr, reinterpret_cast<IDXGISwapChain1**>(swapChain.GetAddressOf()));
+	hr = graphic.GetDXGIFactory()->CreateSwapChainForHwnd(commandQueue.Get(), window.GetHwnd(), &swapChainDesc, nullptr, nullptr, reinterpret_cast<IDXGISwapChain1**>(swapChain.GetAddressOf()));
 	//スワップチェーンの生成に失敗した場合はエラー
 	assert(SUCCEEDED(hr));
 

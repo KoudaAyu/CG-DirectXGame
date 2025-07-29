@@ -16,6 +16,8 @@ public:
 
 	static LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam);
 
+	void Show();
+
 	HWND GetHwnd() const { return hwnd_; }
 
 	int32_t GetClientWidth() const { return kClientWidth; }
