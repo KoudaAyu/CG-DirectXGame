@@ -4,7 +4,9 @@
 #include<wrl.h>
 
 #include"DebugLog.h"
+#include"DescriptorHeap.h"
 #include"StringUtil.h"
+#include"Window.h"
 
 class Graphic
 {
@@ -15,6 +17,11 @@ public:
 	void CreateCommandQueue(Microsoft::WRL::ComPtr<ID3D12Device>& device);
 	void CreateCommandAllocator(Microsoft::WRL::ComPtr<ID3D12Device>& device);
 	void CreateCommandList(Microsoft::WRL::ComPtr<ID3D12Device>& device);
+	void CreateSwapChain(Window window);
+	void CreateDescriptorHeaps(Microsoft::WRL::ComPtr<ID3D12Device>& device);
+	void GetSwapChainResources();
+	void CreateRenderTargetViews(Microsoft::WRL::ComPtr<ID3D12Device>& device);
+
 
 	static const D3D_FEATURE_LEVEL featureLevels[];
 	static const size_t featureLevelsCount;
@@ -44,9 +51,53 @@ public:
 		return  commandList;
 	}
 
+	const Microsoft::WRL::ComPtr<IDXGISwapChain4> GetSwapChain() const
+	{
+		return swapChain;
+	}
+
+	
+	const DXGI_SWAP_CHAIN_DESC1& GetSwapChainDesc() const { return swapChainDesc; }
+
+	const Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> GetRtvDescriptorHeap() const
+	{
+		return rtvDescriptorHeap;
+	}
+
+	const Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> GetSrvDescriptorHeap() const
+	{
+		return srvDescriptorHeap;
+	}
+
+	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap>& GetSrvDescriptorHeap()
+	{
+		return srvDescriptorHeap;
+	}
+
+	const Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> GetDsvDescriptorHeap() const
+	{
+		return dsvDescriptorHeap;
+	}
+
+	const Microsoft::WRL::ComPtr<ID3D12Resource>& GetSwapChainResource(int index) const
+	{
+		return swapChainResources[index];
+	}
+
+	const D3D12_RENDER_TARGET_VIEW_DESC GetRtvDesc() const { return rtvDesc; }
+
+	// RTV開始ハンドルを取得（const）
+	const D3D12_CPU_DESCRIPTOR_HANDLE GetRtvStartHandle() const { return rtvStartHandle; }
+
+	const D3D12_CPU_DESCRIPTOR_HANDLE& GetRtvHandles(int index) const
+	{
+		return rtvHandles[index];
+	}
+
 private:
 	HRESULT hr;
 	Debug debug;
+	Window window;
 
 	//DXGIファクトリーの生成
 	Microsoft::WRL::ComPtr<IDXGIFactory7> dxgiFactory = nullptr;
@@ -62,4 +113,27 @@ private:
 
 	//コマンドリストの生成
 	Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> commandList = nullptr;
+
+	//スワップチェーンを生成する
+	Microsoft::WRL::ComPtr<IDXGISwapChain4> swapChain = nullptr;
+
+	DXGI_SWAP_CHAIN_DESC1 swapChainDesc{};
+
+	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> rtvDescriptorHeap = nullptr;
+
+	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> srvDescriptorHeap = nullptr;
+
+	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> dsvDescriptorHeap = nullptr;
+
+	//SwapChainからResorrceを取得する
+	Microsoft::WRL::ComPtr<ID3D12Resource> swapChainResources[2] = { nullptr, nullptr };
+
+	//RTVの設定
+	D3D12_RENDER_TARGET_VIEW_DESC rtvDesc{};
+
+	//ディスクリプタの先頭を取得する
+	D3D12_CPU_DESCRIPTOR_HANDLE rtvStartHandle;
+
+	//RTVを2つ作るのでディスクリプタを2つ用意する
+	D3D12_CPU_DESCRIPTOR_HANDLE rtvHandles[2];
 };

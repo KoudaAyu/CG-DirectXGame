@@ -22,6 +22,28 @@ public:
 		Microsoft::WRL::ComPtr<IDxcCompiler3> dxcCompiler,
 		Microsoft::WRL::ComPtr<IDxcIncludeHandler> includeHandler,
 		std::ofstream* logStream);
-	
+
+	void CreateDxcCompiler(HRESULT hr);
+
+	void CreateIncludeHandler(HRESULT hr);
+
+	const Microsoft::WRL::ComPtr<IDxcUtils>& GetDxcUtils() const
+	{
+		return dxcUtils;
+	}
+	const Microsoft::WRL::ComPtr<IDxcCompiler3>& GetDxcCompiler() const
+	{
+		return dxcCompiler;
+	}
+	const Microsoft::WRL::ComPtr<IDxcIncludeHandler>& GetIncludeHandler() const
+	{
+		return includeHandler;
+	}
+
+
+private:
+	Microsoft::WRL::ComPtr<IDxcUtils> dxcUtils = nullptr;
+	Microsoft::WRL::ComPtr<IDxcCompiler3> dxcCompiler = nullptr;
+	Microsoft::WRL::ComPtr<IDxcIncludeHandler>includeHandler = nullptr;
 
 };

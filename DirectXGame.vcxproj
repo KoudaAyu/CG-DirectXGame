@@ -29,6 +29,7 @@
     <ClCompile Include="main.cpp" />
     <ClCompile Include="Matrix4x4.cpp" />
     <ClCompile Include="Model.cpp" />
+    <ClCompile Include="Renderer.cpp" />
     <ClCompile Include="ShaderCompile.cpp" />
     <ClCompile Include="Sound.cpp" />
     <ClCompile Include="StringUtil.cpp" />
@@ -69,6 +70,8 @@
     <ClInclude Include="DebugLog.h" />
     <ClInclude Include="Matrix4x4.h" />
     <ClInclude Include="Model.h" />
+    <ClInclude Include="Pipeline.h" />
+    <ClInclude Include="Renderer.h" />
     <ClInclude Include="ShaderCompile.h" />
     <ClInclude Include="Sprite.h" />
     <ClInclude Include="StringUtil.h" />

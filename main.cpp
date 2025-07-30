@@ -10,6 +10,7 @@
 #include"KeyInput.h"
 #include"Matrix4x4.h"
 #include"Model.h"
+#include"Renderer.h"
 #include"Sound.h"
 #include"StringUtil.h"
 #include"ShaderCompile.h"
@@ -121,6 +122,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	//誰も補足しなかった場合に(Unhandled)、補足する関数を登録
 	SetUnhandledExceptionFilter(ExportDump);
 
+	HRESULT hr;
 
 	Microsoft::WRL::ComPtr<ID3D12Device> device;
 
@@ -130,14 +132,14 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	Window window;
 	window.Initialize();
 
+	
+
 	debug.EnableDebugLayer();
 
 	window.Show();
 
 	Graphic graphic;
 	graphic.GraphicCreateDXGIFactory();
-
-	HRESULT hr;
 
 	graphic.SelectAdapter();
 
@@ -151,84 +153,22 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	
 	graphic.CreateCommandList(device);
 	
+	graphic.CreateSwapChain(window);
 
+	graphic.CreateDescriptorHeaps(device);
+	
+	graphic.GetSwapChainResources();
+	
+	graphic.CreateRenderTargetViews(device);
+	
+	Renderer renderer;
+	renderer.CreateFence(device, graphic.GetHRESULT());
 
-	//スワップチェーンを生成する
-	Microsoft::WRL::ComPtr<IDXGISwapChain4> swapChain;
-	DXGI_SWAP_CHAIN_DESC1 swapChainDesc{};
-	swapChainDesc.Width = window.GetClientWidth(); //ウィンドウの幅
-	swapChainDesc.Height = window.GetClientHeight(); //ウィンドウの高さ
-	swapChainDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM; //色の形式
-	swapChainDesc.SampleDesc.Count = 1; //マルチサンプルしない
-	swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT; //レンダリングターゲットとして使用
-	swapChainDesc.BufferCount = 2; //ダブルバッファリング
-	swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD; //モニターに映ったら描画を破棄
+	ShaderCompile shaderCompile;
 
-	//コマンドキュー、ウィンドウハンドル、設定を渡して生成する
-	hr = graphic.GetDXGIFactory()->CreateSwapChainForHwnd(graphic.GetCommandQueue().Get(), window.GetHwnd(), &swapChainDesc, nullptr, nullptr, reinterpret_cast<IDXGISwapChain1**>(swapChain.GetAddressOf()));
-	//スワップチェーンの生成に失敗した場合はエラー
-	assert(SUCCEEDED(hr));
+	shaderCompile.CreateDxcCompiler(graphic.GetHRESULT());
 
-	//RTV用のヒープでディスクリプタの数は2。RTVはShader内でふれるものではないため、ShaderVisibleはfalse
-	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> rtvDescriptorHeap = DescriptorHeap::CreateDescriptorHeap(device.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_RTV, 2, false);
-	//SRV用のヒープでディスクリプタの数は128。SRTはShader内で触れるものなので、ShaderVisibleはtrue
-	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> srvDescriptorHeap = DescriptorHeap::CreateDescriptorHeap(device.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 128, true);
-
-	//DSV用のヒープでディスクリプタの数は1。DSVはShader内で触れるものではないため、ShaderVisibleはfalse
-	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> dsvDescriptorHeap = DescriptorHeap::CreateDescriptorHeap(device.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_DSV, 1, false);
-
-
-	//SwapChainからResorrceを取得する
-	Microsoft::WRL::ComPtr<ID3D12Resource> swapChainResources[2] = { nullptr, nullptr };
-	hr = swapChain->GetBuffer(0, IID_PPV_ARGS(&swapChainResources[0]));
-	//うまく取得できなければエラー
-	assert(SUCCEEDED(hr));
-	hr = swapChain->GetBuffer(1, IID_PPV_ARGS(&swapChainResources[1]));
-	//うまく取得できなければエラー
-	assert(SUCCEEDED(hr));
-
-	//RTVの設定
-	D3D12_RENDER_TARGET_VIEW_DESC rtvDesc{};
-	rtvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB; //出力結果をSRGBに変換して書き込む
-	rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D; //2Dテクスチャとして書き込む
-	//ディスクリプタの先頭を取得する
-	D3D12_CPU_DESCRIPTOR_HANDLE rtvStartHandle = rtvDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
-	//RTVを2つ作るのでディスクリプタを2つ用意する
-	D3D12_CPU_DESCRIPTOR_HANDLE rtvHandles[2];
-	//まず1つ目を作る。1つ目は最初のところ。こちらで場所指定する必要あり
-	rtvHandles[0] = rtvStartHandle;
-	device->CreateRenderTargetView(swapChainResources[0].Get(), &rtvDesc, rtvHandles[0]);
-	//2つ目は1つ目の後ろに作る
-	rtvHandles[1].ptr = rtvHandles[0].ptr + device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
-	//2つ目を作る
-	device->CreateRenderTargetView(swapChainResources[1].Get(), &rtvDesc, rtvHandles[1]);
-
-
-	MSG msg{};
-
-	//初期値0でFenceを作る
-	Microsoft::WRL::ComPtr<ID3D12Fence> fence = nullptr;
-	uint64_t fenceValue = 0;
-	hr = device->CreateFence(fenceValue, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&fence));
-	//フェンスの生成に失敗した場合はエラー
-	assert(SUCCEEDED(hr));
-
-	HANDLE fenceEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
-	//フェンスイベントの生成に失敗した場合はエラー
-	assert(fenceEvent != nullptr);
-
-	//dxcCompilerを初期化
-	Microsoft::WRL::ComPtr<IDxcUtils> dxcUtils = nullptr;
-	Microsoft::WRL::ComPtr<IDxcCompiler3> dxcCompiler = nullptr;
-	hr = DxcCreateInstance(CLSID_DxcUtils, IID_PPV_ARGS(&dxcUtils));
-	assert(SUCCEEDED(hr));
-	hr = DxcCreateInstance(CLSID_DxcCompiler, IID_PPV_ARGS(&dxcCompiler));
-	assert(SUCCEEDED(hr));
-
-	//現時点ではincludeしないが、includeに対応する為の設定を行う
-	Microsoft::WRL::ComPtr<IDxcIncludeHandler>includeHandler = nullptr;
-	hr = dxcUtils->CreateDefaultIncludeHandler(&includeHandler);
-	assert(SUCCEEDED(hr));
+	shaderCompile.CreateIncludeHandler(graphic.GetHRESULT());
 
 	//RootSignatureの作成
 	D3D12_ROOT_SIGNATURE_DESC descriptionRootSignature{};
@@ -333,11 +273,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 	//Shaderをコンパイルする
 	Microsoft::WRL::ComPtr<IDxcBlob> vertexShaderBlob = ShaderCompile::CompileShader(L"Object3D.VS.hlsl",
-		L"vs_6_0", dxcUtils.Get(), dxcCompiler, includeHandler, &debug.GetStream());
+		L"vs_6_0", shaderCompile.GetDxcUtils().Get(), shaderCompile.GetDxcCompiler(), shaderCompile.GetIncludeHandler(), &debug.GetStream());
 	assert(vertexShaderBlob != nullptr);
 
 	Microsoft::WRL::ComPtr<IDxcBlob> pixelShaderBlob = ShaderCompile::CompileShader(L"Object3D.PS.hlsl",
-		L"ps_6_0", dxcUtils.Get(), dxcCompiler, includeHandler, &debug.GetStream());
+		L"ps_6_0", shaderCompile.GetDxcUtils().Get(), shaderCompile.GetDxcCompiler(), shaderCompile.GetIncludeHandler(), &debug.GetStream());
 	assert(pixelShaderBlob != nullptr);
 
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC graphicPipelineStateDesc{};
@@ -638,7 +578,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	dsvDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;//Format。基本的にはResourceに合わせる
 	dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;//2dTexture
 	//DSVHeapの先頭にDSVを作る
-	device->CreateDepthStencilView(depthStencilResource.Get(), &dsvDesc, dsvDescriptorHeap->GetCPUDescriptorHandleForHeapStart());
+	device->CreateDepthStencilView(depthStencilResource.Get(), &dsvDesc, graphic.GetDsvDescriptorHeap()->GetCPUDescriptorHandleForHeapStart());
 
 
 	Microsoft::WRL::ComPtr<ID3D12Resource> intermediateResource = Texture::UploadTextureData(textureResource, mipImages, device.Get(), graphic.GetCommandList());
@@ -664,11 +604,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	const uint32_t descriptorSizeDSV = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
 
 	//SRVを生成するDescriptorHeapの場所を決める
-	D3D12_CPU_DESCRIPTOR_HANDLE textureSrvHandleCPU = srvDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
-	D3D12_GPU_DESCRIPTOR_HANDLE textureSrvHandleGPU = srvDescriptorHeap->GetGPUDescriptorHandleForHeapStart();
+	D3D12_CPU_DESCRIPTOR_HANDLE textureSrvHandleCPU = graphic.GetSrvDescriptorHeap()->GetCPUDescriptorHandleForHeapStart();
+	D3D12_GPU_DESCRIPTOR_HANDLE textureSrvHandleGPU = graphic.GetSrvDescriptorHeap()->GetGPUDescriptorHandleForHeapStart();
 
-	D3D12_CPU_DESCRIPTOR_HANDLE textureSrvHandleCPU2 = AtIndex::GetCPUDescriptorHandle(srvDescriptorHeap, descriptorSizeSRV, 2);
-	D3D12_GPU_DESCRIPTOR_HANDLE textureSrvHandleGPU2 = AtIndex::GetGPUDescriptorHandle(srvDescriptorHeap, descriptorSizeSRV, 2);
+	D3D12_CPU_DESCRIPTOR_HANDLE textureSrvHandleCPU2 = AtIndex::GetCPUDescriptorHandle(graphic.GetSrvDescriptorHeap(), descriptorSizeSRV, 2);
+	D3D12_GPU_DESCRIPTOR_HANDLE textureSrvHandleGPU2 = AtIndex::GetGPUDescriptorHandle(graphic.GetSrvDescriptorHeap(), descriptorSizeSRV, 2);
 
 	//先頭はImGuiに使用しているためその次を使う
 	textureSrvHandleCPU.ptr += device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
@@ -706,20 +646,20 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	ImGui_ImplWin32_Init(window.GetHwnd());
 	ImGui_ImplDX12_Init(
 		device.Get(),
-		swapChainDesc.BufferCount,
-		rtvDesc.Format,
-		srvDescriptorHeap.Get(),
-		srvDescriptorHeap->GetCPUDescriptorHandleForHeapStart(),
-		srvDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
+		graphic.GetSwapChainDesc().BufferCount,
+		graphic.GetRtvDesc().Format,
+		graphic.GetSrvDescriptorHeap().Get(),
+		graphic.GetSrvDescriptorHeap()->GetCPUDescriptorHandleForHeapStart(),
+		graphic.GetSrvDescriptorHeap()->GetGPUDescriptorHandleForHeapStart());
 
 	//ウィンドウのxボタンが押されるまでループ
-	while (msg.message != WM_QUIT)
+	while (renderer.GetMSG().message != WM_QUIT)
 	{
 		//Windowに目セージが来ていたら最優先で処理される
-		if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
+		if (PeekMessage(&renderer.GetMSG(), NULL, 0, 0, PM_REMOVE))
 		{
-			TranslateMessage(&msg); //メッセージを変換
-			DispatchMessage(&msg); //メッセージをウィンドウプロシージャに送る
+			TranslateMessage(&renderer.GetMSG()); //メッセージを変換
+			DispatchMessage(&renderer.GetMSG()); //メッセージをウィンドウプロシージャに送る
 		}
 		else
 		{
@@ -778,7 +718,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 			inputManager.Update();
 
 			//これから書き込むバックバッファのインデックスを取得する
-			UINT backBufferIndex = swapChain->GetCurrentBackBufferIndex();
+			UINT backBufferIndex = graphic.GetSwapChain()->GetCurrentBackBufferIndex();
 
 			//TransitionBarrierの設定
 			D3D12_RESOURCE_BARRIER barrier{};
@@ -787,7 +727,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 			//Noneにしておく
 			barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
 			//バリアを張る対象のリソース。現在のバックバッファに対し行う
-			barrier.Transition.pResource = swapChainResources[backBufferIndex].Get();
+			barrier.Transition.pResource = graphic.GetSwapChainResource(backBufferIndex).Get();
 			//遷移前(現在)のResourceState
 			barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_PRESENT;
 			//遷移後のResourceState
@@ -798,15 +738,15 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 
 			//描画先のRTVとDSVを設定する
-			D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = dsvDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
-			graphic.GetCommandList()->OMSetRenderTargets(1, &rtvHandles[backBufferIndex], false, &dsvHandle);
+			D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = graphic.GetDsvDescriptorHeap()->GetCPUDescriptorHandleForHeapStart();
+			graphic.GetCommandList()->OMSetRenderTargets(1, &graphic.GetRtvHandles(backBufferIndex), false, &dsvHandle);
 			float clearColor[] = { 0.1f,0.25f,0.5f,1.0f };//RGBAの値。青っぽい色
-			graphic.GetCommandList()->ClearRenderTargetView(rtvHandles[backBufferIndex], clearColor, 0, nullptr);
+			graphic.GetCommandList()->ClearRenderTargetView(graphic.GetRtvHandles(backBufferIndex), clearColor, 0, nullptr);
 
 			graphic.GetCommandList()->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 
 			//描画用のDescriptorHeapの設定
-			Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> descriptorHeap[] = { srvDescriptorHeap.Get() };
+			Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> descriptorHeap[] = { graphic.GetSrvDescriptorHeap().Get() };
 			graphic.GetCommandList()->SetDescriptorHeaps(1, descriptorHeap->GetAddressOf());
 
 			//コマンドを積む
@@ -864,22 +804,22 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 			ID3D12CommandList* commandLists[] = { graphic.GetCommandList().Get() };
 			graphic.GetCommandQueue()->ExecuteCommandLists(1, commandLists);
 			//GUPとOSに画面の交換を要求する
-			swapChain->Present(1, 0);
+			graphic.GetSwapChain()->Present(1, 0);
 
 			//Fenceの値を更新
-			fenceValue++;
+			renderer.GetFenceValue()++;
 			//GPUがここまでたどり着いたときに、Fenceの値を指定した値に代入するようにSignalを送る
-			graphic.GetCommandQueue()->Signal(fence.Get(), fenceValue);
+			graphic.GetCommandQueue()->Signal(renderer.GetFence().Get(), renderer.GetFenceValue());
 
 			//Fenceの値が指定したSignalの値にたどり着いているか確認する
 			//GetCompletedValueの初期値はFence作成時に渡した初期値
-			if (fence->GetCompletedValue() < fenceValue)
+			if (renderer.GetFence()->GetCompletedValue() < renderer.GetFenceValue())
 			{
 				//指定したSignalにたどり着いていないので、たどり着くまで待つようにイベントを設定する
-				fence->SetEventOnCompletion(fenceValue, fenceEvent);
+				renderer.GetFence()->SetEventOnCompletion(renderer.GetFenceValue(), renderer.GetFenceEvent());
 
 				//イベントを待つ
-				WaitForSingleObject(fenceEvent, INFINITE);
+				WaitForSingleObject(renderer.GetFenceEvent(), INFINITE);
 			}
 
 
@@ -913,7 +853,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	//出力ウィンドウへの文字出力
 	OutputDebugStringA("Hello, DirextX!\n");
 
-	CloseHandle(fenceEvent);
+	CloseHandle(renderer.GetFenceEvent());
 
 	
 

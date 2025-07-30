@@ -72,3 +72,19 @@ Microsoft::WRL::ComPtr<IDxcBlob> ShaderCompile::CompileShader(
 
 	return shaderBlob; //コンパイルしたShaderのバイナリを返す
 }
+
+//dxcCompilerを初期化
+void ShaderCompile::CreateDxcCompiler(HRESULT hr)
+{
+	hr = DxcCreateInstance(CLSID_DxcUtils, IID_PPV_ARGS(&dxcUtils));
+	assert(SUCCEEDED(hr));
+	hr = DxcCreateInstance(CLSID_DxcCompiler, IID_PPV_ARGS(&dxcCompiler));
+	assert(SUCCEEDED(hr));
+}
+
+void ShaderCompile::CreateIncludeHandler(HRESULT hr)
+{
+	//現時点ではincludeしないが、includeに対応する為の設定を行う
+	hr = dxcUtils->CreateDefaultIncludeHandler(&includeHandler);
+	assert(SUCCEEDED(hr));
+}
