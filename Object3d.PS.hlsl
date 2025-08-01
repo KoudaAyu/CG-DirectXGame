@@ -5,6 +5,8 @@ struct Material
 {
     float32_t4 color;
     int32_t enableLighting;
+    int32_t textureIndex;
+    float32_t2 padding;
     float32_t4x4 uvTransform;
 };
 
@@ -18,7 +20,7 @@ struct DirectionalLight
 };
 ConstantBuffer<DirectionalLight> gDirectionalLight : register(b1);
 
-Texture2D<float32_t4> gTexture : register(t3);
+Texture2D<float32_t4> gTexture[2] : register(t3);
 
 SamplerState gSample : register(s0);
 
@@ -32,7 +34,7 @@ PixelShaderOutput main(VertexShaderOutput input)
 {
     PixelShaderOutput output;
     float3 transformedUV = mul(float32_t4(input.texcoord,0.0f, 1.0f), gMaterial.uvTransform);
-    float32_t4 textureColor = gTexture.Sample(gSample, transformedUV.xy);
+    float32_t4 textureColor = gTexture[gMaterial.textureIndex].Sample(gSample, transformedUV.xy);
     output.color = gMaterial.color * textureColor;
     
     //hals lambert

@@ -15,7 +15,7 @@ public:
 
 private:
 	Vector3 rotation_ = { 0.0f,0.0f,0.0f };
-	Vector3 translation_ = { 0.0f,0.0f,-50.0f };
+	Vector3 translation_ = { 0.0f,0.0f,-10.0f };
 
 	//ビュー行列
 	Matrix4x4 view_matrix_ = {};
