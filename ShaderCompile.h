@@ -27,6 +27,10 @@ public:
 
 	void CreateIncludeHandler(HRESULT hr);
 
+	void CreateVertexShaderBlob();
+
+	void CreatePixelShaderBlob();
+
 	const Microsoft::WRL::ComPtr<IDxcUtils>& GetDxcUtils() const
 	{
 		return dxcUtils;
@@ -39,11 +43,22 @@ public:
 	{
 		return includeHandler;
 	}
-
+	const Microsoft::WRL::ComPtr<IDxcBlob>& GetVertexShaderBlob() const
+	{
+		return vertexShaderBlob;
+	}
+	const Microsoft::WRL::ComPtr<IDxcBlob>& GetPixelShaderBlob() const
+	{
+		return pixelShaderBlob;
+	}	
 
 private:
+	Debug debug;
+
 	Microsoft::WRL::ComPtr<IDxcUtils> dxcUtils = nullptr;
 	Microsoft::WRL::ComPtr<IDxcCompiler3> dxcCompiler = nullptr;
 	Microsoft::WRL::ComPtr<IDxcIncludeHandler>includeHandler = nullptr;
-
+	//Shaderをコンパイルする
+	Microsoft::WRL::ComPtr<IDxcBlob> vertexShaderBlob = nullptr;
+	Microsoft::WRL::ComPtr<IDxcBlob> pixelShaderBlob = nullptr;
 };

@@ -3,8 +3,13 @@
 #include <dxgi1_6.h>
 #include<wrl.h>
 
+#include"BlendManager.h"
 #include"DebugLog.h"
 #include"DescriptorHeap.h"
+#include"InputLayoutManage.h"
+#include"RasterizerManager.h"
+#include"RootSignatureManager.h"
+#include"ShaderCompile.h"
 #include"StringUtil.h"
 #include"Window.h"
 
@@ -21,7 +26,9 @@ public:
 	void CreateDescriptorHeaps(Microsoft::WRL::ComPtr<ID3D12Device>& device);
 	void GetSwapChainResources();
 	void CreateRenderTargetViews(Microsoft::WRL::ComPtr<ID3D12Device>& device);
-
+	void CreateGraphicPipelineStateDesc(const Microsoft::WRL::ComPtr<IDxcBlob>& vertexShaderBlob,
+		const Microsoft::WRL::ComPtr<IDxcBlob>& pixelShaderBlob, D3D12_INPUT_LAYOUT_DESC inputLayoutDesc,
+		D3D12_BLEND_DESC blendDesc, D3D12_RASTERIZER_DESC rasterizerDesc);
 
 	static const D3D_FEATURE_LEVEL featureLevels[];
 	static const size_t featureLevelsCount;
@@ -94,9 +101,25 @@ public:
 		return rtvHandles[index];
 	}
 
+	const D3D12_GRAPHICS_PIPELINE_STATE_DESC& GetGraphicPipelineStateDesc() const
+	{
+		return graphicPipelineStateDesc;
+	}
+
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC& GetGraphicPipelineStateDesc()
+	{
+		return graphicPipelineStateDesc;
+	}
+
 private:
-	HRESULT hr;
+	BlendManager blendManager;
 	Debug debug;
+	HRESULT hr;
+	
+	RasterizerManager rasterizerManager;
+	RootSignatureManager rootSignatureManager;
+	
+
 	Window window;
 
 	//DXGIファクトリーの生成
@@ -136,4 +159,6 @@ private:
 
 	//RTVを2つ作るのでディスクリプタを2つ用意する
 	D3D12_CPU_DESCRIPTOR_HANDLE rtvHandles[2];
+
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC graphicPipelineStateDesc{};
 };

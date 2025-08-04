@@ -12,6 +12,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="AtIndex.cpp" />
+    <ClCompile Include="BlendManager.cpp" />
     <ClCompile Include="Buffer.cpp" />
     <ClCompile Include="DebugCamera.cpp" />
     <ClCompile Include="DebugLog.cpp" />
@@ -25,11 +26,14 @@
     <ClCompile Include="externals\imgui\imgui_widgets.cpp" />
     <ClCompile Include="GameSnene.cpp" />
     <ClCompile Include="Graphic.cpp" />
+    <ClCompile Include="InputLayoutManage.cpp" />
     <ClCompile Include="KeyInput.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="Matrix4x4.cpp" />
     <ClCompile Include="Model.cpp" />
+    <ClCompile Include="RasterizerManager.cpp" />
     <ClCompile Include="Renderer.cpp" />
+    <ClCompile Include="RootSignatureManager.cpp" />
     <ClCompile Include="ShaderCompile.cpp" />
     <ClCompile Include="Sound.cpp" />
     <ClCompile Include="StringUtil.cpp" />
@@ -53,6 +57,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="AtIndex.h" />
+    <ClInclude Include="BlendManager.h" />
     <ClInclude Include="Buffer.h" />
     <ClInclude Include="DebugCamera.h" />
     <ClInclude Include="DescriptorHeap.h" />
@@ -66,12 +71,15 @@
     <ClInclude Include="externals\imgui\imstb_truetype.h" />
     <ClInclude Include="GameScene.h" />
     <ClInclude Include="Graphic.h" />
+    <ClInclude Include="InputLayoutManage.h" />
     <ClInclude Include="KeyInput.h" />
     <ClInclude Include="DebugLog.h" />
     <ClInclude Include="Matrix4x4.h" />
     <ClInclude Include="Model.h" />
     <ClInclude Include="Pipeline.h" />
+    <ClInclude Include="RasterizerManager.h" />
     <ClInclude Include="Renderer.h" />
+    <ClInclude Include="RootSignatureManager.h" />
     <ClInclude Include="ShaderCompile.h" />
     <ClInclude Include="Sprite.h" />
     <ClInclude Include="StringUtil.h" />

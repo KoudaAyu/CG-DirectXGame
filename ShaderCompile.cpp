@@ -88,3 +88,18 @@ void ShaderCompile::CreateIncludeHandler(HRESULT hr)
 	hr = dxcUtils->CreateDefaultIncludeHandler(&includeHandler);
 	assert(SUCCEEDED(hr));
 }
+
+void ShaderCompile::CreateVertexShaderBlob()
+{
+	//Shaderをコンパイルする
+	vertexShaderBlob = CompileShader(L"Object3D.VS.hlsl",
+		L"vs_6_0", dxcUtils.Get(), dxcCompiler, includeHandler, &debug.GetStream());
+	assert(vertexShaderBlob != nullptr);
+}
+
+void ShaderCompile::CreatePixelShaderBlob()
+{
+	pixelShaderBlob = ShaderCompile::CompileShader(L"Object3D.PS.hlsl",
+		L"ps_6_0", dxcUtils.Get(), dxcCompiler, includeHandler, &debug.GetStream());
+	assert(pixelShaderBlob != nullptr);
+}
