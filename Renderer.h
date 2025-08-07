@@ -9,7 +9,7 @@
 class Renderer
 {
 public:
-	void CreateFence(Microsoft::WRL::ComPtr<ID3D12Device>& device, HRESULT hr);
+	void CreateFence(const Microsoft::WRL::ComPtr<ID3D12Device>& device, HRESULT hr);
 
 	const MSG GetMSG() const { return msg; }
 

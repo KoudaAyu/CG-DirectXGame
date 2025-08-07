@@ -6,6 +6,7 @@
 #include"DebugCamera.h"
 #include"DebugLog.h"
 #include"DescriptorHeap.h"
+#include"DepthStencilStateManager.h"
 #include"GameScene.h"
 #include"Graphic.h"
 #include"InputLayoutManage.h"
@@ -15,12 +16,16 @@
 #include"RasterizerManager.h"
 #include"Renderer.h"
 #include"RootSignatureManager.h"
+#include"ScissorManager.h"
 #include"Sound.h"
 #include"StringUtil.h"
 #include"ShaderCompile.h"
+#include"Sphere.h"
+#include"Sprite.h"
 #include"Texture.h"
 #include"UVTransform.h"
 #include"Vector.h"
+#include"ViewportManager.h"
 #include"Window.h"
 
 #include<chrono> //時間を扱うライブラリ
@@ -194,220 +199,28 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	shaderCompile.CreateVertexShaderBlob();
 	shaderCompile.CreatePixelShaderBlob();
 
-	D3D12_GRAPHICS_PIPELINE_STATE_DESC graphicPipelineStateDesc{};
-	graphicPipelineStateDesc.pRootSignature = rootSignatureManager.GetRootSignature().Get(); //ルートシグネチャ
-	graphicPipelineStateDesc.InputLayout = inputLayer.GetInputLayoutDesc(); //入力レイアウト
-	graphicPipelineStateDesc.VS = { shaderCompile.GetVertexShaderBlob()->GetBufferPointer(),
-	shaderCompile.GetVertexShaderBlob()->GetBufferSize() }; //頂点シェーダーの設定
-	graphicPipelineStateDesc.PS = { shaderCompile.GetPixelShaderBlob()->GetBufferPointer(),
-		shaderCompile.GetPixelShaderBlob()->GetBufferSize() }; //ピクセルシェーダーの設定
-	graphicPipelineStateDesc.BlendState = blendManager.GetBlendDesc(); //ブレンドステートの設定
-	graphicPipelineStateDesc.RasterizerState = rasterizerManager.GetRasterizerDesc(); //ラスタライザーステートの設定
-	//書き込むRTVの情報
-	graphicPipelineStateDesc.NumRenderTargets = 1;
-	graphicPipelineStateDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB; //RTVのフォーマット
-	//利用するトロポジ(形状)のタイプ。三角形
-	graphicPipelineStateDesc.PrimitiveTopologyType =
-		D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-	//どのように画面に色を打ち込むか設定(気にしなくていい？)
-	graphicPipelineStateDesc.SampleDesc.Count = 1; //マルチサンプルしない
-	graphicPipelineStateDesc.SampleMask = D3D12_DEFAULT_SAMPLE_MASK; //サンプルマスクはデフォルト
-
-	//DepthStencilStateの設定
-	D3D12_DEPTH_STENCIL_DESC depthStencilDesc{};
-	//Depthの機能を有効化する
-	depthStencilDesc.DepthEnable = true;
-	//書き込み
-	depthStencilDesc.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
-	//比較関数はLessEqua。つまり、近ければ描画される
-	depthStencilDesc.DepthFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
-	//DepthStencilの設定
-	graphic.GetGraphicPipelineStateDesc().DepthStencilState = depthStencilDesc;
-	graphic.GetGraphicPipelineStateDesc().DSVFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
-	//実際に生成
-	Microsoft::WRL::ComPtr<ID3D12PipelineState> graphicPipelineState = nullptr;
-	hr = device->CreateGraphicsPipelineState(&graphicPipelineStateDesc,
-		IID_PPV_ARGS(&graphicPipelineState));
-
-	assert(shaderCompile.GetVertexShaderBlob() && "頂点シェーダーの読み込み失敗！");
-	assert(shaderCompile.GetPixelShaderBlob() && "ピクセルシェーダーの読み込み失敗！");
-
-	//パイプラインステートの生成に失敗した場合はエラー
-	assert(SUCCEEDED(hr));
-
-	// 球体
-	const uint32_t kSubdivision = 16; // 16分割
-
-	// 経度分割1つ分の角度
-	const float kLonEvery = DirectX::XM_2PI / float(kSubdivision);
-	// 緯度分割1つ分の角度
-	const float kLatEvery = DirectX::XM_PI / float(kSubdivision);
-
-	// 頂点数・インデックス数
-	// 緯度方向と経度方向の両端に重複する頂点があるため、+1が必要
-	const uint32_t kVertexCount = (kSubdivision + 1) * (kSubdivision + 1);
-	const uint32_t kIndexCount = kSubdivision * kSubdivision * 6; // 各四角形に三角形2つ、各三角形に頂点3つで 2*3=6
-
-	// 頂点配列を確保
-	VertexData* vertexData = new VertexData[kVertexCount];
-
-	// --- 頂点データを埋める ---
-	for (uint32_t lat = 0; lat <= kSubdivision; ++lat)
-	{
-		// 緯度 (theta): -π/2 (下端) から π/2 (上端) まで
-		float theta = -DirectX::XM_PIDIV2 + DirectX::XM_PI * (float(lat) / kSubdivision);
-		for (uint32_t lon = 0; lon <= kSubdivision; ++lon)
-		{
-			// 経度 (phi): 0 (東端) から 2π (一周) まで
-			float phi = DirectX::XM_2PI * (float(lon) / kSubdivision);
-			uint32_t idx = lat * (kSubdivision + 1) + lon; // 1次元配列内のインデックス
-
-			// 球面座標からデカルト座標への変換
-			vertexData[idx].position.x = cos(theta) * cos(phi);
-			vertexData[idx].position.y = sin(theta);
-			vertexData[idx].position.z = cos(theta) * sin(phi);
-			vertexData[idx].position.w = 1.0f; // 同次座標
-
-			// テクスチャ座標 (UV)
-			// U: 経度に比例 (0.0 から 1.0)
-			vertexData[idx].texcoord.x = float(lon) / kSubdivision;
-			// V: 緯度に比例 (1.0 から 0.0、上向きが正になるように反転)
-			vertexData[idx].texcoord.y = 1.0f - float(lat) / kSubdivision;
-
-			// 法線ベクトル (原点から頂点へのベクトルがそのまま法線となる)
-			vertexData[idx].normal = {
-				vertexData[idx].position.x,
-				vertexData[idx].position.y,
-				vertexData[idx].position.z
-			};
-		}
-	}
-
-	// --- 頂点バッファを作成・アップロード ---
-	Microsoft::WRL::ComPtr<ID3D12Resource> vertexResourceSphere = Buffer::CreateBufferResource(device.Get(), sizeof(VertexData) * kVertexCount);
-	VertexData* mappedVertex = nullptr;
-	vertexResourceSphere->Map(0, nullptr, reinterpret_cast<void**>(&mappedVertex));
-	memcpy(mappedVertex, vertexData, sizeof(VertexData) * kVertexCount);
-	vertexResourceSphere->Unmap(0, nullptr);
-
-	uint32_t* indexData = new uint32_t[kIndexCount];
-	uint32_t idx = 0; // ここを元のままの変数名に戻しました
-
-	for (uint32_t lat = 0; lat < kSubdivision; ++lat)
-	{
-		for (uint32_t lon = 0; lon < kSubdivision; ++lon)
-		{
-
-			uint32_t v0 = lat * (kSubdivision + 1) + lon;             // 左上 (A)
-			uint32_t v1 = v0 + 1;                                      // 右上 (C)
-			uint32_t v2 = v0 + (kSubdivision + 1);                     // 左下 (B)
-			uint32_t v3 = v2 + 1;                                      // 右下 (D)
-
-			// 四角形を2つの三角形で表現する
-			// 1つ目の三角形: v0, v2, v1 (A, B, C)
-			// DirectXでは通常、右手座標系で反時計回り（CCW）が表
-			indexData[idx++] = v0; // A
-			indexData[idx++] = v2; // B
-			indexData[idx++] = v1; // C
-
-			// 2つ目の三角形: v2, v3, v1 (B, D, C)
-			indexData[idx++] = v2; // B
-			indexData[idx++] = v3; // D
-			indexData[idx++] = v1; // C
-		}
-	}
-
-	// --- インデックスバッファを作成・アップロード ---
-	Microsoft::WRL::ComPtr<ID3D12Resource> indexResourceSphere = Buffer::CreateBufferResource(device.Get(), sizeof(uint32_t) * kIndexCount);
-	uint32_t* mappedIndex = nullptr;
-	indexResourceSphere->Map(0, nullptr, reinterpret_cast<void**>(&mappedIndex));
-	memcpy(mappedIndex, indexData, sizeof(uint32_t) * kIndexCount);
-	indexResourceSphere->Unmap(0, nullptr);
-
-	// --- バッファビュー設定 ---
-	D3D12_VERTEX_BUFFER_VIEW vertexBufferViewSphere{};
-	vertexBufferViewSphere.BufferLocation = vertexResourceSphere->GetGPUVirtualAddress();
-	vertexBufferViewSphere.SizeInBytes = sizeof(VertexData) * kVertexCount;
-	vertexBufferViewSphere.StrideInBytes = sizeof(VertexData);
-
-	D3D12_INDEX_BUFFER_VIEW indexBufferViewSphere{};
-	indexBufferViewSphere.BufferLocation = indexResourceSphere->GetGPUVirtualAddress();
-	indexBufferViewSphere.SizeInBytes = sizeof(uint32_t) * kIndexCount;
-	indexBufferViewSphere.Format = DXGI_FORMAT_R32_UINT;
-
-	VertexData* mapped = nullptr;
-	vertexResourceSphere->Map(0, nullptr, reinterpret_cast<void**>(&mapped));
-	memcpy(mapped, vertexData, sizeof(VertexData) * kVertexCount);
-	vertexResourceSphere->Unmap(0, nullptr);
-
-
-
-	//Sprite用の頂点Resource
-	Microsoft::WRL::ComPtr<ID3D12Resource> vertexResourceSprite = Buffer::CreateBufferResource(device.Get(), sizeof(VertexData) * 6);
-	//頂点バッファビューを生成する
-	D3D12_VERTEX_BUFFER_VIEW vertexBufferViewSprite{};
-	//リソースの先頭のアドレスから使う
-	vertexBufferViewSprite.BufferLocation = vertexResourceSprite->GetGPUVirtualAddress();
-	//使用するリソースのサイズは頂点6つ分のサイズ
-	vertexBufferViewSprite.SizeInBytes = sizeof(VertexData) * 6;
-	//1頂点当たりのサイズ
-	vertexBufferViewSprite.StrideInBytes = sizeof(VertexData);
-
-
-	Microsoft::WRL::ComPtr<ID3D12Resource> indexResourceSprite = Buffer::CreateBufferResource(device.Get(), sizeof(uint32_t) * 6);
-	//頂点バッファービューを生成する
-	D3D12_INDEX_BUFFER_VIEW indexBufferViewSprite{};
-	//リソースの先頭アドレスから使う
-	indexBufferViewSprite.BufferLocation = indexResourceSprite->GetGPUVirtualAddress();
-	//使用するリソースのサイズは頂点6つ分のサイズ
-	indexBufferViewSprite.SizeInBytes = sizeof(uint32_t) * 6;
-	//インデックスはuint32_tとする
-	indexBufferViewSprite.Format = DXGI_FORMAT_R32_UINT;
-
-	//インデックスリソースにデータを書き込む
-	uint32_t* indexDataSprite = nullptr;
-	indexResourceSprite->Map(0, nullptr, reinterpret_cast<void**>(&indexDataSprite));
-	indexDataSprite[0] = 0; // 左下
-	indexDataSprite[1] = 1; // 左上
-	indexDataSprite[2] = 2; // 右下
-	indexDataSprite[3] = 2; // 右下
-	indexDataSprite[4] = 1; // 左上
-	indexDataSprite[5] = 3; // 右上
-
-	indexResourceSprite->Unmap(0, nullptr);
+	graphic.CreateGraphicPipelineState(rootSignatureManager.GetRootSignature(),
+		inputLayer.GetInputLayoutDesc(),shaderCompile.GetVertexShaderBlob(),
+		shaderCompile.GetPixelShaderBlob(),blendManager.GetBlendDesc(),rasterizerManager.GetRasterizerDesc());
+	
+	DepthStencilStateManager depthStencilStateManager;
+	depthStencilStateManager.DepthStencilStateSetting(device, graphic.GetHRESULT(),
+		graphic.GetGraphicPipelineStateDesc(), shaderCompile.GetVertexShaderBlob(),
+		shaderCompile.GetPixelShaderBlob());
+	Buffer buffer;
+	Sphere sphere;
+	sphere.Initialize(device,buffer);
 
 	//Sprite用
-	VertexData* vertexDataSprite = nullptr;
-	vertexResourceSprite->Map(0, nullptr, reinterpret_cast<void**>(&vertexDataSprite));
-	//一枚目の三角形
-	vertexDataSprite[0].position = { 0.0f,360.0f,0.0f,1.0f }; // 左下
-	vertexDataSprite[1].position = { 0.0f,0.0f,0.0f,1.0f };   // 左上
-	vertexDataSprite[2].position = { 640.0f,360.0f,0.0f,1.0f }; // 右下
-	vertexDataSprite[3].position = { 640.0f,0.0f,0.0f,1.0f };   // 右上
+	Sprite sprite;
+	sprite.Initialize(device, buffer);
 
-	vertexDataSprite[0].texcoord = { 0.0f,1.0f };
-	vertexDataSprite[1].texcoord = { 0.0f,0.0f };
-	vertexDataSprite[2].texcoord = { 1.0f,1.0f };
-	vertexDataSprite[3].texcoord = { 1.0f,0.0f };
+	ViewportManager viewportManager;
+	viewportManager.Initialize(window);
 
-	//ビューポート
-	D3D12_VIEWPORT viewport{};
-	//クライアント領域のサイズと一緒にして画面全体に表示
-	viewport.Width = static_cast<float>(window.GetClientWidth());
-	viewport.Height = static_cast<float>(window.GetClientHeight());
-	viewport.TopLeftX = 0.0f; //左上のX座標
-	viewport.TopLeftY = 0.0f; //左上のY座標
-	viewport.MinDepth = 0.0f; //最小の深度
-	viewport.MaxDepth = 1.0f; //最大の深度
-
-	//シザー矩形
-	D3D12_RECT scissorRect{};
-	//基本的にビューポートと同じ矩形が構成されるようにする
-	scissorRect.left = 0; //左上のX座標
-	scissorRect.right = window.GetClientWidth(); //右下のX座標
-	scissorRect.top = 0; //左上のY座標
-	scissorRect.bottom = window.GetClientHeight(); //右下のY座標
-
+	ScissorManager scissorManager;
+	scissorManager.Initialize(window);
+	
 	UVTransform uvTransforms;
 	uvTransforms.Initialize(device.Get());
 	
@@ -664,15 +477,15 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 			graphic.GetCommandList()->SetDescriptorHeaps(1, descriptorHeap->GetAddressOf());
 
 			//コマンドを積む
-			graphic.GetCommandList()->RSSetViewports(1, &viewport); //ビューポートを設定
-			graphic.GetCommandList()->RSSetScissorRects(1, &scissorRect); //シザー矩形を設定
+			graphic.GetCommandList()->RSSetViewports(1, &viewportManager.GetViewport()); //ビューポートを設定
+			graphic.GetCommandList()->RSSetScissorRects(1, &scissorManager.GetScissorRect()); //シザー矩形を設定
 			//RootSignatureを設定。PSOに設定しているけれど別途設定が必要
 			graphic.GetCommandList()->SetGraphicsRootSignature(rootSignatureManager.GetRootSignature().Get());
-			graphic.GetCommandList()->SetPipelineState(graphicPipelineState.Get()); //パイプラインステートを設定
+			graphic.GetCommandList()->SetPipelineState(depthStencilStateManager.GetGraphicPipelineState().Get()); //パイプラインステートを設定
 			//Sphereの描画
 
 			graphic.GetCommandList()->IASetVertexBuffers(0, 1, &model.GetVertexBufferView());
-			graphic.GetCommandList()->IASetIndexBuffer(&indexBufferViewSphere);
+			graphic.GetCommandList()->IASetIndexBuffer(&sphere.GetIndexBufferViewSphere());
 			graphic.GetCommandList()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 			uvTransforms.Draw(graphic.GetCommandList().Get());
 			graphic.GetCommandList()->SetGraphicsRootConstantBufferView(1, transformationMatrixResourceSphere->GetGPUVirtualAddress());
@@ -685,8 +498,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 			if (drawSprite)
 			{
-				graphic.GetCommandList()->IASetVertexBuffers(0, 1, &vertexBufferViewSprite);
-				graphic.GetCommandList()->IASetIndexBuffer(&indexBufferViewSprite);
+				graphic.GetCommandList()->IASetVertexBuffers(0, 1, &sprite.GetVertexBufferViewSprite());
+				graphic.GetCommandList()->IASetIndexBuffer(&sprite.GetIndexBufferViewSprite());
 				graphic.GetCommandList()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 				uvTransforms.DrawSprite(graphic.GetCommandList().Get());
 				graphic.GetCommandList()->SetGraphicsRootConstantBufferView(1, transformationMatrixResourceSprite->GetGPUVirtualAddress());
@@ -773,9 +586,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 	sound.~Sound();
 
-
-	delete[] vertexData;
-	delete[] indexData;
 	// --- ウィンドウ解放 ---
 	CloseWindow(window.GetHwnd()); //ウィンドウの解放
 

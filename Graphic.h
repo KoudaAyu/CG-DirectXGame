@@ -16,6 +16,7 @@
 class Graphic
 {
 public:
+	void Initialize();
 	void GraphicCreateDXGIFactory();
 	void SelectAdapter();
 	void SelectDevice(Microsoft::WRL::ComPtr<ID3D12Device>& device);
@@ -26,9 +27,10 @@ public:
 	void CreateDescriptorHeaps(Microsoft::WRL::ComPtr<ID3D12Device>& device);
 	void GetSwapChainResources();
 	void CreateRenderTargetViews(Microsoft::WRL::ComPtr<ID3D12Device>& device);
-	void CreateGraphicPipelineStateDesc(const Microsoft::WRL::ComPtr<IDxcBlob>& vertexShaderBlob,
-		const Microsoft::WRL::ComPtr<IDxcBlob>& pixelShaderBlob, D3D12_INPUT_LAYOUT_DESC inputLayoutDesc,
-		D3D12_BLEND_DESC blendDesc, D3D12_RASTERIZER_DESC rasterizerDesc);
+	void CreateGraphicPipelineState(const Microsoft::WRL::ComPtr<ID3D12RootSignature>& GetRootSignature,
+		const D3D12_INPUT_LAYOUT_DESC& inputLayer, const Microsoft::WRL::ComPtr<IDxcBlob>& vertexShaderBlob,
+		const Microsoft::WRL::ComPtr<IDxcBlob>& pixelShaderBlob, const D3D12_BLEND_DESC& blend,
+		const D3D12_RASTERIZER_DESC& rasterizerDesc);
 
 	static const D3D_FEATURE_LEVEL featureLevels[];
 	static const size_t featureLevelsCount;
@@ -110,6 +112,7 @@ public:
 	{
 		return graphicPipelineStateDesc;
 	}
+
 
 private:
 	BlendManager blendManager;

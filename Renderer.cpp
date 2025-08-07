@@ -3,7 +3,7 @@
 
 #pragma comment(lib,"d3d12.lib")
 
-void Renderer::CreateFence(Microsoft::WRL::ComPtr<ID3D12Device>& device, HRESULT hr)
+void Renderer::CreateFence(const Microsoft::WRL::ComPtr<ID3D12Device>& device, HRESULT hr)
 {
 	fenceValue = 0;
 	

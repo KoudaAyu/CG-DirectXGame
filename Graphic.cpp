@@ -1,5 +1,7 @@
 #include "Graphic.h"
 
+
+
 void Graphic::GraphicCreateDXGIFactory()
 {
 	//HRESULTはWindoes系のエラーコード
@@ -143,36 +145,32 @@ void Graphic::CreateRenderTargetViews(Microsoft::WRL::ComPtr<ID3D12Device>& devi
 	//2つ目を作る
 	device->CreateRenderTargetView(swapChainResources[1].Get(), &rtvDesc, rtvHandles[1]);
 }
-//
-//void Graphic::CreateGraphicPipelineStateDesc(const Microsoft::WRL::ComPtr<IDxcBlob>& vertexShaderBlob,
-//	const Microsoft::WRL::ComPtr<IDxcBlob>& pixelShaderBlob, D3D12_INPUT_LAYOUT_DESC inputLayer,
-//	D3D12_BLEND_DESC blendManager, D3D12_RASTERIZER_DESC rasterizerDesc)
-//{
-//	// シェーダーブロブのnullチェック
-//	assert(vertexShaderBlob != nullptr && "vertexShaderBlobがnullptrです");
-//	assert(pixelShaderBlob != nullptr && "pixelShaderBlobがnullptrです");
-//	// 入力レイアウトのnullチェック
-//	assert(inputLayer.pInputElementDescs != nullptr && "InputElementDescsがnullptrです");
-//
-//
-//	graphicPipelineStateDesc.pRootSignature = rootSignatureManager.GetRootSignature().Get(); //ルートシグネチャ
-//	graphicPipelineStateDesc.InputLayout = inputLayer; //入力レイアウト
-//	graphicPipelineStateDesc.VS = { vertexShaderBlob->GetBufferPointer(),
-//	vertexShaderBlob->GetBufferSize() }; //頂点シェーダーの設定
-//	graphicPipelineStateDesc.PS = { pixelShaderBlob->GetBufferPointer(),
-//		pixelShaderBlob->GetBufferSize() }; //ピクセルシェーダーの設定
-//	graphicPipelineStateDesc.BlendState = blendManager; //ブレンドステートの設定
-//	graphicPipelineStateDesc.RasterizerState = rasterizerDesc; //ラスタライザーステートの設定
-//	//書き込むRTVの情報
-//	graphicPipelineStateDesc.NumRenderTargets = 1;
-//	graphicPipelineStateDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB; //RTVのフォーマット
-//	//利用するトロポジ(形状)のタイプ。三角形
-//	graphicPipelineStateDesc.PrimitiveTopologyType =
-//		D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-//	//どのように画面に色を打ち込むか設定(気にしなくていい？)
-//	graphicPipelineStateDesc.SampleDesc.Count = 1; //マルチサンプルしない
-//	graphicPipelineStateDesc.SampleMask = D3D12_DEFAULT_SAMPLE_MASK; //サンプルマスクはデフォルト
-//}
+
+void Graphic::CreateGraphicPipelineState(const Microsoft::WRL::ComPtr<ID3D12RootSignature>& rootSignature,
+	const D3D12_INPUT_LAYOUT_DESC& inputLayer, const Microsoft::WRL::ComPtr<IDxcBlob>& vertexShaderBlob,
+	const Microsoft::WRL::ComPtr<IDxcBlob>& pixelShaderBlob, const D3D12_BLEND_DESC& blend,
+	const D3D12_RASTERIZER_DESC& rasterizerDesc)
+{
+	graphicPipelineStateDesc.pRootSignature = rootSignature.Get(); //ルートシグネチャ
+	graphicPipelineStateDesc.InputLayout = inputLayer; //入力レイアウト
+	graphicPipelineStateDesc.VS = { vertexShaderBlob->GetBufferPointer(),
+	vertexShaderBlob->GetBufferSize() }; //頂点シェーダーの設定
+	graphicPipelineStateDesc.PS = { pixelShaderBlob->GetBufferPointer(),
+		pixelShaderBlob->GetBufferSize() }; //ピクセルシェーダーの設定
+	graphicPipelineStateDesc.BlendState = blend; //ブレンドステートの設定
+	graphicPipelineStateDesc.RasterizerState = rasterizerDesc;
+	//ラスタライザーステートの設定
+   //書き込むRTVの情報
+	graphicPipelineStateDesc.NumRenderTargets = 1;
+	graphicPipelineStateDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB; //RTVのフォーマット
+	//利用するトロポジ(形状)のタイプ。三角形
+	graphicPipelineStateDesc.PrimitiveTopologyType =
+		D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+	//どのように画面に色を打ち込むか設定(気にしなくていい？)
+	graphicPipelineStateDesc.SampleDesc.Count = 1; //マルチサンプルしない
+	graphicPipelineStateDesc.SampleMask = D3D12_DEFAULT_SAMPLE_MASK; //サンプルマスクはデフォルト
+}
+
 
 const D3D_FEATURE_LEVEL Graphic::featureLevels[] = {
 	D3D_FEATURE_LEVEL_12_2,
@@ -191,3 +189,4 @@ const char* Graphic::featureLevelNames[] = {
 };
 
 const size_t Graphic::featureLevelNamesCount = sizeof(Graphic::featureLevelNames) / sizeof(Graphic::featureLevelNames[0]);
+

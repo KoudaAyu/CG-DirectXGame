@@ -16,6 +16,7 @@
     <ClCompile Include="Buffer.cpp" />
     <ClCompile Include="DebugCamera.cpp" />
     <ClCompile Include="DebugLog.cpp" />
+    <ClCompile Include="DepthStencilStateManager.cpp" />
     <ClCompile Include="DescriptorHeap.cpp" />
     <ClCompile Include="externals\imgui\imgui.cpp" />
     <ClCompile Include="externals\imgui\imgui_demo.cpp" />
@@ -34,11 +35,15 @@
     <ClCompile Include="RasterizerManager.cpp" />
     <ClCompile Include="Renderer.cpp" />
     <ClCompile Include="RootSignatureManager.cpp" />
+    <ClCompile Include="ScissorManager.cpp" />
     <ClCompile Include="ShaderCompile.cpp" />
     <ClCompile Include="Sound.cpp" />
+    <ClCompile Include="Sphere.cpp" />
+    <ClCompile Include="Sprite.cpp" />
     <ClCompile Include="StringUtil.cpp" />
     <ClCompile Include="Texture.cpp" />
     <ClCompile Include="UVTransform.cpp" />
+    <ClCompile Include="ViewportManager.cpp" />
     <ClCompile Include="Window.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -60,6 +65,7 @@
     <ClInclude Include="BlendManager.h" />
     <ClInclude Include="Buffer.h" />
     <ClInclude Include="DebugCamera.h" />
+    <ClInclude Include="DepthStencilStateManager.h" />
     <ClInclude Include="DescriptorHeap.h" />
     <ClInclude Include="externals\imgui\imconfig.h" />
     <ClInclude Include="externals\imgui\imgui.h" />
@@ -80,7 +86,9 @@
     <ClInclude Include="RasterizerManager.h" />
     <ClInclude Include="Renderer.h" />
     <ClInclude Include="RootSignatureManager.h" />
+    <ClInclude Include="ScissorManager.h" />
     <ClInclude Include="ShaderCompile.h" />
+    <ClInclude Include="Sphere.h" />
     <ClInclude Include="Sprite.h" />
     <ClInclude Include="StringUtil.h" />
     <ClInclude Include="Struct.h" />
@@ -88,6 +96,7 @@
     <ClInclude Include="UVTransform.h" />
     <ClInclude Include="Vector.h" />
     <ClInclude Include="Sound.h" />
+    <ClInclude Include="ViewportManager.h" />
     <ClInclude Include="Window.h" />
   </ItemGroup>
   <ItemGroup>
