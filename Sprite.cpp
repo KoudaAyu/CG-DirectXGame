@@ -45,4 +45,13 @@ void Sprite::Initialize(const Microsoft::WRL::ComPtr<ID3D12Device>& device, Buff
 	vertexDataSprite[1].texcoord = { 0.0f,0.0f };
 	vertexDataSprite[2].texcoord = { 1.0f,1.0f };
 	vertexDataSprite[3].texcoord = { 1.0f,0.0f };
+
+	 transformationMatrixResourceSprite = buffer.CreateBufferResource(device.Get(), sizeof(TransformationMatrix));
+
+	//書き込むためのアドレス取得
+	transformationMatrixResourceSprite->Map(0, nullptr, reinterpret_cast<void**>(&transformationMatrixDataSprite));
+	//単位行列を書き込んでおく
+	transformationMatrixDataSprite->WVP = MakeIdentity4x4();
+	transformationMatrixDataSprite->World = MakeIdentity4x4();
+	transformationMatrixResourceSprite->Unmap(0, nullptr);
 }

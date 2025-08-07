@@ -95,6 +95,15 @@ void Sphere::Initialize(const Microsoft::WRL::ComPtr<ID3D12Device>& device,Buffe
 	delete[] indexData; // Free allocated memory
 
 	CreateMapping();
+
+	transformationMatrixResourceSphere = buffer.CreateBufferResource(device.Get(), sizeof(TransformationMatrix));
+
+	
+	transformationMatrixResourceSphere->Map(0, nullptr, reinterpret_cast<void**>(&transformationMatrixDataSphere));
+	transformationMatrixDataSphere->WVP = MakeIdentity4x4();
+	transformationMatrixDataSphere->World = MakeIdentity4x4();
+	// 書き込みが完了したので、マップを解除
+	transformationMatrixResourceSphere->Unmap(0, nullptr);
 }
 
 void Sphere::CreateMapping()

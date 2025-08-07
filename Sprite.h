@@ -28,6 +28,14 @@ public:
 	{
 		return indexDataSprite;
 	}
+	Microsoft::WRL::ComPtr<ID3D12Resource> GetTransformationMatrixResourceSprite()
+	{
+		return transformationMatrixResourceSprite;
+	}
+	TransformationMatrix* GetTransformationMatrixDataSprite()
+	{
+		return transformationMatrixDataSprite;
+	}
 private:
 	Microsoft::WRL::ComPtr<ID3D12Resource> vertexResourceSprite = nullptr;
 	//頂点バッファビューを生成する
@@ -40,4 +48,10 @@ private:
 	uint32_t* indexDataSprite = nullptr;
 
 	VertexData* vertexDataSprite = nullptr;
+
+	//Sprite用のTransformationMatrix用のリソースを作る
+	Microsoft::WRL::ComPtr<ID3D12Resource> transformationMatrixResourceSprite = nullptr;
+
+	//データを書き込む
+	TransformationMatrix* transformationMatrixDataSprite = nullptr;
 };

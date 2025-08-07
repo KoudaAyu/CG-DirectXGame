@@ -28,6 +28,7 @@
 #include"Vector.h"
 #include"ViewportManager.h"
 #include"Window.h"
+#include"WVPManager.h"
 
 #include<chrono> //時間を扱うライブラリ
 #include<cstdint>
@@ -227,37 +228,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	
 	DirectionalLightManager directionalLightManager;
 	directionalLightManager.Initialize(device, buffer);
+
+	WVPManager wvpManager;
+	wvpManager.Initialize(device, buffer);
 	
-	//WVP用のリソースを作る。　Matrix4x4 1つのサイズを用意する
-	Microsoft::WRL::ComPtr<ID3D12Resource> wvpResource = Buffer::CreateBufferResource(device.Get(), sizeof(TransformationMatrix));
-	//データを書き込む
-	TransformationMatrix* wvpData = nullptr;
-	//書き込む為のアドレス取得
-	wvpResource->Map(0, nullptr, reinterpret_cast<void**>(&wvpData));
-	//単位行列を書き込む
-	wvpData->World = MakeIdentity4x4();
-	wvpData->WVP = MakeIdentity4x4();
-
-	Microsoft::WRL::ComPtr<ID3D12Resource> transformationMatrixResourceSphere = Buffer::CreateBufferResource(device.Get(), sizeof(TransformationMatrix));
-
-	// データを書き込むためのポインタを取得
-	TransformationMatrix* transformationMatrixDataSphere = nullptr;
-	transformationMatrixResourceSphere->Map(0, nullptr, reinterpret_cast<void**>(&transformationMatrixDataSphere));
-	transformationMatrixDataSphere->WVP = MakeIdentity4x4();
-	transformationMatrixDataSphere->World = MakeIdentity4x4();
-	// 書き込みが完了したので、マップを解除
-	transformationMatrixResourceSphere->Unmap(0, nullptr);
-
-	//Sprite用のTransformationMatrix用のリソースを作る
-	Microsoft::WRL::ComPtr<ID3D12Resource> transformationMatrixResourceSprite = Buffer::CreateBufferResource(device.Get(), sizeof(TransformationMatrix));
-	//データを書き込む
-	TransformationMatrix* transformationMatrixDataSprite = nullptr;
-	//書き込むためのアドレス取得
-	transformationMatrixResourceSprite->Map(0, nullptr, reinterpret_cast<void**>(&transformationMatrixDataSprite));
-	//単位行列を書き込んでおく
-	transformationMatrixDataSprite->WVP = MakeIdentity4x4();
-	transformationMatrixDataSprite->World = MakeIdentity4x4();
-	transformationMatrixResourceSprite->Unmap(0, nullptr);
+	
 
 	//Transform変数を作る
 	Transform transform = { {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };
@@ -394,16 +369,16 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 			Matrix4x4 projectionMatrix = MakePerspectiveFovMatrix(fovY, aspectRatio, nearZ, farZ);
 			//WVPMatrixを作る
 			Matrix4x4 worldViewProjectMatrix = Multiply(worldMatrix, Multiply(debugCamera_.GetViewMatrix(), projectionMatrix));
-			transformationMatrixDataSphere->WVP = worldViewProjectMatrix;
-			transformationMatrixDataSphere->World = worldMatrix;
+			sphere.GetTransformationMatrixDataSphere()->WVP = worldViewProjectMatrix;
+			sphere.GetTransformationMatrixDataSphere()->World = worldMatrix;
 
 			//Sprite用のworldViewProjectMatrix
 			Matrix4x4 worldMatrixSprite = MakeAffineMatrix(transformSprite.scale, transformSprite.rotate, transformSprite.translate);
 			Matrix4x4 viewMatrixSprite = MakeIdentity4x4();
 			Matrix4x4 projectionMatrixSprite = MakeOrthographicMatrix(0.0f, 0.0f, float(window.GetClientWidth()), float(window.GetClientHeight()), 0.0f, 100.0f);
 			Matrix4x4 worldViewProjectionmatrixSprite = Multiply(worldMatrixSprite, Multiply(debugCamera_.GetViewMatrix(), projectionMatrixSprite));
-			transformationMatrixDataSprite->WVP = worldViewProjectionmatrixSprite;
-			transformationMatrixDataSprite->World = worldMatrixSprite;
+			sprite.GetTransformationMatrixDataSprite()->WVP = worldViewProjectionmatrixSprite;
+			sprite.GetTransformationMatrixDataSprite()->World = worldMatrixSprite;
 
 			uvTransforms.Update();
 
@@ -477,7 +452,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 			graphic.GetCommandList()->IASetIndexBuffer(&sphere.GetIndexBufferViewSphere());
 			graphic.GetCommandList()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 			uvTransforms.Draw(graphic.GetCommandList().Get());
-			graphic.GetCommandList()->SetGraphicsRootConstantBufferView(1, transformationMatrixResourceSphere->GetGPUVirtualAddress());
+			graphic.GetCommandList()->SetGraphicsRootConstantBufferView(1, sphere.GetTransformationMatrixResourceSphere()->GetGPUVirtualAddress());
 			graphic.GetCommandList()->SetGraphicsRootDescriptorTable(2, useMonsterBall ? textureSrvHandleGPU2 : textureSrvHandleGPU);
 			graphic.GetCommandList()->SetGraphicsRootConstantBufferView(3, directionalLightManager.GetDirectionalLightResource()->GetGPUVirtualAddress());
 			if (drawSphere)
@@ -491,7 +466,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 				graphic.GetCommandList()->IASetIndexBuffer(&sprite.GetIndexBufferViewSprite());
 				graphic.GetCommandList()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 				uvTransforms.DrawSprite(graphic.GetCommandList().Get());
-				graphic.GetCommandList()->SetGraphicsRootConstantBufferView(1, transformationMatrixResourceSprite->GetGPUVirtualAddress());
+				graphic.GetCommandList()->SetGraphicsRootConstantBufferView(1, sprite.GetTransformationMatrixResourceSprite()->GetGPUVirtualAddress());
 				graphic.GetCommandList()->SetGraphicsRootDescriptorTable(2, useMonsterBall ? textureSrvHandleGPU2 : textureSrvHandleGPU);
 				graphic.GetCommandList()->SetGraphicsRootConstantBufferView(3, directionalLightManager.GetDirectionalLightResource()->GetGPUVirtualAddress());
 

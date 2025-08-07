@@ -33,6 +33,19 @@ public:
 	{
 		return indexBufferViewSphere;
 	}
+	const Microsoft::WRL::ComPtr<ID3D12Resource>& GetTransformationMatrixResourceSphere() const
+	{
+		return transformationMatrixResourceSphere;
+	}
+	const TransformationMatrix* GetTransformationMatrixDataSphere() const
+	{
+		return transformationMatrixDataSphere;
+	}
+	TransformationMatrix* GetTransformationMatrixDataSphere()
+	{
+		return transformationMatrixDataSphere;
+	}
+
 private:
 	// 球体
 	const uint32_t kSubdivision = 16; // 16分割
@@ -57,4 +70,8 @@ private:
 	D3D12_INDEX_BUFFER_VIEW indexBufferViewSphere{};
 
 	VertexData* mapped = nullptr;
+
+	Microsoft::WRL::ComPtr<ID3D12Resource> transformationMatrixResourceSphere;
+	// データを書き込むためのポインタを取得
+	TransformationMatrix* transformationMatrixDataSphere = nullptr;
 };

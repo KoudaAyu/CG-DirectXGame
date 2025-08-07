@@ -46,6 +46,7 @@
     <ClCompile Include="UVTransform.cpp" />
     <ClCompile Include="ViewportManager.cpp" />
     <ClCompile Include="Window.cpp" />
+    <ClCompile Include="WVPManager.cpp" />
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="Object3d.PS.hlsl">
@@ -100,6 +101,7 @@
     <ClInclude Include="Sound.h" />
     <ClInclude Include="ViewportManager.h" />
     <ClInclude Include="Window.h" />
+    <ClInclude Include="WVPManager.h" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="externals\imgui\LICENSE.txt" />
