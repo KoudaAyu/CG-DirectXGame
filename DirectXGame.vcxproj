@@ -18,6 +18,7 @@
     <ClCompile Include="DebugLog.cpp" />
     <ClCompile Include="DepthStencilStateManager.cpp" />
     <ClCompile Include="DescriptorHeap.cpp" />
+    <ClCompile Include="DirectionalLight.cpp" />
     <ClCompile Include="externals\imgui\imgui.cpp" />
     <ClCompile Include="externals\imgui\imgui_demo.cpp" />
     <ClCompile Include="externals\imgui\imgui_draw.cpp" />
@@ -67,6 +68,7 @@
     <ClInclude Include="DebugCamera.h" />
     <ClInclude Include="DepthStencilStateManager.h" />
     <ClInclude Include="DescriptorHeap.h" />
+    <ClInclude Include="DirectionalLight.h" />
     <ClInclude Include="externals\imgui\imconfig.h" />
     <ClInclude Include="externals\imgui\imgui.h" />
     <ClInclude Include="externals\imgui\imgui_impl_dx12.h" />

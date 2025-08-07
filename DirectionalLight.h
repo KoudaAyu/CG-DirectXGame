@@ -1,20 +1,26 @@
 #pragma once
-
 #include"Buffer.h"
 #include"Struct.h"
-
-class DirectionalLight
+class DirectionalLightManager
 {
 public:
-	void Initialize(ID3D12Device* device);
-	void Update();
-	void Draw(ID3D12GraphicsCommandList* commandList);
-	void DrawSprite(ID3D12GraphicsCommandList* commandList);
-
-	Vector3& GetUVTranslateSprite() { return directionalLightData->direction; }
+	void Initialize(const Microsoft::WRL::ComPtr<ID3D12Device>& device,Buffer buffer);
+	const Microsoft::WRL::ComPtr<ID3D12Resource>& GetDirectionalLightResource() const { return directionalLight; }
+	Microsoft::WRL::ComPtr<ID3D12Resource>& GetDirectionalLightResource() 
+	{ 
+		return directionalLight; 
+	}
+	const DirectionalLight* GetDirectionalLightData() const
+	{
+		return directionalLightData;
+	}
+	DirectionalLight* GetDirectionalLightData()
+	{
+		return directionalLightData;
+	}
 
 private:
-	DirectionalLightData* directionalLightData = nullptr;
-	Microsoft::WRL::ComPtr<ID3D12Resource> directionalLight;
-	Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> commandList;
+	Microsoft::WRL::ComPtr<ID3D12Resource> directionalLight = nullptr;
+	// MapしてGPUリソースのCPU側の書き込み可能ポインタを取得する
+	DirectionalLight* directionalLightData = nullptr;
 };

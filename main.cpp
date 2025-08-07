@@ -7,6 +7,7 @@
 #include"DebugLog.h"
 #include"DescriptorHeap.h"
 #include"DepthStencilStateManager.h"
+#include"DirectionalLight.h"
 #include"GameScene.h"
 #include"Graphic.h"
 #include"InputLayoutManage.h"
@@ -224,21 +225,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	UVTransform uvTransforms;
 	uvTransforms.Initialize(device.Get());
 	
-
-	Microsoft::WRL::ComPtr<ID3D12Resource> directionalLight = Buffer::CreateBufferResource(device.Get(), sizeof(DirectionalLight));
-
-	// MapしてGPUリソースのCPU側の書き込み可能ポインタを取得する
-	DirectionalLight* directionalLightData = nullptr;
-	directionalLight->Map(0, nullptr, reinterpret_cast<void**>(&directionalLightData));
-
-	// directionalLightDataに値を書き込む
-	directionalLightData->color = { 1.0f, 1.0f, 1.0f, 1.0f };
-	directionalLightData->direction = { 0.0f, -1.0f, 0.0f };
-	directionalLightData->intensity = 1.0f;
-
-	// 書き込み完了後はUnmapを呼ぶ
-	directionalLight->Unmap(0, nullptr);
-
+	DirectionalLightManager directionalLightManager;
+	directionalLightManager.Initialize(device, buffer);
+	
 	//WVP用のリソースを作る。　Matrix4x4 1つのサイズを用意する
 	Microsoft::WRL::ComPtr<ID3D12Resource> wvpResource = Buffer::CreateBufferResource(device.Get(), sizeof(TransformationMatrix));
 	//データを書き込む
@@ -429,7 +418,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 			ImGui::Checkbox("DrawSphere", &drawSphere);
 			ImGui::Checkbox("DrawSprite", &drawSprite);
-			ImGui::DragFloat3("LightDirection", &directionalLightData->direction.x, 0.01f);
+			ImGui::DragFloat3("LightDirection", &directionalLightManager.GetDirectionalLightData()->direction.x, 0.01f);
 
 			ImGui::DragFloat3("Sphere Rotate", &transformSphere.rotate.x);
 
@@ -490,7 +479,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 			uvTransforms.Draw(graphic.GetCommandList().Get());
 			graphic.GetCommandList()->SetGraphicsRootConstantBufferView(1, transformationMatrixResourceSphere->GetGPUVirtualAddress());
 			graphic.GetCommandList()->SetGraphicsRootDescriptorTable(2, useMonsterBall ? textureSrvHandleGPU2 : textureSrvHandleGPU);
-			graphic.GetCommandList()->SetGraphicsRootConstantBufferView(3, directionalLight->GetGPUVirtualAddress());
+			graphic.GetCommandList()->SetGraphicsRootConstantBufferView(3, directionalLightManager.GetDirectionalLightResource()->GetGPUVirtualAddress());
 			if (drawSphere)
 			{
 				model.Draw(graphic.GetCommandList().Get());
@@ -504,7 +493,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 				uvTransforms.DrawSprite(graphic.GetCommandList().Get());
 				graphic.GetCommandList()->SetGraphicsRootConstantBufferView(1, transformationMatrixResourceSprite->GetGPUVirtualAddress());
 				graphic.GetCommandList()->SetGraphicsRootDescriptorTable(2, useMonsterBall ? textureSrvHandleGPU2 : textureSrvHandleGPU);
-				graphic.GetCommandList()->SetGraphicsRootConstantBufferView(3, directionalLight->GetGPUVirtualAddress());
+				graphic.GetCommandList()->SetGraphicsRootConstantBufferView(3, directionalLightManager.GetDirectionalLightResource()->GetGPUVirtualAddress());
 
 				graphic.GetCommandList()->DrawIndexedInstanced(6, 1, 0, 0, 0);
 			}
