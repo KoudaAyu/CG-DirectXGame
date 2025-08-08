@@ -1,5 +1,7 @@
 #include "Sprite.h"
 #pragma comment(lib,"d3d12.lib")
+
+
 void Sprite::Initialize(const Microsoft::WRL::ComPtr<ID3D12Device>& device, Buffer buffer)
 {
 	//Sprite用の頂点Resource
@@ -55,3 +57,5 @@ void Sprite::Initialize(const Microsoft::WRL::ComPtr<ID3D12Device>& device, Buff
 	transformationMatrixDataSprite->World = MakeIdentity4x4();
 	transformationMatrixResourceSprite->Unmap(0, nullptr);
 }
+
+

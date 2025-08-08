@@ -253,6 +253,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	DirectX::ScratchImage mipImages = Texture::LoadTexture("./Resources/uvChecker.png");
 	const DirectX::TexMetadata& metadata = mipImages.GetMetadata();
 	Microsoft::WRL::ComPtr<ID3D12Resource> textureResource = Texture::CreateTextureResource(device, metadata);
+	
 	//DepthStecilTextureをウィンドウのサイズで生成
 	Microsoft::WRL::ComPtr<ID3D12Resource> depthStencilResource = Texture::CreateDepthStencilTextureResource(device.Get(), window.GetClientWidth(), window.GetClientHeight());
 
@@ -263,7 +264,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	DirectX::ScratchImage mipImages2 = Texture::LoadTexture(model.GetTextureFilePath());
 	const DirectX::TexMetadata& metadata2 = mipImages2.GetMetadata();
 	Microsoft::WRL::ComPtr<ID3D12Resource> textureResource2 = Texture::CreateTextureResource(device, metadata2);
-
+	
 	//DSVの設定
 	D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc{};
 	dsvDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;//Format。基本的にはResourceに合わせる
@@ -322,7 +323,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	debugCamera_.Initialize(hInstance, window.GetHwnd());
 
 	GameScene gameScene;
-	gameScene.Initialize();
+	gameScene.Initialize(device);
 
 	Sound sound;
 	sound.Initialize();
@@ -362,7 +363,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 			debugCamera_.Update();
 
 			//ゲームの処理
-			/*transformSphere.rotate.y += 0.01f;*/
+			
 			Matrix4x4 worldMatrix = MakeAffineMatrix(transformSphere.scale, transformSphere.rotate, transformSphere.translate);
 			Matrix4x4 cameraMatrix = MakeAffineMatrix(cameraTransform.scale, cameraTransform.rotate, cameraTransform.translate);
 			Matrix4x4 viewMatrix = Inverse(cameraMatrix);
@@ -431,9 +432,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 			//描画先のRTVとDSVを設定する
 			D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = graphic.GetDsvDescriptorHeap()->GetCPUDescriptorHandleForHeapStart();
 			graphic.GetCommandList()->OMSetRenderTargets(1, &graphic.GetRtvHandles(backBufferIndex), false, &dsvHandle);
+			//Window
 			float clearColor[] = { 0.1f,0.25f,0.5f,1.0f };//RGBAの値。青っぽい色
 			graphic.GetCommandList()->ClearRenderTargetView(graphic.GetRtvHandles(backBufferIndex), clearColor, 0, nullptr);
-
 			graphic.GetCommandList()->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 
 			//描画用のDescriptorHeapの設定
@@ -549,6 +550,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	
 
 	sound.~Sound();
+
+	Texture texture;
+	texture.ReleaseAllResources();
 
 	// --- ウィンドウ解放 ---
 	CloseWindow(window.GetHwnd()); //ウィンドウの解放

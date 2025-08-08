@@ -81,9 +81,9 @@ void Graphic::CreateCommandAllocator(Microsoft::WRL::ComPtr<ID3D12Device>& devic
 	assert(SUCCEEDED(hr));
 }
 
-void Graphic::CreateCommandList(Microsoft::WRL::ComPtr<ID3D12Device>& device)
+void Graphic::CreateCommandList(const Microsoft::WRL::ComPtr<ID3D12Device>& device)
 {
-	hr = device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, commandAllocator.Get(), nullptr, IID_PPV_ARGS(&commandList));
+	hr = device.Get()->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, commandAllocator.Get(), nullptr, IID_PPV_ARGS(&commandList));
 
 	//コマンドリストの生成に失敗した場合はエラー
 	assert(SUCCEEDED(hr));

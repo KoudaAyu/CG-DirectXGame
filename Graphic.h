@@ -22,7 +22,7 @@ public:
 	void SelectDevice(Microsoft::WRL::ComPtr<ID3D12Device>& device);
 	void CreateCommandQueue(Microsoft::WRL::ComPtr<ID3D12Device>& device);
 	void CreateCommandAllocator(Microsoft::WRL::ComPtr<ID3D12Device>& device);
-	void CreateCommandList(Microsoft::WRL::ComPtr<ID3D12Device>& device);
+	void CreateCommandList(const Microsoft::WRL::ComPtr<ID3D12Device>& device);
 	void CreateSwapChain(Window window);
 	void CreateDescriptorHeaps(Microsoft::WRL::ComPtr<ID3D12Device>& device);
 	void GetSwapChainResources();

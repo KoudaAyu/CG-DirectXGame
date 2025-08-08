@@ -8,6 +8,8 @@ class Sprite
 public:
 	void Initialize(const Microsoft::WRL::ComPtr<ID3D12Device>& device, Buffer buffer);
 	
+
+
 	const Microsoft::WRL::ComPtr<ID3D12Resource>& GetVertexResourceSprite() const
 	{
 		return vertexResourceSprite;

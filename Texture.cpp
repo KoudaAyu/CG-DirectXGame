@@ -1,5 +1,42 @@
 #include "Texture.h"
 
+// Texture.h で宣言した static メンバーの定義
+std::unordered_map<uint32_t, Microsoft::WRL::ComPtr<ID3D12Resource>> Texture::resources_;
+
+Texture::Texture()
+{
+}
+
+Texture::~Texture()
+{
+
+}
+
+uint32_t Texture::Load(
+	const Microsoft::WRL::ComPtr<ID3D12Device>& device,
+	const std::string& filePath)
+{
+	// 1. テクスチャ画像のロード
+	DirectX::ScratchImage mipImages = LoadTexture(filePath);
+
+	// 2. メタデータ取得
+	const DirectX::TexMetadata& metadata = mipImages.GetMetadata();
+
+	// 3. GPUリソース生成
+	Microsoft::WRL::ComPtr<ID3D12Resource> textureResource = CreateTextureResource(device, metadata);
+
+	//// 4. データアップロード
+	//auto intermediateResource = UploadTextureData(textureResource, mipImages, device, commandList);
+
+	// 5. 一意なID生成（例: resources_のサイズを利用）
+	uint32_t id = static_cast<uint32_t>(resources_.size());
+
+	// 6. マップに登録
+	resources_[id] = textureResource;
+
+	// 7. ID返却
+	return id;
+}
 
 
 DirectX::ScratchImage Texture::LoadTexture(const std::string& filePath)
@@ -102,4 +139,9 @@ Microsoft::WRL::ComPtr<ID3D12Resource> Texture::CreateDepthStencilTextureResourc
 		IID_PPV_ARGS(&resource));//作成するResourceポインタへのポインタ
 	assert(SUCCEEDED(hr));
 	return resource;
+}
+
+void Texture::ReleaseAllResources()
+{
+	resources_.clear(); // これでComPtrの参照カウントが0になり、ID3D12Resourceが解放される
 }
