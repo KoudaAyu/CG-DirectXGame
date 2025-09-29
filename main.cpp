@@ -5,6 +5,7 @@
 #include"KeyInput.h"
 #include"Matrix4x4.h"
 #include"Vector.h"
+#include"WindowsAPI.h"
 
 #include<chrono> //時間を扱うライブラリ
 #include<cstdint>
@@ -692,6 +693,9 @@ void SoundPlayWave(Microsoft::WRL::ComPtr<IXAudio2>& xAudio2, const SoundData& s
 //Windowsアプリでのエントリーポイント(main関数)
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 {
+	
+
+
 	D3DResourceLeakChecker leakChecker; //リソースリークチェック用のオブジェクト
 
 	CoInitializeEx(0, COINIT_MULTITHREADED);
@@ -725,48 +729,14 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	//ファイルを作って書き込み準備
 	std::ofstream logStream(logFilePath);
 
+	WindowAPI windowAPI; //ウィンドウ関連のAPIをまとめたオブジェクト
+	windowAPI.Initialize();
+	HWND hwnd = windowAPI.GetHwnd();
 
-
-	//ウィンドウ関係
-	WNDCLASS wc{};
-
-	//ウィンドウプロシージャ
-	wc.lpfnWndProc = WindowProc;
-
-	//ウィンドウクラス名
-	wc.lpszClassName = L"MyWindowClass";
-
-	//インスタンスハンドル
-	wc.hInstance = GetModuleHandle(nullptr);
-
-	//カーソル
-	wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
-
-	//ウィンドウクラスを登録する
-	RegisterClass(&wc);
-
-	//クライアント領域のサイズ
 	const int32_t kClientWidth = 1280;
 	const int32_t kClientHeight = 720;
 
-	//ウィンドウサイズを表す構造体にクライアント領域を入れる
-	RECT wrc = { 0, 0, kClientWidth, kClientHeight };
-
-	//クライアント領域をもとに実際のサイズにwrcを変更してもらう
-	AdjustWindowRect(&wrc, WS_OVERLAPPEDWINDOW, FALSE);
-
-	//ウィンドウの生成
-	HWND hwnd = CreateWindow(
-		wc.lpszClassName, //ウィンドウクラス名
-		L"DirectX Window", //ウィンドウタイトル
-		WS_OVERLAPPEDWINDOW, //ウィンドウスタイル
-		CW_USEDEFAULT, CW_USEDEFAULT, //位置
-		wrc.right - wrc.left, wrc.bottom - wrc.top, //サイズ
-		nullptr, //親ウィンドウハンドル
-		nullptr, //メニューハンドル
-		wc.hInstance, //インスタンスハンドル
-		nullptr //追加のパラメータ
-	);
+	
 
 #ifdef _DEBUG
 	Microsoft::WRL::ComPtr<ID3D12Debug1> debugController = nullptr;
@@ -780,7 +750,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	}
 #endif
 	//ウィンドウを表示する
-	ShowWindow(hwnd, SW_SHOW);
+	windowAPI.Show();
 
 	//DXGIファクトリーの生成
 	Microsoft::WRL::ComPtr<IDXGIFactory7> dxgiFactory = nullptr;

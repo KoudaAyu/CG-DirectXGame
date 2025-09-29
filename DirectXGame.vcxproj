@@ -28,6 +28,7 @@
       <Optimization Condition="'$(Configuration)|$(Platform)'=='Development|x64'">MaxSpeed</Optimization>
     </ClCompile>
     <ClCompile Include="Matrix4x4.cpp" />
+    <ClCompile Include="WindowsAPI.cpp" />
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="Object3d.PS.hlsl">
@@ -60,6 +61,7 @@
     <ClInclude Include="KeyInput.h" />
     <ClInclude Include="Matrix4x4.h" />
     <ClInclude Include="Vector.h" />
+    <ClInclude Include="WindowsAPI.h" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="externals\imgui\LICENSE.txt" />
