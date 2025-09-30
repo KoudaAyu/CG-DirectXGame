@@ -4,8 +4,7 @@
 
 void WindowAPI::Initialize()
 {
-	//ウィンドウ関係
-	WNDCLASS wc{};
+
 
 	//ウィンドウプロシージャ
 	wc.lpfnWndProc = WindowAPI::WindowProc;

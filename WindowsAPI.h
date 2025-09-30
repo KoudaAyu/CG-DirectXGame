@@ -22,6 +22,9 @@ public:
 
 private:
 
+	//ウィンドウ関係
+	WNDCLASS wc{};
+
 	HWND hwnd_ = nullptr;
 
 	const int32_t kClientWidth = 1280;

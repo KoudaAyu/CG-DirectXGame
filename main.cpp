@@ -755,7 +755,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	WindowAPI* windowAPI = nullptr; //ウィンドウ関連のAPIをまとめたオブジェクト
 	windowAPI = new WindowAPI();
 	windowAPI->Initialize();
-	HWND hwnd = windowAPI->GetHwnd();
+	
 
 #ifdef _DEBUG
 	Microsoft::WRL::ComPtr<ID3D12Debug1> debugController = nullptr;
@@ -914,7 +914,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD; //モニターに映ったら描画を破棄
 
 	//コマンドキュー、ウィンドウハンドル、設定を渡して生成する
-	hr = dxgiFactory->CreateSwapChainForHwnd(commandQueue.Get(), hwnd, &swapChainDesc, nullptr, nullptr, reinterpret_cast<IDXGISwapChain1**>(swapChain.GetAddressOf()));
+	hr = dxgiFactory->CreateSwapChainForHwnd(commandQueue.Get(), windowAPI->GetHwnd(), &swapChainDesc, nullptr, nullptr, reinterpret_cast<IDXGISwapChain1**>(swapChain.GetAddressOf()));
 	//スワップチェーンの生成に失敗した場合はエラー
 	assert(SUCCEEDED(hr));
 
@@ -1545,17 +1545,17 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	SoundPlayWave(xAudio2, soundData);
 
 	KeyInput inputManager;
-	inputManager.Initialize(hInstance, hwnd);
+	inputManager.Initialize(hInstance, windowAPI->GetHwnd());
 
 	DebugCamera debugCamera_;
-	debugCamera_.Initialize(hInstance, hwnd);
+	debugCamera_.Initialize(hInstance, windowAPI->GetHwnd());
 
 
 	//Imguiの初期化
 	IMGUI_CHECKVERSION();
 	ImGui::CreateContext();
 	ImGui::StyleColorsDark();
-	ImGui_ImplWin32_Init(hwnd);
+	ImGui_ImplWin32_Init(windowAPI->GetHwnd());
 	ImGui_ImplDX12_Init(
 		device.Get(),
 		swapChainDesc.BufferCount,
@@ -1788,10 +1788,12 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	delete[] vertexData;
 	delete[] indexData;
 
-	delete windowAPI;
+	
 
 	// --- ウィンドウ解放 ---
-	CloseWindow(hwnd); //ウィンドウの解放
+	CloseWindow(windowAPI->GetHwnd()); //ウィンドウの解放
+
+	delete windowAPI;
 
 	return 0;
 }
