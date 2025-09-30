@@ -1,5 +1,7 @@
 #include "WindowsAPI.h"
 
+#include<Windows.h>
+
 void WindowAPI::Initialize()
 {
 	//ウィンドウ関係
