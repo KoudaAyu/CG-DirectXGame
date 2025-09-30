@@ -13,24 +13,19 @@ KeyInput::~KeyInput()
 void KeyInput::Initialize(WindowAPI* windowAPI)
 {
 
-	this->windowAPI = windowAPI;
-
 	/*HRESULT hr;*/
 
 	 // DirectInputの初期化
 	HRESULT result = DirectInput8Create(windowAPI->GetHInstance(), DIRECTINPUT_VERSION, IID_IDirectInput8, (void**)&directInput, nullptr);
 	assert(SUCCEEDED(result) && directInput != nullptr); // 失敗時停止
 
-
 	 //キーボードデバイスの生成
 	result = directInput->CreateDevice(GUID_SysKeyboard, &keyboard, NULL);
 	assert(SUCCEEDED(result) && directInput != nullptr); // 失敗時停止
 
-
 	 //入力データ形式のセット
 	result = keyboard->SetDataFormat(&c_dfDIKeyboard); //標準形式
 	assert(SUCCEEDED(result) && directInput != nullptr); // 失敗時停止
-
 
 	 //排他制御レベルのセット
 	result = keyboard->SetCooperativeLevel(windowAPI->GetHwnd(), DISCL_BACKGROUND | DISCL_NONEXCLUSIVE | DISCL_NOWINKEY);
