@@ -6,7 +6,10 @@
 #pragma comment(lib, "dxguid.lib")
 #include <Windows.h> // HINSTANCE, HWND, HRESULT のために必要です
 #include<wrl.h>
-#include <cassert>   // assert のために必要です
+#include <cassert> 
+
+#include"WindowsAPI.h"
+
 // ZeroMemory のために必要です
 
 using Microsoft::WRL::ComPtr;
@@ -21,7 +24,7 @@ public:
     ~KeyInput();
 
     // 初期化メソッド
-    void Initialize(HINSTANCE hInstance, HWND hwnd);
+    void Initialize(WindowAPI* windowAPI);
 
     // 更新メソッド
     void Update();
@@ -44,6 +47,8 @@ public:
     // 実装はヘッダーファイルに inline で書いても、.cpp に書いても良い
     bool IsKeyPressed(int dik_code) const;
 
+    WindowAPI* GetWindowAPI() const { return windowAPI; }
+
 private:
     // DirectInput オブジェクトのポインタ
     ComPtr<IDirectInput8> directInput ;
@@ -55,6 +60,8 @@ private:
     // コピーコンストラクタと代入演算子を禁止 (リソース管理クラスでは一般的)
     KeyInput(const KeyInput&) = delete;
     KeyInput& operator=(const KeyInput&) = delete;
+
+    WindowAPI* windowAPI = nullptr;
 };
 
 // IsKeyPressed メソッドのインライン実装 (ヘッダーファイルに直接書く場合)

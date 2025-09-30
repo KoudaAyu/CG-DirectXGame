@@ -15,7 +15,11 @@ public:
 	static LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam);
 	void Show();
 
+	void Finalize();
+
 	HWND GetHwnd() const { return hwnd_; }
+	HINSTANCE GetHInstance() const { return wc.hInstance; }
+
 
 	const int32_t GetClientWidth() const { return kClientWidth; }
 	const int32_t GetClientHeight() const { return kClientHeight; }

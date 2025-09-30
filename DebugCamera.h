@@ -6,7 +6,7 @@
 class DebugCamera
 {
 public: 
-	void Initialize(HINSTANCE hInstance, HWND hwnd);
+	void Initialize(WindowAPI* windowAPI);
 
 	void Update();
 
@@ -14,6 +14,9 @@ public:
 	const Matrix4x4& GetProjectionMatrix() const { return projection_matrix_; }
 
 private:
+
+	WindowAPI* windowAPI = nullptr;
+
 	Vector3 rotation_ = { 0.0f,0.0f,0.0f };
 	Vector3 translation_ = { 0.0f,0.0f,-50.0f };
 

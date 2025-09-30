@@ -2,6 +2,7 @@
 
 //自作h
 #include"DebugCamera.h"
+
 #include"KeyInput.h"
 #include"Matrix4x4.h"
 #include"Vector.h"
@@ -770,6 +771,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 #endif
 	//ウィンドウを表示する
 	windowAPI->Show();
+
+	
 
 	//DXGIファクトリーの生成
 	Microsoft::WRL::ComPtr<IDXGIFactory7> dxgiFactory = nullptr;
@@ -1545,10 +1548,10 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	SoundPlayWave(xAudio2, soundData);
 
 	KeyInput inputManager;
-	inputManager.Initialize(hInstance, windowAPI->GetHwnd());
+	inputManager.Initialize(windowAPI);
 
 	DebugCamera debugCamera_;
-	debugCamera_.Initialize(hInstance, windowAPI->GetHwnd());
+	debugCamera_.Initialize(windowAPI);
 
 
 	//Imguiの初期化
@@ -1768,8 +1771,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	ImGui_ImplWin32_Shutdown();
 	ImGui::DestroyContext();
 
-	//COMの終了処理
-	CoUninitialize();
+	
 
 	Log(logStream, "Application terminating.");
 
@@ -1788,10 +1790,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	delete[] vertexData;
 	delete[] indexData;
 
-	
-
-	// --- ウィンドウ解放 ---
-	CloseWindow(windowAPI->GetHwnd()); //ウィンドウの解放
+	windowAPI->Finalize();
 
 	delete windowAPI;
 

@@ -69,3 +69,11 @@ void WindowAPI::Show()
 	//ウィンドウを表示する
 	ShowWindow(hwnd_, SW_SHOW);
 }
+
+void WindowAPI::Finalize()
+{
+	// --- ウィンドウ解放 ---
+	CloseWindow(hwnd_); //ウィンドウの解放
+	//COMの終了処理
+	CoUninitialize();
+}

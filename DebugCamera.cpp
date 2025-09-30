@@ -1,8 +1,10 @@
 #include "DebugCamera.h"
 
-void DebugCamera::Initialize(HINSTANCE hInstance, HWND hwnd)
+void DebugCamera::Initialize(WindowAPI* windowAPI)
 {
-	keyInput_.Initialize(hInstance, hwnd);
+	this->windowAPI = windowAPI;
+
+	keyInput_.Initialize(windowAPI);
 
 	matRot_ = MakeIdentity4x4();
 }
