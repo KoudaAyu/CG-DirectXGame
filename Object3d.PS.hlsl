@@ -39,7 +39,7 @@ PixelShaderOutput main(VertexShaderOutput input)
     float NdotL = dot(normalize(input.normal), normalize(-gDirectionalLight.direction));
     //float cos = pow(NdotL * 0.5f + 0.5f, 2.0f);
     
-    if (textureColor.a <= 0.5 || output.color.a == 0.0)
+    if (textureColor.a <= 0.1 || output.color.a == 0.0)
     {
         discard;
     }

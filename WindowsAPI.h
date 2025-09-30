@@ -17,6 +17,9 @@ public:
 
 	HWND GetHwnd() const { return hwnd_; }
 
+	const int32_t GetClientWidth() const { return kClientWidth; }
+	const int32_t GetClientHeight() const { return kClientHeight; }
+
 private:
 
 	HWND hwnd_ = nullptr;

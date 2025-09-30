@@ -756,8 +756,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	windowAPI.Initialize();
 	HWND hwnd = windowAPI.GetHwnd();
 
-	const int32_t kClientWidth = 1280;
-	const int32_t kClientHeight = 720;
+	
 
 	
 
@@ -909,8 +908,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	//スワップチェーンを生成する
 	Microsoft::WRL::ComPtr<IDXGISwapChain4> swapChain;
 	DXGI_SWAP_CHAIN_DESC1 swapChainDesc{};
-	swapChainDesc.Width = kClientWidth; //ウィンドウの幅
-	swapChainDesc.Height = kClientHeight; //ウィンドウの高さ
+	swapChainDesc.Width = windowAPI.GetClientWidth(); //ウィンドウの幅
+	swapChainDesc.Height = windowAPI.GetClientHeight(); //ウィンドウの高さ
 	swapChainDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM; //色の形式
 	swapChainDesc.SampleDesc.Count = 1; //マルチサンプルしない
 	swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT; //レンダリングターゲットとして使用
@@ -1284,7 +1283,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 
 	//モデル読み込み
-	ModelData modelData = LoadObjFile("Resources", "fence.obj");
+	ModelData modelData = LoadObjFile("Resources", "plane.obj");
 	//頂点リソースを作る
 	Microsoft::WRL::ComPtr<ID3D12Resource> vertexResourceModel = CreateBufferResource(device.Get(), sizeof(VertexData) * modelData.vertices.size());
 	//頂点バッファービューを作成末う
@@ -1351,8 +1350,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	//ビューポート
 	D3D12_VIEWPORT viewport{};
 	//クライアント領域のサイズと一緒にして画面全体に表示
-	viewport.Width = kClientWidth;
-	viewport.Height = kClientHeight;
+	viewport.Width = static_cast<float>(windowAPI.GetClientWidth());
+	viewport.Height = static_cast<float>(windowAPI.GetClientHeight());
 	viewport.TopLeftX = 0.0f; //左上のX座標
 	viewport.TopLeftY = 0.0f; //左上のY座標
 	viewport.MinDepth = 0.0f; //最小の深度
@@ -1362,9 +1361,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	D3D12_RECT scissorRect{};
 	//基本的にビューポートと同じ矩形が構成されるようにする
 	scissorRect.left = 0; //左上のX座標
-	scissorRect.right = kClientWidth; //右下のX座標
+	scissorRect.right = windowAPI.GetClientWidth(); //右下のX座標
 	scissorRect.top = 0; //左上のY座標
-	scissorRect.bottom = kClientHeight; //右下のY座標
+	scissorRect.bottom = windowAPI.GetClientHeight(); //右下のY座標
 
 
 	//マテリアル用のリソースを作る
@@ -1460,7 +1459,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	materialDataSprite->uvTransform = MakeIdentity4x4();
 
 	float fovY = 0.45f;  // 資料通り
-	float aspectRatio = static_cast<float>(kClientWidth) / static_cast<float>(kClientHeight);
+	float aspectRatio = static_cast<float>(windowAPI.GetClientWidth()) / static_cast<float>(windowAPI.GetClientHeight());
 	float nearZ = 0.1f;
 	float farZ = 100.0f;
 
@@ -1469,7 +1468,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	const DirectX::TexMetadata& metadata = mipImages.GetMetadata();
 	Microsoft::WRL::ComPtr<ID3D12Resource> textureResource = CreateTextureResource(device, metadata);
 	//DepthStecilTextureをウィンドウのサイズで生成
-	Microsoft::WRL::ComPtr<ID3D12Resource> depthStencilResource = CreateDepthStencilTextureResource(device.Get(), kClientWidth, kClientHeight);
+	Microsoft::WRL::ComPtr<ID3D12Resource> depthStencilResource = CreateDepthStencilTextureResource(device.Get(), windowAPI.GetClientWidth(), windowAPI.GetClientHeight());
 
 	//2枚目のTextureを読んで転送する
 	DirectX::ScratchImage mipImages2 = LoadTexture(modelData.material.textureFilePath);
@@ -1600,7 +1599,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 			//Sprite用のworldViewProjectMatrix
 			Matrix4x4 worldMatrixSprite = MakeAffineMatrix(transformSprite.scale, transformSprite.rotate, transformSprite.translate);
 			Matrix4x4 viewMatrixSprite = MakeIdentity4x4();
-			Matrix4x4 projectionMatrixSprite = MakeOrthographicMatrix(0.0f, 0.0f, float(kClientWidth), float(kClientHeight), 0.0f, 100.0f);
+			Matrix4x4 projectionMatrixSprite = MakeOrthographicMatrix(0.0f, 0.0f, float(windowAPI.GetClientWidth()), float(windowAPI.GetClientHeight()), 0.0f, 100.0f);
 			Matrix4x4 worldViewProjectionmatrixSprite = Multiply(worldMatrixSprite, Multiply(debugCamera_.GetViewMatrix(), projectionMatrixSprite));
 			transformationMatrixDataSprite->WVP = worldViewProjectionmatrixSprite;
 			transformationMatrixDataSprite->World = worldMatrixSprite;
