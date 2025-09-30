@@ -717,7 +717,7 @@ void SoundPlayWave(Microsoft::WRL::ComPtr<IXAudio2>& xAudio2, const SoundData& s
 //Windowsアプリでのエントリーポイント(main関数)
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 {
-	
+
 
 
 	D3DResourceLeakChecker leakChecker; //リソースリークチェック用のオブジェクト
@@ -756,7 +756,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	WindowAPI* windowAPI = nullptr; //ウィンドウ関連のAPIをまとめたオブジェクト
 	windowAPI = new WindowAPI();
 	windowAPI->Initialize();
-	
+
 
 #ifdef _DEBUG
 	Microsoft::WRL::ComPtr<ID3D12Debug1> debugController = nullptr;
@@ -772,7 +772,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	//ウィンドウを表示する
 	windowAPI->Show();
 
-	
+
 
 	//DXGIファクトリーの生成
 	Microsoft::WRL::ComPtr<IDXGIFactory7> dxgiFactory = nullptr;
@@ -1080,7 +1080,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	//すべての色要素を書き込む
 	blendDesc.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
 	blendDesc.RenderTarget[0].BlendEnable = TRUE;
-	
+
 	//--ノーマルブレンド------------------------------
 	blendDesc.RenderTarget[0].SrcBlend = D3D12_BLEND_SRC_ALPHA;
 	blendDesc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
@@ -1104,7 +1104,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	blendDesc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
 	blendDesc.RenderTarget[0].DestBlend = D3D12_BLEND_ZERO;*/
 	//--------------------------------------------
-	
+
 	//--スクリーン合成------------------------------
 	/*blendDesc.RenderTarget[0].SrcBlend = D3D12_BLEND_INV_DEST_COLOR;
 	blendDesc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
@@ -1570,14 +1570,23 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	//ウィンドウのxボタンが押されるまでループ
 	while (msg.message != WM_QUIT)
 	{
-		//Windowに目セージが来ていたら最優先で処理される
+		////Windowに目セージが来ていたら最優先で処理される
 		if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
 		{
 			TranslateMessage(&msg); //メッセージを変換
 			DispatchMessage(&msg); //メッセージをウィンドウプロシージャに送る
 		}
+
 		else
 		{
+
+			//if (windowAPI->ProcessMassage())
+			//{
+			//	//ゲームループ抜ける
+			//	break;
+			//}
+
+
 			//Imguiにここからフレームが始まる趣旨をつたえる
 			ImGui_ImplDX12_NewFrame();
 			ImGui_ImplWin32_NewFrame();
@@ -1645,7 +1654,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 			inputManager.Update();
 
-			
+
 			//これから書き込むバックバッファのインデックスを取得する
 			UINT backBufferIndex = swapChain->GetCurrentBackBufferIndex();
 
@@ -1762,8 +1771,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 			//コマンドリストのリセットに失敗した場合はエラー
 			assert(SUCCEEDED(hr));
 
-
 		}
+
 	}
 
 	//ImGui終了処理

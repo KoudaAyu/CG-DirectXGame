@@ -17,6 +17,9 @@ public:
 
 	void Finalize();
 
+	//メッセージ処理
+	bool ProcessMassage();
+
 	HWND GetHwnd() const { return hwnd_; }
 	HINSTANCE GetHInstance() const { return wc.hInstance; }
 

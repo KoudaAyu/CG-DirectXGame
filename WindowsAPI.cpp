@@ -77,3 +77,8 @@ void WindowAPI::Finalize()
 	//COMの終了処理
 	CoUninitialize();
 }
+
+bool WindowAPI::ProcessMassage()
+{
+	return false;
+}
