@@ -1589,7 +1589,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 			ImGui::Begin("Windows");
 
 
-			ImGui::ColorEdit4("Light Color", &directionalLightData->color.x);
+			ImGui::ColorEdit4("Material Color", &materialData->color.x);
 			ImGui::DragFloat("Light Intensity", &directionalLightData->intensity, 0.01f, 0.0f, 10.0f);
 
 
