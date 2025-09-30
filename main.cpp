@@ -144,6 +144,29 @@ struct SoundData
 	unsigned int bufferSize;
 };
 
+enum BlendMode
+{
+	//!< ブレンドなし
+	kBlendMode_None,
+
+	//!< αブレンド
+	kBlendMode_Normal,
+
+	//!< 加算ブレンド
+	kBlendMode_Add,
+
+	//!< 減算ブレンド
+	kBlendMode_Sub,
+
+	//!< 乗算ブレンド
+	kBlendMode_Mul,
+
+	//!< スクリーンブレンド
+	kBlendMode_Screen,
+
+	//利用禁止
+	kCountOfBlendMode,
+};
 
 std::wstring ConvertString(const std::string& str)
 {
@@ -1057,6 +1080,13 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	D3D12_BLEND_DESC blendDesc{};
 	//すべての色要素を書き込む
 	blendDesc.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
+	blendDesc.RenderTarget[0].BlendEnable = TRUE;
+	blendDesc.RenderTarget[0].SrcBlend = D3D12_BLEND_SRC_ALPHA;
+	blendDesc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
+	blendDesc.RenderTarget[0].DestBlend = D3D12_BLEND_INV_SRC_ALPHA;
+	blendDesc.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_ONE;
+	blendDesc.RenderTarget[0].BlendOpAlpha = D3D12_BLEND_OP_ADD;
+	blendDesc.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_ZERO;
 
 	//RasterizerStateの設定
 	D3D12_RASTERIZER_DESC rasterizerDesc{};
@@ -1550,10 +1580,18 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 			uvTransformMatrix = Multiply(uvTransformMatrix, MakeTranslateMatrix(uvTransformSprite.translate));
 			materialDataSprite->uvTransform = uvTransformMatrix;
 
+			directionalLight->Map(0, nullptr, reinterpret_cast<void**>(&directionalLightData));
+
+
 			//開発用UIの処理、実際に開発用のUIを出す場合はここをゲーム固有の処理に置き換え
 			ImGui::ShowDemoWindow();
 
 			ImGui::Begin("Windows");
+
+
+			ImGui::ColorEdit4("Light Color", &directionalLightData->color.x);
+			ImGui::DragFloat("Light Intensity", &directionalLightData->intensity, 0.01f, 0.0f, 10.0f);
+
 
 			ImGui::Checkbox("useMonsterBall", &useMonsterBall);
 			ImGui::Checkbox("LightSprite Flag", (bool*)&materialData->enableLighting);
@@ -1569,6 +1607,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 			ImGui::DragFloat2("UVScale", &uvTransformSprite.scale.x, 0.01f, -10.0f, 10.0f);
 			ImGui::DragFloat("UVRotate", &uvTransformSprite.rotate.z, 0.01f);
 
+
 			ImGui::End();
 
 			//ImGui内部コマンドを生成する
@@ -1576,6 +1615,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 			inputManager.Update();
 
+			
 			//これから書き込むバックバッファのインデックスを取得する
 			UINT backBufferIndex = swapChain->GetCurrentBackBufferIndex();
 
