@@ -2,6 +2,7 @@
 
 //自作h
 #include"DebugCamera.h"
+#include"DirectXCom.h"
 #include"KeyInput.h"
 #include"Matrix4x4.h"
 #include"Sound.h"
@@ -623,10 +624,6 @@ ModelData LoadObjFile(const std::string& directoryPath, const std::string& filen
 
 
 
-
-
-
-
 //Windowsアプリでのエントリーポイント(main関数)
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 {
@@ -670,18 +667,12 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	windowAPI = new WindowAPI();
 	windowAPI->Initialize();
 
+	DirectXCom* dxCommon = nullptr;
+	dxCommon = new DirectXCom();
+	dxCommon->Initialize();
 
-#ifdef _DEBUG
-	Microsoft::WRL::ComPtr<ID3D12Debug1> debugController = nullptr;
+	dxCommon->DebugLayer();
 
-	if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debugController))))
-	{
-		//デバックレイヤーを有効化する
-		debugController->EnableDebugLayer();
-		//更にGPU側でもチェックを行うようにする
-		debugController->SetEnableGPUBasedValidation(TRUE);
-	}
-#endif
 	//ウィンドウを表示する
 	windowAPI->Show();
 
@@ -1525,7 +1516,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 			//開発用UIの処理、実際に開発用のUIを出す場合はここをゲーム固有の処理に置き換え
 
-#ifdef DEBUG
+#ifdef _DEBUG
 
 
 
@@ -1709,6 +1700,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	delete[] indexData;
 
 	windowAPI->Finalize();
+
+	delete dxCommon;
 
 	delete windowAPI;
 
