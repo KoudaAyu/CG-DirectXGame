@@ -45,4 +45,14 @@ public:
 	void SoundUnload(SoundData* soundData);
 
 	SoundData SoundLoadWave(const char* filename);
+
+	Microsoft::WRL::ComPtr<IXAudio2>& GetXAudio2()
+	{
+		return xAudio2;
+	}
+
+
+private:
+	Microsoft::WRL::ComPtr<IXAudio2> xAudio2;
+	IXAudio2MasteringVoice* masterVoice = nullptr;
 };

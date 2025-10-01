@@ -3,6 +3,18 @@
 
 void Sound::Initialize()
 {
+	// XAudio2の初期化
+	HRESULT result = XAudio2Create(&xAudio2, 0, XAUDIO2_DEFAULT_PROCESSOR);
+	if (FAILED(result))
+	{
+		assert(0 && "XAudio2Create failed");
+	}
+
+	result = xAudio2->CreateMasteringVoice(&masterVoice);
+	if (FAILED(result))
+	{
+		assert(0 && "CreateMasteringVoice failed");
+	}
 }
 
 void Sound::Finalize()

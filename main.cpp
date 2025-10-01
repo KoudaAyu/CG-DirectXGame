@@ -1439,31 +1439,14 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	bool drawSphere = true;
 	bool drawSprite = false;
 
-	//サウンド関係
-	Microsoft::WRL::ComPtr<IXAudio2> xAudio2;
-	IXAudio2MasteringVoice* masterVoice = nullptr;
-
-	// XAudio2の初期化
-	HRESULT result = XAudio2Create(&xAudio2, 0, XAUDIO2_DEFAULT_PROCESSOR);
-	if (FAILED(result))
-	{
-		assert(0 && "XAudio2Create failed");
-	}
-
-	result = xAudio2->CreateMasteringVoice(&masterVoice);
-	if (FAILED(result))
-	{
-		assert(0 && "CreateMasteringVoice failed");
-	}
-
-
+	
 	//音声読み込み
 	Sound* sound_ = nullptr;
 	sound_ = new Sound();
 	sound_->Initialize();
 	//音声再生
 	SoundData soundData = sound_->SoundLoadWave("Resources/Alarm01.wav");
-	sound_->SoundPlayWave(xAudio2, soundData);
+	sound_->SoundPlayWave(sound_->GetXAudio2(), soundData);
 
 	KeyInput inputManager;
 	inputManager.Initialize(windowAPI);
@@ -1710,7 +1693,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 	CloseHandle(fenceEvent);
 
-	xAudio2.Reset();
+	sound_->GetXAudio2().Reset();
 	sound_->SoundUnload(&soundData);
 
 	delete sound_;
