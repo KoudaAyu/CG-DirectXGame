@@ -1524,6 +1524,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 
 			//開発用UIの処理、実際に開発用のUIを出す場合はここをゲーム固有の処理に置き換え
+
+#ifdef DEBUG
+
+
+
 			ImGui::ShowDemoWindow();
 
 			ImGui::Begin("Windows");
@@ -1549,6 +1554,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 
 			ImGui::End();
+
+#endif // DEBUG
 
 			//ImGui内部コマンドを生成する
 			ImGui::Render();
