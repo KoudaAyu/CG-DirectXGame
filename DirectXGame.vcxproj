@@ -60,6 +60,7 @@
     <ClInclude Include="externals\imgui\imstb_truetype.h" />
     <ClInclude Include="KeyInput.h" />
     <ClInclude Include="Matrix4x4.h" />
+    <ClInclude Include="Sound.h" />
     <ClInclude Include="Vector.h" />
     <ClInclude Include="WindowsAPI.h" />
   </ItemGroup>

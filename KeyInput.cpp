@@ -23,20 +23,13 @@ void KeyInput::Initialize(WindowAPI* windowAPI)
 	result = directInput->CreateDevice(GUID_SysKeyboard, &keyboard, NULL);
 	assert(SUCCEEDED(result) && directInput != nullptr); // 失敗時停止
 
-	 //入力データ形式のセット
-	result = keyboard->SetDataFormat(&c_dfDIKeyboard); //標準形式
-	assert(SUCCEEDED(result) && directInput != nullptr); // 失敗時停止
-
-	 //排他制御レベルのセット
-	result = keyboard->SetCooperativeLevel(windowAPI->GetHwnd(), DISCL_BACKGROUND | DISCL_NONEXCLUSIVE | DISCL_NOWINKEY);
-	assert(SUCCEEDED(result) && directInput != nullptr); // 失敗時停止
-
 	//入力データ形式のセット
 	result = keyboard->SetDataFormat(&c_dfDIKeyboard);
 	assert(SUCCEEDED(result) && keyboard != nullptr);
 
+	
 	//排他制御レベルのセット
-	result = keyboard->SetCooperativeLevel(windowAPI->GetHwnd(), DISCL_BACKGROUND | DISCL_NONEXCLUSIVE | DISCL_NOWINKEY);
+	result = keyboard->SetCooperativeLevel(windowAPI->GetHwnd(), DISCL_FOREGROUND | DISCL_NONEXCLUSIVE | DISCL_NOWINKEY);
 	assert(SUCCEEDED(result) && keyboard != nullptr);
 
 

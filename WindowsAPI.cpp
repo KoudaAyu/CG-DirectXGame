@@ -41,6 +41,8 @@ void WindowAPI::Initialize()
 		wc.hInstance, //インスタンスハンドル
 		nullptr //追加のパラメータ
 	);
+
+	assert(hwnd_ != nullptr);
 }
 
 LRESULT WindowAPI::WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)

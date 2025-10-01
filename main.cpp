@@ -5,6 +5,7 @@
 
 #include"KeyInput.h"
 #include"Matrix4x4.h"
+#include"Sound.h"
 #include"Vector.h"
 #include"WindowsAPI.h"
 
@@ -32,8 +33,8 @@
 
 //ファイル関係 / サウンド関係
 #include<sstream>
-#include <xaudio2.h>
-#pragma comment(lib, "xaudio2.lib")
+//#include <xaudio2.h>
+//#pragma comment(lib, "xaudio2.lib")
 
 
 //ReportLiveObjects
