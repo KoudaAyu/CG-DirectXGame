@@ -148,6 +148,39 @@ void DirectXCom::SetupD3D12InfoQueue()
 #endif
 }
 
+void DirectXCom::InitializeCommandList()
+{
+	CreateCommandAllocator();
+	CreateCommandList();
+	CreateCommandQueue();
+}
+
+//コマンドアロケーターを生成する
+void DirectXCom::CreateCommandAllocator()
+{
+	hr = (device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&commandAllocator)));
+
+	//コマンドアロケーターの生成に失敗した場合はエラー
+	assert(SUCCEEDED(hr));
+}
+
+//コマンドリストの生成
+void DirectXCom::CreateCommandList()
+{
+	hr = (device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, commandAllocator.Get(), nullptr, IID_PPV_ARGS(&commandList)));
+	//コマンドリストの生成に失敗した場合はエラー
+	assert(SUCCEEDED(hr));
+}
+
+//コマンドキューの生成
+void DirectXCom::CreateCommandQueue()
+{
+	
+	hr = (device->CreateCommandQueue(&commandQueueDesc, IID_PPV_ARGS(&commandQueue)));
+	//コマンドキューの生成に失敗した場合はエラー
+	assert(SUCCEEDED(hr));
+}
+
 
 const char* DirectXCom::featureLevelNames[] = {
 	"12.2",

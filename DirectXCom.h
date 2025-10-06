@@ -34,6 +34,14 @@ public:
 
 	void SetupD3D12InfoQueue();
 
+	void InitializeCommandList();
+
+	void CreateCommandAllocator();
+
+	void CreateCommandList();
+
+	void CreateCommandQueue();
+
 	Microsoft::WRL::ComPtr<ID3D12Device>& GetDevice()
 	{
 		return device;
@@ -46,6 +54,20 @@ public:
 	{
 		return useAdapter;
 	}
+	Microsoft::WRL::ComPtr<ID3D12CommandAllocator>& GetCommandAllocator()
+	{
+		return commandAllocator;
+	}
+	Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList>& GetCommandList()
+	{
+		return commandList;
+	}
+
+	Microsoft::WRL::ComPtr<ID3D12CommandQueue>& GetCommandQueue()
+	{
+		return commandQueue;
+	}
+
 
 
 	HRESULT GetHr() const { return hr; }
@@ -59,7 +81,10 @@ private:
 	Microsoft::WRL::ComPtr<ID3D12Device> device = nullptr;
 	Microsoft::WRL::ComPtr<IDXGIFactory7> dxgiFactory = nullptr;
 	Microsoft::WRL::ComPtr<IDXGIAdapter4>useAdapter = nullptr;
-
+	Microsoft::WRL::ComPtr<ID3D12CommandAllocator> commandAllocator = nullptr;
+	Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> commandList = nullptr;
+	Microsoft::WRL::ComPtr<ID3D12CommandQueue> commandQueue = nullptr;
+	D3D12_COMMAND_QUEUE_DESC commandQueueDesc{};
 	ID3D12InfoQueue* infoQueue = nullptr;
 
 	std::ostream& logStream;
