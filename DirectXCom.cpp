@@ -29,6 +29,10 @@ void DirectXCom::Initialize()
 	SelectAdapter();
 	CreateDevice();
 	SetupD3D12InfoQueue();
+	InitializeCommandList();
+	CreateSwapChain();
+	CreateDescriptorHeaps();
+	InitializeRenderTargetView();
 }
 
 void DirectXCom::DebugLayer()
@@ -238,7 +242,61 @@ Microsoft::WRL::ComPtr<ID3D12Resource> DirectXCom::CreateDepthStencilTextureReso
 	return resource;
 }
 
+//DescriptorHeapの作成関数
+Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> DirectXCom::CreateDescriptorHeap(const Microsoft::WRL::ComPtr<ID3D12Device>& device, D3D12_DESCRIPTOR_HEAP_TYPE heapType, UINT numDescriptors, bool shaderVisible)
+{
+	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap>  descriptorHeap = nullptr;
+	D3D12_DESCRIPTOR_HEAP_DESC descriptorHeapDesc{};
+	descriptorHeapDesc.Type = heapType;
+	descriptorHeapDesc.NumDescriptors = numDescriptors;
+	descriptorHeapDesc.Flags = shaderVisible ? D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE : D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
+	HRESULT hr = device->CreateDescriptorHeap(&descriptorHeapDesc, IID_PPV_ARGS(&descriptorHeap));
+	assert(SUCCEEDED(hr));
+	return descriptorHeap;
+}
 
+void DirectXCom::CreateDescriptorHeaps()
+{
+
+	const uint32_t descriptorSizeSRV = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+	const uint32_t descriptorSizeRTV = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+	const uint32_t descriptorSizeDSV = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
+
+
+	//RTV用のヒープでディスクリプタの数は2。RTVはShader内でふれるものではないため、ShaderVisibleはfalse
+	rtvDescriptorHeap = CreateDescriptorHeap(device.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_RTV, 2, false);
+	//SRV用のヒープでディスクリプタの数は128。SRTはShader内で触れるものなので、ShaderVisibleはtrue
+	srvDescriptorHeap = CreateDescriptorHeap(device.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 128, true);
+	//DSV用のヒープでディスクリプタの数は1。DSVはShader内で触れるものではないため、ShaderVisibleはfalse
+	dsvDescriptorHeap = CreateDescriptorHeap(device.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_DSV, 1, false);
+
+}
+
+void DirectXCom::InitializeRenderTargetView()
+{
+	//SwapChainからResorrceを取得する
+	hr = (swapChain->GetBuffer(0, IID_PPV_ARGS(&swapChainResources[0])));
+	//うまく取得できなければエラー
+	assert(SUCCEEDED(hr));
+	hr = (swapChain->GetBuffer(1, IID_PPV_ARGS(&swapChainResources[1])));
+	//うまく取得できなければエラー
+	assert(SUCCEEDED(hr));
+
+	//RTVの設定
+	rtvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB; //出力結果をSRGBに変換して書き込む
+	rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D; //2Dテクスチャとして書き込む
+	//ディスクリプタの先頭を取得する
+	D3D12_CPU_DESCRIPTOR_HANDLE rtvStartHandle = rtvDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
+	
+	
+	UINT descriptorSize = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+	for (int i = 0; i < 2; ++i)
+	{
+		rtvHandles[i].ptr = rtvStartHandle.ptr + descriptorSize * i;
+		device->CreateRenderTargetView(swapChainResources[i].Get(), &rtvDesc, rtvHandles[i]);
+	}
+
+}
 
 
 const char* DirectXCom::featureLevelNames[] = {

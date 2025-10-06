@@ -51,6 +51,14 @@ public:
 		int32_t width,
 		int32_t height);
 
+	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap>  CreateDescriptorHeap(
+		const Microsoft::WRL::ComPtr<ID3D12Device>& device, D3D12_DESCRIPTOR_HEAP_TYPE heapType, UINT numDescriptors, bool shaderVisible);
+
+
+	void CreateDescriptorHeaps();
+
+	void InitializeRenderTargetView();
+
 	Microsoft::WRL::ComPtr<ID3D12Device>& GetDevice()
 	{
 		return device;
@@ -84,8 +92,43 @@ public:
 	{
 		return swapChainDesc;
 	}
+	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap>& GetRtvDescriptorHeap()
+	{
+		return rtvDescriptorHeap;
+	}
+	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap>& GetSrvDescriptorHeap()
+	{
+		return srvDescriptorHeap;
+	}
+	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap>& GetDsvDescriptorHeap()
+	{
+		return dsvDescriptorHeap;
+	}
 
-
+	uint32_t GetDescriptorSizeSRV() const
+	{
+		return device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+	}
+	uint32_t GetDescriptorSizeRTV() const
+	{
+		return device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+	}
+	uint32_t GetDescriptorSizeDSV() const
+	{
+		return device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
+	}
+	const D3D12_RENDER_TARGET_VIEW_DESC& GetRtvDesc() const
+	{
+		return rtvDesc;
+	}
+	const Microsoft::WRL::ComPtr<ID3D12Resource>* GetSwapChainResources() const
+	{
+		return swapChainResources;
+	}
+	const D3D12_CPU_DESCRIPTOR_HANDLE* GetRtvHandles() const
+	{
+		return rtvHandles;
+	}
 	HRESULT GetHr() const { return hr; }
 	void SetHr(HRESULT value) { hr = value; }
 
@@ -104,6 +147,15 @@ private:
 	ID3D12InfoQueue* infoQueue = nullptr;
 	Microsoft::WRL::ComPtr<IDXGISwapChain4> swapChain;
 	DXGI_SWAP_CHAIN_DESC1 swapChainDesc{};
+	D3D12_RENDER_TARGET_VIEW_DESC rtvDesc{};
+	D3D12_CPU_DESCRIPTOR_HANDLE rtvHandles[2];//RTVを2つ作るのでディスクリプタを2つ用意する
+	Microsoft::WRL::ComPtr<ID3D12Resource> swapChainResources[2] = { nullptr, nullptr };
+
+	//DescriptorSizeを取得しておく
+	
+	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> rtvDescriptorHeap = nullptr;
+	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> srvDescriptorHeap = nullptr;
+	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> dsvDescriptorHeap = nullptr;
 
 	std::ostream& logStream;
 
