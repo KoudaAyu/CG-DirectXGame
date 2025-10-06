@@ -25,11 +25,13 @@
     <ClCompile Include="externals\imgui\imgui_tables.cpp" />
     <ClCompile Include="externals\imgui\imgui_widgets.cpp" />
     <ClCompile Include="KeyInput.cpp" />
+    <ClCompile Include="Log.cpp" />
     <ClCompile Include="main.cpp">
       <Optimization Condition="'$(Configuration)|$(Platform)'=='Development|x64'">MaxSpeed</Optimization>
     </ClCompile>
     <ClCompile Include="Matrix4x4.cpp" />
     <ClCompile Include="Sound.cpp" />
+    <ClCompile Include="StringUti.cpp" />
     <ClCompile Include="WindowsAPI.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -62,8 +64,10 @@
     <ClInclude Include="externals\imgui\imstb_textedit.h" />
     <ClInclude Include="externals\imgui\imstb_truetype.h" />
     <ClInclude Include="KeyInput.h" />
+    <ClInclude Include="Log.h" />
     <ClInclude Include="Matrix4x4.h" />
     <ClInclude Include="Sound.h" />
+    <ClInclude Include="StringUti.h" />
     <ClInclude Include="Vector.h" />
     <ClInclude Include="WindowsAPI.h" />
   </ItemGroup>
