@@ -4,6 +4,7 @@
 #include"DebugCamera.h"
 #include"DirectXCom.h"
 #include"KeyInput.h"
+#include"Log.h"
 #include"Matrix4x4.h"
 #include"Sound.h"
 #include"Vector.h"
@@ -171,39 +172,39 @@ enum BlendMode
 	kCountOfBlendMode,
 };
 
-std::wstring ConvertString(const std::string& str)
-{
-	if (str.empty())
-	{
-		return std::wstring();
-	}
-
-	auto sizeNeeded = MultiByteToWideChar(CP_UTF8, 0, reinterpret_cast<const char*>(&str[0]), static_cast<int>(str.size()), NULL, 0);
-	if (sizeNeeded == 0)
-	{
-		return std::wstring();
-	}
-	std::wstring result(sizeNeeded, 0);
-	MultiByteToWideChar(CP_UTF8, 0, reinterpret_cast<const char*>(&str[0]), static_cast<int>(str.size()), &result[0], sizeNeeded);
-	return result;
-}
-
-std::string ConvertString(const std::wstring& str)
-{
-	if (str.empty())
-	{
-		return std::string();
-	}
-
-	auto sizeNeeded = WideCharToMultiByte(CP_UTF8, 0, str.data(), static_cast<int>(str.size()), NULL, 0, NULL, NULL);
-	if (sizeNeeded == 0)
-	{
-		return std::string();
-	}
-	std::string result(sizeNeeded, 0);
-	WideCharToMultiByte(CP_UTF8, 0, str.data(), static_cast<int>(str.size()), result.data(), sizeNeeded, NULL, NULL);
-	return result;
-}
+//std::wstring ConvertString(const std::string& str)
+//{
+//	if (str.empty())
+//	{
+//		return std::wstring();
+//	}
+//
+//	auto sizeNeeded = MultiByteToWideChar(CP_UTF8, 0, reinterpret_cast<const char*>(&str[0]), static_cast<int>(str.size()), NULL, 0);
+//	if (sizeNeeded == 0)
+//	{
+//		return std::wstring();
+//	}
+//	std::wstring result(sizeNeeded, 0);
+//	MultiByteToWideChar(CP_UTF8, 0, reinterpret_cast<const char*>(&str[0]), static_cast<int>(str.size()), &result[0], sizeNeeded);
+//	return result;
+//}
+//
+//std::string ConvertString(const std::wstring& str)
+//{
+//	if (str.empty())
+//	{
+//		return std::string();
+//	}
+//
+//	auto sizeNeeded = WideCharToMultiByte(CP_UTF8, 0, str.data(), static_cast<int>(str.size()), NULL, 0, NULL, NULL);
+//	if (sizeNeeded == 0)
+//	{
+//		return std::string();
+//	}
+//	std::string result(sizeNeeded, 0);
+//	WideCharToMultiByte(CP_UTF8, 0, str.data(), static_cast<int>(str.size()), result.data(), sizeNeeded, NULL, NULL);
+//	return result;
+//}
 
 
 
@@ -274,7 +275,7 @@ Microsoft::WRL::ComPtr<IDxcBlob> CompileShader(
 	std::ofstream* logStream)
 {
 	//これからシェーダーをコンパイルする旨をログに出す
-	Log(*logStream, ConvertString(std::format(L"Begin CompileShader, path{},profile:{}\n", filePath, profile)));
+	Log(*logStream, StringUtil::ConvertString(std::format(L"Begin CompileShader, path{},profile:{}\n", filePath, profile)));
 	//hlslファイルを読み込む
 	Microsoft::WRL::ComPtr<IDxcBlobEncoding> shaderScore = nullptr;
 	HRESULT hr = dxcUtils->LoadFile(filePath.c_str(), nullptr, &shaderScore);
@@ -328,7 +329,7 @@ Microsoft::WRL::ComPtr<IDxcBlob> CompileShader(
 	assert(SUCCEEDED(hr));
 
 	//Shaderのコンパイルに成功したので、ログに出力する
-	Log(*logStream, ConvertString(std::format(L"Complete CompileShader, path{},profile:{}\n", filePath, profile)));
+	Log(*logStream, StringUtil::ConvertString(std::format(L"Complete CompileShader, path{},profile:{}\n", filePath, profile)));
 
 
 	return shaderBlob; //コンパイルしたShaderのバイナリを返す
@@ -383,7 +384,7 @@ DirectX::ScratchImage LoadTexture(const std::string& filePath)
 {
 	//テクスチャファイルを読み込んでプログラムで使えるようにする
 	DirectX::ScratchImage image{};
-	std::wstring filePathW = ConvertString(filePath);
+	std::wstring filePathW = StringUtil::ConvertString(filePath);
 	HRESULT hr = DirectX::LoadFromWICFile(filePathW.c_str(), DirectX::WIC_FLAGS_DEFAULT_SRGB, nullptr, image);
 	assert(SUCCEEDED(hr));
 
@@ -667,82 +668,24 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	windowAPI->Initialize();
 
 	DirectXCom* dxCommon = nullptr;
-	dxCommon = new DirectXCom();
-	dxCommon->Initialize();
-
+	dxCommon = new DirectXCom(logStream);
+	
 	dxCommon->DebugLayer();
 
 	//ウィンドウを表示する
 	windowAPI->Show();
 
+	dxCommon->Initialize();
+
+	
+
+
+
 
 
 	
 
-	//使用するアダプタ用の変数。最初にnullptrを入れる
-	Microsoft::WRL::ComPtr<IDXGIAdapter4>useAdapter = nullptr;
-
-	//いい順にアダプタを頼む
-	for (UINT i = 0; dxgiFactory->EnumAdapterByGpuPreference(i,
-		DXGI_GPU_PREFERENCE_HIGH_PERFORMANCE, IID_PPV_ARGS(&useAdapter)) != DXGI_ERROR_NOT_FOUND; ++i)
-	{
-
-		//アダプターの情報を取得する
-		DXGI_ADAPTER_DESC3 adapterDesc{};
-		hr = useAdapter->GetDesc3(&adapterDesc);
-		assert(SUCCEEDED(hr));//ここで止まった場合一大事
-
-		//ソフトウェアアダプタでなければ採用する
-		if (!(adapterDesc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE))
-		{
-			Log(logStream, std::format("Using adapter: {}\n", ConvertString(adapterDesc.Description)));
-			break;
-		}
-		useAdapter = nullptr; //ソフトウェアアダプタの場合は見なかったことにするためしないのでnullptr
-	}
-
-	//アダプターが見つからなかった場合はエラー
-	assert(useAdapter != nullptr);
-
-
-
-	//機能レベルとログの出力用の文字列
-	D3D_FEATURE_LEVEL featureLevels[] = {
-		D3D_FEATURE_LEVEL_12_2,
-		D3D_FEATURE_LEVEL_12_1,
-		D3D_FEATURE_LEVEL_12_0,
-	};
-
-	const char* featureLevelNames[] = {
-		"12.2",
-		"12.1",
-		"12.0",
-	};
-
-	//機能レベルを順に試していく
-	for (size_t i = 0; i < _countof(featureLevels); ++i)
-	{
-		//採用したアダプタでデバイスを作成
-		hr = D3D12CreateDevice(
-			useAdapter.Get(), //アダプタ
-			featureLevels[i], //機能レベル
-			IID_PPV_ARGS(&dxCommon->GetDevice()) //デバイスのポインタ
-		);
-
-		//指定した昨日レベルでデバイスが生成できたか確認
-		if (SUCCEEDED(hr))
-		{
-			//生成出来たのでログ出力を行う
-			Log(logStream, std::format("Feature Level: {}\n", featureLevelNames[i]));
-			break; //ループを抜ける
-		}
-
-
-	}
-
-	//デバイスの生成に失敗し起動できない
-	assert(dxCommon->GetDevice() != nullptr);
-	Log(logStream, std::format("Complete create D3D12Device!"));//初期起動完了のLogを出す
+	
 
 #ifdef _DEBUG
 	ID3D12InfoQueue* infoQueue = nullptr;
@@ -783,24 +726,24 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	//コマンドキューの生成
 	Microsoft::WRL::ComPtr<ID3D12CommandQueue> commandQueue = nullptr;
 	D3D12_COMMAND_QUEUE_DESC commandQueueDesc{};
-	hr = dxCommon->GetDevice()->CreateCommandQueue(&commandQueueDesc, IID_PPV_ARGS(&commandQueue));
+	dxCommon->SetHr(dxCommon->GetDevice()->CreateCommandQueue(&commandQueueDesc, IID_PPV_ARGS(&commandQueue)));
 
 	//コマンドキューの生成に失敗した場合はエラー
-	assert(SUCCEEDED(hr));
+	assert(SUCCEEDED(dxCommon->GetHr()));
 
 	//コマンドアロケーターを生成する
 	Microsoft::WRL::ComPtr<ID3D12CommandAllocator> commandAllocator = nullptr;
-	hr = dxCommon->GetDevice()->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&commandAllocator));
+	dxCommon->SetHr(dxCommon->GetDevice()->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&commandAllocator)));
 
 	//コマンドアロケーターの生成に失敗した場合はエラー
-	assert(SUCCEEDED(hr));
+	assert(SUCCEEDED(dxCommon->GetHr()));
 
 	//コマンドリストの生成
 	Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> commandList = nullptr;
-	hr = dxCommon->GetDevice()->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, commandAllocator.Get(), nullptr, IID_PPV_ARGS(&commandList));
+	dxCommon->SetHr(dxCommon->GetDevice()->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, commandAllocator.Get(), nullptr, IID_PPV_ARGS(&commandList)));
 
 	//コマンドリストの生成に失敗した場合はエラー
-	assert(SUCCEEDED(hr));
+	assert(SUCCEEDED(dxCommon->GetHr()));
 
 	//スワップチェーンを生成する
 	Microsoft::WRL::ComPtr<IDXGISwapChain4> swapChain;
@@ -814,9 +757,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD; //モニターに映ったら描画を破棄
 
 	//コマンドキュー、ウィンドウハンドル、設定を渡して生成する
-	hr = dxgiFactory->CreateSwapChainForHwnd(commandQueue.Get(), windowAPI->GetHwnd(), &swapChainDesc, nullptr, nullptr, reinterpret_cast<IDXGISwapChain1**>(swapChain.GetAddressOf()));
+	dxCommon->SetHr(dxCommon->GetDxgiFactory()->CreateSwapChainForHwnd(commandQueue.Get(), windowAPI->GetHwnd(), &swapChainDesc, nullptr, nullptr, reinterpret_cast<IDXGISwapChain1**>(swapChain.GetAddressOf())));
 	//スワップチェーンの生成に失敗した場合はエラー
-	assert(SUCCEEDED(hr));
+	assert(SUCCEEDED(dxCommon->GetHr()));
 
 	//RTV用のヒープでディスクリプタの数は2。RTVはShader内でふれるものではないため、ShaderVisibleはfalse
 	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> rtvDescriptorHeap = CreateDescriptorHeap(dxCommon->GetDevice().Get(), D3D12_DESCRIPTOR_HEAP_TYPE_RTV, 2, false);
@@ -829,12 +772,12 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 	//SwapChainからResorrceを取得する
 	Microsoft::WRL::ComPtr<ID3D12Resource> swapChainResources[2] = { nullptr, nullptr };
-	hr = swapChain->GetBuffer(0, IID_PPV_ARGS(&swapChainResources[0]));
+	dxCommon->SetHr(swapChain->GetBuffer(0, IID_PPV_ARGS(&swapChainResources[0])));
 	//うまく取得できなければエラー
-	assert(SUCCEEDED(hr));
-	hr = swapChain->GetBuffer(1, IID_PPV_ARGS(&swapChainResources[1]));
+	assert(SUCCEEDED(dxCommon->GetHr()));
+	dxCommon->SetHr(swapChain->GetBuffer(1, IID_PPV_ARGS(&swapChainResources[1])));
 	//うまく取得できなければエラー
-	assert(SUCCEEDED(hr));
+	assert(SUCCEEDED(dxCommon->GetHr()));
 
 	//RTVの設定
 	D3D12_RENDER_TARGET_VIEW_DESC rtvDesc{};
@@ -858,9 +801,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	//初期値0でFenceを作る
 	Microsoft::WRL::ComPtr<ID3D12Fence> fence = nullptr;
 	uint64_t fenceValue = 0;
-	hr = dxCommon->GetDevice()->CreateFence(fenceValue, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&fence));
+	dxCommon->SetHr(dxCommon->GetDevice()->CreateFence(fenceValue, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&fence)));
 	//フェンスの生成に失敗した場合はエラー
-	assert(SUCCEEDED(hr));
+	assert(SUCCEEDED(dxCommon->GetHr()));
 
 	HANDLE fenceEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
 	//フェンスイベントの生成に失敗した場合はエラー
@@ -869,15 +812,15 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	//dxcCompilerを初期化
 	Microsoft::WRL::ComPtr<IDxcUtils> dxcUtils = nullptr;
 	Microsoft::WRL::ComPtr<IDxcCompiler3> dxcCompiler = nullptr;
-	hr = DxcCreateInstance(CLSID_DxcUtils, IID_PPV_ARGS(&dxcUtils));
-	assert(SUCCEEDED(hr));
-	hr = DxcCreateInstance(CLSID_DxcCompiler, IID_PPV_ARGS(&dxcCompiler));
-	assert(SUCCEEDED(hr));
+	dxCommon->SetHr(DxcCreateInstance(CLSID_DxcUtils, IID_PPV_ARGS(&dxcUtils)));
+	assert(SUCCEEDED(dxCommon->GetHr()));
+	dxCommon->SetHr(DxcCreateInstance(CLSID_DxcCompiler, IID_PPV_ARGS(&dxcCompiler)));
+	assert(SUCCEEDED(dxCommon->GetHr()));
 
 	//現時点ではincludeしないが、includeに対応する為の設定を行う
 	Microsoft::WRL::ComPtr<IDxcIncludeHandler>includeHandler = nullptr;
-	hr = dxcUtils->CreateDefaultIncludeHandler(&includeHandler);
-	assert(SUCCEEDED(hr));
+	dxCommon->SetHr(dxcUtils->CreateDefaultIncludeHandler(&includeHandler));
+	assert(SUCCEEDED(dxCommon->GetHr()));
 
 	//RootSignatureの作成
 	D3D12_ROOT_SIGNATURE_DESC descriptionRootSignature{};
@@ -936,10 +879,10 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	//シリアライズしてバイナリにする
 	Microsoft::WRL::ComPtr<ID3DBlob> signatureBlob = nullptr;
 	Microsoft::WRL::ComPtr<ID3DBlob> errorBlob = nullptr;
-	hr = D3D12SerializeRootSignature(&descriptionRootSignature,
-		D3D_ROOT_SIGNATURE_VERSION_1, &signatureBlob, &errorBlob);
+	dxCommon->SetHr(D3D12SerializeRootSignature(&descriptionRootSignature,
+		D3D_ROOT_SIGNATURE_VERSION_1, &signatureBlob, &errorBlob));
 
-	if (FAILED(hr))
+	if (FAILED(dxCommon->GetHr()))
 	{
 		Log(logStream, reinterpret_cast<char*>(errorBlob->GetBufferPointer()));
 		assert(false);
@@ -947,10 +890,10 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 	//バイナリをもとに生成
 	Microsoft::WRL::ComPtr<ID3D12RootSignature> rootSignature = nullptr;
-	hr = dxCommon->GetDevice()->CreateRootSignature(0,
+	dxCommon->SetHr(dxCommon->GetDevice()->CreateRootSignature(0,
 		signatureBlob->GetBufferPointer(), signatureBlob->GetBufferSize(),
-		IID_PPV_ARGS(&rootSignature));
-	assert(SUCCEEDED(hr));
+		IID_PPV_ARGS(&rootSignature)));
+	assert(SUCCEEDED(dxCommon->GetHr()));
 
 
 	//InputLayer
@@ -1063,14 +1006,14 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	graphicPipelineStateDesc.DSVFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
 	//実際に生成
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> graphicPipelineState = nullptr;
-	hr = dxCommon->GetDevice()->CreateGraphicsPipelineState(&graphicPipelineStateDesc,
-		IID_PPV_ARGS(&graphicPipelineState));
+	dxCommon->SetHr(dxCommon->GetDevice()->CreateGraphicsPipelineState(&graphicPipelineStateDesc,
+		IID_PPV_ARGS(&graphicPipelineState)));
 
 	assert(vertexShaderBlob && "頂点シェーダーの読み込み失敗！");
 	assert(pixelShaderBlob && "ピクセルシェーダーの読み込み失敗！");
 
 	//パイプラインステートの生成に失敗した場合はエラー
-	assert(SUCCEEDED(hr));
+	assert(SUCCEEDED(dxCommon->GetHr()));
 
 	// 球体
 	const uint32_t kSubdivision = 16; // 16分割
@@ -1627,9 +1570,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 
 			//コマンドリストの内容を下記率させる。すべてのコマンドを積んでからCloseする
-			hr = commandList->Close();
+			dxCommon->SetHr(commandList->Close());
 			//コマンドリストのCloseに失敗した場合はエラー
-			assert(SUCCEEDED(hr));
+			assert(SUCCEEDED(dxCommon->GetHr()));
 
 			//GUPにコマンドリストの実行を行わせる
 			ID3D12CommandList* commandLists[] = { commandList.Get() };
@@ -1655,13 +1598,13 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 
 			//次フレーム用のコマンドリストを用意
-			hr = commandAllocator->Reset();
+			dxCommon->SetHr(commandAllocator->Reset());
 			//コマンドアロケーターのリセットに失敗した場合はエラー
-			assert(SUCCEEDED(hr));
+			assert(SUCCEEDED(dxCommon->GetHr()));
 			//コマンドリストをリセットする
-			hr = commandList->Reset(commandAllocator.Get(), nullptr);
+			dxCommon->SetHr(commandList->Reset(commandAllocator.Get(), nullptr));
 			//コマンドリストのリセットに失敗した場合はエラー
-			assert(SUCCEEDED(hr));
+			assert(SUCCEEDED(dxCommon->GetHr()));
 
 		}
 
@@ -1676,7 +1619,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	Log(logStream, "Application terminating.");
 
 	std::wstring wstringValue = L"Hello, DirectX!";
-	Log(logStream, ConvertString(std::format(L"WSTRING{}\n", wstringValue)));
+	Log(logStream, StringUtil::ConvertString(std::format(L"WSTRING{}\n", wstringValue)));
 
 
 	//出力ウィンドウへの文字出力

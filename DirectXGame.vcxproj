@@ -31,7 +31,7 @@
     </ClCompile>
     <ClCompile Include="Matrix4x4.cpp" />
     <ClCompile Include="Sound.cpp" />
-    <ClCompile Include="StringUti.cpp" />
+    <ClCompile Include="StringUtil.cpp" />
     <ClCompile Include="WindowsAPI.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -67,7 +67,7 @@
     <ClInclude Include="Log.h" />
     <ClInclude Include="Matrix4x4.h" />
     <ClInclude Include="Sound.h" />
-    <ClInclude Include="StringUti.h" />
+    <ClInclude Include="StringUtil.h" />
     <ClInclude Include="Vector.h" />
     <ClInclude Include="WindowsAPI.h" />
   </ItemGroup>

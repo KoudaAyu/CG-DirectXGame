@@ -63,7 +63,7 @@
     <ClCompile Include="Log.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
-    <ClCompile Include="StringUti.cpp">
+    <ClCompile Include="StringUtil.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
   </ItemGroup>
@@ -120,7 +120,7 @@
     <ClInclude Include="Log.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
-    <ClInclude Include="StringUti.h">
+    <ClInclude Include="StringUtil.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
   </ItemGroup>

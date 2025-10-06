@@ -1,7 +1,8 @@
 #pragma once
 #include <string>
+#include"StringUtil.h"
 
 namespace Logger
 {
-	void Log(const std::string& message);
+	void Log(std::ostream& os, const std::string& message);
 }
