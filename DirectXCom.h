@@ -8,6 +8,8 @@
 
 #include <array>
 
+#include"WindowsAPI.h"
+
 class DirectXCom
 {
 public:
@@ -19,7 +21,7 @@ public:
 	static const char* featureLevelNames[];
 	static const size_t featureLevelNamesCount;
 
-	DirectXCom(std::ostream& logStream);
+	DirectXCom(WindowAPI* windowAPI, std::ostream& logStream);
 	~DirectXCom();
 
 	void Initialize();
@@ -41,6 +43,13 @@ public:
 	void CreateCommandList();
 
 	void CreateCommandQueue();
+
+	void CreateSwapChain();
+
+	Microsoft::WRL::ComPtr<ID3D12Resource> CreateDepthStencilTextureResource(
+		const Microsoft::WRL::ComPtr<ID3D12Device>& device,
+		int32_t width,
+		int32_t height);
 
 	Microsoft::WRL::ComPtr<ID3D12Device>& GetDevice()
 	{
@@ -67,7 +76,14 @@ public:
 	{
 		return commandQueue;
 	}
-
+	Microsoft::WRL::ComPtr<IDXGISwapChain4> GetSwapChain()
+	{
+		return swapChain;
+	}
+	DXGI_SWAP_CHAIN_DESC1& GetSwapChainDesc()
+	{
+		return swapChainDesc;
+	}
 
 
 	HRESULT GetHr() const { return hr; }
@@ -86,9 +102,11 @@ private:
 	Microsoft::WRL::ComPtr<ID3D12CommandQueue> commandQueue = nullptr;
 	D3D12_COMMAND_QUEUE_DESC commandQueueDesc{};
 	ID3D12InfoQueue* infoQueue = nullptr;
+	Microsoft::WRL::ComPtr<IDXGISwapChain4> swapChain;
+	DXGI_SWAP_CHAIN_DESC1 swapChainDesc{};
 
 	std::ostream& logStream;
 
-	
+	WindowAPI* windowAPI = nullptr;
 
 };
