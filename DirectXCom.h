@@ -13,17 +13,11 @@ class DirectXCom
 public:
 
 	//機能レベルとログの出力用の文字列
-	D3D_FEATURE_LEVEL featureLevels[] = {
-		D3D_FEATURE_LEVEL_12_2,
-		D3D_FEATURE_LEVEL_12_1,
-		D3D_FEATURE_LEVEL_12_0,
-	};
+	static const D3D_FEATURE_LEVEL featureLevels[];
+	static const size_t featureLevelsCount;
 
-	const char* featureLevelNames[] = {
-		"12.2",
-		"12.1",
-		"12.0",
-	};
+	static const char* featureLevelNames[];
+	static const size_t featureLevelNamesCount;
 
 	DirectXCom(std::ostream& logStream);
 	~DirectXCom();
@@ -37,6 +31,8 @@ public:
 	void SelectAdapter();
 
 	void CreateDevice();
+
+	void SetupD3D12InfoQueue();
 
 	Microsoft::WRL::ComPtr<ID3D12Device>& GetDevice()
 	{
@@ -63,6 +59,8 @@ private:
 	Microsoft::WRL::ComPtr<ID3D12Device> device = nullptr;
 	Microsoft::WRL::ComPtr<IDXGIFactory7> dxgiFactory = nullptr;
 	Microsoft::WRL::ComPtr<IDXGIAdapter4>useAdapter = nullptr;
+
+	ID3D12InfoQueue* infoQueue = nullptr;
 
 	std::ostream& logStream;
 

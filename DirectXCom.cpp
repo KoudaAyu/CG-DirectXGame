@@ -25,6 +25,7 @@ void DirectXCom::Initialize()
 	GraphicCreateDXGIFactory();
 	SelectAdapter();
 	CreateDevice();
+	SetupD3D12InfoQueue();
 }
 
 void DirectXCom::DebugLayer()
@@ -84,7 +85,7 @@ void DirectXCom::SelectAdapter()
 void DirectXCom::CreateDevice()
 {
 	//機能レベルを順に試していく
-	for (size_t i = 0; i < _countof(featureLevels); ++i)
+	for (size_t i = 0; i < featureLevelNamesCount; ++i)
 	{
 		//採用したアダプタでデバイスを作成
 		hr = D3D12CreateDevice(
@@ -108,3 +109,56 @@ void DirectXCom::CreateDevice()
 	assert(device != nullptr);
 	Logger::Log(logStream, std::format("Complete create D3D12Device!"));//初期起動完了のLogを出す
 }
+
+void DirectXCom::SetupD3D12InfoQueue()
+{
+#ifdef _DEBUG
+	
+	if (SUCCEEDED(device->QueryInterface(IID_PPV_ARGS(&infoQueue))))
+	{
+		//重大なエラーの時に止まる
+		infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_CORRUPTION, true);
+
+		//エラーの時に止まる
+		infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_ERROR, true);
+
+		//警告時に止まる
+		infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_WARNING, true);
+
+
+
+		//抑制するメッセージのID
+		D3D12_MESSAGE_ID denyIds[] =
+		{
+			D3D12_MESSAGE_ID_RESOURCE_BARRIER_MISMATCHING_COMMAND_LIST_TYPE
+		};
+
+		D3D12_MESSAGE_SEVERITY serverities[] = { D3D12_MESSAGE_SEVERITY_INFO };
+		D3D12_INFO_QUEUE_FILTER filter{};
+		filter.DenyList.NumIDs = _countof(denyIds); //抑制するメッセージの数
+		filter.DenyList.pIDList = denyIds; //抑制するメッセージのID
+		filter.DenyList.NumSeverities = _countof(serverities); //抑制するメッセージの重要度の数
+		filter.DenyList.pSeverityList = serverities; //抑制するメッセージの重要度
+
+		infoQueue->PushStorageFilter(&filter); //フィルターを適用する
+
+		//解放
+		infoQueue->Release();
+	}
+#endif
+}
+
+
+const char* DirectXCom::featureLevelNames[] = {
+	"12.2",
+	"12.1",
+	"12.0",
+};
+
+const D3D_FEATURE_LEVEL DirectXCom::featureLevels[] = {
+	D3D_FEATURE_LEVEL_12_2,
+	D3D_FEATURE_LEVEL_12_1,
+	D3D_FEATURE_LEVEL_12_0,
+};
+
+const size_t DirectXCom::featureLevelNamesCount = sizeof(DirectXCom::featureLevelNames) / sizeof(DirectXCom::featureLevelNames[0]);
