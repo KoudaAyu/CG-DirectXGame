@@ -2,6 +2,7 @@
 
 #include<wrl.h>
 #include <d3d12.h>
+#include <dxcapi.h>
 #include <dxgi1_6.h>
 #include <d3d12sdklayers.h>
 #include <ostream>
@@ -65,6 +66,18 @@ public:
 	D3D12_GPU_DESCRIPTOR_HANDLE GetGPUDescriptorHandle(Microsoft::WRL::ComPtr<ID3D12DescriptorHeap>& descriptorHeap,
 		uint32_t descriptorSize, uint32_t index);
 
+
+	void InitializeDepthStencilView();
+
+	void CreateFence();
+
+	void CreateViewportRect();
+
+	void CerateScissorRect();
+
+	void CreateDxcCompiler();
+
+	void InitializeImGui();
 
 	Microsoft::WRL::ComPtr<ID3D12Device>& GetDevice()
 	{
@@ -136,9 +149,32 @@ public:
 	{
 		return rtvHandles;
 	}
+	uint64_t GetFenceValue() const { return fenceValue; }
+	void SetFenceValue(uint64_t value) { fenceValue = value; }
+	const Microsoft::WRL::ComPtr<ID3D12Fence>& GetFence() const
+	{
+		return fence;
+	}
+	HANDLE GetFenceEvent() const { return fenceEvent; }
+	const D3D12_VIEWPORT& GetViewport() const { return viewport; }
+	const D3D12_RECT& GetScissorRect() const { return scissorRect; }
+	const Microsoft::WRL::ComPtr<IDxcUtils>& GetDxcUtils() const 
+	{ 
+		return dxcUtils; 
+	}
+	const Microsoft::WRL::ComPtr<IDxcCompiler3>& GetDxcCompiler() const {
+		return dxcCompiler; 
+	}
+	const Microsoft::WRL::ComPtr<IDxcIncludeHandler>& GetIncludeHandler() const {
+		return includeHandler; 
+	}
+
+
 
 	HRESULT GetHr() const { return hr; }
 	void SetHr(HRESULT value) { hr = value; }
+
+	MSG& GetMsg() { return msg; }
 
 
 private:
@@ -158,6 +194,18 @@ private:
 	D3D12_RENDER_TARGET_VIEW_DESC rtvDesc{};
 	D3D12_CPU_DESCRIPTOR_HANDLE rtvHandles[2];//RTVを2つ作るのでディスクリプタを2つ用意する
 	Microsoft::WRL::ComPtr<ID3D12Resource> swapChainResources[2] = { nullptr, nullptr };
+	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap>  descriptorHeap = nullptr;
+	Microsoft::WRL::ComPtr<ID3D12Resource> depthStencilResource = nullptr;
+	D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc{};
+	MSG msg{};
+	Microsoft::WRL::ComPtr<ID3D12Fence> fence = nullptr;
+	uint64_t fenceValue = 0;//初期値0でFenceを作る
+	HANDLE fenceEvent;
+	D3D12_VIEWPORT viewport{};
+	D3D12_RECT scissorRect{};
+	Microsoft::WRL::ComPtr<IDxcUtils> dxcUtils = nullptr;
+	Microsoft::WRL::ComPtr<IDxcCompiler3> dxcCompiler = nullptr;
+	Microsoft::WRL::ComPtr<IDxcIncludeHandler>includeHandler = nullptr;
 
 	//DescriptorSizeを取得しておく
 	

@@ -534,33 +534,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 	dxCommon->Initialize();
 
-	
-
-	MSG msg{};
-
-	//初期値0でFenceを作る
-	Microsoft::WRL::ComPtr<ID3D12Fence> fence = nullptr;
-	uint64_t fenceValue = 0;
-	dxCommon->SetHr(dxCommon->GetDevice()->CreateFence(fenceValue, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&fence)));
-	//フェンスの生成に失敗した場合はエラー
-	assert(SUCCEEDED(dxCommon->GetHr()));
-
-	HANDLE fenceEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
-	//フェンスイベントの生成に失敗した場合はエラー
-	assert(fenceEvent != nullptr);
-
-	//dxcCompilerを初期化
-	Microsoft::WRL::ComPtr<IDxcUtils> dxcUtils = nullptr;
-	Microsoft::WRL::ComPtr<IDxcCompiler3> dxcCompiler = nullptr;
-	dxCommon->SetHr(DxcCreateInstance(CLSID_DxcUtils, IID_PPV_ARGS(&dxcUtils)));
-	assert(SUCCEEDED(dxCommon->GetHr()));
-	dxCommon->SetHr(DxcCreateInstance(CLSID_DxcCompiler, IID_PPV_ARGS(&dxcCompiler)));
-	assert(SUCCEEDED(dxCommon->GetHr()));
-
-	//現時点ではincludeしないが、includeに対応する為の設定を行う
-	Microsoft::WRL::ComPtr<IDxcIncludeHandler>includeHandler = nullptr;
-	dxCommon->SetHr(dxcUtils->CreateDefaultIncludeHandler(&includeHandler));
-	assert(SUCCEEDED(dxCommon->GetHr()));
 
 	//RootSignatureの作成
 	D3D12_ROOT_SIGNATURE_DESC descriptionRootSignature{};
@@ -707,11 +680,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 	//Shaderをコンパイルする
 	Microsoft::WRL::ComPtr<IDxcBlob> vertexShaderBlob = CompileShader(L"Object3D.VS.hlsl",
-		L"vs_6_0", dxcUtils.Get(), dxcCompiler, includeHandler, &logStream);
+		L"vs_6_0", dxCommon->GetDxcUtils().Get(), dxCommon->GetDxcCompiler(), dxCommon->GetIncludeHandler(), &logStream);
 	assert(vertexShaderBlob != nullptr);
 
 	Microsoft::WRL::ComPtr<IDxcBlob> pixelShaderBlob = CompileShader(L"Object3D.PS.hlsl",
-		L"ps_6_0", dxcUtils.Get(), dxcCompiler, includeHandler, &logStream);
+		L"ps_6_0", dxCommon->GetDxcUtils().Get(), dxCommon->GetDxcCompiler(), dxCommon->GetIncludeHandler(), &logStream);
 	assert(pixelShaderBlob != nullptr);
 
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC graphicPipelineStateDesc{};
@@ -927,25 +900,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 
 
-	//ビューポート
-	D3D12_VIEWPORT viewport{};
-	//クライアント領域のサイズと一緒にして画面全体に表示
-	viewport.Width = static_cast<float>(windowAPI->GetClientWidth());
-	viewport.Height = static_cast<float>(windowAPI->GetClientHeight());
-	viewport.TopLeftX = 0.0f; //左上のX座標
-	viewport.TopLeftY = 0.0f; //左上のY座標
-	viewport.MinDepth = 0.0f; //最小の深度
-	viewport.MaxDepth = 1.0f; //最大の深度
-
-	//シザー矩形
-	D3D12_RECT scissorRect{};
-	//基本的にビューポートと同じ矩形が構成されるようにする
-	scissorRect.left = 0; //左上のX座標
-	scissorRect.right = windowAPI->GetClientWidth(); //右下のX座標
-	scissorRect.top = 0; //左上のY座標
-	scissorRect.bottom = windowAPI->GetClientHeight(); //右下のY座標
-
-
 	//マテリアル用のリソースを作る
 	Microsoft::WRL::ComPtr<ID3D12Resource> materialResource = CreateBufferResource(dxCommon->GetDevice().Get(), sizeof(Material));
 	//マテリアルにデータを書き込む
@@ -1118,27 +1072,14 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	debugCamera_.Initialize(windowAPI);
 
 
-	//Imguiの初期化
-	IMGUI_CHECKVERSION();
-	ImGui::CreateContext();
-	ImGui::StyleColorsDark();
-	ImGui_ImplWin32_Init(windowAPI->GetHwnd());
-	ImGui_ImplDX12_Init(
-		dxCommon->GetDevice().Get(),
-		dxCommon->GetSwapChainDesc().BufferCount,
-		dxCommon->GetRtvDesc().Format,
-		dxCommon->GetSrvDescriptorHeap().Get(),
-		dxCommon->GetSrvDescriptorHeap()->GetCPUDescriptorHandleForHeapStart(),
-		dxCommon->GetSrvDescriptorHeap()->GetGPUDescriptorHandleForHeapStart());
-
 	//ウィンドウのxボタンが押されるまでループ
-	while (msg.message != WM_QUIT)
+	while (dxCommon->GetMsg().message != WM_QUIT)
 	{
 		////Windowに目セージが来ていたら最優先で処理される
-		if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
+		if (PeekMessage(&dxCommon->GetMsg(), NULL, 0, 0, PM_REMOVE))
 		{
-			TranslateMessage(&msg); //メッセージを変換
-			DispatchMessage(&msg); //メッセージをウィンドウプロシージャに送る
+			TranslateMessage(&dxCommon->GetMsg()); //メッセージを変換
+			DispatchMessage(&dxCommon->GetMsg()); //メッセージをウィンドウプロシージャに送る
 		}
 
 		else
@@ -1259,8 +1200,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 			dxCommon->GetCommandList()->SetDescriptorHeaps(1, descriptorHeap->GetAddressOf());
 
 			//コマンドを積む
-			dxCommon->GetCommandList()->RSSetViewports(1, &viewport); //ビューポートを設定
-			dxCommon->GetCommandList()->RSSetScissorRects(1, &scissorRect); //シザー矩形を設定
+			dxCommon->GetCommandList()->RSSetViewports(1, &dxCommon->GetViewport()); //ビューポートを設定
+			dxCommon->GetCommandList()->RSSetScissorRects(1, &dxCommon->GetScissorRect()); //シザー矩形を設定
 			//RootSignatureを設定。PSOに設定しているけれど別途設定が必要
 			dxCommon->GetCommandList()->SetGraphicsRootSignature(rootSignature.Get());
 			dxCommon->GetCommandList()->SetPipelineState(graphicPipelineState.Get()); //パイプラインステートを設定
@@ -1317,19 +1258,19 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 			dxCommon->GetSwapChain()->Present(1, 0);
 
 			//Fenceの値を更新
-			fenceValue++;
+			dxCommon->SetFenceValue(dxCommon->GetFenceValue() + 1);
 			//GPUがここまでたどり着いたときに、Fenceの値を指定した値に代入するようにSignalを送る
-			dxCommon->GetCommandQueue()->Signal(fence.Get(), fenceValue);
+			dxCommon->GetCommandQueue()->Signal(dxCommon->GetFence().Get(), dxCommon->GetFenceValue());
 
 			//Fenceの値が指定したSignalの値にたどり着いているか確認する
 			//GetCompletedValueの初期値はFence作成時に渡した初期値
-			if (fence->GetCompletedValue() < fenceValue)
+			if (dxCommon->GetFence()->GetCompletedValue() < dxCommon->GetFenceValue())
 			{
 				//指定したSignalにたどり着いていないので、たどり着くまで待つようにイベントを設定する
-				fence->SetEventOnCompletion(fenceValue, fenceEvent);
+				dxCommon->GetFence()->SetEventOnCompletion(dxCommon->GetFenceValue(), dxCommon->GetFenceEvent());
 
 				//イベントを待つ
-				WaitForSingleObject(fenceEvent, INFINITE);
+				WaitForSingleObject(dxCommon->GetFenceEvent(), INFINITE);
 			}
 
 
@@ -1361,7 +1302,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	//出力ウィンドウへの文字出力
 	OutputDebugStringA("Hello, DirextX!\n");
 
-	CloseHandle(fenceEvent);
+	CloseHandle(dxCommon->GetFenceEvent());
 
 	sound_->GetXAudio2().Reset();
 	sound_->SoundUnload(&soundData);

@@ -4,6 +4,7 @@
 #include <format>
 
 #pragma comment(lib,"d3d12.lib")
+#pragma comment(lib, "dxcompiler.lib")
 #pragma comment(lib,"dxgi.lib")
 
 #include"Log.h"
@@ -33,6 +34,12 @@ void DirectXCom::Initialize()
 	CreateSwapChain();
 	CreateDescriptorHeaps();
 	InitializeRenderTargetView();
+	//InitializeDepthStencilView();
+	CreateFence();
+	CreateViewportRect();
+	CerateScissorRect();
+	CreateDxcCompiler();
+	InitializeImGui();
 }
 
 void DirectXCom::DebugLayer()
@@ -244,7 +251,6 @@ Microsoft::WRL::ComPtr<ID3D12Resource> DirectXCom::CreateDepthStencilTextureReso
 //DescriptorHeapの作成関数
 Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> DirectXCom::CreateDescriptorHeap(const Microsoft::WRL::ComPtr<ID3D12Device>& device, D3D12_DESCRIPTOR_HEAP_TYPE heapType, UINT numDescriptors, bool shaderVisible)
 {
-	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap>  descriptorHeap = nullptr;
 	D3D12_DESCRIPTOR_HEAP_DESC descriptorHeapDesc{};
 	descriptorHeapDesc.Type = heapType;
 	descriptorHeapDesc.NumDescriptors = numDescriptors;
@@ -309,6 +315,81 @@ D3D12_GPU_DESCRIPTOR_HANDLE DirectXCom::GetGPUDescriptorHandle(Microsoft::WRL::C
 	D3D12_GPU_DESCRIPTOR_HANDLE handleGPU = descriptorHeap->GetGPUDescriptorHandleForHeapStart();
 	handleGPU.ptr += (descriptorSize * index);
 	return handleGPU;
+}
+
+void DirectXCom::InitializeDepthStencilView()
+{
+	//DepthStecilTextureをウィンドウのサイズで生成
+	dsvDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;//Format。基本的にはResourceに合わせる
+	dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;//2dTexture
+	//DSVHeapの先頭にDSVを作る
+	device->CreateDepthStencilView(depthStencilResource.Get(), &dsvDesc, dsvDescriptorHeap->GetCPUDescriptorHandleForHeapStart());
+}
+
+void DirectXCom::CreateFence()
+{
+
+	hr = (device->CreateFence(fenceValue, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&fence)));
+	//フェンスの生成に失敗した場合はエラー
+	assert(SUCCEEDED(hr));
+
+	fenceEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
+	//フェンスイベントの生成に失敗した場合はエラー
+	assert(fenceEvent != nullptr);
+}
+
+//ビューポート
+void DirectXCom::CreateViewportRect()
+{
+
+	//クライアント領域のサイズと一緒にして画面全体に表示
+	viewport.Width = static_cast<float>(windowAPI->GetClientWidth());
+	viewport.Height = static_cast<float>(windowAPI->GetClientHeight());
+	viewport.TopLeftX = 0.0f; //左上のX座標
+	viewport.TopLeftY = 0.0f; //左上のY座標
+	viewport.MinDepth = 0.0f; //最小の深度
+	viewport.MaxDepth = 1.0f; //最大の深度
+}
+
+//シザー矩形
+void DirectXCom::CerateScissorRect()
+{
+	
+	//基本的にビューポートと同じ矩形が構成されるようにする
+	scissorRect.left = 0; //左上のX座標
+	scissorRect.right = windowAPI->GetClientWidth(); //右下のX座標
+	scissorRect.top = 0; //左上のY座標
+	scissorRect.bottom = windowAPI->GetClientHeight(); //右下のY座標
+}
+
+void DirectXCom::CreateDxcCompiler()
+{
+
+	//dxcCompilerを初期化
+	hr = (DxcCreateInstance(CLSID_DxcUtils, IID_PPV_ARGS(&dxcUtils)));
+	assert(SUCCEEDED(hr));
+	hr = (DxcCreateInstance(CLSID_DxcCompiler, IID_PPV_ARGS(&dxcCompiler)));
+	assert(SUCCEEDED(hr));
+
+	//現時点ではincludeしないが、includeに対応する為の設定を行う
+	hr = (dxcUtils->CreateDefaultIncludeHandler(&includeHandler));
+	assert(SUCCEEDED(hr));
+}
+
+void DirectXCom::InitializeImGui()
+{
+	//Imguiの初期化
+	IMGUI_CHECKVERSION();
+	ImGui::CreateContext();
+	ImGui::StyleColorsDark();
+	ImGui_ImplWin32_Init(windowAPI->GetHwnd());
+	ImGui_ImplDX12_Init(
+		device.Get(),
+		swapChainDesc.BufferCount,
+		rtvDesc.Format,
+		srvDescriptorHeap.Get(),
+		srvDescriptorHeap->GetCPUDescriptorHandleForHeapStart(),
+		srvDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
 }
 
 
