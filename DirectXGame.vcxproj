@@ -30,6 +30,7 @@
       <Optimization Condition="'$(Configuration)|$(Platform)'=='Development|x64'">MaxSpeed</Optimization>
     </ClCompile>
     <ClCompile Include="Matrix4x4.cpp" />
+    <ClCompile Include="ResourceLeakCheak.cpp" />
     <ClCompile Include="Sound.cpp" />
     <ClCompile Include="StringUtil.cpp" />
     <ClCompile Include="WindowsAPI.cpp" />
@@ -66,6 +67,7 @@
     <ClInclude Include="KeyInput.h" />
     <ClInclude Include="Log.h" />
     <ClInclude Include="Matrix4x4.h" />
+    <ClInclude Include="ResourceLeakCheak.h" />
     <ClInclude Include="Sound.h" />
     <ClInclude Include="StringUtil.h" />
     <ClInclude Include="Vector.h" />
