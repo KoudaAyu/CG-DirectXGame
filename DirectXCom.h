@@ -59,6 +59,13 @@ public:
 
 	void InitializeRenderTargetView();
 
+	D3D12_CPU_DESCRIPTOR_HANDLE GetCPUDescroptirHandle(Microsoft::WRL::ComPtr<ID3D12DescriptorHeap>& descriptorHeap,
+		uint32_t descriptorSize, uint32_t index);
+
+	D3D12_GPU_DESCRIPTOR_HANDLE GetGPUDescriptorHandle(Microsoft::WRL::ComPtr<ID3D12DescriptorHeap>& descriptorHeap,
+		uint32_t descriptorSize, uint32_t index);
+
+
 	Microsoft::WRL::ComPtr<ID3D12Device>& GetDevice()
 	{
 		return device;
@@ -129,6 +136,7 @@ public:
 	{
 		return rtvHandles;
 	}
+
 	HRESULT GetHr() const { return hr; }
 	void SetHr(HRESULT value) { hr = value; }
 
