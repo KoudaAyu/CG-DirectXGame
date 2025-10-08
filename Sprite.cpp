@@ -61,6 +61,16 @@ void Sprite::Initialize(SpriteCom* spriteCom)
 	materialDataSprite->uvTransform = MakeIdentity4x4();
 	materialResourceSprite->Unmap(0, nullptr);
 
+	//Sprite用のTransformationMatrix用のリソースを作る
+	transformationMatrixResourceSprite = dxCommon->CreateBufferResource(dxCommon->GetDevice().Get(), sizeof(TransformationMatrix));
+	//データを書き込む
+	//書き込むためのアドレス取得
+	transformationMatrixResourceSprite->Map(0, nullptr, reinterpret_cast<void**>(&transformationMatrixDataSprite));
+	//単位行列を書き込んでおく
+	transformationMatrixDataSprite->WVP = MakeIdentity4x4();
+	transformationMatrixDataSprite->World = MakeIdentity4x4();
+	transformationMatrixResourceSprite->Unmap(0, nullptr);
+
 }
 
 void Sprite::Update()

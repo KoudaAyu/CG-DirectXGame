@@ -35,6 +35,8 @@ public:
 	const D3D12_INDEX_BUFFER_VIEW& GetIndexBufferViewSprite() const { return indexBufferViewSprite; }
 	Microsoft::WRL::ComPtr<ID3D12Resource> GetMaterialResourceSprite() const { return materialResourceSprite; }
 	Material* GetMaterialDataSprite() const { return materialDataSprite; }
+	Microsoft::WRL::ComPtr<ID3D12Resource> GetTransformationMatrixResourceSprite() const { return transformationMatrixResourceSprite; }
+	TransformationMatrix* GetTransformationMatrixDataSprite() const { return transformationMatrixDataSprite; }
 
 private:
 	SpriteCom* spriteCom = nullptr;
@@ -48,4 +50,6 @@ private:
 	uint32_t* indexDataSprite = nullptr;
 	Microsoft::WRL::ComPtr<ID3D12Resource> materialResourceSprite = nullptr;
 	Material* materialDataSprite = nullptr;
+	Microsoft::WRL::ComPtr<ID3D12Resource> transformationMatrixResourceSprite = nullptr;
+	TransformationMatrix* transformationMatrixDataSprite = nullptr;
 };
