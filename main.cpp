@@ -375,7 +375,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 	Sprite* sprite = nullptr;
 	sprite = new Sprite;
-	sprite->Initialize(spriteCom);
+	
 
 	spriteCom->CrateGraphicPipeline();
 
@@ -528,31 +528,14 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	vertexResourceModel->Map(0, nullptr, reinterpret_cast<void**>(&vertexDataModel));
 	std::memcpy(vertexDataModel, modelData.vertices.data(), sizeof(Sprite::VertexData) * modelData.vertices.size());//頂点データをリソースにコピー
 
-	//Sprite用の頂点Resource
-	Microsoft::WRL::ComPtr<ID3D12Resource> vertexResourceSprite = dxCommon->CreateBufferResource(dxCommon->GetDevice().Get(), sizeof(Sprite::VertexData) * 6);
-	//頂点バッファビューを生成する
-	D3D12_VERTEX_BUFFER_VIEW vertexBufferViewSprite{};
-	//リソースの先頭のアドレスから使う
-	vertexBufferViewSprite.BufferLocation = vertexResourceSprite->GetGPUVirtualAddress();
-	//使用するリソースのサイズは頂点6つ分のサイズ
-	vertexBufferViewSprite.SizeInBytes = sizeof(Sprite::VertexData) * 6;
-	//1頂点当たりのサイズ
-	vertexBufferViewSprite.StrideInBytes = sizeof(Sprite::VertexData);
+	sprite->Initialize(spriteCom);
 
 
-	Microsoft::WRL::ComPtr<ID3D12Resource> indexResourceSprite = dxCommon->CreateBufferResource(dxCommon->GetDevice().Get(), sizeof(uint32_t) * 6);
-	//頂点バッファービューを生成する
-	D3D12_INDEX_BUFFER_VIEW indexBufferViewSprite{};
-	//リソースの先頭アドレスから使う
-	indexBufferViewSprite.BufferLocation = indexResourceSprite->GetGPUVirtualAddress();
-	//使用するリソースのサイズは頂点6つ分のサイズ
-	indexBufferViewSprite.SizeInBytes = sizeof(uint32_t) * 6;
-	//インデックスはuint32_tとする
-	indexBufferViewSprite.Format = DXGI_FORMAT_R32_UINT;
+	
 
 	//インデックスリソースにデータを書き込む
 	uint32_t* indexDataSprite = nullptr;
-	indexResourceSprite->Map(0, nullptr, reinterpret_cast<void**>(&indexDataSprite));
+	sprite->GetIndexResourceSprite()->Map(0, nullptr, reinterpret_cast<void**>(&indexDataSprite));
 	indexDataSprite[0] = 0; // 左下
 	indexDataSprite[1] = 1; // 左上
 	indexDataSprite[2] = 2; // 右下
@@ -560,11 +543,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	indexDataSprite[4] = 1; // 左上
 	indexDataSprite[5] = 3; // 右上
 
-	indexResourceSprite->Unmap(0, nullptr);
+	sprite->GetIndexResourceSprite()->Unmap(0, nullptr);
 
 	//Sprite用
 	Sprite::VertexData* vertexDataSprite = nullptr;
-	vertexResourceSprite->Map(0, nullptr, reinterpret_cast<void**>(&vertexDataSprite));
+	sprite->GetVertexResourceSprite()->Map(0, nullptr, reinterpret_cast<void**>(&vertexDataSprite));
 	//一枚目の三角形
 	vertexDataSprite[0].position = { 0.0f,360.0f,0.0f,1.0f }; // 左下
 	vertexDataSprite[1].position = { 0.0f,0.0f,0.0f,1.0f };   // 左上
@@ -862,8 +845,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 			if (drawSprite)
 			{
-				dxCommon->GetCommandList()->IASetVertexBuffers(0, 1, &vertexBufferViewSprite);
-				dxCommon->GetCommandList()->IASetIndexBuffer(&indexBufferViewSprite);
+				dxCommon->GetCommandList()->IASetVertexBuffers(0, 1, &sprite->GetVertexBufferViewSprite());
+				dxCommon->GetCommandList()->IASetIndexBuffer(&sprite->GetIndexBufferViewSprite());
 				dxCommon->GetCommandList()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 				dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(0, materialResourceSprite->GetGPUVirtualAddress());
 				dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(1, transformationMatrixResourceSprite->GetGPUVirtualAddress());

@@ -77,6 +77,7 @@ public:
 	const D3D12_GRAPHICS_PIPELINE_STATE_DESC& GetGraphicPipelineStateDesc() const { return graphicPipelineStateDesc; }
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC& GetGraphicPipelineStateDesc() { return graphicPipelineStateDesc; }
 
+	DirectXCom* GetDxCommon() { return dxCommon; }
 
 private:
 	D3D12_ROOT_SIGNATURE_DESC descriptionRootSignature;
