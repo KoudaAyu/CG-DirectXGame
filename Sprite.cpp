@@ -1,10 +1,9 @@
 #include "Sprite.h"
 
-void Sprite::Initialize()
+
+void Sprite::Initialize(SpriteCom* spriteCom)
 {
-
-	
-
+	this->spriteCom = spriteCom;
 }
 
 void Sprite::Update()

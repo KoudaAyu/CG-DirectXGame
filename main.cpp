@@ -63,12 +63,7 @@ struct Transform
 	Vector3 translate;
 };
 
-struct VertexData
-{
-	Vector4 position;
-	Vector2 texcoord;
-	Vector3 normal;
-};
+
 
 struct Material
 {
@@ -93,7 +88,7 @@ struct MaterialData
 //objファイル関係
 struct ModelData
 {
-	std::vector<VertexData> vertices; // 頂点データ
+	std::vector<Sprite::VertexData> vertices; // 頂点データ
 	MaterialData material; // マテリアルデータ
 };
 
@@ -282,7 +277,7 @@ ModelData LoadObjFile(const std::string& directoryPath, const std::string& filen
 		else if (identifile == "f")
 		{
 			//面は三角形限定。その他は未対応
-			VertexData triangle[3];
+			Sprite::VertexData triangle[3];
 
 			for (int32_t faceVertex = 0; faceVertex < 3; ++faceVertex)
 			{
@@ -380,7 +375,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 	Sprite* sprite = nullptr;
 	sprite = new Sprite;
-	sprite->Initialize();
+	sprite->Initialize(spriteCom);
 
 	spriteCom->CrateGraphicPipeline();
 
@@ -426,7 +421,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	const uint32_t kIndexCount = kSubdivision * kSubdivision * 6; // 各四角形に三角形2つ、各三角形に頂点3つで 2*3=6
 
 	// 頂点配列を確保
-	VertexData* vertexData = new VertexData[kVertexCount];
+	Sprite::VertexData* vertexData = new Sprite::VertexData[kVertexCount];
 
 	// --- 頂点データを埋める ---
 	for (uint32_t lat = 0; lat <= kSubdivision; ++lat)
@@ -462,10 +457,10 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 
 	// --- 頂点バッファを作成・アップロード ---
-	Microsoft::WRL::ComPtr<ID3D12Resource> vertexResourceSphere = dxCommon->CreateBufferResource(dxCommon->GetDevice().Get(), sizeof(VertexData) * kVertexCount);
-	VertexData* mappedVertex = nullptr;
+	Microsoft::WRL::ComPtr<ID3D12Resource> vertexResourceSphere = dxCommon->CreateBufferResource(dxCommon->GetDevice().Get(), sizeof(Sprite::VertexData) * kVertexCount);
+	Sprite::VertexData* mappedVertex = nullptr;
 	vertexResourceSphere->Map(0, nullptr, reinterpret_cast<void**>(&mappedVertex));
-	memcpy(mappedVertex, vertexData, sizeof(VertexData) * kVertexCount);
+	memcpy(mappedVertex, vertexData, sizeof(Sprite::VertexData) * kVertexCount);
 	vertexResourceSphere->Unmap(0, nullptr);
 
 	uint32_t* indexData = new uint32_t[kIndexCount];
@@ -505,44 +500,44 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	// --- バッファビュー設定 ---
 	D3D12_VERTEX_BUFFER_VIEW vertexBufferViewSphere{};
 	vertexBufferViewSphere.BufferLocation = vertexResourceSphere->GetGPUVirtualAddress();
-	vertexBufferViewSphere.SizeInBytes = sizeof(VertexData) * kVertexCount;
-	vertexBufferViewSphere.StrideInBytes = sizeof(VertexData);
+	vertexBufferViewSphere.SizeInBytes = sizeof(Sprite::VertexData) * kVertexCount;
+	vertexBufferViewSphere.StrideInBytes = sizeof(Sprite::VertexData);
 
 	D3D12_INDEX_BUFFER_VIEW indexBufferViewSphere{};
 	indexBufferViewSphere.BufferLocation = indexResourceSphere->GetGPUVirtualAddress();
 	indexBufferViewSphere.SizeInBytes = sizeof(uint32_t) * kIndexCount;
 	indexBufferViewSphere.Format = DXGI_FORMAT_R32_UINT;
 
-	VertexData* mapped = nullptr;
+	Sprite::VertexData* mapped = nullptr;
 	vertexResourceSphere->Map(0, nullptr, reinterpret_cast<void**>(&mapped));
-	memcpy(mapped, vertexData, sizeof(VertexData) * kVertexCount);
+	memcpy(mapped, vertexData, sizeof(Sprite::VertexData) * kVertexCount);
 	vertexResourceSphere->Unmap(0, nullptr);
 
 
 	//モデル読み込み
 	ModelData modelData = LoadObjFile("Resources", "plane.obj");
 	//頂点リソースを作る
-	Microsoft::WRL::ComPtr<ID3D12Resource> vertexResourceModel = dxCommon->CreateBufferResource(dxCommon->GetDevice().Get(), sizeof(VertexData) * modelData.vertices.size());
+	Microsoft::WRL::ComPtr<ID3D12Resource> vertexResourceModel = dxCommon->CreateBufferResource(dxCommon->GetDevice().Get(), sizeof(Sprite::VertexData) * modelData.vertices.size());
 	//頂点バッファービューを作成末う
 	D3D12_VERTEX_BUFFER_VIEW vertexBufferView{};
 	vertexBufferView.BufferLocation = vertexResourceModel->GetGPUVirtualAddress();//リソースの先頭のアドレスから使う
-	vertexBufferView.SizeInBytes = UINT(sizeof(VertexData) * modelData.vertices.size()); //使用するリソースのサイズは頂点のサイズ
-	vertexBufferView.StrideInBytes = sizeof(VertexData); //1頂点当たりのサイズ
+	vertexBufferView.SizeInBytes = UINT(sizeof(Sprite::VertexData) * modelData.vertices.size()); //使用するリソースのサイズは頂点のサイズ
+	vertexBufferView.StrideInBytes = sizeof(Sprite::VertexData); //1頂点当たりのサイズ
 	//頂点リソースにデータを書き込む
-	VertexData* vertexDataModel = nullptr;
+	Sprite::VertexData* vertexDataModel = nullptr;
 	vertexResourceModel->Map(0, nullptr, reinterpret_cast<void**>(&vertexDataModel));
-	std::memcpy(vertexDataModel, modelData.vertices.data(), sizeof(VertexData) * modelData.vertices.size());//頂点データをリソースにコピー
+	std::memcpy(vertexDataModel, modelData.vertices.data(), sizeof(Sprite::VertexData) * modelData.vertices.size());//頂点データをリソースにコピー
 
 	//Sprite用の頂点Resource
-	Microsoft::WRL::ComPtr<ID3D12Resource> vertexResourceSprite = dxCommon->CreateBufferResource(dxCommon->GetDevice().Get(), sizeof(VertexData) * 6);
+	Microsoft::WRL::ComPtr<ID3D12Resource> vertexResourceSprite = dxCommon->CreateBufferResource(dxCommon->GetDevice().Get(), sizeof(Sprite::VertexData) * 6);
 	//頂点バッファビューを生成する
 	D3D12_VERTEX_BUFFER_VIEW vertexBufferViewSprite{};
 	//リソースの先頭のアドレスから使う
 	vertexBufferViewSprite.BufferLocation = vertexResourceSprite->GetGPUVirtualAddress();
 	//使用するリソースのサイズは頂点6つ分のサイズ
-	vertexBufferViewSprite.SizeInBytes = sizeof(VertexData) * 6;
+	vertexBufferViewSprite.SizeInBytes = sizeof(Sprite::VertexData) * 6;
 	//1頂点当たりのサイズ
-	vertexBufferViewSprite.StrideInBytes = sizeof(VertexData);
+	vertexBufferViewSprite.StrideInBytes = sizeof(Sprite::VertexData);
 
 
 	Microsoft::WRL::ComPtr<ID3D12Resource> indexResourceSprite = dxCommon->CreateBufferResource(dxCommon->GetDevice().Get(), sizeof(uint32_t) * 6);
@@ -568,7 +563,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	indexResourceSprite->Unmap(0, nullptr);
 
 	//Sprite用
-	VertexData* vertexDataSprite = nullptr;
+	Sprite::VertexData* vertexDataSprite = nullptr;
 	vertexResourceSprite->Map(0, nullptr, reinterpret_cast<void**>(&vertexDataSprite));
 	//一枚目の三角形
 	vertexDataSprite[0].position = { 0.0f,360.0f,0.0f,1.0f }; // 左下
