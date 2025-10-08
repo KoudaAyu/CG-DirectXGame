@@ -8,6 +8,8 @@
 #include"Matrix4x4.h"
 #include"ResourceLeakCheak.h"
 #include"Sound.h"
+#include"Sprite.h"
+#include"SpriteCom.h"
 #include"Vector.h"
 #include"WindowsAPI.h"
 
@@ -375,12 +377,15 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 	dxCommon->Initialize();
 
+	SpriteCom* spriteCom = nullptr;
+	spriteCom = new SpriteCom;
+	spriteCom->Initialize();
 
-	//RootSignatureの作成
-	D3D12_ROOT_SIGNATURE_DESC descriptionRootSignature{};
-	descriptionRootSignature.Flags =
-		D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT; //入力アセンブラーでの使用を許可
+	Sprite* sprite = nullptr;
+	sprite = new Sprite;
+	sprite->Initialize();
 
+	D3D12_ROOT_SIGNATURE_DESC descriptionRootSignature = spriteCom->GetDescriptionRootSignature();
 
 	D3D12_DESCRIPTOR_RANGE descriptorRange[1] = {};
 
@@ -412,6 +417,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	rootParameters[3].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
 	rootParameters[3].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 	rootParameters[3].Descriptor.ShaderRegister = 1;
+
+	D3D12_ROOT_SIGNATURE_DESC desc = {};
 
 	descriptionRootSignature.pParameters = rootParameters; //ルートパラメーター配列へのポインタ
 	descriptionRootSignature.NumParameters = _countof(rootParameters);//配列の長さ

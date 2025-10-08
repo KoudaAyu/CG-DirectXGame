@@ -32,6 +32,8 @@
     <ClCompile Include="Matrix4x4.cpp" />
     <ClCompile Include="ResourceLeakCheak.cpp" />
     <ClCompile Include="Sound.cpp" />
+    <ClCompile Include="Sprite.cpp" />
+    <ClCompile Include="SpriteCom.cpp" />
     <ClCompile Include="StringUtil.cpp" />
     <ClCompile Include="WindowsAPI.cpp" />
   </ItemGroup>
@@ -69,6 +71,8 @@
     <ClInclude Include="Matrix4x4.h" />
     <ClInclude Include="ResourceLeakCheak.h" />
     <ClInclude Include="Sound.h" />
+    <ClInclude Include="Sprite.h" />
+    <ClInclude Include="SpriteCom.h" />
     <ClInclude Include="StringUtil.h" />
     <ClInclude Include="Vector.h" />
     <ClInclude Include="WindowsAPI.h" />
