@@ -4,6 +4,14 @@ struct Vector2
 {
 	float x;
 	float y;
+
+	Vector2& operator+=(const Vector2& other)
+	{
+		x += other.x;
+		y += other.y;
+		return *this;
+	}
+
 };
 
 struct Vector3
