@@ -88,6 +88,9 @@
   <ItemGroup>
     <None Include="Resources\shaders\Object3d.hlsli" />
   </ItemGroup>
+  <ItemGroup>
+    <Image Include="Resources\uvChecker.png" />
+  </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
