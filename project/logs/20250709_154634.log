@@ -1,0 +1,32 @@
+Using adapter: NVIDIA GeForce RTX 4060 Laptop GPU
+
+Feature Level: 12.2
+
+Complete create D3D12Device!
+Begin CompileShader, pathObject3D.VS.hlsl,profile:vs_6_0
+
+Complete CompileShader, pathObject3D.VS.hlsl,profile:vs_6_0
+
+Begin CompileShader, pathObject3D.PS.hlsl,profile:ps_6_0
+
+Qembed_debug:35:9: error: use of undeclared identifier 'gMaterial'
+    if (gMaterial.enableLighting != 0)
+        ^
+Qembed_debug:37:60: error: use of undeclared identifier 'gDirectionalLight'
+        float cos = saturate(dot(normalize(input.normal), -gDirectionalLight.direction));
+                                                           ^
+Qembed_debug:38:24: error: use of undeclared identifier 'gMaterial'
+        output.color = gMaterial.color * textureColor * gDirectionalLight.color * cos * gDirectionalLight.intensity;
+                       ^
+Qembed_debug:38:57: error: use of undeclared identifier 'gDirectionalLight'
+        output.color = gMaterial.color * textureColor * gDirectionalLight.color * cos * gDirectionalLight.intensity;
+                                                        ^
+Qembed_debug:38:89: error: use of undeclared identifier 'gDirectionalLight'
+        output.color = gMaterial.color * textureColor * gDirectionalLight.color * cos * gDirectionalLight.intensity;
+                                                                                        ^
+Qembed_debug:43:24: error: use of undeclared identifier 'gMaterial'
+        output.color = gMaterial.color * textureColor;
+                       ^
+
+Complete CompileShader, pathObject3D.PS.hlsl,profile:ps_6_0
+

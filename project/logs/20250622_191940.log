@@ -1,0 +1,31 @@
+Using adapter: NVIDIA GeForce RTX 4060 Laptop GPU
+
+Feature Level: 12.2
+
+Complete create D3D12Device!
+Begin CompileShader, pathObject3D.VS.hlsl,profile:vs_6_0
+
+Complete CompileShader, pathObject3D.VS.hlsl,profile:vs_6_0
+
+Begin CompileShader, pathObject3D.PS.hlsl,profile:ps_6_0
+
+Qembed_debug:6:1: error: unknown type name 'PixelShaderOutPut'; did you mean 'PixelShaderOutput'?
+PixelShaderOutPut main()
+^~~~~~~~~~~~~~~~~
+PixelShaderOutput
+Qembed_debug:1:8: note: 'PixelShaderOutput' declared here
+struct PixelShaderOutput
+       ^
+Qembed_debug:8:5: error: unknown type name 'PixelShaderOutPut'; did you mean 'PixelShaderOutput'?
+    PixelShaderOutPut output;
+    ^~~~~~~~~~~~~~~~~
+    PixelShaderOutput
+Qembed_debug:1:8: note: 'PixelShaderOutput' declared here
+struct PixelShaderOutput
+       ^
+
+Complete CompileShader, pathObject3D.PS.hlsl,profile:ps_6_0
+
+Application terminating.
+WSTRINGHello, DirectX!
+

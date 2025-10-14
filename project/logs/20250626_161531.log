@@ -1,0 +1,38 @@
+Using adapter: NVIDIA GeForce RTX 4060 Laptop GPU
+
+Feature Level: 12.2
+
+Complete create D3D12Device!
+Begin CompileShader, pathObject3D.VS.hlsl,profile:vs_6_0
+
+Qembed_debug:20:1: error: unknown type name 'VertecShaderOutput'; did you mean 'VertexShaderOutput'?
+VertecShaderOutput main(VertecShederInput input)
+^~~~~~~~~~~~~~~~~~
+VertexShaderOutput
+./Object3d.hlsli:1:8: note: 'VertexShaderOutput' declared here
+struct VertexShaderOutput
+       ^
+Qembed_debug:22:5: error: unknown type name 'VertecShaderOutput'; did you mean 'VertexShaderOutput'?
+    VertecShaderOutput output;
+    ^~~~~~~~~~~~~~~~~~
+    VertexShaderOutput
+./Object3d.hlsli:1:8: note: 'VertexShaderOutput' declared here
+struct VertexShaderOutput
+       ^
+Qembed_debug:23:12: error: no member named 'posision' in 'VertexShaderOutput'; did you mean 'position'?
+    output.posision = mul(input.position, gTransformationMatrix.WVP);
+           ^~~~~~~~
+           position
+./Object3d.hlsli:3:16: note: 'position' declared here
+    float32_t4 position : SV_Position;
+               ^
+Qembed_debug:24:21: error: cannot convert from 'float32_t2' to 'float32_t4'
+    output.texcoord = input.texcoord;
+                    ^
+
+Complete CompileShader, pathObject3D.VS.hlsl,profile:vs_6_0
+
+Begin CompileShader, pathObject3D.PS.hlsl,profile:ps_6_0
+
+Complete CompileShader, pathObject3D.PS.hlsl,profile:ps_6_0
+

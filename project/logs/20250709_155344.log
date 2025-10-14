@@ -1,0 +1,45 @@
+Using adapter: NVIDIA GeForce RTX 4060 Laptop GPU
+
+Feature Level: 12.2
+
+Complete create D3D12Device!
+Begin CompileShader, pathObject3D.VS.hlsl,profile:vs_6_0
+
+Qembed_debug:5:25: error: unknown type name 'VertexShaderInput'; did you mean 'VertexShaderOutput'?
+VertexShaderOutput main(VertexShaderInput input)
+                        ^~~~~~~~~~~~~~~~~
+                        VertexShaderOutput
+./Object3d.hlsli:1:8: note: 'VertexShaderOutput' declared here
+struct VertexShaderOutput
+       ^
+
+Complete CompileShader, pathObject3D.VS.hlsl,profile:vs_6_0
+
+Begin CompileShader, pathObject3D.PS.hlsl,profile:ps_6_0
+
+Qembed_debug:3:16: error: use of undeclared identifier 'Material'
+ConstantBuffer<Material> gMaterial0 : register(b0);
+               ^
+Qembed_debug:9:1: error: unknown type name 'PixelShaderOutput'; did you mean 'VertexShaderOutput'?
+PixelShaderOutput main(VertexShaderOutput input)
+^~~~~~~~~~~~~~~~~
+VertexShaderOutput
+./Object3d.hlsli:1:8: note: 'VertexShaderOutput' declared here
+struct VertexShaderOutput
+       ^
+Qembed_debug:11:5: error: unknown type name 'PixelShaderOutput'; did you mean 'VertexShaderOutput'?
+    PixelShaderOutput output;
+    ^~~~~~~~~~~~~~~~~
+    VertexShaderOutput
+./Object3d.hlsli:1:8: note: 'VertexShaderOutput' declared here
+struct VertexShaderOutput
+       ^
+Qembed_debug:17:16: error: no member named 'color' in 'VertexShaderOutput'
+        output.color = gMaterial0.color * textureColor * gDirectionalLight.color * cos * gDirectionalLight.intensity;
+        ~~~~~~ ^
+Qembed_debug:21:16: error: no member named 'color' in 'VertexShaderOutput'
+        output.color = gMaterial0.color * textureColor;
+        ~~~~~~ ^
+
+Complete CompileShader, pathObject3D.PS.hlsl,profile:ps_6_0
+

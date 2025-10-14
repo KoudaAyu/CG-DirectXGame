@@ -1,0 +1,24 @@
+Using adapter: NVIDIA GeForce RTX 4060 Laptop GPU
+
+Feature Level: 12.2
+
+Complete create D3D12Device!
+Begin CompileShader, pathObject3D.VS.hlsl,profile:vs_6_0
+
+Qembed_debug:25:8: error: redefinition of 'VertexShaderOutput'
+struct VertexShaderOutput
+       ^
+./Object3d.hlsli:1:8: note: previous definition is here
+struct VertexShaderOutput
+       ^
+
+Complete CompileShader, pathObject3D.VS.hlsl,profile:vs_6_0
+
+Begin CompileShader, pathObject3D.PS.hlsl,profile:ps_6_0
+
+Qembed_debug:10:16: error: use of undeclared identifier 'DirectionalLight'
+ConstantBuffer<DirectionalLight> gDirectionalLight : register(b1);
+               ^
+
+Complete CompileShader, pathObject3D.PS.hlsl,profile:ps_6_0
+
