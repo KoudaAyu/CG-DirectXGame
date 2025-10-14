@@ -522,7 +522,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 		Sprite* sprite = new Sprite;
 		sprite->Initialize(spriteCom);
 		sprites.push_back(sprite);
-		sprite->SetPosition({ (float)(rand() % windowAPI->GetClientWidth()), (float)(rand() % windowAPI->GetClientHeight()) });
+		sprite->SetPosition({1.0f,1.0f});
 	}
 
 
