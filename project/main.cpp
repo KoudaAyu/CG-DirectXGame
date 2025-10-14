@@ -10,7 +10,6 @@
 #include"Sound.h"
 #include"Sprite.h"
 #include"SpriteCom.h"
-#include"TextureManager.h"
 #include"Vector.h"
 #include"WindowsAPI.h"
 
@@ -346,7 +345,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 	DirectXCom* dxCommon = nullptr;
 	dxCommon = new DirectXCom(windowAPI, logStream);
-	
+
 	dxCommon->DebugLayer();
 
 	//ウィンドウを表示する
@@ -355,16 +354,19 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	dxCommon->Initialize();
 
 	SpriteCom* spriteCom = nullptr;
-	spriteCom = new SpriteCom(logStream,dxCommon);
+	spriteCom = new SpriteCom(logStream, dxCommon);
 	spriteCom->Initialize();
+
+
+
 
 	spriteCom->CrateGraphicPipeline();
 
 
 	/*D3D12_ROOT_SIGNATURE_DESC desc = {};*/
 
-	
-	TextureManager::GetInstance()->Initialize();
+
+
 
 	//DepthStencilStateの設定
 	D3D12_DEPTH_STENCIL_DESC depthStencilDesc{};
@@ -495,19 +497,20 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	vertexResourceSphere->Unmap(0, nullptr);
 
 
-	//モデル読み込み
-	ModelData modelData = LoadObjFile("Resources", "plane.obj");
+	////モデル読み込み
+	//ModelData modelData = LoadObjFile("./project/Resources", "plane.obj");
+
 	//頂点リソースを作る
-	Microsoft::WRL::ComPtr<ID3D12Resource> vertexResourceModel = dxCommon->CreateBufferResource(dxCommon->GetDevice().Get(), sizeof(Sprite::VertexData) * modelData.vertices.size());
-	//頂点バッファービューを作成末う
-	D3D12_VERTEX_BUFFER_VIEW vertexBufferView{};
-	vertexBufferView.BufferLocation = vertexResourceModel->GetGPUVirtualAddress();//リソースの先頭のアドレスから使う
-	vertexBufferView.SizeInBytes = UINT(sizeof(Sprite::VertexData) * modelData.vertices.size()); //使用するリソースのサイズは頂点のサイズ
-	vertexBufferView.StrideInBytes = sizeof(Sprite::VertexData); //1頂点当たりのサイズ
-	//頂点リソースにデータを書き込む
-	Sprite::VertexData* vertexDataModel = nullptr;
-	vertexResourceModel->Map(0, nullptr, reinterpret_cast<void**>(&vertexDataModel));
-	std::memcpy(vertexDataModel, modelData.vertices.data(), sizeof(Sprite::VertexData) * modelData.vertices.size());//頂点データをリソースにコピー
+	//Microsoft::WRL::ComPtr<ID3D12Resource> vertexResourceModel = dxCommon->CreateBufferResource(dxCommon->GetDevice().Get(), sizeof(Sprite::VertexData) * modelData.vertices.size());
+	////頂点バッファービューを作成末う
+	//D3D12_VERTEX_BUFFER_VIEW vertexBufferView{};
+	//vertexBufferView.BufferLocation = vertexResourceModel->GetGPUVirtualAddress();//リソースの先頭のアドレスから使う
+	//vertexBufferView.SizeInBytes = UINT(sizeof(Sprite::VertexData) * modelData.vertices.size()); //使用するリソースのサイズは頂点のサイズ
+	//vertexBufferView.StrideInBytes = sizeof(Sprite::VertexData); //1頂点当たりのサイズ
+	////頂点リソースにデータを書き込む
+	//Sprite::VertexData* vertexDataModel = nullptr;
+	//vertexResourceModel->Map(0, nullptr, reinterpret_cast<void**>(&vertexDataModel));
+	//std::memcpy(vertexDataModel, modelData.vertices.data(), sizeof(Sprite::VertexData) * modelData.vertices.size());//頂点データをリソースにコピー
 
 	//Sprite* sprite = nullptr;
 	//sprite = new Sprite;
@@ -556,7 +559,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	// 書き込み完了後はUnmapを呼ぶ
 	directionalLight->Unmap(0, nullptr);
 
-	
+
 
 
 	//WVP用のリソースを作る。　Matrix4x4 1つのサイズを用意する
@@ -579,11 +582,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	// 書き込みが完了したので、マップを解除
 	transformationMatrixResourceSphere->Unmap(0, nullptr);
 
-	
+
 
 	//Transform変数を作る
 	Sprite::Transform transform = { {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };
-	
+
 	//Sphere用
 	Sprite::Transform transformSphere{ {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };
 
@@ -606,19 +609,19 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	float farZ = 100.0f;
 
 	//Textureを読んで転送する
-	DirectX::ScratchImage mipImages = dxCommon->LoadTexture("./Resources/uvChecker.png");
+	DirectX::ScratchImage mipImages = dxCommon->LoadTexture("Resources/uvChecker.png");
 	const DirectX::TexMetadata& metadata = mipImages.GetMetadata();
 	Microsoft::WRL::ComPtr<ID3D12Resource> textureResource = CreateTextureResource(dxCommon->GetDevice(), metadata);
-	
-	//2枚目のTextureを読んで転送する
-	DirectX::ScratchImage mipImages2 = dxCommon->LoadTexture(modelData.material.textureFilePath);
-	const DirectX::TexMetadata& metadata2 = mipImages2.GetMetadata();
-	Microsoft::WRL::ComPtr<ID3D12Resource> textureResource2 = CreateTextureResource(dxCommon->GetDevice(), metadata2);
 
-	
+	//2枚目のTextureを読んで転送する
+	/*DirectX::ScratchImage mipImages2 = dxCommon->LoadTexture(modelData.material.textureFilePath);
+	const DirectX::TexMetadata& metadata2 = mipImages2.GetMetadata();
+	Microsoft::WRL::ComPtr<ID3D12Resource> textureResource2 = CreateTextureResource(dxCommon->GetDevice(), metadata2);*/
+
+
 
 	Microsoft::WRL::ComPtr<ID3D12Resource> intermediateResource = dxCommon->UploadTextureData(textureResource, mipImages, dxCommon->GetDevice().Get(), dxCommon->GetCommandList());
-	Microsoft::WRL::ComPtr<ID3D12Resource> intermediateResource2 = dxCommon->UploadTextureData(textureResource2, mipImages2, dxCommon->GetDevice().Get(), dxCommon->GetCommandList());
+	/*Microsoft::WRL::ComPtr<ID3D12Resource> intermediateResource2 = dxCommon->UploadTextureData(textureResource2, mipImages2, dxCommon->GetDevice().Get(), dxCommon->GetCommandList());*/
 
 	//metaDataを基にSRVの設定
 	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
@@ -627,14 +630,14 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;//2Dテクスチャ
 	srvDesc.Texture2D.MipLevels = UINT(metadata.mipLevels);
 
-	//二つ目。metaDataを基にSRVの設定
-	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc2{};
-	srvDesc2.Format = metadata2.format;
-	srvDesc2.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-	srvDesc2.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;//2Dテクスチャ
-	srvDesc2.Texture2D.MipLevels = UINT(metadata2.mipLevels);
+	////二つ目。metaDataを基にSRVの設定
+	//D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc2{};
+	//srvDesc2.Format = metadata2.format;
+	//srvDesc2.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+	//srvDesc2.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;//2Dテクスチャ
+	//srvDesc2.Texture2D.MipLevels = UINT(metadata2.mipLevels);
 
-	
+
 	//SRVを生成するDescriptorHeapの場所を決める
 	D3D12_CPU_DESCRIPTOR_HANDLE textureSrvHandleCPU = dxCommon->GetSrvDescriptorHeap()->GetCPUDescriptorHandleForHeapStart();
 	D3D12_GPU_DESCRIPTOR_HANDLE textureSrvHandleGPU = dxCommon->GetSrvDescriptorHeap()->GetGPUDescriptorHandleForHeapStart();
@@ -648,7 +651,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	//SRVの生成
 	dxCommon->GetDevice()->CreateShaderResourceView(textureResource.Get(), &srvDesc, textureSrvHandleCPU);
 	//2つ目
-	dxCommon->GetDevice()->CreateShaderResourceView(textureResource2.Get(), &srvDesc2, textureSrvHandleCPU2);
+	//dxCommon->GetDevice()->CreateShaderResourceView(textureResource2.Get(), &srvDesc2, textureSrvHandleCPU2);
 
 	//SRVの切り替え
 	bool useMonsterBall = true;
@@ -656,14 +659,14 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	bool drawSphere = true;
 	bool drawSprite = true;
 
-	
+
 	//音声読み込み
 	Sound* sound_ = nullptr;
 	sound_ = new Sound();
 	sound_->Initialize();
-	//音声再生
-	SoundData soundData = sound_->SoundLoadWave("Resources/Alarm01.wav");
-	sound_->SoundPlayWave(sound_->GetXAudio2(), soundData);
+	////音声再生
+	//SoundData soundData = sound_->SoundLoadWave("./project/Resources/Alarm01.wav");
+	//sound_->SoundPlayWave(sound_->GetXAudio2(), soundData);
 
 	KeyInput inputManager;
 	inputManager.Initialize(windowAPI);
@@ -701,10 +704,10 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 			for (auto* sprite : sprites)
 			{
 				sprite->Update(&debugCamera_, windowAPI);
-				
+
 			}
 
-			
+
 
 			//ゲームの処理
 			/*transformSphere.rotate.y += 0.01f;*/
@@ -717,7 +720,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 			transformationMatrixDataSphere->WVP = worldViewProjectMatrix;
 			transformationMatrixDataSphere->World = worldMatrix;
 
-		
+
 
 			//UVTransform用
 			Matrix4x4 uvTransformMatrix = MakeScaleMatrix(uvTransformSprite.scale);
@@ -777,24 +780,24 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 			spriteCom->SetupDraw();
 
-		
-		//RootSignatureを設定。PSOに設定しているけれど別途設定が必要
+
+			//RootSignatureを設定。PSOに設定しているけれど別途設定が必要
 			dxCommon->GetCommandList()->SetGraphicsRootSignature(spriteCom->GetRootSignature().Get());
 			dxCommon->GetCommandList()->SetPipelineState(graphicPipelineState.Get()); //パイプラインステートを設定
 			//Sphereの描画
 
-			dxCommon->GetCommandList()->IASetVertexBuffers(0, 1, &vertexBufferView);
-			dxCommon->GetCommandList()->IASetIndexBuffer(&indexBufferViewSphere);
-			dxCommon->GetCommandList()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-			dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(0, materialResource->GetGPUVirtualAddress());
-			dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(1, transformationMatrixResourceSphere->GetGPUVirtualAddress());
-			dxCommon->GetCommandList()->SetGraphicsRootDescriptorTable(2, useMonsterBall ? textureSrvHandleGPU2 : textureSrvHandleGPU);
-			dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(3, directionalLight->GetGPUVirtualAddress());
-			if (drawSphere)
-			{
-				/*commandList->DrawIndexedInstanced(kIndexCount, 1, 0, 0, 0);*/
-				dxCommon->GetCommandList()->DrawInstanced(UINT(modelData.vertices.size()), 1, 0, 0);
-			}
+			//dxCommon->GetCommandList()->IASetVertexBuffers(0, 1, &vertexBufferView);
+			//dxCommon->GetCommandList()->IASetIndexBuffer(&indexBufferViewSphere);
+			//dxCommon->GetCommandList()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+			//dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(0, materialResource->GetGPUVirtualAddress());
+			//dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(1, transformationMatrixResourceSphere->GetGPUVirtualAddress());
+			//dxCommon->GetCommandList()->SetGraphicsRootDescriptorTable(2, useMonsterBall ? textureSrvHandleGPU2 : textureSrvHandleGPU);
+			//dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(3, directionalLight->GetGPUVirtualAddress());
+			//if (drawSphere)
+			//{
+			//	/*commandList->DrawIndexedInstanced(kIndexCount, 1, 0, 0, 0);*/
+			//	dxCommon->GetCommandList()->DrawInstanced(UINT(modelData.vertices.size()), 1, 0, 0);
+			//}
 
 			if (drawSprite)
 			{
@@ -840,7 +843,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	CloseHandle(dxCommon->GetFenceEvent());
 
 	sound_->GetXAudio2().Reset();
-	sound_->SoundUnload(&soundData);
+	/*sound_->SoundUnload(&soundData);*/
 
 	delete sound_;
 
@@ -853,8 +856,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 		delete sprite;
 	}
 
-	TextureManager::GetInstance()->Finalize();
-
 	windowAPI->Finalize();
 
 	delete dxCommon;
@@ -863,4 +864,3 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 	return 0;
 }
-

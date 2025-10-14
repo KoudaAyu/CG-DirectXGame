@@ -11,13 +11,13 @@ SpriteCom::~SpriteCom()
 
 void SpriteCom::Initialize()
 {
-	
+
 }
 
 //Update
 void SpriteCom::Update()
 {
-	
+
 }
 
 void SpriteCom::SetupDraw()
@@ -81,7 +81,7 @@ void SpriteCom::RootSignature()
 {
 	//RootSignatureの作成
 	descriptionRootSignature.Flags =
-	D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT; //入力アセンブラーでの使用を許可
+		D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT; //入力アセンブラーでの使用を許可
 }
 
 void SpriteCom::StaticSamplers()
@@ -115,7 +115,7 @@ void SpriteCom::InputLayer()
 	inputElementDescs[2].Format = DXGI_FORMAT_R32G32B32_FLOAT;
 	inputElementDescs[2].AlignedByteOffset = D3D12_APPEND_ALIGNED_ELEMENT;
 
-	
+
 	inputLayoutDesc.pInputElementDescs = inputElementDescs; //入力要素の配列
 	inputLayoutDesc.NumElements = _countof(inputElementDescs); //入力要素の数
 }
@@ -123,7 +123,7 @@ void SpriteCom::InputLayer()
 void SpriteCom::InitializeBlend()
 {
 	//BlendStateの設定
-	
+
 	//すべての色要素を書き込む
 	blendDesc.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
 	blendDesc.RenderTarget[0].BlendEnable = TRUE;
@@ -167,7 +167,7 @@ void SpriteCom::InitializeBlend()
 void SpriteCom::RasterizerState()
 {
 	//RasterizerStateの設定
-	
+
 	//裏面(時計回り)を表示しない
 	rasterizerDesc.CullMode = D3D12_CULL_MODE_BACK;
 	//三角形の中を塗りつぶす
@@ -177,18 +177,18 @@ void SpriteCom::RasterizerState()
 void SpriteCom::ShaderCompile()
 {
 	//Shaderをコンパイルする
-	vertexShaderBlob = dxCommon->CompileShader(L"Resources/shaders/Object3D.VS.hlsl",
+	vertexShaderBlob = dxCommon->CompileShader(L"Object3D.VS.hlsl",
 		L"vs_6_0", dxCommon->GetDxcUtils().Get(), dxCommon->GetDxcCompiler(), dxCommon->GetIncludeHandler(), logStream);
 	assert(vertexShaderBlob != nullptr);
 
-	pixelShaderBlob = dxCommon->CompileShader(L"Resources/shaders/Object3D.PS.hlsl",
+	pixelShaderBlob = dxCommon->CompileShader(L"Object3D.PS.hlsl",
 		L"ps_6_0", dxCommon->GetDxcUtils().Get(), dxCommon->GetDxcCompiler(), dxCommon->GetIncludeHandler(), logStream);
 	assert(pixelShaderBlob != nullptr);
 }
 
 void SpriteCom::InitializeGraphicPipeline()
 {
-	
+
 	graphicPipelineStateDesc.pRootSignature = rootSignature.Get(); //ルートシグネチャ
 	graphicPipelineStateDesc.InputLayout = inputLayoutDesc; //入力レイアウト
 	graphicPipelineStateDesc.VS = { vertexShaderBlob->GetBufferPointer(),

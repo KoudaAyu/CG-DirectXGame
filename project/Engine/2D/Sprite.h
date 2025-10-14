@@ -36,7 +36,7 @@ public:
 
 
 	void Initialize(SpriteCom* spriteCom);
-	void Update(DebugCamera* debugCamera,WindowAPI* windowAPI);
+	void Update(DebugCamera* debugCamera, WindowAPI* windowAPI);
 	void Draw();
 
 	void VertexDataInitialize();

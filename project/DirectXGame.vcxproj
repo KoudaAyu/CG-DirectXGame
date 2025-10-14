@@ -35,7 +35,6 @@
     <ClCompile Include="Engine\2D\Sprite.cpp" />
     <ClCompile Include="Engine\2D\SpriteCom.cpp" />
     <ClCompile Include="Engine\Base\StringUtil.cpp" />
-    <ClCompile Include="Engine\2D\TextureManager.cpp" />
     <ClCompile Include="Engine\Base\WindowsAPI.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -75,7 +74,6 @@
     <ClInclude Include="Engine\2D\Sprite.h" />
     <ClInclude Include="Engine\2D\SpriteCom.h" />
     <ClInclude Include="Engine\Base\StringUtil.h" />
-    <ClInclude Include="Engine\2D\TextureManager.h" />
     <ClInclude Include="Engine\Base\Vector.h" />
     <ClInclude Include="Engine\Base\WindowsAPI.h" />
   </ItemGroup>

@@ -15,7 +15,7 @@ void Sprite::Initialize(SpriteCom* spriteCom)
 	vertexBufferViewSprite.SizeInBytes = sizeof(Sprite::VertexData) * 6;
 	//1頂点当たりのサイズ
 	vertexBufferViewSprite.StrideInBytes = sizeof(Sprite::VertexData);
-	
+
 
 	indexResourceSprite = dxCommon->CreateBufferResource(dxCommon->GetDevice().Get(), sizeof(uint32_t) * 6);
 	//頂点バッファービューを生成する
@@ -28,13 +28,13 @@ void Sprite::Initialize(SpriteCom* spriteCom)
 
 
 	//インデックスリソースにデータを書き込む
-	
+
 	IndexDataCreate();
 
 	VertexDataInitialize();
 
 	materialResourceSprite = dxCommon->CreateBufferResource(dxCommon->GetDevice().Get(), sizeof(Sprite::Material));
-	
+
 	materialResourceSprite->Map(0, nullptr, reinterpret_cast<void**>(&materialDataSprite));
 	materialDataSprite->color = { 1.0f, 1.0f, 1.0f, 1.0f }; // 白（テクスチャ色をそのまま出す用）
 	materialDataSprite->enableLighting = false;
@@ -51,7 +51,7 @@ void Sprite::Initialize(SpriteCom* spriteCom)
 	transformationMatrixDataSprite->World = MakeIdentity4x4();
 	transformationMatrixResourceSprite->Unmap(0, nullptr);
 
-	transformSprite = { 
+	transformSprite = {
 		{1.0f,1.0f,1.0f},
 		{0.0f,0.0f,0.0f},
 		{0.0f,0.0f,0.0f}

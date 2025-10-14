@@ -9,7 +9,7 @@ class SpriteCom
 {
 public:
 
-	SpriteCom(std::ostream& logStream, DirectXCom* dxCommon); 
+	SpriteCom(std::ostream& logStream, DirectXCom* dxCommon);
 	~SpriteCom();
 
 	void Initialize();
@@ -27,7 +27,7 @@ public:
 	void RasterizerState();
 	void ShaderCompile();
 	void InitializeGraphicPipeline();
-	
+
 	void SignatureBlob();
 	void RootSignatureFromBlob();
 
@@ -68,11 +68,13 @@ public:
 	}
 	const D3D12_BLEND_DESC& GetBlendDesc() const { return blendDesc; }
 	const D3D12_RASTERIZER_DESC& GetRasterizerDesc() const { return rasterizerDesc; }
-	const Microsoft::WRL::ComPtr<IDxcBlob>& GetVertexShaderBlob() const {
-		return vertexShaderBlob; 
+	const Microsoft::WRL::ComPtr<IDxcBlob>& GetVertexShaderBlob() const
+	{
+		return vertexShaderBlob;
 	}
-	const Microsoft::WRL::ComPtr<IDxcBlob>& GetPixelShaderBlob() const {
-		return pixelShaderBlob; 
+	const Microsoft::WRL::ComPtr<IDxcBlob>& GetPixelShaderBlob() const
+	{
+		return pixelShaderBlob;
 	}
 	const D3D12_GRAPHICS_PIPELINE_STATE_DESC& GetGraphicPipelineStateDesc() const { return graphicPipelineStateDesc; }
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC& GetGraphicPipelineStateDesc() { return graphicPipelineStateDesc; }
@@ -98,7 +100,7 @@ private:
 
 	bool drawSphere = true;
 	bool drawSprite = false;
-	
+
 
 	std::ostream& logStream;
 };
