@@ -1,0 +1,89 @@
+Using adapter: NVIDIA GeForce RTX 4060 Laptop GPU
+
+Feature Level: 12.2
+
+Complete create D3D12Device!
+Begin CompileShader, pathObject3D.VS.hlsl,profile:vs_6_0
+
+Complete CompileShader, pathObject3D.VS.hlsl,profile:vs_6_0
+
+Begin CompileShader, pathObject3D.PS.hlsl,profile:ps_6_0
+
+Qembed_debug:11:5: error: unknown type name 'PixelShaderOutput'; did you mean 'VertexShaderOutput'?
+    PixelShaderOutput main(VertexShaderOutput input)
+    ^~~~~~~~~~~~~~~~~
+    VertexShaderOutput
+./Object3d.hlsli:1:8: note: 'VertexShaderOutput' declared here
+struct VertexShaderOutput
+       ^
+Qembed_debug:13:9: error: unknown type name 'PixelShaderOutput'; did you mean 'VertexShaderOutput'?
+        PixelShaderOutput output;
+        ^~~~~~~~~~~~~~~~~
+        VertexShaderOutput
+./Object3d.hlsli:1:8: note: 'VertexShaderOutput' declared here
+struct VertexShaderOutput
+       ^
+Qembed_debug:14:72: error: use of undeclared identifier 'gMaterial'
+        float3 transformedUV = mul(float4(input.texcoord, 0.0f, 1.0f), gMaterial.uvTransform);
+                                                                       ^
+Qembed_debug:15:71: error: use of undeclared identifier 'gSample'
+        float4 textureColor = gTexture[gMaterial.textureIndex].Sample(gSample, transformedUV.xy);
+                                                                      ^
+Qembed_debug:15:31: error: use of undeclared identifier 'gTexture'
+        float4 textureColor = gTexture[gMaterial.textureIndex].Sample(gSample, transformedUV.xy);
+                              ^
+Qembed_debug:15:40: error: use of undeclared identifier 'gMaterial'
+        float4 textureColor = gTexture[gMaterial.textureIndex].Sample(gSample, transformedUV.xy);
+                                       ^
+Qembed_debug:16:16: error: no member named 'color' in 'VertexShaderOutput'
+        output.color = gMaterial.color * textureColor;
+        ~~~~~~ ^
+Qembed_debug:16:24: error: use of undeclared identifier 'gMaterial'
+        output.color = gMaterial.color * textureColor;
+                       ^
+Qembed_debug:20:38: error: use of undeclared identifier 'gDirectionalLight'
+        float3 lightDir = normalize(-gDirectionalLight.direction);
+                                     ^
+Qembed_debug:24:13: error: use of undeclared identifier 'gMaterial'
+        if (gMaterial.useHalfLambert == 1)
+            ^
+Qembed_debug:29:13: error: use of undeclared identifier 'gMaterial'
+        if (gMaterial.enableLighting != 0)
+            ^
+Qembed_debug:31:20: error: no member named 'color' in 'VertexShaderOutput'
+            output.color = gMaterial.color * textureColor * gDirectionalLight.color * lambert * gDirectionalLight.intensity;
+            ~~~~~~ ^
+Qembed_debug:31:28: error: use of undeclared identifier 'gMaterial'
+            output.color = gMaterial.color * textureColor * gDirectionalLight.color * lambert * gDirectionalLight.intensity;
+                           ^
+Qembed_debug:31:61: error: use of undeclared identifier 'gDirectionalLight'
+            output.color = gMaterial.color * textureColor * gDirectionalLight.color * lambert * gDirectionalLight.intensity;
+                                                            ^
+Qembed_debug:31:97: error: use of undeclared identifier 'gDirectionalLight'
+            output.color = gMaterial.color * textureColor * gDirectionalLight.color * lambert * gDirectionalLight.intensity;
+                                                                                                ^
+Qembed_debug:35:20: error: no member named 'color' in 'VertexShaderOutput'
+            output.color = gMaterial.color * textureColor;
+            ~~~~~~ ^
+Qembed_debug:35:28: error: use of undeclared identifier 'gMaterial'
+            output.color = gMaterial.color * textureColor;
+                           ^
+Qembed_debug:66:12: warning: implicit truncation of vector type [-Wconversion]
+    float3 transformedUV = mul(float32_t4(input.texcoord,0.0f, 1.0f), gMaterial.uvTransform);
+           ^
+Qembed_debug:72:34: error: use of undeclared identifier 'normal'
+    float lambert = saturate(dot(normal, lightDir));
+                                 ^
+Qembed_debug:72:42: error: use of undeclared identifier 'lightDir'
+    float lambert = saturate(dot(normal, lightDir));
+                                         ^
+Qembed_debug:73:9: error: use of undeclared identifier 'material'; did you mean 'gMaterial'?
+    if (material.useHalfLambert == 1)
+        ^~~~~~~~
+        gMaterial
+Qembed_debug:43:26: note: 'gMaterial' declared here
+ConstantBuffer<Material> gMaterial : register(b0);
+                         ^
+
+Complete CompileShader, pathObject3D.PS.hlsl,profile:ps_6_0
+

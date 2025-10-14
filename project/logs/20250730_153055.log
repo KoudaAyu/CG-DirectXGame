@@ -1,0 +1,7 @@
+Using adapter: NVIDIA GeForce RTX 4060 Laptop GPU
+
+Feature Level: 12.2
+
+Complete create D3D12Device!
+Shader register range of type SRV (root parameter [4], visibility ALL, descriptor table slot [0]) overlaps with another shader register range (root parameter[2], visibility ALL, descriptor table slot [0]).
+

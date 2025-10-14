@@ -1,0 +1,31 @@
+Using adapter: NVIDIA GeForce RTX 4060 Laptop GPU
+
+Feature Level: 12.2
+
+Complete create D3D12Device!
+Begin CompileShader, pathObject3D.VS.hlsl,profile:vs_6_0
+
+Qembed_debug:29:16: error: unknown type name 'DirectionaLight'; did you mean 'DirectionalLight'?
+ConstantBuffer<DirectionaLight> gDirectionalLight : register(b1);
+               ^~~~~~~~~~~~~~~
+               DirectionalLight
+Qembed_debug:23:8: note: 'DirectionalLight' declared here
+struct DirectionalLight
+       ^
+
+Complete CompileShader, pathObject3D.VS.hlsl,profile:vs_6_0
+
+Begin CompileShader, pathObject3D.PS.hlsl,profile:ps_6_0
+
+Qembed_debug:40:60: error: use of undeclared identifier 'gDirectionalLight'
+        float cos = saturate(dot(normalize(input.normal), -gDirectionalLight.direction));
+                                                           ^
+Qembed_debug:41:57: error: use of undeclared identifier 'gDirectionalLight'
+        output.color = gMaterial.color * textureColor * gDirectionalLight.color * cos * gDirectionalLight.intensity;
+                                                        ^
+Qembed_debug:41:89: error: use of undeclared identifier 'gDirectionalLight'
+        output.color = gMaterial.color * textureColor * gDirectionalLight.color * cos * gDirectionalLight.intensity;
+                                                                                        ^
+
+Complete CompileShader, pathObject3D.PS.hlsl,profile:ps_6_0
+

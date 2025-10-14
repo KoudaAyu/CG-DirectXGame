@@ -1,0 +1,31 @@
+Using adapter: NVIDIA GeForce RTX 4060 Laptop GPU
+
+Feature Level: 12.2
+
+Complete create D3D12Device!
+Begin CompileShader, pathObject3D.VS.hlsl,profile:vs_6_0
+
+Qembed_debug:11:1: error: unknown type name 'VertecShaderOutput'; did you mean 'VertecShaderOutPut'?
+VertecShaderOutput main(VertecShederInput input)
+^~~~~~~~~~~~~~~~~~
+VertecShaderOutPut
+Qembed_debug:1:8: note: 'VertecShaderOutPut' declared here
+struct VertecShaderOutPut
+       ^
+Qembed_debug:13:5: error: unknown type name 'VertecShaderOutput'; did you mean 'VertecShaderOutPut'?
+    VertecShaderOutput output;
+    ^~~~~~~~~~~~~~~~~~
+    VertecShaderOutPut
+Qembed_debug:1:8: note: 'VertecShaderOutPut' declared here
+struct VertecShaderOutPut
+       ^
+
+Complete CompileShader, pathObject3D.VS.hlsl,profile:vs_6_0
+
+Begin CompileShader, pathObject3D.PS.hlsl,profile:ps_6_0
+
+warning: DXIL signing library (dxil.dll,libdxil.so) not found.  Resulting DXIL will not be signed for use in release environments.
+
+
+Complete CompileShader, pathObject3D.PS.hlsl,profile:ps_6_0
+

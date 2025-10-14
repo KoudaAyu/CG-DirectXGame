@@ -1,0 +1,1 @@
+C:\Users\k024g\OneDrive\デスクトップ\授業関係二年次\GE3\DirectXGame\project\externals\DirectXTex\Bin\Desktop_2022_Win10\x64\Debug\DirectXTex.lib

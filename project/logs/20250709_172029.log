@@ -1,0 +1,21 @@
+Using adapter: NVIDIA GeForce RTX 4060 Laptop GPU
+
+Feature Level: 12.2
+
+Complete create D3D12Device!
+Begin CompileShader, pathObject3D.VS.hlsl,profile:vs_6_0
+
+Qembed_debug:28:16: error: unknown type name 'DirectionaLight'; did you mean 'DirectionalLight'?
+ConstantBuffer<DirectionaLight> gDirectionalLight : register(b1);
+               ^~~~~~~~~~~~~~~
+               DirectionalLight
+Qembed_debug:22:8: note: 'DirectionalLight' declared here
+struct DirectionalLight
+       ^
+
+Complete CompileShader, pathObject3D.VS.hlsl,profile:vs_6_0
+
+Begin CompileShader, pathObject3D.PS.hlsl,profile:ps_6_0
+
+Complete CompileShader, pathObject3D.PS.hlsl,profile:ps_6_0
+
