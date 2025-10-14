@@ -10,6 +10,7 @@
 #include"Sound.h"
 #include"Sprite.h"
 #include"SpriteCom.h"
+#include"TextureManager.h"
 #include"Vector.h"
 #include"WindowsAPI.h"
 
@@ -357,16 +358,13 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	spriteCom = new SpriteCom(logStream,dxCommon);
 	spriteCom->Initialize();
 
-	
-	
-
 	spriteCom->CrateGraphicPipeline();
 
 
 	/*D3D12_ROOT_SIGNATURE_DESC desc = {};*/
 
 	
-
+	TextureManager::GetInstance()->Initialize();
 
 	//DepthStencilStateの設定
 	D3D12_DEPTH_STENCIL_DESC depthStencilDesc{};
@@ -854,6 +852,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	{
 		delete sprite;
 	}
+
+	TextureManager::GetInstance()->Finalize();
 
 	windowAPI->Finalize();
 

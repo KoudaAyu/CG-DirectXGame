@@ -206,6 +206,11 @@ public:
 
 	MSG& GetMsg() { return msg; }
 
+	static const uint32_t GetKMaXSRVCount()
+	{
+		return kMacSRVCount;
+	}
+
 
 private:
 	HRESULT hr;
@@ -249,4 +254,6 @@ private:
 
 	WindowAPI* windowAPI = nullptr;
 
+	//最大SRV数(Texture枚数)
+	static const uint32_t kMacSRVCount = 512;
 };
