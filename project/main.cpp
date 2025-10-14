@@ -769,6 +769,21 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 			ImGui::End();
 
+			ImGui::Begin("Windows");
+
+			// ...既存のImGuiコード...
+
+			// Sprite座標表示
+			for (size_t i = 0; i < sprites.size(); ++i)
+			{
+				const Vector2& pos = sprites[i]->GetPosition();
+				std::string label = std::format("Sprite[{}] Position: ({:.2f}, {:.2f})", i, pos.x, pos.y);
+				ImGui::Text("%s", label.c_str());
+			}
+
+			ImGui::End();
+
+
 #endif // DEBUG
 
 			//ImGui内部コマンドを生成する
