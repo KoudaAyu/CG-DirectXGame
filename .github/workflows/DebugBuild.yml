@@ -25,4 +25,4 @@ jobs:
 
     - name: Build
       run:
-       msbuild ${{env.SOLUTION_FILE_PATH}} /p:Platform=X64;Configuration=${{env.CONFIGURATION}}
+        msbuild ${{env.SOLUTION_FILE_PATH}} /p:Platfrom=x64,Configuration=${{env.CONFIGURATION}}
