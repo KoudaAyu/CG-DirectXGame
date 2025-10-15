@@ -6,6 +6,8 @@
 #include"KeyInput.h"
 #include"Log.h"
 #include"Matrix4x4.h"
+#include"Sprite.h"
+#include"SpriteCom.h"
 #include"ResourceLeakCheak.h"
 #include"Sound.h"
 #include"Vector.h"
@@ -374,6 +376,14 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	windowAPI->Show();
 
 	dxCommon->Initialize();
+
+	SpriteCom* spriteCom = nullptr;
+	spriteCom = new SpriteCom();
+	spriteCom->Initialize();
+
+	Sprite* sprite = nullptr;
+	sprite = new Sprite();
+	sprite->Initialize();
 
 
 	//RootSignatureの作成
@@ -887,7 +897,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	bool useMonsterBall = true;
 	//Sphereの描画切り替え
 	bool drawSphere = true;
-	bool drawSprite = false;
+	bool drawSprite = true;
 
 	
 	//音声読み込み
@@ -1069,6 +1079,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	delete[] indexData;
 
 	windowAPI->Finalize();
+
+	delete sprite;
+	delete spriteCom;
 
 	delete dxCommon;
 
