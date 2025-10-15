@@ -225,3 +225,8 @@ void SpriteCom::InitializeGraphicPipeline()
 	graphicPipelineStateDesc.SampleMask = D3D12_DEFAULT_SAMPLE_MASK; //サンプルマスクはデフォルト
 
 }
+
+void SpriteCom::SetupDraw()
+{
+	CreateGraphicsPipeline();
+}

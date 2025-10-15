@@ -13,6 +13,7 @@ public:
 	~SpriteCom();
 
 	void Initialize();
+
 	void RootSignature();
 	void CreateGraphicsPipeline();
 	void Descriptor();
@@ -25,6 +26,9 @@ public:
 	void RasterizerState();
 	void ShaderCompile();
 	void InitializeGraphicPipeline();
+	
+	void SetupDraw();
+
 
 public:
 	const D3D12_ROOT_SIGNATURE_DESC& GetDescriptionRootSignature() const

@@ -1,5 +1,12 @@
 #include"Sprite.h"
+#include"SpriteCom.h"
 
-void Sprite::Initialize()
+#include<cassert>
+
+void Sprite::Initialize(SpriteCom* spriteCom)
 {
+	this->spriteCom = spriteCom;
+	assert(spriteCom);
+
+
 }
