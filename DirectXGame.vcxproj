@@ -15,8 +15,8 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="DebugCamera.cpp" />
-    <ClCompile Include="DirectXCom.cpp" />
+    <ClCompile Include="project\Engine\Base\DebugCamera.cpp" />
+    <ClCompile Include="project\Engine\Base\DirectXCom.cpp" />
     <ClCompile Include="externals\imgui\imgui.cpp" />
     <ClCompile Include="externals\imgui\imgui_demo.cpp" />
     <ClCompile Include="externals\imgui\imgui_draw.cpp" />
@@ -24,19 +24,19 @@
     <ClCompile Include="externals\imgui\imgui_impl_win32.cpp" />
     <ClCompile Include="externals\imgui\imgui_tables.cpp" />
     <ClCompile Include="externals\imgui\imgui_widgets.cpp" />
-    <ClCompile Include="KeyInput.cpp" />
-    <ClCompile Include="Log.cpp" />
+    <ClCompile Include="project\Engine\Base\KeyInput.cpp" />
+    <ClCompile Include="project\Engine\Base\Log.cpp" />
     <ClCompile Include="main.cpp">
       <Optimization Condition="'$(Configuration)|$(Platform)'=='Development|x64'">MaxSpeed</Optimization>
     </ClCompile>
-    <ClCompile Include="Matrix4x4.cpp" />
-    <ClCompile Include="ResourceLeakCheak.cpp" />
-    <ClCompile Include="Sound.cpp" />
-    <ClCompile Include="StringUtil.cpp" />
-    <ClCompile Include="WindowsAPI.cpp" />
+    <ClCompile Include="project\Engine\Base\Matrix4x4.cpp" />
+    <ClCompile Include="project\Engine\Base\ResourceLeakCheak.cpp" />
+    <ClCompile Include="project\Engine\Audio\Sound.cpp" />
+    <ClCompile Include="project\Engine\Base\StringUtil.cpp" />
+    <ClCompile Include="project\Engine\Base\WindowsAPI.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <FxCompile Include="Object3d.PS.hlsl">
+    <FxCompile Include="Resources\shaders\Object3d.PS.hlsl">
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Pixel</ShaderType>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Pixel</ShaderType>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Development|x64'">Pixel</ShaderType>
@@ -44,7 +44,7 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</ExcludedFromBuild>
     </FxCompile>
-    <FxCompile Include="Object3d.VS.hlsl">
+    <FxCompile Include="Resources\shaders\Object3d.VS.hlsl">
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Vertex</ShaderType>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Vertex</ShaderType>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Development|x64'">Vertex</ShaderType>
@@ -54,8 +54,8 @@
     </FxCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="DebugCamera.h" />
-    <ClInclude Include="DirectXCom.h" />
+    <ClInclude Include="project\Engine\Base\DebugCamera.h" />
+    <ClInclude Include="project\Engine\Base\DirectXCom.h" />
     <ClInclude Include="externals\imgui\imconfig.h" />
     <ClInclude Include="externals\imgui\imgui.h" />
     <ClInclude Include="externals\imgui\imgui_impl_dx12.h" />
@@ -64,14 +64,14 @@
     <ClInclude Include="externals\imgui\imstb_rectpack.h" />
     <ClInclude Include="externals\imgui\imstb_textedit.h" />
     <ClInclude Include="externals\imgui\imstb_truetype.h" />
-    <ClInclude Include="KeyInput.h" />
-    <ClInclude Include="Log.h" />
-    <ClInclude Include="Matrix4x4.h" />
-    <ClInclude Include="ResourceLeakCheak.h" />
-    <ClInclude Include="Sound.h" />
-    <ClInclude Include="StringUtil.h" />
-    <ClInclude Include="Vector.h" />
-    <ClInclude Include="WindowsAPI.h" />
+    <ClInclude Include="project\Engine\Base\KeyInput.h" />
+    <ClInclude Include="project\Engine\Base\Log.h" />
+    <ClInclude Include="project\Engine\Base\Matrix4x4.h" />
+    <ClInclude Include="project\Engine\Base\ResourceLeakCheak.h" />
+    <ClInclude Include="project\Engine\Audio\Sound.h" />
+    <ClInclude Include="project\Engine\Base\StringUtil.h" />
+    <ClInclude Include="project\Engine\Base\Vector.h" />
+    <ClInclude Include="project\Engine\Base\WindowsAPI.h" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="externals\imgui\LICENSE.txt" />
@@ -82,7 +82,7 @@
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
-    <None Include="Object3d.hlsli" />
+    <None Include="Resources\shaders\Object3d.hlsli" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>
@@ -138,6 +138,7 @@
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <TreatWarningAsError>true</TreatWarningAsError>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)project\Engine\Base;$(ProjectDir)project\Engine\2D;$(ProjectDir)project\Engine\3D;$(ProjectDir)project\Engine\Audio;$(ProjectDir)project\Engine\IO;$(ProjectDir)project\Engine\Scene;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -164,6 +165,7 @@ copy /Y "C:\Program Files (x86)\Windows Kits\10\bin\10.0.26100.0\x64\dxil.dll"  
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <Optimization>MinSpace</Optimization>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)project\Engine\Base;$(ProjectDir)project\Engine\2D;$(ProjectDir)project\Engine\3D;$(ProjectDir)project\Engine\Audio;$(ProjectDir)project\Engine\IO;$(ProjectDir)project\Engine\Scene;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -185,6 +187,7 @@ copy /Y "C:\Program Files (x86)\Windows Kits\10\bin\10.0.26100.0\x64\dxil.dll"  
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <Optimization>Disabled</Optimization>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)project\Engine\Base;$(ProjectDir)project\Engine\2D;$(ProjectDir)project\Engine\3D;$(ProjectDir)project\Engine\Audio;$(ProjectDir)project\Engine\IO;$(ProjectDir)project\Engine\Scene;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
