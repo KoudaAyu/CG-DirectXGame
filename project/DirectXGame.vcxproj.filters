@@ -18,9 +18,6 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="main.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
     <ClCompile Include="externals\imgui\imgui.cpp">
       <Filter>imgui</Filter>
     </ClCompile>
@@ -42,32 +39,35 @@
     <ClCompile Include="externals\imgui\imgui_widgets.cpp">
       <Filter>imgui</Filter>
     </ClCompile>
-    <ClCompile Include="project\Engine\Base\Matrix4x4.cpp">
-      <Filter>ソース ファイル</Filter>
+    <ClCompile Include="Engine\Base\DebugCamera.cpp">
+      <Filter>ヘッダー ファイル</Filter>
     </ClCompile>
-    <ClCompile Include="project\Engine\Base\DebugCamera.cpp">
-      <Filter>ソース ファイル</Filter>
+    <ClCompile Include="Engine\Base\DirectXCom.cpp">
+      <Filter>ヘッダー ファイル</Filter>
     </ClCompile>
-    <ClCompile Include="project\Engine\Base\KeyInput.cpp">
-      <Filter>ソース ファイル</Filter>
+    <ClCompile Include="Engine\Base\KeyInput.cpp">
+      <Filter>ヘッダー ファイル</Filter>
     </ClCompile>
-    <ClCompile Include="project\Engine\Base\WindowsAPI.cpp">
-      <Filter>ソース ファイル</Filter>
+    <ClCompile Include="Engine\Base\Log.cpp">
+      <Filter>ヘッダー ファイル</Filter>
     </ClCompile>
-    <ClCompile Include="project\Engine\Audio\Sound.cpp">
-      <Filter>ソース ファイル</Filter>
+    <ClCompile Include="Engine\Base\Matrix4x4.cpp">
+      <Filter>ヘッダー ファイル</Filter>
     </ClCompile>
-    <ClCompile Include="project\Engine\Base\DirectXCom.cpp">
-      <Filter>ソース ファイル</Filter>
+    <ClCompile Include="Engine\Base\ResourceLeakCheak.cpp">
+      <Filter>ヘッダー ファイル</Filter>
     </ClCompile>
-    <ClCompile Include="project\Engine\Base\Log.cpp">
-      <Filter>ソース ファイル</Filter>
+    <ClCompile Include="Engine\Base\StringUtil.cpp">
+      <Filter>ヘッダー ファイル</Filter>
     </ClCompile>
-    <ClCompile Include="project\Engine\Base\StringUtil.cpp">
-      <Filter>ソース ファイル</Filter>
+    <ClCompile Include="Engine\Base\WindowsAPI.cpp">
+      <Filter>ヘッダー ファイル</Filter>
     </ClCompile>
-    <ClCompile Include="project\Engine\Base\ResourceLeakCheak.cpp">
-      <Filter>ソース ファイル</Filter>
+    <ClCompile Include="Engine\Audio\Sound.cpp">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="main.cpp">
+      <Filter>ヘッダー ファイル</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -99,34 +99,34 @@
     <ClInclude Include="externals\imgui\imstb_truetype.h">
       <Filter>imgui</Filter>
     </ClInclude>
-    <ClInclude Include="project\Engine\Base\Matrix4x4.h">
+    <ClInclude Include="Engine\Base\DebugCamera.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
-    <ClInclude Include="project\Engine\Base\Vector.h">
+    <ClInclude Include="Engine\Base\DirectXCom.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
-    <ClInclude Include="project\Engine\Base\DebugCamera.h">
+    <ClInclude Include="Engine\Base\KeyInput.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
-    <ClInclude Include="project\Engine\Base\KeyInput.h">
+    <ClInclude Include="Engine\Base\Log.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
-    <ClInclude Include="project\Engine\Base\WindowsAPI.h">
+    <ClInclude Include="Engine\Base\Matrix4x4.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
-    <ClInclude Include="project\Engine\Audio\Sound.h">
+    <ClInclude Include="Engine\Base\ResourceLeakCheak.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
-    <ClInclude Include="project\Engine\Base\DirectXCom.h">
+    <ClInclude Include="Engine\Base\StringUtil.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
-    <ClInclude Include="project\Engine\Base\Log.h">
+    <ClInclude Include="Engine\Base\Vector.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
-    <ClInclude Include="project\Engine\Base\StringUtil.h">
+    <ClInclude Include="Engine\Base\WindowsAPI.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
-    <ClInclude Include="project\Engine\Base\ResourceLeakCheak.h">
+    <ClInclude Include="Engine\Audio\Sound.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
   </ItemGroup>
