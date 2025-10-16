@@ -65,13 +65,7 @@ struct Transform
 
 
 
-struct Material
-{
-	Vector4 color;
-	int32_t enableLighting;
-	float padding[3]; // パディングを追加して16バイト境界に揃える
-	Matrix4x4 uvTransform; // UV変換行列
-};
+
 
 struct DirectionalLight
 {
@@ -374,11 +368,12 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 	Sprite* sprite = nullptr;
 	sprite = new Sprite();
-	sprite->Initialize(spriteCom);
+	
 
 
 	spriteCom->CreateGraphicsPipeline();
 
+	
 
 	//DepthStencilStateの設定
 	D3D12_DEPTH_STENCIL_DESC depthStencilDesc{};
@@ -524,60 +519,18 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	std::memcpy(vertexDataModel, modelData.vertices.data(), sizeof(Sprite::VertexData) * modelData.vertices.size());//頂点データをリソースにコピー
 
 	//Sprite用の頂点Resource
-	Microsoft::WRL::ComPtr<ID3D12Resource> vertexResourceSprite = dxCommon->CreateBufferResource(dxCommon->GetDevice().Get(), sizeof(Sprite::VertexData) * 6);
-	//頂点バッファビューを生成する
-	D3D12_VERTEX_BUFFER_VIEW vertexBufferViewSprite{};
-	//リソースの先頭のアドレスから使う
-	vertexBufferViewSprite.BufferLocation = vertexResourceSprite->GetGPUVirtualAddress();
-	//使用するリソースのサイズは頂点6つ分のサイズ
-	vertexBufferViewSprite.SizeInBytes = sizeof(Sprite::VertexData) * 6;
-	//1頂点当たりのサイズ
-	vertexBufferViewSprite.StrideInBytes = sizeof(Sprite::VertexData);
+	sprite->Initialize(spriteCom);
 
 
-	Microsoft::WRL::ComPtr<ID3D12Resource> indexResourceSprite = dxCommon->CreateBufferResource(dxCommon->GetDevice().Get(), sizeof(uint32_t) * 6);
-	//頂点バッファービューを生成する
-	D3D12_INDEX_BUFFER_VIEW indexBufferViewSprite{};
-	//リソースの先頭アドレスから使う
-	indexBufferViewSprite.BufferLocation = indexResourceSprite->GetGPUVirtualAddress();
-	//使用するリソースのサイズは頂点6つ分のサイズ
-	indexBufferViewSprite.SizeInBytes = sizeof(uint32_t) * 6;
-	//インデックスはuint32_tとする
-	indexBufferViewSprite.Format = DXGI_FORMAT_R32_UINT;
-
-	//インデックスリソースにデータを書き込む
-	uint32_t* indexDataSprite = nullptr;
-	indexResourceSprite->Map(0, nullptr, reinterpret_cast<void**>(&indexDataSprite));
-	indexDataSprite[0] = 0; // 左下
-	indexDataSprite[1] = 1; // 左上
-	indexDataSprite[2] = 2; // 右下
-	indexDataSprite[3] = 2; // 右下
-	indexDataSprite[4] = 1; // 左上
-	indexDataSprite[5] = 3; // 右上
-
-	indexResourceSprite->Unmap(0, nullptr);
-
-	//Sprite用
-	Sprite::VertexData* vertexDataSprite = nullptr;
-	vertexResourceSprite->Map(0, nullptr, reinterpret_cast<void**>(&vertexDataSprite));
-	//一枚目の三角形
-	vertexDataSprite[0].position = { 0.0f,360.0f,0.0f,1.0f }; // 左下
-	vertexDataSprite[1].position = { 0.0f,0.0f,0.0f,1.0f };   // 左上
-	vertexDataSprite[2].position = { 640.0f,360.0f,0.0f,1.0f }; // 右下
-	vertexDataSprite[3].position = { 640.0f,0.0f,0.0f,1.0f };   // 右上
-
-	vertexDataSprite[0].texcoord = { 0.0f,1.0f };
-	vertexDataSprite[1].texcoord = { 0.0f,0.0f };
-	vertexDataSprite[2].texcoord = { 1.0f,1.0f };
-	vertexDataSprite[3].texcoord = { 1.0f,0.0f };
+	
 
 
 
 
 	//マテリアル用のリソースを作る
-	Microsoft::WRL::ComPtr<ID3D12Resource> materialResource = dxCommon->CreateBufferResource(dxCommon->GetDevice().Get(), sizeof(Material));
+	Microsoft::WRL::ComPtr<ID3D12Resource> materialResource = dxCommon->CreateBufferResource(dxCommon->GetDevice().Get(), sizeof(Sprite::Material));
 	//マテリアルにデータを書き込む
-	Material* materialData = nullptr;
+	Sprite::Material* materialData = nullptr;
 	//書き込む為のアドレス取得
 	materialResource->Map(0, nullptr, reinterpret_cast<void**>(&materialData));
 	// データを設定（赤色 RGBA: 1,0,0,1）
@@ -606,12 +559,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	// 書き込み完了後はUnmapを呼ぶ
 	directionalLight->Unmap(0, nullptr);
 
-	Microsoft::WRL::ComPtr<ID3D12Resource> materialResourceSprite = dxCommon->CreateBufferResource(dxCommon->GetDevice().Get(), sizeof(Material));
-	Material* materialDataSprite = nullptr;
-	materialResourceSprite->Map(0, nullptr, reinterpret_cast<void**>(&materialDataSprite));
-	materialDataSprite->color = { 1.0f, 1.0f, 1.0f, 1.0f }; // 白（テクスチャ色をそのまま出す用）
-	materialDataSprite->enableLighting = false;
-	materialResourceSprite->Unmap(0, nullptr);
+	
 
 
 	//WVP用のリソースを作る。　Matrix4x4 1つのサイズを用意する
@@ -664,7 +612,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 	//uvTransform行列の初期化
 	materialData->uvTransform = MakeIdentity4x4();
-	materialDataSprite->uvTransform = MakeIdentity4x4();
+
 
 	float fovY = 0.45f;  // 資料通り
 	float aspectRatio = static_cast<float>(windowAPI->GetClientWidth()) / static_cast<float>(windowAPI->GetClientHeight());
@@ -788,7 +736,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 			Matrix4x4 uvTransformMatrix = MakeScaleMatrix(uvTransformSprite.scale);
 			uvTransformMatrix = Multiply(uvTransformMatrix, MakeRotateZMatrix(uvTransformSprite.rotate.z));
 			uvTransformMatrix = Multiply(uvTransformMatrix, MakeTranslateMatrix(uvTransformSprite.translate));
-			materialDataSprite->uvTransform = uvTransformMatrix;
+			sprite->SetUVTransform(uvTransformMatrix);
 
 			directionalLight->Map(0, nullptr, reinterpret_cast<void**>(&directionalLightData));
 
@@ -810,7 +758,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 			ImGui::Checkbox("useMonsterBall", &useMonsterBall);
 			ImGui::Checkbox("LightSprite Flag", (bool*)&materialData->enableLighting);
-			ImGui::Checkbox("LightSphere Flag", (bool*)&materialDataSprite->enableLighting);
+			ImGui::Checkbox("LightSphere Flag", (bool*)&sprite->GetMaterialDataSprite()->enableLighting);
 
 			ImGui::Checkbox("DrawSphere", &drawSphere);
 			ImGui::Checkbox("DrawSprite", &drawSprite);
@@ -857,10 +805,10 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 			if (drawSprite)
 			{
-				dxCommon->GetCommandList()->IASetVertexBuffers(0, 1, &vertexBufferViewSprite);
-				dxCommon->GetCommandList()->IASetIndexBuffer(&indexBufferViewSprite);
+				dxCommon->GetCommandList()->IASetVertexBuffers(0, 1, &sprite->GetVertexBufferViewSprite());
+				dxCommon->GetCommandList()->IASetIndexBuffer(&sprite->GetIndexBufferViewSprite());
 				dxCommon->GetCommandList()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-				dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(0, materialResourceSprite->GetGPUVirtualAddress());
+				dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(0, sprite->GetMaterialResourceSprite()->GetGPUVirtualAddress());
 				dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(1, transformationMatrixResourceSprite->GetGPUVirtualAddress());
 				dxCommon->GetCommandList()->SetGraphicsRootDescriptorTable(2, useMonsterBall ? textureSrvHandleGPU2 : textureSrvHandleGPU);
 				dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(3, directionalLight->GetGPUVirtualAddress());
