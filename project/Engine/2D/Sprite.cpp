@@ -40,6 +40,9 @@ void Sprite::Update(WindowAPI* windowAPI, DebugCamera* debugCamera_)
 	CreateVertexData();
 	CreateIndexData();
 	//Sprite用のworldViewProjectMatrix
+
+	transformSprite.translate = { position.x, position.y, 0.0f };
+
 	Matrix4x4 worldMatrixSprite = MakeAffineMatrix(transformSprite.scale, transformSprite.rotate, transformSprite.translate);
 	Matrix4x4 viewMatrixSprite = MakeIdentity4x4();
 	Matrix4x4 projectionMatrixSprite = MakeOrthographicMatrix(0.0f, 0.0f, float(windowAPI->GetClientWidth()), float(windowAPI->GetClientHeight()), 0.0f, 100.0f);

@@ -65,8 +65,14 @@ public:
 		}
 	}
 	const Microsoft::WRL::ComPtr<ID3D12Resource>& GetTransformationMatrixResourceSprite() const { return transformationMatrixResourceSprite; }
+
+	//スプライトの実用化のためのgetter setter
+	const Vector2& GetPosition() const { return position; }
+	void SetPosition(const Vector2& position)  { this->position = position; }
+
 private:
 	Transform transformSprite{ {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };
+	Vector2 position = { 0.0f,0.0f };
 
 private:
 	DirectXCom* dxCommon = nullptr;
