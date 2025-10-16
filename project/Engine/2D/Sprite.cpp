@@ -9,24 +9,10 @@ void Sprite::Initialize(SpriteCom* spriteCom)
 	assert(spriteCom);
 	this->dxCommon = spriteCom->GetDxCommon();
 	assert(dxCommon);
-	vertexResourceSprite = dxCommon->CreateBufferResource(dxCommon->GetDevice().Get(), sizeof(VertexData) * 6);
-	//頂点バッファビューを生成する
-	//リソースの先頭のアドレスから使う
-	vertexBufferViewSprite.BufferLocation = vertexResourceSprite->GetGPUVirtualAddress();
-	//使用するリソースのサイズは頂点6つ分のサイズ
-	vertexBufferViewSprite.SizeInBytes = sizeof(VertexData) * 6;
-	//1頂点当たりのサイズ
-	vertexBufferViewSprite.StrideInBytes = sizeof(VertexData);
+	
 
-
-	 indexResourceSprite = dxCommon->CreateBufferResource(dxCommon->GetDevice().Get(), sizeof(uint32_t) * 6);
-	//頂点バッファービューを生成する
-	//リソースの先頭アドレスから使う
-	indexBufferViewSprite.BufferLocation = indexResourceSprite->GetGPUVirtualAddress();
-	//使用するリソースのサイズは頂点6つ分のサイズ
-	indexBufferViewSprite.SizeInBytes = sizeof(uint32_t) * 6;
-	//インデックスはuint32_tとする
-	indexBufferViewSprite.Format = DXGI_FORMAT_R32_UINT;
+	CreateVertexBufferView();
+	CreateIndexBufferView();
 
 	CreateVertexData();
 	CreateIndexData();
@@ -60,6 +46,39 @@ void Sprite::Update(WindowAPI* windowAPI, DebugCamera* debugCamera_)
 	Matrix4x4 worldViewProjectionmatrixSprite = Multiply(worldMatrixSprite, Multiply(debugCamera_->GetViewMatrix(), projectionMatrixSprite));
 	transformationMatrixDataSprite->WVP = worldViewProjectionmatrixSprite; 
 	transformationMatrixDataSprite->World = worldMatrixSprite;
+}
+
+void Sprite::Draw()
+{
+	CreateVertexBufferView();
+	CreateIndexBufferView();
+	dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(0, materialResourceSprite->GetGPUVirtualAddress());
+	dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(1, transformationMatrixResourceSprite->GetGPUVirtualAddress());
+
+}
+
+void Sprite::CreateIndexBufferView()
+{
+	indexResourceSprite = dxCommon->CreateBufferResource(dxCommon->GetDevice().Get(), sizeof(uint32_t) * 6);
+	//頂点バッファービューを生成する
+	//リソースの先頭アドレスから使う
+	indexBufferViewSprite.BufferLocation = indexResourceSprite->GetGPUVirtualAddress();
+	//使用するリソースのサイズは頂点6つ分のサイズ
+	indexBufferViewSprite.SizeInBytes = sizeof(uint32_t) * 6;
+	//インデックスはuint32_tとする
+	indexBufferViewSprite.Format = DXGI_FORMAT_R32_UINT;
+}
+
+void Sprite::CreateVertexBufferView()
+{
+	vertexResourceSprite = dxCommon->CreateBufferResource(dxCommon->GetDevice().Get(), sizeof(VertexData) * 6);
+	//頂点バッファビューを生成する
+	//リソースの先頭のアドレスから使う
+	vertexBufferViewSprite.BufferLocation = vertexResourceSprite->GetGPUVirtualAddress();
+	//使用するリソースのサイズは頂点6つ分のサイズ
+	vertexBufferViewSprite.SizeInBytes = sizeof(VertexData) * 6;
+	//1頂点当たりのサイズ
+	vertexBufferViewSprite.StrideInBytes = sizeof(VertexData);
 }
 
 void Sprite::CreateVertexData()

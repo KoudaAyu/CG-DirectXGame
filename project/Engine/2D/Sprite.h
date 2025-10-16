@@ -34,9 +34,11 @@ public:
 	};
 
 	void Initialize(SpriteCom* spriteCom);
-	void Update(WindowAPI* windowAPI,DebugCamera* debugCamera_);
+	void Update(WindowAPI* windowAPI, DebugCamera* debugCamera_);
+	void Draw();
 
-
+	void CreateIndexBufferView();
+	void CreateVertexBufferView();
 	void CreateVertexData();
 	void CreateIndexData();
 

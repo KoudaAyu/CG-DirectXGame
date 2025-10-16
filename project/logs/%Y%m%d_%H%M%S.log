@@ -1863,6 +1863,342 @@ Qembed_debug:33:12: warning: implicit truncation of vector type [-Wconversion]
 
 Complete CompileShader, pathResources/shaders/Object3D.PS.hlsl,profile:ps_6_0
 
+Begin CompileShader, pathResources/shaders/Object3D.VS.hlsl,profile:vs_6_0
+
+Complete CompileShader, pathResources/shaders/Object3D.VS.hlsl,profile:vs_6_0
+
+Begin CompileShader, pathResources/shaders/Object3D.PS.hlsl,profile:ps_6_0
+
+Qembed_debug:33:12: warning: implicit truncation of vector type [-Wconversion]
+    float3 transformedUV = mul(float32_t4(input.texcoord, 0.0f, 1.0f), gMaterial.uvTransform);
+           ^
+
+Complete CompileShader, pathResources/shaders/Object3D.PS.hlsl,profile:ps_6_0
+
+Begin CompileShader, pathResources/shaders/Object3D.VS.hlsl,profile:vs_6_0
+
+Complete CompileShader, pathResources/shaders/Object3D.VS.hlsl,profile:vs_6_0
+
+Begin CompileShader, pathResources/shaders/Object3D.PS.hlsl,profile:ps_6_0
+
+Qembed_debug:33:12: warning: implicit truncation of vector type [-Wconversion]
+    float3 transformedUV = mul(float32_t4(input.texcoord, 0.0f, 1.0f), gMaterial.uvTransform);
+           ^
+
+Complete CompileShader, pathResources/shaders/Object3D.PS.hlsl,profile:ps_6_0
+
+Begin CompileShader, pathResources/shaders/Object3D.VS.hlsl,profile:vs_6_0
+
+Complete CompileShader, pathResources/shaders/Object3D.VS.hlsl,profile:vs_6_0
+
+Begin CompileShader, pathResources/shaders/Object3D.PS.hlsl,profile:ps_6_0
+
+Qembed_debug:33:12: warning: implicit truncation of vector type [-Wconversion]
+    float3 transformedUV = mul(float32_t4(input.texcoord, 0.0f, 1.0f), gMaterial.uvTransform);
+           ^
+
+Complete CompileShader, pathResources/shaders/Object3D.PS.hlsl,profile:ps_6_0
+
+Begin CompileShader, pathResources/shaders/Object3D.VS.hlsl,profile:vs_6_0
+
+Complete CompileShader, pathResources/shaders/Object3D.VS.hlsl,profile:vs_6_0
+
+Begin CompileShader, pathResources/shaders/Object3D.PS.hlsl,profile:ps_6_0
+
+Qembed_debug:33:12: warning: implicit truncation of vector type [-Wconversion]
+    float3 transformedUV = mul(float32_t4(input.texcoord, 0.0f, 1.0f), gMaterial.uvTransform);
+           ^
+
+Complete CompileShader, pathResources/shaders/Object3D.PS.hlsl,profile:ps_6_0
+
+Begin CompileShader, pathResources/shaders/Object3D.VS.hlsl,profile:vs_6_0
+
+Complete CompileShader, pathResources/shaders/Object3D.VS.hlsl,profile:vs_6_0
+
+Begin CompileShader, pathResources/shaders/Object3D.PS.hlsl,profile:ps_6_0
+
+Qembed_debug:33:12: warning: implicit truncation of vector type [-Wconversion]
+    float3 transformedUV = mul(float32_t4(input.texcoord, 0.0f, 1.0f), gMaterial.uvTransform);
+           ^
+
+Complete CompileShader, pathResources/shaders/Object3D.PS.hlsl,profile:ps_6_0
+
+Begin CompileShader, pathResources/shaders/Object3D.VS.hlsl,profile:vs_6_0
+
+Complete CompileShader, pathResources/shaders/Object3D.VS.hlsl,profile:vs_6_0
+
+Begin CompileShader, pathResources/shaders/Object3D.PS.hlsl,profile:ps_6_0
+
+Qembed_debug:33:12: warning: implicit truncation of vector type [-Wconversion]
+    float3 transformedUV = mul(float32_t4(input.texcoord, 0.0f, 1.0f), gMaterial.uvTransform);
+           ^
+
+Complete CompileShader, pathResources/shaders/Object3D.PS.hlsl,profile:ps_6_0
+
+Begin CompileShader, pathResources/shaders/Object3D.VS.hlsl,profile:vs_6_0
+
+Complete CompileShader, pathResources/shaders/Object3D.VS.hlsl,profile:vs_6_0
+
+Begin CompileShader, pathResources/shaders/Object3D.PS.hlsl,profile:ps_6_0
+
+Qembed_debug:33:12: warning: implicit truncation of vector type [-Wconversion]
+    float3 transformedUV = mul(float32_t4(input.texcoord, 0.0f, 1.0f), gMaterial.uvTransform);
+           ^
+
+Complete CompileShader, pathResources/shaders/Object3D.PS.hlsl,profile:ps_6_0
+
+Begin CompileShader, pathResources/shaders/Object3D.VS.hlsl,profile:vs_6_0
+
+Complete CompileShader, pathResources/shaders/Object3D.VS.hlsl,profile:vs_6_0
+
+Begin CompileShader, pathResources/shaders/Object3D.PS.hlsl,profile:ps_6_0
+
+Qembed_debug:33:12: warning: implicit truncation of vector type [-Wconversion]
+    float3 transformedUV = mul(float32_t4(input.texcoord, 0.0f, 1.0f), gMaterial.uvTransform);
+           ^
+
+Complete CompileShader, pathResources/shaders/Object3D.PS.hlsl,profile:ps_6_0
+
+Begin CompileShader, pathResources/shaders/Object3D.VS.hlsl,profile:vs_6_0
+
+Complete CompileShader, pathResources/shaders/Object3D.VS.hlsl,profile:vs_6_0
+
+Begin CompileShader, pathResources/shaders/Object3D.PS.hlsl,profile:ps_6_0
+
+Qembed_debug:33:12: warning: implicit truncation of vector type [-Wconversion]
+    float3 transformedUV = mul(float32_t4(input.texcoord, 0.0f, 1.0f), gMaterial.uvTransform);
+           ^
+
+Complete CompileShader, pathResources/shaders/Object3D.PS.hlsl,profile:ps_6_0
+
+Begin CompileShader, pathResources/shaders/Object3D.VS.hlsl,profile:vs_6_0
+
+Complete CompileShader, pathResources/shaders/Object3D.VS.hlsl,profile:vs_6_0
+
+Begin CompileShader, pathResources/shaders/Object3D.PS.hlsl,profile:ps_6_0
+
+Qembed_debug:33:12: warning: implicit truncation of vector type [-Wconversion]
+    float3 transformedUV = mul(float32_t4(input.texcoord, 0.0f, 1.0f), gMaterial.uvTransform);
+           ^
+
+Complete CompileShader, pathResources/shaders/Object3D.PS.hlsl,profile:ps_6_0
+
+Begin CompileShader, pathResources/shaders/Object3D.VS.hlsl,profile:vs_6_0
+
+Complete CompileShader, pathResources/shaders/Object3D.VS.hlsl,profile:vs_6_0
+
+Begin CompileShader, pathResources/shaders/Object3D.PS.hlsl,profile:ps_6_0
+
+Qembed_debug:33:12: warning: implicit truncation of vector type [-Wconversion]
+    float3 transformedUV = mul(float32_t4(input.texcoord, 0.0f, 1.0f), gMaterial.uvTransform);
+           ^
+
+Complete CompileShader, pathResources/shaders/Object3D.PS.hlsl,profile:ps_6_0
+
+Begin CompileShader, pathResources/shaders/Object3D.VS.hlsl,profile:vs_6_0
+
+Complete CompileShader, pathResources/shaders/Object3D.VS.hlsl,profile:vs_6_0
+
+Begin CompileShader, pathResources/shaders/Object3D.PS.hlsl,profile:ps_6_0
+
+Qembed_debug:33:12: warning: implicit truncation of vector type [-Wconversion]
+    float3 transformedUV = mul(float32_t4(input.texcoord, 0.0f, 1.0f), gMaterial.uvTransform);
+           ^
+
+Complete CompileShader, pathResources/shaders/Object3D.PS.hlsl,profile:ps_6_0
+
+Begin CompileShader, pathResources/shaders/Object3D.VS.hlsl,profile:vs_6_0
+
+Complete CompileShader, pathResources/shaders/Object3D.VS.hlsl,profile:vs_6_0
+
+Begin CompileShader, pathResources/shaders/Object3D.PS.hlsl,profile:ps_6_0
+
+Qembed_debug:33:12: warning: implicit truncation of vector type [-Wconversion]
+    float3 transformedUV = mul(float32_t4(input.texcoord, 0.0f, 1.0f), gMaterial.uvTransform);
+           ^
+
+Complete CompileShader, pathResources/shaders/Object3D.PS.hlsl,profile:ps_6_0
+
+Begin CompileShader, pathResources/shaders/Object3D.VS.hlsl,profile:vs_6_0
+
+Complete CompileShader, pathResources/shaders/Object3D.VS.hlsl,profile:vs_6_0
+
+Begin CompileShader, pathResources/shaders/Object3D.PS.hlsl,profile:ps_6_0
+
+Qembed_debug:33:12: warning: implicit truncation of vector type [-Wconversion]
+    float3 transformedUV = mul(float32_t4(input.texcoord, 0.0f, 1.0f), gMaterial.uvTransform);
+           ^
+
+Complete CompileShader, pathResources/shaders/Object3D.PS.hlsl,profile:ps_6_0
+
+Begin CompileShader, pathResources/shaders/Object3D.VS.hlsl,profile:vs_6_0
+
+Complete CompileShader, pathResources/shaders/Object3D.VS.hlsl,profile:vs_6_0
+
+Begin CompileShader, pathResources/shaders/Object3D.PS.hlsl,profile:ps_6_0
+
+Qembed_debug:33:12: warning: implicit truncation of vector type [-Wconversion]
+    float3 transformedUV = mul(float32_t4(input.texcoord, 0.0f, 1.0f), gMaterial.uvTransform);
+           ^
+
+Complete CompileShader, pathResources/shaders/Object3D.PS.hlsl,profile:ps_6_0
+
+Begin CompileShader, pathResources/shaders/Object3D.VS.hlsl,profile:vs_6_0
+
+Complete CompileShader, pathResources/shaders/Object3D.VS.hlsl,profile:vs_6_0
+
+Begin CompileShader, pathResources/shaders/Object3D.PS.hlsl,profile:ps_6_0
+
+Qembed_debug:33:12: warning: implicit truncation of vector type [-Wconversion]
+    float3 transformedUV = mul(float32_t4(input.texcoord, 0.0f, 1.0f), gMaterial.uvTransform);
+           ^
+
+Complete CompileShader, pathResources/shaders/Object3D.PS.hlsl,profile:ps_6_0
+
+Begin CompileShader, pathResources/shaders/Object3D.VS.hlsl,profile:vs_6_0
+
+Complete CompileShader, pathResources/shaders/Object3D.VS.hlsl,profile:vs_6_0
+
+Begin CompileShader, pathResources/shaders/Object3D.PS.hlsl,profile:ps_6_0
+
+Qembed_debug:33:12: warning: implicit truncation of vector type [-Wconversion]
+    float3 transformedUV = mul(float32_t4(input.texcoord, 0.0f, 1.0f), gMaterial.uvTransform);
+           ^
+
+Complete CompileShader, pathResources/shaders/Object3D.PS.hlsl,profile:ps_6_0
+
+Begin CompileShader, pathResources/shaders/Object3D.VS.hlsl,profile:vs_6_0
+
+Complete CompileShader, pathResources/shaders/Object3D.VS.hlsl,profile:vs_6_0
+
+Begin CompileShader, pathResources/shaders/Object3D.PS.hlsl,profile:ps_6_0
+
+Qembed_debug:33:12: warning: implicit truncation of vector type [-Wconversion]
+    float3 transformedUV = mul(float32_t4(input.texcoord, 0.0f, 1.0f), gMaterial.uvTransform);
+           ^
+
+Complete CompileShader, pathResources/shaders/Object3D.PS.hlsl,profile:ps_6_0
+
+Begin CompileShader, pathResources/shaders/Object3D.VS.hlsl,profile:vs_6_0
+
+Complete CompileShader, pathResources/shaders/Object3D.VS.hlsl,profile:vs_6_0
+
+Begin CompileShader, pathResources/shaders/Object3D.PS.hlsl,profile:ps_6_0
+
+Qembed_debug:33:12: warning: implicit truncation of vector type [-Wconversion]
+    float3 transformedUV = mul(float32_t4(input.texcoord, 0.0f, 1.0f), gMaterial.uvTransform);
+           ^
+
+Complete CompileShader, pathResources/shaders/Object3D.PS.hlsl,profile:ps_6_0
+
+Begin CompileShader, pathResources/shaders/Object3D.VS.hlsl,profile:vs_6_0
+
+Complete CompileShader, pathResources/shaders/Object3D.VS.hlsl,profile:vs_6_0
+
+Begin CompileShader, pathResources/shaders/Object3D.PS.hlsl,profile:ps_6_0
+
+Qembed_debug:33:12: warning: implicit truncation of vector type [-Wconversion]
+    float3 transformedUV = mul(float32_t4(input.texcoord, 0.0f, 1.0f), gMaterial.uvTransform);
+           ^
+
+Complete CompileShader, pathResources/shaders/Object3D.PS.hlsl,profile:ps_6_0
+
+Begin CompileShader, pathResources/shaders/Object3D.VS.hlsl,profile:vs_6_0
+
+Complete CompileShader, pathResources/shaders/Object3D.VS.hlsl,profile:vs_6_0
+
+Begin CompileShader, pathResources/shaders/Object3D.PS.hlsl,profile:ps_6_0
+
+Qembed_debug:33:12: warning: implicit truncation of vector type [-Wconversion]
+    float3 transformedUV = mul(float32_t4(input.texcoord, 0.0f, 1.0f), gMaterial.uvTransform);
+           ^
+
+Complete CompileShader, pathResources/shaders/Object3D.PS.hlsl,profile:ps_6_0
+
+Begin CompileShader, pathResources/shaders/Object3D.VS.hlsl,profile:vs_6_0
+
+Complete CompileShader, pathResources/shaders/Object3D.VS.hlsl,profile:vs_6_0
+
+Begin CompileShader, pathResources/shaders/Object3D.PS.hlsl,profile:ps_6_0
+
+Qembed_debug:33:12: warning: implicit truncation of vector type [-Wconversion]
+    float3 transformedUV = mul(float32_t4(input.texcoord, 0.0f, 1.0f), gMaterial.uvTransform);
+           ^
+
+Complete CompileShader, pathResources/shaders/Object3D.PS.hlsl,profile:ps_6_0
+
+Begin CompileShader, pathResources/shaders/Object3D.VS.hlsl,profile:vs_6_0
+
+Complete CompileShader, pathResources/shaders/Object3D.VS.hlsl,profile:vs_6_0
+
+Begin CompileShader, pathResources/shaders/Object3D.PS.hlsl,profile:ps_6_0
+
+Qembed_debug:33:12: warning: implicit truncation of vector type [-Wconversion]
+    float3 transformedUV = mul(float32_t4(input.texcoord, 0.0f, 1.0f), gMaterial.uvTransform);
+           ^
+
+Complete CompileShader, pathResources/shaders/Object3D.PS.hlsl,profile:ps_6_0
+
+Begin CompileShader, pathResources/shaders/Object3D.VS.hlsl,profile:vs_6_0
+
+Complete CompileShader, pathResources/shaders/Object3D.VS.hlsl,profile:vs_6_0
+
+Begin CompileShader, pathResources/shaders/Object3D.PS.hlsl,profile:ps_6_0
+
+Qembed_debug:33:12: warning: implicit truncation of vector type [-Wconversion]
+    float3 transformedUV = mul(float32_t4(input.texcoord, 0.0f, 1.0f), gMaterial.uvTransform);
+           ^
+
+Complete CompileShader, pathResources/shaders/Object3D.PS.hlsl,profile:ps_6_0
+
+Begin CompileShader, pathResources/shaders/Object3D.VS.hlsl,profile:vs_6_0
+
+Complete CompileShader, pathResources/shaders/Object3D.VS.hlsl,profile:vs_6_0
+
+Begin CompileShader, pathResources/shaders/Object3D.PS.hlsl,profile:ps_6_0
+
+Qembed_debug:33:12: warning: implicit truncation of vector type [-Wconversion]
+    float3 transformedUV = mul(float32_t4(input.texcoord, 0.0f, 1.0f), gMaterial.uvTransform);
+           ^
+
+Complete CompileShader, pathResources/shaders/Object3D.PS.hlsl,profile:ps_6_0
+
+Begin CompileShader, pathResources/shaders/Object3D.VS.hlsl,profile:vs_6_0
+
+Complete CompileShader, pathResources/shaders/Object3D.VS.hlsl,profile:vs_6_0
+
+Begin CompileShader, pathResources/shaders/Object3D.PS.hlsl,profile:ps_6_0
+
+Qembed_debug:33:12: warning: implicit truncation of vector type [-Wconversion]
+    float3 transformedUV = mul(float32_t4(input.texcoord, 0.0f, 1.0f), gMaterial.uvTransform);
+           ^
+
+Complete CompileShader, pathResources/shaders/Object3D.PS.hlsl,profile:ps_6_0
+
+Begin CompileShader, pathResources/shaders/Object3D.VS.hlsl,profile:vs_6_0
+
+Complete CompileShader, pathResources/shaders/Object3D.VS.hlsl,profile:vs_6_0
+
+Begin CompileShader, pathResources/shaders/Object3D.PS.hlsl,profile:ps_6_0
+
+Qembed_debug:33:12: warning: implicit truncation of vector type [-Wconversion]
+    float3 transformedUV = mul(float32_t4(input.texcoord, 0.0f, 1.0f), gMaterial.uvTransform);
+           ^
+
+Complete CompileShader, pathResources/shaders/Object3D.PS.hlsl,profile:ps_6_0
+
+Begin CompileShader, pathResources/shaders/Object3D.VS.hlsl,profile:vs_6_0
+
+Complete CompileShader, pathResources/shaders/Object3D.VS.hlsl,profile:vs_6_0
+
+Begin CompileShader, pathResources/shaders/Object3D.PS.hlsl,profile:ps_6_0
+
+Qembed_debug:33:12: warning: implicit truncation of vector type [-Wconversion]
+    float3 transformedUV = mul(float32_t4(input.texcoord, 0.0f, 1.0f), gMaterial.uvTransform);
+           ^
+
+Complete CompileShader, pathResources/shaders/Object3D.PS.hlsl,profile:ps_6_0
+
 Application terminating.
 WSTRINGHello, DirectX!
 
