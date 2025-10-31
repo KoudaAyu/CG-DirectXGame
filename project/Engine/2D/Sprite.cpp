@@ -15,13 +15,14 @@ void Sprite::Initialize(SpriteCom* spriteCom)
 	CreateIndexBufferView();
 
 	CreateVertexData();
+	ReflectionProcessing();
 	CreateIndexData();
 
 	materialResourceSprite = dxCommon->CreateBufferResource(dxCommon->GetDevice().Get(), sizeof(Material));
-	materialResourceSprite->Map(0, nullptr, reinterpret_cast<void**>(&materialDataSprite));
-	materialDataSprite->color = { 1.0f, 1.0f, 1.0f, 1.0f }; // 白（テクスチャ色をそのまま出す用）
-	materialDataSprite->enableLighting = false;
-	materialDataSprite->uvTransform = MakeIdentity4x4();
+	materialResourceSprite->Map(0, nullptr, reinterpret_cast<void**>(&materialData));
+	materialData->color = { 1.0f, 1.0f, 1.0f, 1.0f }; // 白（テクスチャ色をそのまま出す用）
+	materialData->enableLighting = false;
+	materialData->uvTransform = MakeIdentity4x4();
 	materialResourceSprite->Unmap(0, nullptr);
 
 	//Sprite用のTransformationMatrix用のリソースを作る
@@ -37,13 +38,13 @@ void Sprite::Initialize(SpriteCom* spriteCom)
 
 void Sprite::Update(WindowAPI* windowAPI, DebugCamera* debugCamera_)
 {
-	CreateVertexData();
-	CreateIndexData();
-	//Sprite用のworldViewProjectMatrix
+	//spriteの座標、回転、拡縮関係
+	transform.translate = { position.x, position.y, 0.0f };
+	transform.rotate = { 0.0f,0.0f,rotation };
+	transform.scale = { size.x, size.y,1.0f };
 
-	transformSprite.translate = { position.x, position.y, 0.0f };
 
-	Matrix4x4 worldMatrixSprite = MakeAffineMatrix(transformSprite.scale, transformSprite.rotate, transformSprite.translate);
+	Matrix4x4 worldMatrixSprite = MakeAffineMatrix(transform.scale, transform.rotate, transform.translate);
 	Matrix4x4 viewMatrixSprite = MakeIdentity4x4();
 	Matrix4x4 projectionMatrixSprite = MakeOrthographicMatrix(0.0f, 0.0f, float(windowAPI->GetClientWidth()), float(windowAPI->GetClientHeight()), 0.0f, 100.0f);
 	Matrix4x4 worldViewProjectionmatrixSprite = Multiply(worldMatrixSprite, Multiply(debugCamera_->GetViewMatrix(), projectionMatrixSprite));
@@ -86,16 +87,16 @@ void Sprite::CreateVertexBufferView()
 
 void Sprite::CreateVertexData()
 {
-	vertexResourceSprite->Map(0, nullptr, reinterpret_cast<void**>(&vertexDataSprite));
-	vertexDataSprite[0].position = { 0.0f,360.0f,0.0f,1.0f }; // 左下
-	vertexDataSprite[1].position = { 0.0f,0.0f,0.0f,1.0f };   // 左上
-	vertexDataSprite[2].position = { 640.0f,360.0f,0.0f,1.0f }; // 右下
-	vertexDataSprite[3].position = { 640.0f,0.0f,0.0f,1.0f };   // 右上
+	vertexResourceSprite->Map(0, nullptr, reinterpret_cast<void**>(&vertexData));
+	vertexData[0].position = { 0.0f,360.0f,0.0f,1.0f }; // 左下
+	vertexData[1].position = { 0.0f,0.0f,0.0f,1.0f };   // 左上
+	vertexData[2].position = { 640.0f,360.0f,0.0f,1.0f }; // 右下
+	vertexData[3].position = { 640.0f,0.0f,0.0f,1.0f };   // 右上
 
-	vertexDataSprite[0].texcoord = { 0.0f,1.0f };
-	vertexDataSprite[1].texcoord = { 0.0f,0.0f };
-	vertexDataSprite[2].texcoord = { 1.0f,1.0f };
-	vertexDataSprite[3].texcoord = { 1.0f,0.0f };
+	vertexData[0].texcoord = { 0.0f,1.0f };
+	vertexData[1].texcoord = { 0.0f,0.0f };
+	vertexData[2].texcoord = { 1.0f,1.0f };
+	vertexData[3].texcoord = { 1.0f,0.0f };
 }
 
 void Sprite::CreateIndexData()
@@ -110,4 +111,27 @@ void Sprite::CreateIndexData()
 	indexDataSprite[5] = 3; // 右上
 
 	indexResourceSprite->Unmap(0, nullptr);
+}
+
+void Sprite::ReflectionProcessing()
+{
+	//頂点リソースにデータを書き込む
+	//左下
+	vertexData[0].position = { 0.0f,1.0f,0.0f,1.0f };
+	vertexData[0].texcoord = { 0.0f,1.0f };
+	vertexData[0].normal = { 0.0f,0.0f,-1.0f };
+	//左上
+	vertexData[1].position = { 0.0f,0.0f,0.0f,1.0f };
+	vertexData[1].texcoord = { 0.0f,0.0f };
+	vertexData[1].normal = { 0.0f,0.0f,-1.0f };
+	//右下
+	vertexData[2].position = { 1.0f,1.0f,0.0f,1.0f };
+	vertexData[2].texcoord = { 1.0f,1.0f };
+	vertexData[2].normal = { 0.0f,0.0f,-1.0f };
+	//右上
+	vertexData[3].position = { 1.0f,0.0f,0.0f,1.0f };
+	vertexData[3].texcoord = { 1.0f,0.0f };
+	vertexData[3].normal = { 0.0f,0.0f,-1.0f };
+
+
 }

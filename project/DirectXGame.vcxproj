@@ -74,6 +74,7 @@
     <ClInclude Include="externals\imgui\imstb_truetype.h" />
     <ClInclude Include="Engine\2D\Sprite.h" />
     <ClInclude Include="Engine\2D\SpriteCom.h" />
+    <ClInclude Include="Engine\Base\Operator.h" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="externals\imgui\LICENSE.txt" />

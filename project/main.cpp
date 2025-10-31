@@ -145,12 +145,6 @@ static LONG WINAPI ExportDump(EXCEPTION_POINTERS* exception)
 
 
 
-
-
-
-
-
-
 //TextureResourceを作る
 Microsoft::WRL::ComPtr<ID3D12Resource>CreateTextureResource(const Microsoft::WRL::ComPtr<ID3D12Device>& device, const DirectX::TexMetadata& metadata)
 {
@@ -361,8 +355,14 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	spriteCom = new SpriteCom(logStream,dxCommon);
 	spriteCom->Initialize();
 
-	Sprite* sprite = nullptr;
-	sprite = new Sprite();
+
+	std::vector<Sprite*>sprites;
+	for (uint32_t i = 0; i < 5; ++i)
+	{
+		Sprite* sprite = new Sprite();
+		sprite->Initialize(spriteCom);
+		sprites.push_back(sprite);
+	}
 	
 
 
@@ -513,11 +513,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	vertexResourceModel->Map(0, nullptr, reinterpret_cast<void**>(&vertexDataModel));
 	std::memcpy(vertexDataModel, modelData.vertices.data(), sizeof(Sprite::VertexData) * modelData.vertices.size());//頂点データをリソースにコピー
 
-	//Sprite用の頂点Resource
-	sprite->Initialize(spriteCom);
-
-
-	
 
 
 
@@ -581,7 +576,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 	//Transform変数を作る
 	Sprite::Transform transform = { {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };
-	//Sprite用
 	
 
 	//Sphere用
@@ -710,13 +704,22 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 			transformationMatrixDataSphere->WVP = worldViewProjectMatrix;
 			transformationMatrixDataSphere->World = worldMatrix;
 
-			sprite->Update(windowAPI,&debugCamera_);
+			for (auto* sprite : sprites)
+			{
+				sprite->SetPosition({ 0.0f,0.0f});
+				sprite->Update(windowAPI, &debugCamera_);
+			}
+
+		
 
 			//UVTransform用
 			Matrix4x4 uvTransformMatrix = MakeScaleMatrix(uvTransformSprite.scale);
 			uvTransformMatrix = Multiply(uvTransformMatrix, MakeRotateZMatrix(uvTransformSprite.rotate.z));
 			uvTransformMatrix = Multiply(uvTransformMatrix, MakeTranslateMatrix(uvTransformSprite.translate));
-			sprite->SetUVTransform(uvTransformMatrix);
+			for (auto* sprite : sprites)
+			{
+				sprite->SetUVTransform(uvTransformMatrix);
+			}
 
 			directionalLight->Map(0, nullptr, reinterpret_cast<void**>(&directionalLightData));
 
@@ -738,8 +741,10 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 			ImGui::Checkbox("useMonsterBall", &useMonsterBall);
 			ImGui::Checkbox("LightSprite Flag", (bool*)&materialData->enableLighting);
-			ImGui::Checkbox("LightSphere Flag", (bool*)&sprite->GetMaterialDataSprite()->enableLighting);
-
+			for (auto* sprite : sprites)
+			{
+				ImGui::Checkbox("LightSphere Flag", (bool*)&sprite->GetMaterialDataSprite()->enableLighting);
+			}
 			ImGui::Checkbox("DrawSphere", &drawSphere);
 			ImGui::Checkbox("DrawSprite", &drawSprite);
 			ImGui::DragFloat3("LightDirection", &directionalLightData->direction.x, 0.01f);
@@ -785,15 +790,18 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 			if (drawSprite)
 			{
-				dxCommon->GetCommandList()->IASetVertexBuffers(0, 1, &sprite->GetVertexBufferViewSprite());
-				dxCommon->GetCommandList()->IASetIndexBuffer(&sprite->GetIndexBufferViewSprite());
-				dxCommon->GetCommandList()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-				dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(0, sprite->GetMaterialResourceSprite()->GetGPUVirtualAddress());
-				dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(1, sprite->GetTransformationMatrixResourceSprite()->GetGPUVirtualAddress());
-				dxCommon->GetCommandList()->SetGraphicsRootDescriptorTable(2, useMonsterBall ? textureSrvHandleGPU2 : textureSrvHandleGPU);
-				dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(3, directionalLight->GetGPUVirtualAddress());
+				for (auto* sprite : sprites)
+				{
+					dxCommon->GetCommandList()->IASetVertexBuffers(0, 1, &sprite->GetVertexBufferViewSprite());
+					dxCommon->GetCommandList()->IASetIndexBuffer(&sprite->GetIndexBufferViewSprite());
+					dxCommon->GetCommandList()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+					dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(0, sprite->GetMaterialResourceSprite()->GetGPUVirtualAddress());
+					dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(1, sprite->GetTransformationMatrixResourceSprite()->GetGPUVirtualAddress());
+					dxCommon->GetCommandList()->SetGraphicsRootDescriptorTable(2, useMonsterBall ? textureSrvHandleGPU2 : textureSrvHandleGPU);
+					dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(3, directionalLight->GetGPUVirtualAddress());
 
-				dxCommon->GetCommandList()->DrawIndexedInstanced(6, 1, 0, 0, 0);
+					dxCommon->GetCommandList()->DrawIndexedInstanced(6, 1, 0, 0, 0);
+				}
 			}
 
 
@@ -832,8 +840,12 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	delete[] indexData;
 
 	windowAPI->Finalize();
+	for(auto* sprite : sprites)
+	{
+		delete sprite;
+	}
+	sprites.clear();
 
-	delete sprite;
 	delete spriteCom;
 
 	delete dxCommon;
