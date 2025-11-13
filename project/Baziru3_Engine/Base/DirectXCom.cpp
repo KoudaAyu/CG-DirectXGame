@@ -13,8 +13,6 @@
 
 using namespace Microsoft::WRL;
 
-const uint32_t DirectXCom::kMaxSRVCount = 512;
-
 DirectXCom::DirectXCom(WindowAPI* windowAPI, std::ostream& logStream)
 	: windowAPI(windowAPI), logStream(logStream)
 {
@@ -617,6 +615,55 @@ DirectX::ScratchImage DirectXCom::LoadTexture(const std::string& filePath)
 
 	//ミニマップ付きのデータを返す
 	return mipImages;
+}
+
+Microsoft::WRL::ComPtr<ID3D12Resource> DirectXCom::CreateTextureResource(const DirectX::TexMetadata& metadata)
+{
+	//1. metadataを基にResourceの設定
+	D3D12_RESOURCE_DESC resourceDesc{};
+	resourceDesc.Width = UINT(metadata.width);//Textureの幅
+	resourceDesc.Height = UINT(metadata.height);//Textureの高さ
+	resourceDesc.MipLevels = UINT16(metadata.mipLevels);//mipmapの数
+	resourceDesc.DepthOrArraySize = UINT16(metadata.arraySize);//奥行き or 配列Textureの配列数
+	resourceDesc.Format = metadata.format;//TextureのFormat
+	resourceDesc.SampleDesc.Count = 1;//サンプリングカウント。1固定
+	resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION(metadata.dimension);//Textureの次元数。普段使っているのは2次元
+
+	//2. 利用するHeapの設定
+	D3D12_HEAP_PROPERTIES heapProperties{};
+	heapProperties.Type = D3D12_HEAP_TYPE_DEFAULT;//細かい設定を行う
+	//heapProperties.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_WRITE_BACK;//WriteBackポリシーでCPUアクセス可能
+	//heapProperties.MemoryPoolPreference = D3D12_MEMORY_POOL_L0;//プロセッサの近くに配列
+
+	//3. Resourceを生成する
+	Microsoft::WRL::ComPtr<ID3D12Resource> resource = nullptr;
+	HRESULT hr = device_->CreateCommittedResource(
+		&heapProperties,//Heapの設定
+		D3D12_HEAP_FLAG_NONE,//Heapの特殊な設定
+		&resourceDesc,//Resourceの設定
+		D3D12_RESOURCE_STATE_COPY_DEST,//初回のResourceState。Textureは基本読むだけ
+		nullptr,//Clear最適値。使わないのでnullptr
+		IID_PPV_ARGS(&resource));//作成するResourceポインタへのポインタ
+	assert(SUCCEEDED(hr));
+	return resource;
+}
+
+D3D12_CPU_DESCRIPTOR_HANDLE DirectXCom::GetSRVHandleCPU(uint32_t index)
+{
+	D3D12_CPU_DESCRIPTOR_HANDLE handleCPU =
+		descriptorHeap_->GetCPUDescriptorHandleForHeapStart();
+
+	handleCPU.ptr += (descriptorSize_ * index);
+	return handleCPU;
+}
+
+D3D12_GPU_DESCRIPTOR_HANDLE DirectXCom::GetSRVHandleGPU(uint32_t index)
+{
+	D3D12_GPU_DESCRIPTOR_HANDLE handleGPU =
+		descriptorHeap_->GetGPUDescriptorHandleForHeapStart();
+
+	handleGPU.ptr += (descriptorSize_ * index);
+	return handleGPU;
 }
 
 

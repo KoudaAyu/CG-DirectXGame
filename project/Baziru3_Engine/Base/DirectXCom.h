@@ -25,6 +25,10 @@ public:
 	static const char* featureLevelNames[];
 	static const size_t featureLevelNamesCount;
 
+	// 公開SRV最大数定数
+	static constexpr uint32_t kMaxSRVCount = 512;
+	static constexpr uint32_t GetMaxSRVCount() { return kMaxSRVCount; }
+
 	DirectXCom(WindowAPI* windowAPI, std::ostream& logStream);
 	~DirectXCom();
 
@@ -69,7 +73,6 @@ public:
 	D3D12_GPU_DESCRIPTOR_HANDLE GetGPUDescriptorHandle(Microsoft::WRL::ComPtr<ID3D12DescriptorHeap>& descriptorHeap,
 		uint32_t descriptorSize, uint32_t index);
 
-
 	void InitializeDepthStencilView();
 
 	void CreateFence();
@@ -106,6 +109,9 @@ public:
 
 	DirectX::ScratchImage LoadTexture(const std::string& filePath);
 
+	Microsoft::WRL::ComPtr<ID3D12Resource>CreateTextureResource(const DirectX::TexMetadata& metadata);
+
+public:
 	Microsoft::WRL::ComPtr<ID3D12Device>& GetDevice()
 	{
 		return device;
@@ -206,6 +212,9 @@ public:
 
 	MSG& GetMsg() { return msg; }
 
+	// 新規追加: SRV用CPU/GPUディスクリプタハンドル取得
+	D3D12_CPU_DESCRIPTOR_HANDLE GetSRVHandleCPU(uint32_t index);
+	D3D12_GPU_DESCRIPTOR_HANDLE GetSRVHandleGPU(uint32_t index);
 
 private:
 	HRESULT hr;
@@ -245,11 +254,12 @@ private:
 	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> srvDescriptorHeap = nullptr;
 	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> dsvDescriptorHeap = nullptr;
 
+	Microsoft::WRL::ComPtr<ID3D12Device> device_ = nullptr;
+
+	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> descriptorHeap_;
+	uint32_t descriptorSize_;
+
 	std::ostream& logStream;
 
 	WindowAPI* windowAPI = nullptr;
-
-public:
-	static const uint32_t kMaxSRVCount;
-
 };
