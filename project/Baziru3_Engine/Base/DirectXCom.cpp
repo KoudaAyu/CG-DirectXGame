@@ -23,6 +23,11 @@ DirectXCom::~DirectXCom()
 {
 }
 
+void DirectXCom::InitializeFixFPS()
+{
+	refrence_ = std::chrono::steady_clock::now();
+}
+
 void DirectXCom::UpdateFixFPS()
 {
 	// 1/60秒ぴったりの時間
@@ -55,6 +60,8 @@ void DirectXCom::Initialize()
 {
 	assert(windowAPI);
 	this->windowAPI = windowAPI;
+
+	InitializeFixFPS();
 
 	GraphicCreateDXGIFactory();
 	SelectAdapter();
@@ -468,6 +475,8 @@ void DirectXCom::PreDraw()
 
 void DirectXCom::PostDraw()
 {
+	UpdateFixFPS();
+
 	backBufferIndex = swapChain->GetCurrentBackBufferIndex();
 	//画面に描く処理は終わり画面に映すので、状態を遷移
 		//RenderTargetからPresentにする

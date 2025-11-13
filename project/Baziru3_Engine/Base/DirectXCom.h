@@ -33,6 +33,8 @@ public:
 	DirectXCom(WindowAPI* windowAPI, std::ostream& logStream);
 	~DirectXCom();
 
+	void InitializeFixFPS();
+
 	void UpdateFixFPS();
 
 	void Initialize();
