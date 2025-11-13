@@ -1,11 +1,13 @@
 //#include<Windows.h>
 
 //自作h
+#include"Camera.h"
 #include"DebugCamera.h"
 #include"DirectXCom.h"
 #include"KeyInput.h"
 #include"Log.h"
 #include"Matrix4x4.h"
+#include"Object3dCom.h"
 #include"Sprite.h"
 #include"SpriteCom.h"
 #include"ResourceLeakCheak.h"
@@ -363,6 +365,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 	TextureManager::GetInstance()->Initialize();
 
+	Object3dCom* object3dCom = new Object3dCom();
+	object3dCom->Initialize();
+
 	//DepthStencilStateの設定
 	D3D12_DEPTH_STENCIL_DESC depthStencilDesc{};
 	//Depthの機能を有効化する
@@ -658,6 +663,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	DebugCamera debugCamera_;
 	debugCamera_.Initialize(windowAPI);
 
+	Camera* camera = new Camera();
+	camera->SetRotate({ 0.0f,0.0f,0.0f });
+	camera->SetTranslate({ 0.0f,0.0f,-10.0f });
+	object3dCom->SetDefaultCamera(camera);
+
 
 	//ウィンドウのxボタンが押されるまでループ
 	while (dxCommon->GetMsg().message != WM_QUIT)
@@ -672,6 +682,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 		else
 		{
 
+			
+
 			//if (windowAPI->ProcessMassage())
 			//{
 			//	//ゲームループ抜ける
@@ -685,6 +697,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 			ImGui::NewFrame();
 
 			debugCamera_.Update();
+
+			camera->Update();
 
 			//ゲームの処理
 			/*transformSphere.rotate.y += 0.01f;*/
@@ -829,6 +843,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 	delete sound_;
 
+	delete camera;
+
 	delete[] vertexData;
 	delete[] indexData;
 
@@ -841,6 +857,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 		delete sprite;
 	}
 	sprites.clear();
+
+	delete object3dCom;
 
 	delete spriteCom;
 

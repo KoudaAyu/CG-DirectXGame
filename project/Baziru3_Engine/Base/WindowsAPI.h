@@ -23,8 +23,11 @@ public:
 	HWND GetHwnd() const { return hwnd_; }
 	HINSTANCE GetHInstance() const { return wc.hInstance; }
 
-	const int32_t GetClientWidth() const { return kClientWidth; }
-	const int32_t GetClientHeight() const { return kClientHeight; }
+	// クライアントサイズ取得を静的にして、オブジェクト不要で参照できるようにする
+	static int32_t GetClientWidth() { return kClientWidth; }
+	static int32_t GetClientHeight() { return kClientHeight; }
+
+	
 
 private:
 
@@ -33,6 +36,7 @@ private:
 
 	HWND hwnd_ = nullptr;
 
-	const int32_t kClientWidth = 1280;
-	const int32_t kClientHeight = 720;
+	// クライアントサイズ定数（静的）
+	static constexpr int32_t kClientWidth = 1280;
+	static constexpr int32_t kClientHeight = 720;
 };
