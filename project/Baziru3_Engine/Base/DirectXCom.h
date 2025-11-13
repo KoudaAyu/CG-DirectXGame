@@ -8,6 +8,7 @@
 #include <ostream>
 
 #include <array>
+#include <chrono>
 
 #include "externals/DirectXTex/DirectXTex.h"
 
@@ -31,6 +32,8 @@ public:
 
 	DirectXCom(WindowAPI* windowAPI, std::ostream& logStream);
 	~DirectXCom();
+
+	void UpdateFixFPS();
 
 	void Initialize();
 
@@ -262,4 +265,6 @@ private:
 	std::ostream& logStream;
 
 	WindowAPI* windowAPI = nullptr;
+
+	std::chrono::steady_clock::time_point refrence_;
 };
