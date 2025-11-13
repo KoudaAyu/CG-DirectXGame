@@ -4,6 +4,7 @@
 #include"Transform.h"
 class Object3d
 {
+public:
 
 	void Initialize();
 

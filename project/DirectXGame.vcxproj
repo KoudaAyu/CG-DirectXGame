@@ -19,7 +19,7 @@
     <ClCompile Include="Baziru3_Engine\3D\Object\Object3d.cpp" />
     <ClCompile Include="Baziru3_Engine\3D\Object\Object3dCom.cpp" />
     <ClCompile Include="Baziru3_Engine\Audio\Sound.cpp" />
-    <ClCompile Include="Baziru3_Engine\Base\Camera.cpp" />
+    <ClCompile Include="Baziru3_Engine\Camera\Camera.cpp" />
     <ClCompile Include="Baziru3_Engine\Base\DebugCamera.cpp" />
     <ClCompile Include="Baziru3_Engine\Base\DirectXCom.cpp" />
     <ClCompile Include="Baziru3_Engine\Base\KeyInput.cpp" />

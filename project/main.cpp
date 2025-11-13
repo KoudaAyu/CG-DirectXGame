@@ -7,6 +7,7 @@
 #include"KeyInput.h"
 #include"Log.h"
 #include"Matrix4x4.h"
+#include"Object3d.h"
 #include"Object3dCom.h"
 #include"Sprite.h"
 #include"SpriteCom.h"
@@ -367,6 +368,12 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 	Object3dCom* object3dCom = new Object3dCom();
 	object3dCom->Initialize();
+
+#pragma region 最初のシーンの初期化
+	Object3d* object3d = new Object3d();
+	object3d->Initialize();
+
+#pragma endregion 最初のシーン終了
 
 	//DepthStencilStateの設定
 	D3D12_DEPTH_STENCIL_DESC depthStencilDesc{};
@@ -857,6 +864,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 		delete sprite;
 	}
 	sprites.clear();
+
+	delete object3d;
 
 	delete object3dCom;
 

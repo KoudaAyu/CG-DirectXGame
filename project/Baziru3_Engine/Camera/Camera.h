@@ -3,8 +3,6 @@
 #include"Transform.h"
 #include"Matrix4x4.h"
 
-class WindowAPI;
-
 class Camera
 {
 public:
