@@ -249,4 +249,7 @@ private:
 
 	WindowAPI* windowAPI = nullptr;
 
+public:
+	static const uint32_t kMaxSRVCount;
+
 };

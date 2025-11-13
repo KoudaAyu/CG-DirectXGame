@@ -10,6 +10,7 @@
 #include"SpriteCom.h"
 #include"ResourceLeakCheak.h"
 #include"Sound.h"
+#include"TextureManager.h"
 #include"Vector.h"
 #include"WindowsAPI.h"
 
@@ -108,12 +109,6 @@ enum BlendMode
 	//利用禁止
 	kCountOfBlendMode,
 };
-
-
-
-
-
-
 
 
 static LONG WINAPI ExportDump(EXCEPTION_POINTERS* exception)
@@ -364,11 +359,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 		sprites.push_back(sprite);
 	}
 	
-
-
 	spriteCom->CreateGraphicsPipeline();
 
-	
+	TextureManager::GetInstance()->Initialize();
 
 	//DepthStencilStateの設定
 	D3D12_DEPTH_STENCIL_DESC depthStencilDesc{};
@@ -840,6 +833,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	delete[] indexData;
 
 	windowAPI->Finalize();
+
+	TextureManager::GetInstance()->Finalize();
+
 	for(auto* sprite : sprites)
 	{
 		delete sprite;

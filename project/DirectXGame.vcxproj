@@ -15,15 +15,16 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Engine\Audio\Sound.cpp" />
-    <ClCompile Include="Engine\Base\DebugCamera.cpp" />
-    <ClCompile Include="Engine\Base\DirectXCom.cpp" />
-    <ClCompile Include="Engine\Base\KeyInput.cpp" />
-    <ClCompile Include="Engine\Base\Log.cpp" />
-    <ClCompile Include="Engine\Base\Matrix4x4.cpp" />
-    <ClCompile Include="Engine\Base\ResourceLeakCheak.cpp" />
-    <ClCompile Include="Engine\Base\StringUtil.cpp" />
-    <ClCompile Include="Engine\Base\WindowsAPI.cpp" />
+    <ClCompile Include="Baziru3_Engine\2D\Texture\TextureManager.cpp" />
+    <ClCompile Include="Baziru3_Engine\Audio\Sound.cpp" />
+    <ClCompile Include="Baziru3_Engine\Base\DebugCamera.cpp" />
+    <ClCompile Include="Baziru3_Engine\Base\DirectXCom.cpp" />
+    <ClCompile Include="Baziru3_Engine\Base\KeyInput.cpp" />
+    <ClCompile Include="Baziru3_Engine\Base\Log.cpp" />
+    <ClCompile Include="Baziru3_Engine\Base\Matrix4x4.cpp" />
+    <ClCompile Include="Baziru3_Engine\Base\ResourceLeakCheak.cpp" />
+    <ClCompile Include="Baziru3_Engine\Base\StringUtil.cpp" />
+    <ClCompile Include="Baziru3_Engine\Base\WindowsAPI.cpp" />
     <ClCompile Include="externals\imgui\imgui.cpp" />
     <ClCompile Include="externals\imgui\imgui_demo.cpp" />
     <ClCompile Include="externals\imgui\imgui_draw.cpp" />
@@ -32,8 +33,8 @@
     <ClCompile Include="externals\imgui\imgui_tables.cpp" />
     <ClCompile Include="externals\imgui\imgui_widgets.cpp" />
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="Engine\2D\Sprite.cpp" />
-    <ClCompile Include="Engine\2D\SpriteCom.cpp" />
+    <ClCompile Include="Baziru3_Engine\2D\Sprite\Sprite.cpp" />
+    <ClCompile Include="Baziru3_Engine\2D\Sprite\SpriteCom.cpp" />
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="Resources\shaders\Object3d.PS.hlsl">
@@ -54,16 +55,16 @@
     </FxCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Engine\Audio\Sound.h" />
-    <ClInclude Include="Engine\Base\DebugCamera.h" />
-    <ClInclude Include="Engine\Base\DirectXCom.h" />
-    <ClInclude Include="Engine\Base\KeyInput.h" />
-    <ClInclude Include="Engine\Base\Log.h" />
-    <ClInclude Include="Engine\Base\Matrix4x4.h" />
-    <ClInclude Include="Engine\Base\ResourceLeakCheak.h" />
-    <ClInclude Include="Engine\Base\StringUtil.h" />
-    <ClInclude Include="Engine\Base\Vector.h" />
-    <ClInclude Include="Engine\Base\WindowsAPI.h" />
+    <ClInclude Include="Baziru3_Engine\Audio\Sound.h" />
+    <ClInclude Include="Baziru3_Engine\Base\DebugCamera.h" />
+    <ClInclude Include="Baziru3_Engine\Base\DirectXCom.h" />
+    <ClInclude Include="Baziru3_Engine\Base\KeyInput.h" />
+    <ClInclude Include="Baziru3_Engine\Base\Log.h" />
+    <ClInclude Include="Baziru3_Engine\Base\Matrix4x4.h" />
+    <ClInclude Include="Baziru3_Engine\Base\ResourceLeakCheak.h" />
+    <ClInclude Include="Baziru3_Engine\Base\StringUtil.h" />
+    <ClInclude Include="Baziru3_Engine\Base\Vector.h" />
+    <ClInclude Include="Baziru3_Engine\Base\WindowsAPI.h" />
     <ClInclude Include="externals\imgui\imconfig.h" />
     <ClInclude Include="externals\imgui\imgui.h" />
     <ClInclude Include="externals\imgui\imgui_impl_dx12.h" />
@@ -72,9 +73,10 @@
     <ClInclude Include="externals\imgui\imstb_rectpack.h" />
     <ClInclude Include="externals\imgui\imstb_textedit.h" />
     <ClInclude Include="externals\imgui\imstb_truetype.h" />
-    <ClInclude Include="Engine\2D\Sprite.h" />
-    <ClInclude Include="Engine\2D\SpriteCom.h" />
-    <ClInclude Include="Engine\Base\Operator.h" />
+    <ClInclude Include="Baziru3_Engine\2D\Sprite\Sprite.h" />
+    <ClInclude Include="Baziru3_Engine\2D\Sprite\SpriteCom.h" />
+    <ClInclude Include="Baziru3_Engine\Base\Operator.h" />
+    <ClInclude Include="Baziru3_Engine\2D\Texture\TextureManager.h" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="externals\imgui\LICENSE.txt" />
@@ -153,7 +155,7 @@
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <TreatWarningAsError>true</TreatWarningAsError>
-      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)Engine\Base;$(ProjectDir)Engine\2D;$(ProjectDir)Engine\3D;$(ProjectDir)Engine\Audio;$(ProjectDir)Engine\IO;$(ProjectDir)Engine\Scene;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)Baziru3_Engine\Base;$(ProjectDir)Baziru3_Engine\2D;$(ProjectDir)Baziru3_Engine\3D;$(ProjectDir)Baziru3_Engine\Audio;$(ProjectDir)Baziru3_Engine\IO;$(ProjectDir)Baziru3_Engine\Scene;$(ProjectDir)Baziru3_Engine\2D\Sprite;$(ProjectDir)Baziru3_Engine\2D\Texture;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -180,7 +182,7 @@ copy /Y "C:\Program Files (x86)\Windows Kits\10\bin\10.0.26100.0\x64\dxil.dll"  
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <Optimization>MinSpace</Optimization>
-      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)Engine\Base;$(ProjectDir)Engine\2D;$(ProjectDir)Engine\3D;$(ProjectDir)Engine\Audio;$(ProjectDir)Engine\IO;$(ProjectDir)Engine\Scene;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)Baziru3_Engine\Base;$(ProjectDir)Baziru3_Engine\2D;$(ProjectDir)Baziru3_Engine\3D;$(ProjectDir)Baziru3_Engine\Audio;$(ProjectDir)Baziru3_Engine\IO;$(ProjectDir)Baziru3_Engine\Scene;$(ProjectDir)Baziru3_Engine\2D\Sprite;$(ProjectDir)Baziru3_Engine\2D\Texture;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -202,7 +204,7 @@ copy /Y "C:\Program Files (x86)\Windows Kits\10\bin\10.0.26100.0\x64\dxil.dll"  
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)Engine\Base;$(ProjectDir)Engine\2D;$(ProjectDir)Engine\3D;$(ProjectDir)Engine\Audio;$(ProjectDir)Engine\IO;$(ProjectDir)Engine\Scene;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)Baziru3_Engine\Base;$(ProjectDir)Baziru3_Engine\2D;$(ProjectDir)Baziru3_Engine\3D;$(ProjectDir)Baziru3_Engine\Audio;$(ProjectDir)Baziru3_Engine\IO;$(ProjectDir)Baziru3_Engine\Scene;$(ProjectDir)Baziru3_Engine\2D\Sprite;$(ProjectDir)Baziru3_Engine\2D\Texture;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>

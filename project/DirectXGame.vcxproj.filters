@@ -39,40 +39,43 @@
     <ClCompile Include="externals\imgui\imgui_widgets.cpp">
       <Filter>imgui</Filter>
     </ClCompile>
-    <ClCompile Include="Engine\Base\KeyInput.cpp">
+    <ClCompile Include="Baziru3_Engine\Base\KeyInput.cpp">
       <Filter>ヘッダー ファイル</Filter>
     </ClCompile>
-    <ClCompile Include="Engine\Base\Log.cpp">
+    <ClCompile Include="Baziru3_Engine\Base\Log.cpp">
       <Filter>ヘッダー ファイル</Filter>
     </ClCompile>
-    <ClCompile Include="Engine\Base\Matrix4x4.cpp">
+    <ClCompile Include="Baziru3_Engine\Base\Matrix4x4.cpp">
       <Filter>ヘッダー ファイル</Filter>
     </ClCompile>
-    <ClCompile Include="Engine\Base\ResourceLeakCheak.cpp">
+    <ClCompile Include="Baziru3_Engine\Base\ResourceLeakCheak.cpp">
       <Filter>ヘッダー ファイル</Filter>
     </ClCompile>
-    <ClCompile Include="Engine\Base\StringUtil.cpp">
+    <ClCompile Include="Baziru3_Engine\Base\StringUtil.cpp">
       <Filter>ヘッダー ファイル</Filter>
     </ClCompile>
-    <ClCompile Include="Engine\Base\WindowsAPI.cpp">
+    <ClCompile Include="Baziru3_Engine\Base\WindowsAPI.cpp">
       <Filter>ヘッダー ファイル</Filter>
     </ClCompile>
-    <ClCompile Include="Engine\Audio\Sound.cpp">
+    <ClCompile Include="Baziru3_Engine\Audio\Sound.cpp">
       <Filter>ヘッダー ファイル</Filter>
     </ClCompile>
     <ClCompile Include="main.cpp">
       <Filter>ヘッダー ファイル</Filter>
     </ClCompile>
-    <ClCompile Include="Engine\Base\DebugCamera.cpp">
+    <ClCompile Include="Baziru3_Engine\Base\DebugCamera.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
-    <ClCompile Include="Engine\Base\DirectXCom.cpp">
+    <ClCompile Include="Baziru3_Engine\Base\DirectXCom.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
-    <ClCompile Include="Engine\2D\Sprite.cpp">
+    <ClCompile Include="Baziru3_Engine\2D\Sprite\Sprite.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
-    <ClCompile Include="Engine\2D\SpriteCom.cpp">
+    <ClCompile Include="Baziru3_Engine\2D\Sprite\SpriteCom.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\2D\Texture\TextureManager.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
   </ItemGroup>
@@ -105,43 +108,46 @@
     <ClInclude Include="externals\imgui\imstb_truetype.h">
       <Filter>imgui</Filter>
     </ClInclude>
-    <ClInclude Include="Engine\Base\DebugCamera.h">
+    <ClInclude Include="Baziru3_Engine\Base\DebugCamera.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
-    <ClInclude Include="Engine\Base\DirectXCom.h">
+    <ClInclude Include="Baziru3_Engine\Base\DirectXCom.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
-    <ClInclude Include="Engine\Base\KeyInput.h">
+    <ClInclude Include="Baziru3_Engine\Base\KeyInput.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
-    <ClInclude Include="Engine\Base\Log.h">
+    <ClInclude Include="Baziru3_Engine\Base\Log.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
-    <ClInclude Include="Engine\Base\Matrix4x4.h">
+    <ClInclude Include="Baziru3_Engine\Base\Matrix4x4.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
-    <ClInclude Include="Engine\Base\ResourceLeakCheak.h">
+    <ClInclude Include="Baziru3_Engine\Base\ResourceLeakCheak.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
-    <ClInclude Include="Engine\Base\StringUtil.h">
+    <ClInclude Include="Baziru3_Engine\Base\StringUtil.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
-    <ClInclude Include="Engine\Base\Vector.h">
+    <ClInclude Include="Baziru3_Engine\Base\Vector.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
-    <ClInclude Include="Engine\Base\WindowsAPI.h">
+    <ClInclude Include="Baziru3_Engine\Base\WindowsAPI.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
-    <ClInclude Include="Engine\Audio\Sound.h">
+    <ClInclude Include="Baziru3_Engine\Audio\Sound.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
-    <ClInclude Include="Engine\2D\SpriteCom.h">
+    <ClInclude Include="Baziru3_Engine\2D\Sprite\SpriteCom.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
-    <ClInclude Include="Engine\2D\Sprite.h">
+    <ClInclude Include="Baziru3_Engine\2D\Sprite\Sprite.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
-    <ClInclude Include="Engine\Base\Operator.h">
+    <ClInclude Include="Baziru3_Engine\Base\Operator.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="Baziru3_Engine\2D\Texture\TextureManager.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
   </ItemGroup>
