@@ -1,15 +1,18 @@
 //#include<Windows.h>
 
 //自作h
+#include"Camera.h"
 #include"DebugCamera.h"
 #include"DirectXCom.h"
 #include"KeyInput.h"
 #include"Log.h"
 #include"Matrix4x4.h"
-#include"ResourceLeakCheak.h"
-#include"Sound.h"
+#include"Object3d.h"
+#include"Object3dCom.h"
 #include"Sprite.h"
 #include"SpriteCom.h"
+#include"ResourceLeakCheak.h"
+#include"Sound.h"
 #include"TextureManager.h"
 #include"Vector.h"
 #include"WindowsAPI.h"
@@ -55,6 +58,11 @@
 #include <DirectXMath.h>
 #include<cmath>
 #include "externals/DirectXTex/DirectXTex.h"
+
+
+
+
+
 
 
 
@@ -106,12 +114,6 @@ enum BlendMode
 };
 
 
-
-
-
-
-
-
 static LONG WINAPI ExportDump(EXCEPTION_POINTERS* exception)
 {
 	//時刻を取得して、時刻を名前に入れたファイルを作成。Dumpsディレクトリ以下に出力
@@ -138,12 +140,6 @@ static LONG WINAPI ExportDump(EXCEPTION_POINTERS* exception)
 	//ほかに関連付けられているSEH例外ハンドラがあったら実行。通常時はプロセスを終了
 	return EXCEPTION_EXECUTE_HANDLER;
 }
-
-
-
-
-
-
 
 
 
@@ -178,10 +174,6 @@ Microsoft::WRL::ComPtr<ID3D12Resource>CreateTextureResource(const Microsoft::WRL
 	assert(SUCCEEDED(hr));
 	return resource;
 }
-
-
-
-
 
 
 
@@ -309,6 +301,9 @@ ModelData LoadObjFile(const std::string& directoryPath, const std::string& filen
 //Windowsアプリでのエントリーポイント(main関数)
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 {
+
+
+
 	ResourceLeakCheak leakChecker; //リソースリークチェック用のオブジェクト
 
 	CoInitializeEx(0, COINIT_MULTITHREADED);
@@ -358,13 +353,27 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	spriteCom = new SpriteCom(logStream,dxCommon);
 	spriteCom->Initialize();
 
-	spriteCom->CrateGraphicPipeline();
 
-
-	/*D3D12_ROOT_SIGNATURE_DESC desc = {};*/
-
+	std::vector<Sprite*>sprites;
+	for (uint32_t i = 0; i < 5; ++i)
+	{
+		Sprite* sprite = new Sprite();
+		sprite->Initialize(spriteCom);
+		sprites.push_back(sprite);
+	}
 	
+	spriteCom->CreateGraphicsPipeline();
+
 	TextureManager::GetInstance()->Initialize();
+
+	Object3dCom* object3dCom = new Object3dCom();
+	object3dCom->Initialize();
+
+#pragma region 最初のシーンの初期化
+	Object3d* object3d = new Object3d();
+	object3d->Initialize();
+
+#pragma endregion 最初のシーン終了
 
 	//DepthStencilStateの設定
 	D3D12_DEPTH_STENCIL_DESC depthStencilDesc{};
@@ -509,18 +518,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	vertexResourceModel->Map(0, nullptr, reinterpret_cast<void**>(&vertexDataModel));
 	std::memcpy(vertexDataModel, modelData.vertices.data(), sizeof(Sprite::VertexData) * modelData.vertices.size());//頂点データをリソースにコピー
 
-	//Sprite* sprite = nullptr;
-	//sprite = new Sprite;
-	//sprite->Initialize(spriteCom);
 
-	std::vector<Sprite*> sprites;
-	for (uint32_t i = 0; i < 5; i++)
-	{
-		Sprite* sprite = new Sprite;
-		sprite->Initialize(spriteCom);
-		sprites.push_back(sprite);
-		sprite->SetPosition({ (float)(rand() % windowAPI->GetClientWidth()), (float)(rand() % windowAPI->GetClientHeight()) });
-	}
 
 
 
@@ -584,6 +582,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	//Transform変数を作る
 	Sprite::Transform transform = { {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };
 	
+
 	//Sphere用
 	Sprite::Transform transformSphere{ {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };
 
@@ -671,6 +670,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	DebugCamera debugCamera_;
 	debugCamera_.Initialize(windowAPI);
 
+	Camera* camera = new Camera();
+	camera->SetRotate({ 0.0f,0.0f,0.0f });
+	camera->SetTranslate({ 0.0f,0.0f,-10.0f });
+	object3dCom->SetDefaultCamera(camera);
+
 
 	//ウィンドウのxボタンが押されるまでループ
 	while (dxCommon->GetMsg().message != WM_QUIT)
@@ -685,6 +689,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 		else
 		{
 
+			
+
 			//if (windowAPI->ProcessMassage())
 			//{
 			//	//ゲームループ抜ける
@@ -698,13 +704,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 			ImGui::NewFrame();
 
 			debugCamera_.Update();
-			for (auto* sprite : sprites)
-			{
-				sprite->Update(&debugCamera_, windowAPI);
-				
-			}
 
-			
+			camera->Update();
 
 			//ゲームの処理
 			/*transformSphere.rotate.y += 0.01f;*/
@@ -717,6 +718,12 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 			transformationMatrixDataSphere->WVP = worldViewProjectMatrix;
 			transformationMatrixDataSphere->World = worldMatrix;
 
+			for (auto* sprite : sprites)
+			{
+				sprite->SetPosition({ 0.0f,0.0f});
+				sprite->Update(windowAPI, &debugCamera_);
+			}
+
 		
 
 			//UVTransform用
@@ -725,7 +732,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 			uvTransformMatrix = Multiply(uvTransformMatrix, MakeTranslateMatrix(uvTransformSprite.translate));
 			for (auto* sprite : sprites)
 			{
-				sprite->GetMaterialDataSprite()->uvTransform = uvTransformMatrix;
+				sprite->SetUVTransform(uvTransformMatrix);
 			}
 
 			directionalLight->Map(0, nullptr, reinterpret_cast<void**>(&directionalLightData));
@@ -747,11 +754,10 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 
 			ImGui::Checkbox("useMonsterBall", &useMonsterBall);
-			ImGui::Checkbox("LightSphere Flag", (bool*)&materialData->enableLighting);
+			ImGui::Checkbox("LightSprite Flag", (bool*)&materialData->enableLighting);
 			for (auto* sprite : sprites)
 			{
-				std::string label = "LightSprite Flag##" + std::to_string(reinterpret_cast<uintptr_t>(sprite));
-				ImGui::Checkbox(label.c_str(), (bool*)&sprite->GetMaterialDataSprite()->enableLighting);
+				ImGui::Checkbox("LightSphere Flag", (bool*)&sprite->GetMaterialDataSprite()->enableLighting);
 			}
 			ImGui::Checkbox("DrawSphere", &drawSphere);
 			ImGui::Checkbox("DrawSprite", &drawSprite);
@@ -844,18 +850,26 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 	delete sound_;
 
+	delete camera;
+
 	delete[] vertexData;
 	delete[] indexData;
 
-	delete spriteCom;
-	for (auto* sprite : sprites)
-	{
-		delete sprite;
-	}
+	windowAPI->Finalize();
 
 	TextureManager::GetInstance()->Finalize();
 
-	windowAPI->Finalize();
+	for(auto* sprite : sprites)
+	{
+		delete sprite;
+	}
+	sprites.clear();
+
+	delete object3d;
+
+	delete object3dCom;
+
+	delete spriteCom;
 
 	delete dxCommon;
 

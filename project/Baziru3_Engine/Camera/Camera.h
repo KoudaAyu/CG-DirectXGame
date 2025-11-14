@@ -1,0 +1,81 @@
+#pragma once
+
+#include"Transform.h"
+#include"Matrix4x4.h"
+
+class Camera
+{
+public:
+
+	Camera();
+	void Update();
+
+public:
+
+	const Matrix4x4& GetWorldMatrix() const
+	{
+		return worldMatrix_;
+	}
+	const Matrix4x4& GetViewMatrix() const
+	{
+		return viewMatrix_;
+	}
+	const Matrix4x4& GetProjectionMatrix() const
+	{
+		return projectionMatrix_;
+	}
+	const Matrix4x4& GetViewProjectionMatrix() const
+	{
+		return viewProjectionMatrix_;
+	}
+	const Vector3& GetRotate() const { return rotation_; }
+	const Vector3& GetTranslate() const { return translation_; }
+
+	void SetRotate(const Vector3& rotate)
+	{
+		transform_.SetRotate(rotate);
+	}
+	void SetTranslate(const Vector3& translate)
+	{
+		transform_.SetTranslate(translate);
+	}
+	void SetFovY(float fovY)
+	{
+		fovY_ = fovY;
+	}
+	void SetAspectRatio(float aspectRatio)
+	{
+		aspectRatio_ = aspectRatio;
+	}
+	void SetNearZ(float nearZ)
+	{
+		nearZ_ = nearZ;
+	}
+	void SetFarZ(float farZ)
+	{
+		farZ_ = farZ;
+	}
+
+private:
+	Transform transform_;
+	// 回転
+	Vector3 rotation_ = { 0.0f, 0.0f, 0.0f };
+	// 移動
+	Vector3 translation_ = { 0.0f, 0.0f, 0.0f };
+	Matrix4x4 worldMatrix_{};
+	Matrix4x4 viewMatrix_{};
+
+	Matrix4x4 projectionMatrix_{};
+
+	Matrix4x4 viewProjectionMatrix_{};
+
+	//水平方向視野角
+	float fovY_ = 0.45f;
+	//アスペクト比
+	float aspectRatio_ = 1.0f;
+	//ニアクリップ距離
+	float nearZ_ = 0.1f;
+	//ファークリップ距離
+	float farZ_ = 100.0f;
+
+};
