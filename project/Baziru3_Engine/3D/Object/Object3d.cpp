@@ -11,25 +11,25 @@
 void Object3d::Initialize(Object3dCom* object3dCom)
 {
 	object3dCom_ = object3dCom;
-    // object3dCom_ が未設定の場合は何もしない(デフォルトカメラは取得しない)
-    if (object3dCom_)
-    {
-        camera_ = object3dCom_->GetDefaultCamera();
-    }
+	// object3dCom_ が未設定の場合は何もしない(デフォルトカメラは取得しない)
+	if (object3dCom_)
+	{
+		camera_ = object3dCom_->GetDefaultCamera();
+	}
 
 	VertexResource();
 	MaterialResource();
 	TransformationMatrixResource();
 	DirectionalLightResource();
 
-    // テクスチャロードはパスが有効なときのみ実行
-    if (!modelData_.material.textureFilePath.empty())
-    {
-        // TextureManagerにDirectXコンテキストが渡っていることを前提にする
-        TextureManager::GetInstance()->LoadTexture(modelData_.material.textureFilePath);
-        modelData_.material.textureIndex =
-            TextureManager::GetInstance()->GetTextureIndexByFilePath(modelData_.material.textureFilePath);
-    }
+	// テクスチャロードはパスが有効なときのみ実行
+	if (!modelData_.material.textureFilePath.empty())
+	{
+		// TextureManagerにDirectXコンテキストが渡っていることを前提にする
+		TextureManager::GetInstance()->LoadTexture(modelData_.material.textureFilePath);
+		modelData_.material.textureIndex =
+			TextureManager::GetInstance()->GetTextureIndexByFilePath(modelData_.material.textureFilePath);
+	}
 
 	//Transform変数の生成
 	transform = { {1.0f,1.0f,1.0f}, {0.0f,0.0f,0.0f}, {0.0f,0.0f,0.0f} };
@@ -38,18 +38,35 @@ void Object3d::Initialize(Object3dCom* object3dCom)
 
 void Object3d::Update()
 {
-    Matrix4x4 worldMatrix = MakeAffineMatrix(transform_.GetScale(), transform_.GetRotate(), transform_.GetTranslate());
-    Matrix4x4 worldViewProjectionMatrix;
-    if (camera_)
-    {
-        const Matrix4x4& viewProjectionMatrix = camera_->GetViewProjectionMatrix();
-        worldViewProjectionMatrix = Multiply(worldMatrix, viewProjectionMatrix);
-    }
-    else
-    {
-        worldViewProjectionMatrix = worldMatrix;
-    }
+	// 毎フレーム、Object3dCom から最新のカメラを取得（初期化後に設定されたケースへ対応）
+	if (object3dCom_)
+	{
+		camera_ = object3dCom_->GetDefaultCamera();
+	}
 
+	// 優先: Object3dComに設定されたカメラを使う
+	Matrix4x4 worldMatrix = MakeAffineMatrix(transform.GetScale(), transform.GetRotate(), transform.GetTranslate());
+
+	Matrix4x4 viewMatrix;
+	Matrix4x4 projectionMatrix;
+
+	if (camera_)
+	{
+		// カメラが有効な場合はそれを使う
+		viewMatrix = camera_->GetViewMatrix();
+		projectionMatrix = camera_->GetProjectionMatrix();
+	}
+	else
+	{
+		// フォールバック: 内部の簡易カメラで計算
+		Matrix4x4 cameraMatrix = MakeAffineMatrix(cameraTransform.GetScale(), cameraTransform.GetRotate(), cameraTransform.GetTranslate());
+		viewMatrix = Inverse(cameraMatrix);
+		projectionMatrix = MakePerspectiveFovMatrix(0.45f, 1.0f, 0.1f, 100.0f);
+	}
+
+	// WVP を更新
+	transformationMatrixData_->WVP = Multiply(worldMatrix, Multiply(viewMatrix, projectionMatrix));
+	transformationMatrixData_->World = worldMatrix;
 }
 
 Object3d::MaterialData Object3d::LoadMaterialTemplateFile(const std::string& direcrotyPath, const std::string& filename)
