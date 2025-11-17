@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 #include "Camera.h"
+#include"TextureManager.h"
 #include "Transform.h"
 #include "Sprite.h"
 
@@ -23,6 +24,7 @@ public:
 	struct MaterialData
 	{
 		std::string textureFilePath; // テクスチャファイルのパス
+		uint32_t textureIndex = 0;      // テクスチャのインデックス
 	};
 
 	//objファイル関係
@@ -45,6 +47,13 @@ public:
 		Matrix4x4 World;
 	};
 
+	struct DirectionalLight
+	{
+		Vector4 color;
+		Vector3 direction;
+		float intensity;
+	};
+
 	void Initialize(Object3dCom* object3dCom);
 
 	void Update();
@@ -65,11 +74,15 @@ public:
 	/// <returns></returns>
 	static ModelData LoadObjFile(const std::string& directoryPath, const std::string& filename);
 
-	void CreateVertexResource();
+	
+
+	void VertexResource();
 
 	void MaterialResource();
 
 	void TransformationMatrixResource();
+
+	void DirectionalLightResource();
 	
 public:
 	void SetCamera(Camera* camera)
@@ -108,4 +121,9 @@ private:
 	Microsoft::WRL::ComPtr<ID3D12Resource> transformationMatrixResource = nullptr;
 	//バッファリソース内のデータを指すポインタ
 	TransformationMatrix* transformationMatrixData_ = nullptr;
+
+	// ディレクショナルライト用のバッファリソース
+	Microsoft::WRL::ComPtr<ID3D12Resource> directionalLightResource = nullptr;
+	// バッファリソース内のデータを指すポインタ
+	DirectionalLight* directionalLightData_ = nullptr;
 };

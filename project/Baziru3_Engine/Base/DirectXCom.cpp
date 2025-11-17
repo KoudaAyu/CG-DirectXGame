@@ -689,19 +689,21 @@ Microsoft::WRL::ComPtr<ID3D12Resource> DirectXCom::CreateTextureResource(const D
 
 D3D12_CPU_DESCRIPTOR_HANDLE DirectXCom::GetSRVHandleCPU(uint32_t index)
 {
+	// Use the actual SRV descriptor heap
 	D3D12_CPU_DESCRIPTOR_HANDLE handleCPU =
-		descriptorHeap_->GetCPUDescriptorHandleForHeapStart();
-
-	handleCPU.ptr += (descriptorSize_ * index);
+		srvDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
+	UINT increment = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+	handleCPU.ptr += (static_cast<SIZE_T>(increment) * index);
 	return handleCPU;
 }
 
 D3D12_GPU_DESCRIPTOR_HANDLE DirectXCom::GetSRVHandleGPU(uint32_t index)
 {
+	// Use the actual SRV descriptor heap
 	D3D12_GPU_DESCRIPTOR_HANDLE handleGPU =
-		descriptorHeap_->GetGPUDescriptorHandleForHeapStart();
-
-	handleGPU.ptr += (descriptorSize_ * index);
+		srvDescriptorHeap->GetGPUDescriptorHandleForHeapStart();
+	UINT increment = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+	handleGPU.ptr += (static_cast<UINT64>(increment) * index);
 	return handleGPU;
 }
 

@@ -17,9 +17,19 @@ void Object3d::Initialize(Object3dCom* object3dCom)
         camera_ = object3dCom_->GetDefaultCamera();
     }
 
-	CreateVertexResource();
+	VertexResource();
 	MaterialResource();
+	TransformationMatrixResource();
+	DirectionalLightResource();
 
+    // テクスチャロードはパスが有効なときのみ実行
+    if (!modelData_.material.textureFilePath.empty())
+    {
+        // TextureManagerにDirectXコンテキストが渡っていることを前提にする
+        TextureManager::GetInstance()->LoadTexture(modelData_.material.textureFilePath);
+        modelData_.material.textureIndex =
+            TextureManager::GetInstance()->GetTextureIndexByFilePath(modelData_.material.textureFilePath);
+    }
 }
 
 void Object3d::Update()
@@ -156,7 +166,7 @@ Object3d::ModelData Object3d::LoadObjFile(const std::string& directoryPath, cons
 }
 
 
-void Object3d::CreateVertexResource()
+void Object3d::VertexResource()
 {
 	//VertexResourceの生成
 	if (object3dCom_ && object3dCom_->GetDirectXCom())
@@ -213,5 +223,26 @@ void Object3d::TransformationMatrixResource()
 
 		transformationMatrixData_->WVP = MakeIdentity4x4();
 		transformationMatrixData_->World = MakeIdentity4x4();
+	}
+}
+
+void Object3d::DirectionalLightResource()
+{
+	// Create buffer before mapping and add safety checks
+	if (object3dCom_ && object3dCom_->GetDirectXCom())
+	{
+		DirectXCom* dxCommon = object3dCom_->GetDirectXCom();
+		// ディレクショナルライト用のCBVリソースを作成
+		directionalLightResource = dxCommon->CreateBufferResource(dxCommon->GetDevice().Get(), sizeof(DirectionalLight));
+		// 書き込み用アドレスを取得
+		directionalLightResource->Map(0, nullptr, reinterpret_cast<void**>(&directionalLightData_));
+
+		// 初期値を書き込む
+		directionalLightData_->color = { 1.0f, 1.0f, 1.0f, 1.0f };
+		directionalLightData_->direction = { 0.0f, -1.0f, 0.0f };
+		directionalLightData_->intensity = 1.0f;
+
+		// 必要に応じてアンマップ（頻繁に更新しない場合）
+		directionalLightResource->Unmap(0, nullptr);
 	}
 }

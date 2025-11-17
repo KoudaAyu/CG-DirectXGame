@@ -1,4 +1,6 @@
 #include"TextureManager.h"
+#include <cassert>
+#include <filesystem>
 
 TextureManager* TextureManager::instance_ = nullptr;
 
@@ -24,6 +26,14 @@ void TextureManager::Initialize()
 
 void TextureManager::LoadTexture(const std::string& filePath)
 {
+	// 無効なパスは無視
+	if (filePath.empty()) {
+		return;
+	}
+	// DirectXコンテキスト未設定なら何もしない
+	if (!directXCom_) {
+		return;
+	}
 	//テクスチャファイルを読み込んでプログラムで使えるようにする
 	DirectX::ScratchImage image{};
 	std::wstring filePathW = StringUtil::ConvertString(filePath);
@@ -63,4 +73,16 @@ void TextureManager::LoadTexture(const std::string& filePath)
 
 	directXCom_->GetDevice()->CreateShaderResourceView(
 		textureData.resource_.Get(), &srvDesc, textureData.srvHandleCPU_);
+}
+
+int32_t TextureManager::GetTextureIndexByFilePath(const std::string& filePath) const
+{
+	for (size_t i = 0; i < textureDatas_.size(); ++i)
+	{
+		if (textureDatas_[i].filePath_ == filePath)
+		{
+			return static_cast<int32_t>(i);
+		}
+	}
+	return -1; // 見つからなかった
 }

@@ -61,23 +61,6 @@
 
 
 
-
-
-
-
-
-struct DirectionalLight
-{
-	Vector4 color;
-	Vector3 direction;
-	float intensity;
-};
-
-
-
-
-
-
 enum BlendMode
 {
 	//!< ブレンドなし
@@ -164,7 +147,6 @@ Microsoft::WRL::ComPtr<ID3D12Resource>CreateTextureResource(const Microsoft::WRL
 	return resource;
 }
 
-
 //Windowsアプリでのエントリーポイント(main関数)
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 {
@@ -232,6 +214,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	spriteCom->CreateGraphicsPipeline();
 
 	TextureManager::GetInstance()->Initialize();
+    // Provide DirectX context so TextureManager can create textures and SRVs
+    TextureManager::GetInstance()->SetDirectXCom(dxCommon);
 
 	Object3dCom* object3dCom = new Object3dCom(logStream);
 	object3dCom->Initialize(dxCommon);
@@ -387,8 +371,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 
 
-
-
 	//マテリアル用のリソースを作る
 	Microsoft::WRL::ComPtr<ID3D12Resource> materialResource = dxCommon->CreateBufferResource(dxCommon->GetDevice().Get(), sizeof(Sprite::Material));
 	//マテリアルにデータを書き込む
@@ -405,10 +387,10 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	materialData->enableLighting = false;
 	materialResource->Unmap(0, nullptr);
 
-	Microsoft::WRL::ComPtr<ID3D12Resource> directionalLight = dxCommon->CreateBufferResource(dxCommon->GetDevice().Get(), sizeof(DirectionalLight));
+	Microsoft::WRL::ComPtr<ID3D12Resource> directionalLight = dxCommon->CreateBufferResource(dxCommon->GetDevice().Get(), sizeof(Object3d::DirectionalLight));
 
 	// MapしてGPUリソースのCPU側の書き込み可能ポインタを取得する
-	DirectionalLight* directionalLightData = nullptr;
+	Object3d::DirectionalLight* directionalLightData = nullptr;
 	directionalLight->Map(0, nullptr, reinterpret_cast<void**>(&directionalLightData));
 
 	// directionalLightDataに値を書き込む
