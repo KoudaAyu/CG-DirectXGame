@@ -68,6 +68,9 @@ public:
 	}
 	const Microsoft::WRL::ComPtr<ID3D12Resource>& GetTransformationMatrixResourceSprite() const { return transformationMatrixResourceSprite; }
 
+	// 新規: 描画に必要な外部リソースを設定
+	void SetTextureHandle(D3D12_GPU_DESCRIPTOR_HANDLE handle) { textureHandleGPU = handle; }
+	void SetDirectionalLightResource(const Microsoft::WRL::ComPtr<ID3D12Resource>& light) { directionalLightResource = light; }
 
 public:
 	//Spriteの座標関係
@@ -107,4 +110,8 @@ private:
 	Microsoft::WRL::ComPtr<ID3D12Resource> materialResourceSprite = nullptr;
 	Microsoft::WRL::ComPtr<ID3D12Resource> transformationMatrixResourceSprite = nullptr;
 	TransformationMatrix* transformationMatrixDataSprite = nullptr;
+
+	// 新規: 描画時に使うハンドル/リソース
+	D3D12_GPU_DESCRIPTOR_HANDLE textureHandleGPU{};
+	Microsoft::WRL::ComPtr<ID3D12Resource> directionalLightResource = nullptr;
 };

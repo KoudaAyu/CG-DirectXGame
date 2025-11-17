@@ -23,7 +23,8 @@ void Sprite::Initialize(SpriteCom* spriteCom)
 	materialData->color = { 1.0f, 1.0f, 1.0f, 1.0f }; // 白（テクスチャ色をそのまま出す用）
 	materialData->enableLighting = false;
 	materialData->uvTransform = MakeIdentity4x4();
-	materialResourceSprite->Unmap(0, nullptr);
+	// Note: keep mapped for lifetime so caller can update directly
+	// materialResourceSprite->Unmap(0, nullptr);
 
 	//Sprite用のTransformationMatrix用のリソースを作る
 	transformationMatrixResourceSprite = dxCommon->CreateBufferResource(dxCommon->GetDevice().Get(), sizeof(TransformationMatrix));
@@ -33,7 +34,8 @@ void Sprite::Initialize(SpriteCom* spriteCom)
 	//単位行列を書き込んでおく
 	transformationMatrixDataSprite->WVP = MakeIdentity4x4();
 	transformationMatrixDataSprite->World = MakeIdentity4x4();
-	transformationMatrixResourceSprite->Unmap(0, nullptr);
+	// keep mapped
+	// transformationMatrixResourceSprite->Unmap(0, nullptr);
 }
 
 void Sprite::Update(WindowAPI* windowAPI, DebugCamera* debugCamera_)
@@ -54,11 +56,23 @@ void Sprite::Update(WindowAPI* windowAPI, DebugCamera* debugCamera_)
 
 void Sprite::Draw()
 {
-	CreateVertexBufferView();
-	CreateIndexBufferView();
+	// bind IA
+	dxCommon->GetCommandList()->IASetVertexBuffers(0, 1, &vertexBufferViewSprite);
+	dxCommon->GetCommandList()->IASetIndexBuffer(&indexBufferViewSprite);
+	dxCommon->GetCommandList()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+	// bind root parameters expected by pipeline [0]=material, [1]=transform, [2]=SRV table, [3]=directional light
 	dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(0, materialResourceSprite->GetGPUVirtualAddress());
 	dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(1, transformationMatrixResourceSprite->GetGPUVirtualAddress());
+	if (textureHandleGPU.ptr != 0) {
+		dxCommon->GetCommandList()->SetGraphicsRootDescriptorTable(2, textureHandleGPU);
+	}
+	if (directionalLightResource) {
+		dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(3, directionalLightResource->GetGPUVirtualAddress());
+	}
 
+	// draw quad
+	dxCommon->GetCommandList()->DrawIndexedInstanced(6, 1, 0, 0, 0);
 }
 
 void Sprite::CreateIndexBufferView()

@@ -662,15 +662,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 			{
 				for (auto* sprite : sprites)
 				{
-					dxCommon->GetCommandList()->IASetVertexBuffers(0, 1, &sprite->GetVertexBufferViewSprite());
-					dxCommon->GetCommandList()->IASetIndexBuffer(&sprite->GetIndexBufferViewSprite());
-					dxCommon->GetCommandList()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-					dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(0, sprite->GetMaterialResourceSprite()->GetGPUVirtualAddress());
-					dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(1, sprite->GetTransformationMatrixResourceSprite()->GetGPUVirtualAddress());
-					dxCommon->GetCommandList()->SetGraphicsRootDescriptorTable(2, useMonsterBall ? textureSrvHandleGPU2 : textureSrvHandleGPU);
-					dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(3, directionalLight->GetGPUVirtualAddress());
-
-					dxCommon->GetCommandList()->DrawIndexedInstanced(6, 1, 0, 0, 0);
+					sprite->Draw();
 				}
 			}
 
