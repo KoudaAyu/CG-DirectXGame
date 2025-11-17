@@ -19,6 +19,10 @@ public:
 	// DirectXCom を設定するためのセッターを追加
 	void SetDirectXCom(DirectXCom* directXCom) { directXCom_ = directXCom; }
 
+	// 追加: ファイルパスからSRVインデックスを取得（見つからなければ -1）
+	int32_t GetTextureIndexByFilePath(const std::string& filePath) const;
+	
+
 private:
 	static TextureManager* instance_;
 

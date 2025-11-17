@@ -40,8 +40,6 @@ void SpriteCom::CreateGraphicsPipeline()
 
 void SpriteCom::Descriptor()
 {
-	descriptionRootSignature = descriptionRootSignature;
-
 	// SRV: t3, t4
 	descriptorRange[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
 	descriptorRange[0].NumDescriptors = 1;
