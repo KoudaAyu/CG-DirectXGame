@@ -12,6 +12,14 @@ class Object3d
 {
 public:
 
+	struct Material
+	{
+		Vector4 color;
+		int32_t enableLighting;
+		float padding[3]; // パディングを追加して16バイト境界に揃える
+		Matrix4x4 uvTransform; // UV変換行列
+	};
+
 	struct MaterialData
 	{
 		std::string textureFilePath; // テクスチャファイルのパス
@@ -31,6 +39,11 @@ public:
 		Vector3 normal;
 	};
 
+	struct TransformationMatrixData
+	{
+		Matrix4x4 WVP;
+		Matrix4x4 World;
+	};
 
 	void Initialize(Object3dCom* object3dCom);
 
@@ -52,7 +65,11 @@ public:
 	/// <returns></returns>
 	static ModelData LoadObjFile(const std::string& directoryPath, const std::string& filename);
 
+	void CreateVertexResource();
 
+	void MaterialResource();
+
+	void TransformationMatrixResource();
 	
 public:
 	void SetCamera(Camera* camera)
@@ -74,4 +91,21 @@ private:
 	Transform transform_;
 
 	ModelData modelData_;
+
+	//バッファリソース
+	Microsoft::WRL::ComPtr<ID3D12Resource> vertexResource = nullptr;
+	//バッファリソース内のデータを指すポインタ
+	VertexData* vertexData_ = nullptr;
+	//バッファリソースの使い道を補足するバッファビュー
+	D3D12_VERTEX_BUFFER_VIEW vertexBufferView_{};
+
+	//バッファリソース
+	Microsoft::WRL::ComPtr<ID3D12Resource> materialResource = nullptr;
+	//バッファリソース内のデータを指すポインタ
+	Material* materialData_ = nullptr;
+
+	//バッファリソース
+	Microsoft::WRL::ComPtr<ID3D12Resource> transformationMatrixResource = nullptr;
+	//バッファリソース内のデータを指すポインタ
+	TransformationMatrix* transformationMatrixData_ = nullptr;
 };

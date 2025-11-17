@@ -4,6 +4,7 @@
 #include<cassert>
 #include<fstream> // 追加: mtlファイル読み込み
 #include<sstream> // 追加: 行分解用
+#include<cstring> // 追加: memcpy 用
 
 
 
@@ -15,6 +16,10 @@ void Object3d::Initialize(Object3dCom* object3dCom)
     {
         camera_ = object3dCom_->GetDefaultCamera();
     }
+
+	CreateVertexResource();
+	MaterialResource();
+
 }
 
 void Object3d::Update()
@@ -103,7 +108,7 @@ Object3d::ModelData Object3d::LoadObjFile(const std::string& directoryPath, cons
 		else if (identifile == "vn")
 		{
 			Vector3 normal;
-			s >> normal.x >> normal.y >> normal.z;
+		 s >> normal.x >> normal.y >> normal.z;
 			normal.x *= -1.0f; //X軸を反転する
 			normals.push_back(normal);//法線を格納
 		}
@@ -151,3 +156,62 @@ Object3d::ModelData Object3d::LoadObjFile(const std::string& directoryPath, cons
 }
 
 
+void Object3d::CreateVertexResource()
+{
+	//VertexResourceの生成
+	if (object3dCom_ && object3dCom_->GetDirectXCom())
+	{
+		DirectXCom* dxCommon = object3dCom_->GetDirectXCom();
+		// 現在保持している頂点数に応じたサイズで確保（未設定の場合は最小1頂点分）
+		size_t vertexCount = modelData_.vertices.size();
+		if (vertexCount == 0) { vertexCount = 1; }
+		size_t bufferSize = sizeof(Sprite::VertexData) * vertexCount;
+
+		vertexResource = dxCommon->CreateBufferResource(dxCommon->GetDevice().Get(), bufferSize);
+
+		// VertexBufferView を設定（値の設定のみ）
+		vertexBufferView_.BufferLocation = vertexResource->GetGPUVirtualAddress();
+		vertexBufferView_.SizeInBytes = static_cast<UINT>(bufferSize);
+		vertexBufferView_.StrideInBytes = sizeof(Sprite::VertexData);
+
+		// 書き込み用アドレスを取得してメンバーに保持
+		vertexResource->Map(0, nullptr, reinterpret_cast<void**>(&vertexData_));
+
+		// 可能なら読み込んだモデル頂点をアップロード
+		if (!modelData_.vertices.empty())
+		{
+			std::memcpy(vertexData_, modelData_.vertices.data(), sizeof(Sprite::VertexData) * modelData_.vertices.size());
+		}
+	}
+}
+
+void Object3d::MaterialResource()
+{
+	if (object3dCom_ && object3dCom_->GetDirectXCom())
+	{
+		DirectXCom* dxCommon = object3dCom_->GetDirectXCom();
+		// マテリアル用のリソースを作成（1個分）
+		materialResource = dxCommon->CreateBufferResource(dxCommon->GetDevice().Get(), sizeof(Material));
+		// 書き込み用アドレスを取得してメンバーに保持
+		materialResource->Map(0, nullptr, reinterpret_cast<void**>(&materialData_));
+		// 初期値を設定
+		materialData_->color = { 1.0f,1.0f,1.0f,1.0f };
+		materialData_->enableLighting = false;
+		materialData_->uvTransform = MakeIdentity4x4();
+	}
+}
+
+void Object3d::TransformationMatrixResource()
+{
+	if (object3dCom_ && object3dCom_->GetDirectXCom())
+	{
+		DirectXCom* dxCommon = object3dCom_->GetDirectXCom();
+		// Transformation
+		transformationMatrixResource = dxCommon->CreateBufferResource(dxCommon->GetDevice().Get(), sizeof(TransformationMatrix));
+		// 書き込み用アドレスを取得してメンバーに保持
+		transformationMatrixResource->Map(0, nullptr, reinterpret_cast<void**>(&transformationMatrixData_));
+
+		transformationMatrixData_->WVP = MakeIdentity4x4();
+		transformationMatrixData_->World = MakeIdentity4x4();
+	}
+}
