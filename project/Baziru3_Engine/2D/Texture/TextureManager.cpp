@@ -57,7 +57,10 @@ void TextureManager::LoadTexture(const std::string& filePath)
 		directXCom_->CreateTextureResource(textureData.metadata_);
 
 	//テクスチャデータの要素数番号をSRVのインデックスとする
-	uint32_t srvIndex = static_cast<uint32_t>(textureDatas_.size() - 1);
+	uint32_t srvIndex = static_cast<uint32_t>(textureDatas_.size() - 1) + kSRVIndexTop;
+
+	//テクスチャ枚数上限チェック
+	assert(textureDatas_.size() + kSRVIndexTop <= DirectXCom::kMaxSRVCount);
 
 	textureData.srvHandleCPU_ =
 		directXCom_->GetSRVHandleCPU(srvIndex);
@@ -75,14 +78,31 @@ void TextureManager::LoadTexture(const std::string& filePath)
 		textureData.resource_.Get(), &srvDesc, textureData.srvHandleCPU_);
 }
 
-int32_t TextureManager::GetTextureIndexByFilePath(const std::string& filePath) const
+uint32_t TextureManager::GetTextureIndexByFilePath(const std::string& filePath) const
 {
-	for (size_t i = 0; i < textureDatas_.size(); ++i)
-	{
-		if (textureDatas_[i].filePath_ == filePath)
+	//for (size_t i = 0; i < textureDatas_.size(); ++i)
+	//{
+	//	if (textureDatas_[i].filePath_ == filePath)
+	//	{
+	//		return static_cast<int32_t>(i);
+	//	}
+	//}
+	//return -1; // 見つからなかった
+
+	//読み込み済みテクスチャデータを検索
+	auto it = std::find_if(textureDatas_.begin(), textureDatas_.end(),
+		[&filePath](const TextureData& data)
 		{
-			return static_cast<int32_t>(i);
-		}
+			return data.filePath_ == filePath;
+		});
+
+	if (it != textureDatas_.end())
+
+	{
+		uint32_t textureIndex = static_cast<uint32_t>(std::distance(textureDatas_.begin(), it));
+		return textureIndex;
 	}
-	return -1; // 見つからなかった
+
+	assert(0);
+	return 0;
 }

@@ -33,7 +33,7 @@ public:
 		Matrix4x4 uvTransform; // UV変換行列
 	};
 
-	void Initialize(SpriteCom* spriteCom);
+	void Initialize(SpriteCom* spriteCom,std::string textureFilePath);
 	void Update(WindowAPI* windowAPI, DebugCamera* debugCamera_);
 	void Draw();
 
@@ -114,4 +114,6 @@ private:
 	// 新規: 描画時に使うハンドル/リソース
 	D3D12_GPU_DESCRIPTOR_HANDLE textureHandleGPU{};
 	Microsoft::WRL::ComPtr<ID3D12Resource> directionalLightResource = nullptr;
+
+	uint32_t textureIndex = 0;
 };

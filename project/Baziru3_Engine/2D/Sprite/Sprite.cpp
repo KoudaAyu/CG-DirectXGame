@@ -1,15 +1,17 @@
 #include"Sprite.h"
 #include"SpriteCom.h"
-
+#include"TextureManager.h"
 #include<cassert>
 
-void Sprite::Initialize(SpriteCom* spriteCom)
+
+
+void Sprite::Initialize(SpriteCom* spriteCom, std::string textureFilePath)
 {
 	this->spriteCom = spriteCom;
 	assert(spriteCom);
 	this->dxCommon = spriteCom->GetDxCommon();
 	assert(dxCommon);
-	
+
 
 	CreateVertexBufferView();
 	CreateIndexBufferView();
@@ -34,8 +36,8 @@ void Sprite::Initialize(SpriteCom* spriteCom)
 	//単位行列を書き込んでおく
 	transformationMatrixDataSprite->WVP = MakeIdentity4x4();
 	transformationMatrixDataSprite->World = MakeIdentity4x4();
-	// keep mapped
-	// transformationMatrixResourceSprite->Unmap(0, nullptr);
+	
+	textureIndex = TextureManager::GetInstance()->GetTextureIndexByFilePath(textureFilePath);
 }
 
 void Sprite::Update(WindowAPI* windowAPI, DebugCamera* debugCamera_)
@@ -56,16 +58,15 @@ void Sprite::Update(WindowAPI* windowAPI, DebugCamera* debugCamera_)
 
 void Sprite::Draw()
 {
-	// bind IA
+	
 	dxCommon->GetCommandList()->IASetVertexBuffers(0, 1, &vertexBufferViewSprite);
 	dxCommon->GetCommandList()->IASetIndexBuffer(&indexBufferViewSprite);
 	dxCommon->GetCommandList()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-	// bind root parameters expected by pipeline [0]=material, [1]=transform, [2]=SRV table, [3]=directional light
 	dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(0, materialResourceSprite->GetGPUVirtualAddress());
 	dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(1, transformationMatrixResourceSprite->GetGPUVirtualAddress());
 	if (textureHandleGPU.ptr != 0) {
-		dxCommon->GetCommandList()->SetGraphicsRootDescriptorTable(2, textureHandleGPU);
+		dxCommon->GetCommandList()->SetGraphicsRootDescriptorTable(2, TextureManager::GetInstance()->GetSrvHandleGPU(textureIndex));
 	}
 	if (directionalLightResource) {
 		dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(3, directionalLightResource->GetGPUVirtualAddress());

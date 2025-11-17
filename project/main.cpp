@@ -198,6 +198,12 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 	dxCommon->Initialize();
 
+	// TextureManager は SRV ヒープに依存するので DX 初期化の後に初期化
+	TextureManager::GetInstance()->Initialize();
+	TextureManager::GetInstance()->SetDirectXCom(dxCommon);
+	// 作業ディレクトリが project/ である前提の相対パスを使う
+	TextureManager::GetInstance()->LoadTexture("Resources/uvChecker.png");
+
 	SpriteCom* spriteCom = nullptr;
 	spriteCom = new SpriteCom(logStream,dxCommon);
 	spriteCom->Initialize();
@@ -207,15 +213,14 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	for (uint32_t i = 0; i < 5; ++i)
 	{
 		Sprite* sprite = new Sprite();
-		sprite->Initialize(spriteCom);
+		// Resources フォルダ直下の uvChecker.png を指定
+		sprite->Initialize(spriteCom, "Resources/uvChecker.png");
 		sprites.push_back(sprite);
 	}
 	
 	spriteCom->CreateGraphicsPipeline();
 
-	TextureManager::GetInstance()->Initialize();
-    // Provide DirectX context so TextureManager can create textures and SRVs
-    TextureManager::GetInstance()->SetDirectXCom(dxCommon);
+	// 既存の手動テクスチャ読み込みはそのまま利用（Sphere用）
 
 	Object3dCom* object3dCom = new Object3dCom(logStream);
 	object3dCom->Initialize(dxCommon);
