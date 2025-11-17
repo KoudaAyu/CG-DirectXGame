@@ -20,8 +20,14 @@ public:
 	void SetDirectXCom(DirectXCom* directXCom) { directXCom_ = directXCom; }
 
 	// 追加: ファイルパスからSRVインデックスを取得（見つからなければ -1）
-	int32_t GetTextureIndexByFilePath(const std::string& filePath) const;
+	uint32_t GetTextureIndexByFilePath(const std::string& filePath) const;
 	
+public: 
+	D3D12_GPU_DESCRIPTOR_HANDLE GetSrvHandleGPU(uint32_t index) const
+	{
+		assert(index < textureDatas_.size());
+		return textureDatas_[index].srvHandleGPU_;
+	}
 
 private:
 	static TextureManager* instance_;
@@ -45,4 +51,7 @@ private:
 	std::vector<TextureData> textureDatas_;
 
 	DirectXCom* directXCom_ = nullptr;
+
+	//SRVインデックスの開始番号
+	uint32_t kSRVIndexTop = 1;
 };

@@ -98,6 +98,18 @@ public:
 	{
 		object3dCom_ = object3dCom;
 	}
+
+	// Expose transformation matrix CBV so external code can bind the correct constant buffer
+	const Microsoft::WRL::ComPtr<ID3D12Resource>& GetTransformationMatrixResource() const { return transformationMatrixResource; }
+
+	// Transform setters/getters to control from outside (e.g., ImGui)
+	void SetRotate(const Vector3& r) { transform.SetRotate(r); }
+	void SetTranslate(const Vector3& t) { transform.SetTranslate(t); }
+	void SetScale(const Vector3& s) { transform.SetScale(s); }
+	Vector3 GetRotate() const { return transform.GetRotate(); }
+	Vector3 GetTranslate() const { return transform.GetTranslate(); }
+	Vector3 GetScale() const { return transform.GetScale(); }
+
 private:
 	Transform transform;
 	Transform cameraTransform;
