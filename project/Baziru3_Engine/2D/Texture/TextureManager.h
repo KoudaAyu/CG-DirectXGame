@@ -21,6 +21,13 @@ public:
 
 	// 追加: ファイルパスからSRVインデックスを取得（見つからなければ -1）
 	uint32_t GetTextureIndexByFilePath(const std::string& filePath) const;
+
+	//メタデータ取得
+	const DirectX::TexMetadata& GetMetadata(uint32_t index) const
+	{
+		assert(index < textureDatas_.size());
+		return textureDatas_[index].metadata_;
+	}
 	
 public: 
 	D3D12_GPU_DESCRIPTOR_HANDLE GetSrvHandleGPU(uint32_t index) const

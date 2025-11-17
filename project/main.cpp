@@ -565,24 +565,13 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 			object3d->SetRotate(transformSphere.rotate);
 			object3d->Update();
 
-			//ゲームの処理
-			/*transformSphere.rotate.y += 0.01f;*/
-			//Matrix4x4 worldMatrix = MakeAffineMatrix(transformSphere.scale, transformSphere.rotate, transformSphere.translate);
-			//Matrix4x4 cameraMatrix = MakeAffineMatrix(cameraTransform.scale, cameraTransform.rotate, cameraTransform.translate);
-			//Matrix4x4 viewMatrix = Inverse(cameraMatrix);
-			//Matrix4x4 projectionMatrix = MakePerspectiveFovMatrix(fovY, aspectRatio, nearZ, farZ);
-			////WVPMatrixを作る
-			//Matrix4x4 worldViewProjectMatrix = Multiply(worldMatrix, Multiply(debugCamera_.GetViewMatrix(), projectionMatrix));
-			//transformationMatrixDataSphere->WVP = worldViewProjectMatrix;
-			//transformationMatrixDataSphere->World = worldMatrix;
+			
 
 			for (auto* sprite : sprites)
 			{
 				sprite->SetPosition({ 0.0f,0.0f});
 				sprite->Update(windowAPI, &debugCamera_);
 			}
-
-		
 
 			//UVTransform用
 			Matrix4x4 uvTransformMatrix = MakeScaleMatrix(uvTransformSprite.scale);
