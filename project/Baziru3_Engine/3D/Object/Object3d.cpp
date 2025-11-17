@@ -30,6 +30,10 @@ void Object3d::Initialize(Object3dCom* object3dCom)
         modelData_.material.textureIndex =
             TextureManager::GetInstance()->GetTextureIndexByFilePath(modelData_.material.textureFilePath);
     }
+
+	//Transform変数の生成
+	transform = { {1.0f,1.0f,1.0f}, {0.0f,0.0f,0.0f}, {0.0f,0.0f,0.0f} };
+	cameraTransform = { {1.0f,1.0f,1.0f}, {0.0f,0.0f,0.0f}, {0.0f,0.0f,-10.0f} };
 }
 
 void Object3d::Update()

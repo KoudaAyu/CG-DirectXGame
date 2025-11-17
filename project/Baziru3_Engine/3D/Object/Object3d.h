@@ -99,6 +99,10 @@ public:
 		object3dCom_ = object3dCom;
 	}
 private:
+	Transform transform;
+	Transform cameraTransform;
+
+private:
 	Camera* camera_ = nullptr;
 	Object3dCom* object3dCom_ = nullptr;
 	Transform transform_;
