@@ -529,6 +529,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	camera->SetTranslate({ 0.0f,0.0f,-10.0f });
 	object3dCom->SetDefaultCamera(camera);
 
+	uint32_t instanceCount = 10;
+
 
 	//ウィンドウのxボタンが押されるまでループ
 	while (dxCommon->GetMsg().message != WM_QUIT)
@@ -649,7 +651,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 			if (drawSphere)
 			{
 				/*commandList->DrawIndexedInstanced(kIndexCount, 1, 0, 0, 0);*/
-				dxCommon->GetCommandList()->DrawInstanced(UINT(modelData.vertices.size()), 1, 0, 0);
+				dxCommon->GetCommandList()->DrawInstanced(UINT(modelData.vertices.size()), instanceCount, 0, 0);
 			}
 
 			if (drawSprite)
