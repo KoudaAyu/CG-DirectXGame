@@ -190,7 +190,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 	DirectXCom* dxCommon = nullptr;
 	dxCommon = new DirectXCom(windowAPI, logStream);
-	
+
 	dxCommon->DebugLayer();
 
 	//ウィンドウを表示する
@@ -205,7 +205,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	TextureManager::GetInstance()->LoadTexture("Resources/uvChecker.png");
 
 	SpriteCom* spriteCom = nullptr;
-	spriteCom = new SpriteCom(logStream,dxCommon);
+	spriteCom = new SpriteCom(logStream, dxCommon);
 	spriteCom->Initialize();
 
 
@@ -217,7 +217,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 		sprite->Initialize(spriteCom, "Resources/uvChecker.png");
 		sprites.push_back(sprite);
 	}
-	
+
 	spriteCom->CreateGraphicsPipeline();
 
 	// 既存の手動テクスチャ読み込みはそのまま利用（Sphere用）
@@ -330,7 +330,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 			indexData[idx++] = v1; // C
 
 			// 2つ目の三角形: v2, v3, v1 (B, D, C)
-			indexData[idx++] = v2; // B
+		indexData[idx++] = v2; // B
 			indexData[idx++] = v3; // D
 			indexData[idx++] = v1; // C
 		}
@@ -408,7 +408,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	// 書き込み完了後はUnmapを呼ぶ
 	directionalLight->Unmap(0, nullptr);
 
-	
+
 
 
 	//WVP用のリソースを作る。　Matrix4x4 1つのサイズを用意する
@@ -431,11 +431,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	// 書き込みが完了したので、マップを解除
 	transformationMatrixResourceSphere->Unmap(0, nullptr);
 
-	
+
 
 	//Transform変数を作る
-	Sprite::Transform transform = { {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };
-	
+	Sprite::Transform transformDebug = { {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };
+
 
 	//Sphere用
 	Sprite::Transform transformSphere{ {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };
@@ -462,13 +462,13 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	DirectX::ScratchImage mipImages = dxCommon->LoadTexture("./Resources/uvChecker.png");
 	const DirectX::TexMetadata& metadata = mipImages.GetMetadata();
 	Microsoft::WRL::ComPtr<ID3D12Resource> textureResource = CreateTextureResource(dxCommon->GetDevice(), metadata);
-	
+
 	//2枚目のTextureを読んで転送する
 	DirectX::ScratchImage mipImages2 = dxCommon->LoadTexture(modelData.material.textureFilePath);
 	const DirectX::TexMetadata& metadata2 = mipImages2.GetMetadata();
 	Microsoft::WRL::ComPtr<ID3D12Resource> textureResource2 = CreateTextureResource(dxCommon->GetDevice(), metadata2);
 
-	
+
 
 	Microsoft::WRL::ComPtr<ID3D12Resource> intermediateResource = dxCommon->UploadTextureData(textureResource, mipImages, dxCommon->GetDevice().Get(), dxCommon->GetCommandList());
 	Microsoft::WRL::ComPtr<ID3D12Resource> intermediateResource2 = dxCommon->UploadTextureData(textureResource2, mipImages2, dxCommon->GetDevice().Get(), dxCommon->GetCommandList());
@@ -487,7 +487,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	srvDesc2.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;//2Dテクスチャ
 	srvDesc2.Texture2D.MipLevels = UINT(metadata2.mipLevels);
 
-	
+
 	//SRVを生成するDescriptorHeapの場所を決める
 	D3D12_CPU_DESCRIPTOR_HANDLE textureSrvHandleCPU = dxCommon->GetSrvDescriptorHeap()->GetCPUDescriptorHandleForHeapStart();
 	D3D12_GPU_DESCRIPTOR_HANDLE textureSrvHandleGPU = dxCommon->GetSrvDescriptorHeap()->GetGPUDescriptorHandleForHeapStart();
@@ -509,7 +509,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	bool drawSphere = true;
 	bool drawSprite = true;
 
-	
+
 	//音声読み込み
 	Sound* sound_ = nullptr;
 	sound_ = new Sound();
@@ -530,6 +530,41 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	object3dCom->SetDefaultCamera(camera);
 
 	uint32_t instanceCount = 10;
+	const uint32_t kNumInstance = 10;
+	Microsoft::WRL::ComPtr<ID3D12Resource> instanceResource =
+		dxCommon->CreateBufferResource(dxCommon->GetDevice(), sizeof(TransformationMatrix) + kNumInstance);
+	TransformationMatrix* instanceData = nullptr;
+	instanceResource->Map(0, nullptr, reinterpret_cast<void**>(&instanceData));
+	for (uint32_t index = 0; index < kNumInstance; ++index)
+	{
+		instanceData[index].WVP = MakeIdentity4x4();
+		instanceData[index].World = MakeIdentity4x4();
+	}
+
+	D3D12_SHADER_RESOURCE_VIEW_DESC instanceSrvDesc{};
+	instanceSrvDesc.Format = DXGI_FORMAT_UNKNOWN;
+	instanceSrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+	instanceSrvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+	instanceSrvDesc.Buffer.FirstElement = 0;
+	instanceSrvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
+	instanceSrvDesc.Buffer.NumElements = kNumInstance;
+	instanceSrvDesc.Buffer.StructureByteStride = sizeof(TransformationMatrix);
+	D3D12_CPU_DESCRIPTOR_HANDLE instanceSrvHandleCPU =
+		dxCommon->GetCPUDescroptirHandle(dxCommon->GetSrvDescriptorHeap(),
+			dxCommon->GetDescriptorSizeSRV(), 4);
+	D3D12_GPU_DESCRIPTOR_HANDLE instanceSrvHandleGPU =
+		dxCommon->GetGPUDescriptorHandle(dxCommon->GetSrvDescriptorHeap(),
+			dxCommon->GetDescriptorSizeSRV(), 4);
+	dxCommon->GetDevice()->CreateShaderResourceView(
+		instanceResource.Get(), &instanceSrvDesc, instanceSrvHandleCPU);
+
+	Transform transform[kNumInstance];
+	for (uint32_t i = 0; i < kNumInstance; ++i)
+	{
+		transform[i].SetScale({ 1.0f, 1.0f, 1.0f });
+		transform[i].SetRotate({ 0.0f, 0.0f, 0.0f });
+		transform[i].SetTranslate({ i * 0.1f, i * 0.1f, i * 0.1f });
+	}
 
 
 	//ウィンドウのxボタンが押されるまでループ
@@ -545,7 +580,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 		else
 		{
 
-			
+
 
 			//if (windowAPI->ProcessMassage())
 			//{
@@ -567,11 +602,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 			object3d->SetRotate(transformSphere.rotate);
 			object3d->Update();
 
-			
+
 
 			for (auto* sprite : sprites)
 			{
-				sprite->SetPosition({ 0.0f,0.0f});
+				sprite->SetPosition({ 0.0f,0.0f });
 				sprite->Update(windowAPI, &debugCamera_);
 			}
 
@@ -586,6 +621,21 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 			directionalLight->Map(0, nullptr, reinterpret_cast<void**>(&directionalLightData));
 
+			for (uint32_t i = 0; i < kNumInstance; ++i)
+			{
+				Matrix4x4 worldMatrix = MakeAffineMatrix(
+					transform[i].GetScale(),
+					transform[i].GetRotate(),
+					transform[i].GetTranslate()
+				);
+
+				Matrix4x4 worldViewProjMatrix = Multiply(
+					worldMatrix,
+					camera->GetViewProjectionMatrix()
+				);
+				instanceData[i].WVP = worldViewProjMatrix;
+				instanceData[i].World = worldMatrix;
+			}
 
 			//開発用UIの処理、実際に開発用のUIを出す場合はここをゲーム固有の処理に置き換え
 
@@ -634,8 +684,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 			spriteCom->SetupDraw();
 
-		
-		//RootSignatureを設定。PSOに設定しているけれど別途設定が必要
+
+			//RootSignatureを設定。PSOに設定しているけれど別途設定が必要
 			dxCommon->GetCommandList()->SetGraphicsRootSignature(spriteCom->GetRootSignature().Get());
 			dxCommon->GetCommandList()->SetPipelineState(graphicPipelineState.Get()); //パイプラインステートを設定
 			//Sphereの描画
@@ -646,8 +696,12 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 			dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(0, materialResource->GetGPUVirtualAddress());
 			// Use Object3d WVP updated above
 			dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(1, object3d->GetTransformationMatrixResource()->GetGPUVirtualAddress());
+			/* dxCommon->GetCommandList()->SetGraphicsRootDescriptorTable(2, useMonsterBall ? textureSrvHandleGPU2 : textureSrvHandleGPU); */
 			dxCommon->GetCommandList()->SetGraphicsRootDescriptorTable(2, useMonsterBall ? textureSrvHandleGPU2 : textureSrvHandleGPU);
 			dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(3, directionalLight->GetGPUVirtualAddress());
+			dxCommon->GetCommandList()->SetGraphicsRootDescriptorTable(4, instanceSrvHandleGPU);
+
+
 			if (drawSphere)
 			{
 				/*commandList->DrawIndexedInstanced(kIndexCount, 1, 0, 0, 0);*/
@@ -703,7 +757,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 	TextureManager::GetInstance()->Finalize();
 
-	for(auto* sprite : sprites)
+	for (auto* sprite : sprites)
 	{
 		delete sprite;
 	}
