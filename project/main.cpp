@@ -532,7 +532,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	uint32_t instanceCount = 10;
 	const uint32_t kNumInstance = 10;
 	Microsoft::WRL::ComPtr<ID3D12Resource> instanceResource =
-		dxCommon->CreateBufferResource(dxCommon->GetDevice(), sizeof(TransformationMatrix) + kNumInstance);
+		dxCommon->CreateBufferResource(dxCommon->GetDevice(), sizeof(TransformationMatrix) * kNumInstance);
 	TransformationMatrix* instanceData = nullptr;
 	instanceResource->Map(0, nullptr, reinterpret_cast<void**>(&instanceData));
 	for (uint32_t index = 0; index < kNumInstance; ++index)

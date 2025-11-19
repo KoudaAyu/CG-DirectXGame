@@ -40,58 +40,61 @@ void SpriteCom::CreateGraphicsPipeline()
 
 void SpriteCom::Descriptor()
 {
-	// SRV: t3, t4
+	// 2 つの SRV レンジを用意する
+	// [0]: Vertex Shader 用のインスタンスバッファ (StructuredBuffer) -> t0
+	descriptorRange[0] = {};
 	descriptorRange[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-
-	//Particle用
-	descriptorRange[0].BaseShaderRegister = 0; //0から始まる
-	descriptorRange[0].NumDescriptors = 1; //数は1つ
-	descriptorRange[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV; //SRV
+	descriptorRange[0].NumDescriptors = 1;
+	descriptorRange[0].BaseShaderRegister = 0; // t0
+	descriptorRange[0].RegisterSpace = 0;
 	descriptorRange[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
-	//Sprite用
-	/*descriptorRange[0].NumDescriptors = 1;
-	descriptorRange[0].BaseShaderRegister = 3;
-	descriptorRange[0].RegisterSpace = 0;
-	descriptorRange[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;*/
-
-
+	// [1]: Pixel Shader 用のテクスチャ -> t3
+	descriptorRange[1] = {};
+	descriptorRange[1].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+	descriptorRange[1].NumDescriptors = 1;
+	descriptorRange[1].BaseShaderRegister = 3; // t3
+	descriptorRange[1].RegisterSpace = 0;
+	descriptorRange[1].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 }
 
 void SpriteCom::CreateRootParameters()
 {
 	//RootParemeter生成PuxelShaderのMaterialとVertexShaderのTransform
 
+	rootParameters[0] = {};
 	rootParameters[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;//CBVを使う
 	rootParameters[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL; //PixelShaderで使う
 	rootParameters[0].Descriptor.ShaderRegister = 0; //レジスタ番号0とバインド。b0の0と一致
 
-	
-
 	//Sprite用
+	rootParameters[1] = {};
 	rootParameters[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
 	rootParameters[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;//VertexShaderで使える
 	rootParameters[1].Descriptor.ShaderRegister = 0;//レジスタ番号0を使用
 
-	//rootParameters[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;//DescriptorTableを使う
-	//rootParameters[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;//PixelShaderで使う
-	//rootParameters[2].DescriptorTable.pDescriptorRanges = descriptorRange;//Tableの中身の配列を指定
-	//rootParameters[2].DescriptorTable.NumDescriptorRanges = _countof(descriptorRange);//Tableで管理する数
+	// [2]: PixelShader のテクスチャ SRV テーブル (t3)
+	rootParameters[2] = {};
+	rootParameters[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;//DescriptorTableを使う
+	rootParameters[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;//PixelShaderで使う
+	rootParameters[2].DescriptorTable.pDescriptorRanges = &descriptorRange[1];// テクスチャSRV
+	rootParameters[2].DescriptorTable.NumDescriptorRanges = 1;
 
+	// [3]: DirectionalLight の CBV b1 (PS)
+	rootParameters[3] = {};
 	rootParameters[3].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
 	rootParameters[3].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 	rootParameters[3].Descriptor.ShaderRegister = 1;
 
-	//Particle用
+	// [4]: VertexShader のインスタンス StructuredBuffer SRV テーブル (t0)
+	rootParameters[4] = {};
 	rootParameters[4].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
 	rootParameters[4].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
-	rootParameters[4].DescriptorTable.pDescriptorRanges = descriptorRange;
-	rootParameters[4].DescriptorTable.NumDescriptorRanges = _countof(descriptorRange);
+	rootParameters[4].DescriptorTable.pDescriptorRanges = &descriptorRange[0];
+	rootParameters[4].DescriptorTable.NumDescriptorRanges = 1;
 
 	descriptionRootSignature.pParameters = rootParameters; //ルートパラメーター配列へのポインタ
 	descriptionRootSignature.NumParameters = _countof(rootParameters);//配列の長さ
-
-
 }
 
 void SpriteCom::StaticSamplers()

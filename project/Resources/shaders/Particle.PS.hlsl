@@ -27,10 +27,18 @@ struct PixelShaderOutput
     float32_t4 color : SV_TARGET0;
 };
 
-PixelShaderOutput main(VertexShaderOutput input)
+PixelShaderOutput main(VertexShaderOutput input, bool isFrontFace : SV_IsFrontFace)
 {
     PixelShaderOutput output;
-    float3 transformedUV = mul(float32_t4(input.texcoord, 0.0f, 1.0f), gMaterial.uvTransform);
+
+   
+    float2 uv = input.texcoord;
+    if (!isFrontFace)
+    {
+        uv.x = 1.0f - uv.x;
+    }
+
+    float3 transformedUV = mul(float32_t4(uv, 0.0f, 1.0f), gMaterial.uvTransform);
     float32_t4 textureColor = gTexture.Sample(gSample, transformedUV.xy);
     output.color = gMaterial.color * textureColor;
     
