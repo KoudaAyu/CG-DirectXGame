@@ -506,7 +506,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	//SRVの切り替え
 	bool useMonsterBall = true;
 	//Sphereの描画切り替え
-	bool drawSphere = true;
+	bool drawParticle = true;
 	bool drawSprite = true;
 
 
@@ -658,7 +658,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 			{
 				ImGui::Checkbox("LightSphere Flag", (bool*)&sprite->GetMaterialDataSprite()->enableLighting);
 			}
-			ImGui::Checkbox("DrawSphere", &drawSphere);
+			ImGui::Checkbox("DrawParticle", &drawParticle);
 			ImGui::Checkbox("DrawSprite", &drawSprite);
 			ImGui::DragFloat3("LightDirection", &directionalLightData->direction.x, 0.01f, -10.0f, 10.0f);
 
@@ -702,7 +702,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 			dxCommon->GetCommandList()->SetGraphicsRootDescriptorTable(4, instanceSrvHandleGPU);
 
 
-			if (drawSphere)
+			if (drawParticle)
 			{
 				/*commandList->DrawIndexedInstanced(kIndexCount, 1, 0, 0, 0);*/
 				dxCommon->GetCommandList()->DrawInstanced(UINT(modelData.vertices.size()), instanceCount, 0, 0);
