@@ -739,6 +739,48 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 				drawParticle = false;
 			}
 
+			// Additional particle presets on keys 3..0
+			if (inputManager.TriggerKey(DIK_3))
+			{
+				particleSystem->SpawnSpiral();
+				drawParticle = false;
+			}
+			if (inputManager.TriggerKey(DIK_4))
+			{
+				particleSystem->SpawnFountain();
+				drawParticle = false;
+			}
+			if (inputManager.TriggerKey(DIK_5))
+			{
+				particleSystem->SpawnBurst();
+				drawParticle = false;
+			}
+			if (inputManager.TriggerKey(DIK_6))
+			{
+				particleSystem->SpawnSmoke();
+				drawParticle = false;
+			}
+			if (inputManager.TriggerKey(DIK_7))
+			{
+				particleSystem->SpawnRain();
+				drawParticle = false;
+			}
+			if (inputManager.TriggerKey(DIK_8))
+			{
+				particleSystem->SpawnRing();
+				drawParticle = false;
+			}
+			if (inputManager.TriggerKey(DIK_9))
+			{
+				particleSystem->SpawnHelix();
+				drawParticle = false;
+			}
+			if (inputManager.TriggerKey(DIK_0))
+			{
+				particleSystem->SpawnExpanding();
+				drawParticle = false;
+			}
+
 			// Update particle system (use fixed dt)
 			const float dt = 1.0f / 60.0f;
 			particleSystem->Update(dt, camera);
