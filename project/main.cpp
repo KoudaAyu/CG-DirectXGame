@@ -233,7 +233,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	particleSrvDesc.Buffer.FirstElement = 0;
 	particleSrvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
 	particleSrvDesc.Buffer.NumElements = particleSystem->GetNumInstances();
-	particleSrvDesc.Buffer.StructureByteStride = sizeof(TransformationMatrix);
+	// Must match the struct used in the particle vertex shader (InstanceData including alpha)
+	particleSrvDesc.Buffer.StructureByteStride = sizeof(ParticleSystem::InstanceData);
 
 	D3D12_CPU_DESCRIPTOR_HANDLE particleInstanceSrvHandleCPU =
 		dxCommon->GetCPUDescroptirHandle(dxCommon->GetSrvDescriptorHeap(), dxCommon->GetDescriptorSizeSRV(), 5);
@@ -580,14 +581,16 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 	uint32_t instanceCount = 10;
 	const uint32_t kNumInstance = 10;
+	// Use the same instance data layout as the particle system (includes alpha)
 	Microsoft::WRL::ComPtr<ID3D12Resource> instanceResource =
-		dxCommon->CreateBufferResource(dxCommon->GetDevice(), sizeof(TransformationMatrix) * kNumInstance);
-	TransformationMatrix* instanceData = nullptr;
+		dxCommon->CreateBufferResource(dxCommon->GetDevice(), sizeof(ParticleSystem::InstanceData) * kNumInstance);
+	ParticleSystem::InstanceData* instanceData = nullptr;
 	instanceResource->Map(0, nullptr, reinterpret_cast<void**>(&instanceData));
 	for (uint32_t index = 0; index < kNumInstance; ++index)
 	{
-		instanceData[index].WVP = MakeIdentity4x4();
-		instanceData[index].World = MakeIdentity4x4();
+		instanceData[index].tm.WVP = MakeIdentity4x4();
+		instanceData[index].tm.World = MakeIdentity4x4();
+		instanceData[index].alpha = 1.0f;
 	}
 
 	D3D12_SHADER_RESOURCE_VIEW_DESC instanceSrvDesc{};
@@ -597,7 +600,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	instanceSrvDesc.Buffer.FirstElement = 0;
 	instanceSrvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
 	instanceSrvDesc.Buffer.NumElements = kNumInstance;
-	instanceSrvDesc.Buffer.StructureByteStride = sizeof(TransformationMatrix);
+	// Structure stride must match the struct used in the vertex shader
+	instanceSrvDesc.Buffer.StructureByteStride = sizeof(ParticleSystem::InstanceData);
 	D3D12_CPU_DESCRIPTOR_HANDLE instanceSrvHandleCPU =
 		dxCommon->GetCPUDescroptirHandle(dxCommon->GetSrvDescriptorHeap(),
 			dxCommon->GetDescriptorSizeSRV(), 4);
@@ -680,8 +684,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 					worldMatrix,
 					camera->GetViewProjectionMatrix()
 				);
-				instanceData[i].WVP = worldViewProjMatrix;
-				instanceData[i].World = worldMatrix;
+				instanceData[i].tm.WVP = worldViewProjMatrix;
+				instanceData[i].tm.World = worldMatrix;
 			}
 
 			//開発用UIの処理、実際に開発用のUIを出す場合はここをゲーム固有の処理に置き換え

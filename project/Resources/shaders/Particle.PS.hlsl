@@ -31,7 +31,6 @@ PixelShaderOutput main(VertexShaderOutput input, bool isFrontFace : SV_IsFrontFa
 {
     PixelShaderOutput output;
 
-   
     float2 uv = input.texcoord;
     if (!isFrontFace)
     {
@@ -41,12 +40,14 @@ PixelShaderOutput main(VertexShaderOutput input, bool isFrontFace : SV_IsFrontFa
     float3 transformedUV = mul(float32_t4(uv, 0.0f, 1.0f), gMaterial.uvTransform);
     float32_t4 textureColor = gTexture.Sample(gSample, transformedUV.xy);
     output.color = gMaterial.color * textureColor;
-    
-    if (output.color.a == 0.0)
+
+    // Modulate final alpha by per-instance alpha passed from VS
+    output.color.a *= input.alpha;
+
+    if (output.color.a <= 0.01)
     {
         discard;
     }
-    
-  
+
     return output;
 }

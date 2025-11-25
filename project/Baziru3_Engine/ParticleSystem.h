@@ -42,18 +42,30 @@ public:
     bool HasAliveParticles() const;
     bool IsColorCycleActive() const;
 
+    // public instance data layout so external code can create SRV with correct stride
+    struct InstanceData
+    {
+        TransformationMatrix tm; // WVP + World
+        float alpha;             // alpha value (0..1)
+        float pad[3];            // padding to align to 16 bytes
+    };
+
+    // Setter to control fade speed (exponent > 1 -> faster near end)
+    void SetAlphaExponent(float e) { alphaExponent_ = e; }
+
 private:
     struct Particle
     {
         Vector3 pos;
         Vector3 vel;
         float life;
+        float initialLife; // store initial life for alpha calculation
     };
 
     uint32_t numInstances_ = 8;
     Particle* particles_ = nullptr;
     Microsoft::WRL::ComPtr<ID3D12Resource> instanceResource_ = nullptr;
-    TransformationMatrix* instanceData_ = nullptr;
+    InstanceData* instanceData_ = nullptr;
     DirectXCom* dxCommon_ = nullptr;
     Sprite* quad_ = nullptr;
 
@@ -67,6 +79,9 @@ private:
 
     Microsoft::WRL::ComPtr<ID3D12Resource> materialResource_ = nullptr;
     Sprite::Material* materialDataLocal_ = nullptr;
+
+    // exponent applied to normalized life when computing alpha. >1 => faster fade
+    float alphaExponent_ = 2.0f;
 };
 
 // Inline implementations
@@ -90,14 +105,16 @@ inline void ParticleSystem::Initialize(DirectXCom* dxCommon, Sprite* quadSprite,
         particles_[i].pos = {0.0f,0.0f,0.0f};
         particles_[i].vel = {0.0f,0.0f,0.0f};
         particles_[i].life = 0.0f;
+        particles_[i].initialLife = 1.0f;
     }
 
-    instanceResource_ = dxCommon_->CreateBufferResource(dxCommon_->GetDevice(), sizeof(TransformationMatrix) * numInstances_);
+    instanceResource_ = dxCommon_->CreateBufferResource(dxCommon_->GetDevice(), sizeof(InstanceData) * numInstances_);
     instanceResource_->Map(0, nullptr, reinterpret_cast<void**>(&instanceData_));
     for (uint32_t i = 0; i < numInstances_; ++i)
     {
-        instanceData_[i].WVP = MakeIdentity4x4();
-        instanceData_[i].World = MakeIdentity4x4();
+        instanceData_[i].tm.WVP = MakeIdentity4x4();
+        instanceData_[i].tm.World = MakeIdentity4x4();
+        instanceData_[i].alpha = 0.0f;
     }
 
     materialResource_ = dxCommon_->CreateBufferResource(dxCommon_->GetDevice(), sizeof(Sprite::Material));
@@ -117,6 +134,7 @@ inline void ParticleSystem::Spawn8()
         particles_[i].pos = {0.0f,0.0f,0.0f};
         particles_[i].vel = {cosf(angle) * speed, sinf(angle) * speed, 0.0f};
         particles_[i].life = 3.0f;
+        particles_[i].initialLife = particles_[i].life;
     }
     particleColor_ = {1.0f,0.5f,0.2f,1.0f};
     particleScale_ = 0.45f;
@@ -141,6 +159,7 @@ inline void ParticleSystem::SpawnFirework()
         particles_[i].pos = { originX + biasDist(rng_) * 0.2f, originY + biasDist(rng_) * 0.2f, 0.0f };
         particles_[i].vel = { cosf(angle) * speed * 0.7f, sinf(angle) * speed * 0.7f + upBias, 0.0f };
         particles_[i].life = 2.5f + biasDist(rng_) * 0.8f;
+        particles_[i].initialLife = particles_[i].life;
     }
     particleColor_ = {1.0f,0.85f,0.4f,1.0f};
     particleScale_ = 0.35f;
@@ -160,6 +179,7 @@ inline void ParticleSystem::SpawnSpiral()
         particles_[i].pos = {0.0f,0.0f,0.0f};
         particles_[i].vel = {cosf(angle) * r * 2.5f, sinf(angle) * r * 2.5f + 1.0f * t, 0.0f};
         particles_[i].life = 3.0f + t * 2.0f;
+        particles_[i].initialLife = particles_[i].life;
     }
     particleColor_ = {0.4f,0.8f,1.0f,1.0f};
     particleScale_ = 0.4f;
@@ -178,6 +198,7 @@ inline void ParticleSystem::SpawnFountain()
         particles_[i].pos = {0.0f,-1.0f,0.0f};
         particles_[i].vel = {ang * 2.0f, speed, 0.0f};
         particles_[i].life = 2.0f + (float(i) / numInstances_) * 1.5f;
+        particles_[i].initialLife = particles_[i].life;
     }
     particleColor_ = {0.8f,0.9f,0.3f,1.0f};
     particleScale_ = 0.5f;
@@ -196,6 +217,7 @@ inline void ParticleSystem::SpawnBurst()
         particles_[i].pos = {0.0f,0.0f,0.0f};
         particles_[i].vel = {cosf(a) * s, sinf(a) * s, 0.0f};
         particles_[i].life = 1.2f + (s / 12.0f) * 1.5f;
+        particles_[i].initialLife = particles_[i].life;
     }
     particleColor_ = {1.0f,0.3f,0.9f,1.0f};
     particleScale_ = 0.3f;
@@ -212,6 +234,7 @@ inline void ParticleSystem::SpawnSmoke()
         particles_[i].pos = {spread(rng_) * 0.5f, -1.0f + spread(rng_) * 0.2f, 0.0f};
         particles_[i].vel = {spread(rng_) * 0.2f, up(rng_) * 0.5f + 0.2f, 0.0f};
         particles_[i].life = 4.0f + (float(i) / numInstances_) * 2.0f;
+        particles_[i].initialLife = particles_[i].life;
     }
     particleColor_ = {0.15f,0.15f,0.15f,0.9f};
     particleScale_ = 0.9f;
@@ -228,6 +251,7 @@ inline void ParticleSystem::SpawnRain()
         particles_[i].pos = {xDist(rng_), yDist(rng_), 0.0f};
         particles_[i].vel = {0.0f, -6.0f - (float(i) / numInstances_) * 2.0f, 0.0f};
         particles_[i].life = 1.5f + (float(i) / numInstances_) * 0.8f;
+        particles_[i].initialLife = particles_[i].life;
     }
     particleColor_ = {0.4f,0.6f,1.0f,1.0f};
     particleScale_ = 0.25f;
@@ -246,6 +270,7 @@ inline void ParticleSystem::SpawnRing()
         particles_[i].pos = {cosf(a) * r * 0.1f, sinf(a) * r * 0.1f, 0.0f};
         particles_[i].vel = {cosf(a) * r * 5.0f, sinf(a) * r * 5.0f, 0.0f};
         particles_[i].life = 2.2f + (float(i) / numInstances_) * 1.0f;
+        particles_[i].initialLife = particles_[i].life;
     }
     particleColor_ = {1.0f,0.6f,0.2f,1.0f};
     particleScale_ = 0.5f;
@@ -264,6 +289,7 @@ inline void ParticleSystem::SpawnHelix()
         particles_[i].pos = {cosf(angle) * 0.2f, -1.0f + height, sinf(angle) * 0.2f};
         particles_[i].vel = {-sinf(angle) * 2.5f, 2.0f + t * 1.5f, cosf(angle) * 2.5f};
         particles_[i].life = 3.0f + t * 2.0f;
+        particles_[i].initialLife = particles_[i].life;
     }
     particleColor_ = {0.9f,0.4f,0.7f,1.0f};
     particleScale_ = 0.45f;
@@ -282,6 +308,7 @@ inline void ParticleSystem::SpawnExpanding()
         particles_[i].pos = {cosf(a) * 0.2f * s, sinf(a) * 0.2f * s, 0.0f};
         particles_[i].vel = {cosf(a) * s * 1.5f, sinf(a) * s * 1.5f, 0.0f};
         particles_[i].life = 3.0f + s;
+        particles_[i].initialLife = particles_[i].life;
     }
     particleColor_ = {0.6f,1.0f,0.6f,0.9f};
     particleScale_ = 0.6f;
@@ -310,8 +337,20 @@ inline void ParticleSystem::Update(float dt, Camera* camera)
         Vector3 translate = particles_[i].pos;
         Matrix4x4 world = MakeAffineMatrix(scale, rotate, translate);
         Matrix4x4 wvp = Multiply(world, camera->GetViewProjectionMatrix());
-        instanceData_[i].World = world;
-        instanceData_[i].WVP = wvp;
+        instanceData_[i].tm.World = world;
+        instanceData_[i].tm.WVP = wvp;
+
+        // compute alpha based on remaining life and initialLife (clamped)
+        float alpha = 0.0f;
+        if (particles_[i].initialLife > 0.0f)
+        {
+            float t = particles_[i].life / particles_[i].initialLife;
+            if (t < 0.0f) t = 0.0f;
+            if (t > 1.0f) t = 1.0f;
+            // apply exponent to make fade faster when exponent > 1
+            alpha = powf(t, alphaExponent_);
+        }
+        instanceData_[i].alpha = alpha;
     }
 }
 

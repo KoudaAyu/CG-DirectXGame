@@ -1,11 +1,14 @@
 #include "Resources/shaders/Particle.hlsli"
 
-struct TransformationMatrix
+struct InstanceData
 {
     float32_t4x4 WVP;
     float32_t4x4 World;
+    float alpha;
+    float3 pad; // padding to 16-byte boundary
 };
-StructuredBuffer<TransformationMatrix> gTransformationMatrices : register(t0);
+
+StructuredBuffer<InstanceData> gInstanceData : register(t0);
 
 struct VertecShederInput
 {
@@ -17,9 +20,12 @@ struct VertecShederInput
 VertexShaderOutput main(VertecShederInput input,uint32_t instanceId : SV_InstanceID)
 {
     VertexShaderOutput output;
-    output.position = mul(input.position, gTransformationMatrices[instanceId].WVP);
+    output.position = mul(input.position, gInstanceData[instanceId].WVP);
     output.texcoord = input.texcoord;
-    output.normal = normalize(mul(input.normal, (float32_t3x3) gTransformationMatrices[instanceId].World));
+    output.normal = normalize(mul(input.normal, (float32_t3x3) gInstanceData[instanceId].World));
+    // pack alpha into texcoord.z (or extend VertexShaderOutput to carry alpha) but reuse available fields: here extend by adding .w component to texcoord isn't possible
+    // So add a new semantic in VertexShaderOutput for alpha. Update Particle.hlsli accordingly.
+    output.alpha = gInstanceData[instanceId].alpha;
     return output;
 }
 
