@@ -37,6 +37,9 @@ void ParticleSystem::Initialize(DirectXCom* dxCommon, Sprite* quadSprite, uint32
 		instanceData_[i].WVP = MakeIdentity4x4();
 		instanceData_[i].World = MakeIdentity4x4();
 	}
+
+	// Seed RNG
+	rng_.seed(static_cast<unsigned int>(std::chrono::high_resolution_clock::now().time_since_epoch().count()));
 }
 
 void ParticleSystem::Spawn8()
@@ -50,14 +53,45 @@ void ParticleSystem::Spawn8()
 		particles_[i].vel = { cosf(angle) * speed, sinf(angle) * speed, 0.0f };
 		particles_[i].life = 3.0f;
 	}
+	// This is not the firework spawn, so disable color cycling
+	colorCycleActive_ = false;
+}
+
+void ParticleSystem::SpawnFirework()
+{
+	// Firework: particles start near bottom, shoot up a bit and spread outward
+	std::uniform_real_distribution<float> angleDist(0.0f, DirectX::XM_2PI);
+	std::uniform_real_distribution<float> speedDist(2.0f, 8.0f);
+	std::uniform_real_distribution<float> biasDist(-1.0f, 1.0f);
+
+	// Launch origin slightly randomized horizontally
+	float originX = biasDist(rng_) * 2.0f;
+	float originY = -3.0f; // bottom area
+
+	for (uint32_t i = 0; i < numInstances_; ++i)
+	{
+		float angle = angleDist(rng_);
+		float speed = speedDist(rng_);
+		// upward bias so that particles also go up
+		float upBias = 6.0f + biasDist(rng_) * 2.0f;
+		particles_[i].pos = { originX + biasDist(rng_) * 0.2f, originY + biasDist(rng_) * 0.2f, 0.0f };
+		particles_[i].vel = { cosf(angle) * speed * 0.7f, sinf(angle) * speed * 0.7f + upBias, 0.0f };
+		particles_[i].life = 2.5f + biasDist(rng_) * 0.8f; // vary lifetime
+	}
+	// Enable color cycling for this spawn
+	colorCycleActive_ = true;
 }
 
 void ParticleSystem::Update(float dt, Camera* camera)
 {
+	bool anyAlive = false;
 	for (uint32_t i = 0; i < numInstances_; ++i)
 	{
 		if (particles_[i].life > 0.0f)
 		{
+			anyAlive = true;
+			// apply simple gravity
+			particles_[i].vel.y -= 9.8f * dt * 0.5f; // scaled gravity for visual effect
 			particles_[i].pos.x += particles_[i].vel.x * dt;
 			particles_[i].pos.y += particles_[i].vel.y * dt;
 			particles_[i].pos.z += particles_[i].vel.z * dt;
@@ -71,6 +105,12 @@ void ParticleSystem::Update(float dt, Camera* camera)
 		Matrix4x4 wvp = Multiply(world, camera->GetViewProjectionMatrix());
 		instanceData_[i].World = world;
 		instanceData_[i].WVP = wvp;
+	}
+
+	// If no particles are alive, disable color cycling
+	if (!anyAlive)
+	{
+		colorCycleActive_ = false;
 	}
 }
 
@@ -104,4 +144,18 @@ void ParticleSystem::Draw(D3D12_GPU_DESCRIPTOR_HANDLE textureSrvGPU, D3D12_GPU_D
 	if (aliveCount == 0) return; // nothing to draw
 
 	cmd->DrawIndexedInstanced(6, aliveCount, 0, 0, 0);
+}
+
+bool ParticleSystem::HasAliveParticles() const
+{
+	for (uint32_t i = 0; i < numInstances_; ++i)
+	{
+		if (particles_[i].life > 0.0f) return true;
+	}
+	return false;
+}
+
+bool ParticleSystem::IsColorCycleActive() const
+{
+	return colorCycleActive_;
 }

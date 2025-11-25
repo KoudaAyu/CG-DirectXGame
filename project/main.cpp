@@ -475,6 +475,32 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	//uvTransform行列の初期化
 	materialData->uvTransform = MakeIdentity4x4();
 
+	// Particle color animation phase
+	float particleColorPhase = 0.0f;
+
+	// Helper: HSV to RGB (h in [0,1], s in [0,1], v in [0,1])
+	auto HSVtoRGB = [](float h, float s, float v){
+		float r = 0, g = 0, b = 0;
+		if (s <= 0.0f) { r = g = b = v; }
+		else {
+			h = fmodf(h, 1.0f) * 6.0f;
+			int i = static_cast<int>(floorf(h));
+			float f = h - (float)i;
+			float p = v * (1.0f - s);
+			float q = v * (1.0f - s * f);
+			float t = v * (1.0f - s * (1.0f - f));
+			switch (i) {
+			case 0: r = v; g = t; b = p; break;
+			case 1: r = q; g = v; b = p; break;
+			case 2: r = p; g = v; b = t; break;
+			case 3: r = p; g = q; b = v; break;
+			case 4: r = t; g = p; b = v; break;
+			case 5: default: r = v; g = p; b = q; break;
+			}
+		}
+		return std::array<float,3>{r,g,b};
+	};
+
 
 	float fovY = 0.45f;  // 資料通り
 	float aspectRatio = static_cast<float>(windowAPI->GetClientWidth()) / static_cast<float>(windowAPI->GetClientHeight());
@@ -518,7 +544,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	D3D12_CPU_DESCRIPTOR_HANDLE textureSrvHandleCPU2 = dxCommon->GetCPUDescroptirHandle(dxCommon->GetSrvDescriptorHeap(), dxCommon->GetDescriptorSizeSRV(), 2);
 	D3D12_GPU_DESCRIPTOR_HANDLE textureSrvHandleGPU2 = dxCommon->GetGPUDescriptorHandle(dxCommon->GetSrvDescriptorHeap(), dxCommon->GetDescriptorSizeSRV(), 2);
 
-	//先頭はImGuiに使用しているためその次を使う
+	//先頭はImGuiに使用している為その次を使う
 	textureSrvHandleCPU.ptr += dxCommon->GetDevice()->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 	textureSrvHandleGPU.ptr += dxCommon->GetDevice()->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 	//SRVの生成
@@ -706,8 +732,31 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 				drawParticle = false; // Stop drawing the 10 instanced objects
 			}
 
+			// Spawn firework on key '2'
+			if (inputManager.TriggerKey(DIK_2))
+			{
+				particleSystem->SpawnFirework();
+				drawParticle = false;
+			}
+
 			// Update particle system (use fixed dt)
-			particleSystem->Update(1.0f / 60.0f, camera);
+			const float dt = 1.0f / 60.0f;
+			particleSystem->Update(dt, camera);
+
+			// Animate material color only when the particle system was spawned by firework (key 2)
+			if (particleSystem->IsColorCycleActive() && particleSystem->HasAliveParticles())
+             {
+                 particleColorPhase += dt * 0.2f; // speed of color change
+                 if (particleColorPhase >= 1.0f) particleColorPhase -= 1.0f;
+                 auto rgb = HSVtoRGB(particleColorPhase, 1.0f, 1.0f);
+
+                 // Map material resource and write new color
+                 Sprite::Material* mappedMaterial = nullptr;
+                 materialResource->Map(0, nullptr, reinterpret_cast<void**>(&mappedMaterial));
+                 mappedMaterial->color = { rgb[0], rgb[1], rgb[2], 1.0f };
+                 materialResource->Unmap(0, nullptr);
+             }
+
 
 			dxCommon->PreDraw();
 
