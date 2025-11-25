@@ -4,6 +4,7 @@
 #include"DirectXCom.h"
 #include"Matrix4x4.h"
 #include"Vector.h"
+#include <string>
 
 class SpriteCom;
 
@@ -44,6 +45,13 @@ public:
 
 	void ReflectionProcessing();
 
+	// 追加: 一発生成用のファクトリ
+	static Sprite* Create(SpriteCom* spriteCom, const std::string& textureFilePath);
+	// 追加: テクスチャ設定（ファイル名指定）
+	void SetTextureByFile(const std::string& filePath);
+	// 追加: ディレクショナルライトCBV
+	void SetDirectionalLightResource(const Microsoft::WRL::ComPtr<ID3D12Resource>& resource) { directionalLightResourceSprite = resource; }
+
 public:
 
 	const Microsoft::WRL::ComPtr<ID3D12Resource>& GetVertexResourceSprite() const { return vertexResourceSprite; }
@@ -68,6 +76,9 @@ public:
 	}
 	const Microsoft::WRL::ComPtr<ID3D12Resource>& GetTransformationMatrixResourceSprite() const { return transformationMatrixResourceSprite; }
 
+	// 追加: このスプライトが保持するSRV GPUハンドルを取得
+	D3D12_GPU_DESCRIPTOR_HANDLE GetTextureSrvHandleGPU() const { return textureSrvHandleGPU_; }
+	int32_t GetTextureIndex() const { return textureIndex_; }
 
 public:
 	//Spriteの座標関係
@@ -107,4 +118,11 @@ private:
 	Microsoft::WRL::ComPtr<ID3D12Resource> materialResourceSprite = nullptr;
 	Microsoft::WRL::ComPtr<ID3D12Resource> transformationMatrixResourceSprite = nullptr;
 	TransformationMatrix* transformationMatrixDataSprite = nullptr;
+
+	// 追加: テクスチャ関連
+	std::string textureFilePath_{};
+	int32_t textureIndex_ = -1;
+	D3D12_GPU_DESCRIPTOR_HANDLE textureSrvHandleGPU_{};
+	// 追加: ディレクショナルライトCBV
+	Microsoft::WRL::ComPtr<ID3D12Resource> directionalLightResourceSprite = nullptr;
 };

@@ -34,6 +34,10 @@ void TextureManager::LoadTexture(const std::string& filePath)
 	if (!directXCom_) {
 		return;
 	}
+	// 既に読み込み済みの場合は何もしない
+	if (GetTextureIndexByFilePath(filePath) >= 0) {
+		return;
+	}
 	//テクスチャファイルを読み込んでプログラムで使えるようにする
 	DirectX::ScratchImage image{};
 	std::wstring filePathW = StringUtil::ConvertString(filePath);
@@ -56,8 +60,13 @@ void TextureManager::LoadTexture(const std::string& filePath)
 	textureData.resource_ =
 		directXCom_->CreateTextureResource(textureData.metadata_);
 
-	//テクスチャデータの要素数番号をSRVのインデックスとする
-	uint32_t srvIndex = static_cast<uint32_t>(textureDatas_.size() - 1);
+	// SRV割り当て: 0 は ImGui 用に予約する
+	const uint32_t descriptorSize = directXCom_->GetDescriptorSizeSRV();
+	const uint32_t heapReservedForImGui = 1u;
+	// ベクタ上のインデックス
+	uint32_t vecIndex = static_cast<uint32_t>(textureDatas_.size() - 1);
+	uint32_t srvIndex = heapReservedForImGui + vecIndex;
+	textureData.srvIndex_ = srvIndex;
 
 	textureData.srvHandleCPU_ =
 		directXCom_->GetSRVHandleCPU(srvIndex);
@@ -81,7 +90,8 @@ int32_t TextureManager::GetTextureIndexByFilePath(const std::string& filePath) c
 	{
 		if (textureDatas_[i].filePath_ == filePath)
 		{
-			return static_cast<int32_t>(i);
+			// SRVインデックスを返す
+			return static_cast<int32_t>(textureDatas_[i].srvIndex_);
 		}
 	}
 	return -1; // 見つからなかった

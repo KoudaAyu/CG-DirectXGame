@@ -1,5 +1,6 @@
 #include"Sprite.h"
 #include"SpriteCom.h"
+#include"TextureManager.h"
 
 #include<cassert>
 
@@ -54,11 +55,24 @@ void Sprite::Update(WindowAPI* windowAPI, DebugCamera* debugCamera_)
 
 void Sprite::Draw()
 {
-	CreateVertexBufferView();
-	CreateIndexBufferView();
+	// IA と Root の設定 + SRV のバインド + DrawCall をここに集約
+	dxCommon->GetCommandList()->IASetVertexBuffers(0, 1, &vertexBufferViewSprite);
+	dxCommon->GetCommandList()->IASetIndexBuffer(&indexBufferViewSprite);
+	dxCommon->GetCommandList()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
 	dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(0, materialResourceSprite->GetGPUVirtualAddress());
 	dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(1, transformationMatrixResourceSprite->GetGPUVirtualAddress());
+	// Texture
+	if (textureIndex_ >= 0 && textureSrvHandleGPU_.ptr != 0) {
+		dxCommon->GetCommandList()->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU_);
+	}
+	// Directional Light
+	if (directionalLightResourceSprite) {
+		dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(3, directionalLightResourceSprite->GetGPUVirtualAddress());
+	}
 
+	// Draw quad
+	dxCommon->GetCommandList()->DrawIndexedInstanced(6, 1, 0, 0, 0);
 }
 
 void Sprite::CreateIndexBufferView()
@@ -134,4 +148,38 @@ void Sprite::ReflectionProcessing()
 	vertexData[3].normal = { 0.0f,0.0f,-1.0f };
 
 
+}
+
+// 追加: 一発生成ファクトリ実装
+Sprite* Sprite::Create(SpriteCom* spriteCom, const std::string& textureFilePath)
+{
+	Sprite* sprite = new Sprite();
+	sprite->Initialize(spriteCom);
+	if (!textureFilePath.empty()) {
+		sprite->SetTextureByFile(textureFilePath);
+	}
+	return sprite;
+}
+
+// 追加: テクスチャ設定（ファイルパス指定）
+void Sprite::SetTextureByFile(const std::string& filePath)
+{
+	textureFilePath_ = filePath;
+	TextureManager* tm = TextureManager::GetInstance();
+	if (!tm) { return; }
+
+	// TextureManager の初期化と DX コンテキストを確実に設定
+	tm->Initialize();
+	tm->SetDirectXCom(dxCommon);
+
+	int32_t idx = tm->GetTextureIndexByFilePath(filePath);
+	if (idx < 0) {
+		// 未ロードならロード
+		tm->LoadTexture(filePath);
+		idx = tm->GetTextureIndexByFilePath(filePath);
+	}
+	textureIndex_ = idx;
+	if (textureIndex_ >= 0 && dxCommon) {
+		textureSrvHandleGPU_ = dxCommon->GetSRVHandleGPU(static_cast<uint32_t>(textureIndex_));
+	}
 }
