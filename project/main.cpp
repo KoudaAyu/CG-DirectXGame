@@ -659,7 +659,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 				ImGui::Checkbox("LightSphere Flag", (bool*)&sprite->GetMaterialDataSprite()->enableLighting);
 			}
 			ImGui::Checkbox("DrawParticle", &drawParticle);
-			ImGui::Checkbox("DrawSprite", &drawSprite);
+			
 			ImGui::DragFloat3("LightDirection", &directionalLightData->direction.x, 0.01f, -10.0f, 10.0f);
 
 			ImGui::DragFloat3("Sphere Rotate", &transformSphere.rotate.x, 0.01f, -10.0f, 10.0f);
@@ -708,13 +708,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 				dxCommon->GetCommandList()->DrawInstanced(UINT(modelData.vertices.size()), instanceCount, 0, 0);
 			}
 
-			if (drawSprite)
-			{
-				for (auto* sprite : sprites)
-				{
-					sprite->Draw();
-				}
-			}
+			
 
 
 			//実際のcommandListのImGuiの描画コマンドを積む
