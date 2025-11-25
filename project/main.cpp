@@ -16,6 +16,7 @@
 #include"TextureManager.h"
 #include"Vector.h"
 #include"WindowsAPI.h"
+#include"Baziru3_Engine/ParticleSystem.h"
 
 #include<chrono> //時間を扱うライブラリ
 #include<filesystem> //ファイルやディレクトリに関する操作を行うライブラリ
@@ -219,6 +220,28 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	}
 
 	spriteCom->CreateGraphicsPipeline();
+
+	// Initialize particle system using first sprite as quad
+	ParticleSystem* particleSystem = new ParticleSystem();
+	particleSystem->Initialize(dxCommon, sprites[0], 8);
+
+	// Create SRV for particle instance buffer (reserve descriptor index 5)
+	D3D12_SHADER_RESOURCE_VIEW_DESC particleSrvDesc{};
+	particleSrvDesc.Format = DXGI_FORMAT_UNKNOWN;
+	particleSrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+	particleSrvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+	particleSrvDesc.Buffer.FirstElement = 0;
+	particleSrvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
+	particleSrvDesc.Buffer.NumElements = particleSystem->GetNumInstances();
+	particleSrvDesc.Buffer.StructureByteStride = sizeof(TransformationMatrix);
+
+	D3D12_CPU_DESCRIPTOR_HANDLE particleInstanceSrvHandleCPU =
+		dxCommon->GetCPUDescroptirHandle(dxCommon->GetSrvDescriptorHeap(), dxCommon->GetDescriptorSizeSRV(), 5);
+
+	D3D12_GPU_DESCRIPTOR_HANDLE particleInstanceSrvHandleGPU =
+		dxCommon->GetGPUDescriptorHandle(dxCommon->GetSrvDescriptorHeap(), dxCommon->GetDescriptorSizeSRV(), 5);
+
+	dxCommon->GetDevice()->CreateShaderResourceView(particleSystem->GetInstanceResource().Get(), &particleSrvDesc, particleInstanceSrvHandleCPU);
 
 	// 既存の手動テクスチャ読み込みはそのまま利用（Sphere用）
 
@@ -580,8 +603,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 		else
 		{
 
-
-
 			//if (windowAPI->ProcessMassage())
 			//{
 			//	//ゲームループ抜ける
@@ -678,6 +699,16 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 			inputManager.Update();
 
+			// Handle key input: spawn particles on '1' and hide the existing instanced draw
+			if (inputManager.TriggerKey(DIK_1))
+			{
+				particleSystem->Spawn8();
+				drawParticle = false; // Stop drawing the 10 instanced objects
+			}
+
+			// Update particle system (use fixed dt)
+			particleSystem->Update(1.0f / 60.0f, camera);
+
 			dxCommon->PreDraw();
 
 			object3dCom->PreDraw();
@@ -688,6 +719,10 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 			//RootSignatureを設定。PSOに設定しているけれど別途設定が必要
 			dxCommon->GetCommandList()->SetGraphicsRootSignature(spriteCom->GetRootSignature().Get());
 			dxCommon->GetCommandList()->SetPipelineState(graphicPipelineState.Get()); //パイプラインステートを設定
+
+			// Draw particle system (instances for particle quads)
+			particleSystem->Draw(textureSrvHandleGPU, textureSrvHandleGPU2, materialResource, directionalLight, particleInstanceSrvHandleGPU, useMonsterBall);
+
 			//Sphereの描画
 
 			dxCommon->GetCommandList()->IASetVertexBuffers(0, 1, &vertexBufferView);
@@ -718,55 +753,58 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 			dxCommon->PostDraw();
 		}
 
-	}
+    }
 
-	//ImGui終了処理
-	ImGui_ImplDX12_Shutdown();
-	ImGui_ImplWin32_Shutdown();
-	ImGui::DestroyContext();
-
-
-	Logger::Log(logStream, "Application terminating.");
-
-	std::wstring wstringValue = L"Hello, DirectX!";
-	Logger::Log(logStream, StringUtil::ConvertString(std::format(L"WSTRING{}\n", wstringValue)));
+    //ImGui終了処理
+    ImGui_ImplDX12_Shutdown();
+    ImGui_ImplWin32_Shutdown();
+    ImGui::DestroyContext();
 
 
-	//出力ウィンドウへの文字出力
-	OutputDebugStringA("Hello, DirextX!\n");
+    Logger::Log(logStream, "Application terminating.");
 
-	CloseHandle(dxCommon->GetFenceEvent());
+    std::wstring wstringValue = L"Hello, DirectX!";
+    Logger::Log(logStream, StringUtil::ConvertString(std::format(L"WSTRING{}\n", wstringValue)));
 
-	sound_->GetXAudio2().Reset();
-	sound_->SoundUnload(&soundData);
 
-	delete sound_;
+    //出力ウィンドウへの文字出力
+    OutputDebugStringA("Hello, DirextX!\n");
 
-	delete camera;
+    CloseHandle(dxCommon->GetFenceEvent());
 
-	delete[] vertexData;
-	delete[] indexData;
+    sound_->GetXAudio2().Reset();
+    sound_->SoundUnload(&soundData);
 
-	windowAPI->Finalize();
+    delete sound_;
 
-	TextureManager::GetInstance()->Finalize();
+    delete camera;
 
-	for (auto* sprite : sprites)
-	{
-		delete sprite;
-	}
-	sprites.clear();
+    delete[] vertexData;
+    delete[] indexData;
 
-	delete object3d;
+    windowAPI->Finalize();
 
-	delete object3dCom;
+    TextureManager::GetInstance()->Finalize();
 
-	delete spriteCom;
+    for (auto* sprite : sprites)
+    {
+        delete sprite;
+    }
+    sprites.clear();
 
-	delete dxCommon;
+    delete object3d;
 
-	delete windowAPI;
+    delete object3dCom;
 
-	return 0;
+    delete spriteCom;
+
+    // Delete particle system to avoid memory leak
+    delete particleSystem;
+
+    delete dxCommon;
+
+    delete windowAPI;
+
+    return 0;
 }
 
