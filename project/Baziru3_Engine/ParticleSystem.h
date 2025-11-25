@@ -52,6 +52,12 @@ public:
 
     // Setter to control fade speed (exponent > 1 -> faster near end)
     void SetAlphaExponent(float e) { alphaExponent_ = e; }
+    // Set primary and secondary texture SRV handles for particles (primary used by default)
+    void SetTextureHandles(D3D12_GPU_DESCRIPTOR_HANDLE primary, D3D12_GPU_DESCRIPTOR_HANDLE secondary)
+    {
+        primaryTextureHandle_ = primary;
+        secondaryTextureHandle_ = secondary;
+    }
 
 private:
     struct Particle
@@ -76,12 +82,17 @@ private:
     DirectX::XMFLOAT4 particleColor_ = {1.0f,1.0f,1.0f,1.0f};
     float particleScale_ = 0.5f;
     bool useTexture2_ = false;
+    float colorPhase_ = 0.0f; // phase for color cycling (0..1)
 
     Microsoft::WRL::ComPtr<ID3D12Resource> materialResource_ = nullptr;
     Sprite::Material* materialDataLocal_ = nullptr;
 
     // exponent applied to normalized life when computing alpha. >1 => faster fade
     float alphaExponent_ = 2.0f;
+
+    // Optional externally supplied SRV handles for particle textures
+    D3D12_GPU_DESCRIPTOR_HANDLE primaryTextureHandle_{};
+    D3D12_GPU_DESCRIPTOR_HANDLE secondaryTextureHandle_{};
 };
 
 // Inline implementations
@@ -352,6 +363,41 @@ inline void ParticleSystem::Update(float dt, Camera* camera)
         }
         instanceData_[i].alpha = alpha;
     }
+
+    // Update particle color cycle if active
+    if (colorCycleActive_)
+    {
+        // advance phase
+        colorPhase_ += dt * 0.2f; // speed
+        if (colorPhase_ >= 1.0f) colorPhase_ -= 1.0f;
+
+        // HSV to RGB conversion (h in [0,1], s=1, v=1)
+        float h = colorPhase_;
+        float s = 1.0f;
+        float v = 1.0f;
+        float r = 0.0f, g = 0.0f, b = 0.0f;
+        if (s <= 0.0f) { r = g = b = v; }
+        else {
+            float hh = fmodf(h, 1.0f) * 6.0f;
+            int i = static_cast<int>(floorf(hh));
+            float ff = hh - (float)i;
+            float p = v * (1.0f - s);
+            float q = v * (1.0f - s * ff);
+            float t = v * (1.0f - s * (1.0f - ff));
+            switch(i) {
+            case 0: r = v; g = t; b = p; break;
+            case 1: r = q; g = v; b = p; break;
+            case 2: r = p; g = v; b = t; break;
+            case 3: r = p; g = q; b = v; break;
+            case 4: r = t; g = p; b = v; break;
+            case 5: default: r = v; g = p; b = q; break;
+            }
+        }
+        particleColor_.x = r;
+        particleColor_.y = g;
+        particleColor_.z = b;
+        particleColor_.w = 1.0f;
+    }
 }
 
 inline void ParticleSystem::Draw(D3D12_GPU_DESCRIPTOR_HANDLE textureSrvGPU, D3D12_GPU_DESCRIPTOR_HANDLE textureSrvGPU2,
@@ -374,8 +420,18 @@ inline void ParticleSystem::Draw(D3D12_GPU_DESCRIPTOR_HANDLE textureSrvGPU, D3D1
     cmd->SetGraphicsRootConstantBufferView(0, materialResource_->GetGPUVirtualAddress());
     cmd->SetGraphicsRootConstantBufferView(1, quad_->GetTransformationMatrixResourceSprite()->GetGPUVirtualAddress());
 
-    D3D12_GPU_DESCRIPTOR_HANDLE chosenTexture = useTexture2_ ? textureSrvGPU2 : textureSrvGPU;
-    if (useMonsterBall) chosenTexture = textureSrvGPU2;
+    // Prefer externally supplied handles if set; fall back to parameters
+    D3D12_GPU_DESCRIPTOR_HANDLE chosenTexture{};
+    if (useMonsterBall)
+    {
+        if (secondaryTextureHandle_.ptr != 0) chosenTexture = secondaryTextureHandle_;
+        else chosenTexture = textureSrvGPU2;
+    }
+    else
+    {
+        if (primaryTextureHandle_.ptr != 0) chosenTexture = primaryTextureHandle_;
+        else chosenTexture = textureSrvGPU;
+    }
 
     cmd->SetGraphicsRootDescriptorTable(2, chosenTexture);
     cmd->SetGraphicsRootConstantBufferView(3, directionalLight->GetGPUVirtualAddress());

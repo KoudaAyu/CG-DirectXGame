@@ -222,15 +222,7 @@ void SpriteCom::ShaderCompile()
 		L"ps_6_0", dxCommon->GetDxcUtils().Get(), dxCommon->GetDxcCompiler(), dxCommon->GetIncludeHandler(), logStream);
 	assert(pixelShaderBlob != nullptr);
 
-	//Sprite用Shaderをコンパイルする
-	//Shaderをコンパイルする
-	//vertexShaderBlob = dxCommon->CompileShader(L"Resources/shaders/Object3D.VS.hlsl",
-	//	L"vs_6_0", dxCommon->GetDxcUtils().Get(), dxCommon->GetDxcCompiler(), dxCommon->GetIncludeHandler(), logStream);
-	//assert(vertexShaderBlob != nullptr);
-
-	//pixelShaderBlob = dxCommon->CompileShader(L"Resources/shaders/Object3D.PS.hlsl",
-	//	L"ps_6_0", dxCommon->GetDxcUtils().Get(), dxCommon->GetDxcCompiler(), dxCommon->GetIncludeHandler(), logStream);
-	//assert(pixelShaderBlob != nullptr);
+	// Note: Sprite pipeline uses the particle shaders which support a StructuredBuffer<t0> for instance data.
 }
 
 void SpriteCom::InitializeGraphicPipeline()

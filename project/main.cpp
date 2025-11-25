@@ -142,7 +142,7 @@ Microsoft::WRL::ComPtr<ID3D12Resource>CreateTextureResource(const Microsoft::WRL
 		D3D12_HEAP_FLAG_NONE,//Heapの特殊な設定
 		&resourceDesc,//Resourceの設定
 		D3D12_RESOURCE_STATE_COPY_DEST,//初回のResourceState。Textureは基本読むだけ
-		nullptr,//Clear最適値。使わないのでnullptr
+		nullptr,//Clear最適値。使わないので nullptr
 		IID_PPV_ARGS(&resource));//作成するResourceポインタへのポインタ
 	assert(SUCCEEDED(hr));
 	return resource;
@@ -203,23 +203,93 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	TextureManager::GetInstance()->Initialize();
 	TextureManager::GetInstance()->SetDirectXCom(dxCommon);
 	// 作業ディレクトリが project/ である前提の相対パスを使う
-	TextureManager::GetInstance()->LoadTexture("Resources/uvChecker.png");
+	TextureManager::GetInstance()->LoadTexture("Resources/White.png");
+	// Load UI texture into TextureManager so sprites can reference it
+	TextureManager::GetInstance()->LoadTexture("Resources/UI.png");
 
+	// Create SpriteCom
 	SpriteCom* spriteCom = nullptr;
 	spriteCom = new SpriteCom(logStream, dxCommon);
 	spriteCom->Initialize();
 
-
-	std::vector<Sprite*>sprites;
+	// Create sprite list and populate with White.png sprites
+	std::vector<Sprite*> sprites;
 	for (uint32_t i = 0; i < 5; ++i)
 	{
 		Sprite* sprite = new Sprite();
-		// Resources フォルダ直下の uvChecker.png を指定
-		sprite->Initialize(spriteCom, "Resources/uvChecker.png");
+		// Resources フォルダ直下の White.png を指定
+		sprite->Initialize(spriteCom, "Resources/White.png");
 		sprites.push_back(sprite);
 	}
 
+	// Create a UI Sprite anchored to the top-left of the screen
+	Sprite* uiSprite = new Sprite();
+	uiSprite->Initialize(spriteCom, "Resources/UI.png");
+	// Set UI size (width, height)
+	uiSprite->SetSize({ 600.0f, 100.0f });
+	// Anchor at top-left so position {0,0} is top-left of the sprite
+	uiSprite->SetAnchorPoint({ 0.0f, 0.0f });
+	// Position at top-left of the window (with small margin)
+	// uiSprite->SetPosition({ -100.0f, 8.0f });
+	Vector2 uiPosition = { 0.0f, 8.0f };
+
+	// Use white tint to show texture
+	Vector4 uiColor = { 1.0f, 1.0f, 1.0f, 1.0f };
+	uiSprite->SetColor(uiColor);
+	// Add to sprites vector so it's updated and cleaned up with others
+	sprites.push_back(uiSprite);
+
+	// Persistent holder so UI texture resource isn't destroyed while SRV is live
+	Microsoft::WRL::ComPtr<ID3D12Resource> uiTextureResourcePersistent = nullptr;
+
+	// Assign UI sprite SRV GPU handle using a dedicated SRV created via dxCommon
+	{
+		// Load UI image and create GPU resource
+		DirectX::ScratchImage uiImg = dxCommon->LoadTexture("./Resources/UI.png");
+		const DirectX::TexMetadata& uiMeta = uiImg.GetMetadata();
+		Microsoft::WRL::ComPtr<ID3D12Resource> uiTextureResource = CreateTextureResource(dxCommon->GetDevice(), uiMeta);
+		// Upload texture data to the GPU
+		Microsoft::WRL::ComPtr<ID3D12Resource> uiIntermediate = dxCommon->UploadTextureData(uiTextureResource, uiImg, dxCommon->GetDevice().Get(), dxCommon->GetCommandList());
+
+		// Move to persistent holder so resource stays alive
+		uiTextureResourcePersistent = uiTextureResource;
+
+		// Choose a descriptor slot unlikely to be used by others
+		const uint32_t kUiSrvIndex = 20;
+		D3D12_CPU_DESCRIPTOR_HANDLE uiSrvHandleCPU = dxCommon->GetCPUDescroptirHandle(dxCommon->GetSrvDescriptorHeap(), dxCommon->GetDescriptorSizeSRV(), kUiSrvIndex);
+		D3D12_GPU_DESCRIPTOR_HANDLE uiSrvHandleGPU = dxCommon->GetGPUDescriptorHandle(dxCommon->GetSrvDescriptorHeap(), dxCommon->GetDescriptorSizeSRV(), kUiSrvIndex);
+
+		D3D12_SHADER_RESOURCE_VIEW_DESC uiSrvDesc{};
+		uiSrvDesc.Format = uiMeta.format;
+		uiSrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+		uiSrvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+		uiSrvDesc.Texture2D.MipLevels = UINT(uiMeta.mipLevels);
+
+		dxCommon->GetDevice()->CreateShaderResourceView(uiTextureResourcePersistent.Get(), &uiSrvDesc, uiSrvHandleCPU);
+		uiSprite->SetTextureHandle(uiSrvHandleGPU);
+	}
+
+	// Create graphics pipeline for sprites
 	spriteCom->CreateGraphicsPipeline();
+
+	// After creating graphicPipelineState for particle/instanced pipeline, also create a PSO for single-sprite (UI) using Object3d shaders
+	Microsoft::WRL::ComPtr<ID3D12PipelineState> spritePipelineState = nullptr;
+	{
+		// Compile Object3d shaders
+		auto vsBlobObj = dxCommon->CompileShader(L"Resources/shaders/Object3D.VS.hlsl", L"vs_6_0", dxCommon->GetDxcUtils().Get(), dxCommon->GetDxcCompiler(), dxCommon->GetIncludeHandler(), logStream);
+		auto psBlobObj = dxCommon->CompileShader(L"Resources/shaders/Object3d.PS.hlsl", L"ps_6_0", dxCommon->GetDxcUtils().Get(), dxCommon->GetDxcCompiler(), dxCommon->GetIncludeHandler(), logStream);
+		assert(vsBlobObj && psBlobObj);
+
+		D3D12_GRAPHICS_PIPELINE_STATE_DESC spritePsoDesc = spriteCom->GetGraphicPipelineStateDesc();
+		// replace shader bytecodes with object3d shaders
+		spritePsoDesc.VS = { vsBlobObj->GetBufferPointer(), vsBlobObj->GetBufferSize() };
+		spritePsoDesc.PS = { psBlobObj->GetBufferPointer(), psBlobObj->GetBufferSize() };
+
+		dxCommon->SetHr(dxCommon->GetDevice()->CreateGraphicsPipelineState(&spritePsoDesc, IID_PPV_ARGS(&spritePipelineState)));
+		assert(SUCCEEDED(dxCommon->GetHr()));
+	}
+
+
 
 	// Initialize particle system using first sprite as quad
 	ParticleSystem* particleSystem = new ParticleSystem();
@@ -257,8 +327,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 	//DepthStencilStateの設定
 	D3D12_DEPTH_STENCIL_DESC depthStencilDesc{};
-	//Depthの機能を有効化する
-	depthStencilDesc.DepthEnable = true;
+	//Depthの機能を無効化する（UI / sprites should not be depth-tested）
+	depthStencilDesc.DepthEnable = false;
 	//書き込み
 	depthStencilDesc.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO;
 	//比較関数はLessEqua。つまり、近ければ描画される
@@ -288,7 +358,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	// 頂点数・インデックス数
 	// 緯度方向と経度方向の両端に重複する頂点があるため、+1が必要
 	const uint32_t kVertexCount = (kSubdivision + 1) * (kSubdivision + 1);
-	const uint32_t kIndexCount = kSubdivision * kSubdivision * 6; // 各四角形に三角形2つ、各三角形に頂点3つで 2*3=6
+	const uint32_t kIndexCount = kSubdivision * kSubdivision * 6; // 各四角形に三角形2つ、各三角形に頂 vertex3つで 2*3=6
 
 	// 頂点配列を確保
 	Sprite::VertexData* vertexData = new Sprite::VertexData[kVertexCount];
@@ -354,7 +424,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 			indexData[idx++] = v1; // C
 
 			// 2つ目の三角形: v2, v3, v1 (B, D, C)
-		indexData[idx++] = v2; // B
+			indexData[idx++] = v2; // B
 			indexData[idx++] = v3; // D
 			indexData[idx++] = v1; // C
 		}
@@ -480,27 +550,30 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	float particleColorPhase = 0.0f;
 
 	// Helper: HSV to RGB (h in [0,1], s in [0,1], v in [0,1])
-	auto HSVtoRGB = [](float h, float s, float v){
-		float r = 0, g = 0, b = 0;
-		if (s <= 0.0f) { r = g = b = v; }
-		else {
-			h = fmodf(h, 1.0f) * 6.0f;
-			int i = static_cast<int>(floorf(h));
-			float f = h - (float)i;
-			float p = v * (1.0f - s);
-			float q = v * (1.0f - s * f);
-			float t = v * (1.0f - s * (1.0f - f));
-			switch (i) {
-			case 0: r = v; g = t; b = p; break;
-			case 1: r = q; g = v; b = p; break;
-			case 2: r = p; g = v; b = t; break;
-			case 3: r = p; g = q; b = v; break;
-			case 4: r = t; g = p; b = v; break;
-			case 5: default: r = v; g = p; b = q; break;
+	auto HSVtoRGB = [](float h, float s, float v)
+		{
+			float r = 0, g = 0, b = 0;
+			if (s <= 0.0f) { r = g = b = v; }
+			else
+			{
+				h = fmodf(h, 1.0f) * 6.0f;
+				int i = static_cast<int>(floorf(h));
+				float f = h - (float)i;
+				float p = v * (1.0f - s);
+				float q = v * (1.0f - s * f);
+				float t = v * (1.0f - s * (1.0f - f));
+				switch (i)
+				{
+				case 0: r = v; g = t; b = p; break;
+				case 1: r = q; g = v; b = p; break;
+				case 2: r = p; g = v; b = t; break;
+				case 3: r = p; g = q; b = v; break;
+				case 4: r = t; g = p; b = v; break;
+				case 5: default: r = v; g = p; b = q; break;
+				}
 			}
-		}
-		return std::array<float,3>{r,g,b};
-	};
+			return std::array<float, 3>{r, g, b};
+		};
 
 
 	float fovY = 0.45f;  // 資料通り
@@ -509,7 +582,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	float farZ = 100.0f;
 
 	//Textureを読んで転送する
-	DirectX::ScratchImage mipImages = dxCommon->LoadTexture("./Resources/uvChecker.png");
+	DirectX::ScratchImage mipImages = dxCommon->LoadTexture("./Resources/White.png");
 	const DirectX::TexMetadata& metadata = mipImages.GetMetadata();
 	Microsoft::WRL::ComPtr<ID3D12Resource> textureResource = CreateTextureResource(dxCommon->GetDevice(), metadata);
 
@@ -553,8 +626,13 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	//2つ目
 	dxCommon->GetDevice()->CreateShaderResourceView(textureResource2.Get(), &srvDesc2, textureSrvHandleCPU2);
 
+	// Let particle system use these SRV GPU handles (primary = White.png)
+	particleSystem->SetTextureHandles(textureSrvHandleGPU, textureSrvHandleGPU2);
+
+
 	//SRVの切り替え
-	bool useMonsterBall = true;
+	// Ensure particles use the White.png SRV by default
+	bool useMonsterBall = false;
 	//Sphereの描画切り替え
 	bool drawParticle = true;
 	bool drawSprite = true;
@@ -656,19 +734,54 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 
 			for (auto* sprite : sprites)
+		{
+			// Update all sprites; for UI apply uiPosition before update so Update computes WVP correctly
+			if (sprite == uiSprite)
 			{
+				// Apply desired UI position each frame
+				sprite->SetPosition(uiPosition);
+				// Keep UI UV flip if needed
+				//Matrix4x4 uiUvFlip = MakeScaleMatrix({ -1.0f, -1.0f, 1.0f });
+				//uiUvFlip = Multiply(uiUvFlip, MakeTranslateMatrix({ 1.0f, 1.0f, 0.0f }));
+				//sprite->SetUVTransform(uiUvFlip);
+				// Use identity UV transform for UI to avoid mirrored/upside-down texture
+				Matrix4x4 uiUvFlip = MakeIdentity4x4();
+				sprite->SetUVTransform(uiUvFlip);
+				// Update so sprite recalculates its internal WVP using its position/size/anchor
+				// Pass nullptr to use screen-space orthographic camera for UI
+				sprite->Update(windowAPI, nullptr);
+
+				// Debug output: window size and ui position
+				{
+					char dbg[128];
+					sprintf_s(dbg, "Window=(%d,%d) UI pos=(%.1f,%.1f) size=(%.1f,%.1f) anchor=(%.1f,%.1f)\\n",
+						windowAPI->GetClientWidth(), windowAPI->GetClientHeight(),
+						sprite->GetPosition().x, sprite->GetPosition().y,
+						sprite->GetSize().x, sprite->GetSize().y,
+						sprite->GetAnchorPoint().x, sprite->GetAnchorPoint().y);
+					OutputDebugStringA(dbg);
+				}
+			}
+			else
+			{
+				// Reset other sprites position and update
 				sprite->SetPosition({ 0.0f,0.0f });
 				sprite->Update(windowAPI, &debugCamera_);
 			}
+		}
 
-			//UVTransform用
-			Matrix4x4 uvTransformMatrix = MakeScaleMatrix(uvTransformSprite.scale);
-			uvTransformMatrix = Multiply(uvTransformMatrix, MakeRotateZMatrix(uvTransformSprite.rotate.z));
-			uvTransformMatrix = Multiply(uvTransformMatrix, MakeTranslateMatrix(uvTransformSprite.translate));
-			for (auto* sprite : sprites)
+			// Remove separate manual UI transform block that previously overwrote WVP
+			// (UI now updated via sprite->Update above)
+
+			// Debug: output current UI pos
+			if (uiSprite)
 			{
-				sprite->SetUVTransform(uvTransformMatrix);
+				char dbgBuf[128];
+				sprintf_s(dbgBuf, "UI pos=(%.1f,%.1f)\n", uiSprite->GetPosition().x, uiSprite->GetPosition().y);
+				OutputDebugStringA(dbgBuf);
 			}
+
+			// Note: keep following code that used to set UI transform removed to avoid overwriting Update's result
 
 			directionalLight->Map(0, nullptr, reinterpret_cast<void**>(&directionalLightData));
 
@@ -710,7 +823,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 				ImGui::Checkbox("LightSphere Flag", (bool*)&sprite->GetMaterialDataSprite()->enableLighting);
 			}
 			ImGui::Checkbox("DrawParticle", &drawParticle);
-			
+
 			ImGui::DragFloat3("LightDirection", &directionalLightData->direction.x, 0.01f, -10.0f, 10.0f);
 
 			ImGui::DragFloat3("Sphere Rotate", &transformSphere.rotate.x, 0.01f, -10.0f, 10.0f);
@@ -791,17 +904,17 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 			// Animate material color only when the particle system was spawned by firework (key 2)
 			if (particleSystem->IsColorCycleActive() && particleSystem->HasAliveParticles())
-             {
-                 particleColorPhase += dt * 0.2f; // speed of color change
-                 if (particleColorPhase >= 1.0f) particleColorPhase -= 1.0f;
-                 auto rgb = HSVtoRGB(particleColorPhase, 1.0f, 1.0f);
+			{
+				particleColorPhase += dt * 0.2f; // speed of color change
+				if (particleColorPhase >= 1.0f) particleColorPhase -= 1.0f;
+				auto rgb = HSVtoRGB(particleColorPhase, 1.0f, 1.0f);
 
-                 // Map material resource and write new color
-                 Sprite::Material* mappedMaterial = nullptr;
-                 materialResource->Map(0, nullptr, reinterpret_cast<void**>(&mappedMaterial));
-                 mappedMaterial->color = { rgb[0], rgb[1], rgb[2], 1.0f };
-                 materialResource->Unmap(0, nullptr);
-             }
+				// Map material resource and write new color
+				Sprite::Material* mappedMaterial = nullptr;
+				materialResource->Map(0, nullptr, reinterpret_cast<void**>(&mappedMaterial));
+				mappedMaterial->color = { rgb[0], rgb[1], rgb[2], 1.0f };
+				materialResource->Unmap(0, nullptr);
+			}
 
 
 			dxCommon->PreDraw();
@@ -838,8 +951,17 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 				dxCommon->GetCommandList()->DrawInstanced(UINT(modelData.vertices.size()), instanceCount, 0, 0);
 			}
 
-			
-
+			// Draw UI sprite on top
+			if (uiSprite)
+			{
+				// Use sprite PSO (object shaders) so UI uses CBV transform path
+				dxCommon->GetCommandList()->SetGraphicsRootSignature(spriteCom->GetRootSignature().Get());
+				dxCommon->GetCommandList()->SetPipelineState(spritePipelineState.Get());
+				uiSprite->Draw();
+				// Restore particle/instanced pipeline for any subsequent rendering if needed (not strictly necessary here)
+				dxCommon->GetCommandList()->SetGraphicsRootSignature(spriteCom->GetRootSignature().Get());
+				dxCommon->GetCommandList()->SetPipelineState(graphicPipelineState.Get());
+			}
 
 			//実際のcommandListのImGuiの描画コマンドを積む
 			ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), dxCommon->GetCommandList().Get());
@@ -848,58 +970,58 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 			dxCommon->PostDraw();
 		}
 
-    }
+	}
 
-    //ImGui終了処理
-    ImGui_ImplDX12_Shutdown();
-    ImGui_ImplWin32_Shutdown();
-    ImGui::DestroyContext();
-
-
-    Logger::Log(logStream, "Application terminating.");
-
-    std::wstring wstringValue = L"Hello, DirectX!";
-    Logger::Log(logStream, StringUtil::ConvertString(std::format(L"WSTRING{}\n", wstringValue)));
+	//ImGui終了処理
+	ImGui_ImplDX12_Shutdown();
+	ImGui_ImplWin32_Shutdown();
+	ImGui::DestroyContext();
 
 
-    //出力ウィンドウへの文字出力
-    OutputDebugStringA("Hello, DirextX!\n");
+	Logger::Log(logStream, "Application terminating.");
 
-    CloseHandle(dxCommon->GetFenceEvent());
+	std::wstring wstringValue = L"Hello, DirectX!";
+	Logger::Log(logStream, StringUtil::ConvertString(std::format(L"WSTRING{}\n", wstringValue)));
 
-    sound_->GetXAudio2().Reset();
-    sound_->SoundUnload(&soundData);
 
-    delete sound_;
+	//出力ウィンドウへの文字出力
+	OutputDebugStringA("Hello, DirextX!\n");
 
-    delete camera;
+	CloseHandle(dxCommon->GetFenceEvent());
 
-    delete[] vertexData;
-    delete[] indexData;
+	sound_->GetXAudio2().Reset();
+	sound_->SoundUnload(&soundData);
 
-    windowAPI->Finalize();
+	delete sound_;
 
-    TextureManager::GetInstance()->Finalize();
+	delete camera;
 
-    for (auto* sprite : sprites)
-    {
-        delete sprite;
-    }
-    sprites.clear();
+	delete[] vertexData;
+	delete[] indexData;
 
-    delete object3d;
+	windowAPI->Finalize();
 
-    delete object3dCom;
+	TextureManager::GetInstance()->Finalize();
 
-    delete spriteCom;
+	for (auto* sprite : sprites)
+	{
+		delete sprite;
+	}
+	sprites.clear();
 
-    // Delete particle system to avoid memory leak
-    delete particleSystem;
+	delete object3d;
 
-    delete dxCommon;
+	delete object3dCom;
 
-    delete windowAPI;
+	delete spriteCom;
 
-    return 0;
+	// Delete particle system to avoid memory leak
+	delete particleSystem;
+
+	delete dxCommon;
+
+	delete windowAPI;
+
+	return 0;
 }
 

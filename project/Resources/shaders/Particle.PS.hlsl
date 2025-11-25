@@ -31,11 +31,8 @@ PixelShaderOutput main(VertexShaderOutput input, bool isFrontFace : SV_IsFrontFa
 {
     PixelShaderOutput output;
 
+    // Do not flip UV automatically based on face orientation; allow CPU-side uvTransform to control orientation.
     float2 uv = input.texcoord;
-    if (!isFrontFace)
-    {
-        uv.x = 1.0f - uv.x;
-    }
 
     float3 transformedUV = mul(float32_t4(uv, 0.0f, 1.0f), gMaterial.uvTransform);
     float32_t4 textureColor = gTexture.Sample(gSample, transformedUV.xy);

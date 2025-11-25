@@ -34,7 +34,7 @@ public:
 	};
 
 	void Initialize(SpriteCom* spriteCom,std::string textureFilePath);
-	void Update(WindowAPI* windowAPI, DebugCamera* debugCamera_);
+	void Update(WindowAPI* windowAPI, DebugCamera* debugCamera_ = nullptr);
 	void Draw();
 
 	void CreateIndexBufferView();
@@ -131,4 +131,10 @@ private:
 	Microsoft::WRL::ComPtr<ID3D12Resource> directionalLightResource = nullptr;
 
 	uint32_t textureIndex = 0;
+
+	Microsoft::WRL::ComPtr<ID3D12Resource> instanceBufferResourceSprite = nullptr;
+	// Pointer to mapped instance data for quick updates
+	void* instanceDataPtr = nullptr;
+	// GPU descriptor handle for the instance SRV (t0)
+	D3D12_GPU_DESCRIPTOR_HANDLE instanceSrvHandleGPU{};
 };

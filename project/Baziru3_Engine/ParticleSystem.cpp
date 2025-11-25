@@ -93,7 +93,7 @@ void ParticleSystem::SpawnFirework()
     // vivid color cycling for firework
     particleColor_ = {1.0f, 0.85f, 0.4f, 1.0f};
     particleScale_ = 0.35f;
-    useTexture2_ = true;
+    useTexture2_ = false;
     colorCycleActive_ = true; // Enable color cycling for firework particles
 }
 
@@ -151,7 +151,7 @@ void ParticleSystem::SpawnBurst()
     }
     particleColor_ = {1.0f, 0.3f, 0.9f, 1.0f}; // magenta
     particleScale_ = 0.3f;
-    useTexture2_ = true;
+    useTexture2_ = false;
     colorCycleActive_ = false;
 }
 
@@ -204,7 +204,7 @@ void ParticleSystem::SpawnRing()
     }
     particleColor_ = {1.0f, 0.6f, 0.2f, 1.0f}; // orange
     particleScale_ = 0.5f;
-    useTexture2_ = true;
+    useTexture2_ = false;
     colorCycleActive_ = false;
 }
 
@@ -294,11 +294,8 @@ void ParticleSystem::Draw(D3D12_GPU_DESCRIPTOR_HANDLE textureSrvGPU, D3D12_GPU_D
     cmd->SetGraphicsRootConstantBufferView(0, materialResource_->GetGPUVirtualAddress());
     cmd->SetGraphicsRootConstantBufferView(1, quad_->GetTransformationMatrixResourceSprite()->GetGPUVirtualAddress());
 
-    D3D12_GPU_DESCRIPTOR_HANDLE chosenTexture = useTexture2_ ? textureSrvGPU2 : textureSrvGPU;
-    if (useMonsterBall)
-    {
-        chosenTexture = textureSrvGPU2;
-    }
+    // Always use the first texture (e.g. White.png) for particles
+    D3D12_GPU_DESCRIPTOR_HANDLE chosenTexture = textureSrvGPU;
 
     cmd->SetGraphicsRootDescriptorTable(2, chosenTexture);
     cmd->SetGraphicsRootConstantBufferView(3, directionalLight->GetGPUVirtualAddress());

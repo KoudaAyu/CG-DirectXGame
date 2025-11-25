@@ -229,6 +229,9 @@ public:
 	D3D12_GPU_DESCRIPTOR_HANDLE GetSRVHandleGPU(uint32_t index);
 
 
+	// Execute the current command list and wait for GPU to finish (useful for one-shot uploads)
+	void ExecuteCommandListAndWait();
+
 private:
 	HRESULT hr;
 
