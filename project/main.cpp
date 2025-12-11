@@ -202,7 +202,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	TextureManager::GetInstance()->Initialize();
 	TextureManager::GetInstance()->SetDirectXCom(dxCommon);
 	// 作業ディレクトリが project/ である前提の相対パスを使う
-	TextureManager::GetInstance()->LoadTexture("Resources/uvChecker.png");
+	TextureManager::GetInstance()->LoadTexture("Resources/circle.png");
 
 	SpriteCom* spriteCom = nullptr;
 	spriteCom = new SpriteCom(logStream, dxCommon);
@@ -214,7 +214,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	{
 		Sprite* sprite = new Sprite();
 		// Resources フォルダ直下の uvChecker.png を指定
-		sprite->Initialize(spriteCom, "Resources/uvChecker.png");
+		sprite->Initialize(spriteCom, "Resources/circle.png");
 		sprites.push_back(sprite);
 	}
 
@@ -466,7 +466,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	float farZ = 100.0f;
 
 	//Textureを読んで転送する
-	DirectX::ScratchImage mipImages = dxCommon->LoadTexture("./Resources/uvChecker.png");
+	DirectX::ScratchImage mipImages = dxCommon->LoadTexture("./Resources/circle.png");
 	const DirectX::TexMetadata& metadata = mipImages.GetMetadata();
 	Microsoft::WRL::ComPtr<ID3D12Resource> textureResource = CreateTextureResource(dxCommon->GetDevice(), metadata);
 
@@ -511,7 +511,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	dxCommon->GetDevice()->CreateShaderResourceView(textureResource2.Get(), &srvDesc2, textureSrvHandleCPU2);
 
 	//SRVの切り替え
-	bool useMonsterBall = true;
+	bool useMonsterBall = false; // circle.png を使用するためデフォルトは false にする
 	//Sphereの描画切り替え
 	bool drawParticle = true;
 	bool drawSprite = true;

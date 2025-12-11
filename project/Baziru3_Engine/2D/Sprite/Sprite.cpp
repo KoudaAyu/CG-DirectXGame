@@ -38,6 +38,8 @@ void Sprite::Initialize(SpriteCom* spriteCom, std::string textureFilePath)
 	transformationMatrixDataSprite->World = MakeIdentity4x4();
 	
 	textureIndex = TextureManager::GetInstance()->GetTextureIndexByFilePath(textureFilePath);
+	// Sprite のテクスチャ SRV を保持
+	textureHandleGPU = TextureManager::GetInstance()->GetSrvHandleGPU(textureIndex);
 
 	AdjustTextureSize();
 }
@@ -90,9 +92,8 @@ void Sprite::Draw()
 
 	dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(0, materialResourceSprite->GetGPUVirtualAddress());
 	dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(1, transformationMatrixResourceSprite->GetGPUVirtualAddress());
-	if (textureHandleGPU.ptr != 0) {
-		dxCommon->GetCommandList()->SetGraphicsRootDescriptorTable(2, TextureManager::GetInstance()->GetSrvHandleGPU(textureIndex));
-	}
+	// 常に Sprite のテクスチャをバインドする（`textureHandleGPU` は Initialize で設定済み）
+	dxCommon->GetCommandList()->SetGraphicsRootDescriptorTable(2, textureHandleGPU);
 	if (directionalLightResource) {
 		dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(3, directionalLightResource->GetGPUVirtualAddress());
 	}
