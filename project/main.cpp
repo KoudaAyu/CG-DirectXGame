@@ -218,6 +218,13 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 		sprites.push_back(sprite);
 	}
 
+	struct ParticleForGPU
+	{
+		Matrix4x4 WVP;
+		Matrix4x4 World;
+		Vector4 color;
+	};
+
 	spriteCom->CreateGraphicsPipeline();
 
 	// 既存の手動テクスチャ読み込みはそのまま利用（Sphere用）
@@ -530,12 +537,12 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	object3dCom->SetDefaultCamera(camera);
 
 	uint32_t instanceCount = 10;
-	const uint32_t kNumInstance = 10;
+	const uint32_t kNumMaxInstance = 10;
 	Microsoft::WRL::ComPtr<ID3D12Resource> instanceResource =
-		dxCommon->CreateBufferResource(dxCommon->GetDevice(), sizeof(TransformationMatrix) * kNumInstance);
-	TransformationMatrix* instanceData = nullptr;
+		dxCommon->CreateBufferResource(dxCommon->GetDevice(), sizeof(TransformationMatrix) * kNumMaxInstance);
+	ParticleForGPU* instanceData = nullptr;
 	instanceResource->Map(0, nullptr, reinterpret_cast<void**>(&instanceData));
-	for (uint32_t index = 0; index < kNumInstance; ++index)
+	for (uint32_t index = 0; index < kNumMaxInstance; ++index)
 	{
 		instanceData[index].WVP = MakeIdentity4x4();
 		instanceData[index].World = MakeIdentity4x4();
@@ -547,7 +554,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	instanceSrvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
 	instanceSrvDesc.Buffer.FirstElement = 0;
 	instanceSrvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
-	instanceSrvDesc.Buffer.NumElements = kNumInstance;
+	instanceSrvDesc.Buffer.NumElements = kNumMaxInstance;
 	instanceSrvDesc.Buffer.StructureByteStride = sizeof(TransformationMatrix);
 	D3D12_CPU_DESCRIPTOR_HANDLE instanceSrvHandleCPU =
 		dxCommon->GetCPUDescroptirHandle(dxCommon->GetSrvDescriptorHeap(),
@@ -564,19 +571,17 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 	std::uniform_real_distribution<float> distPosition(-1.0f, 1.0f);
 
-	SpriteCom::Particle particles[kNumInstance];
+	std::uniform_real_distribution<float> distTime(1.0f, 3.0f);
+	
 
-	struct ParticleForGPU
-	{
-		Matrix4x4 WVP;
-		Matrix4x4 World;
-		Vector4 color;
-	};
+	SpriteCom::Particle particles[kNumMaxInstance];
+
+	
 
 	Microsoft::WRL::ComPtr<ID3D12Resource> particleResource =
-		dxCommon->CreateBufferResource(dxCommon->GetDevice(), sizeof(ParticleForGPU) * kNumInstance);
+		dxCommon->CreateBufferResource(dxCommon->GetDevice(), sizeof(ParticleForGPU) * kNumMaxInstance);
 
-	for (uint32_t i = 0; i < kNumInstance; ++i)
+	for (uint32_t i = 0; i < kNumMaxInstance; ++i)
 	{
 		// Particle has an inner `transform` of type Transform
 		particles[i].transform.SetScale({ 1.0f, 1.0f, 1.0f });
@@ -590,6 +595,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 							  distPosition(engine) * 0.5f + 0.5f,
 							  distPosition(engine) * 0.5f + 0.5f,
 							  1.0f };
+
+		particles[i].lifeTime = distTime(engine);
+		particles[i].currentTime = 0;
 	}
 
 	// SRV は ParticleForGPU のストライドに変更し、particleResource を参照させる
@@ -597,7 +605,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	dxCommon->GetDevice()->CreateShaderResourceView(
 		particleResource.Get(), &instanceSrvDesc, instanceSrvHandleCPU);
 
-	const float lDeltaTime = 1.0f / 60.0f; // 仮の固定フレーム時間 (60 FPS)
+	const float kDeltaTime = 1.0f / 60.0f; // 仮の固定フレーム時間 (60 FPS)
+
+	uint32_t numInstances = 0;
 
 	//ウィンドウのxボタンが押されるまでループ
 	while (dxCommon->GetMsg().message != WM_QUIT)
@@ -657,8 +667,17 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 			ParticleForGPU* particleGPUData = nullptr;
 			particleResource->Map(0, nullptr, reinterpret_cast<void**>(&particleGPUData));
 
-			for (uint32_t i = 0; i < kNumInstance; ++i)
+			// フレームごとにインスタンス数をリセットし、先頭から詰めて書き込む
+			numInstances = 0;
+
+			for (uint32_t i = 0; i < kNumMaxInstance; ++i)
 			{
+				// 生存時間を超えたらスキップ（描画しない）
+				if (particles[i].lifeTime <= particles[i].currentTime)
+				{
+					continue;
+				}
+
 				Matrix4x4 worldMatrix = MakeAffineMatrix(
 					particles[i].transform.GetScale(),
 					particles[i].transform.GetRotate(),
@@ -670,17 +689,22 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 					camera->GetViewProjectionMatrix()
 				);
 
-				// GPU へ書き込むデータ
-				particleGPUData[i].WVP = worldViewProjMatrix;
-				particleGPUData[i].World = worldMatrix;
-				particleGPUData[i].color = particles[i].color;
+				// 先頭から詰めるため、書き込み先は numInstances を使う
+				particleGPUData[numInstances].WVP = worldViewProjMatrix;
+				particleGPUData[numInstances].World = worldMatrix;
+				particleGPUData[numInstances].color = particles[i].color;
 
 				// 速度による移動
 				particles[i].transform.SetTranslate({
-					particles[i].transform.GetTranslate().x + particles[i].velocity.x * lDeltaTime,
-					particles[i].transform.GetTranslate().y + particles[i].velocity.y * lDeltaTime,
-					particles[i].transform.GetTranslate().z + particles[i].velocity.z * lDeltaTime
+					particles[i].transform.GetTranslate().x + particles[i].velocity.x * kDeltaTime,
+					particles[i].transform.GetTranslate().y + particles[i].velocity.y * kDeltaTime,
+					particles[i].transform.GetTranslate().z + particles[i].velocity.z * kDeltaTime
 					});
+
+				particles[i].currentTime += kDeltaTime;
+
+				// 有効インスタンス数を増やす
+				++numInstances;
 			}
 
 			particleResource->Unmap(0, nullptr);
@@ -753,7 +777,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 			if (drawParticle)
 			{
 				/*commandList->DrawIndexedInstanced(kIndexCount, 1, 0, 0, 0);*/
-				dxCommon->GetCommandList()->DrawInstanced(UINT(modelData.vertices.size()), instanceCount, 0, 0);
+				dxCommon->GetCommandList()->DrawInstanced(UINT(modelData.vertices.size()), numInstances, 0, 0);
 			}
 
 			if (drawSprite)
