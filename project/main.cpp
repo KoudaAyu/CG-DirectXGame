@@ -558,14 +558,19 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	dxCommon->GetDevice()->CreateShaderResourceView(
 		instanceResource.Get(), &instanceSrvDesc, instanceSrvHandleCPU);
 
-	Transform transform[kNumInstance];
+	SpriteCom::Particle particles[kNumInstance];
 	for (uint32_t i = 0; i < kNumInstance; ++i)
 	{
-		transform[i].SetScale({ 1.0f, 1.0f, 1.0f });
-		transform[i].SetRotate({ 0.0f, 0.0f, 0.0f });
-		transform[i].SetTranslate({ i * 0.1f, i * 0.1f, i * 0.1f });
+		// Particle has an inner `transform` of type Transform
+		particles[i].transform.SetScale({ 1.0f, 1.0f, 1.0f });
+		particles[i].transform.SetRotate({ 0.0f, 0.0f, 0.0f });
+		particles[i].transform.SetTranslate({ i * 0.1f, i * 0.1f, i * 0.1f });
+
+		particles[i].velocity = { 0.0f,1.0f,0.0f };
 	}
 
+
+	const float lDeltaTime = 1.0f / 60.0f; // 仮の固定フレーム時間 (60 FPS)
 
 	//ウィンドウのxボタンが押されるまでループ
 	while (dxCommon->GetMsg().message != WM_QUIT)
@@ -624,9 +629,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 			for (uint32_t i = 0; i < kNumInstance; ++i)
 			{
 				Matrix4x4 worldMatrix = MakeAffineMatrix(
-					transform[i].GetScale(),
-					transform[i].GetRotate(),
-					transform[i].GetTranslate()
+					particles[i].transform.GetScale(),
+					particles[i].transform.GetRotate(),
+					particles[i].transform.GetTranslate()
 				);
 
 				Matrix4x4 worldViewProjMatrix = Multiply(
@@ -635,6 +640,13 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 				);
 				instanceData[i].WVP = worldViewProjMatrix;
 				instanceData[i].World = worldMatrix;
+
+				particles[i].transform.SetTranslate({
+					particles[i].transform.GetTranslate().x + particles[i].velocity.x * lDeltaTime,
+					particles[i].transform.GetTranslate().y + particles[i].velocity.y * lDeltaTime,
+					particles[i].transform.GetTranslate().z + particles[i].velocity.z * lDeltaTime
+					});
+
 			}
 
 			//開発用UIの処理、実際に開発用のUIを出す場合はここをゲーム固有の処理に置き換え

@@ -4,11 +4,13 @@
 #include <ostream>
 #include"DirectXCom.h"
 #include"Log.h"
+#include"Transform.h"
 
 class ParticleManager
 {
 public:
 
+	
 	ParticleManager(std::ostream& logStream, DirectXCom* dxCommon);
 	~ParticleManager();
 

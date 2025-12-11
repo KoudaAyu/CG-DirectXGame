@@ -4,10 +4,18 @@
 #include <ostream>
 #include"DirectXCom.h"
 #include"Log.h"
+#include"Transform.h"
 
 class SpriteCom
 {
 public:
+
+	struct Particle
+	{
+		Transform transform;
+		Vector3 velocity;
+	};
+
 
 	SpriteCom(std::ostream& logStream, DirectXCom* dxCommon);
 	~SpriteCom();
