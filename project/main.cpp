@@ -59,7 +59,7 @@
 #include<cmath>
 #include "externals/DirectXTex/DirectXTex.h"
 
-
+#include<random>
 
 enum BlendMode
 {
@@ -558,15 +558,20 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	dxCommon->GetDevice()->CreateShaderResourceView(
 		instanceResource.Get(), &instanceSrvDesc, instanceSrvHandleCPU);
 
+	std::random_device seed;
+	std::mt19937 engine(seed());
+
+	std::uniform_real_distribution<float> distPosition(-1.0f, 1.0f);
+
 	SpriteCom::Particle particles[kNumInstance];
 	for (uint32_t i = 0; i < kNumInstance; ++i)
 	{
 		// Particle has an inner `transform` of type Transform
 		particles[i].transform.SetScale({ 1.0f, 1.0f, 1.0f });
 		particles[i].transform.SetRotate({ 0.0f, 0.0f, 0.0f });
-		particles[i].transform.SetTranslate({ i * 0.1f, i * 0.1f, i * 0.1f });
+		particles[i].transform.SetTranslate({distPosition(engine),distPosition(engine) ,distPosition(engine) });
 
-		particles[i].velocity = { 0.0f,1.0f,0.0f };
+		particles[i].velocity = { distPosition(engine),distPosition(engine) ,distPosition(engine) };
 	}
 
 
