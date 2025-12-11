@@ -40,7 +40,7 @@ PixelShaderOutput main(VertexShaderOutput input, bool isFrontFace : SV_IsFrontFa
 
     float3 transformedUV = mul(float32_t4(uv, 0.0f, 1.0f), gMaterial.uvTransform);
     float32_t4 textureColor = gTexture.Sample(gSample, transformedUV.xy);
-    output.color = gMaterial.color * textureColor;
+    output.color = gMaterial.color * textureColor * input.color;
     
     if (output.color.a == 0.0)
     {

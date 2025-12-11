@@ -330,7 +330,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 			indexData[idx++] = v1; // C
 
 			// 2つ目の三角形: v2, v3, v1 (B, D, C)
-		indexData[idx++] = v2; // B
+			indexData[idx++] = v2; // B
 			indexData[idx++] = v3; // D
 			indexData[idx++] = v1; // C
 		}
@@ -555,8 +555,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	D3D12_GPU_DESCRIPTOR_HANDLE instanceSrvHandleGPU =
 		dxCommon->GetGPUDescriptorHandle(dxCommon->GetSrvDescriptorHeap(),
 			dxCommon->GetDescriptorSizeSRV(), 4);
-	dxCommon->GetDevice()->CreateShaderResourceView(
-		instanceResource.Get(), &instanceSrvDesc, instanceSrvHandleCPU);
+	// このSRVは ParticleForGPU 用に後で差し替える
+	// dxCommon->GetDevice()->CreateShaderResourceView(
+	// 	instanceResource.Get(), &instanceSrvDesc, instanceSrvHandleCPU);
 
 	std::random_device seed;
 	std::mt19937 engine(seed());
@@ -564,16 +565,37 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	std::uniform_real_distribution<float> distPosition(-1.0f, 1.0f);
 
 	SpriteCom::Particle particles[kNumInstance];
+
+	struct ParticleForGPU
+	{
+		Matrix4x4 WVP;
+		Matrix4x4 World;
+		Vector4 color;
+	};
+
+	Microsoft::WRL::ComPtr<ID3D12Resource> particleResource =
+		dxCommon->CreateBufferResource(dxCommon->GetDevice(), sizeof(ParticleForGPU) * kNumInstance);
+
 	for (uint32_t i = 0; i < kNumInstance; ++i)
 	{
 		// Particle has an inner `transform` of type Transform
 		particles[i].transform.SetScale({ 1.0f, 1.0f, 1.0f });
 		particles[i].transform.SetRotate({ 0.0f, 0.0f, 0.0f });
-		particles[i].transform.SetTranslate({distPosition(engine),distPosition(engine) ,distPosition(engine) });
+		particles[i].transform.SetTranslate({ distPosition(engine),distPosition(engine) ,distPosition(engine) });
 
 		particles[i].velocity = { distPosition(engine),distPosition(engine) ,distPosition(engine) };
+
+		// 初期カラーをランダムに設定
+		particles[i].color = { distPosition(engine) * 0.5f + 0.5f,
+							  distPosition(engine) * 0.5f + 0.5f,
+							  distPosition(engine) * 0.5f + 0.5f,
+							  1.0f };
 	}
 
+	// SRV は ParticleForGPU のストライドに変更し、particleResource を参照させる
+	instanceSrvDesc.Buffer.StructureByteStride = sizeof(ParticleForGPU);
+	dxCommon->GetDevice()->CreateShaderResourceView(
+		particleResource.Get(), &instanceSrvDesc, instanceSrvHandleCPU);
 
 	const float lDeltaTime = 1.0f / 60.0f; // 仮の固定フレーム時間 (60 FPS)
 
@@ -631,6 +653,10 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 			directionalLight->Map(0, nullptr, reinterpret_cast<void**>(&directionalLightData));
 
+			// 毎フレーム ParticleForGPU を更新して GPU バッファへ書き込む
+			ParticleForGPU* particleGPUData = nullptr;
+			particleResource->Map(0, nullptr, reinterpret_cast<void**>(&particleGPUData));
+
 			for (uint32_t i = 0; i < kNumInstance; ++i)
 			{
 				Matrix4x4 worldMatrix = MakeAffineMatrix(
@@ -643,16 +669,21 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 					worldMatrix,
 					camera->GetViewProjectionMatrix()
 				);
-				instanceData[i].WVP = worldViewProjMatrix;
-				instanceData[i].World = worldMatrix;
 
+				// GPU へ書き込むデータ
+				particleGPUData[i].WVP = worldViewProjMatrix;
+				particleGPUData[i].World = worldMatrix;
+				particleGPUData[i].color = particles[i].color;
+
+				// 速度による移動
 				particles[i].transform.SetTranslate({
 					particles[i].transform.GetTranslate().x + particles[i].velocity.x * lDeltaTime,
 					particles[i].transform.GetTranslate().y + particles[i].velocity.y * lDeltaTime,
 					particles[i].transform.GetTranslate().z + particles[i].velocity.z * lDeltaTime
 					});
-
 			}
+
+			particleResource->Unmap(0, nullptr);
 
 			//開発用UIの処理、実際に開発用のUIを出す場合はここをゲーム固有の処理に置き換え
 
@@ -716,8 +747,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 			/* dxCommon->GetCommandList()->SetGraphicsRootDescriptorTable(2, useMonsterBall ? textureSrvHandleGPU2 : textureSrvHandleGPU); */
 			dxCommon->GetCommandList()->SetGraphicsRootDescriptorTable(2, useMonsterBall ? textureSrvHandleGPU2 : textureSrvHandleGPU);
 			dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(3, directionalLight->GetGPUVirtualAddress());
+			// SRV テーブルには ParticleForGPU の SRV を渡す
 			dxCommon->GetCommandList()->SetGraphicsRootDescriptorTable(4, instanceSrvHandleGPU);
-
 
 			if (drawParticle)
 			{
