@@ -609,6 +609,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 	uint32_t numInstances = 0;
 
+	
+
 	//ウィンドウのxボタンが押されるまでループ
 	while (dxCommon->GetMsg().message != WM_QUIT)
 	{
@@ -689,10 +691,13 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 					camera->GetViewProjectionMatrix()
 				);
 
+				float alpha = 1.0f - (particles[i].currentTime / particles[i].lifeTime);
+
 				// 先頭から詰めるため、書き込み先は numInstances を使う
 				particleGPUData[numInstances].WVP = worldViewProjMatrix;
 				particleGPUData[numInstances].World = worldMatrix;
 				particleGPUData[numInstances].color = particles[i].color;
+				particleGPUData[numInstances].color.w = alpha; // アルファ値を設定
 
 				// 速度による移動
 				particles[i].transform.SetTranslate({
@@ -776,8 +781,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 			if (drawParticle)
 			{
-				/*commandList->DrawIndexedInstanced(kIndexCount, 1, 0, 0, 0);*/
-				dxCommon->GetCommandList()->DrawInstanced(UINT(modelData.vertices.size()), numInstances, 0, 0);
+				// インスタンス数が0のときは描画をスキップして警告/ブレークを回避
+				if (numInstances > 0)
+				{
+					dxCommon->GetCommandList()->DrawInstanced(UINT(modelData.vertices.size()), numInstances, 0, 0);
+				}
 			}
 
 			if (drawSprite)
