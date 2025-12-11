@@ -60,6 +60,7 @@
 #include "externals/DirectXTex/DirectXTex.h"
 
 #include<random>
+#include<list>
 
 enum BlendMode
 {
@@ -273,7 +274,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	// 頂点数・インデックス数
 	// 緯度方向と経度方向の両端に重複する頂点があるため、+1が必要
 	const uint32_t kVertexCount = (kSubdivision + 1) * (kSubdivision + 1);
-	const uint32_t kIndexCount = kSubdivision * kSubdivision * 6; // 各四角形に三角形2つ、各三角形に頂点3つで 2*3=6
+	const uint32_t kIndexCount = kSubdivision * kSubdivision * 6; // 各四角形に三角形2つ、各三角形に頂 vertex3つで 2*3=6
 
 	// 頂点配列を確保
 	Sprite::VertexData* vertexData = new Sprite::VertexData[kVertexCount];
@@ -571,34 +572,29 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	std::mt19937 engine(seed());
 
 	std::uniform_real_distribution<float> distPosition(-1.0f, 1.0f);
-
 	std::uniform_real_distribution<float> distTime(1.0f, 3.0f);
-	
 
-	SpriteCom::Particle particles[kNumMaxInstance];
-
-	
+	// Use list to manage particles
+	std::list<SpriteCom::Particle> particles;
 
 	Microsoft::WRL::ComPtr<ID3D12Resource> particleResource =
 		dxCommon->CreateBufferResource(dxCommon->GetDevice(), sizeof(ParticleForGPU) * kNumMaxInstance);
 
+	// Initialize particles
 	for (uint32_t i = 0; i < kNumMaxInstance; ++i)
 	{
-		// Particle has an inner `transform` of type Transform
-		particles[i].transform.SetScale({ 1.0f, 1.0f, 1.0f });
-		particles[i].transform.SetRotate({ 0.0f, 0.0f, 0.0f });
-		particles[i].transform.SetTranslate({ distPosition(engine),distPosition(engine) ,distPosition(engine) });
-
-		particles[i].velocity = { distPosition(engine),distPosition(engine) ,distPosition(engine) };
-
-		// 初期カラーをランダムに設定
-		particles[i].color = { distPosition(engine) * 0.5f + 0.5f,
-							  distPosition(engine) * 0.5f + 0.5f,
-							  distPosition(engine) * 0.5f + 0.5f,
-							  1.0f };
-
-		particles[i].lifeTime = distTime(engine);
-		particles[i].currentTime = 0;
+		SpriteCom::Particle p;
+		p.transform.SetScale({ 1.0f, 1.0f, 1.0f });
+		p.transform.SetRotate({ 0.0f, 0.0f, 0.0f });
+		p.transform.SetTranslate({ distPosition(engine), distPosition(engine), distPosition(engine) });
+		p.velocity = { distPosition(engine), distPosition(engine), distPosition(engine) };
+		p.color = { distPosition(engine) * 0.5f + 0.5f,
+					distPosition(engine) * 0.5f + 0.5f,
+					distPosition(engine) * 0.5f + 0.5f,
+					1.0f };
+		p.lifeTime = distTime(engine);
+		p.currentTime = 0.0f;
+		particles.emplace_back(std::move(p));
 	}
 
 	// SRV は ParticleForGPU のストライドに変更し、particleResource を参照させる
@@ -608,9 +604,13 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 	const float kDeltaTime = 1.0f / 60.0f; // 仮の固定フレーム時間 (60 FPS)
 
-	uint32_t numInstances = 0;
+	// Field force parameters
+	// float vortexStrength = 1.0f;      // 速度をZ軸周りに回す強さ
+	// float attractionStrength = 0.5f;  // 原点への引力
+	float damping = 0.1f;             // 速度減衰
+	float windStrength = 1.0f;        // 右(+)から左(-)へ吹く風の強さ
 
-	
+	uint32_t numInstances = 0;
 
 	//ウィンドウのxボタンが押されるまでループ
 	while (dxCommon->GetMsg().message != WM_QUIT)
@@ -687,84 +687,100 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 			billboardRotate.m[2][1] = cameraWorld.m[2][1];
 			billboardRotate.m[2][2] = cameraWorld.m[2][2];
 
-			for (uint32_t i = 0; i < kNumMaxInstance; ++i)
+			// Iterate through list, remove dead particles, and write alive ones packed to GPU buffer
+			for (auto it = particles.begin(); it != particles.end(); )
 			{
-				// 生存時間を超えたらスキップ（描画しない）
-				if (particles[i].lifeTime <= particles[i].currentTime)
+				// If particle expired, erase
+				if (it->lifeTime <= it->currentTime)
 				{
+					it = particles.erase(it);
 					continue;
 				}
 
-				// スケールを適用し、ビルボード回転を適用、最後に平行移動を適用
-				// カメラの回転のみを適用し、Scaleは含めない
+				// Update particle physics
+				// Field forces: Only leftward wind and damping
+				Vector3 pos = it->transform.GetTranslate();
+				Vector3 vel = it->velocity;
+
+				// Leftward wind (from +X to -X) with slight temporal/spatial variation
+				float windVar = 0.2f * sinf(it->currentTime * 1.7f + pos.y * 2.3f);
+				vel.x += -(windStrength + windVar) * kDeltaTime;
+
+				// Damping
+				vel.x *= (1.0f - damping * kDeltaTime);
+				vel.y *= (1.0f - damping * kDeltaTime);
+				vel.z *= (1.0f - damping * kDeltaTime);
+
+				it->velocity = vel;
+
+				// Integrate position
+				it->transform.SetTranslate({
+					pos.x + vel.x * kDeltaTime,
+					pos.y + vel.y * kDeltaTime,
+					pos.z + vel.z * kDeltaTime
+				});
+				it->currentTime += kDeltaTime;
+
+				// If GPU buffer full, skip writing but keep the particle updated
+				if (numInstances >= kNumMaxInstance)
+				{
+					++it;
+					continue;
+				}
+
+				// Build world matrix using billboard rotation
 				Matrix4x4 worldMatrix = MakeAffineMatrix(
-					{1.0f, 1.0f, 1.0f}, // スケールは固定で1
+					{1.0f, 1.0f, 1.0f}, // scale
 					billboardRotate,
-					particles[i].transform.GetTranslate()
+					it->transform.GetTranslate()
 				);
 
-				Matrix4x4 worldViewProjMatrix = Multiply(
-					worldMatrix,
-					camera->GetViewProjectionMatrix()
-				);
+				Matrix4x4 worldViewProjMatrix = Multiply(worldMatrix, camera->GetViewProjectionMatrix());
 
-				float alpha = 1.0f - (particles[i].currentTime / particles[i].lifeTime);
+				float alpha = 1.0f - (it->currentTime / it->lifeTime);
 
-				// 先頭から詰めるため、書き込み先は numInstances を使う
+				// Pack into GPU buffer
 				particleGPUData[numInstances].WVP = worldViewProjMatrix;
 				particleGPUData[numInstances].World = worldMatrix;
-				particleGPUData[numInstances].color = particles[i].color;
-				particleGPUData[numInstances].color.w = alpha; // アルファ値を設定
+				particleGPUData[numInstances].color = it->color;
+				particleGPUData[numInstances].color.w = alpha;
 
-				// 速度による移動
-				particles[i].transform.SetTranslate({
-					particles[i].transform.GetTranslate().x + particles[i].velocity.x * kDeltaTime,
-					particles[i].transform.GetTranslate().y + particles[i].velocity.y * kDeltaTime,
-					particles[i].transform.GetTranslate().z + particles[i].velocity.z * kDeltaTime
-					});
-
-				particles[i].currentTime += kDeltaTime;
-
-				// 有効インスタンス数を増やす
 				++numInstances;
+				++it;
 			}
 
 			particleResource->Unmap(0, nullptr);
 
-			//開発用UIの処理、実際に開発用のUIを出す場合はここをゲーム固有の処理に置き換え
-
 #ifdef _DEBUG
+            ImGui::ShowDemoWindow();
+
+            ImGui::Begin("Windows");
+            ImGui::ColorEdit4("Material Color", &materialData->color.x);
+            ImGui::DragFloat("Light Intensity", &directionalLightData->intensity, 0.01f, 0.0f, 10.0f);
 
 
+            ImGui::Checkbox("useMonsterBall", &useMonsterBall);
+            ImGui::Checkbox("LightSprite Flag", (bool*)&materialData->enableLighting);
+            for (auto* sprite : sprites)
+            {
+                ImGui::Checkbox("LightSphere Flag", (bool*)&sprite->GetMaterialDataSprite()->enableLighting);
+            }
+            ImGui::Checkbox("DrawParticle", &drawParticle);
+            ImGui::Checkbox("DrawSprite", &drawSprite);
+            ImGui::DragFloat3("LightDirection", &directionalLightData->direction.x, 0.01f, -10.0f, 10.0f);
 
-			ImGui::ShowDemoWindow();
+            ImGui::DragFloat3("Sphere Rotate", &transformSphere.rotate.x, 0.01f, -10.0f, 10.0f);
 
-			ImGui::Begin("Windows");
-
-
-			ImGui::ColorEdit4("Material Color", &materialData->color.x);
-			ImGui::DragFloat("Light Intensity", &directionalLightData->intensity, 0.01f, 0.0f, 10.0f);
-
-
-			ImGui::Checkbox("useMonsterBall", &useMonsterBall);
-			ImGui::Checkbox("LightSprite Flag", (bool*)&materialData->enableLighting);
-			for (auto* sprite : sprites)
-			{
-				ImGui::Checkbox("LightSphere Flag", (bool*)&sprite->GetMaterialDataSprite()->enableLighting);
-			}
-			ImGui::Checkbox("DrawParticle", &drawParticle);
-			ImGui::Checkbox("DrawSprite", &drawSprite);
-			ImGui::DragFloat3("LightDirection", &directionalLightData->direction.x, 0.01f, -10.0f, 10.0f);
-
-			ImGui::DragFloat3("Sphere Rotate", &transformSphere.rotate.x, 0.01f, -10.0f, 10.0f);
-
-			ImGui::DragFloat2("UVTranslate", &uvTransformSprite.translate.x, 0.01f, -10.0f, 10.0f);
-			ImGui::DragFloat2("UVScale", &uvTransformSprite.scale.x, 0.01f, -10.0f, 10.0f);
-			ImGui::DragFloat("UVRotate", &uvTransformSprite.rotate.z, 0.01f);
+            ImGui::DragFloat2("UVTranslate", &uvTransformSprite.translate.x, 0.01f, -10.0f, 10.0f);
+            ImGui::DragFloat2("UVScale", &uvTransformSprite.scale.x, 0.01f, -10.0f, 10.0f);
+            ImGui::DragFloat("UVRotate", &uvTransformSprite.rotate.z, 0.01f);
 
 
-			ImGui::End();
-
+            ImGui::Separator();
+            ImGui::Text("Particle Field");
+            ImGui::DragFloat("Wind Strength (-X)", &windStrength, 0.01f, 0.0f, 10.0f);
+            ImGui::DragFloat("Damping", &damping, 0.001f, 0.0f, 1.0f);
+            ImGui::End();
 #endif // DEBUG
 
 			//ImGui内部コマンドを生成する
