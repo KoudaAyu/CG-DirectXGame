@@ -249,6 +249,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	//DepthStencilの設定
 	spriteCom->GetGraphicPipelineStateDesc().DepthStencilState = depthStencilDesc;
 	spriteCom->GetGraphicPipelineStateDesc().DSVFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
+	// カリングをOFFにする
+	spriteCom->GetGraphicPipelineStateDesc().RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
 	//実際に生成
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> graphicPipelineState = nullptr;
 	dxCommon->SetHr(dxCommon->GetDevice()->CreateGraphicsPipelineState(&spriteCom->GetGraphicPipelineStateDesc(),
@@ -414,7 +416,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 	// 書き込み完了後はUnmapを呼ぶ
 	directionalLight->Unmap(0, nullptr);
-
 
 
 
@@ -672,6 +673,20 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 			// フレームごとにインスタンス数をリセットし、先頭から詰めて書き込む
 			numInstances = 0;
 
+			// カメラが-Zから原点を見る場合に表を向くように、ビュー行列の逆(カメラのワールド行列)から回転のみを使用
+			Matrix4x4 cameraWorld = Inverse(camera->GetViewMatrix());
+			// 回転成分だけの行列を作る（上3x3をそのまま、平行移動を0）
+			Matrix4x4 billboardRotate = MakeIdentity4x4();
+			billboardRotate.m[0][0] = cameraWorld.m[0][0];
+			billboardRotate.m[0][1] = cameraWorld.m[0][1];
+			billboardRotate.m[0][2] = cameraWorld.m[0][2];
+			billboardRotate.m[1][0] = cameraWorld.m[1][0];
+			billboardRotate.m[1][1] = cameraWorld.m[1][1];
+			billboardRotate.m[1][2] = cameraWorld.m[1][2];
+			billboardRotate.m[2][0] = cameraWorld.m[2][0];
+			billboardRotate.m[2][1] = cameraWorld.m[2][1];
+			billboardRotate.m[2][2] = cameraWorld.m[2][2];
+
 			for (uint32_t i = 0; i < kNumMaxInstance; ++i)
 			{
 				// 生存時間を超えたらスキップ（描画しない）
@@ -680,9 +695,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 					continue;
 				}
 
+				// スケールを適用し、ビルボード回転を適用、最後に平行移動を適用
+				// カメラの回転のみを適用し、Scaleは含めない
 				Matrix4x4 worldMatrix = MakeAffineMatrix(
-					particles[i].transform.GetScale(),
-					particles[i].transform.GetRotate(),
+					{1.0f, 1.0f, 1.0f}, // スケールは固定で1
+					billboardRotate,
 					particles[i].transform.GetTranslate()
 				);
 
