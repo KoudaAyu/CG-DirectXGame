@@ -74,10 +74,9 @@ jobs:
           UNWANTED_LIST=$(find . -path "./.git" -prune -o \
            \( \( "${DIR_CONDITIONS[@]}" \) -a -type d -print -prune \) -o \
             \( \( "${NAME_CONDITIONS[@]}" \) -a -type f -print \) )
-            )
 
           # 検出結果があればエラーとして出力させ、失敗させる
-          if [ -n $UNWANTED_LIST" ]; then
+          if [ -n "$UNWANTED_LIST" ]; then
             echo "::error::不要なファイル/ディレクトリが見つかりました:"
             echo "$UNWANTED_LIST"
             exit 1
