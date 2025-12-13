@@ -46,7 +46,6 @@ void Object3d::Update()
 
 	// 優先: Object3dComに設定されたカメラを使う
 	Matrix4x4 worldMatrix = MakeAffineMatrix(transform.GetScale(), transform.GetRotate(), transform.GetTranslate());
-
 	Matrix4x4 viewMatrix;
 	Matrix4x4 projectionMatrix;
 
@@ -67,6 +66,11 @@ void Object3d::Update()
 	// WVP を更新
 	transformationMatrixData_->WVP = Multiply(worldMatrix, Multiply(viewMatrix, projectionMatrix));
 	transformationMatrixData_->World = worldMatrix;
+}
+
+void Object3d::Draw()
+{
+	
 }
 
 Object3d::MaterialData Object3d::LoadMaterialTemplateFile(const std::string& direcrotyPath, const std::string& filename)
