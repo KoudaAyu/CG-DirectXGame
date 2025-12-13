@@ -58,6 +58,8 @@ public:
 
 	void Update();
 
+	void Draw();
+
 	/// <summary>
 	/// .mtlファイルの読み込み
 	/// </summary>
