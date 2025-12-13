@@ -4,6 +4,7 @@
 #include <vector>
 #include "Camera.h"
 #include"Model.h"
+#include"ModelManager.h"
 #include"TextureManager.h"
 #include "Transform.h"
 #include "Sprite.h"
@@ -85,6 +86,11 @@ public:
 	void SetModel(Model* model)
 	{
 		model_ = model;
+	}
+
+	void SetModel(const std::string& filePath)
+	{
+		model_ = ModelManager::GetInstance()->LoadModel(filePath);
 	}
 	// New getters to access model internals via Object3d
 	Model* GetModel() const { return model_; }

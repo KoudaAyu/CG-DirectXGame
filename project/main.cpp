@@ -9,6 +9,7 @@
 #include"Matrix4x4.h"
 #include"ModelCom.h"
 #include"Model.h"
+#include"ModelManager.h"
 #include"Object3d.h"
 #include"Object3dCom.h"
 #include"Sprite.h"
@@ -361,6 +362,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	memcpy(mapped, vertexData, sizeof(Sprite::VertexData) * kVertexCount);
 	vertexResourceSphere->Unmap(0, nullptr);
 
+	ModelManager::GetInstance()->Initialize(dxCommon);
+
 	ModelCom* modelCom = new ModelCom();
 	modelCom->Initialize(dxCommon);
 
@@ -494,6 +497,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	camera->SetRotate({ 0.0f,0.0f,0.0f });
 	camera->SetTranslate({ 0.0f,0.0f,-10.0f });
 	object3dCom->SetDefaultCamera(camera);
+
+	
 
 
 	//ウィンドウのxボタンが押されるまでループ
@@ -650,6 +655,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	OutputDebugStringA("Hello, DirextX!\n");
 
 	CloseHandle(dxCommon->GetFenceEvent());
+
+	ModelManager::GetInstance()->Destroy();
 
 	sound_->GetXAudio2().Reset();
 	sound_->SoundUnload(&soundData);
