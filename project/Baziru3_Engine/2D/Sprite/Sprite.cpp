@@ -4,13 +4,15 @@
 
 #include<cassert>
 
-void Sprite::Initialize(SpriteCom* spriteCom)
+
+
+void Sprite::Initialize(SpriteCom* spriteCom, std::string textureFilePath)
 {
 	this->spriteCom = spriteCom;
 	assert(spriteCom);
 	this->dxCommon = spriteCom->GetDxCommon();
 	assert(dxCommon);
-	
+
 
 	CreateVertexBufferView();
 	CreateIndexBufferView();
@@ -24,7 +26,8 @@ void Sprite::Initialize(SpriteCom* spriteCom)
 	materialData->color = { 1.0f, 1.0f, 1.0f, 1.0f }; // 白（テクスチャ色をそのまま出す用）
 	materialData->enableLighting = false;
 	materialData->uvTransform = MakeIdentity4x4();
-	materialResourceSprite->Unmap(0, nullptr);
+	// Note: keep mapped for lifetime so caller can update directly
+	// materialResourceSprite->Unmap(0, nullptr);
 
 	//Sprite用のTransformationMatrix用のリソースを作る
 	transformationMatrixResourceSprite = dxCommon->CreateBufferResource(dxCommon->GetDevice().Get(), sizeof(TransformationMatrix));
@@ -34,11 +37,37 @@ void Sprite::Initialize(SpriteCom* spriteCom)
 	//単位行列を書き込んでおく
 	transformationMatrixDataSprite->WVP = MakeIdentity4x4();
 	transformationMatrixDataSprite->World = MakeIdentity4x4();
-	transformationMatrixResourceSprite->Unmap(0, nullptr);
+	
+	textureIndex = TextureManager::GetInstance()->GetTextureIndexByFilePath(textureFilePath);
+
+	AdjustTextureSize();
 }
 
 void Sprite::Update(WindowAPI* windowAPI, DebugCamera* debugCamera_)
 {
+
+	const DirectX::TexMetadata& metadata = TextureManager::GetInstance()->GetMetadata(textureIndex);
+
+	float tex_left = textureLeftTop.x / static_cast<float>(metadata.width);
+	float tex_right = (textureLeftTop.x + textureSize.x) / static_cast<float>(metadata.width);
+	float tex_top = textureLeftTop.y / static_cast<float>(metadata.height);
+	float tex_bottom = (textureLeftTop.y + textureSize.y) / static_cast<float>(metadata.height);
+
+	vertexData[0].texcoord = { tex_left,tex_bottom }; // 左下
+	vertexData[1].texcoord = { tex_left,tex_top };   // 左上
+	vertexData[2].texcoord = { tex_right,tex_bottom }; // 右下
+	vertexData[3].texcoord = { tex_right,tex_top };   // 右上
+
+	float left = 0.0f - anchorPoint.x;
+	float right = 1.0f - anchorPoint.x;
+	float top = 0.0f - anchorPoint.y;
+	float bottom = 1.0f - anchorPoint.y;
+
+	vertexData[0].position = { left,bottom,0.0f,1.0f }; // 左下
+	vertexData[1].position = { left,top,0.0f,1.0f };   // 左上
+	vertexData[2].position = { right,bottom,0.0f,1.0f }; // 右下
+	vertexData[3].position = { right,top,0.0f,1.0f };   // 右上
+
 	//spriteの座標、回転、拡縮関係
 	transform.translate = { position.x, position.y, 0.0f };
 	transform.rotate = { 0.0f,0.0f,rotation };
@@ -55,13 +84,16 @@ void Sprite::Update(WindowAPI* windowAPI, DebugCamera* debugCamera_)
 
 void Sprite::Draw()
 {
+
 	// IA と Root の設定 + SRV のバインド + DrawCall をここに集約
+
 	dxCommon->GetCommandList()->IASetVertexBuffers(0, 1, &vertexBufferViewSprite);
 	dxCommon->GetCommandList()->IASetIndexBuffer(&indexBufferViewSprite);
 	dxCommon->GetCommandList()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
 	dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(0, materialResourceSprite->GetGPUVirtualAddress());
 	dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(1, transformationMatrixResourceSprite->GetGPUVirtualAddress());
+
 	// Texture
 	if (textureIndex_ >= 0 && textureSrvHandleGPU_.ptr != 0) {
 		dxCommon->GetCommandList()->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU_);
@@ -72,6 +104,7 @@ void Sprite::Draw()
 	}
 
 	// Draw quad
+
 	dxCommon->GetCommandList()->DrawIndexedInstanced(6, 1, 0, 0, 0);
 }
 
@@ -150,6 +183,7 @@ void Sprite::ReflectionProcessing()
 
 }
 
+
 // 追加: 一発生成ファクトリ実装
 Sprite* Sprite::Create(SpriteCom* spriteCom, const std::string& textureFilePath)
 {
@@ -182,4 +216,14 @@ void Sprite::SetTextureByFile(const std::string& filePath)
 	if (textureIndex_ >= 0 && dxCommon) {
 		textureSrvHandleGPU_ = dxCommon->GetSRVHandleGPU(static_cast<uint32_t>(textureIndex_));
 	}
+
+void Sprite::AdjustTextureSize()
+{
+	const DirectX::TexMetadata& metadata = TextureManager::GetInstance()->GetMetadata(textureIndex);
+	
+	textureSize.x = static_cast<float>(metadata.width);
+	textureSize.y = static_cast<float>(metadata.height);
+
+	size = textureSize;
+
 }

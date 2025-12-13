@@ -60,6 +60,7 @@ void TextureManager::LoadTexture(const std::string& filePath)
 	textureData.resource_ =
 		directXCom_->CreateTextureResource(textureData.metadata_);
 
+
 	// SRV割り当て: 0 は ImGui 用に予約する
 	const uint32_t descriptorSize = directXCom_->GetDescriptorSizeSRV();
 	const uint32_t heapReservedForImGui = 1u;
@@ -67,6 +68,7 @@ void TextureManager::LoadTexture(const std::string& filePath)
 	uint32_t vecIndex = static_cast<uint32_t>(textureDatas_.size() - 1);
 	uint32_t srvIndex = heapReservedForImGui + vecIndex;
 	textureData.srvIndex_ = srvIndex;
+
 
 	textureData.srvHandleCPU_ =
 		directXCom_->GetSRVHandleCPU(srvIndex);
@@ -84,15 +86,28 @@ void TextureManager::LoadTexture(const std::string& filePath)
 		textureData.resource_.Get(), &srvDesc, textureData.srvHandleCPU_);
 }
 
-int32_t TextureManager::GetTextureIndexByFilePath(const std::string& filePath) const
+uint32_t TextureManager::GetTextureIndexByFilePath(const std::string& filePath) const
 {
-	for (size_t i = 0; i < textureDatas_.size(); ++i)
-	{
-		if (textureDatas_[i].filePath_ == filePath)
+	//for (size_t i = 0; i < textureDatas_.size(); ++i)
+	//{
+	//	if (textureDatas_[i].filePath_ == filePath)
+	//	{
+	//		return static_cast<int32_t>(i);
+	//	}
+	//}
+	//return -1; // 見つからなかった
+
+	//読み込み済みテクスチャデータを検索
+	auto it = std::find_if(textureDatas_.begin(), textureDatas_.end(),
+		[&filePath](const TextureData& data)
 		{
+
 			// SRVインデックスを返す
 			return static_cast<int32_t>(textureDatas_[i].srvIndex_);
 		}
+
 	}
-	return -1; // 見つからなかった
+
+	assert(0);
+	return 0;
 }

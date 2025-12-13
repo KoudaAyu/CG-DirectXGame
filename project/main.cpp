@@ -198,6 +198,12 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 	dxCommon->Initialize();
 
+	// TextureManager は SRV ヒープに依存するので DX 初期化の後に初期化
+	TextureManager::GetInstance()->Initialize();
+	TextureManager::GetInstance()->SetDirectXCom(dxCommon);
+	// 作業ディレクトリが project/ である前提の相対パスを使う
+	TextureManager::GetInstance()->LoadTexture("Resources/uvChecker.png");
+
 	SpriteCom* spriteCom = nullptr;
 	spriteCom = new SpriteCom(logStream,dxCommon);
 	spriteCom->Initialize();
@@ -207,15 +213,14 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	for (uint32_t i = 0; i < 5; ++i)
 	{
 		Sprite* sprite = new Sprite();
-		sprite->Initialize(spriteCom);
+		// Resources フォルダ直下の uvChecker.png を指定
+		sprite->Initialize(spriteCom, "Resources/uvChecker.png");
 		sprites.push_back(sprite);
 	}
 	
 	spriteCom->CreateGraphicsPipeline();
 
-	TextureManager::GetInstance()->Initialize();
-    // Provide DirectX context so TextureManager can create textures and SRVs
-    TextureManager::GetInstance()->SetDirectXCom(dxCommon);
+	// 既存の手動テクスチャ読み込みはそのまま利用（Sphere用）
 
 	Object3dCom* object3dCom = new Object3dCom(logStream);
 	object3dCom->Initialize(dxCommon);
@@ -556,6 +561,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 			camera->Update();
 
+
 			//ゲームの処理
 		
 			Matrix4x4 worldMatrix = MakeAffineMatrix(transformSphere.scale, transformSphere.rotate, transformSphere.translate);
@@ -567,13 +573,12 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 			transformationMatrixDataSphere->WVP = worldViewProjectMatrix;
 			transformationMatrixDataSphere->World = worldMatrix;
 
+
 			for (auto* sprite : sprites)
 			{
 				sprite->SetPosition({ 0.0f,0.0f});
 				sprite->Update(windowAPI, &debugCamera_);
 			}
-
-		
 
 			//UVTransform用
 			Matrix4x4 uvTransformMatrix = MakeScaleMatrix(uvTransformSprite.scale);
@@ -644,7 +649,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 			dxCommon->GetCommandList()->IASetIndexBuffer(&indexBufferViewSphere);
 			dxCommon->GetCommandList()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 			dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(0, materialResource->GetGPUVirtualAddress());
-			dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(1, transformationMatrixResourceSphere->GetGPUVirtualAddress());
+			// Use Object3d WVP updated above
+			dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(1, object3d->GetTransformationMatrixResource()->GetGPUVirtualAddress());
 			dxCommon->GetCommandList()->SetGraphicsRootDescriptorTable(2, useMonsterBall ? textureSrvHandleGPU2 : textureSrvHandleGPU);
 			dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(3, directionalLight->GetGPUVirtualAddress());
 			if (drawSphere)
@@ -657,7 +663,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 			{
 				for (auto* sprite : sprites)
 				{
+
 					sprite->SetDirectionalLightResource(directionalLight);
+
 					sprite->Draw();
 				}
 			}

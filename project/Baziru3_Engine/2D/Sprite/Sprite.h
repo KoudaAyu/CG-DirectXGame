@@ -34,7 +34,7 @@ public:
 		Matrix4x4 uvTransform; // UV変換行列
 	};
 
-	void Initialize(SpriteCom* spriteCom);
+	void Initialize(SpriteCom* spriteCom,std::string textureFilePath);
 	void Update(WindowAPI* windowAPI, DebugCamera* debugCamera_);
 	void Draw();
 
@@ -76,11 +76,13 @@ public:
 	}
 	const Microsoft::WRL::ComPtr<ID3D12Resource>& GetTransformationMatrixResourceSprite() const { return transformationMatrixResourceSprite; }
 
+
 	// 追加: このスプライトが保持するSRV GPUハンドルを取得
 	D3D12_GPU_DESCRIPTOR_HANDLE GetTextureSrvHandleGPU() const { return textureSrvHandleGPU_; }
 	int32_t GetTextureIndex() const { return textureIndex_; }
 
 public:
+
 	//Spriteの座標関係
 	const Vector2& GetPosition() const { return position; }
 	void SetPosition(const Vector2& position)  { this->position = position; }
@@ -97,11 +99,31 @@ public:
 	const Vector2& GetSize() const { return size; }
 	void SetSize(const Vector2& size) { this->size = size; }
 
+	const Vector2& GetAnchorPoint() const { return anchorPoint; }
+	void SetAnchorPoint(const Vector2& anchorPoint) { this->anchorPoint = anchorPoint; }
+
+	void SetTextureLeftTop(const Vector2& leftTop) { textureLeftTop = leftTop; }
+
+	void SetTextureSize(const Vector2& size) { textureSize = size; }
+
+	void SetTextureHandle(D3D12_GPU_DESCRIPTOR_HANDLE handle) { textureHandleGPU = handle; }
+	
+	void SetDirectionalLightResource(const Microsoft::WRL::ComPtr<ID3D12Resource>& light) { directionalLightResource = light; }
+
+private:
+	void AdjustTextureSize();
+
 private:
 	Transform transform{ {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };
 	Vector2 position = { 0.0f,0.0f };
 	float rotation = 0.0f;
 	Vector2 size = { 640.0f,360.0f };
+	Vector2 anchorPoint = { 0.0f,0.0f };
+	bool isFlipX_ = false;
+	bool isFlipY_ = false;
+	//テクスチャ左上座標
+	Vector2 textureLeftTop = { 0.0f,0.0f };
+	Vector2 textureSize = { 100.0f,100.0f };
 
 private:
 	DirectXCom* dxCommon = nullptr;
@@ -119,10 +141,15 @@ private:
 	Microsoft::WRL::ComPtr<ID3D12Resource> transformationMatrixResourceSprite = nullptr;
 	TransformationMatrix* transformationMatrixDataSprite = nullptr;
 
+
 	// 追加: テクスチャ関連
 	std::string textureFilePath_{};
 	int32_t textureIndex_ = -1;
 	D3D12_GPU_DESCRIPTOR_HANDLE textureSrvHandleGPU_{};
 	// 追加: ディレクショナルライトCBV
 	Microsoft::WRL::ComPtr<ID3D12Resource> directionalLightResourceSprite = nullptr;
+
+
+	uint32_t textureIndex = 0;
+
 };
