@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 #include "Camera.h"
+#include"Model.h"
 #include"TextureManager.h"
 #include "Transform.h"
 #include "Sprite.h"
@@ -19,19 +20,6 @@ public:
 		int32_t enableLighting;
 		float padding[3]; // パディングを追加して16バイト境界に揃える
 		Matrix4x4 uvTransform; // UV変換行列
-	};
-
-	struct MaterialData
-	{
-		std::string textureFilePath; // テクスチャファイルのパス
-		uint32_t textureIndex = 0;      // テクスチャのインデックス
-	};
-
-	//objファイル関係
-	struct ModelData
-	{
-		std::vector<Sprite::VertexData> vertices; // 頂点データ
-		MaterialData material; // マテリアルデータ
 	};
 
 	struct VertexData
@@ -59,24 +47,6 @@ public:
 	void Update();
 
 	void Draw();
-
-	/// <summary>
-	/// .mtlファイルの読み込み
-	/// </summary>
-	/// <param name="direcrotyPath"></param>
-	/// <param name="filename"></param>
-	/// <returns></returns>
-	static MaterialData LoadMaterialTemplateFile(const std::string& direcrotyPath, const std::string& filename);
-
-	/// <summary>
-	/// .objファイルの読み込み
-	/// </summary>
-	/// <param name="directoryPath">ファイルパス</param>
-	/// <param name="filename">.objパス</param>
-	/// <returns></returns>
-	static ModelData LoadObjFile(const std::string& directoryPath, const std::string& filename);
-
-	
 
 	void VertexResource();
 
@@ -112,6 +82,17 @@ public:
 	Vector3 GetTranslate() const { return transform.GetTranslate(); }
 	Vector3 GetScale() const { return transform.GetScale(); }
 
+	void SetModel(Model* model)
+	{
+		model_ = model;
+	}
+	// New getters to access model internals via Object3d
+	Model* GetModel() const { return model_; }
+	const Model::ModelData& GetModelData() const { return model_->GetModelData(); }
+	const D3D12_VERTEX_BUFFER_VIEW& GetVertexBufferView() const { return model_->GetVertexBufferView(); }
+	ID3D12Resource* GetMaterialResource() const { return model_->GetMaterialResource(); }
+	Model::Material* GetMaterialData() const { return model_->GetMaterialData(); }
+
 private:
 	Transform transform;
 	Transform cameraTransform;
@@ -121,7 +102,7 @@ private:
 	Object3dCom* object3dCom_ = nullptr;
 	Transform transform_;
 
-	ModelData modelData_;
+	Model* model_ = nullptr;
 
 	//バッファリソース
 	Microsoft::WRL::ComPtr<ID3D12Resource> vertexResource = nullptr;
