@@ -2,8 +2,8 @@
 name: ChechUnnecessaryFiles
 
 on:
-  #　githunのActionsタブから手動で実行できるようにする
-   workflow_dispatch:
+  # GitHub Actionsタブから手動で実行できるようにする
+  workflow_dispatch:
   # masterブランチへのプッシュでも実行する
   push:
     branches:
