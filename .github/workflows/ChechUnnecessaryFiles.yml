@@ -1,5 +1,5 @@
 # リポジトリ内の不のなファイルを見つけるためのGitHub Actions
-name: CheckUnnecessaryFiles
+name: ChechUnnecessaryFiles
 
 on:
   # GitHub Actionsタブから手動で実行できるようにする
