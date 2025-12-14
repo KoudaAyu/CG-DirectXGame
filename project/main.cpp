@@ -16,6 +16,7 @@
 #include"SpriteCom.h"
 #include"ResourceLeakCheak.h"
 #include"Sound.h"
+#include"SRVManager.h"
 #include"TextureManager.h"
 #include"Vector.h"
 #include"WindowsAPI.h"
@@ -201,11 +202,19 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 	dxCommon->Initialize();
 
+#pragma region 基盤システムの初期化
+
+	SRVManager* srvManager = new SRVManager();
+	srvManager->Initialize(dxCommon);
+
 	// TextureManager は SRV ヒープに依存するので DX 初期化の後に初期化
-	TextureManager::GetInstance()->Initialize();
-	TextureManager::GetInstance()->SetDirectXCom(dxCommon);
+	TextureManager::GetInstance()->Initialize(dxCommon,srvManager);
 	// 作業ディレクトリが project/ である前提の相対パスを使う
 	TextureManager::GetInstance()->LoadTexture("Resources/uvChecker.png");
+
+#pragma endregion 基盤システムの初期化
+
+
 
 	SpriteCom* spriteCom = nullptr;
 	spriteCom = new SpriteCom(logStream,dxCommon);
@@ -233,6 +242,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	object3d->Initialize(object3dCom);
 
 #pragma endregion 最初のシーン終了
+
+
 
 	//DepthStencilStateの設定
 	D3D12_DEPTH_STENCIL_DESC depthStencilDesc{};
@@ -681,6 +692,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 		delete sprite;
 	}
 	sprites.clear();
+
+	delete srvManager;
 
 	delete object3d;
 
