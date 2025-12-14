@@ -13,6 +13,18 @@ public:
 
 	void PreDraw();
 
+
+	uint32_t Allocate();
+
+public:
+	void SeTGraphicsRootDescriptorTable(UINT RootParameterIndex, uint32_t srvIndex)
+	{
+		directXCom_->GetCommandList()->SetGraphicsRootDescriptorTable(RootParameterIndex, GetGPUDescriptorHandle(srvIndex));
+	}
+
+	D3D12_CPU_DESCRIPTOR_HANDLE GetSRVHandleCPU(uint32_t index);
+	D3D12_GPU_DESCRIPTOR_HANDLE GetGPUDescriptorHandle(uint32_t index);
+
 private:
 	DirectXCom* directXCom_ = nullptr;
 
@@ -26,10 +38,8 @@ private:
 	//次に使用するSRVインデックス
 	uint32_t useIndex = 0;
 
-	uint32_t Allocate();
 
-	D3D12_CPU_DESCRIPTOR_HANDLE GetSRVHandleCPU(uint32_t index);
-	D3D12_GPU_DESCRIPTOR_HANDLE GetSRVHandleGPU(uint32_t index);
+	
 
 	
 };

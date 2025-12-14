@@ -71,7 +71,7 @@ D3D12_CPU_DESCRIPTOR_HANDLE SRVManager::GetSRVHandleCPU(uint32_t index)
 	return handleCPU;
 }
 
-D3D12_GPU_DESCRIPTOR_HANDLE SRVManager::GetSRVHandleGPU(uint32_t index)
+D3D12_GPU_DESCRIPTOR_HANDLE SRVManager::GetGPUDescriptorHandle(uint32_t index)
 {
 	D3D12_GPU_DESCRIPTOR_HANDLE handleGPU = descriptirHeap->GetGPUDescriptorHandleForHeapStart();
 	handleGPU.ptr += (descriptorSize_ * index);

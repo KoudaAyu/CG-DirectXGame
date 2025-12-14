@@ -1,6 +1,11 @@
 #pragma once
+
+#include<unordered_map>
+#include <iterator>
 #include "DirectXCom.h"
+#include "SRVManager.h"
 #include "StringUtil.h"
+
 
 class TextureManager
 {
@@ -12,7 +17,7 @@ public:
 	void Finalize();
 
 
-	void Initialize();
+	void Initialize(DirectXCom* dxCommon, SRVManager* SrvManager);
 
 	void LoadTexture(const std::string& filePath);
 
@@ -25,15 +30,25 @@ public:
 	//メタデータ取得
 	const DirectX::TexMetadata& GetMetadata(uint32_t index) const
 	{
-		assert(index < textureDatas_.size());
-		return textureDatas_[index].metadata_;
+		assert(index < textureDatas.size());
+		auto it = textureDatas.begin();
+		std::advance(it, index);
+		return it->second.metadata_;
 	}
-	
-public: 
+
+public:
+	const DirectX::TexMetadata& GetMetadata(const std::string& filePath) const
+	{
+		assert(textureDatas.contains(filePath));
+		return textureDatas.at(filePath).metadata_;
+	}
+
 	D3D12_GPU_DESCRIPTOR_HANDLE GetSrvHandleGPU(uint32_t index) const
 	{
-		assert(index < textureDatas_.size());
-		return textureDatas_[index].srvHandleGPU_;
+		assert(index < textureDatas.size());
+		auto it = textureDatas.begin();
+		std::advance(it, index);
+		return it->second.srvHandleGPU_;
 	}
 
 private:
@@ -55,10 +70,13 @@ private:
 		D3D12_GPU_DESCRIPTOR_HANDLE srvHandleGPU_{};
 	};
 
-	std::vector<TextureData> textureDatas_;
 
 	DirectXCom* directXCom_ = nullptr;
 
+	SRVManager* srvManager_ = nullptr;
+
 	//SRVインデックスの開始番号
 	uint32_t kSRVIndexTop = 1;
+
+	std::unordered_map<std::string, TextureData> textureDatas;
 };
