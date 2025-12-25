@@ -7,11 +7,15 @@ void SRVManager::Initialize(DirectXCom* directXCom)
 {
 	directXCom_ = directXCom;
 
-	//デスクリプタヒープの設定
-	descriptirHeap = directXCom_->CreateDescriptorHeap(directXCom_->GetDevice(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, kMaxSRVCount, true);
+	// Use the application's shared SRV descriptor heap from DirectXCom instead of creating a separate one.
+	// This ensures ImGui and SRVManager operate on the same descriptor heap.
+	descriptirHeap = directXCom_->GetSrvDescriptorHeap();
 
 	//デスクリプタサイズ1個分のサイズを取得して記録
 	descriptorSize_ = directXCom_->GetDevice()->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+
+	// Reserve descriptor 0 which is used by ImGui for font SRV to avoid overwriting it
+	useIndex = 1;
 }
 
 void SRVManager::CreateSRVforTexture2D(uint32_t srvIndex, ID3D12Resource* pResource, DXGI_FORMAT Format, UINT MipLeveles)

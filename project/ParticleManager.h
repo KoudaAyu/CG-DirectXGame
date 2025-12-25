@@ -33,6 +33,14 @@ public:
 		Vector4 color;
 	};
 
+	// C++ 側で使う DirectionalLight 構造体（HLSL の DirectionalLight とバイナリ互換）
+	struct DirectionalLight
+	{
+		Vector4 color;
+		Vector3 direction;
+		float intensity;
+	};
+
 	struct ParticleGroup
 	{
 		std::string textureFilePath_; // テクスチャファイルパス
@@ -129,6 +137,9 @@ private:
 	std::chrono::steady_clock::time_point lastUpdateTime_{};
 
 	Vector3 globalOffset_{ 0.0f, 0.0f, 0.0f };
+
+	// ParticleManager が自前でバインドできる DirectionalLight CBV（ルートパラメータ 3）
+	Microsoft::WRL::ComPtr<ID3D12Resource> directionalLightResource_ = nullptr;
 
 	static ParticleManager* instance_;
 };

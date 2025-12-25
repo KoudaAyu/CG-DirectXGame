@@ -59,6 +59,16 @@ void ParticleManager::Initialize(DirectXCom* dxCommon, SRVManager* srvManager)
 	vbv_.StrideInBytes = sizeof(VertexData);
 
 	lastUpdateTime_ = std::chrono::steady_clock::now();
+
+	directionalLightResource_ = dxCommon_->CreateBufferResource(dxCommon_->GetDevice(), sizeof(DirectionalLight));
+	DirectionalLight* dlData = nullptr;
+	if (SUCCEEDED(directionalLightResource_->Map(0, nullptr, reinterpret_cast<void**>(&dlData))))
+	{
+		dlData->color = {1.0f,1.0f,1.0f,1.0f};
+		dlData->direction = {0.0f,-1.0f,0.0f};
+		dlData->intensity = 1.0f;
+		directionalLightResource_->Unmap(0, nullptr);
+	}
 }
 
 void ParticleManager::Update()
@@ -400,10 +410,17 @@ void ParticleManager::SetupDraw()
 void ParticleManager::Draw()
 {
 	auto cmdList = dxCommon_->GetCommandList();
+
+	
 	cmdList->SetPipelineState(pipelineState.Get());
 	cmdList->SetGraphicsRootSignature(rootSignature.Get());
 
-	// Bind the descriptor heap managed by SRVManager to match handles returned by srvManager_
+	
+	if (directionalLightResource_)
+	{
+		cmdList->SetGraphicsRootConstantBufferView(3, directionalLightResource_->GetGPUVirtualAddress());
+	}
+
 	srvManager_->PreDraw();
 
 	cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);

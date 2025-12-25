@@ -416,10 +416,19 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	// 書き込みが完了したので、マップを解除
 	transformationMatrixResourceSphere->Unmap(0, nullptr);
 
-	
+	  Microsoft::WRL::ComPtr<ID3D12Resource> globalDirectionalLightResource = dxCommon->CreateBufferResource(dxCommon->GetDevice().Get(), sizeof(Object3d::DirectionalLight));
+    Object3d::DirectionalLight* globalDL = nullptr;
+    if (SUCCEEDED(globalDirectionalLightResource->Map(0, nullptr, reinterpret_cast<void**>(&globalDL))))
+    {
+        globalDL->color = { 1.0f, 1.0f, 1.0f, 1.0f };
+        globalDL->direction = { 0.0f, -1.0f, 0.0f };
+        globalDL->intensity = 1.0f;
+        globalDirectionalLightResource->Unmap(0, nullptr);
+    }
 
-	//Transform変数を作る
-	Sprite::Transform transform = { {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };
+    
+    //Transform変数を作る
+    Sprite::Transform transform = { {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };
 	
 
 	//Sphere用
@@ -489,7 +498,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	//SRVの切り替え
 	bool useMonsterBall = true;
 	//Sphereの描画切り替え
-	bool drawSphere = true;
+	bool drawObject = true;
 	bool drawSprite = true;
 
 	
@@ -591,7 +600,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 			{
 				ImGui::Checkbox("LightSphere Flag", (bool*)&sprite->GetMaterialDataSprite()->enableLighting);
 			}
-			ImGui::Checkbox("DrawSphere", &drawSphere);
+			ImGui::Checkbox("drawObject", &drawObject);
 			ImGui::Checkbox("DrawSprite", &drawSprite);
 		
 
@@ -614,34 +623,42 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 			dxCommon->PreDraw();
 
 			object3dCom->PreDraw();
+			if (globalDirectionalLightResource)
+			{
+				dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(3, globalDirectionalLightResource->GetGPUVirtualAddress());
+			}
 
 			spriteCom->SetupDraw();
 
 		
 			//RootSignatureを設定。PSOに設定しているけれど別途設定が必要
 			dxCommon->GetCommandList()->SetGraphicsRootSignature(spriteCom->GetRootSignature().Get());
-			dxCommon->GetCommandList()->SetPipelineState(graphicPipelineState.Get()); //パイプラインステートを設定
-			//Sphereの描画
+            dxCommon->GetCommandList()->SetPipelineState(graphicPipelineState.Get()); //パイプラインステートを設定
+            //Sphereの描画
 
-			dxCommon->GetCommandList()->IASetVertexBuffers(0, 1, &vertexBufferView);
-			dxCommon->GetCommandList()->IASetIndexBuffer(&indexBufferViewSphere);
-			dxCommon->GetCommandList()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-			dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(0, materialResource->GetGPUVirtualAddress());
-			// Use Object3d WVP updated above
-			dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(1, object3d->GetTransformationMatrixResource()->GetGPUVirtualAddress());
-			dxCommon->GetCommandList()->SetGraphicsRootDescriptorTable(2, useMonsterBall ? textureSrvHandleGPU2 : textureSrvHandleGPU);
-			if (drawSphere)
-			{
-				object3d->Draw();
-			}
+            dxCommon->GetCommandList()->IASetVertexBuffers(0, 1, &vertexBufferView);
+            dxCommon->GetCommandList()->IASetIndexBuffer(&indexBufferViewSphere);
+            dxCommon->GetCommandList()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+            dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(0, materialResource->GetGPUVirtualAddress());
+           
+            dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(1, object3d->GetTransformationMatrixResource()->GetGPUVirtualAddress());
+            if (globalDirectionalLightResource)
+            {
+                dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(3, globalDirectionalLightResource->GetGPUVirtualAddress());
+            }
+            dxCommon->GetCommandList()->SetGraphicsRootDescriptorTable(2, useMonsterBall ? textureSrvHandleGPU2 : textureSrvHandleGPU);
+            if (drawObject)
+            {
+                object3d->Draw();
+            }
 
-			if (drawSprite)
-			{
-				for (auto* sprite : sprites)
-				{
+            if (drawSprite)
+            {
+                for (auto* sprite : sprites)
+                {
 					sprite->Draw();
-				}
-			}
+                }
+            }
 
 			particleManager->Draw();
 
