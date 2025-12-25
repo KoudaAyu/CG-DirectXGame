@@ -12,6 +12,7 @@
 #include"ModelManager.h"
 #include"Object3d.h"
 #include"Object3dCom.h"
+#include"ParticleManager.h"
 #include"Sprite.h"
 #include"SpriteCom.h"
 #include"ResourceLeakCheak.h"
@@ -243,6 +244,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 #pragma endregion 最初のシーン終了
 
+	ParticleManager* particleManager = new ParticleManager(logStream,dxCommon);
+	particleManager->Initialize(dxCommon, srvManager);
 
 
 	//DepthStencilStateの設定
@@ -547,7 +550,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 			object3d->SetRotate(transformSphere.rotate);
 			object3d->Update();
 
-			
+			particleManager->Update();
 
 			
 
@@ -640,6 +643,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 				}
 			}
 
+			particleManager->Draw();
 
 			//実際のcommandListのImGuiの描画コマンドを積む
 			ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), dxCommon->GetCommandList().Get());
@@ -692,6 +696,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 		delete sprite;
 	}
 	sprites.clear();
+
+	delete particleManager;
 
 	delete srvManager;
 

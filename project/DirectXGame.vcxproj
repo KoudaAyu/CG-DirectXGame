@@ -19,6 +19,7 @@
     <ClCompile Include="Baziru3_Engine\3D\Object\Object3d.cpp" />
     <ClCompile Include="Baziru3_Engine\3D\Object\Object3dCom.cpp" />
     <ClCompile Include="Baziru3_Engine\Audio\Sound.cpp" />
+    <ClCompile Include="Baziru3_Engine\Base\Random.cpp" />
     <ClCompile Include="Baziru3_Engine\Camera\Camera.cpp" />
     <ClCompile Include="Baziru3_Engine\Base\DebugCamera.cpp" />
     <ClCompile Include="Baziru3_Engine\Base\DirectXCom.cpp" />
@@ -42,9 +43,21 @@
     <ClCompile Include="Model.cpp" />
     <ClCompile Include="ModelCom.cpp" />
     <ClCompile Include="ModelManager.cpp" />
+    <ClCompile Include="ParticleEmitter.cpp" />
+    <ClCompile Include="ParticleManager.cpp" />
     <ClCompile Include="SRVManager.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <FxCompile Include="Resources\shaders\Particle.PS.hlsl">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </FxCompile>
+    <FxCompile Include="Resources\shaders\Particle.VS.hlsl">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </FxCompile>
     <FxCompile Include="Resources\shaders\Object3d.PS.hlsl">
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Pixel</ShaderType>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Pixel</ShaderType>
@@ -71,6 +84,7 @@
     <ClInclude Include="Baziru3_Engine\Base\KeyInput.h" />
     <ClInclude Include="Baziru3_Engine\Base\Log.h" />
     <ClInclude Include="Baziru3_Engine\Base\Matrix4x4.h" />
+    <ClInclude Include="Baziru3_Engine\Base\Random.h" />
     <ClInclude Include="Baziru3_Engine\Base\ResourceLeakCheak.h" />
     <ClInclude Include="Baziru3_Engine\Base\StringUtil.h" />
     <ClInclude Include="Baziru3_Engine\Base\Transform.h" />
@@ -92,6 +106,8 @@
     <ClInclude Include="Model.h" />
     <ClInclude Include="ModelCom.h" />
     <ClInclude Include="ModelManager.h" />
+    <ClInclude Include="ParticleEmitter.h" />
+    <ClInclude Include="ParticleManager.h" />
     <ClInclude Include="SRVManager.h" />
   </ItemGroup>
   <ItemGroup>
@@ -103,6 +119,7 @@
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
+    <None Include="Resources\shaders\Particle.hlsli" />
     <None Include="Resources\shaders\Object3d.hlsli" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
