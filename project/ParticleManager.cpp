@@ -495,3 +495,8 @@ void ParticleManager::CreateParticleGroup(const std::string& name, const std::st
 
 	particleGroups_.emplace(name, std::move(newGroup));
 }
+
+void ParticleManager::Emit(const std::string name, const Vector3& position, uint32_t count)
+{
+	
+}

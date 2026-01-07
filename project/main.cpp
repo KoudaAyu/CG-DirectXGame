@@ -264,8 +264,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	dxCommon->SetHr(dxCommon->GetDevice()->CreateGraphicsPipelineState(&spriteCom->GetGraphicPipelineStateDesc(),
 		IID_PPV_ARGS(&graphicPipelineState)));
 
-	assert(spriteCom->GetVertexShaderBlob() && "頂点シェーダーの読み込み失敗！");
-	assert(spriteCom->GetPixelShaderBlob() && "ピクセルシェーダーの読み込み失敗！");
+
 
 	//パイプラインステートの生成に失敗した場合はエラー
 	assert(SUCCEEDED(dxCommon->GetHr()));
@@ -376,6 +375,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	memcpy(mapped, vertexData, sizeof(Sprite::VertexData) * kVertexCount);
 	vertexResourceSphere->Unmap(0, nullptr);
 
+#pragma region モデル関連の初期化
+
 	ModelManager::GetInstance()->Initialize(dxCommon);
 
 	ModelCom* modelCom = new ModelCom();
@@ -384,6 +385,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	Model* model = new Model();
 	model->Initialize(modelCom, "Resources", "plane.obj");
 
+#pragma endregion モデル関連の初期化
 
 	// モデル由来の頂点ビュー/データ/マテリアルを使う
 	D3D12_VERTEX_BUFFER_VIEW vertexBufferView{};
@@ -391,10 +393,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	object3d->SetModel(model);
 	ID3D12Resource* materialResource = model->GetMaterialResource();
 	Sprite::Material* materialData = reinterpret_cast<Sprite::Material*>(model->GetMaterialData());
-
-
-	
-
 
 	//WVP用のリソースを作る。　Matrix4x4 1つのサイズを用意する
 	Microsoft::WRL::ComPtr<ID3D12Resource> wvpResource = dxCommon->CreateBufferResource(dxCommon->GetDevice().Get(), sizeof(TransformationMatrix));
@@ -432,9 +430,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	
 
 	//Sphere用
-	Sprite::Transform transformSphere{ {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };
+	Sprite::Transform transformObject{ {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };
 
-	Sprite::Transform cameraTransform = { {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, -10.0f} };
 
 	//uvTrandform用の変数
 	Sprite::Transform uvTransformSprite = {
@@ -517,8 +514,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	debugCamera_.Initialize(windowAPI);
 
 	Camera* camera = new Camera();
-	camera->SetRotate({ 0.0f,0.0f,0.0f });
-	camera->SetTranslate({ 0.0f,0.0f,-10.0f });
 	object3dCom->SetDefaultCamera(camera);
 
 	
@@ -556,7 +551,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 			camera->Update();
 
 			// Apply ImGui rotation to the object3d transform
-			object3d->SetRotate(transformSphere.rotate);
+			object3d->SetRotate(transformObject.rotate);
 			object3d->Update();
 
 			particleManager->Update();
@@ -604,7 +599,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 			ImGui::Checkbox("DrawSprite", &drawSprite);
 		
 
-			ImGui::DragFloat3("Sphere Rotate", &transformSphere.rotate.x, 0.01f, -10.0f, 10.0f);
+			ImGui::DragFloat3("Sphere Rotate", &transformObject.rotate.x, 0.01f, -10.0f, 10.0f);
 
 			ImGui::DragFloat2("UVTranslate", &uvTransformSprite.translate.x, 0.01f, -10.0f, 10.0f);
 			ImGui::DragFloat2("UVScale", &uvTransformSprite.scale.x, 0.01f, -10.0f, 10.0f);

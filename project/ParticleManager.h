@@ -62,6 +62,8 @@ public:
 		Vector2 texcoord;
 	};
 
+
+
 public:
 
 	ParticleManager(std::ostream& logStream, DirectXCom* dxCommon);
@@ -78,6 +80,8 @@ public:
 	void SetGlobalOffset(const Vector3& offset) { globalOffset_ = offset; }
 
 	static ParticleManager* GetInstance() { return instance_; }
+
+	void Emit(const std::string name, const Vector3& position, uint32_t count);
 
 private:
 

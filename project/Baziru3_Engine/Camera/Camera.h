@@ -61,7 +61,7 @@ private:
 	// 回転
 	Vector3 rotation_ = { 0.0f, 0.0f, 0.0f };
 	// 移動
-	Vector3 translation_ = { 0.0f, 0.0f, 0.0f };
+	Vector3 translation_ = { 0.0f,0.0f,-10.0f };
 	Matrix4x4 worldMatrix_{};
 	Matrix4x4 viewMatrix_{};
 

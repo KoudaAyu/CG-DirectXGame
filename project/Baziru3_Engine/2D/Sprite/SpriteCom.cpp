@@ -193,11 +193,12 @@ void SpriteCom::ShaderCompile()
 	//Shaderをコンパイルする
 	vertexShaderBlob = dxCommon->CompileShader(L"Resources/shaders/Object3D.VS.hlsl",
 		L"vs_6_0", dxCommon->GetDxcUtils().Get(), dxCommon->GetDxcCompiler(), dxCommon->GetIncludeHandler(), logStream);
-	assert(vertexShaderBlob != nullptr);
+	assert(vertexShaderBlob != nullptr && "頂点シェーダーの読み込み失敗！");
 
 	pixelShaderBlob = dxCommon->CompileShader(L"Resources/shaders/Object3D.PS.hlsl",
 		L"ps_6_0", dxCommon->GetDxcUtils().Get(), dxCommon->GetDxcCompiler(), dxCommon->GetIncludeHandler(), logStream);
-	assert(pixelShaderBlob != nullptr);
+	assert(pixelShaderBlob != nullptr && "ピクセルシェーダーの読み込み失敗！");
+
 }
 
 void SpriteCom::InitializeGraphicPipeline()

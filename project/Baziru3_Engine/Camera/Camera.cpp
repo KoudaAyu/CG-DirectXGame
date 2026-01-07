@@ -2,7 +2,7 @@
 #include"WindowsAPI.h"
 
 Camera::Camera()
-	: transform_({ {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f} }),
+	: transform_({ {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f,0.0f,-10.0f } }),
 	fovY_(0.45f),
 	aspectRatio_(float(WindowAPI::GetClientWidth()) / float(WindowAPI::GetClientHeight())),
 	nearZ_(0.1f), farZ_(100.0f),
