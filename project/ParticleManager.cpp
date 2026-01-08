@@ -43,7 +43,7 @@ void ParticleManager::Update()
 
 void Draw()
 {
-	dxCommon->GetCommandList()->SetGraphicsRootDescriptorTable(1, instancingSrvHandleGPU);
+	/*dxCommon->GetCommandList()->SetGraphicsRootDescriptorTable(1, instancingSrvHandleGPU);*/
 }
 
 void ParticleManager::RootSignature()
