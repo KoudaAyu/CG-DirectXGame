@@ -61,6 +61,8 @@
 
 
 
+
+
 enum BlendMode
 {
 	//!< ブレンドなし
@@ -146,6 +148,11 @@ Microsoft::WRL::ComPtr<ID3D12Resource>CreateTextureResource(const Microsoft::WRL
 	assert(SUCCEEDED(hr));
 	return resource;
 }
+
+struct CameraForGPU
+{
+	Vector3 worldPosition;
+};
 
 //Windowsアプリでのエントリーポイント(main関数)
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
