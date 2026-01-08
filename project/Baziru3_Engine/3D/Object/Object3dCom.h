@@ -45,6 +45,14 @@ public:
 	{
 		return dxCommon;
 	}
+	const Microsoft::WRL::ComPtr<ID3D12PipelineState>& GetPipelineState() const
+	{
+		return pipelineState;
+	}
+	const Microsoft::WRL::ComPtr<ID3D12RootSignature>& GetRootSignature() const
+	{
+		return rootSignature;
+	}
 
 private:
 	Camera* defaultCamera_ = nullptr;

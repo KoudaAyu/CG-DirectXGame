@@ -46,10 +46,12 @@ public:
 
 public:
 
-	const Microsoft::WRL::ComPtr<ID3D12Resource>& GetVertexResourceSprite() const { return vertexResourceSprite; }
+
+	Microsoft::WRL::ComPtr<ID3D12Resource> GetVertexResourceSprite() const { return vertexResourceSprite; }
 	const D3D12_VERTEX_BUFFER_VIEW& GetVertexBufferViewSprite() const { return vertexBufferViewSprite; }
 	const D3D12_INDEX_BUFFER_VIEW& GetIndexBufferViewSprite() const { return indexBufferViewSprite; }
-	const Microsoft::WRL::ComPtr<ID3D12Resource>& GetMaterialResourceSprite() const { return materialResourceSprite; }
+
+	Microsoft::WRL::ComPtr<ID3D12Resource> GetMaterialResourceSprite() const { return materialResourceSprite; }
 	void SetUVTransform(const Matrix4x4& uv)
 	{
 		if (materialData)

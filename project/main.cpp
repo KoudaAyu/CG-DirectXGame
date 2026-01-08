@@ -190,7 +190,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 	DirectXCom* dxCommon = nullptr;
 	dxCommon = new DirectXCom(windowAPI, logStream);
-	
+
 	dxCommon->DebugLayer();
 
 	//ウィンドウを表示する
@@ -205,7 +205,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	TextureManager::GetInstance()->LoadTexture("Resources/uvChecker.png");
 
 	SpriteCom* spriteCom = nullptr;
-	spriteCom = new SpriteCom(logStream,dxCommon);
+	spriteCom = new SpriteCom(logStream, dxCommon);
 	spriteCom->Initialize();
 
 
@@ -217,7 +217,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 		sprite->Initialize(spriteCom, "Resources/uvChecker.png");
 		sprites.push_back(sprite);
 	}
-	
+
 	spriteCom->CreateGraphicsPipeline();
 
 	// 既存の手動テクスチャ読み込みはそのまま利用（Sphere用）
@@ -349,10 +349,10 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	vertexBufferViewSphere.SizeInBytes = sizeof(Sprite::VertexData) * kVertexCount;
 	vertexBufferViewSphere.StrideInBytes = sizeof(Sprite::VertexData);
 
-	D3D12_INDEX_BUFFER_VIEW indexBufferViewSphere{};
-	indexBufferViewSphere.BufferLocation = indexResourceSphere->GetGPUVirtualAddress();
-	indexBufferViewSphere.SizeInBytes = sizeof(uint32_t) * kIndexCount;
-	indexBufferViewSphere.Format = DXGI_FORMAT_R32_UINT;
+	D3D12_INDEX_BUFFER_VIEW indexBufferViewObject{};
+	indexBufferViewObject.BufferLocation = indexResourceSphere->GetGPUVirtualAddress();
+	indexBufferViewObject.SizeInBytes = sizeof(uint32_t) * kIndexCount;
+	indexBufferViewObject.Format = DXGI_FORMAT_R32_UINT;
 
 	Sprite::VertexData* mapped = nullptr;
 	vertexResourceSphere->Map(0, nullptr, reinterpret_cast<void**>(&mapped));
@@ -408,7 +408,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	// 書き込み完了後はUnmapを呼ぶ
 	directionalLight->Unmap(0, nullptr);
 
-	
+
 
 
 	//WVP用のリソースを作る。　Matrix4x4 1つのサイズを用意する
@@ -431,14 +431,14 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	// 書き込みが完了したので、マップを解除
 	transformationMatrixResourceSphere->Unmap(0, nullptr);
 
-	
+
 
 	//Transform変数を作る
 	Sprite::Transform transform = { {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };
-	
+
 
 	//Sphere用
-	Sprite::Transform transformSphere{ {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };
+	Sprite::Transform transformObject{ {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };
 
 	Sprite::Transform cameraTransform = { {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, -10.0f} };
 
@@ -462,13 +462,13 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	DirectX::ScratchImage mipImages = dxCommon->LoadTexture("./Resources/uvChecker.png");
 	const DirectX::TexMetadata& metadata = mipImages.GetMetadata();
 	Microsoft::WRL::ComPtr<ID3D12Resource> textureResource = CreateTextureResource(dxCommon->GetDevice(), metadata);
-	
+
 	//2枚目のTextureを読んで転送する
 	DirectX::ScratchImage mipImages2 = dxCommon->LoadTexture(modelData.material.textureFilePath);
 	const DirectX::TexMetadata& metadata2 = mipImages2.GetMetadata();
 	Microsoft::WRL::ComPtr<ID3D12Resource> textureResource2 = CreateTextureResource(dxCommon->GetDevice(), metadata2);
 
-	
+
 
 	Microsoft::WRL::ComPtr<ID3D12Resource> intermediateResource = dxCommon->UploadTextureData(textureResource, mipImages, dxCommon->GetDevice().Get(), dxCommon->GetCommandList());
 	Microsoft::WRL::ComPtr<ID3D12Resource> intermediateResource2 = dxCommon->UploadTextureData(textureResource2, mipImages2, dxCommon->GetDevice().Get(), dxCommon->GetCommandList());
@@ -487,7 +487,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	srvDesc2.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;//2Dテクスチャ
 	srvDesc2.Texture2D.MipLevels = UINT(metadata2.mipLevels);
 
-	
+
 	//SRVを生成するDescriptorHeapの場所を決める
 	D3D12_CPU_DESCRIPTOR_HANDLE textureSrvHandleCPU = dxCommon->GetSrvDescriptorHeap()->GetCPUDescriptorHandleForHeapStart();
 	D3D12_GPU_DESCRIPTOR_HANDLE textureSrvHandleGPU = dxCommon->GetSrvDescriptorHeap()->GetGPUDescriptorHandleForHeapStart();
@@ -505,11 +505,12 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 	//SRVの切り替え
 	bool useMonsterBall = true;
-	//Sphereの描画切り替え
-	bool drawSphere = true;
+	//Objectの描画切り替え
+	bool drawObject = true;
 	bool drawSprite = true;
+	bool drawSphere = true;
 
-	
+
 	//音声読み込み
 	Sound* sound_ = nullptr;
 	sound_ = new Sound();
@@ -530,6 +531,26 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	object3dCom->SetDefaultCamera(camera);
 
 
+	//ビューポート
+	D3D12_VIEWPORT viewport{};
+	//クライアント領域のサイズと一緒にして画面全体に表示
+	viewport.Width = static_cast<float>(windowAPI->GetClientWidth());
+	viewport.Height = static_cast<float>(windowAPI->GetClientHeight());
+	viewport.TopLeftX = 0.0f; //左上のX座標
+	viewport.TopLeftY = 0.0f; //左上のY座標
+	viewport.MinDepth = 0.0f; //最小の深度
+	viewport.MaxDepth = 1.0f; //最大の深度
+
+	//シザー矩形
+	D3D12_RECT scissorRect{};
+	//基本的にビューポートと同じ矩形が構成されるようにする
+	scissorRect.left = 0; //左上のX座標
+	scissorRect.right = windowAPI->GetClientWidth(); //右下のX座標
+	scissorRect.top = 0; //左上のY座標
+	scissorRect.bottom = windowAPI->GetClientHeight(); //右下のY座標
+
+
+	Sprite::Transform transformSphere{ {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };
 	//ウィンドウのxボタンが押されるまでループ
 	while (dxCommon->GetMsg().message != WM_QUIT)
 	{
@@ -543,7 +564,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 		else
 		{
 
-			
+
 
 			//if (windowAPI->ProcessMassage())
 			//{
@@ -562,14 +583,14 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 			camera->Update();
 
 			// Apply ImGui rotation to the object3d transform
-			object3d->SetRotate(transformSphere.rotate);
+			object3d->SetRotate(transformObject.rotate);
 			object3d->Update();
 
-			
+
 
 			for (auto* sprite : sprites)
 			{
-				sprite->SetPosition({ 0.0f,0.0f});
+				sprite->SetPosition({ 0.0f,0.0f });
 				sprite->Update(windowAPI, &debugCamera_);
 			}
 
@@ -583,6 +604,17 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 			}
 
 			directionalLight->Map(0, nullptr, reinterpret_cast<void**>(&directionalLightData));
+
+			transformSphere.rotate.y += 0.01f;
+			Matrix4x4 worldMatrix = MakeAffineMatrix(transformSphere.scale, transformSphere.rotate, transformSphere.translate);
+			Matrix4x4 cameraMatrix = MakeAffineMatrix(cameraTransform.scale, cameraTransform.rotate, cameraTransform.translate);
+			Matrix4x4 viewMatrix = Inverse(cameraMatrix);
+			Matrix4x4 projectionMatrix = MakePerspectiveFovMatrix(fovY, aspectRatio, nearZ, farZ);
+			//WVPMatrixを作る
+			Matrix4x4 worldViewProjectMatrix = Multiply(worldMatrix, Multiply(viewMatrix, projectionMatrix));
+			transformationMatrixDataSphere->WVP = worldViewProjectMatrix;
+			transformationMatrixDataSphere->World = worldMatrix;
+			
 
 
 			//開発用UIの処理、実際に開発用のUIを出す場合はここをゲーム固有の処理に置き換え
@@ -604,13 +636,13 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 			ImGui::Checkbox("LightSprite Flag", (bool*)&materialData->enableLighting);
 			for (auto* sprite : sprites)
 			{
-				ImGui::Checkbox("LightSphere Flag", (bool*)&sprite->GetMaterialDataSprite()->enableLighting);
+				ImGui::Checkbox("LightObject Flag", (bool*)&sprite->GetMaterialDataSprite()->enableLighting);
 			}
-			ImGui::Checkbox("DrawSphere", &drawSphere);
+			ImGui::Checkbox("DrawObject", &drawObject);
 			ImGui::Checkbox("DrawSprite", &drawSprite);
 			ImGui::DragFloat3("LightDirection", &directionalLightData->direction.x, 0.01f, -10.0f, 10.0f);
 
-			ImGui::DragFloat3("Sphere Rotate", &transformSphere.rotate.x, 0.01f, -10.0f, 10.0f);
+			ImGui::DragFloat3("Object Rotate", &transformObject.rotate.x, 0.01f, -10.0f, 10.0f);
 
 			ImGui::DragFloat2("UVTranslate", &uvTransformSprite.translate.x, 0.01f, -10.0f, 10.0f);
 			ImGui::DragFloat2("UVScale", &uvTransformSprite.scale.x, 0.01f, -10.0f, 10.0f);
@@ -632,24 +664,51 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 			spriteCom->SetupDraw();
 
-		
-		//RootSignatureを設定。PSOに設定しているけれど別途設定が必要
+
+			//RootSignatureを設定。PSOに設定しているけれど別途設定が必要
 			dxCommon->GetCommandList()->SetGraphicsRootSignature(spriteCom->GetRootSignature().Get());
 			dxCommon->GetCommandList()->SetPipelineState(graphicPipelineState.Get()); //パイプラインステートを設定
-			//Sphereの描画
+			//Objectの描画
 
 			dxCommon->GetCommandList()->IASetVertexBuffers(0, 1, &vertexBufferView);
-			dxCommon->GetCommandList()->IASetIndexBuffer(&indexBufferViewSphere);
+			dxCommon->GetCommandList()->IASetIndexBuffer(&indexBufferViewObject);
 			dxCommon->GetCommandList()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 			dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(0, materialResource->GetGPUVirtualAddress());
 			// Use Object3d WVP updated above
 			dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(1, object3d->GetTransformationMatrixResource()->GetGPUVirtualAddress());
 			dxCommon->GetCommandList()->SetGraphicsRootDescriptorTable(2, useMonsterBall ? textureSrvHandleGPU2 : textureSrvHandleGPU);
 			dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(3, directionalLight->GetGPUVirtualAddress());
-			if (drawSphere)
+			if (drawObject)
 			{
 				/*commandList->DrawIndexedInstanced(kIndexCount, 1, 0, 0, 0);*/
 				dxCommon->GetCommandList()->DrawInstanced(UINT(modelData.vertices.size()), 1, 0, 0);
+			}
+
+			if (drawSphere)
+			{
+			
+				dxCommon->GetCommandList()->RSSetViewports(1, &viewport);
+				dxCommon->GetCommandList()->RSSetScissorRects(1, &scissorRect);
+			
+				dxCommon->GetCommandList()->SetGraphicsRootSignature(object3dCom->GetRootSignature().Get());
+				dxCommon->GetCommandList()->SetPipelineState(object3dCom->GetPipelineState().Get());
+
+				
+				dxCommon->GetCommandList()->IASetVertexBuffers(0, 1, &vertexBufferViewSphere);
+				dxCommon->GetCommandList()->IASetIndexBuffer(&indexBufferViewObject);
+				dxCommon->GetCommandList()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+				
+				dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(0, materialResource->GetGPUVirtualAddress());
+				
+				dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(1, transformationMatrixResourceSphere->GetGPUVirtualAddress());
+				
+				dxCommon->GetCommandList()->SetGraphicsRootDescriptorTable(2, useMonsterBall ? textureSrvHandleGPU2 : textureSrvHandleGPU);
+				
+				dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(3, directionalLight->GetGPUVirtualAddress());
+
+				
+				dxCommon->GetCommandList()->DrawIndexedInstanced(kIndexCount, 1, 0, 0, 0);
 			}
 
 			if (drawSprite)
@@ -701,7 +760,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 	TextureManager::GetInstance()->Finalize();
 
-	for(auto* sprite : sprites)
+	for (auto* sprite : sprites)
 	{
 		delete sprite;
 	}
