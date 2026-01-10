@@ -16,6 +16,9 @@
 #include"TextureManager.h"
 #include"Vector.h"
 #include"WindowsAPI.h"
+#include"SrvManager.h"
+#include"ParticleManager.h"
+#include"ParticleEmitter.h"
 
 #include<chrono> //時間を扱うライブラリ
 #include<filesystem> //ファイルやディレクトリに関する操作を行うライブラリ
@@ -157,9 +160,6 @@ struct CameraForGPU
 //Windowsアプリでのエントリーポイント(main関数)
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 {
-
-
-
 	ResourceLeakCheak leakChecker; //リソースリークチェック用のオブジェクト
 
 	CoInitializeEx(0, COINIT_MULTITHREADED);
@@ -205,11 +205,17 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 	dxCommon->Initialize();
 
-	// TextureManager は SRV ヒープに依存するので DX 初期化の後に初期化
+	// TextureManager 初期化
 	TextureManager::GetInstance()->Initialize();
 	TextureManager::GetInstance()->SetDirectXCom(dxCommon);
-	// 作業ディレクトリが project/ である前提の相対パスを使う
 	TextureManager::GetInstance()->LoadTexture("Resources/uvChecker.png");
+
+	// SrvManager と ParticleManager 初期化
+	SrvManager srvMgr;
+	srvMgr.Initialize(dxCommon);
+	ParticleManager::GetInstance()->Initialize(dxCommon, &srvMgr, nullptr);
+	ParticleManager::GetInstance()->CreateParticleGroup("default", "Resources/uvChecker.png");
+	ParticleEmitter emitter("default", {0.0f, 0.0f, 0.0f}, 10, 0.05f);
 
 	SpriteCom* spriteCom = nullptr;
 	spriteCom = new SpriteCom(logStream, dxCommon);
@@ -220,14 +226,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	for (uint32_t i = 0; i < 5; ++i)
 	{
 		Sprite* sprite = new Sprite();
-		// Resources フォルダ直下の uvChecker.png を指定
 		sprite->Initialize(spriteCom, "Resources/uvChecker.png");
 		sprites.push_back(sprite);
 	}
 
 	spriteCom->CreateGraphicsPipeline();
-
-	// 既存の手動テクスチャ読み込みはそのまま利用（Sphere用）
 
 	Object3dCom* object3dCom = new Object3dCom(logStream);
 	object3dCom->Initialize(dxCommon);
@@ -238,26 +241,17 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 #pragma endregion 最初のシーン終了
 
-	//DepthStencilStateの設定
+	//DepthStencilState設定
 	D3D12_DEPTH_STENCIL_DESC depthStencilDesc{};
-	//Depthの機能を有効化する
 	depthStencilDesc.DepthEnable = true;
-	//書き込み
 	depthStencilDesc.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO;
-	//比較関数はLessEqua。つまり、近ければ描画される
 	depthStencilDesc.DepthFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
-	//DepthStencilの設定
 	spriteCom->GetGraphicPipelineStateDesc().DepthStencilState = depthStencilDesc;
 	spriteCom->GetGraphicPipelineStateDesc().DSVFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
-	//実際に生成
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> graphicPipelineState = nullptr;
-	dxCommon->SetHr(dxCommon->GetDevice()->CreateGraphicsPipelineState(&spriteCom->GetGraphicPipelineStateDesc(),
-		IID_PPV_ARGS(&graphicPipelineState)));
-
+	dxCommon->SetHr(dxCommon->GetDevice()->CreateGraphicsPipelineState(&spriteCom->GetGraphicPipelineStateDesc(), IID_PPV_ARGS(&graphicPipelineState)));
 	assert(spriteCom->GetVertexShaderBlob() && "頂点シェーダーの読み込み失敗！");
 	assert(spriteCom->GetPixelShaderBlob() && "ピクセルシェーダーの読み込み失敗！");
-
-	//パイプラインステートの生成に失敗した場合はエラー
 	assert(SUCCEEDED(dxCommon->GetHr()));
 
 	// 球体
@@ -478,7 +472,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	Microsoft::WRL::ComPtr<ID3D12Resource> textureResource2 = CreateTextureResource(dxCommon->GetDevice(), metadata2);
 
 
-
 	Microsoft::WRL::ComPtr<ID3D12Resource> intermediateResource = dxCommon->UploadTextureData(textureResource, mipImages, dxCommon->GetDevice().Get(), dxCommon->GetCommandList());
 	Microsoft::WRL::ComPtr<ID3D12Resource> intermediateResource2 = dxCommon->UploadTextureData(textureResource2, mipImages2, dxCommon->GetDevice().Get(), dxCommon->GetCommandList());
 
@@ -540,26 +533,23 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	object3dCom->SetDefaultCamera(camera);
 
 
-	//ビューポート
+	// ビューポート/シザーは元のコード維持
 	D3D12_VIEWPORT viewport{};
-	//クライアント領域のサイズと一緒にして画面全体に表示
 	viewport.Width = static_cast<float>(windowAPI->GetClientWidth());
 	viewport.Height = static_cast<float>(windowAPI->GetClientHeight());
-	viewport.TopLeftX = 0.0f; //左上のX座標
-	viewport.TopLeftY = 0.0f; //左上のY座標
-	viewport.MinDepth = 0.0f; //最小の深度
-	viewport.MaxDepth = 1.0f; //最大の深度
+	viewport.TopLeftX = 0.0f;
+	viewport.TopLeftY = 0.0f;
+	viewport.MinDepth = 0.0f;
+	viewport.MaxDepth = 1.0f;
 
-	//シザー矩形
 	D3D12_RECT scissorRect{};
-	//基本的にビューポートと同じ矩形が構成されるようにする
-	scissorRect.left = 0; //左上のX座標
-	scissorRect.right = windowAPI->GetClientWidth(); //右下のX座標
-	scissorRect.top = 0; //左上のY座標
-	scissorRect.bottom = windowAPI->GetClientHeight(); //右下のY座標
-
+	scissorRect.left = 0;
+	scissorRect.right = windowAPI->GetClientWidth();
+	scissorRect.top = 0;
+	scissorRect.bottom = windowAPI->GetClientHeight();
 
 	Sprite::Transform transformSphere{ {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };
+
 	//ウィンドウのxボタンが押されるまでループ
 	while (dxCommon->GetMsg().message != WM_QUIT)
 	{
@@ -572,14 +562,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 		else
 		{
-
-
-
-			//if (windowAPI->ProcessMassage())
-			//{
-			//	//ゲームループ抜ける
-			//	break;
-			//}
 
 
 			//Imguiにここからフレームが始まる趣旨をつたえる
@@ -628,7 +610,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 			// 法線変換用の逆転置行列も更新
 			transformationMatrixDataSphere->WorldInverseTranspose = Transpose(Inverse(worldMatrix));
 			
-
 
 			//開発用UIの処理、実際に開発用のUIを出す場合はここをゲーム固有の処理に置き換え
 
@@ -816,6 +797,10 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 					sprite->Draw();
 				}
 			}
+
+
+			// パーティクル描画
+			ParticleManager::GetInstance()->Draw();
 
 
 			//実際のcommandListのImGuiの描画コマンドを積む
