@@ -67,6 +67,8 @@ void Object3d::Update()
 	// WVP を更新
 	transformationMatrixData_->WVP = Multiply(worldMatrix, Multiply(viewMatrix, projectionMatrix));
 	transformationMatrixData_->World = worldMatrix;
+	// WorldInverseTranspose を計算して格納（法線変換用）
+	transformationMatrixData_->WorldInverseTranspose = Transpose(Inverse(worldMatrix));
 }
 
 Object3d::MaterialData Object3d::LoadMaterialTemplateFile(const std::string& direcrotyPath, const std::string& filename)

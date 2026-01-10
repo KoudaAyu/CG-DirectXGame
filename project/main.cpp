@@ -440,10 +440,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	transformationMatrixResourceSphere->Map(0, nullptr, reinterpret_cast<void**>(&transformationMatrixDataSphere));
 	transformationMatrixDataSphere->WVP = MakeIdentity4x4();
 	transformationMatrixDataSphere->World = MakeIdentity4x4();
-	// 書き込みが完了したので、マップを解除
-	transformationMatrixResourceSphere->Unmap(0, nullptr);
-
-
+	// NOTE: Keep this buffer mapped for the program lifetime so we can update per-frame without remapping.
 
 	//Transform変数を作る
 	Sprite::Transform transform = { {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };
@@ -628,6 +625,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 			Matrix4x4 worldViewProjectMatrix = Multiply(worldMatrix, Multiply(viewMatrix, projectionMatrix));
 			transformationMatrixDataSphere->WVP = worldViewProjectMatrix;
 			transformationMatrixDataSphere->World = worldMatrix;
+			// 法線変換用の逆転置行列も更新
+			transformationMatrixDataSphere->WorldInverseTranspose = Transpose(Inverse(worldMatrix));
 			
 
 

@@ -38,7 +38,7 @@ struct TransformationMatrix
 {
 	Matrix4x4 WVP;
 	Matrix4x4 World;
-
+	Matrix4x4 WorldInverseTranspose;
 };
 
 Matrix4x4 MakeScaleMatrix(const Vector3& scale);
@@ -66,3 +66,6 @@ Matrix4x4 MakeAffineMatrix(const Vector3& scale, const Matrix4x4& rotateMatrix, 
 Matrix4x4 MakePerspectiveFovMatrix(float fovY, float aspectRatio, float nearZ, float farZ);
 
 Matrix4x4 MakeOrthographicMatrix(float left, float top, float right, float bottom, float nearZ, float farZ);
+
+// 追加: 転置行列を取得するユーティリティ
+Matrix4x4 Transpose(const Matrix4x4& m);
