@@ -93,6 +93,10 @@ void Object3dCom::CreateRootParameters()
 	rootParameters[3].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 	rootParameters[3].Descriptor.ShaderRegister = 1;
 
+	rootParameters[4].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+	rootParameters[4].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL; // PixelShaderで使う 
+	rootParameters[4].Descriptor.ShaderRegister = 2; // b2 とバインド
+
 	descriptionRootSignature.pParameters = rootParameters; //ルートパラメーター配列へのポインタ
 	descriptionRootSignature.NumParameters = _countof(rootParameters);//配列の長さ
 }

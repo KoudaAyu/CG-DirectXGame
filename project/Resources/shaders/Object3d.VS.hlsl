@@ -14,11 +14,7 @@ struct VertecShederInput
     float32_t3 normal : NORMAL0;
 };
 
-struct Camera
-{
-   float32_t3 worldPosition;
-};
-ConstantBuffer<Camera> gCamera : register(b2);
+
 
 VertexShaderOutput main(VertecShederInput input)
 {

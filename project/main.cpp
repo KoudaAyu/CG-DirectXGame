@@ -415,7 +415,12 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	// 書き込み完了後はUnmapを呼ぶ
 	directionalLight->Unmap(0, nullptr);
 
-
+	// --- カメラ用のリソース作成を追加 ---
+	Microsoft::WRL::ComPtr<ID3D12Resource> cameraResource = dxCommon->CreateBufferResource(dxCommon->GetDevice(), sizeof(CameraForGPU));
+	CameraForGPU* cameraData = nullptr;
+	cameraResource->Map(0, nullptr, reinterpret_cast<void**>(&cameraData));
+	// 初期値を設定
+	cameraData->worldPosition = { 0.0f, 0.0f, -10.0f };
 
 
 	//WVP用のリソースを作る。　Matrix4x4 1つのサイズを用意する
@@ -589,6 +594,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 			camera->Update();
 
+			cameraData->worldPosition = camera->GetWorldPosition();
+
 			// Apply ImGui rotation to the object3d transform
 			object3d->SetRotate(transformObject.rotate);
 			object3d->Update();
@@ -655,6 +662,90 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 			ImGui::DragFloat2("UVScale", &uvTransformSprite.scale.x, 0.01f, -10.0f, 10.0f);
 			ImGui::DragFloat("UVRotate", &uvTransformSprite.rotate.z, 0.01f);
 
+			// --- ここから追加：マテリアル調整 ---
+			if (ImGui::CollapsingHeader("Material"))
+			{
+				// ライティングのON/OFF切り替え
+				// boolからint32_tへ変換して代入
+				bool enableLock = (materialData->enableLighting != 0);
+				if (ImGui::Checkbox("Enable Lighting", &enableLock))
+				{
+					materialData->enableLighting = enableLock ? 1 : 0;
+				}
+
+				// Shininess（テカリ具合）のスライダー
+				// 0.1 ～ 100.0 くらいの範囲で調整できるようにします
+				ImGui::SliderFloat("Shininess", &materialData->shininess, 0.1f, 100.0f);
+
+				// 色の調整もできるようにするとモンスターボールの赤が調整しやすいです
+				ImGui::ColorEdit4("Material Color", &materialData->color.x);
+			}
+
+			// --- ここまで追加 ---
+
+			if (ImGui::Button("Reset Camera"))
+			{
+				camera->SetRotate({ 0.0f, 0.0f, 0.0f });
+				camera->SetTranslate({ 0.0f, 0.0f, -5.0f });
+			}
+
+			ImGui::End();
+
+			ImGui::Begin("Material Settings"); // ウィンドウ名は既存のものに合わせてください
+
+			// ライティングの有効化フラグ
+			bool enableLighting = (materialData->enableLighting != 0);
+			if (ImGui::Checkbox("Enable Lighting", &enableLighting))
+			{
+				materialData->enableLighting = enableLighting ? 1 : 0;
+			}
+
+			// テカリ具合 (shininess)
+			// 0.1 ～ 100.0 くらいの範囲で調整できるようにします
+			ImGui::DragFloat("Shininess", &materialData->shininess, 0.5f, 0.1f, 100.0f);
+
+			// 光の色 (DirectionalLight)
+			if (ImGui::CollapsingHeader("Light"))
+			{
+				ImGui::ColorEdit4("Light Color", &directionalLightData->color.x);
+				ImGui::DragFloat3("Light Direction", &directionalLightData->direction.x, 0.01f, -1.0f, 1.0f);
+				ImGui::DragFloat("Intensity", &directionalLightData->intensity, 0.01f, 0.0f, 5.0f);
+			}
+
+			ImGui::End();
+
+			// --- main.cpp ---
+			ImGui::Begin("Settings");
+
+			// モンスターボールのテクスチャ切り替え（既存のコードがある場合）
+			ImGui::Checkbox("Use Monster Ball", &useMonsterBall);
+
+			ImGui::Separator(); // 区切り線
+
+			// --- マテリアル（質感）の設定 ---
+			if (ImGui::CollapsingHeader("Material"))
+			{
+				// ライティングを有効にするかどうか
+				bool enable = (materialData->enableLighting != 0);
+				if (ImGui::Checkbox("Enable Lighting", &enable))
+				{
+					materialData->enableLighting = enable ? 1 : 0;
+				}
+
+				// ★重要：Shininessのスライダー
+				// 0.1(鈍い) ～ 100.0(鋭いテカリ) までの範囲で調整
+				ImGui::SliderFloat("Shininess", &materialData->shininess, 0.1f, 100.0f);
+
+				// 色も変えれるようにしておくと便利です
+				ImGui::ColorEdit4("Color", &materialData->color.x);
+			}
+
+			// --- 平行光源の設定 ---
+			if (ImGui::CollapsingHeader("Directional Light"))
+			{
+				ImGui::DragFloat3("Direction", &directionalLightData->direction.x, 0.01f, -1.0f, 1.0f);
+				ImGui::DragFloat("Intensity", &directionalLightData->intensity, 0.01f, 0.0f, 5.0f);
+			}
 
 			ImGui::End();
 
@@ -685,6 +776,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 			dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(1, object3d->GetTransformationMatrixResource()->GetGPUVirtualAddress());
 			dxCommon->GetCommandList()->SetGraphicsRootDescriptorTable(2, useMonsterBall ? textureSrvHandleGPU2 : textureSrvHandleGPU);
 			dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(3, directionalLight->GetGPUVirtualAddress());
+			dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(4, cameraResource->GetGPUVirtualAddress());
 			if (drawObject)
 			{
 				/*commandList->DrawIndexedInstanced(kIndexCount, 1, 0, 0, 0);*/
