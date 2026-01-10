@@ -1,22 +1,21 @@
-#include"SpriteCom.h"
-#include "ParticleManager.h"
+#include"ParticleManager.h"
 
-SpriteCom::SpriteCom(std::ostream& logStream, DirectXCom* dxCommon)
+ParticleManager::ParticleManager(std::ostream& logStream, DirectXCom* dxCommon)
 	: logStream(logStream), dxCommon(dxCommon)
 {
 }
 
 
-SpriteCom::~SpriteCom()
+ParticleManager::~ParticleManager()
 {
 }
 
-void SpriteCom::Initialize()
+void ParticleManager::Initialize()
 {
-	
+
 }
 
-void SpriteCom::RootSignature()
+void ParticleManager::RootSignature()
 {
 	//RootSignatureの作成
 
@@ -24,9 +23,7 @@ void SpriteCom::RootSignature()
 		D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT; //入力アセンブラーでの使用を許可
 }
 
-
-
-void SpriteCom::CreateGraphicsPipeline()
+void ParticleManager::CreateGraphicsPipeline()
 {
 	RootSignature();
 	Descriptor();
@@ -39,50 +36,75 @@ void SpriteCom::CreateGraphicsPipeline()
 	RasterizerState();
 	ShaderCompile();
 	InitializeGraphicPipeline();
+
+	// Create the actual PSO on the device using the prepared desc
+	dxCommon->SetHr(dxCommon->GetDevice()->CreateGraphicsPipelineState(&graphicPipelineStateDesc,
+		IID_PPV_ARGS(&pipelineState)));
+	assert(SUCCEEDED(dxCommon->GetHr()));
 }
 
-void SpriteCom::Descriptor()
+void ParticleManager::Descriptor()
 {
-	// SRV: t3, t4
+	// 2 つの SRV レンジを用意する
+	// [0]: Vertex Shader 用のインスタンスバッファ (StructuredBuffer) -> t0
+	descriptorRange[0] = {};
 	descriptorRange[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
 	descriptorRange[0].NumDescriptors = 1;
-	descriptorRange[0].BaseShaderRegister = 3;
+	descriptorRange[0].BaseShaderRegister = 0; // t0
 	descriptorRange[0].RegisterSpace = 0;
 	descriptorRange[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+
+	// [1]: Pixel Shader 用のテクスチャ -> t3
+	descriptorRange[1] = {};
+	descriptorRange[1].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+	descriptorRange[1].NumDescriptors = 1;
+	descriptorRange[1].BaseShaderRegister = 3; // t3
+	descriptorRange[1].RegisterSpace = 0;
+	descriptorRange[1].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 }
 
-void SpriteCom::CreateRootParameters()
+void ParticleManager::CreateRootParameters()
 {
 	//RootParemeter生成PuxelShaderのMaterialとVertexShaderのTransform
 
+	rootParameters[0] = {};
 	rootParameters[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;//CBVを使う
 	rootParameters[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL; //PixelShaderで使う
 	rootParameters[0].Descriptor.ShaderRegister = 0; //レジスタ番号0とバインド。b0の0と一致
 
+	//Sprite用
+	rootParameters[1] = {};
 	rootParameters[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
 	rootParameters[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;//VertexShaderで使える
 	rootParameters[1].Descriptor.ShaderRegister = 0;//レジスタ番号0を使用
 
+	// [2]: PixelShader のテクスチャ SRV テーブル (t3)
+	rootParameters[2] = {};
 	rootParameters[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;//DescriptorTableを使う
-	rootParameters[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;//PixelShaderで使う
-	rootParameters[2].DescriptorTable.pDescriptorRanges = descriptorRange;//Tableの中身の配列を指定
-	rootParameters[2].DescriptorTable.NumDescriptorRanges = _countof(descriptorRange);//Tableで管理する数
+	rootParameters[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;//PixelShaderで使う
+	rootParameters[2].DescriptorTable.pDescriptorRanges = &descriptorRange[1];// テクスチャSRV
+	rootParameters[2].DescriptorTable.NumDescriptorRanges = 1;
 
+	// [3]: DirectionalLight の CBV b1 (PS)
+	rootParameters[3] = {};
 	rootParameters[3].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
 	rootParameters[3].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 	rootParameters[3].Descriptor.ShaderRegister = 1;
 
-	rootParameters[4].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
-	rootParameters[4].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
-	rootParameters[4].Descriptor.ShaderRegister = 2; // b2 を定義しておく
+	// [4]: VertexShader のインスタンス StructuredBuffer SRV テーブル (t0)
+	rootParameters[4] = {};
+	rootParameters[4].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+	rootParameters[4].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
+	rootParameters[4].DescriptorTable.pDescriptorRanges = &descriptorRange[0];
+	rootParameters[4].DescriptorTable.NumDescriptorRanges = 1;
 
 	descriptionRootSignature.pParameters = rootParameters; //ルートパラメーター配列へのポインタ
 	descriptionRootSignature.NumParameters = _countof(rootParameters);//配列の長さ
 }
 
-void SpriteCom::StaticSamplers()
+void ParticleManager::StaticSamplers()
 {
-	
+
 	staticSamplers[0].Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;//バイアリニアフィルタ
 	staticSamplers[0].AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;//0~1の範囲外をリピート
 	staticSamplers[0].AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
@@ -97,7 +119,7 @@ void SpriteCom::StaticSamplers()
 
 }
 
-void SpriteCom::SignatureBlob()
+void ParticleManager::SignatureBlob()
 {
 	//シリアライズしてバイナリにする
 
@@ -111,20 +133,20 @@ void SpriteCom::SignatureBlob()
 	}
 }
 
-void SpriteCom::RootSignatureFromBlob()
+void ParticleManager::RootSignatureFromBlob()
 {
 	//バイナリをもとに生成
-	
+
 	dxCommon->SetHr(dxCommon->GetDevice()->CreateRootSignature(0,
 		signatureBlob->GetBufferPointer(), signatureBlob->GetBufferSize(),
 		IID_PPV_ARGS(&rootSignature)));
 	assert(SUCCEEDED(dxCommon->GetHr()));
 }
 
-void SpriteCom::InputLayer()
+void ParticleManager::InputLayer()
 {
 	//InputLayer
-	
+
 	inputElementDescs[0].SemanticName = "POSITION"; //セマンティック名
 	inputElementDescs[0].SemanticIndex = 0; //セマンティックインデックス
 	inputElementDescs[0].Format = DXGI_FORMAT_R32G32B32A32_FLOAT; //頂点のフォーマット
@@ -138,12 +160,12 @@ void SpriteCom::InputLayer()
 	inputElementDescs[2].Format = DXGI_FORMAT_R32G32B32_FLOAT;
 	inputElementDescs[2].AlignedByteOffset = D3D12_APPEND_ALIGNED_ELEMENT;
 
-	
+
 	inputLayoutDesc.pInputElementDescs = inputElementDescs; //入力要素の配列
 	inputLayoutDesc.NumElements = _countof(inputElementDescs); //入力要素の数
 }
 
-void SpriteCom::InitializeBlend()
+void ParticleManager::InitializeBlend()
 {
 	//BlendStateの設定
 	//すべての色要素を書き込む
@@ -151,15 +173,15 @@ void SpriteCom::InitializeBlend()
 	blendDesc.RenderTarget[0].BlendEnable = TRUE;
 
 	//--ノーマルブレンド------------------------------
-	blendDesc.RenderTarget[0].SrcBlend = D3D12_BLEND_SRC_ALPHA;
-	blendDesc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
-	blendDesc.RenderTarget[0].DestBlend = D3D12_BLEND_INV_SRC_ALPHA;
+	//blendDesc.RenderTarget[0].SrcBlend = D3D12_BLEND_SRC_ALPHA;
+	//blendDesc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
+	//blendDesc.RenderTarget[0].DestBlend = D3D12_BLEND_INV_SRC_ALPHA;
 	//--------------------------------------------
 
 	//--加算ブレンド------------------------------
-	/*blendDesc.RenderTarget[0].SrcBlend = D3D12_BLEND_ONE;
+	blendDesc.RenderTarget[0].SrcBlend = D3D12_BLEND_ONE;
 	blendDesc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
-	blendDesc.RenderTarget[0].DestBlend = D3D12_BLEND_ONE;*/
+	blendDesc.RenderTarget[0].DestBlend = D3D12_BLEND_ONE;
 	//--------------------------------------------
 
 	//--減算ブレンド------------------------------
@@ -186,31 +208,40 @@ void SpriteCom::InitializeBlend()
 	blendDesc.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_ZERO;
 }
 
-void SpriteCom::RasterizerState()
+void ParticleManager::RasterizerState()
 {
-	
+
 	//カリングしない
 	rasterizerDesc.CullMode = D3D12_CULL_MODE_NONE;
 	//三角形の中を塗りつぶす
 	rasterizerDesc.FillMode = D3D12_FILL_MODE_SOLID;
 }
 
-void SpriteCom::ShaderCompile()
+void ParticleManager::ShaderCompile()
 {
-	//Shaderをコンパイルする
-	vertexShaderBlob = dxCommon->CompileShader(L"Resources/shaders/Object3D.VS.hlsl",
+
+	vertexShaderBlob = dxCommon->CompileShader(L"Resources/shaders/Particle.VS.hlsl",
 		L"vs_6_0", dxCommon->GetDxcUtils().Get(), dxCommon->GetDxcCompiler(), dxCommon->GetIncludeHandler(), logStream);
 	assert(vertexShaderBlob != nullptr);
-
-	pixelShaderBlob = dxCommon->CompileShader(L"Resources/shaders/Object3D.PS.hlsl",
+	pixelShaderBlob = dxCommon->CompileShader(L"Resources/shaders/Particle.PS.hlsl",
 		L"ps_6_0", dxCommon->GetDxcUtils().Get(), dxCommon->GetDxcCompiler(), dxCommon->GetIncludeHandler(), logStream);
 	assert(pixelShaderBlob != nullptr);
+
+	//Sprite用Shaderをコンパイルする
+	//Shaderをコンパイルする
+	//vertexShaderBlob = dxCommon->CompileShader(L"Resources/shaders/Object3D.VS.hlsl",
+	//	L"vs_6_0", dxCommon->GetDxcUtils().Get(), dxCommon->GetDxcCompiler(), dxCommon->GetIncludeHandler(), logStream);
+	//assert(vertexShaderBlob != nullptr);
+
+	//pixelShaderBlob = dxCommon->CompileShader(L"Resources/shaders/Object3D.PS.hlsl",
+	//	L"ps_6_0", dxCommon->GetDxcUtils().Get(), dxCommon->GetDxcCompiler(), dxCommon->GetIncludeHandler(), logStream);
+	//assert(pixelShaderBlob != nullptr);
 }
 
-void SpriteCom::InitializeGraphicPipeline()
+void ParticleManager::InitializeGraphicPipeline()
 {
 
-	
+
 	graphicPipelineStateDesc.pRootSignature = rootSignature.Get(); //ルートシグネチャ
 	graphicPipelineStateDesc.InputLayout = inputLayoutDesc; //入力レイアウト
 	graphicPipelineStateDesc.VS = { vertexShaderBlob->GetBufferPointer(),
@@ -229,9 +260,13 @@ void SpriteCom::InitializeGraphicPipeline()
 	graphicPipelineStateDesc.SampleDesc.Count = 1; //マルチサンプルしない
 	graphicPipelineStateDesc.SampleMask = D3D12_DEFAULT_SAMPLE_MASK; //サンプルマスクはデフォルト
 
+	// Depth disabled for particles (no DSV format)
+	graphicPipelineStateDesc.DepthStencilState = {};
+	graphicPipelineStateDesc.DepthStencilState.DepthEnable = FALSE;
+	graphicPipelineStateDesc.DSVFormat = DXGI_FORMAT_UNKNOWN;
 }
 
-void SpriteCom::SetupDraw()
+void ParticleManager::SetupDraw()
 {
 	CreateGraphicsPipeline();
 }
