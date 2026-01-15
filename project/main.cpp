@@ -589,13 +589,17 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	D3D12_GPU_DESCRIPTOR_HANDLE instancingSrvHandleGPU = dxCommon->GetGPUDescriptorHandle(dxCommon->GetSrvDescriptorHeap(), dxCommon->GetDescriptorSizeSRV(), 3);
 	dxCommon->GetDevice()->CreateShaderResourceView(instancingResource.Get(), &instancingSrvDesc, instancingSrvHandleCPU);
 
-	Sprite::Transform transforms[kNumInstances];
+	ParticleManager::Particle particles[kNumInstances];
 	for (uint32_t index = 0; index < kNumInstances; ++index)
 	{
-		transforms[index].scale = { 1.0f,1.0f,1.0f };
-		transforms[index].rotate = { 0.0f,0.0f,0.0f };
-		transforms[index].translate = { index * 0.5f, index * 0.5f,index * 0.5f };
+		particles[index].transform.SetScale({ 1.0f,1.0f,1.0f });
+		particles[index].transform.SetRotate({ 0.0f,0.0f,0.0f });
+		particles[index].transform.SetTranslate({ index * 0.5f, index * 0.5f,index * 0.5f });
+		particles[index].velocity = { 0.0f,1.0f,0.0f };
 	}
+
+
+	const float kDeltaTime = 1.0f / 60.0f;
 
 	//ウィンドウのxボタンが押されるまでループ
 	while (dxCommon->GetMsg().message != WM_QUIT)
@@ -635,7 +639,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 			object3d->Update();
 
 
-
 			for (auto* sprite : sprites)
 			{
 				sprite->SetPosition({ 0.0f,0.0f });
@@ -667,12 +670,16 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 			for (uint32_t index = 0; index < kNumInstances; ++index)
 			{
+				
 				Matrix4x4 ParticleWorldMatrix = MakeAffineMatrix(
-					transforms[index].scale, transforms[index].rotate, transforms[index].translate);
+					particles[index].transform.GetScale(), particles[index].transform.GetRotate(), particles[index].transform.GetTranslate());
 				Matrix4x4 ParticleViewProjectMatrix = Multiply(
 					ParticleWorldMatrix, Multiply(viewMatrix, projectionMatrix));
 				instanceData[index].WVP = ParticleViewProjectMatrix;
 				instanceData[index].World = ParticleWorldMatrix;
+
+				particles[index].transform.SetTranslate(
+					particles[index].transform.GetTranslate() + particles[index].velocity * kDeltaTime);
 			}
 
 			//開発用UIの処理、実際に開発用のUIを出す場合はここをゲーム固有の処理に置き換え

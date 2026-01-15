@@ -3,10 +3,19 @@
 #include <d3d12.h>
 #include <ostream>
 #include"DirectXCom.h"
+#include"Transform.h"
 #include"Log.h"
 
 class ParticleManager
 {
+public:
+	struct Particle
+	{
+		Transform transform;
+		Vector3 velocity;
+	};
+
+
 public:
 
 	ParticleManager(std::ostream& logStream, DirectXCom* dxCommon);
