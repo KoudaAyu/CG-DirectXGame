@@ -9,6 +9,7 @@
 #include"Matrix4x4.h"
 #include"Object3d.h"
 #include"Object3dCom.h"
+#include"ParticleManager.h"
 #include"Sprite.h"
 #include"SpriteCom.h"
 #include"ResourceLeakCheak.h"
@@ -236,6 +237,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	Object3d* object3d = new Object3d();
 	object3d->Initialize(object3dCom);
 
+	ParticleManager* particleManager = new ParticleManager(logStream, dxCommon);
+	particleManager->Initialize();
 #pragma endregion 最初のシーン終了
 
 	//DepthStencilStateの設定
@@ -515,9 +518,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	//SRVの切り替え
 	bool useMonsterBall = true;
 	//Objectの描画切り替え
-	bool drawObject = true;
-	bool drawSprite = true;
-	bool drawSphere = true;
+	bool drawObject = false;
+	bool drawSprite = false;
+	bool drawSphere = false;
 
 
 	//音声読み込み
@@ -560,6 +563,40 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 
 	Sprite::Transform transformSphere{ {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };
+
+	//TransformationMatrix gTransformationMatrices[10];
+	const uint32_t kNumInstances = 10;
+	Microsoft::WRL::ComPtr<ID3D12Resource> instancingResource =
+		dxCommon->CreateBufferResource(dxCommon->GetDevice(), sizeof(TransformationMatrix) * kNumInstances);
+	TransformationMatrix* instanceData = nullptr;
+	instancingResource->Map(0, nullptr, reinterpret_cast<void**>(&instanceData));
+
+	for (uint32_t index = 0; index < kNumInstances; ++index)
+	{
+		instanceData[index].WVP = MakeIdentity4x4();
+		instanceData[index].World = MakeIdentity4x4();
+	}
+
+	D3D12_SHADER_RESOURCE_VIEW_DESC instancingSrvDesc{};
+	instancingSrvDesc.Format = DXGI_FORMAT_UNKNOWN;
+	instancingSrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+	instancingSrvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+	instancingSrvDesc.Buffer.NumElements = 0;
+	instancingSrvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
+	instancingSrvDesc.Buffer.NumElements = kNumInstances;
+	instancingSrvDesc.Buffer.StructureByteStride = sizeof(TransformationMatrix);
+	D3D12_CPU_DESCRIPTOR_HANDLE instancingSrvHandleCPU = dxCommon->GetCPUDescroptirHandle(dxCommon->GetSrvDescriptorHeap(), dxCommon->GetDescriptorSizeSRV(), 3);
+	D3D12_GPU_DESCRIPTOR_HANDLE instancingSrvHandleGPU = dxCommon->GetGPUDescriptorHandle(dxCommon->GetSrvDescriptorHeap(), dxCommon->GetDescriptorSizeSRV(), 3);
+	dxCommon->GetDevice()->CreateShaderResourceView(instancingResource.Get(), &instancingSrvDesc, instancingSrvHandleCPU);
+
+	Sprite::Transform transforms[kNumInstances];
+	for (uint32_t index = 0; index < kNumInstances; ++index)
+	{
+		transforms[index].scale = { 1.0f,1.0f,1.0f };
+		transforms[index].rotate = { 0.0f,0.0f,0.0f };
+		transforms[index].translate = { index * 0.5f, index * 0.5f,index * 0.5f };
+	}
+
 	//ウィンドウのxボタンが押されるまでループ
 	while (dxCommon->GetMsg().message != WM_QUIT)
 	{
@@ -627,8 +664,16 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 			transformationMatrixDataSphere->World = worldMatrix;
 			// 法線変換用の逆転置行列も更新
 			transformationMatrixDataSphere->WorldInverseTranspose = Transpose(Inverse(worldMatrix));
-			
 
+			for (uint32_t index = 0; index < kNumInstances; ++index)
+			{
+				Matrix4x4 ParticleWorldMatrix = MakeAffineMatrix(
+					transforms[index].scale, transforms[index].rotate, transforms[index].translate);
+				Matrix4x4 ParticleViewProjectMatrix = Multiply(
+					ParticleWorldMatrix, Multiply(viewMatrix, projectionMatrix));
+				instanceData[index].WVP = ParticleViewProjectMatrix;
+				instanceData[index].World = ParticleWorldMatrix;
+			}
 
 			//開発用UIの処理、実際に開発用のUIを出す場合はここをゲーム固有の処理に置き換え
 
@@ -760,6 +805,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 			object3dCom->PreDraw();
 
 			spriteCom->SetupDraw();
+			// Ensure ParticleManager's pipeline and root signature are created before any Draw calls
+			particleManager->SetupDraw();
 
 
 			//RootSignatureを設定。PSOに設定しているけれど別途設定が必要
@@ -784,28 +831,28 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 			if (drawSphere)
 			{
-			
+
 				dxCommon->GetCommandList()->RSSetViewports(1, &viewport);
 				dxCommon->GetCommandList()->RSSetScissorRects(1, &scissorRect);
-			
+
 				dxCommon->GetCommandList()->SetGraphicsRootSignature(object3dCom->GetRootSignature().Get());
 				dxCommon->GetCommandList()->SetPipelineState(object3dCom->GetPipelineState().Get());
 
-				
+
 				dxCommon->GetCommandList()->IASetVertexBuffers(0, 1, &vertexBufferViewSphere);
 				dxCommon->GetCommandList()->IASetIndexBuffer(&indexBufferViewObject);
 				dxCommon->GetCommandList()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-				
+
 				dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(0, materialResource->GetGPUVirtualAddress());
-				
+
 				dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(1, transformationMatrixResourceSphere->GetGPUVirtualAddress());
-				
+
 				dxCommon->GetCommandList()->SetGraphicsRootDescriptorTable(2, useMonsterBall ? textureSrvHandleGPU2 : textureSrvHandleGPU);
-				
+
 				dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(3, directionalLight->GetGPUVirtualAddress());
 
-				
+
 				dxCommon->GetCommandList()->DrawIndexedInstanced(kIndexCount, 1, 0, 0, 0);
 			}
 
@@ -816,6 +863,27 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 					sprite->Draw();
 				}
 			}
+
+			//RootSignatureを設定。PSOに設定しているけれど別途設定が必要
+			dxCommon->GetCommandList()->SetGraphicsRootSignature(particleManager->GetRootSignature().Get());
+			dxCommon->GetCommandList()->SetPipelineState(particleManager->GetPipelineState().Get()); // パーティクル用PSOを設定
+			//Objectの描画
+
+			dxCommon->GetCommandList()->IASetVertexBuffers(0, 1, &vertexBufferView);
+			dxCommon->GetCommandList()->IASetIndexBuffer(&indexBufferViewObject);
+			dxCommon->GetCommandList()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+			dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(0, materialResource->GetGPUVirtualAddress());
+			// Do NOT set a CBV at root parameter 1 because particle manager declares parameter 1 as a descriptor table.
+			// Set descriptor table for instance data (root parameter 1)
+			dxCommon->GetCommandList()->SetGraphicsRootDescriptorTable(1, instancingSrvHandleGPU);
+			// Set descriptor table for texture (root parameter 2)
+			dxCommon->GetCommandList()->SetGraphicsRootDescriptorTable(2, useMonsterBall ? textureSrvHandleGPU2 : textureSrvHandleGPU);
+			dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(3, directionalLight->GetGPUVirtualAddress());
+			dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(4, cameraResource->GetGPUVirtualAddress());
+
+			/*commandList->DrawIndexedInstanced(kIndexCount, 1, 0, 0, 0);*/
+			dxCommon->GetCommandList()->DrawInstanced(UINT(modelData.vertices.size()), kNumInstances, 0, 0);
+
 
 
 			//実際のcommandListのImGuiの描画コマンドを積む
@@ -863,6 +931,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 		delete sprite;
 	}
 	sprites.clear();
+
+	delete particleManager;
 
 	delete object3d;
 
