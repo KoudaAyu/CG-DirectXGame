@@ -12,7 +12,7 @@ SpriteCom::~SpriteCom()
 
 void SpriteCom::Initialize()
 {
-	
+	CreateGraphicsPipeline();
 }
 
 void SpriteCom::RootSignature()

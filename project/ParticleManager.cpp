@@ -12,8 +12,21 @@ ParticleManager::~ParticleManager()
 
 void ParticleManager::Initialize()
 {
-
+	SetupDraw();
 }
+
+ParticleManager::Particle ParticleManager::MakeNewParticles(std::mt19937& randomEngine)
+{
+	std::uniform_real_distribution<float> distribution(-1.0f, 1.0f);
+	Particle particle;
+	particle.transform.SetScale({ 1.0f,1.0f,1.0f });
+	particle.transform.SetRotate({ 0.0f,0.0f,0.0f });
+	particle.transform.SetTranslate({ distribution(randomEngine), distribution(randomEngine), distribution(randomEngine) });
+	particle.velocity = { distribution(randomEngine), distribution(randomEngine), distribution(randomEngine) };
+	return particle;
+}
+
+
 
 void ParticleManager::RootSignature()
 {

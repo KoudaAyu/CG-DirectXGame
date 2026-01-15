@@ -5,6 +5,7 @@
 #include"DirectXCom.h"
 #include"Transform.h"
 #include"Log.h"
+#include"Random.h"
 
 class ParticleManager
 {
@@ -22,6 +23,8 @@ public:
 	~ParticleManager();
 
 	void Initialize();
+
+	Particle MakeNewParticles(std::mt19937& randomEngine);
 
 	void RootSignature();
 	void CreateGraphicsPipeline();

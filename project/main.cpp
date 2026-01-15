@@ -12,6 +12,7 @@
 #include"ParticleManager.h"
 #include"Sprite.h"
 #include"SpriteCom.h"
+#include"Random.h"
 #include"ResourceLeakCheak.h"
 #include"Sound.h"
 #include"TextureManager.h"
@@ -274,7 +275,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	// 頂点数・インデックス数
 	// 緯度方向と経度方向の両端に重複する頂点があるため、+1が必要
 	const uint32_t kVertexCount = (kSubdivision + 1) * (kSubdivision + 1);
-	const uint32_t kIndexCount = kSubdivision * kSubdivision * 6; // 各四角形に三角形2つ、各三角形に頂点3つで 2*3=6
+	const uint32_t kIndexCount = kSubdivision * kSubdivision * 6; // 各四角形に三角形2つ、各三角形に頂 vertex 3つで 2*3=6
 
 	// 頂点配列を確保
 	Sprite::VertexData* vertexData = new Sprite::VertexData[kVertexCount];
@@ -590,16 +591,18 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	dxCommon->GetDevice()->CreateShaderResourceView(instancingResource.Get(), &instancingSrvDesc, instancingSrvHandleCPU);
 
 	ParticleManager::Particle particles[kNumInstances];
+
+	Random::SeedEngine();
+	std::mt19937 randomEngine(std::random_device{}());
 	for (uint32_t index = 0; index < kNumInstances; ++index)
 	{
-		particles[index].transform.SetScale({ 1.0f,1.0f,1.0f });
-		particles[index].transform.SetRotate({ 0.0f,0.0f,0.0f });
-		particles[index].transform.SetTranslate({ index * 0.5f, index * 0.5f,index * 0.5f });
-		particles[index].velocity = { 0.0f,1.0f,0.0f };
+		particles[index] = particleManager->MakeNewParticles(randomEngine);
 	}
 
 
 	const float kDeltaTime = 1.0f / 60.0f;
+
+	
 
 	//ウィンドウのxボタンが押されるまでループ
 	while (dxCommon->GetMsg().message != WM_QUIT)
@@ -810,11 +813,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 			dxCommon->PreDraw();
 
 			object3dCom->PreDraw();
-
-			spriteCom->SetupDraw();
-			// Ensure ParticleManager's pipeline and root signature are created before any Draw calls
-			particleManager->SetupDraw();
-
 
 			//RootSignatureを設定。PSOに設定しているけれど別途設定が必要
 			dxCommon->GetCommandList()->SetGraphicsRootSignature(spriteCom->GetRootSignature().Get());
