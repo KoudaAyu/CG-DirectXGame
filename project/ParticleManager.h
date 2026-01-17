@@ -3,6 +3,7 @@
 #include <d3d12.h>
 #include <ostream>
 #include"DirectXCom.h"
+#include"Matrix4x4.h"
 #include"Transform.h"
 #include"Log.h"
 #include"Random.h"
@@ -14,6 +15,14 @@ public:
 	{
 		Transform transform;
 		Vector3 velocity;
+		Vector4 color;
+	};
+
+	struct ParticleForGPU
+	{
+		Matrix4x4 WVP;
+		Matrix4x4 World;
+		Vector4 color;
 	};
 
 

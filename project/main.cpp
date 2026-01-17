@@ -565,30 +565,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 	Sprite::Transform transformSphere{ {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };
 
-	//TransformationMatrix gTransformationMatrices[10];
 	const uint32_t kNumInstances = 10;
-	Microsoft::WRL::ComPtr<ID3D12Resource> instancingResource =
-		dxCommon->CreateBufferResource(dxCommon->GetDevice(), sizeof(TransformationMatrix) * kNumInstances);
-	TransformationMatrix* instanceData = nullptr;
-	instancingResource->Map(0, nullptr, reinterpret_cast<void**>(&instanceData));
-
-	for (uint32_t index = 0; index < kNumInstances; ++index)
-	{
-		instanceData[index].WVP = MakeIdentity4x4();
-		instanceData[index].World = MakeIdentity4x4();
-	}
-
-	D3D12_SHADER_RESOURCE_VIEW_DESC instancingSrvDesc{};
-	instancingSrvDesc.Format = DXGI_FORMAT_UNKNOWN;
-	instancingSrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-	instancingSrvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
-	instancingSrvDesc.Buffer.NumElements = 0;
-	instancingSrvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
-	instancingSrvDesc.Buffer.NumElements = kNumInstances;
-	instancingSrvDesc.Buffer.StructureByteStride = sizeof(TransformationMatrix);
-	D3D12_CPU_DESCRIPTOR_HANDLE instancingSrvHandleCPU = dxCommon->GetCPUDescroptirHandle(dxCommon->GetSrvDescriptorHeap(), dxCommon->GetDescriptorSizeSRV(), 3);
-	D3D12_GPU_DESCRIPTOR_HANDLE instancingSrvHandleGPU = dxCommon->GetGPUDescriptorHandle(dxCommon->GetSrvDescriptorHeap(), dxCommon->GetDescriptorSizeSRV(), 3);
-	dxCommon->GetDevice()->CreateShaderResourceView(instancingResource.Get(), &instancingSrvDesc, instancingSrvHandleCPU);
 
 	ParticleManager::Particle particles[kNumInstances];
 
@@ -598,6 +575,34 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	{
 		particles[index] = particleManager->MakeNewParticles(randomEngine);
 	}
+
+	//TransformationMatrix gTransformationMatrices[10];
+	
+	Microsoft::WRL::ComPtr<ID3D12Resource> instancingResource =
+		dxCommon->CreateBufferResource(dxCommon->GetDevice(), sizeof(ParticleManager::ParticleForGPU) * kNumInstances);
+	ParticleManager::ParticleForGPU* instanceData = nullptr;
+	instancingResource->Map(0, nullptr, reinterpret_cast<void**>(&instanceData));
+
+	for (uint32_t index = 0; index < kNumInstances; ++index)
+	{
+		instanceData[index].WVP = MakeIdentity4x4();
+		instanceData[index].World = MakeIdentity4x4();
+		instanceData[index].color = particles[index].color;
+	}
+
+	D3D12_SHADER_RESOURCE_VIEW_DESC instancingSrvDesc{};
+	instancingSrvDesc.Format = DXGI_FORMAT_UNKNOWN;
+	instancingSrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+	instancingSrvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+	instancingSrvDesc.Buffer.NumElements = 0;
+	instancingSrvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
+	instancingSrvDesc.Buffer.NumElements = kNumInstances;
+	instancingSrvDesc.Buffer.StructureByteStride = sizeof(ParticleManager::ParticleForGPU);
+	D3D12_CPU_DESCRIPTOR_HANDLE instancingSrvHandleCPU = dxCommon->GetCPUDescroptirHandle(dxCommon->GetSrvDescriptorHeap(), dxCommon->GetDescriptorSizeSRV(), 3);
+	D3D12_GPU_DESCRIPTOR_HANDLE instancingSrvHandleGPU = dxCommon->GetGPUDescriptorHandle(dxCommon->GetSrvDescriptorHeap(), dxCommon->GetDescriptorSizeSRV(), 3);
+	dxCommon->GetDevice()->CreateShaderResourceView(instancingResource.Get(), &instancingSrvDesc, instancingSrvHandleCPU);
+
+	
 
 
 	const float kDeltaTime = 1.0f / 60.0f;
