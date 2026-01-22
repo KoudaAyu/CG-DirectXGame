@@ -372,7 +372,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 
 	//モデル読み込み
-	Object3d::ModelData modelData = object3d->LoadObjFile("Resources", "plane.obj");
+	Object3d::ModelData modelData = object3d->LoadObjFile("Resources", "terrain.obj");
 	//頂点リソースを作る
 	Microsoft::WRL::ComPtr<ID3D12Resource> vertexResourceModel = dxCommon->CreateBufferResource(dxCommon->GetDevice().Get(), sizeof(Sprite::VertexData) * modelData.vertices.size());
 	//頂点バッファービューを作成末う
@@ -455,7 +455,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 	Sprite::Transform cameraTransform = { {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, -10.0f} };
 
-	//uvTrandform用の変数
+	//uvTransform用の変数
 	Sprite::Transform uvTransformSprite = {
 		{1.0f, 1.0f, 1.0f},
 		{0.0f, 0.0f, 0.0f},
@@ -874,25 +874,25 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 				}
 			}
 
-			//RootSignatureを設定。PSOに設定しているけれど別途設定が必要
-			dxCommon->GetCommandList()->SetGraphicsRootSignature(particleManager->GetRootSignature().Get());
-			dxCommon->GetCommandList()->SetPipelineState(particleManager->GetPipelineState().Get()); // パーティクル用PSOを設定
-			//Objectの描画
+			////RootSignatureを設定。PSOに設定しているけれど別途設定が必要
+			//dxCommon->GetCommandList()->SetGraphicsRootSignature(particleManager->GetRootSignature().Get());
+			//dxCommon->GetCommandList()->SetPipelineState(particleManager->GetPipelineState().Get()); // パーティクル用PSOを設定
+			////Objectの描画
 
-			dxCommon->GetCommandList()->IASetVertexBuffers(0, 1, &vertexBufferView);
-			dxCommon->GetCommandList()->IASetIndexBuffer(&indexBufferViewObject);
-			dxCommon->GetCommandList()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-			dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(0, materialResource->GetGPUVirtualAddress());
-			// Do NOT set a CBV at root parameter 1 because particle manager declares parameter 1 as a descriptor table.
-			// Set descriptor table for instance data (root parameter 1)
-			dxCommon->GetCommandList()->SetGraphicsRootDescriptorTable(1, instancingSrvHandleGPU);
-			// Set descriptor table for texture (root parameter 2)
-			dxCommon->GetCommandList()->SetGraphicsRootDescriptorTable(2, useMonsterBall ? textureSrvHandleGPU2 : textureSrvHandleGPU);
-			dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(3, directionalLight->GetGPUVirtualAddress());
-			dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(4, cameraResource->GetGPUVirtualAddress());
+			//dxCommon->GetCommandList()->IASetVertexBuffers(0, 1, &vertexBufferView);
+			//dxCommon->GetCommandList()->IASetIndexBuffer(&indexBufferViewObject);
+			//dxCommon->GetCommandList()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+			//dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(0, materialResource->GetGPUVirtualAddress());
+			//// Do NOT set a CBV at root parameter 1 because particle manager declares parameter 1 as a descriptor table.
+			//// Set descriptor table for instance data (root parameter 1)
+			//dxCommon->GetCommandList()->SetGraphicsRootDescriptorTable(1, instancingSrvHandleGPU);
+			//// Set descriptor table for texture (root parameter 2)
+			//dxCommon->GetCommandList()->SetGraphicsRootDescriptorTable(2, useMonsterBall ? textureSrvHandleGPU2 : textureSrvHandleGPU);
+			//dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(3, directionalLight->GetGPUVirtualAddress());
+			//dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(4, cameraResource->GetGPUVirtualAddress());
 
-			/*commandList->DrawIndexedInstanced(kIndexCount, 1, 0, 0, 0);*/
-			dxCommon->GetCommandList()->DrawInstanced(UINT(modelData.vertices.size()), kNumInstances, 0, 0);
+			///*commandList->DrawIndexedInstanced(kIndexCount, 1, 0, 0, 0);*/
+			//dxCommon->GetCommandList()->DrawInstanced(UINT(modelData.vertices.size()), kNumInstances, 0, 0);
 
 
 

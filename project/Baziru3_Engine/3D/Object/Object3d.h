@@ -45,6 +45,7 @@ public:
 	{
 		Matrix4x4 WVP;
 		Matrix4x4 World;
+
 	};
 
 	struct DirectionalLight
@@ -61,7 +62,7 @@ public:
 	/// <summary>
 	/// .mtlファイルの読み込み
 	/// </summary>
-	/// <param name="direcrotyPath"></param>
+	/// <param name="directoryPath"></param>
 	/// <param name="filename"></param>
 	/// <returns></returns>
 	static MaterialData LoadMaterialTemplateFile(const std::string& direcrotyPath, const std::string& filename);

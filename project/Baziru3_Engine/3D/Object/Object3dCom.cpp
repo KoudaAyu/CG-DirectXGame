@@ -198,9 +198,8 @@ void Object3dCom::InitializeBlend()
 
 void Object3dCom::RasterizerState()
 {
-	//RasterizerStateの設定
-	//裏面(時計回り)を表示しない
-	rasterizerDesc.CullMode = D3D12_CULL_MODE_BACK;
+	//カリングしない
+	rasterizerDesc.CullMode = D3D12_CULL_MODE_NONE;
 	//三角形の中を塗りつぶす
 	rasterizerDesc.FillMode = D3D12_FILL_MODE_SOLID;
 }
