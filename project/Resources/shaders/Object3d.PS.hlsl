@@ -41,6 +41,9 @@ struct PointLight
     float32_t4 color;
     float32_t3 position;
     float intensity;
+    float radius;
+    float decay;
+    float padding[2];
 };
 
 ConstantBuffer<PointLight> gPointLight : register(b3);
@@ -82,8 +85,8 @@ if (gMaterial.enableLighting != 0)
     float32_t3 specular = gDirectionalLight.color.rgb * gDirectionalLight.intensity * specularPow * saturate(NdotL);
 
   
-        float32_t distance = length(gPointLight.position - input.worldPosition);
-        float32_t factor = 1.0f / (distance * distance);
+    float32_t distance = length(gPointLight.position - input.worldPosition);
+        float32_t factor = pow(saturate(-distance / gPointLight.radius + 1.0), gPointLight.decay);
     float32_t3 positionDirection = normalize(input.worldPosition - gPointLight.position);
     gPointLight.color.rgb * gPointLight.intensity * factor;
         
