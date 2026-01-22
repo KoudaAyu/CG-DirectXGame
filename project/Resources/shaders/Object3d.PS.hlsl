@@ -82,9 +82,10 @@ if (gMaterial.enableLighting != 0)
     float32_t3 specular = gDirectionalLight.color.rgb * gDirectionalLight.intensity * specularPow * saturate(NdotL);
 
   
-        
+        float32_t distance = length(gPointLight.position - input.worldPosition);
+        float32_t factor = 1.0f / (distance * distance);
     float32_t3 positionDirection = normalize(input.worldPosition - gPointLight.position);
-    gPointLight.color.rgb * gPointLight.intensity;
+    gPointLight.color.rgb * gPointLight.intensity * factor;
         
     float NdotPointLight = dot(normalize(input.normal), normalize(gPointLight.position - input.worldPosition));
     float specularPowPointLight = pow(saturate(NdotPointLight), gMaterial.shininess);
