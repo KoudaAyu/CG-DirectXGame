@@ -97,6 +97,11 @@ void Object3dCom::CreateRootParameters()
 	rootParameters[4].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL; // PixelShaderで使う 
 	rootParameters[4].Descriptor.ShaderRegister = 2; // b2 とバインド
 
+    // 追加: PointLight 用の定数バッファを PixelShader の b3 にバインド
+    rootParameters[5].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+    rootParameters[5].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+    rootParameters[5].Descriptor.ShaderRegister = 3; // b3 とバインド
+
 	descriptionRootSignature.pParameters = rootParameters; //ルートパラメーター配列へのポインタ
 	descriptionRootSignature.NumParameters = _countof(rootParameters);//配列の長さ
 }

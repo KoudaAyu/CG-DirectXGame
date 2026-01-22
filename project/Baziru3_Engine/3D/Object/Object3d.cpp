@@ -127,7 +127,7 @@ Object3d::ModelData Object3d::LoadObjFile(const std::string& directoryPath, cons
 		{
 			Vector4 position;
 			s >> position.x >> position.y >> position.z;
-			position.x *= -1.0f; //X軸を反転する
+			// position.x *= -1.0f; // X反転を無効化: テクスチャ向きが変わる原因になる
 			position.w = 1.0f;
 			positions.push_back(position);//位置を格納
 		}
@@ -135,14 +135,15 @@ Object3d::ModelData Object3d::LoadObjFile(const std::string& directoryPath, cons
 		{
 			Vector2 texcoord;
 			s >> texcoord.x >> texcoord.y;
-			texcoord.y = 1.0f - texcoord.y; //Y軸を反転する
+			// OBJのVTは左下原点のことが多いので、DirectXのテクスチャ原点(左上)に合わせてVを反転する
+			texcoord.y = 1.0f - texcoord.y;
 			texcoords.push_back(texcoord);//テクスチャ座標を格納
 		}
 		else if (identifile == "vn")
 		{
 			Vector3 normal;
-		 s >> normal.x >> normal.y >> normal.z;
-			normal.x *= -1.0f; //X軸を反転する
+			s >> normal.x >> normal.y >> normal.z;
+			// normal.x *= -1.0f; // 法線X反転を無効化
 			normals.push_back(normal);//法線を格納
 		}
 		else if (identifile == "f")
@@ -170,9 +171,10 @@ Object3d::ModelData Object3d::LoadObjFile(const std::string& directoryPath, cons
 				Vector3 normal = normals[elementIndices[2] - 1];
 				triangle[faceVertex] = { position, texcoord, normal };
 			}
-			modelData.vertices.push_back(triangle[2]);
-			modelData.vertices.push_back(triangle[1]);
+			// OBJの元の頂点順を維持して追加（入れ替えない）
 			modelData.vertices.push_back(triangle[0]);
+			modelData.vertices.push_back(triangle[1]);
+			modelData.vertices.push_back(triangle[2]);
 		}
 		else if (identifile == "mtllib")
 		{
