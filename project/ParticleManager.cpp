@@ -22,7 +22,7 @@ ParticleManager::Particle ParticleManager::MakeNewParticles(std::mt19937& random
 	particle.transform.SetScale({ 1.0f,1.0f,1.0f });
 	particle.transform.SetRotate({ 0.0f,0.0f,0.0f });
 	Vector3 randomTranslate{ distribution(randomEngine), distribution(randomEngine), distribution(randomEngine) };
-	particle.transform.SetTranslate({ Vector3{translate.x + randomTranslate.x, translate.y + randomTranslate.y, translate.z + randomTranslate.z} });
+	particle.transform.SetTranslate({ translate + randomTranslate });
 	particle.velocity = { distribution(randomEngine), distribution(randomEngine), distribution(randomEngine) };
 	std::uniform_real_distribution<float> distColor(0.0f, 1.0f);
 	particle.color = { distColor(randomEngine), distColor(randomEngine), distColor(randomEngine), 1.0f };
@@ -49,7 +49,7 @@ void ParticleManager::CreateGraphicsPipeline()
 	CreateRootParameters();
 	StaticSamplers();
 	SignatureBlob();
-
+	
 	if (!signatureBlob)
 	{
 		Logger::Log(logStream, "ParticleManager: Failed to serialize root signature. Aborting pipeline creation.\n");
@@ -102,7 +102,7 @@ void ParticleManager::CreateRootParameters()
 
 	rootParameters[3].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
 	rootParameters[3].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
-	rootParameters[3].Descriptor.ShaderRegister = 1;
+	rootParameters[3].Descriptor.ShaderRegister = 1; 
 
 	rootParameters[4].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
 	rootParameters[4].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
@@ -137,7 +137,7 @@ void ParticleManager::SignatureBlob()
 	HRESULT hr = D3D12SerializeRootSignature(&descriptionRootSignature,
 		D3D_ROOT_SIGNATURE_VERSION_1, signatureBlob.GetAddressOf(), errorBlob.GetAddressOf());
 
-
+	
 	dxCommon->SetHr(hr);
 
 	if (FAILED(hr))
@@ -150,7 +150,7 @@ void ParticleManager::SignatureBlob()
 		{
 			Logger::Log(logStream, "D3D12SerializeRootSignature failed but error blob is null.\n");
 		}
-
+		
 		return;
 	}
 }
@@ -281,7 +281,7 @@ void ParticleManager::InitializeGraphicPipeline()
 	// DepthStencilState の設定（パーティクル向け）
 	// 深度テストは有効にして、深度書き込みは行わない（描画順やブレンドに依存するため）
 	depthStencilDesc.DepthEnable = TRUE;
-	depthStencilDesc.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO;
+	depthStencilDesc.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO; 
 	depthStencilDesc.DepthFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
 	// 生成する PSO の設定に適用
 	graphicPipelineStateDesc.DepthStencilState = depthStencilDesc;

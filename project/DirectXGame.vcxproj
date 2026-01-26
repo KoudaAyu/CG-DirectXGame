@@ -39,11 +39,13 @@
     <ClCompile Include="main.cpp" />
     <ClCompile Include="Baziru3_Engine\2D\Sprite\Sprite.cpp" />
     <ClCompile Include="Baziru3_Engine\2D\Sprite\SpriteCom.cpp" />
+    <ClCompile Include="ParticleManager.cpp" />
+    <ClCompile Include="Random.cpp" />
+
     <ClCompile Include="Model.cpp" />
     <ClCompile Include="ModelCom.cpp" />
     <ClCompile Include="ModelManager.cpp" />
-    <ClCompile Include="ParticleManager.cpp" />
-    <ClCompile Include="Random.cpp" />
+
     <ClCompile Include="SRVManager.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -58,12 +60,19 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
     </FxCompile>
     <FxCompile Include="Resources\shaders\Object3d.PS.hlsl">
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Pixel</ShaderType>
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Pixel</ShaderType>
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Development|x64'">Pixel</ShaderType>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </FxCompile>
+    <FxCompile Include="Resources\shaders\Particle.PS.hlsl">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </FxCompile>
+    <FxCompile Include="Resources\shaders\Particle.VS.hlsl">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
     </FxCompile>
     <FxCompile Include="Resources\shaders\Object3d.VS.hlsl">
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Vertex</ShaderType>
@@ -101,13 +110,17 @@
     <ClInclude Include="Baziru3_Engine\2D\Sprite\SpriteCom.h" />
     <ClInclude Include="Baziru3_Engine\Base\Operator.h" />
     <ClInclude Include="Baziru3_Engine\2D\Texture\TextureManager.h" />
-    <ClInclude Include="Model.h" />
-    <ClInclude Include="ModelCom.h" />
-    <ClInclude Include="ModelManager.h" />
+
     <ClInclude Include="ParticleEmitter.h" />
     <ClInclude Include="ParticleManager.h" />
     <ClInclude Include="Random.h" />
+
+    <ClInclude Include="Model.h" />
+    <ClInclude Include="ModelCom.h" />
+    <ClInclude Include="ModelManager.h" />
+ 
     <ClInclude Include="SRVManager.h" />
+
   </ItemGroup>
   <ItemGroup>
     <Text Include="externals\imgui\LICENSE.txt" />

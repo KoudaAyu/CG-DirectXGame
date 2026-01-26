@@ -35,7 +35,7 @@ public:
 
 	void Initialize();
 
-	Particle MakeNewParticles(std::mt19937& randomEngine, const Vector3& translate);
+	Particle MakeNewParticles(std::mt19937& randomEngine,const Vector3& translate);
 
 	void RootSignature();
 	void CreateGraphicsPipeline();
@@ -52,7 +52,7 @@ public:
 
 	void SetupDraw();
 
-
+	
 	const Microsoft::WRL::ComPtr<ID3D12PipelineState>& GetPipelineState() const { return pipelineState; }
 
 public:

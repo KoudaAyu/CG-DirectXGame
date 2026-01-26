@@ -17,7 +17,7 @@ struct VertecShederInput
 
 
 
-VertexShaderOutput main(VertecShederInput input, uint32_t instanceId : SV_InstanceID)
+VertexShaderOutput main(VertecShederInput input,uint32_t instanceId : SV_InstanceID)
 {
     VertexShaderOutput output;
     output.position = mul(input.position, gParticle[instanceId].WVP);
@@ -25,3 +25,4 @@ VertexShaderOutput main(VertecShederInput input, uint32_t instanceId : SV_Instan
     output.color = gParticle[instanceId].color;
     return output;
 }
+
