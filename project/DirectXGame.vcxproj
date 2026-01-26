@@ -16,8 +16,6 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Baziru3_Engine\2D\Texture\TextureManager.cpp" />
-    <ClCompile Include="Baziru3_Engine\3D\Model\Model.cpp" />
-    <ClCompile Include="Baziru3_Engine\3D\Model\ModelCom.cpp" />
     <ClCompile Include="Baziru3_Engine\3D\Object\Object3d.cpp" />
     <ClCompile Include="Baziru3_Engine\3D\Object\Object3dCom.cpp" />
     <ClCompile Include="Baziru3_Engine\Audio\Sound.cpp" />
@@ -41,6 +39,10 @@
     <ClCompile Include="main.cpp" />
     <ClCompile Include="Baziru3_Engine\2D\Sprite\Sprite.cpp" />
     <ClCompile Include="Baziru3_Engine\2D\Sprite\SpriteCom.cpp" />
+    <ClCompile Include="Model.cpp" />
+    <ClCompile Include="ModelCom.cpp" />
+    <ClCompile Include="ModelManager.cpp" />
+    <ClCompile Include="SRVManager.cpp" />
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="Resources\shaders\Object3d.PS.hlsl">
@@ -61,8 +63,6 @@
     </FxCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Baziru3_Engine\3D\Model\Model.h" />
-    <ClInclude Include="Baziru3_Engine\3D\Model\ModelCom.h" />
     <ClInclude Include="Baziru3_Engine\3D\Object\Object3d.h" />
     <ClInclude Include="Baziru3_Engine\3D\Object\Object3dCom.h" />
     <ClInclude Include="Baziru3_Engine\Audio\Sound.h" />
@@ -89,6 +89,10 @@
     <ClInclude Include="Baziru3_Engine\2D\Sprite\SpriteCom.h" />
     <ClInclude Include="Baziru3_Engine\Base\Operator.h" />
     <ClInclude Include="Baziru3_Engine\2D\Texture\TextureManager.h" />
+    <ClInclude Include="Model.h" />
+    <ClInclude Include="ModelCom.h" />
+    <ClInclude Include="ModelManager.h" />
+    <ClInclude Include="SRVManager.h" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="externals\imgui\LICENSE.txt" />
