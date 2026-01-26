@@ -25,6 +25,9 @@ ParticleManager::Particle ParticleManager::MakeNewParticles(std::mt19937& random
 	particle.velocity = { distribution(randomEngine), distribution(randomEngine), distribution(randomEngine) };
 	std::uniform_real_distribution<float> distColor(0.0f, 1.0f);
 	particle.color = { distColor(randomEngine), distColor(randomEngine), distColor(randomEngine), 1.0f };
+	std::uniform_real_distribution<float> distTime(1.0f, 3.0f);
+	particle.lifeTime = distTime(randomEngine);
+	particle.currentTime = 0.0f;
 	return particle;
 }
 
@@ -192,15 +195,15 @@ void ParticleManager::InitializeBlend()
 	blendDesc.RenderTarget[0].BlendEnable = TRUE;
 
 	//--ノーマルブレンド------------------------------
-	blendDesc.RenderTarget[0].SrcBlend = D3D12_BLEND_SRC_ALPHA;
+	/*blendDesc.RenderTarget[0].SrcBlend = D3D12_BLEND_SRC_ALPHA;
 	blendDesc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
-	blendDesc.RenderTarget[0].DestBlend = D3D12_BLEND_INV_SRC_ALPHA;
+	blendDesc.RenderTarget[0].DestBlend = D3D12_BLEND_INV_SRC_ALPHA;*/
 	//--------------------------------------------
 
 	//--加算ブレンド------------------------------
-	/*blendDesc.RenderTarget[0].SrcBlend = D3D12_BLEND_ONE;
+	blendDesc.RenderTarget[0].SrcBlend = D3D12_BLEND_ONE;
 	blendDesc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
-	blendDesc.RenderTarget[0].DestBlend = D3D12_BLEND_ONE;*/
+	blendDesc.RenderTarget[0].DestBlend = D3D12_BLEND_ONE;
 	//--------------------------------------------
 
 	//--減算ブレンド------------------------------
@@ -274,6 +277,14 @@ void ParticleManager::InitializeGraphicPipeline()
 		IID_PPV_ARGS(&pipelineState)));
 	assert(SUCCEEDED(dxCommon->GetHr()));
 
+	// DepthStencilState の設定（パーティクル向け）
+	// 深度テストは有効にして、深度書き込みは行わない（描画順やブレンドに依存するため）
+	depthStencilDesc.DepthEnable = TRUE;
+	depthStencilDesc.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO; 
+	depthStencilDesc.DepthFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
+	// 生成する PSO の設定に適用
+	graphicPipelineStateDesc.DepthStencilState = depthStencilDesc;
+	graphicPipelineStateDesc.DSVFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
 }
 
 void ParticleManager::SetupDraw()

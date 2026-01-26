@@ -16,6 +16,8 @@ public:
 		Transform transform;
 		Vector3 velocity;
 		Vector4 color;
+		float lifeTime;
+		float currentTime;
 	};
 
 	struct ParticleForGPU
@@ -50,7 +52,7 @@ public:
 
 	void SetupDraw();
 
-	// Expose pipeline state so callers can bind the matching PSO
+	
 	const Microsoft::WRL::ComPtr<ID3D12PipelineState>& GetPipelineState() const { return pipelineState; }
 
 public:
@@ -123,6 +125,7 @@ private:
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC graphicPipeline_stateDesc{};
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC& graphicPipelineStateDesc = graphicPipeline_stateDesc;
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> pipelineState = nullptr;
+	D3D12_DEPTH_STENCIL_DESC depthStencilDesc{};
 
 	std::ostream& logStream;
 };

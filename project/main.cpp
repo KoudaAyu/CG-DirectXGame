@@ -565,13 +565,14 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 	Sprite::Transform transformSphere{ {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };
 
-	const uint32_t kNumInstances = 10;
+	const uint32_t kNumMaxInstances = 10;
+	uint32_t numInstance = 0;
 
-	ParticleManager::Particle particles[kNumInstances];
+	ParticleManager::Particle particles[kNumMaxInstances];
 
 	Random::SeedEngine();
 	std::mt19937 randomEngine(std::random_device{}());
-	for (uint32_t index = 0; index < kNumInstances; ++index)
+	for (uint32_t index = 0; index < kNumMaxInstances; ++index)
 	{
 		particles[index] = particleManager->MakeNewParticles(randomEngine);
 	}
@@ -579,11 +580,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	//TransformationMatrix gTransformationMatrices[10];
 	
 	Microsoft::WRL::ComPtr<ID3D12Resource> instancingResource =
-		dxCommon->CreateBufferResource(dxCommon->GetDevice(), sizeof(ParticleManager::ParticleForGPU) * kNumInstances);
+		dxCommon->CreateBufferResource(dxCommon->GetDevice(), sizeof(ParticleManager::ParticleForGPU) * kNumMaxInstances);
 	ParticleManager::ParticleForGPU* instanceData = nullptr;
 	instancingResource->Map(0, nullptr, reinterpret_cast<void**>(&instanceData));
 
-	for (uint32_t index = 0; index < kNumInstances; ++index)
+	for (uint32_t index = 0; index < kNumMaxInstances; ++index)
 	{
 		instanceData[index].WVP = MakeIdentity4x4();
 		instanceData[index].World = MakeIdentity4x4();
@@ -596,7 +597,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	instancingSrvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
 	instancingSrvDesc.Buffer.NumElements = 0;
 	instancingSrvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
-	instancingSrvDesc.Buffer.NumElements = kNumInstances;
+	instancingSrvDesc.Buffer.NumElements = kNumMaxInstances;
 	instancingSrvDesc.Buffer.StructureByteStride = sizeof(ParticleManager::ParticleForGPU);
 	D3D12_CPU_DESCRIPTOR_HANDLE instancingSrvHandleCPU = dxCommon->GetCPUDescroptirHandle(dxCommon->GetSrvDescriptorHeap(), dxCommon->GetDescriptorSizeSRV(), 3);
 	D3D12_GPU_DESCRIPTOR_HANDLE instancingSrvHandleGPU = dxCommon->GetGPUDescriptorHandle(dxCommon->GetSrvDescriptorHeap(), dxCommon->GetDescriptorSizeSRV(), 3);
@@ -676,18 +677,38 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 			// 法線変換用の逆転置行列も更新
 			transformationMatrixDataSphere->WorldInverseTranspose = Transpose(Inverse(worldMatrix));
 
-			for (uint32_t index = 0; index < kNumInstances; ++index)
+			
+			numInstance = 0;
+
+			for (uint32_t index = 0; index < kNumMaxInstances; ++index)
 			{
+				
+				particles[index].currentTime += kDeltaTime;
+
+				
+				if (particles[index].currentTime >= particles[index].lifeTime)
+				{
+					continue;
+				}
+
 				
 				Matrix4x4 ParticleWorldMatrix = MakeAffineMatrix(
 					particles[index].transform.GetScale(), particles[index].transform.GetRotate(), particles[index].transform.GetTranslate());
 				Matrix4x4 ParticleViewProjectMatrix = Multiply(
 					ParticleWorldMatrix, Multiply(viewMatrix, projectionMatrix));
-				instanceData[index].WVP = ParticleViewProjectMatrix;
-				instanceData[index].World = ParticleWorldMatrix;
 
+				
+				instanceData[numInstance].WVP = ParticleViewProjectMatrix;
+				instanceData[numInstance].World = ParticleWorldMatrix;
+				instanceData[numInstance].color = particles[index].color;
+				float alpha = 1.0f - (particles[index].currentTime / particles[index].lifeTime);
+				instanceData[numInstance].color.w = alpha;
+
+				
 				particles[index].transform.SetTranslate(
 					particles[index].transform.GetTranslate() + particles[index].velocity * kDeltaTime);
+
+				++numInstance;
 			}
 
 			//開発用UIの処理、実際に開発用のUIを出す場合はここをゲーム固有の処理に置き換え
@@ -892,7 +913,10 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 			dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(4, cameraResource->GetGPUVirtualAddress());
 
 			/*commandList->DrawIndexedInstanced(kIndexCount, 1, 0, 0, 0);*/
-			dxCommon->GetCommandList()->DrawInstanced(UINT(modelData.vertices.size()), kNumInstances, 0, 0);
+			if (numInstance > 0)
+			{
+				dxCommon->GetCommandList()->DrawInstanced(UINT(modelData.vertices.size()), numInstance, 0, 0);
+			}
 
 
 
