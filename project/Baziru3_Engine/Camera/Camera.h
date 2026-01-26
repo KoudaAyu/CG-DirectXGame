@@ -30,6 +30,7 @@ public:
 	}
 	const Vector3& GetRotate() const { return rotation_; }
 	const Vector3& GetTranslate() const { return translation_; }
+	const Vector3& GetWorldPosition() const { return transform_.GetTranslate(); }
 
 	void SetRotate(const Vector3& rotate)
 	{

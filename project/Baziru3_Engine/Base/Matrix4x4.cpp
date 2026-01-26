@@ -365,3 +365,16 @@ Matrix4x4 MakeOrthographicMatrix(float left, float top, float right, float botto
 	return mat;
 }
 
+// 追加: 転置行列の実装
+Matrix4x4 Transpose(const Matrix4x4& m)
+{
+	Matrix4x4 r{};
+	for (int i = 0; i < 4; ++i)
+	{
+		for (int j = 0; j < 4; ++j)
+		{
+			r.m[i][j] = m.m[j][i];
+		}
+	}
+	return r;
+}
