@@ -12,7 +12,7 @@ SpriteCom::~SpriteCom()
 
 void SpriteCom::Initialize()
 {
-	
+	CreateGraphicsPipeline();
 }
 
 void SpriteCom::RootSignature()
@@ -69,13 +69,17 @@ void SpriteCom::CreateRootParameters()
 	rootParameters[3].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 	rootParameters[3].Descriptor.ShaderRegister = 1;
 
+	rootParameters[4].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+	rootParameters[4].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+	rootParameters[4].Descriptor.ShaderRegister = 2; // b2 を定義しておく
+
 	descriptionRootSignature.pParameters = rootParameters; //ルートパラメーター配列へのポインタ
 	descriptionRootSignature.NumParameters = _countof(rootParameters);//配列の長さ
 }
 
 void SpriteCom::StaticSamplers()
 {
-	
+
 	staticSamplers[0].Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;//バイアリニアフィルタ
 	staticSamplers[0].AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;//0~1の範囲外をリピート
 	staticSamplers[0].AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
@@ -107,7 +111,7 @@ void SpriteCom::SignatureBlob()
 void SpriteCom::RootSignatureFromBlob()
 {
 	//バイナリをもとに生成
-	
+
 	dxCommon->SetHr(dxCommon->GetDevice()->CreateRootSignature(0,
 		signatureBlob->GetBufferPointer(), signatureBlob->GetBufferSize(),
 		IID_PPV_ARGS(&rootSignature)));
@@ -117,7 +121,7 @@ void SpriteCom::RootSignatureFromBlob()
 void SpriteCom::InputLayer()
 {
 	//InputLayer
-	
+
 	inputElementDescs[0].SemanticName = "POSITION"; //セマンティック名
 	inputElementDescs[0].SemanticIndex = 0; //セマンティックインデックス
 	inputElementDescs[0].Format = DXGI_FORMAT_R32G32B32A32_FLOAT; //頂点のフォーマット
@@ -131,7 +135,7 @@ void SpriteCom::InputLayer()
 	inputElementDescs[2].Format = DXGI_FORMAT_R32G32B32_FLOAT;
 	inputElementDescs[2].AlignedByteOffset = D3D12_APPEND_ALIGNED_ELEMENT;
 
-	
+
 	inputLayoutDesc.pInputElementDescs = inputElementDescs; //入力要素の配列
 	inputLayoutDesc.NumElements = _countof(inputElementDescs); //入力要素の数
 }
@@ -181,7 +185,7 @@ void SpriteCom::InitializeBlend()
 
 void SpriteCom::RasterizerState()
 {
-	
+
 	//カリングしない
 	rasterizerDesc.CullMode = D3D12_CULL_MODE_NONE;
 	//三角形の中を塗りつぶす
@@ -203,7 +207,7 @@ void SpriteCom::ShaderCompile()
 void SpriteCom::InitializeGraphicPipeline()
 {
 
-	
+
 	graphicPipelineStateDesc.pRootSignature = rootSignature.Get(); //ルートシグネチャ
 	graphicPipelineStateDesc.InputLayout = inputLayoutDesc; //入力レイアウト
 	graphicPipelineStateDesc.VS = { vertexShaderBlob->GetBufferPointer(),

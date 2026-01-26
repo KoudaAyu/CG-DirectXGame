@@ -36,7 +36,7 @@ void Sprite::Initialize(SpriteCom* spriteCom, std::string textureFilePath)
 	//単位行列を書き込んでおく
 	transformationMatrixDataSprite->WVP = MakeIdentity4x4();
 	transformationMatrixDataSprite->World = MakeIdentity4x4();
-	
+
 	textureIndex = TextureManager::GetInstance()->GetTextureIndexByFilePath(textureFilePath);
 
 	AdjustTextureSize();
@@ -77,23 +77,25 @@ void Sprite::Update(WindowAPI* windowAPI, DebugCamera* debugCamera_)
 	Matrix4x4 viewMatrixSprite = MakeIdentity4x4();
 	Matrix4x4 projectionMatrixSprite = MakeOrthographicMatrix(0.0f, 0.0f, float(windowAPI->GetClientWidth()), float(windowAPI->GetClientHeight()), 0.0f, 100.0f);
 	Matrix4x4 worldViewProjectionmatrixSprite = Multiply(worldMatrixSprite, Multiply(debugCamera_->GetViewMatrix(), projectionMatrixSprite));
-	transformationMatrixDataSprite->WVP = worldViewProjectionmatrixSprite; 
+	transformationMatrixDataSprite->WVP = worldViewProjectionmatrixSprite;
 	transformationMatrixDataSprite->World = worldMatrixSprite;
 }
 
 void Sprite::Draw()
 {
-	
+
 	dxCommon->GetCommandList()->IASetVertexBuffers(0, 1, &vertexBufferViewSprite);
 	dxCommon->GetCommandList()->IASetIndexBuffer(&indexBufferViewSprite);
 	dxCommon->GetCommandList()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
 	dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(0, materialResourceSprite->GetGPUVirtualAddress());
 	dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(1, transformationMatrixResourceSprite->GetGPUVirtualAddress());
-	if (textureHandleGPU.ptr != 0) {
+	if (textureHandleGPU.ptr != 0)
+	{
 		dxCommon->GetCommandList()->SetGraphicsRootDescriptorTable(2, TextureManager::GetInstance()->GetSrvHandleGPU(textureIndex));
 	}
-	if (directionalLightResource) {
+	if (directionalLightResource)
+	{
 		dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(3, directionalLightResource->GetGPUVirtualAddress());
 	}
 
@@ -179,7 +181,7 @@ void Sprite::ReflectionProcessing()
 void Sprite::AdjustTextureSize()
 {
 	const DirectX::TexMetadata& metadata = TextureManager::GetInstance()->GetMetadata(textureIndex);
-	
+
 	textureSize.x = static_cast<float>(metadata.width);
 	textureSize.y = static_cast<float>(metadata.height);
 

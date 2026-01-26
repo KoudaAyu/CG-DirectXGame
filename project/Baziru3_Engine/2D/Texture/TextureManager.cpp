@@ -24,9 +24,9 @@ void TextureManager::Initialize(DirectXCom* dxCommon, SRVManager* SrvManager)
 	// DirectXCom を保存
 	assert(dxCommon != nullptr);
 	directXCom_ = dxCommon;
-	
 
-	
+
+
 	srvManager_ = SrvManager;
 
 	// SRVヒープの最大数に合わせてテクスチャコンテナを予約
@@ -36,11 +36,13 @@ void TextureManager::Initialize(DirectXCom* dxCommon, SRVManager* SrvManager)
 void TextureManager::LoadTexture(const std::string& filePath)
 {
 	// 無効なパスは無視
-	if (filePath.empty()) {
+	if (filePath.empty())
+	{
 		return;
 	}
 	// DirectXコンテキスト未設定なら何もしない
-	if (!directXCom_) {
+	if (!directXCom_)
+	{
 		return;
 	}
 	// 既に読み込まれているかチェック

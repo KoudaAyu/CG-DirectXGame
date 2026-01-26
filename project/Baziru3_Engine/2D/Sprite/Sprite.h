@@ -31,9 +31,11 @@ public:
 		int32_t enableLighting;
 		float padding[3]; // パディングを追加して16バイト境界に揃える
 		Matrix4x4 uvTransform; // UV変換行列
+		float shininess;
+		float padding2[3];
 	};
 
-	void Initialize(SpriteCom* spriteCom,std::string textureFilePath);
+	void Initialize(SpriteCom* spriteCom, std::string textureFilePath);
 	void Update(WindowAPI* windowAPI, DebugCamera* debugCamera_);
 	void Draw();
 
@@ -46,10 +48,12 @@ public:
 
 public:
 
-	const Microsoft::WRL::ComPtr<ID3D12Resource>& GetVertexResourceSprite() const { return vertexResourceSprite; }
+
+	Microsoft::WRL::ComPtr<ID3D12Resource> GetVertexResourceSprite() const { return vertexResourceSprite; }
 	const D3D12_VERTEX_BUFFER_VIEW& GetVertexBufferViewSprite() const { return vertexBufferViewSprite; }
 	const D3D12_INDEX_BUFFER_VIEW& GetIndexBufferViewSprite() const { return indexBufferViewSprite; }
-	const Microsoft::WRL::ComPtr<ID3D12Resource>& GetMaterialResourceSprite() const { return materialResourceSprite; }
+
+	Microsoft::WRL::ComPtr<ID3D12Resource> GetMaterialResourceSprite() const { return materialResourceSprite; }
 	void SetUVTransform(const Matrix4x4& uv)
 	{
 		if (materialData)
@@ -70,7 +74,7 @@ public:
 
 	//Spriteの座標関係
 	const Vector2& GetPosition() const { return position; }
-	void SetPosition(const Vector2& position)  { this->position = position; }
+	void SetPosition(const Vector2& position) { this->position = position; }
 
 	//Spriteの回転関係
 	const float GetRotation() const { return rotation; }
@@ -92,7 +96,7 @@ public:
 	void SetTextureSize(const Vector2& size) { textureSize = size; }
 
 	void SetTextureHandle(D3D12_GPU_DESCRIPTOR_HANDLE handle) { textureHandleGPU = handle; }
-	
+
 	void SetDirectionalLightResource(const Microsoft::WRL::ComPtr<ID3D12Resource>& light) { directionalLightResource = light; }
 
 private:
