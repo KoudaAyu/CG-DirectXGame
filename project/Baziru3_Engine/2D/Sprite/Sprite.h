@@ -31,6 +31,8 @@ public:
 		int32_t enableLighting;
 		float padding[3]; // パディングを追加して16バイト境界に揃える
 		Matrix4x4 uvTransform; // UV変換行列
+		float shininess;
+		float padding2[3];
 	};
 
 	void Initialize(SpriteCom* spriteCom,std::string textureFilePath);
@@ -46,10 +48,12 @@ public:
 
 public:
 
-	const Microsoft::WRL::ComPtr<ID3D12Resource>& GetVertexResourceSprite() const { return vertexResourceSprite; }
+
+	Microsoft::WRL::ComPtr<ID3D12Resource> GetVertexResourceSprite() const { return vertexResourceSprite; }
 	const D3D12_VERTEX_BUFFER_VIEW& GetVertexBufferViewSprite() const { return vertexBufferViewSprite; }
 	const D3D12_INDEX_BUFFER_VIEW& GetIndexBufferViewSprite() const { return indexBufferViewSprite; }
-	const Microsoft::WRL::ComPtr<ID3D12Resource>& GetMaterialResourceSprite() const { return materialResourceSprite; }
+
+	Microsoft::WRL::ComPtr<ID3D12Resource> GetMaterialResourceSprite() const { return materialResourceSprite; }
 	void SetUVTransform(const Matrix4x4& uv)
 	{
 		if (materialData)

@@ -3,16 +3,39 @@
 #include <d3d12.h>
 #include <ostream>
 #include"DirectXCom.h"
+#include"Matrix4x4.h"
+#include"Transform.h"
 #include"Log.h"
+#include"Random.h"
 
-class SpriteCom
+class ParticleManager
 {
 public:
+	struct Particle
+	{
+		Transform transform;
+		Vector3 velocity;
+		Vector4 color;
+		float lifeTime;
+		float currentTime;
+	};
 
-	SpriteCom(std::ostream& logStream, DirectXCom* dxCommon);
-	~SpriteCom();
+	struct ParticleForGPU
+	{
+		Matrix4x4 WVP;
+		Matrix4x4 World;
+		Vector4 color;
+	};
+
+
+public:
+
+	ParticleManager(std::ostream& logStream, DirectXCom* dxCommon);
+	~ParticleManager();
 
 	void Initialize();
+
+	Particle MakeNewParticles(std::mt19937& randomEngine,const Vector3& translate);
 
 	void RootSignature();
 	void CreateGraphicsPipeline();
@@ -26,9 +49,11 @@ public:
 	void RasterizerState();
 	void ShaderCompile();
 	void InitializeGraphicPipeline();
-	
+
 	void SetupDraw();
 
+	
+	const Microsoft::WRL::ComPtr<ID3D12PipelineState>& GetPipelineState() const { return pipelineState; }
 
 public:
 	const D3D12_ROOT_SIGNATURE_DESC& GetDescriptionRootSignature() const
@@ -47,7 +72,7 @@ public:
 	}
 	D3D12_ROOT_PARAMETER* GetRootParameters() { return rootParameters; }
 	const D3D12_ROOT_PARAMETER* GetRootParameters() const { return rootParameters; }
-	const D3D12_DESCRIPTOR_RANGE* GetDescriptorRange() const { return descriptorRange; }
+	const D3D12_DESCRIPTOR_RANGE* GetDescriptorRange() const { return descriptorRangeForInstancing; }
 	const D3D12_STATIC_SAMPLER_DESC* GetStaticSamplers() const { return staticSamplers; }
 	void SetDescriptionRootSignature(const D3D12_ROOT_SIGNATURE_DESC& desc)
 	{
@@ -85,7 +110,7 @@ private:
 	DirectXCom* dxCommon = nullptr;
 
 	D3D12_ROOT_SIGNATURE_DESC descriptionRootSignature{};
-	D3D12_DESCRIPTOR_RANGE descriptorRange[1] = {};
+	D3D12_DESCRIPTOR_RANGE descriptorRangeForInstancing[2] = {};
 	D3D12_ROOT_PARAMETER rootParameters[5] = {};
 	D3D12_STATIC_SAMPLER_DESC staticSamplers[1] = {};
 	Microsoft::WRL::ComPtr<ID3DBlob> signatureBlob = nullptr;
@@ -97,7 +122,10 @@ private:
 	D3D12_RASTERIZER_DESC rasterizerDesc{};
 	Microsoft::WRL::ComPtr<IDxcBlob> vertexShaderBlob;
 	Microsoft::WRL::ComPtr<IDxcBlob> pixelShaderBlob;
-	D3D12_GRAPHICS_PIPELINE_STATE_DESC graphicPipelineStateDesc{};
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC graphicPipeline_stateDesc{};
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC& graphicPipelineStateDesc = graphicPipeline_stateDesc;
+	Microsoft::WRL::ComPtr<ID3D12PipelineState> pipelineState = nullptr;
+	D3D12_DEPTH_STENCIL_DESC depthStencilDesc{};
 
 	std::ostream& logStream;
 };
