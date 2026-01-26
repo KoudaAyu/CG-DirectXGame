@@ -324,3 +324,7 @@ FodyWeavers.xsd
 
 imgui.ini
 /project/logs
+
+# DirectXTex Compiled Shaders
+**/DirectXTex/Shaders/Compiled/
+/project/externals/DirectXTex/Bin/

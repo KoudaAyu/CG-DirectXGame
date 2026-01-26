@@ -7,6 +7,9 @@
 #include"KeyInput.h"
 #include"Log.h"
 #include"Matrix4x4.h"
+#include"ModelCom.h"
+#include"Model.h"
+#include"ModelManager.h"
 #include"Object3d.h"
 #include"Object3dCom.h"
 #include"ParticleManager.h"
@@ -15,6 +18,7 @@
 #include"Random.h"
 #include"ResourceLeakCheak.h"
 #include"Sound.h"
+#include"SRVManager.h"
 #include"TextureManager.h"
 #include"Vector.h"
 #include"WindowsAPI.h"
@@ -210,11 +214,19 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 	dxCommon->Initialize();
 
+#pragma region 基盤システムの初期化
+
+	SRVManager* srvManager = new SRVManager();
+	srvManager->Initialize(dxCommon);
+
 	// TextureManager は SRV ヒープに依存するので DX 初期化の後に初期化
-	TextureManager::GetInstance()->Initialize();
-	TextureManager::GetInstance()->SetDirectXCom(dxCommon);
+	TextureManager::GetInstance()->Initialize(dxCommon,srvManager);
 	// 作業ディレクトリが project/ である前提の相対パスを使う
 	TextureManager::GetInstance()->LoadTexture("Resources/uvChecker.png");
+
+#pragma endregion 基盤システムの初期化
+
+
 
 	SpriteCom* spriteCom = nullptr;
 	spriteCom = new SpriteCom(logStream, dxCommon);
@@ -244,6 +256,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	ParticleManager* particleManager = new ParticleManager(logStream, dxCommon);
 	particleManager->Initialize();
 #pragma endregion 最初のシーン終了
+
+
 
 	//DepthStencilStateの設定
 	D3D12_DEPTH_STENCIL_DESC depthStencilDesc{};
@@ -373,54 +387,22 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	memcpy(mapped, vertexData, sizeof(Sprite::VertexData) * kVertexCount);
 	vertexResourceSphere->Unmap(0, nullptr);
 
+	ModelManager::GetInstance()->Initialize(dxCommon);
 
-	//モデル読み込み
-	Object3d::ModelData modelData = object3d->LoadObjFile("Resources", "plane.obj");
-	//頂点リソースを作る
-	Microsoft::WRL::ComPtr<ID3D12Resource> vertexResourceModel = dxCommon->CreateBufferResource(dxCommon->GetDevice().Get(), sizeof(Sprite::VertexData) * modelData.vertices.size());
-	//頂点バッファービューを作成末う
+	ModelCom* modelCom = new ModelCom();
+	modelCom->Initialize(dxCommon);
+
+	Model* model = new Model();
+	model->Initialize(modelCom, "Resources", "plane.obj");
+
+
+	// モデル由来の頂点ビュー/データ/マテリアルを使う
 	D3D12_VERTEX_BUFFER_VIEW vertexBufferView{};
-	vertexBufferView.BufferLocation = vertexResourceModel->GetGPUVirtualAddress();//リソースの先頭のアドレスから使う
-	vertexBufferView.SizeInBytes = UINT(sizeof(Sprite::VertexData) * modelData.vertices.size()); //使用するリソースのサイズは頂点のサイズ
-	vertexBufferView.StrideInBytes = sizeof(Sprite::VertexData); //1頂点当たりのサイズ
-	//頂点リソースにデータを書き込む
-	Sprite::VertexData* vertexDataModel = nullptr;
-	vertexResourceModel->Map(0, nullptr, reinterpret_cast<void**>(&vertexDataModel));
-	std::memcpy(vertexDataModel, modelData.vertices.data(), sizeof(Sprite::VertexData) * modelData.vertices.size());//頂点データをリソースにコピー
+	vertexBufferView = model->GetVertexBufferView();
+	object3d->SetModel(model);
+	ID3D12Resource* materialResource = model->GetMaterialResource();
+	Sprite::Material* materialData = reinterpret_cast<Sprite::Material*>(model->GetMaterialData());
 
-
-
-	//マテリアル用のリソースを作る
-	Microsoft::WRL::ComPtr<ID3D12Resource> materialResource = dxCommon->CreateBufferResource(dxCommon->GetDevice().Get(), sizeof(Sprite::Material));
-	//マテリアルにデータを書き込む
-	Sprite::Material* materialData = nullptr;
-	//書き込む為のアドレス取得
-	materialResource->Map(0, nullptr, reinterpret_cast<void**>(&materialData));
-	// データを設定（赤色 RGBA: 1,0,0,1）
-	Vector4 temp{};
-	temp.x = 1.0f;
-	temp.y = 1.0f;
-	temp.z = 1.0f;
-	temp.w = 1.0f;
-	materialData->color = temp;
-	materialData->enableLighting = false;
-	materialResource->Unmap(0, nullptr);
-
-	Microsoft::WRL::ComPtr<ID3D12Resource> directionalLight = dxCommon->CreateBufferResource(dxCommon->GetDevice().Get(), sizeof(Object3d::DirectionalLight));
-
-	// MapしてGPUリソースのCPU側の書き込み可能ポインタを取得する
-	Object3d::DirectionalLight* directionalLightData = nullptr;
-	directionalLight->Map(0, nullptr, reinterpret_cast<void**>(&directionalLightData));
-
-	// directionalLightDataに値を書き込む
-	directionalLightData->color = { 1.0f, 1.0f, 1.0f, 1.0f };
-	directionalLightData->direction = { 0.0f, -1.0f, 0.0f };
-	directionalLightData->intensity = 1.0f;
-
-
-
-	// 書き込み完了後はUnmapを呼ぶ
-	directionalLight->Unmap(0, nullptr);
 
 	// --- カメラ用のリソース作成を追加 ---
 	Microsoft::WRL::ComPtr<ID3D12Resource> cameraResource = dxCommon->CreateBufferResource(dxCommon->GetDevice(), sizeof(CameraForGPU));
@@ -479,11 +461,20 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	const DirectX::TexMetadata& metadata = mipImages.GetMetadata();
 	Microsoft::WRL::ComPtr<ID3D12Resource> textureResource = CreateTextureResource(dxCommon->GetDevice(), metadata);
 
+
 	//2枚目のTextureを読んで転送する
 	DirectX::ScratchImage mipImages2 = dxCommon->LoadTexture(modelData.material.textureFilePath);
 	const DirectX::TexMetadata& metadata2 = mipImages2.GetMetadata();
 	Microsoft::WRL::ComPtr<ID3D12Resource> textureResource2 = CreateTextureResource(dxCommon->GetDevice(), metadata2);
 
+
+
+
+	
+	//2枚目のTextureを読んで転送する（Modelのテクスチャパスを使用）
+	//DirectX::ScratchImage mipImages2 = dxCommon->LoadTexture(object3d->GetModelData().material.textureFilePath);
+	//const DirectX::TexMetadata& metadata2 = mipImages2.GetMetadata();
+	//Microsoft::WRL::ComPtr<ID3D12Resource> textureResource2 = CreateTextureResource(dxCommon->GetDevice(), metadata2);
 
 
 	Microsoft::WRL::ComPtr<ID3D12Resource> intermediateResource = dxCommon->UploadTextureData(textureResource, mipImages, dxCommon->GetDevice().Get(), dxCommon->GetCommandList());
@@ -545,6 +536,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	camera->SetRotate({ 0.0f,0.0f,0.0f });
 	camera->SetTranslate({ 0.0f,0.0f,-10.0f });
 	object3dCom->SetDefaultCamera(camera);
+
+	
 
 
 	//ビューポート
@@ -678,6 +671,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 			object3d->Update();
 
 
+			
+
 			for (auto* sprite : sprites)
 			{
 				sprite->SetPosition({ 0.0f,0.0f });
@@ -693,7 +688,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 				sprite->SetUVTransform(uvTransformMatrix);
 			}
 
-			directionalLight->Map(0, nullptr, reinterpret_cast<void**>(&directionalLightData));
 
 			transformSphere.rotate.y += 0.01f;
 			Matrix4x4 worldMatrix = MakeAffineMatrix(transformSphere.scale, transformSphere.rotate, transformSphere.translate);
@@ -765,8 +759,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 
 			ImGui::ColorEdit4("Material Color", &materialData->color.x);
-			ImGui::DragFloat("Light Intensity", &directionalLightData->intensity, 0.01f, 0.0f, 10.0f);
-
+		
 
 			ImGui::Checkbox("useMonsterBall", &useMonsterBall);
 			ImGui::Checkbox("LightSprite Flag", (bool*)&materialData->enableLighting);
@@ -776,7 +769,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 			}
 			ImGui::Checkbox("DrawObject", &drawObject);
 			ImGui::Checkbox("DrawSprite", &drawSprite);
-			ImGui::DragFloat3("LightDirection", &directionalLightData->direction.x, 0.01f, -10.0f, 10.0f);
+		
 
 			ImGui::DragFloat3("Object Rotate", &transformObject.rotate.x, 0.01f, -10.0f, 10.0f);
 
@@ -888,6 +881,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 			object3dCom->PreDraw();
 
+
 			//RootSignatureを設定。PSOに設定しているけれど別途設定が必要
 			dxCommon->GetCommandList()->SetGraphicsRootSignature(spriteCom->GetRootSignature().Get());
 			dxCommon->GetCommandList()->SetPipelineState(graphicPipelineState.Get()); //パイプラインステートを設定
@@ -900,12 +894,13 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 			// Use Object3d WVP updated above
 			dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(1, object3d->GetTransformationMatrixResource()->GetGPUVirtualAddress());
 			dxCommon->GetCommandList()->SetGraphicsRootDescriptorTable(2, useMonsterBall ? textureSrvHandleGPU2 : textureSrvHandleGPU);
+
 			dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(3, directionalLight->GetGPUVirtualAddress());
 			dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(4, cameraResource->GetGPUVirtualAddress());
 			if (drawObject)
+
 			{
-				/*commandList->DrawIndexedInstanced(kIndexCount, 1, 0, 0, 0);*/
-				dxCommon->GetCommandList()->DrawInstanced(UINT(modelData.vertices.size()), 1, 0, 0);
+				object3d->Draw();
 			}
 
 			if (drawSphere)
@@ -994,6 +989,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 	CloseHandle(dxCommon->GetFenceEvent());
 
+	ModelManager::GetInstance()->Destroy();
+
 	sound_->GetXAudio2().Reset();
 	sound_->SoundUnload(&soundData);
 
@@ -1008,13 +1005,23 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 	TextureManager::GetInstance()->Finalize();
 
-	for (auto* sprite : sprites)
+
+	delete model;
+
+	delete modelCom;
+
+	for(auto* sprite : sprites)
+
 	{
 		delete sprite;
 	}
 	sprites.clear();
 
+
 	delete particleManager;
+
+	delete srvManager;
+
 
 	delete object3d;
 

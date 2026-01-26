@@ -1,5 +1,4 @@
 #pragma once
-
 #include"DirectXCom.h"
 
 class ModelCom
@@ -7,8 +6,10 @@ class ModelCom
 public:
 	void Initialize(DirectXCom* dxCommon);
 
-public:
-	DirectXCom* GetDxCommon() const { return dxCommon_; }
+	DirectXCom* GetDirectXCom() const
+	{
+		return dxCommon_;
+	}
 
 private:
 	DirectXCom* dxCommon_ = nullptr;
