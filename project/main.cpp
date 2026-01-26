@@ -18,6 +18,7 @@
 #include"TextureManager.h"
 #include"Vector.h"
 #include"WindowsAPI.h"
+#include"ParticleEmitter.h"
 
 #include<chrono> //時間を扱うライブラリ
 #include<filesystem> //ファイルやディレクトリに関する操作を行うライブラリ
@@ -62,7 +63,7 @@
 #include "externals/DirectXTex/DirectXTex.h"
 
 #include<numbers>
-
+#include<list>
 
 
 
@@ -570,14 +571,28 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	const uint32_t kNumMaxInstances = 10;
 	uint32_t numInstance = 0;
 
-	ParticleManager::Particle particles[kNumMaxInstances];
+	
+	std::list<ParticleManager::Particle> particles;
+
+	ParticleEmitter particleEmitter;
+	Emitter emitter{};
+	emitter.transform.SetTranslate({ 0.0f,0.0f,0.0f });
+	emitter.transform.SetRotate({ 0.0f,0.0f,0.0f });
+	emitter.transform.SetScale({ 1.0f,1.0f,1.0f });
+
+	emitter.count = 3; // 初期値
+	emitter.frequency = 0.5f;
+	emitter.frequencyTime = 0.0f;
 
 	Random::SeedEngine();
 	std::mt19937 randomEngine(std::random_device{}());
 	for (uint32_t index = 0; index < kNumMaxInstances; ++index)
 	{
-		particles[index] = particleManager->MakeNewParticles(randomEngine);
+		particles.push_back(particleManager->MakeNewParticles(randomEngine,emitter.transform.GetTranslate()));
 	}
+
+
+  
 
 	//TransformationMatrix gTransformationMatrices[10];
 	
@@ -586,11 +601,24 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	ParticleManager::ParticleForGPU* instanceData = nullptr;
 	instancingResource->Map(0, nullptr, reinterpret_cast<void**>(&instanceData));
 
-	for (uint32_t index = 0; index < kNumMaxInstances; ++index)
+
 	{
-		instanceData[index].WVP = MakeIdentity4x4();
-		instanceData[index].World = MakeIdentity4x4();
-		instanceData[index].color = particles[index].color;
+		uint32_t writeIndex = 0;
+		for (const auto& p : particles)
+		{
+			if (writeIndex >= kNumMaxInstances) { break; }
+			instanceData[writeIndex].WVP = MakeIdentity4x4();
+			instanceData[writeIndex].World = MakeIdentity4x4();
+			instanceData[writeIndex].color = p.color;
+			++writeIndex;
+		}
+	
+		for (; writeIndex < kNumMaxInstances; ++writeIndex)
+		{
+			instanceData[writeIndex].WVP = MakeIdentity4x4();
+			instanceData[writeIndex].World = MakeIdentity4x4();
+			instanceData[writeIndex].color = {0,0,0,0};
+		}
 	}
 
 	D3D12_SHADER_RESOURCE_VIEW_DESC instancingSrvDesc{};
@@ -682,49 +710,55 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 			
 			numInstance = 0;
 
-			for (uint32_t index = 0; index < kNumMaxInstances; ++index)
+			emitter.frequencyTime += kDeltaTime;
+			if(emitter.frequencyTime >= emitter.frequency)
 			{
-				
-				particles[index].currentTime += kDeltaTime;
-
-				
-				if (particles[index].currentTime >= particles[index].lifeTime)
+				particles.splice(particles.end(),particleEmitter.Emit(emitter, randomEngine,*particleManager));
+				emitter.frequencyTime -= emitter.frequency;
+			}
+			{
+				uint32_t writeIndex = 0;
+				for (auto it = particles.begin(); it != particles.end(); ++it)
 				{
-					continue;
+					ParticleManager::Particle& p = *it;
+					p.currentTime += kDeltaTime;
+
+					if (p.currentTime >= p.lifeTime)
+					{
+						continue;
+					}
+
+					Matrix4x4 backToFrontMatrix = MakeRotateYMatrix(0.0f);
+					//Matrix4x4 backToFrontMatrix = MakeRotateYMatrix(std::numbers::pi_v<float>);面が逆向きの場合
+					Matrix4x4 billboardMatrix = Multiply(backToFrontMatrix, cameraMatrix);
+					billboardMatrix.m[3][0] = 0.0f;
+					billboardMatrix.m[3][1] = 0.0f;
+					billboardMatrix.m[3][2] = 0.0f;
+
+					Matrix4x4 ParticleWorldMatrix = MakeAffineMatrix(
+						p.transform.GetScale(), billboardMatrix, p.transform.GetTranslate());
+					Matrix4x4 ParticleViewProjectMatrix = Multiply(
+						ParticleWorldMatrix, Multiply(viewMatrix, projectionMatrix));
+
+					if (writeIndex < kNumMaxInstances)
+					{
+						instanceData[writeIndex].WVP = ParticleViewProjectMatrix;
+						instanceData[writeIndex].World = ParticleWorldMatrix;
+						instanceData[writeIndex].color = p.color;
+						float alpha = 1.0f - (p.currentTime / p.lifeTime);
+						instanceData[writeIndex].color.w = alpha;
+						++writeIndex;
+					}
+
+					p.transform.SetTranslate(
+						p.transform.GetTranslate() + p.velocity * kDeltaTime);
 				}
-
-				Matrix4x4 backToFrontMatrix = MakeRotateYMatrix(0.0f);
-				//Matrix4x4 backToFrontMatrix = MakeRotateYMatrix(std::numbers::pi_v<float>);面が逆向きの場合
-				Matrix4x4 billboardMatrix = Multiply(backToFrontMatrix, cameraMatrix);
-				billboardMatrix.m[3][0] = 0.0f;
-				billboardMatrix.m[3][1] = 0.0f;
-				billboardMatrix.m[3][2] = 0.0f;
-
-				Matrix4x4 ParticleWorldMatrix = MakeAffineMatrix(
-					particles[index].transform.GetScale(), billboardMatrix, particles[index].transform.GetTranslate());
-				Matrix4x4 ParticleViewProjectMatrix = Multiply(
-					ParticleWorldMatrix, Multiply(viewMatrix, projectionMatrix));
-
-				
-				instanceData[numInstance].WVP = ParticleViewProjectMatrix;
-				instanceData[numInstance].World = ParticleWorldMatrix;
-				instanceData[numInstance].color = particles[index].color;
-				float alpha = 1.0f - (particles[index].currentTime / particles[index].lifeTime);
-				instanceData[numInstance].color.w = alpha;
-
-				
-				particles[index].transform.SetTranslate(
-					particles[index].transform.GetTranslate() + particles[index].velocity * kDeltaTime);
-
-				++numInstance;
+				numInstance = writeIndex;
 			}
 
 			//開発用UIの処理、実際に開発用のUIを出す場合はここをゲーム固有の処理に置き換え
 
 #ifdef _DEBUG
-
-
-
 			ImGui::ShowDemoWindow();
 
 			ImGui::Begin("Windows");
@@ -844,7 +878,13 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 			inputManager.Update();
 
-			dxCommon->PreDraw();
+			// ImGuiを使わずにSpaceキーでパーティクルを追加
+            if (inputManager.TriggerKey(DIK_SPACE))
+            {
+                particles.splice(particles.end(), ParticleEmitter{}.Emit(emitter, randomEngine, *particleManager));
+            }
+
+            dxCommon->PreDraw();
 
 			object3dCom->PreDraw();
 

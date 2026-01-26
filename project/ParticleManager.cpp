@@ -15,13 +15,14 @@ void ParticleManager::Initialize()
 	SetupDraw();
 }
 
-ParticleManager::Particle ParticleManager::MakeNewParticles(std::mt19937& randomEngine)
+ParticleManager::Particle ParticleManager::MakeNewParticles(std::mt19937& randomEngine, const Vector3& translate)
 {
 	std::uniform_real_distribution<float> distribution(-1.0f, 1.0f);
 	Particle particle;
 	particle.transform.SetScale({ 1.0f,1.0f,1.0f });
 	particle.transform.SetRotate({ 0.0f,0.0f,0.0f });
-	particle.transform.SetTranslate({ distribution(randomEngine), distribution(randomEngine), distribution(randomEngine) });
+	Vector3 randomTranslate{ distribution(randomEngine), distribution(randomEngine), distribution(randomEngine) };
+	particle.transform.SetTranslate({ translate + randomTranslate });
 	particle.velocity = { distribution(randomEngine), distribution(randomEngine), distribution(randomEngine) };
 	std::uniform_real_distribution<float> distColor(0.0f, 1.0f);
 	particle.color = { distColor(randomEngine), distColor(randomEngine), distColor(randomEngine), 1.0f };
