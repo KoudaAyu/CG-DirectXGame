@@ -5,6 +5,7 @@
 #include"DebugCamera.h"
 #include"DirectXCom.h"
 #include"KeyInput.h"
+#include"Light.h"
 #include"Log.h"
 #include"Matrix4x4.h"
 #include"Object3d.h"
@@ -27,6 +28,8 @@
 #include<d3d12.h>
 #include<dxgi1_6.h>
 #include<cassert>
+
+#include<cmath>
 
 
 
@@ -56,7 +59,7 @@
 #include<vector>
 
 #include <DirectXMath.h>
-#include<cmath>
+#include<numbers>
 #include "externals/DirectXTex/DirectXTex.h"
 
 
@@ -149,20 +152,6 @@ Microsoft::WRL::ComPtr<ID3D12Resource>CreateTextureResource(const Microsoft::WRL
 	return resource;
 }
 
-struct CameraForGPU
-{
-	Vector3 worldPosition;
-};
-
-struct PointLight
-{
-    Vector4 color;
-    Vector3 position;
-    float intensity;
-	float radius;
-	float decay;
-};
-
 //Windowsアプリでのエントリーポイント(main関数)
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 {
@@ -247,6 +236,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 #pragma endregion 最初のシーン終了
 
+	//CG2 の 資料見る
 	//DepthStencilStateの設定
 	D3D12_DEPTH_STENCIL_DESC depthStencilDesc{};
 	//Depthの機能を有効化する
@@ -428,8 +418,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	Microsoft::WRL::ComPtr<ID3D12Resource> pointLightResource = dxCommon->CreateBufferResource(dxCommon->GetDevice().Get(), sizeof(PointLight));
 	PointLight* pointLightData = nullptr;
 	pointLightResource->Map(0, nullptr, reinterpret_cast<void**>(&pointLightData));
-	pointLightData->color = {1.0f, 1.0f, 1.0f, 1.0f};
-	pointLightData->position = {0.0f, 2.0f, 0.0f};
+	pointLightData->color = { 1.0f, 1.0f, 1.0f, 1.0f };
+	pointLightData->position = { 0.0f, 2.0f, 0.0f };
 	pointLightData->intensity = 1.0f;
 	pointLightResource->Unmap(0, nullptr);
 
@@ -465,11 +455,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 
 	//Sphere用
-	Sprite::Transform transformObject{ {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };
+	Sprite::Transform transformObject{ {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,-1.0f,0.0f} };
 
 	Sprite::Transform cameraTransform = { {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, -10.0f} };
 
-	//uvTrandform用の変数
+	//uvTransform用の変数
 	Sprite::Transform uvTransformSprite = {
 		{1.0f, 1.0f, 1.0f},
 		{0.0f, 0.0f, 0.0f},
@@ -483,7 +473,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	float fovY = 0.45f;  // 資料通り
 	float aspectRatio = static_cast<float>(windowAPI->GetClientWidth()) / static_cast<float>(windowAPI->GetClientHeight());
 	float nearZ = 0.1f;
-	float farZ = 100.0f;
+	float farZ = 10000.0f;
 
 	//Textureを読んで転送する
 	DirectX::ScratchImage mipImages = dxCommon->LoadTexture("./Resources/uvChecker.png");
@@ -534,7 +524,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	bool useMonsterBall = true;
 	//Objectの描画切り替え
 	bool drawObject = true;
-	bool drawSprite = true;
+	bool drawSprite = false;
 	bool drawSphere = true;
 
 
@@ -578,6 +568,28 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 
 	Sprite::Transform transformSphere{ {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };
+
+	//スポットライト
+	SpotLight spotLight;
+	spotLight.color = { 1.0f,1.0f,1.0f,1.0f };
+	spotLight.position = { 2.0f,1.25f,0.0f };
+	spotLight.distance = 7.0f;
+	spotLight.direction = { -1.0f,-1.0f,0.0f };
+	spotLight.intensity = 4.0f;
+	spotLight.decay = 2.0f;
+	spotLight.cosAngle = std::cos(std::numbers::pi_v<float> / 3.0f);
+
+	// SpotLight 用 CBV（b4）
+	Microsoft::WRL::ComPtr<ID3D12Resource> spotLightResource = dxCommon->CreateBufferResource(dxCommon->GetDevice().Get(), sizeof(SpotLight));
+	SpotLight* spotLightData = nullptr;
+	spotLightResource->Map(0, nullptr, reinterpret_cast<void**>(&spotLightData));
+	*spotLightData = spotLight;
+	spotLightResource->Unmap(0, nullptr);
+
+	bool useDirectionalLight = false; // DirectionalLightを出すならtrue
+	bool usePointLight = false;       // PointLightを出すならtrue
+	bool useSpotLight = true;         // SpotLightを出すならtrue
+
 	//ウィンドウのxボタンが押されるまでループ
 	while (dxCommon->GetMsg().message != WM_QUIT)
 	{
@@ -633,9 +645,24 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 				sprite->SetUVTransform(uvTransformMatrix);
 			}
 
-			directionalLight->Map(0, nullptr, reinterpret_cast<void**>(&directionalLightData));
-			// 毎フレーム PointLight も編集できるように Map してポインタ取得
-			pointLightResource->Map(0, nullptr, reinterpret_cast<void**>(&pointLightData));
+			// 1. Directional Light
+// フラグ useDirectionalLight が false の場合、強度を 0.0f にして実質 OFF にする
+			directionalLightData->intensity = useDirectionalLight ? 1.0f : 0.0f;
+
+			// 2. Point Light
+			// フラグ usePointLight が false の場合、強度を 0.0f にする
+			pointLightData->intensity = usePointLight ? 1.0f : 0.0f;
+
+			// 3. Spot Light
+			// 構造体 spotLight の内容を、バッファポインタ spotLightData へコピー
+			spotLightData->color = spotLight.color;
+			spotLightData->position = spotLight.position;
+			spotLightData->direction = spotLight.direction;
+			spotLightData->distance = spotLight.distance;
+			spotLightData->decay = spotLight.decay;
+			spotLightData->cosAngle = spotLight.cosAngle;
+			// フラグ useSpotLight が false の場合、強度を 0.0f にする
+			spotLightData->intensity = useSpotLight ? spotLight.intensity : 0.0f;
 
 			transformSphere.rotate.y += 0.01f;
 			Matrix4x4 worldMatrix = MakeAffineMatrix(transformSphere.scale, transformSphere.rotate, transformSphere.translate);
@@ -648,7 +675,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 			transformationMatrixDataSphere->World = worldMatrix;
 			// 法線変換用の逆転置行列も更新
 			transformationMatrixDataSphere->WorldInverseTranspose = Transpose(Inverse(worldMatrix));
-			
+
 
 
 			//開発用UIの処理、実際に開発用のUIを出す場合はここをゲーム固有の処理に置き換え
@@ -733,58 +760,90 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 				ImGui::DragFloat("Intensity", &directionalLightData->intensity, 0.01f, 0.0f, 5.0f);
 			}
 
-            // 追加: PointLight の操作（命名は変更せず struct PointLight を直接編集）
-            if (ImGui::CollapsingHeader("Point Light"))
-            {
-                ImGui::ColorEdit4("Point Color", &pointLightData->color.x);
-                ImGui::DragFloat3("Point Position", &pointLightData->position.x, 0.05f, -100.0f, 100.0f);
-                ImGui::DragFloat("Point Intensity", &pointLightData->intensity, 0.01f, 0.0f, 10.0f);
-            }
+			// 追加: PointLight の操作（命名は変更せず struct PointLight を直接編集）
+			if (ImGui::CollapsingHeader("Point Light"))
+			{
+				ImGui::ColorEdit4("Point Color", &pointLightData->color.x);
+				ImGui::DragFloat3("Point Position", &pointLightData->position.x, 0.05f, -100.0f, 100.0f);
+				ImGui::DragFloat("Point Intensity", &pointLightData->intensity, 0.01f, 0.0f, 10.0f);
+			}
 
-            ImGui::End();
+			// SpotLight の操作
+			if (ImGui::CollapsingHeader("Spot Light"))
+			{
+				ImGui::ColorEdit4("Spot Color", &spotLight.color.x);
+				ImGui::DragFloat3("Spot Position", &spotLight.position.x, 0.05f, -100.0f, 100.0f);
+				ImGui::DragFloat3("Spot Direction", &spotLight.direction.x, 0.01f, -1.0f, 1.0f);
+				ImGui::DragFloat("Spot Intensity", &spotLight.intensity, 0.01f, 0.0f, 10.0f);
+				ImGui::DragFloat("Spot Distance", &spotLight.distance, 0.01f, 0.0f, 100.0f);
+				ImGui::DragFloat("Spot Decay", &spotLight.decay, 0.01f, 0.0f, 10.0f);
+				ImGui::DragFloat("Spot cosAngle", &spotLight.cosAngle, 0.01f, -1.0f, 1.0f);
+			}
 
-            // --- main.cpp ---
-            ImGui::Begin("Settings");
+			ImGui::End();
 
-            // モンスターボールのテクスチャ切り替え（既存のコードがある場合）
-            ImGui::Checkbox("Use Monster Ball", &useMonsterBall);
+			// --- main.cpp ---
+			ImGui::Begin("Settings");
 
-            ImGui::Separator(); // 区切り線
+			// モンスターボールのテクスチャ切り替え（既存のコードがある場合）
+			ImGui::Checkbox("Use Monster Ball", &useMonsterBall);
 
-            // --- マテリアル（質感）の設定 ---
-            if (ImGui::CollapsingHeader("Material"))
-            {
-                // ライティングを有効にするかどうか
-                bool enable = (materialData->enableLighting != 0);
-                if (ImGui::Checkbox("Enable Lighting", &enable))
-                {
-                    materialData->enableLighting = enable ? 1 : 0;
-                }
+			// 追加: ライトのON/OFFを切り替えるチェックボックス
+			ImGui::Checkbox("Use Directional Light", &useDirectionalLight);
+			ImGui::Checkbox("Use Point Light", &usePointLight);
+			ImGui::Checkbox("Use Spot Light", &useSpotLight);
 
-                // ★重要：Shininessのスライダー
-                // 0.1(鈍い) ～ 100.0(鋭いテカリ) までの範囲で調整
-                ImGui::SliderFloat("Shininess", &materialData->shininess, 0.1f, 100.0f);
+			ImGui::Separator(); // 区切り線
 
-                // 色も変えれるようにしておくと便利です
-                ImGui::ColorEdit4("Color", &materialData->color.x);
-            }
+			// --- マテリアル（質感）の設定 ---
+			if (ImGui::CollapsingHeader("Material"))
+			{
+				// ライティングを有効にするかどうか
+				bool enable = (materialData->enableLighting != 0);
+				if (ImGui::Checkbox("Enable Lighting", &enable))
+				{
+					materialData->enableLighting = enable ? 1 : 0;
+				}
 
-            // --- 平行光源の設定 ---
-            if (ImGui::CollapsingHeader("Directional Light"))
-            {
-                ImGui::DragFloat3("Direction", &directionalLightData->direction.x, 0.01f, -1.0f, 1.0f);
-                ImGui::DragFloat("Intensity", &directionalLightData->intensity, 0.01f, 0.0f, 5.0f);
-            }
+				// ★重要：Shininessのスライダー
+				// 0.1(鈍い) ～ 100.0(鋭いテカリ) までの範囲で調整
+				ImGui::SliderFloat("Shininess", &materialData->shininess, 0.1f, 100.0f);
 
-            // 追加: PointLight の操作（こちらのウィンドウにも）
-            if (ImGui::CollapsingHeader("Point Light Settings"))
-            {
-                ImGui::ColorEdit4("Color", &pointLightData->color.x);
-                ImGui::DragFloat3("Position", &pointLightData->position.x, 0.05f, -100.0f, 100.0f);
-                ImGui::DragFloat("Intensity", &pointLightData->intensity, 0.01f, 0.0f, 10.0f);
-            }
+				// 色も変えれるようにしておくと便利です
+				ImGui::ColorEdit4("Color", &materialData->color.x);
+			}
 
-            ImGui::End();
+			// --- 平行光源の設定 ---
+			if (ImGui::CollapsingHeader("Directional Light"))
+			{
+				ImGui::DragFloat3("Direction", &directionalLightData->direction.x, 0.01f, -1.0f, 1.0f);
+				ImGui::DragFloat("Intensity", &directionalLightData->intensity, 0.01f, 0.0f, 5.0f);
+			}
+
+			// 追加: PointLight の操作（こちらのウィンドウにも）
+			if (ImGui::CollapsingHeader("Point Light Settings"))
+			{
+				ImGui::ColorEdit4("Color", &pointLightData->color.x);
+				ImGui::DragFloat3("Position", &pointLightData->position.x, 0.05f, -100.0f, 100.0f);
+				ImGui::DragFloat("Intensity", &pointLightData->intensity, 0.01f, 0.0f, 10.0f);
+			}
+
+			ImGui::End();
+
+			// スポットライト設定ウィンドウ
+			ImGui::Begin("Spot Light Settings");
+
+			// スポットライトの色、位置、方向、強度、その他のパラメータを調整
+			ImGui::ColorEdit4("Color", &spotLightData->color.x);
+			ImGui::DragFloat3("Position", &spotLightData->position.x, 0.05f, -100.0f, 100.0f);
+			ImGui::DragFloat3("Direction", &spotLightData->direction.x, 0.01f, -1.0f, 1.0f);
+			ImGui::DragFloat("Intensity", &spotLightData->intensity, 0.01f, 0.0f, 10.0f);
+			ImGui::DragFloat("Distance", &spotLightData->distance, 0.01f, 0.0f, 100.0f);
+			ImGui::DragFloat("Decay", &spotLightData->decay, 0.01f, 0.0f, 10.0f);
+			ImGui::DragFloat("Cos Angle", &spotLightData->cosAngle, 0.01f, -1.0f, 1.0f);
+
+			ImGui::End();
+
 
 #endif // DEBUG
 
@@ -803,9 +862,10 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 			//RootSignatureを設定。PSOに設定しているけれど別途設定が必要
 			dxCommon->GetCommandList()->SetGraphicsRootSignature(spriteCom->GetRootSignature().Get());
 			dxCommon->GetCommandList()->SetPipelineState(graphicPipelineState.Get()); //パイプラインステートを設定
-			// 必須: PS の b2/b3 をセット（未初期化エラー対策）
+			// 必須: PS の b2/b3/b4 をセット
 			dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(4, cameraResource->GetGPUVirtualAddress()); // b2
 			dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(5, pointLightResource->GetGPUVirtualAddress()); // b3
+			dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(6, spotLightResource->GetGPUVirtualAddress()); // b4
 			//Objectの描画
 
 			dxCommon->GetCommandList()->IASetVertexBuffers(0, 1, &vertexBufferView);
@@ -816,7 +876,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 			dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(1, object3d->GetTransformationMatrixResource()->GetGPUVirtualAddress());
 			dxCommon->GetCommandList()->SetGraphicsRootDescriptorTable(2, useMonsterBall ? textureSrvHandleGPU2 : textureSrvHandleGPU);
 			dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(3, directionalLight->GetGPUVirtualAddress());
-			// b2/b3 は上で設定済み（PS 共通）
+			// b2/b3/b4 は上で設定済み（PS 共通）
 			if (drawObject)
 			{
 				/*commandList->DrawIndexedInstanced(kIndexCount, 1, 0, 0, 0);*/
@@ -825,38 +885,40 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 			if (drawSphere)
 			{
-			
+
 				dxCommon->GetCommandList()->RSSetViewports(1, &viewport);
 				dxCommon->GetCommandList()->RSSetScissorRects(1, &scissorRect);
-			
+
 				dxCommon->GetCommandList()->SetGraphicsRootSignature(object3dCom->GetRootSignature().Get());
 				dxCommon->GetCommandList()->SetPipelineState(object3dCom->GetPipelineState().Get());
 
-				
+
 				dxCommon->GetCommandList()->IASetVertexBuffers(0, 1, &vertexBufferViewSphere);
 				dxCommon->GetCommandList()->IASetIndexBuffer(&indexBufferViewObject);
 				dxCommon->GetCommandList()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-				
+
 				dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(0, materialResource->GetGPUVirtualAddress());
-				
+
 				dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(1, transformationMatrixResourceSphere->GetGPUVirtualAddress());
-				
+
 				dxCommon->GetCommandList()->SetGraphicsRootDescriptorTable(2, useMonsterBall ? textureSrvHandleGPU2 : textureSrvHandleGPU);
-				
+
 				dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(3, directionalLight->GetGPUVirtualAddress());
 				dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(4, cameraResource->GetGPUVirtualAddress()); // b2
 				dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(5, pointLightResource->GetGPUVirtualAddress()); // b3
+				dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(6, spotLightResource->GetGPUVirtualAddress()); // b4
 
-				
-				//dxCommon->GetCommandList()->DrawIndexedInstanced(kIndexCount, 1, 0, 0, 0);
+
+				dxCommon->GetCommandList()->DrawIndexedInstanced(kIndexCount, 1, 0, 0, 0);
 			}
 
 			if (drawSprite)
 			{
-				// Sprite PS でも b3 を参照するため、描画前に b2/b3 をセット
+				// Sprite PS でも b3/b4 を参照するため、描画前に b2/b3/b4 をセット
 				dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(4, cameraResource->GetGPUVirtualAddress()); // b2
 				dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(5, pointLightResource->GetGPUVirtualAddress()); // b3
+				dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(6, spotLightResource->GetGPUVirtualAddress()); // b4
 				for (auto* sprite : sprites)
 				{
 					sprite->Draw();

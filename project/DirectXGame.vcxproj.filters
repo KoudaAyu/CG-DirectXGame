@@ -186,7 +186,7 @@
     <ClInclude Include="Baziru3_Engine\3D\Model\ModelCom.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
-    <ClInclude Include="Baziru3_Engine\Light\PointLight.h">
+    <ClInclude Include="Baziru3_Engine\Light\Light.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
   </ItemGroup>

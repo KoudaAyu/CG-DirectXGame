@@ -48,6 +48,20 @@ struct PointLight
 
 ConstantBuffer<PointLight> gPointLight : register(b3);
 
+struct SpotLight
+{
+    float32_t4 color;
+    float32_t3 position;
+    float32_t intensity;
+    float32_t3 direction;
+    float32_t distance;
+    float32_t decay;
+    float32_t cosAngle;
+  
+};
+
+ConstantBuffer<SpotLight> gSpotLight : register(b4);
+
 PixelShaderOutput main(VertexShaderOutput input)
 {
     PixelShaderOutput output;
@@ -85,8 +99,10 @@ if (gMaterial.enableLighting != 0)
     float32_t3 specular = gDirectionalLight.color.rgb * gDirectionalLight.intensity * specularPow * saturate(NdotL);
 
   
+        
+    //ポイントライト
     float32_t distance = length(gPointLight.position - input.worldPosition);
-        float32_t factor = pow(saturate(-distance / gPointLight.radius + 1.0), gPointLight.decay);
+    float32_t factor = pow(saturate(-distance / gPointLight.radius + 1.0), gPointLight.decay);
     float32_t3 positionDirection = normalize(input.worldPosition - gPointLight.position);
     gPointLight.color.rgb * gPointLight.intensity * factor;
         
@@ -101,8 +117,24 @@ if (gMaterial.enableLighting != 0)
     //鏡面反射
     float32_t3 specularPointLight = gPointLight.color.rgb * gPointLight.intensity * specularPointLight * saturate(NdotPointLight);
         
-    // 6. 合体！
-   output.color.rgb = diffuse + specular +diffusePointLight + specularPowPointLight;
+        float32_t3 spotLightDirectionOnSurface = normalize(input.worldPosition - gSpotLight.position);
+        float32_t cosAngle = dot(spotLightDirectionOnSurface, gSpotLight.direction);
+        float32_t falloffFactor = saturate((cosAngle - gSpotLight.cosAngle) / (1.0f - gSpotLight.cosAngle));
+
+// 距離減衰 (PointLightと同様の計算式を適用)
+        float32_t distanceSpot = length(gSpotLight.position - input.worldPosition);
+        float32_t attenuationFactorSpot = pow(saturate(-distanceSpot / gSpotLight.distance + 1.0f), gSpotLight.decay);
+
+// スポットライトによる拡散反射 (入射光の向きを考慮)
+        float32_t3 L_spot = normalize(gSpotLight.position - input.worldPosition);
+        float NdotL_spot = dot(normalize(input.normal), L_spot);
+        float cosSpot = pow(NdotL_spot * 0.5f + 0.5f, 2.0f); // ハーフランバート
+
+        float32_t3 diffuseSpotLight = gMaterial.color.rgb * textureColor.rgb * gSpotLight.color.rgb * cosSpot * gSpotLight.intensity * attenuationFactorSpot * falloffFactor;
+
+// --- 最終合成の修正 ---
+        output.color.rgb = diffuse + specular + diffusePointLight + specularPowPointLight + diffuseSpotLight;
+        
       
     }
     else
