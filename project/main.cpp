@@ -61,6 +61,8 @@
 #include<cmath>
 #include "externals/DirectXTex/DirectXTex.h"
 
+#include<numbers>
+
 
 
 
@@ -691,9 +693,15 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 					continue;
 				}
 
-				
+				Matrix4x4 backToFrontMatrix = MakeRotateYMatrix(0.0f);
+				//Matrix4x4 backToFrontMatrix = MakeRotateYMatrix(std::numbers::pi_v<float>);面が逆向きの場合
+				Matrix4x4 billboardMatrix = Multiply(backToFrontMatrix, cameraMatrix);
+				billboardMatrix.m[3][0] = 0.0f;
+				billboardMatrix.m[3][1] = 0.0f;
+				billboardMatrix.m[3][2] = 0.0f;
+
 				Matrix4x4 ParticleWorldMatrix = MakeAffineMatrix(
-					particles[index].transform.GetScale(), particles[index].transform.GetRotate(), particles[index].transform.GetTranslate());
+					particles[index].transform.GetScale(), billboardMatrix, particles[index].transform.GetTranslate());
 				Matrix4x4 ParticleViewProjectMatrix = Multiply(
 					ParticleWorldMatrix, Multiply(viewMatrix, projectionMatrix));
 
