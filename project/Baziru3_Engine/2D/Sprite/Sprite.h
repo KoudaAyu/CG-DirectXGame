@@ -35,7 +35,7 @@ public:
 		float padding2[3];
 	};
 
-	void Initialize(SpriteCom* spriteCom,std::string textureFilePath);
+	void Initialize(SpriteCom* spriteCom, std::string textureFilePath);
 	void Update(WindowAPI* windowAPI, DebugCamera* debugCamera_);
 	void Draw();
 
@@ -74,7 +74,7 @@ public:
 
 	//Spriteの座標関係
 	const Vector2& GetPosition() const { return position; }
-	void SetPosition(const Vector2& position)  { this->position = position; }
+	void SetPosition(const Vector2& position) { this->position = position; }
 
 	//Spriteの回転関係
 	const float GetRotation() const { return rotation; }
@@ -96,7 +96,7 @@ public:
 	void SetTextureSize(const Vector2& size) { textureSize = size; }
 
 	void SetTextureHandle(D3D12_GPU_DESCRIPTOR_HANDLE handle) { textureHandleGPU = handle; }
-	
+
 	void SetDirectionalLightResource(const Microsoft::WRL::ComPtr<ID3D12Resource>& light) { directionalLightResource = light; }
 
 private:

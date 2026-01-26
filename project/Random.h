@@ -16,4 +16,5 @@ public:
 	static void SeedEngine();
 	static float GeneratorFloat(float min, float max);
 };
-#pragma once
+
+

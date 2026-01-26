@@ -26,7 +26,7 @@ public:
 	void RasterizerState();
 	void ShaderCompile();
 	void InitializeGraphicPipeline();
-	
+
 	void SetupDraw();
 
 
