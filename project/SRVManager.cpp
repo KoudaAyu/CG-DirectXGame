@@ -58,10 +58,16 @@ void SRVManager::PreDraw()
 uint32_t SRVManager::Allocate()
 {
 	// 上限チェック: 使用中のインデックスが最大数に達していないことを確認
-	assert(useIndex < kMaxSRVCount && "SRVManager::Allocate - exceeded maximum SRV count");
+	if (useIndex >= kMaxSRVCount)
+	{
+		// Debug-time assert to catch allocation logic errors
+		assert(false && "SRVManager::Allocate - exceeded maximum SRV count");
+		// Return invalid index to the caller so it can handle the error gracefully in release builds
+		return UINT32_MAX;
+	}
 
-	int index = useIndex;
-	useIndex++;
+	uint32_t index = useIndex;
+	++useIndex;
 	return index;
 }
 D3D12_CPU_DESCRIPTOR_HANDLE SRVManager::GetSRVHandleCPU(uint32_t index)

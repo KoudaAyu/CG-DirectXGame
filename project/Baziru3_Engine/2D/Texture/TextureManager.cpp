@@ -69,33 +69,30 @@ void TextureManager::LoadTexture(const std::string& filePath)
 	textureData.resource_ =
 		directXCom_->CreateTextureResource(textureData.metadata_);
 
-	// SRV を SRVManager から確保する（もし設定されていれば）
+	// SRV を確保してハンドルを設定
 	if (srvManager_)
 	{
-		// SRV確保前に、SRVヒープの上限に達しないか確認する
-		if (textureDatas.size() + kSRVIndexTop <= DirectXCom::kMaxSRVCount)
+		uint32_t alloc = srvManager_->Allocate();
+		if (alloc == UINT32_MAX)
 		{
-			textureData.srvIndex_ = srvManager_->Allocate();
-			textureData.srvHandleCPU_ = srvManager_->GetSRVHandleCPU(textureData.srvIndex_);
-			textureData.srvHandleGPU_ = srvManager_->GetGPUDescriptorHandle(textureData.srvIndex_);
-		}
-		else
-		{
-			// SRV確保できない場合は致命的なのでアサート
-			assert(false && "TextureManager::LoadTexture - SRV allocation would exceed maximum count");
+			// Allocation failed: assert in debug and return early in release
+			assert(false && "TextureManager::LoadTexture - SRV allocation failed");
+			// Remove the inserted entry to keep state consistent
+			textureDatas.erase(filePath);
 			return;
 		}
+
+		textureData.srvIndex_ = alloc;
+		textureData.srvHandleCPU_ = srvManager_->GetSRVHandleCPU(alloc);
+		textureData.srvHandleGPU_ = srvManager_->GetGPUDescriptorHandle(alloc);
 	}
-
-	//テクスチャデータの要素数番号をSRVのインデックスとする
-	uint32_t srvIndex = static_cast<uint32_t>(textureDatas.size() - 1) + kSRVIndexTop;
-
-	//テクスチャ枚数上限チェック
-	assert(textureDatas.size() + kSRVIndexTop <= DirectXCom::kMaxSRVCount);
-
-	// 従来の DirectXCom 経由のハンドル取得は上書きされるが、srvManager_ がない場合に使う
-	if (!srvManager_)
+	else
 	{
+		// Fallback when no SRVManager: compute index based on insertion order + top offset
+		uint32_t srvIndex = static_cast<uint32_t>(textureDatas.size() - 1) + kSRVIndexTop;
+		// Range check
+		assert(srvIndex <= DirectXCom::kMaxSRVCount && "TextureManager::LoadTexture - srvIndex out of range");
+		textureData.srvIndex_ = srvIndex;
 		textureData.srvHandleCPU_ =
 			directXCom_->GetSRVHandleCPU(srvIndex);
 
@@ -109,7 +106,7 @@ void TextureManager::LoadTexture(const std::string& filePath)
 	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D; // 2Dテクスチャ
 	srvDesc.Texture2D.MipLevels = UINT(textureData.metadata_.mipLevels);
 
-	// SRV を作成
+	// SRV を作成（ハンドルは既に安全に設定されているはず）
 	directXCom_->GetDevice()->CreateShaderResourceView(
 		textureData.resource_.Get(), &srvDesc, textureData.srvHandleCPU_);
 
