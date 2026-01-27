@@ -431,6 +431,17 @@ void DirectXCom::InitializeImGui()
 		srvDescriptorHeap.Get(),
 		srvDescriptorHeap->GetCPUDescriptorHandleForHeapStart(),
 		srvDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
+
+	// Ensure a font is added and the atlas is built
+	ImGuiIO& io = ImGui::GetIO();
+	if (io.Fonts->Fonts.empty())
+	{
+		io.Fonts->AddFontDefault();
+	}
+	io.Fonts->Build();
+
+	// Create device objects (font texture etc.) upfront
+	ImGui_ImplDX12_CreateDeviceObjects();
 }
 
 void DirectXCom::PreDraw()

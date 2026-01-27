@@ -663,8 +663,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 
 			//Imguiにここからフレームが始まる趣旨をつたえる
-			ImGui_ImplDX12_NewFrame();
 			ImGui_ImplWin32_NewFrame();
+			ImGui_ImplDX12_NewFrame();
 			ImGui::NewFrame();
 
 			debugCamera_.Update();
@@ -759,6 +759,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 			//開発用UIの処理、実際に開発用のUIを出す場合はここをゲーム固有の処理に置き換え
 
 #ifdef _DEBUG
+		
 			ImGui::ShowDemoWindow();
 
 			ImGui::Begin("Windows");
