@@ -39,15 +39,12 @@
     <ClCompile Include="main.cpp" />
     <ClCompile Include="Baziru3_Engine\2D\Sprite\Sprite.cpp" />
     <ClCompile Include="Baziru3_Engine\2D\Sprite\SpriteCom.cpp" />
-
     <ClCompile Include="ParticleManager.cpp" />
     <ClCompile Include="Random.cpp" />
-
     <ClCompile Include="Model.cpp" />
     <ClCompile Include="ModelCom.cpp" />
     <ClCompile Include="ModelManager.cpp" />
     <ClCompile Include="SRVManager.cpp" />
-
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="Resources\shaders\Object3d.PS.hlsl">
@@ -101,16 +98,13 @@
     <ClInclude Include="Baziru3_Engine\2D\Sprite\SpriteCom.h" />
     <ClInclude Include="Baziru3_Engine\Base\Operator.h" />
     <ClInclude Include="Baziru3_Engine\2D\Texture\TextureManager.h" />
-
     <ClInclude Include="ParticleEmitter.h" />
     <ClInclude Include="ParticleManager.h" />
     <ClInclude Include="Random.h" />
-
     <ClInclude Include="Model.h" />
     <ClInclude Include="ModelCom.h" />
     <ClInclude Include="ModelManager.h" />
     <ClInclude Include="SRVManager.h" />
-
   </ItemGroup>
   <ItemGroup>
     <Text Include="externals\imgui\LICENSE.txt" />
@@ -196,6 +190,8 @@
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <TreatLinkerWarningAsErrors>true</TreatLinkerWarningAsErrors>
+      <AdditionalDependencies>imgui.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(SolutionDir)..\generated\output\$(Configuration)\$(SolutionDir)$(SolutionDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <PostBuildEvent>
       <Command>if not exist "$(TargetDir)" mkdir "$(TargetDir)"</Command>
@@ -221,6 +217,8 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>imgui.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(SolutionDir)..\generated\output\$(Configuration)\$(SolutionDir)$(SolutionDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <PostBuildEvent>
       <Command>if not exist "$(TargetDir)" mkdir "$(TargetDir)"</Command>
@@ -247,6 +245,8 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <LinkTimeCodeGeneration />
+      <AdditionalDependencies>imgui.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(SolutionDir)..\generated\output\$(Configuration)\$(SolutionDir)$(SolutionDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <PostBuildEvent>
       <Command>if not exist "$(TargetDir)" mkdir "$(TargetDir)"</Command>
