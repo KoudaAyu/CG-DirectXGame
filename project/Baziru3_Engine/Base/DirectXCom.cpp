@@ -12,6 +12,8 @@
 #include"Log.h"
 #include"StringUtil.h"
 
+#include"ImGuiManager.h"
+
 using namespace Microsoft::WRL;
 
 DirectXCom::DirectXCom(WindowAPI* windowAPI, std::ostream& logStream)
@@ -419,29 +421,8 @@ void DirectXCom::CreateDxcCompiler()
 
 void DirectXCom::InitializeImGui()
 {
-	//Imguiの初期化
-	IMGUI_CHECKVERSION();
-	ImGui::CreateContext();
-	ImGui::StyleColorsDark();
-	ImGui_ImplWin32_Init(windowAPI->GetHwnd());
-	ImGui_ImplDX12_Init(
-		device.Get(),
-		swapChainDesc.BufferCount,
-		rtvDesc.Format,
-		srvDescriptorHeap.Get(),
-		srvDescriptorHeap->GetCPUDescriptorHandleForHeapStart(),
-		srvDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
-
-	// Ensure a font is added and the atlas is built
-	ImGuiIO& io = ImGui::GetIO();
-	if (io.Fonts->Fonts.empty())
-	{
-		io.Fonts->AddFontDefault();
-	}
-	io.Fonts->Build();
-
-	// Create device objects (font texture etc.) upfront
-	ImGui_ImplDX12_CreateDeviceObjects();
+	// ImGui initialization is handled by ImGuiManager to avoid double-initialization.
+	// Keep this function empty so DirectXCom does not initialize ImGui.
 }
 
 void DirectXCom::PreDraw()

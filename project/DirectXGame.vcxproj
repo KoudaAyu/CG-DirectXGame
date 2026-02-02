@@ -19,6 +19,7 @@
     <ClCompile Include="Baziru3_Engine\3D\Object\Object3d.cpp" />
     <ClCompile Include="Baziru3_Engine\3D\Object\Object3dCom.cpp" />
     <ClCompile Include="Baziru3_Engine\Audio\Sound.cpp" />
+    <ClCompile Include="Baziru3_Engine\Base\ImGui\ImGuiManager.cpp" />
     <ClCompile Include="Baziru3_Engine\Camera\Camera.cpp" />
     <ClCompile Include="Baziru3_Engine\Base\DebugCamera.cpp" />
     <ClCompile Include="Baziru3_Engine\Base\DirectXCom.cpp" />
@@ -70,6 +71,7 @@
     <ClInclude Include="Baziru3_Engine\Audio\Sound.h" />
     <ClInclude Include="Baziru3_Engine\Base\DebugCamera.h" />
     <ClInclude Include="Baziru3_Engine\Base\DirectXCom.h" />
+    <ClInclude Include="Baziru3_Engine\Base\ImGui\ImGuiManager.h" />
     <ClInclude Include="Baziru3_Engine\Base\KeyInput.h" />
     <ClInclude Include="Baziru3_Engine\Base\Log.h" />
     <ClInclude Include="Baziru3_Engine\Base\Matrix4x4.h" />
@@ -169,7 +171,7 @@
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <TreatWarningAsError>true</TreatWarningAsError>
-      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)Baziru3_Engine\Base;$(ProjectDir)Baziru3_Engine\2D;$(ProjectDir)Baziru3_Engine\3D;$(ProjectDir)Baziru3_Engine\Audio;$(ProjectDir)Baziru3_Engine\IO;$(ProjectDir)Baziru3_Engine\Scene;$(ProjectDir)Baziru3_Engine\2D\Sprite;$(ProjectDir)Baziru3_Engine\2D\Texture;$(ProjectDir)Baziru3_Engine\Camera;$(ProjectDir)Baziru3_Engine\3D\Object;$(ProjectDir)externals\imgui;$(ProjectDir)externals\DirectXTex;$(ProjectDir)Baziru3_Engine\3D\Model;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)Baziru3_Engine\Base;$(ProjectDir)Baziru3_Engine\Base\ImGui;$(ProjectDir)Baziru3_Engine\2D;$(ProjectDir)Baziru3_Engine\3D;$(ProjectDir)Baziru3_Engine\Audio;$(ProjectDir)Baziru3_Engine\IO;$(ProjectDir)Baziru3_Engine\Scene;$(ProjectDir)Baziru3_Engine\2D\Sprite;$(ProjectDir)Baziru3_Engine\2D\Texture;$(ProjectDir)Baziru3_Engine\Camera;$(ProjectDir)Baziru3_Engine\3D\Object;$(ProjectDir)externals\imgui;$(ProjectDir)externals\DirectXTex;$(ProjectDir)Baziru3_Engine\3D\Model;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <BasicRuntimeChecks>Default</BasicRuntimeChecks>
     </ClCompile>
     <Link>
