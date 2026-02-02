@@ -44,7 +44,7 @@ public:
 
 	void SoundUnload(SoundData* soundData);
 
-	SoundData SoundLoadWave(const char* filename);
+	SoundData SoundLoadFile(const char* filename);
 
 	Microsoft::WRL::ComPtr<IXAudio2>& GetXAudio2()
 	{

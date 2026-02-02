@@ -532,7 +532,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	sound_ = new Sound();
 	sound_->Initialize();
 	//音声再生
-	SoundData soundData = sound_->SoundLoadWave("Resources/Alarm01.wav");
+	SoundData soundData = sound_->SoundLoadFile("Resources/Alarm01.wav");
 	sound_->SoundPlayWave(sound_->GetXAudio2(), soundData);
 
 	KeyInput inputManager;

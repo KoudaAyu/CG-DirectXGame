@@ -1,5 +1,7 @@
 #include "Sound.h"
 #include<cassert>
+#include<mfapi.h>
+#pragma comment(lib,"mfplat.lib")
 
 void Sound::Initialize()
 {
@@ -15,6 +17,19 @@ void Sound::Initialize()
 	{
 		assert(0 && "CreateMasteringVoice failed");
 	}
+
+	result = MFStartup(MF_VERSION, MFSTARTUP_NOSOCKET);
+	if (FAILED(result))
+	{
+		assert(0 && "MFStartup failed");
+	}
+
+	result = MFShutdown();
+	if(FAILED(result))
+	{
+		assert(0 && "MFShutdown failed");
+	}
+	
 }
 
 void Sound::Finalize()
@@ -51,7 +66,7 @@ void Sound::SoundUnload(SoundData* soundData)
 }
 
 
-SoundData Sound::SoundLoadWave(const char* filename)
+SoundData Sound::SoundLoadFile(const char* filename)
 {
 	/*HRESULT result;*/
 
