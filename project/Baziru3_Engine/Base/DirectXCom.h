@@ -178,6 +178,10 @@ public:
 	{
 		return rtvDesc;
 	}
+	const D3D12_DEPTH_STENCIL_VIEW_DESC& GetDsvDesc() const
+	{
+		return dsvDesc;
+	}
 	const Microsoft::WRL::ComPtr<ID3D12Resource>* GetSwapChainResources() const
 	{
 		return swapChainResources;
@@ -223,6 +227,10 @@ public:
 		return kMacSRVCount;
 	}
 
+	size_t GetSwapChainResourcesNum() const
+	{
+		return std::size(swapChainResources);
+	}
 
 	// 新規追加: SRV用CPU/GPUディスクリプタハンドル取得
 	D3D12_CPU_DESCRIPTOR_HANDLE GetSRVHandleCPU(uint32_t index);

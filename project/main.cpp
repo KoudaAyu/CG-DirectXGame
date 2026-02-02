@@ -66,7 +66,7 @@
 #include<list>
 
 
-
+#include"ImGuiManager.h"
 
 enum BlendMode
 {
@@ -638,6 +638,10 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 	const float kDeltaTime = 1.0f / 60.0f;
 
+	ImGuiManager* imguiManager = nullptr;
+	imguiManager = new ImGuiManager();
+	imguiManager->Initialize(windowAPI, dxCommon);
+
 
 
 	//ウィンドウのxボタンが押されるまでループ
@@ -663,8 +667,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 
 			//Imguiにここからフレームが始まる趣旨をつたえる
-			ImGui_ImplDX12_NewFrame();
 			ImGui_ImplWin32_NewFrame();
+			ImGui_ImplDX12_NewFrame();
 			ImGui::NewFrame();
 
 			debugCamera_.Update();
@@ -759,6 +763,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 			//開発用UIの処理、実際に開発用のUIを出す場合はここをゲーム固有の処理に置き換え
 
 #ifdef _DEBUG
+
 			ImGui::ShowDemoWindow();
 
 			ImGui::Begin("Windows");
@@ -992,21 +997,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	//出力ウィンドウへの文字出力
 	OutputDebugStringA("Hello, DirextX!\n");
 
-	CloseHandle(dxCommon->GetFenceEvent());
+	
 
-	sound_->GetXAudio2().Reset();
-	sound_->SoundUnload(&soundData);
-
-	delete sound_;
-
-	delete camera;
-
-	delete[] vertexData;
-	delete[] indexData;
-
-	windowAPI->Finalize();
-
-	TextureManager::GetInstance()->Finalize();
+	delete imguiManager;
 
 	for (auto* sprite : sprites)
 	{
@@ -1015,15 +1008,25 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	sprites.clear();
 
 	delete particleManager;
-
 	delete object3d;
+	delete camera;
+
+	TextureManager::GetInstance()->Finalize();
+
+	sound_->GetXAudio2().Reset();
+	sound_->SoundUnload(&soundData);
+	delete sound_;
+
+	delete[] vertexData;
+	delete[] indexData;
 
 	delete object3dCom;
-
 	delete spriteCom;
 
+	CloseHandle(dxCommon->GetFenceEvent());
 	delete dxCommon;
 
+	windowAPI->Finalize();
 	delete windowAPI;
 
 	return 0;
