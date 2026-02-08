@@ -36,6 +36,7 @@ void SpriteCom::CreateGraphicsPipeline()
 	RasterizerState();
 	ShaderCompile();
 	InitializeGraphicPipeline();
+	DepthStencilDesc();
 }
 
 void SpriteCom::Descriptor()
@@ -226,6 +227,29 @@ void SpriteCom::InitializeGraphicPipeline()
 	graphicPipelineStateDesc.SampleDesc.Count = 1; //マルチサンプルしない
 	graphicPipelineStateDesc.SampleMask = D3D12_DEFAULT_SAMPLE_MASK; //サンプルマスクはデフォルト
 
+	
+
+}
+
+void SpriteCom::DepthStencilDesc()
+{
+	//DepthStencilStateの設定
+	D3D12_DEPTH_STENCIL_DESC depthStencilDesc{};
+	//Depthの機能を有効化する
+	depthStencilDesc.DepthEnable = true;
+	//書き込み
+	depthStencilDesc.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO;
+	//比較関数はLessEqua。つまり、近ければ描画される
+	depthStencilDesc.DepthFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
+	//DepthStencilの設定
+	GetGraphicPipelineStateDesc().DepthStencilState = depthStencilDesc;
+	GetGraphicPipelineStateDesc().DSVFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
+	//実際に生成
+	dxCommon->SetHr(dxCommon->GetDevice()->CreateGraphicsPipelineState(&graphicPipelineStateDesc,
+		IID_PPV_ARGS(&pipelineState)));
+
+	assert(GetVertexShaderBlob() && "頂点シェーダーの読み込み失敗！");
+	assert(GetPixelShaderBlob() && "ピクセルシェーダーの読み込み失敗！");
 }
 
 void SpriteCom::SetupDraw()

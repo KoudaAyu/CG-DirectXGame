@@ -5,19 +5,13 @@
 #include"DebugCamera.h"
 #include"DirectXCom.h"
 #include"KeyInput.h"
-#include"Log.h"
 #include"Matrix4x4.h"
-#include"Object3d.h"
-#include"Object3dCom.h"
-#include"ParticleManager.h"
-#include"Sprite.h"
-#include"SpriteCom.h"
 #include"Random.h"
+#include"ParticleEmitter.h"
 #include"Sound.h"
 #include"TextureManager.h"
 #include"Vector.h"
 #include"WindowsAPI.h"
-#include"ParticleEmitter.h"
 
 #include<chrono> //時間を扱うライブラリ
 #include<filesystem> //ファイルやディレクトリに関する操作を行うライブラリ
@@ -137,54 +131,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	Game game;
 	game.Initialize();
 
-
-
-	std::vector<Sprite*>sprites;
-	for (uint32_t i = 0; i < 5; ++i)
-	{
-		Sprite* sprite = new Sprite();
-		// Resources フォルダ直下の uvChecker.png を指定
-		sprite->Initialize(game.GetSpriteCom(), "Resources/uvChecker.png");
-		sprites.push_back(sprite);
-	}
-
-	game.GetSpriteCom()->CreateGraphicsPipeline();
-
-	// 既存の手動テクスチャ読み込みはそのまま利用（Sphere用）
-
-	Object3dCom* object3dCom = new Object3dCom(game.logStream);
-	object3dCom->Initialize(game.GetDirectXCom());
-
-#pragma region 最初のシーンの初期化
-	Object3d* object3d = new Object3d();
-	object3d->Initialize(object3dCom);
-
-	ParticleManager* particleManager = new ParticleManager(game.logStream, game.GetDirectXCom());
-	particleManager->Initialize();
-#pragma endregion 最初のシーン終了
-
-	//DepthStencilStateの設定
-	D3D12_DEPTH_STENCIL_DESC depthStencilDesc{};
-	//Depthの機能を有効化する
-	depthStencilDesc.DepthEnable = true;
-	//書き込み
-	depthStencilDesc.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO;
-	//比較関数はLessEqua。つまり、近ければ描画される
-	depthStencilDesc.DepthFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
-	//DepthStencilの設定
-	game.GetSpriteCom()->GetGraphicPipelineStateDesc().DepthStencilState = depthStencilDesc;
-	game.GetSpriteCom()->GetGraphicPipelineStateDesc().DSVFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
-	//実際に生成
-	Microsoft::WRL::ComPtr<ID3D12PipelineState> graphicPipelineState = nullptr;
-	game.GetDirectXCom()->SetHr(game.GetDirectXCom()->GetDevice()->CreateGraphicsPipelineState(&game.GetSpriteCom()->GetGraphicPipelineStateDesc(),
-		IID_PPV_ARGS(&graphicPipelineState)));
-
-	assert(game.GetSpriteCom()->GetVertexShaderBlob() && "頂点シェーダーの読み込み失敗！");
-	assert(game.GetSpriteCom()->GetPixelShaderBlob() && "ピクセルシェーダーの読み込み失敗！");
-
-	//パイプラインステートの生成に失敗した場合はエラー
-	assert(SUCCEEDED(game.GetDirectXCom()->GetHr()));
-
 	// 球体
 	const uint32_t kSubdivision = 16; // 16分割
 
@@ -262,7 +208,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 			indexData[idx++] = v1; // C
 
 			// 2つ目の三角形: v2, v3, v1 (B, D, C)
-			indexData[idx++] = v2; // B
+		indexData[idx++] = v2; // B
 			indexData[idx++] = v3; // D
 			indexData[idx++] = v1; // C
 		}
@@ -293,7 +239,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 
 	//モデル読み込み
-	Object3d::ModelData modelData = object3d->LoadObjFile("Resources", "plane.obj");
+	Object3d::ModelData modelData = game.GetObject3d()->LoadObjFile("Resources", "plane.obj");
 	//頂点リソースを作る
 	Microsoft::WRL::ComPtr<ID3D12Resource> vertexResourceModel = game.GetDirectXCom()->CreateBufferResource(game.GetDirectXCom()->GetDevice().Get(), sizeof(Sprite::VertexData) * modelData.vertices.size());
 	//頂点バッファービューを作成末う
@@ -456,7 +402,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	Camera* camera = new Camera();
 	camera->SetRotate({ 0.0f,0.0f,0.0f });
 	camera->SetTranslate({ 0.0f,0.0f,-10.0f });
-	object3dCom->SetDefaultCamera(camera);
+	game.GetObject3dCom()->SetDefaultCamera(camera);
 
 
 	//ビューポート
@@ -500,7 +446,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	std::mt19937 randomEngine(std::random_device{}());
 	for (uint32_t index = 0; index < kNumMaxInstances; ++index)
 	{
-		particles.push_back(particleManager->MakeNewParticles(randomEngine, emitter.transform.GetTranslate()));
+		particles.push_back(game.GetParticleManager()->MakeNewParticles(randomEngine, emitter.transform.GetTranslate()));
 	}
 
 
@@ -592,11 +538,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 			cameraData->worldPosition = camera->GetWorldPosition();
 
 			// Apply ImGui rotation to the object3d transform
-			object3d->SetRotate(transformObject.rotate);
-			object3d->Update();
+			game.GetObject3d()->SetRotate(transformObject.rotate);
+			game.GetObject3d()->Update();
 
 
-			for (auto* sprite : sprites)
+			for (auto* sprite : game.GetSprites())
 			{
 				sprite->SetPosition({ 0.0f,0.0f });
 				sprite->Update(game.GetWindowAPI(), &debugCamera_);
@@ -606,7 +552,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 			Matrix4x4 uvTransformMatrix = MakeScaleMatrix(uvTransformSprite.scale);
 			uvTransformMatrix = Multiply(uvTransformMatrix, MakeRotateZMatrix(uvTransformSprite.rotate.z));
 			uvTransformMatrix = Multiply(uvTransformMatrix, MakeTranslateMatrix(uvTransformSprite.translate));
-			for (auto* sprite : sprites)
+			for (auto* sprite : game.GetSprites())
 			{
 				sprite->SetUVTransform(uvTransformMatrix);
 			}
@@ -631,7 +577,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 			emitter.frequencyTime += kDeltaTime;
 			if (emitter.frequencyTime >= emitter.frequency)
 			{
-				particles.splice(particles.end(), particleEmitter.Emit(emitter, randomEngine, *particleManager));
+				particles.splice(particles.end(), particleEmitter.Emit(emitter, randomEngine, *game.GetParticleManager()));
 				emitter.frequencyTime -= emitter.frequency;
 			}
 			{
@@ -689,7 +635,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 			ImGui::Checkbox("useMonsterBall", &useMonsterBall);
 			ImGui::Checkbox("LightSprite Flag", (bool*)&materialData->enableLighting);
-			for (auto* sprite : sprites)
+			for (auto* sprite : game.GetSprites())
 			{
 				ImGui::Checkbox("LightObject Flag", (bool*)&sprite->GetMaterialDataSprite()->enableLighting);
 			}
@@ -800,16 +746,17 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 			// ImGuiを使わずにSpaceキーでパーティクルを追加
 			if (inputManager.TriggerKey(DIK_SPACE))
 			{
-				particles.splice(particles.end(), ParticleEmitter{}.Emit(emitter, randomEngine, *particleManager));
+				particles.splice(particles.end(), ParticleEmitter{}.Emit(emitter, randomEngine, *game.GetParticleManager()));
 			}
 
 			game.GetDirectXCom()->PreDraw();
 
-			object3dCom->PreDraw();
+			game.GetObject3dCom()->PreDraw();
 
 			//RootSignatureを設定。PSOに設定しているけれど別途設定が必要
 			game.GetDirectXCom()->GetCommandList()->SetGraphicsRootSignature(game.GetSpriteCom()->GetRootSignature().Get());
-			game.GetDirectXCom()->GetCommandList()->SetPipelineState(graphicPipelineState.Get()); //パイプラインステートを設定
+			// Use pipeline state stored in SpriteCom
+			game.GetDirectXCom()->GetCommandList()->SetPipelineState(game.GetSpriteCom()->GetPipelineState().Get()); //パイプラインステートを設定
 			//Objectの描画
 
 			game.GetDirectXCom()->GetCommandList()->IASetVertexBuffers(0, 1, &vertexBufferView);
@@ -817,7 +764,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 			game.GetDirectXCom()->GetCommandList()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 			game.GetDirectXCom()->GetCommandList()->SetGraphicsRootConstantBufferView(0, materialResource->GetGPUVirtualAddress());
 			// Use Object3d WVP updated above
-			game.GetDirectXCom()->GetCommandList()->SetGraphicsRootConstantBufferView(1, object3d->GetTransformationMatrixResource()->GetGPUVirtualAddress());
+			game.GetDirectXCom()->GetCommandList()->SetGraphicsRootConstantBufferView(1, game.GetObject3d()->GetTransformationMatrixResource()->GetGPUVirtualAddress());
 			game.GetDirectXCom()->GetCommandList()->SetGraphicsRootDescriptorTable(2, useMonsterBall ? textureSrvHandleGPU2 : textureSrvHandleGPU);
 			game.GetDirectXCom()->GetCommandList()->SetGraphicsRootConstantBufferView(3, directionalLight->GetGPUVirtualAddress());
 			game.GetDirectXCom()->GetCommandList()->SetGraphicsRootConstantBufferView(4, cameraResource->GetGPUVirtualAddress());
@@ -833,8 +780,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 				game.GetDirectXCom()->GetCommandList()->RSSetViewports(1, &viewport);
 				game.GetDirectXCom()->GetCommandList()->RSSetScissorRects(1, &scissorRect);
 
-				game.GetDirectXCom()->GetCommandList()->SetGraphicsRootSignature(object3dCom->GetRootSignature().Get());
-				game.GetDirectXCom()->GetCommandList()->SetPipelineState(object3dCom->GetPipelineState().Get());	
+				game.GetDirectXCom()->GetCommandList()->SetGraphicsRootSignature(game.GetObject3dCom()->GetRootSignature().Get());
+				game.GetDirectXCom()->GetCommandList()->SetPipelineState(game.GetObject3dCom()->GetPipelineState().Get());	
 
 				game.GetDirectXCom()->GetCommandList()->IASetVertexBuffers(0, 1, &vertexBufferViewSphere);
 				game.GetDirectXCom()->GetCommandList()->IASetIndexBuffer(&indexBufferViewObject);
@@ -854,15 +801,15 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 			if (drawSprite)
 			{
-				for (auto* sprite : sprites)
+				for (auto* sprite : game.GetSprites())
 				{
 					sprite->Draw();
 				}
 			}
 
 			//RootSignatureを設定。PSOに設定しているけれど別途設定が必要
-			game.GetDirectXCom()->GetCommandList()->SetGraphicsRootSignature(particleManager->GetRootSignature().Get());
-			game.GetDirectXCom()->GetCommandList()->SetPipelineState(particleManager->GetPipelineState().Get()); // パイプラインステートを設定
+			game.GetDirectXCom()->GetCommandList()->SetGraphicsRootSignature(game.GetParticleManager()->GetRootSignature().Get());
+			game.GetDirectXCom()->GetCommandList()->SetPipelineState(game.GetParticleManager()->GetPipelineState().Get()); // パイプラインステートを設定
 			//Objectの描画
 
 			game.GetDirectXCom()->GetCommandList()->IASetVertexBuffers(0, 1, &vertexBufferView);
@@ -918,14 +865,13 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
     delete imguiManager;
 
-	for (auto* sprite : sprites)
+	for (auto* sprite : game.GetSprites())
 	{
 		delete sprite;
 	}
-	sprites.clear();
-
-	delete particleManager;
-	delete object3d;
+	game.GetSprites().clear();
+	delete game.GetParticleManager();
+	delete game.GetObject3d();
 	delete camera;
 
 	TextureManager::GetInstance()->Finalize();
@@ -934,7 +880,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	delete[] vertexData;
 	delete[] indexData;
 
-	delete object3dCom;
+	delete game.GetObject3dCom();
 	delete game.GetSpriteCom();
 
 	CloseHandle(game.GetDirectXCom()->GetFenceEvent());

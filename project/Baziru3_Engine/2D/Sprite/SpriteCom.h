@@ -26,6 +26,7 @@ public:
 	void RasterizerState();
 	void ShaderCompile();
 	void InitializeGraphicPipeline();
+	void DepthStencilDesc();
 	
 	void SetupDraw();
 
@@ -79,6 +80,7 @@ public:
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC& GetGraphicPipelineStateDesc() { return graphicPipelineStateDesc; }
 
 	DirectXCom* GetDxCommon() { return dxCommon; }
+	const Microsoft::WRL::ComPtr<ID3D12PipelineState>& GetPipelineState() const { return pipelineState; }
 
 
 private:
@@ -98,6 +100,7 @@ private:
 	Microsoft::WRL::ComPtr<IDxcBlob> vertexShaderBlob;
 	Microsoft::WRL::ComPtr<IDxcBlob> pixelShaderBlob;
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC graphicPipelineStateDesc{};
+	Microsoft::WRL::ComPtr<ID3D12PipelineState> pipelineState = nullptr;
 
 	std::ostream& logStream;
 };
