@@ -29,24 +29,29 @@ void Sound::Initialize()
 
 void Sound::Finalize()
 {
+	// 実行中に明示的に呼ぶ終了処理用。ここで安全に後片付けを行う
 	SoundUnload();
+
 	if (masterVoice)
 	{
 		masterVoice->DestroyVoice();
 		masterVoice = nullptr;
 	}
+
+	xAudio2.Reset();
 	MFShutdown();
 }
 
 void Sound::SoundUnload()
 {
-	
+	// SourceVoice を安全に破棄
 	if (pSourceVoice)
 	{
 		pSourceVoice->Stop();
 		pSourceVoice->DestroyVoice();
 		pSourceVoice = nullptr;
 	}
+
 	soundData.buffer.clear();
 	soundData.wfex = {};
 }
@@ -149,9 +154,10 @@ void Sound::SoundPlayWave()
 {
 	if (soundData.buffer.empty()) return;
 
-	// 前回のボイスが残っていれば破棄
+	// 前回のボイスが残っていれば一度停止してから破棄
 	if (pSourceVoice)
 	{
+		pSourceVoice->Stop();
 		pSourceVoice->DestroyVoice();
 		pSourceVoice = nullptr;
 	}
