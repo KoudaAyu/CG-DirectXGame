@@ -138,27 +138,17 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	game.Initialize();
 
 
-	// TextureManager は SRV ヒープに依存するので DX 初期化の後に初期化
-	TextureManager::GetInstance()->Initialize();
-	TextureManager::GetInstance()->SetDirectXCom(game.GetDirectXCom());
-	// 作業ディレクトリが project/ である前提の相対パスを使う
-	TextureManager::GetInstance()->LoadTexture("Resources/uvChecker.png");
-
-	SpriteCom* spriteCom = nullptr;
-	spriteCom = new SpriteCom(game.logStream, game.GetDirectXCom());
-	spriteCom->Initialize();
-
 
 	std::vector<Sprite*>sprites;
 	for (uint32_t i = 0; i < 5; ++i)
 	{
 		Sprite* sprite = new Sprite();
 		// Resources フォルダ直下の uvChecker.png を指定
-		sprite->Initialize(spriteCom, "Resources/uvChecker.png");
+		sprite->Initialize(game.GetSpriteCom(), "Resources/uvChecker.png");
 		sprites.push_back(sprite);
 	}
 
-	spriteCom->CreateGraphicsPipeline();
+	game.GetSpriteCom()->CreateGraphicsPipeline();
 
 	// 既存の手動テクスチャ読み込みはそのまま利用（Sphere用）
 
@@ -182,15 +172,15 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	//比較関数はLessEqua。つまり、近ければ描画される
 	depthStencilDesc.DepthFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
 	//DepthStencilの設定
-	spriteCom->GetGraphicPipelineStateDesc().DepthStencilState = depthStencilDesc;
-	spriteCom->GetGraphicPipelineStateDesc().DSVFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
+	game.GetSpriteCom()->GetGraphicPipelineStateDesc().DepthStencilState = depthStencilDesc;
+	game.GetSpriteCom()->GetGraphicPipelineStateDesc().DSVFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
 	//実際に生成
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> graphicPipelineState = nullptr;
-	game.GetDirectXCom()->SetHr(game.GetDirectXCom()->GetDevice()->CreateGraphicsPipelineState(&spriteCom->GetGraphicPipelineStateDesc(),
+	game.GetDirectXCom()->SetHr(game.GetDirectXCom()->GetDevice()->CreateGraphicsPipelineState(&game.GetSpriteCom()->GetGraphicPipelineStateDesc(),
 		IID_PPV_ARGS(&graphicPipelineState)));
 
-	assert(spriteCom->GetVertexShaderBlob() && "頂点シェーダーの読み込み失敗！");
-	assert(spriteCom->GetPixelShaderBlob() && "ピクセルシェーダーの読み込み失敗！");
+	assert(game.GetSpriteCom()->GetVertexShaderBlob() && "頂点シェーダーの読み込み失敗！");
+	assert(game.GetSpriteCom()->GetPixelShaderBlob() && "ピクセルシェーダーの読み込み失敗！");
 
 	//パイプラインステートの生成に失敗した場合はエラー
 	assert(SUCCEEDED(game.GetDirectXCom()->GetHr()));
@@ -818,7 +808,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 			object3dCom->PreDraw();
 
 			//RootSignatureを設定。PSOに設定しているけれど別途設定が必要
-			game.GetDirectXCom()->GetCommandList()->SetGraphicsRootSignature(spriteCom->GetRootSignature().Get());
+			game.GetDirectXCom()->GetCommandList()->SetGraphicsRootSignature(game.GetSpriteCom()->GetRootSignature().Get());
 			game.GetDirectXCom()->GetCommandList()->SetPipelineState(graphicPipelineState.Get()); //パイプラインステートを設定
 			//Objectの描画
 
@@ -945,7 +935,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	delete[] indexData;
 
 	delete object3dCom;
-	delete spriteCom;
+	delete game.GetSpriteCom();
 
 	CloseHandle(game.GetDirectXCom()->GetFenceEvent());
 	delete game.GetDirectXCom();

@@ -3,7 +3,9 @@
 #include"CrashDump.h"
 #include"DirectXCom.h"
 #include"Log.h"
+#include"SpriteCom.h"
 #include"ResourceLeakCheak.h"
+#include"TextureManager.h"
 #include"WindowsAPI.h"
 
 class Game
@@ -21,6 +23,8 @@ public:
 	const WindowAPI* GetWindowAPI() const { return windowAPI; }
 	DirectXCom* GetDirectXCom() { return directXCom; }
 	const DirectXCom* GetDirectXCom() const { return directXCom; }
+	SpriteCom* GetSpriteCom() { return spriteCom; }
+	const SpriteCom* GetSpriteCom() const { return spriteCom; }
 
 private:
 	ResourceLeakCheak leakChecker; //リソースリークチェック用のオブジェクト
@@ -28,6 +32,7 @@ private:
 	Log log;
 	WindowAPI* windowAPI = nullptr; //ウィンドウ関連のAPIをまとめたオブジェクト
 	DirectXCom* directXCom = nullptr;
+	SpriteCom* spriteCom = nullptr;
 private:
 
 	
