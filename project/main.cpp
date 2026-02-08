@@ -532,8 +532,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	sound_ = new Sound();
 	sound_->Initialize();
 	//音声再生
-	SoundData soundData = sound_->SoundLoadFile("Resources/Alarm01.wav");
-	sound_->SoundPlayWave(sound_->GetXAudio2(), soundData);
+	sound_->SoundLoadFile("Resources/Alarm01.wav");
+	sound_->SoundPlayWave();
 
 	KeyInput inputManager;
 	inputManager.Initialize(windowAPI);
@@ -950,7 +950,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 			//RootSignatureを設定。PSOに設定しているけれど別途設定が必要
 			dxCommon->GetCommandList()->SetGraphicsRootSignature(particleManager->GetRootSignature().Get());
-			dxCommon->GetCommandList()->SetPipelineState(particleManager->GetPipelineState().Get()); // パーティクル用PSOを設定
+			dxCommon->GetCommandList()->SetPipelineState(particleManager->GetPipelineState().Get()); // パイプラインステートを設定
 			//Objectの描画
 
 			dxCommon->GetCommandList()->IASetVertexBuffers(0, 1, &vertexBufferView);
@@ -1014,7 +1014,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	TextureManager::GetInstance()->Finalize();
 
 	sound_->GetXAudio2().Reset();
-	sound_->SoundUnload(&soundData);
+	sound_->SoundUnload();
 	delete sound_;
 
 	delete[] vertexData;

@@ -1,133 +1,172 @@
 #include "Sound.h"
-#include<cassert>
-#include<mfapi.h>
+#include <cassert>
+#include <cstring>
+
+// Windows SDK ヘッダの警告を一時的に無効化
+#pragma warning(push, 0)
+#include <mfapi.h>
+#include <mfidl.h>
+#include <mfreadwrite.h>
+#pragma warning(pop)
+
+#include "StringUtil.h"
+
 #pragma comment(lib,"mfplat.lib")
+#pragma comment(lib,"Mfreadwrite.lib")
+#pragma comment(lib,"mfuuid.lib")
 
 void Sound::Initialize()
 {
-	// XAudio2の初期化
 	HRESULT result = XAudio2Create(&xAudio2, 0, XAUDIO2_DEFAULT_PROCESSOR);
-	if (FAILED(result))
-	{
-		assert(0 && "XAudio2Create failed");
-	}
+	assert(SUCCEEDED(result));
 
 	result = xAudio2->CreateMasteringVoice(&masterVoice);
-	if (FAILED(result))
-	{
-		assert(0 && "CreateMasteringVoice failed");
-	}
+	assert(SUCCEEDED(result));
 
 	result = MFStartup(MF_VERSION, MFSTARTUP_NOSOCKET);
-	if (FAILED(result))
-	{
-		assert(0 && "MFStartup failed");
-	}
-
-	result = MFShutdown();
-	if(FAILED(result))
-	{
-		assert(0 && "MFShutdown failed");
-	}
-	
+	assert(SUCCEEDED(result));
 }
 
 void Sound::Finalize()
 {
+	SoundUnload();
+	if (masterVoice)
+	{
+		masterVoice->DestroyVoice();
+		masterVoice = nullptr;
+	}
+	MFShutdown();
 }
 
-void Sound::SoundPlayWave(Microsoft::WRL::ComPtr<IXAudio2>& xAudio2, const SoundData& soundData)
+void Sound::SoundUnload()
 {
-	HRESULT result;
+	
+	if (pSourceVoice)
+	{
+		pSourceVoice->Stop();
+		pSourceVoice->DestroyVoice();
+		pSourceVoice = nullptr;
+	}
+	soundData.buffer.clear();
+	soundData.wfex = {};
+}
 
-	//波形フォーマットを元にSourceVoiceの生成
-	IXAudio2SourceVoice* pSourceVoice = nullptr;
-	result = xAudio2->CreateSourceVoice(&pSourceVoice, &soundData.wfex);
-	assert(SUCCEEDED(result)); //SourceVoiceの生成に失敗したら停止
+void Sound::SoundLoadFile(const std::string& filename)
+{
+	// 読み込み前に以前のデータをリセット
+	SoundUnload();
 
-	//再生する波形データの設定
-	XAUDIO2_BUFFER buf{};
-	buf.pAudioData = soundData.pBuffer;
-	buf.AudioBytes = soundData.bufferSize;
+	std::string ext = "";
+	size_t pos = filename.find_last_of('.');
+	if (pos != std::string::npos)
+	{
+		ext = filename.substr(pos);
+		// ★修正：ラムダ式を使用してtolowerの曖昧さエラーを回避
+		std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c)
+			{
+				return static_cast<char>(std::tolower(c));
+			});
+	}
+
+	// --- WAV直接読み込み ---
+	if (ext == ".wav")
+	{
+		std::ifstream file(filename, std::ios_base::binary);
+		if (file.is_open())
+		{
+			RiffHeader riff;
+			file.read((char*)&riff, sizeof(riff));
+			if (strncmp(riff.chunk.id, "RIFF", 4) == 0 && strncmp(riff.type, "WAVE", 4) == 0)
+			{
+				FormatChunk format = {};
+				file.read((char*)&format, sizeof(ChunkHeader));
+				if (strncmp(format.chunk.id, "fmt ", 4) == 0)
+				{
+					file.read((char*)&format.fmt, format.chunk.size);
+					ChunkHeader data;
+					file.read((char*)&data, sizeof(data));
+					while (strncmp(data.id, "data", 4) != 0 && !file.eof())
+					{
+						file.seekg(data.size, std::ios_base::cur);
+						file.read((char*)&data, sizeof(data));
+					}
+					if (strncmp(data.id, "data", 4) == 0)
+					{
+						this->soundData.wfex = format.fmt;
+						this->soundData.buffer.resize(data.size);
+						file.read(reinterpret_cast<char*>(this->soundData.buffer.data()), data.size);
+						file.close();
+						return;
+					}
+				}
+			}
+		}
+	}
+
+	// --- Media Foundation 読み込み ---
+	std::wstring filePathW = StringUtil::ConvertString(filename);
+	Microsoft::WRL::ComPtr<IMFSourceReader> pReader;
+	HRESULT hr = MFCreateSourceReaderFromURL(filePathW.c_str(), nullptr, &pReader);
+	assert(SUCCEEDED(hr));
+
+	Microsoft::WRL::ComPtr<IMFMediaType> pPCMType;
+	MFCreateMediaType(&pPCMType);
+	pPCMType->SetGUID(MF_MT_MAJOR_TYPE, MFMediaType_Audio);
+	pPCMType->SetGUID(MF_MT_SUBTYPE, MFAudioFormat_PCM);
+	pReader->SetCurrentMediaType((DWORD)MF_SOURCE_READER_FIRST_AUDIO_STREAM, nullptr, pPCMType.Get());
+
+	Microsoft::WRL::ComPtr<IMFMediaType> pOutType;
+	pReader->GetCurrentMediaType((DWORD)MF_SOURCE_READER_FIRST_AUDIO_STREAM, &pOutType);
+
+	WAVEFORMATEX* waveFormat = nullptr;
+	MFCreateWaveFormatExFromMFMediaType(pOutType.Get(), &waveFormat, nullptr);
+	this->soundData.wfex = *waveFormat;
+	CoTaskMemFree(waveFormat);
+
+	while (true)
+	{
+		Microsoft::WRL::ComPtr<IMFSample> pSample;
+		DWORD flags = 0;
+		hr = pReader->ReadSample(MF_SOURCE_READER_FIRST_AUDIO_STREAM, 0, nullptr, &flags, nullptr, &pSample);
+		if (FAILED(hr) || (flags & MF_SOURCE_READERF_ENDOFSTREAM)) break;
+
+		if (pSample)
+		{
+			Microsoft::WRL::ComPtr<IMFMediaBuffer> pBuffer;
+			pSample->ConvertToContiguousBuffer(&pBuffer);
+			BYTE* pData = nullptr;
+			DWORD currentLength = 0;
+			pBuffer->Lock(&pData, nullptr, &currentLength);
+			size_t oldSize = this->soundData.buffer.size();
+			this->soundData.buffer.resize(oldSize + currentLength);
+			memcpy(&this->soundData.buffer[oldSize], pData, currentLength);
+			pBuffer->Unlock();
+		}
+	}
+}
+
+void Sound::SoundPlayWave()
+{
+	if (soundData.buffer.empty()) return;
+
+	// 前回のボイスが残っていれば破棄
+	if (pSourceVoice)
+	{
+		pSourceVoice->DestroyVoice();
+		pSourceVoice = nullptr;
+	}
+
+	HRESULT result = xAudio2->CreateSourceVoice(&pSourceVoice, &soundData.wfex);
+	assert(SUCCEEDED(result));
+
+	XAUDIO2_BUFFER buf = {};
+	buf.pAudioData = soundData.buffer.data();
+	buf.AudioBytes = (UINT32)soundData.buffer.size();
 	buf.Flags = XAUDIO2_END_OF_STREAM;
 
-	//波形データの再生
 	result = pSourceVoice->SubmitSourceBuffer(&buf);
-	result = pSourceVoice->Start();
-}
+	assert(SUCCEEDED(result));
 
-void Sound::SoundUnload(SoundData* soundData)
-{
-	//バッファのメモリを解放
-	delete soundData->pBuffer;
-	soundData->pBuffer = 0;
-	soundData->bufferSize = 0;
-	soundData->wfex = {};
-}
-
-
-SoundData Sound::SoundLoadFile(const char* filename)
-{
-	/*HRESULT result;*/
-
-	//ファイルを開く
-	std::ifstream file;
-	//.wavファイルをバイナリで開く
-	file.open(filename, std::ios_base::binary);
-	//ファイルが開けなかった
-	assert(file.is_open());
-
-	//wavデータの読み込み
-	//RIFFヘッダーの読み込み
-	RiffHeader riff;
-	file.read((char*)&riff, sizeof(riff));
-	//ファイルがRIFFかチェック
-	if (strncmp(riff.chunk.id, "RIFF", 4) != 0)
-	{
-		assert(0);
-	}
-	//タイプがWAVEかチェック
-	if (strncmp(riff.type, "WAVE", 4) != 0)
-	{
-		assert(0);
-	}
-	//Formatチャンクの読み込み
-	FormatChunk format = {};
-	//チャンクヘッダーの読み込み
-	file.read((char*)&format, sizeof(ChunkHeader));
-	if (strncmp(format.chunk.id, "fmt ", 4) != 0) // "fmt" の後にスペースを追加
-	{
-		assert(0);
-	}
-	//チャンク本体の読み込み
-	assert(format.chunk.size <= sizeof(format.fmt));
-	file.read((char*)&format.fmt, format.chunk.size);
-	//Dataチャンクの読み込み
-	ChunkHeader data;
-	file.read((char*)&data, sizeof(data));
-	//JUNKチャンクを検出した場合
-	if (strncmp(data.id, "JUNK", 4) == 0)
-	{
-		//読み取り位置をJUNKチャンクの終わりまで進める
-		file.seekg(data.size, std::ios_base::cur);
-		//再度読み込み
-		file.read((char*)&data, sizeof(data));
-	}
-	if (strncmp(data.id, "data", 4) != 0)
-	{
-		assert(0);
-	}
-	//Dataチャンクのデータ部(波形データ)の読み込み
-	char* pBuffer = new char[data.size];
-	file.read(pBuffer, data.size);
-	//Waveファイルを閉じる
-	file.close();
-
-	//returnする為の音声データ
-	SoundData soundData = {};
-	soundData.wfex = format.fmt; //Waveフォーマット情報をセット
-	soundData.pBuffer = reinterpret_cast<BYTE*>(pBuffer);
-	soundData.bufferSize = data.size;
-
-	return soundData;
+	result = pSourceVoice->Start(0);
+	assert(SUCCEEDED(result));
 }
