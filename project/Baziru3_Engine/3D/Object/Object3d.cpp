@@ -6,6 +6,10 @@
 #include<sstream> // 追加: 行分解用
 #include<cstring> // 追加: memcpy 用
 
+#include<assimp/Importer.hpp>
+#include<assimp/scene.h>
+#include<assimp/postprocess.h>
+
 
 
 void Object3d::Initialize(Object3dCom* object3dCom)
@@ -104,92 +108,71 @@ Object3d::MaterialData Object3d::LoadMaterialTemplateFile(const std::string& dir
 
 Object3d::ModelData Object3d::LoadObjFile(const std::string& directoryPath, const std::string& filename)
 {
-	//中で必要になる変数の宣言
-	Object3d::ModelData modelData;//構築するデータ
-	std::vector<Vector4>positions;//位置
-	std::vector<Vector3>normals;//法線
-	std::vector<Vector2>texcoords;//テクスチャ座標
-	std::string line;//ファイルから読み込んだ1行を格納するもの
+	Object3d::ModelData modelData;
+	Assimp::Importer importer;
+	std::string filePath = directoryPath + "/" + filename;
 
-	//ファイルを開く
-	std::ifstream file(directoryPath + "/" + filename);//ファイルを開く
-	assert(file.is_open());//ファイルが開けなかったら停止
+	// aiProcess_Triangulate を追加して、三角形化を確実にする
+	const aiScene* scene = importer.ReadFile(filePath.c_str(),
+		aiProcess_FlipWindingOrder | aiProcess_FlipUVs | aiProcess_Triangulate);
 
-	//実際にファイルを読み込む。その後modelDataを構築する
-	while (std::getline(file, line))
+	if (!scene || !scene->HasMeshes())
 	{
-		std::string identifile;
-		std::istringstream s(line);
-		s >> identifile; //先頭の識別子を取得
+		assert(false && "Failed to load model");
+		return modelData;
+	}
 
-		//identifileに応じた処理
-		if (identifile == "v")
-		{
-			Vector4 position;
-			s >> position.x >> position.y >> position.z;
-			// position.x *= -1.0f; // X反転を無効化: テクスチャ向きが変わる原因になる
-			position.w = 1.0f;
-			positions.push_back(position);//位置を格納
-		}
-		else if (identifile == "vt")
-		{
-			Vector2 texcoord;
-			s >> texcoord.x >> texcoord.y;
-			// OBJのVTは左下原点のことが多いので、DirectXのテクスチャ原点(左上)に合わせてVを反転する
-			texcoord.y = 1.0f - texcoord.y;
-			texcoords.push_back(texcoord);//テクスチャ座標を格納
-		}
-		else if (identifile == "vn")
-		{
-			Vector3 normal;
-			s >> normal.x >> normal.y >> normal.z;
-			// normal.x *= -1.0f; // 法線X反転を無効化
-			normals.push_back(normal);//法線を格納
-		}
-		else if (identifile == "f")
-		{
-			//面は三角形限定。その他は未対応
-			Sprite::VertexData triangle[3];
+	for (uint32_t meshIndex = 0; meshIndex < scene->mNumMeshes; ++meshIndex)
+	{
+		aiMesh* mesh = scene->mMeshes[meshIndex];
 
-			for (int32_t faceVertex = 0; faceVertex < 3; ++faceVertex)
+		for (uint32_t faceIndex = 0; faceIndex < mesh->mNumFaces; ++faceIndex)
+		{
+			aiFace& face = mesh->mFaces[faceIndex];
+			for (uint32_t element = 0; element < face.mNumIndices; ++element)
 			{
-				std::string vertexDefinition;
-				s >> vertexDefinition; //頂点の定義を取得
+				uint32_t vertexIndex = face.mIndices[element];
 
-				//頂点の要素へのIndexは、位置、UV、法線の順で入っているため、分解してIndexを取得する
-				std::istringstream v(vertexDefinition);
-				uint32_t elementIndices[3];
-				for (int32_t element = 0; element < 3; ++element)
+				Sprite::VertexData vertex{};
+
+				// 位置
+				aiVector3D& pos = mesh->mVertices[vertexIndex];
+				vertex.position = { pos.x, pos.y, pos.z, 1.0f };
+				vertex.position.x *= -1.0f; // 前のコードに合わせて反転
+
+				// 法線
+				if (mesh->HasNormals())
 				{
-					std::string index;
-					std::getline(v, index, '/'); //スラッシュで区切って要素を取得
-					elementIndices[element] = std::stoi(index);
+					aiVector3D& norm = mesh->mNormals[vertexIndex];
+					vertex.normal = { norm.x, norm.y, norm.z };
+					vertex.normal.x *= -1.0f;
 				}
-				//要素へのIndexから実際の用をの値を取得して、頂点を構築する
-				Vector4 position = positions[elementIndices[0] - 1]; //OBJファイルは1始まりなので-1する
-				Vector2 texcoord = texcoords[elementIndices[1] - 1];
-				Vector3 normal = normals[elementIndices[2] - 1];
-				triangle[faceVertex] = { position, texcoord, normal };
-			}
-			// OBJの元の頂点順を維持して追加（入れ替えない）
-			modelData.vertices.push_back(triangle[0]);
-			modelData.vertices.push_back(triangle[1]);
-			modelData.vertices.push_back(triangle[2]);
-		}
-		else if (identifile == "mtllib")
-		{
-			//materialTemplateLibraryファイルの名前を取得する
-			std::string materialFilename;
-			s >> materialFilename; //マテリアルファイル名を取得
-			//基本的にobjファイルを同じ階層にmtlファイルがあるので、ディレクトリ名とファイル名を渡す
-			modelData.material = LoadMaterialTemplateFile(directoryPath, materialFilename);
-		}
 
+				// UV
+				if (mesh->HasTextureCoords(0))
+				{
+					aiVector3D& tex = mesh->mTextureCoords[0][vertexIndex];
+					vertex.texcoord = { tex.x, tex.y };
+				}
+
+				modelData.vertices.push_back(vertex);
+			}
+		}
+	}
+
+	// マテリアル（テクスチャ）の取得
+	for (uint32_t materialIndex = 0; materialIndex < scene->mNumMaterials; ++materialIndex)
+	{
+		aiMaterial* material = scene->mMaterials[materialIndex];
+		aiString texturePath;
+		if (material->GetTexture(aiTextureType_DIFFUSE, 0, &texturePath) == AI_SUCCESS)
+		{
+			modelData.material.textureFilePath = directoryPath + "/" + std::string(texturePath.C_Str());
+		}
 	}
 
 	return modelData;
 }
-
 
 void Object3d::VertexResource()
 {
