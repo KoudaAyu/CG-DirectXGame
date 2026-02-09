@@ -3,6 +3,11 @@
 #include"Transform.h"
 #include"Matrix4x4.h"
 
+struct CameraForGPU
+{
+	Vector3 worldPosition;
+};
+
 class Camera
 {
 public:

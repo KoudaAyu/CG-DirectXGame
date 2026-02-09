@@ -5,6 +5,30 @@
 #include"DirectXCom.h"
 #include"Log.h"
 
+enum BlendMode
+{
+	//!< ブレンドなし
+	kBlendMode_None,
+
+	//!< αブレンド
+	kBlendMode_Normal,
+
+	//!< 加算ブレンド
+	kBlendMode_Add,
+
+	//!< 減算ブレンド
+	kBlendMode_Sub,
+
+	//!< 乗算ブレンド
+	kBlendMode_Mul,
+
+	//!< スクリーンブレンド
+	kBlendMode_Screen,
+
+	//利用禁止
+	kCountOfBlendMode,
+};
+
 class SpriteCom
 {
 public:
