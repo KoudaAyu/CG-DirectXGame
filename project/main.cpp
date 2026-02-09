@@ -131,111 +131,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	Game game;
 	game.Initialize();
 
-	// 球体
-	const uint32_t kSubdivision = 16; // 16分割
-
-	// 経度分割1つ分の角度
-	const float kLonEvery = DirectX::XM_2PI / float(kSubdivision);
-	// 緯度分割1つ分の角度
-	const float kLatEvery = DirectX::XM_PI / float(kSubdivision);
-
-	// 頂点数・インデックス数
-	// 緯度方向と経度方向の両端に重複する頂点があるため、+1が必要
-	const uint32_t kVertexCount = (kSubdivision + 1) * (kSubdivision + 1);
-	const uint32_t kIndexCount = kSubdivision * kSubdivision * 6; // 各四角形に三角形2つ、各三角形に頂 vertex 3つで 2*3=6
-
-	// 頂点配列を確保
-	Sprite::VertexData* vertexData = new Sprite::VertexData[kVertexCount];
-
-	// --- 頂点データを埋める ---
-	for (uint32_t lat = 0; lat <= kSubdivision; ++lat)
-	{
-		// 緯度 (theta): -π/2 (下端) から π/2 (上端) まで
-		float theta = -DirectX::XM_PIDIV2 + DirectX::XM_PI * (float(lat) / kSubdivision);
-		for (uint32_t lon = 0; lon <= kSubdivision; ++lon)
-		{
-			// 経度 (phi): 0 (東端) から 2π (一周) まで
-			float phi = DirectX::XM_2PI * (float(lon) / kSubdivision);
-			uint32_t idx = lat * (kSubdivision + 1) + lon; // 1次元配列内のインデックス
-
-			// 球面座標からデカルト座標への変換
-			vertexData[idx].position.x = cos(theta) * cos(phi);
-			vertexData[idx].position.y = sin(theta);
-			vertexData[idx].position.z = cos(theta) * sin(phi);
-			vertexData[idx].position.w = 1.0f; // 同次座標
-
-			// テクスチャ座標 (UV)
-			// U: 経度に比例 (0.0 から 1.0)
-			vertexData[idx].texcoord.x = float(lon) / kSubdivision;
-			// V: 緯度に比例 (1.0 から 0.0、上向きが正になるように反転)
-			vertexData[idx].texcoord.y = 1.0f - float(lat) / kSubdivision;
-
-			// 法線ベクトル (原点から頂点へのベクトルがそのまま法線となる)
-			vertexData[idx].normal = {
-				vertexData[idx].position.x,
-				vertexData[idx].position.y,
-				vertexData[idx].position.z
-			};
-		}
-	}
-
-
-	// --- 頂点バッファを作成・アップロード ---
-	Microsoft::WRL::ComPtr<ID3D12Resource> vertexResourceSphere = game.GetDirectXCom()->CreateBufferResource(game.GetDirectXCom()->GetDevice().Get(), sizeof(Sprite::VertexData) * kVertexCount);
-	Sprite::VertexData* mappedVertex = nullptr;
-	vertexResourceSphere->Map(0, nullptr, reinterpret_cast<void**>(&mappedVertex));
-	memcpy(mappedVertex, vertexData, sizeof(Sprite::VertexData) * kVertexCount);
-	vertexResourceSphere->Unmap(0, nullptr);
-
-	uint32_t* indexData = new uint32_t[kIndexCount];
-	uint32_t idx = 0; // ここを元のままの変数名に戻しました
-
-	for (uint32_t lat = 0; lat < kSubdivision; ++lat)
-	{
-		for (uint32_t lon = 0; lon < kSubdivision; ++lon)
-		{
-
-			uint32_t v0 = lat * (kSubdivision + 1) + lon;             // 左上 (A)
-			uint32_t v1 = v0 + 1;                                      // 右上 (C)
-			uint32_t v2 = v0 + (kSubdivision + 1);                     // 左下 (B)
-			uint32_t v3 = v2 + 1;                                      // 右下 (D)
-
-			// 四角形を2つの三角形で表現する
-			// 1つ目の三角形: v0, v2, v1 (A, B, C)
-			// DirectXでは通常、右手座標系で反時計回り（CCW）が表
-			indexData[idx++] = v0; // A
-			indexData[idx++] = v2; // B
-			indexData[idx++] = v1; // C
-
-			// 2つ目の三角形: v2, v3, v1 (B, D, C)
-		indexData[idx++] = v2; // B
-			indexData[idx++] = v3; // D
-			indexData[idx++] = v1; // C
-		}
-	}
-
-	// --- インデックスバッファを作成・アップロード ---
-	Microsoft::WRL::ComPtr<ID3D12Resource> indexResourceSphere = game.GetDirectXCom()->CreateBufferResource(game.GetDirectXCom()->GetDevice().Get(), sizeof(uint32_t) * kIndexCount);
-	uint32_t* mappedIndex = nullptr;
-	indexResourceSphere->Map(0, nullptr, reinterpret_cast<void**>(&mappedIndex));
-	memcpy(mappedIndex, indexData, sizeof(uint32_t) * kIndexCount);
-	indexResourceSphere->Unmap(0, nullptr);
-
-	// --- バッファビュー設定 ---
-	D3D12_VERTEX_BUFFER_VIEW vertexBufferViewSphere{};
-	vertexBufferViewSphere.BufferLocation = vertexResourceSphere->GetGPUVirtualAddress();
-	vertexBufferViewSphere.SizeInBytes = sizeof(Sprite::VertexData) * kVertexCount;
-	vertexBufferViewSphere.StrideInBytes = sizeof(Sprite::VertexData);
-
-	D3D12_INDEX_BUFFER_VIEW indexBufferViewObject{};
-	indexBufferViewObject.BufferLocation = indexResourceSphere->GetGPUVirtualAddress();
-	indexBufferViewObject.SizeInBytes = sizeof(uint32_t) * kIndexCount;
-	indexBufferViewObject.Format = DXGI_FORMAT_R32_UINT;
-
-	Sprite::VertexData* mapped = nullptr;
-	vertexResourceSphere->Map(0, nullptr, reinterpret_cast<void**>(&mapped));
-	memcpy(mapped, vertexData, sizeof(Sprite::VertexData) * kVertexCount);
-	vertexResourceSphere->Unmap(0, nullptr);
+	
 
 
 	//モデル読み込み
@@ -760,86 +656,87 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 			//Objectの描画
 
 			game.GetDirectXCom()->GetCommandList()->IASetVertexBuffers(0, 1, &vertexBufferView);
-			game.GetDirectXCom()->GetCommandList()->IASetIndexBuffer(&indexBufferViewObject);
-			game.GetDirectXCom()->GetCommandList()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-			game.GetDirectXCom()->GetCommandList()->SetGraphicsRootConstantBufferView(0, materialResource->GetGPUVirtualAddress());
-			// Use Object3d WVP updated above
-			game.GetDirectXCom()->GetCommandList()->SetGraphicsRootConstantBufferView(1, game.GetObject3d()->GetTransformationMatrixResource()->GetGPUVirtualAddress());
-			game.GetDirectXCom()->GetCommandList()->SetGraphicsRootDescriptorTable(2, useMonsterBall ? textureSrvHandleGPU2 : textureSrvHandleGPU);
-			game.GetDirectXCom()->GetCommandList()->SetGraphicsRootConstantBufferView(3, directionalLight->GetGPUVirtualAddress());
-			game.GetDirectXCom()->GetCommandList()->SetGraphicsRootConstantBufferView(4, cameraResource->GetGPUVirtualAddress());
-			if (drawObject)
-			{
-				/*commandList->DrawIndexedInstanced(kIndexCount, 1, 0, 0, 0);*/
-				game.GetDirectXCom()->GetCommandList()->DrawInstanced(UINT(modelData.vertices.size()), 1, 0, 0);
-			}
+			// Note: object draw uses non-indexed DrawInstanced, so do not set an index buffer here
+            game.GetDirectXCom()->GetCommandList()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+            game.GetDirectXCom()->GetCommandList()->SetGraphicsRootConstantBufferView(0, materialResource->GetGPUVirtualAddress());
+            // Use Object3d WVP updated above
+            game.GetDirectXCom()->GetCommandList()->SetGraphicsRootConstantBufferView(1, game.GetObject3d()->GetTransformationMatrixResource()->GetGPUVirtualAddress());
+            game.GetDirectXCom()->GetCommandList()->SetGraphicsRootDescriptorTable(2, useMonsterBall ? textureSrvHandleGPU2 : textureSrvHandleGPU);
+            game.GetDirectXCom()->GetCommandList()->SetGraphicsRootConstantBufferView(3, directionalLight->GetGPUVirtualAddress());
+            game.GetDirectXCom()->GetCommandList()->SetGraphicsRootConstantBufferView(4, cameraResource->GetGPUVirtualAddress());
+            if (drawObject)
+            {
+                /*commandList->DrawIndexedInstanced(kIndexCount, 1, 0, 0, 0);*/
+                game.GetDirectXCom()->GetCommandList()->DrawInstanced(UINT(modelData.vertices.size()), 1, 0, 0);
+            }
 
-			if (drawSphere)
-			{
+            if (drawSphere)
+            {
 
-				game.GetDirectXCom()->GetCommandList()->RSSetViewports(1, &viewport);
-				game.GetDirectXCom()->GetCommandList()->RSSetScissorRects(1, &scissorRect);
+                game.GetDirectXCom()->GetCommandList()->RSSetViewports(1, &viewport);
+                game.GetDirectXCom()->GetCommandList()->RSSetScissorRects(1, &scissorRect);
 
-				game.GetDirectXCom()->GetCommandList()->SetGraphicsRootSignature(game.GetObject3dCom()->GetRootSignature().Get());
-				game.GetDirectXCom()->GetCommandList()->SetPipelineState(game.GetObject3dCom()->GetPipelineState().Get());	
+                game.GetDirectXCom()->GetCommandList()->SetGraphicsRootSignature(game.GetObject3dCom()->GetRootSignature().Get());
+                game.GetDirectXCom()->GetCommandList()->SetPipelineState(game.GetObject3dCom()->GetPipelineState().Get());
 
-				game.GetDirectXCom()->GetCommandList()->IASetVertexBuffers(0, 1, &vertexBufferViewSphere);
-				game.GetDirectXCom()->GetCommandList()->IASetIndexBuffer(&indexBufferViewObject);
-				game.GetDirectXCom()->GetCommandList()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-
-
-				game.GetDirectXCom()->GetCommandList()->SetGraphicsRootConstantBufferView(0, materialResource->GetGPUVirtualAddress());
-
-				game.GetDirectXCom()->GetCommandList()->SetGraphicsRootConstantBufferView(1, transformationMatrixResourceSphere->GetGPUVirtualAddress());
-
-				game.GetDirectXCom()->GetCommandList()->SetGraphicsRootDescriptorTable(2, useMonsterBall ? textureSrvHandleGPU2 : textureSrvHandleGPU);
-
-				game.GetDirectXCom()->GetCommandList()->SetGraphicsRootConstantBufferView(3, directionalLight->GetGPUVirtualAddress());
-
-				game.GetDirectXCom()->GetCommandList()->DrawIndexedInstanced(kIndexCount, 1, 0, 0, 0);
-			}
-
-			if (drawSprite)
-			{
-				for (auto* sprite : game.GetSprites())
-				{
-					sprite->Draw();
-				}
-			}
-
-			//RootSignatureを設定。PSOに設定しているけれど別途設定が必要
-			game.GetDirectXCom()->GetCommandList()->SetGraphicsRootSignature(game.GetParticleManager()->GetRootSignature().Get());
-			game.GetDirectXCom()->GetCommandList()->SetPipelineState(game.GetParticleManager()->GetPipelineState().Get()); // パイプラインステートを設定
-			//Objectの描画
-
-			game.GetDirectXCom()->GetCommandList()->IASetVertexBuffers(0, 1, &vertexBufferView);
-			game.GetDirectXCom()->GetCommandList()->IASetIndexBuffer(&indexBufferViewObject);
-			game.GetDirectXCom()->GetCommandList()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-			game.GetDirectXCom()->GetCommandList()->SetGraphicsRootConstantBufferView(0, materialResource->GetGPUVirtualAddress());
-			// Do NOT set a CBV at root parameter 1 because particle manager declares parameter 1 as a descriptor table.
-			// Set descriptor table for instance data (root parameter 1)
-			game.GetDirectXCom()->GetCommandList()->SetGraphicsRootDescriptorTable(1, instancingSrvHandleGPU);
-			// Set descriptor table for texture (root parameter 2)
-			game.GetDirectXCom()->GetCommandList()->SetGraphicsRootDescriptorTable(2, useMonsterBall ? textureSrvHandleGPU2 : textureSrvHandleGPU);
-			game.GetDirectXCom()->GetCommandList()->SetGraphicsRootConstantBufferView(3, directionalLight->GetGPUVirtualAddress());
-			game.GetDirectXCom()->GetCommandList()->SetGraphicsRootConstantBufferView(4, cameraResource->GetGPUVirtualAddress());
-
-			/*commandList->DrawIndexedInstanced(kIndexCount, 1, 0, 0, 0);*/
-			if (numInstance > 0)
-			{
-				game.GetDirectXCom()->GetCommandList()->DrawInstanced(UINT(modelData.vertices.size()), numInstance, 0, 0);
-			}
+                game.GetDirectXCom()->GetCommandList()->IASetVertexBuffers(0, 1, &game.GetSphere()->GetVertexBufferViewSphere());
+                // Use sphere's index buffer for indexed draw
+                game.GetDirectXCom()->GetCommandList()->IASetIndexBuffer(&game.GetSphere()->GetIndexBufferViewSphere());
+                game.GetDirectXCom()->GetCommandList()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
 
+                game.GetDirectXCom()->GetCommandList()->SetGraphicsRootConstantBufferView(0, materialResource->GetGPUVirtualAddress());
 
-			//実際のcommandListのImGuiの描画コマンドを積む
-			ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), game.GetDirectXCom()->GetCommandList().Get());
+                game.GetDirectXCom()->GetCommandList()->SetGraphicsRootConstantBufferView(1, transformationMatrixResourceSphere->GetGPUVirtualAddress());
+
+                game.GetDirectXCom()->GetCommandList()->SetGraphicsRootDescriptorTable(2, useMonsterBall ? textureSrvHandleGPU2 : textureSrvHandleGPU);
+
+                game.GetDirectXCom()->GetCommandList()->SetGraphicsRootConstantBufferView(3, directionalLight->GetGPUVirtualAddress());
+
+                game.GetDirectXCom()->GetCommandList()->DrawIndexedInstanced(game.GetSphere()->GetIndexCount(), 1, 0, 0, 0);
+            }
+
+            if (drawSprite)
+            {
+                for (auto* sprite : game.GetSprites())
+                {
+                    sprite->Draw();
+                }
+            }
+
+            //RootSignatureを設定。PSOに設定しているけれど別途設定が必要
+            game.GetDirectXCom()->GetCommandList()->SetGraphicsRootSignature(game.GetParticleManager()->GetRootSignature().Get());
+            game.GetDirectXCom()->GetCommandList()->SetPipelineState(game.GetParticleManager()->GetPipelineState().Get()); // パイプラインステートを設定
+            //Objectの描画
+
+            game.GetDirectXCom()->GetCommandList()->IASetVertexBuffers(0, 1, &vertexBufferView);
+            // Particle draw uses non-indexed DrawInstanced, so do not set an index buffer here
+            game.GetDirectXCom()->GetCommandList()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+            game.GetDirectXCom()->GetCommandList()->SetGraphicsRootConstantBufferView(0, materialResource->GetGPUVirtualAddress());
+            // Do NOT set a CBV at root parameter 1 because particle manager declares parameter 1 as a descriptor table.
+            // Set descriptor table for instance data (root parameter 1)
+            game.GetDirectXCom()->GetCommandList()->SetGraphicsRootDescriptorTable(1, instancingSrvHandleGPU);
+            // Set descriptor table for texture (root parameter 2)
+            game.GetDirectXCom()->GetCommandList()->SetGraphicsRootDescriptorTable(2, useMonsterBall ? textureSrvHandleGPU2 : textureSrvHandleGPU);
+            game.GetDirectXCom()->GetCommandList()->SetGraphicsRootConstantBufferView(3, directionalLight->GetGPUVirtualAddress());
+            game.GetDirectXCom()->GetCommandList()->SetGraphicsRootConstantBufferView(4, cameraResource->GetGPUVirtualAddress());
+
+            /*commandList->DrawIndexedInstanced(kIndexCount, 1, 0, 0, 0);*/
+            if (numInstance > 0)
+            {
+                game.GetDirectXCom()->GetCommandList()->DrawInstanced(UINT(modelData.vertices.size()), numInstance, 0, 0);
+            }
 
 
-			game.GetDirectXCom()->PostDraw();
-		}
 
-	}
+            //実際のcommandListのImGuiの描画コマンドを積む
+            ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), game.GetDirectXCom()->GetCommandList().Get());
+
+
+            game.GetDirectXCom()->PostDraw();
+        }
+
+    }
 
 	//ImGui終了処理
 	ImGui_ImplDX12_Shutdown();
@@ -877,8 +774,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 	TextureManager::GetInstance()->Finalize();
 
 
-	delete[] vertexData;
-	delete[] indexData;
+	delete game.GetSphere();
 
 	delete game.GetObject3dCom();
 	delete game.GetSpriteCom();

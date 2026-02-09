@@ -8,7 +8,7 @@ void Game::Initialize()
 	log.Initialize();
 	windowAPI = new WindowAPI();
 	windowAPI->Initialize();
-	
+
 	directXCom = new DirectXCom(windowAPI, logStream);
 	directXCom->DebugLayer();
 	//ウィンドウを表示する
@@ -24,7 +24,7 @@ void Game::Initialize()
 	spriteCom = new SpriteCom(logStream, directXCom);
 	spriteCom->Initialize();
 
-	
+
 	for (uint32_t i = 0; i < 5; ++i)
 	{
 		Sprite* sprite = new Sprite();
@@ -51,7 +51,8 @@ void Game::Initialize()
 	//パイプラインステートの生成に失敗した場合はエラー
 	assert(SUCCEEDED(GetDirectXCom()->GetHr()));
 
-
+	sphere = new Sphere();
+	sphere->Initialize(directXCom);
 
 }
 void Game::Finalize()

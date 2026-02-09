@@ -1,0 +1,44 @@
+#pragma once
+#include <cstdint>
+#include <DirectXMath.h>
+#include"DirectXCom.h"
+#include"Sprite.h"
+
+class Sphere
+{
+public:
+	void Initialize(DirectXCom* dxCommon);
+
+public:
+	
+	Microsoft::WRL::ComPtr<ID3D12Resource> GetVertexResourceSphere() const { return vertexResourceSphere; }
+	const D3D12_VERTEX_BUFFER_VIEW& GetVertexBufferViewSphere() const { return vertexBufferViewSphere; }
+	const D3D12_INDEX_BUFFER_VIEW& GetIndexBufferViewSphere() const { return indexBufferViewSphere; }
+	const uint32_t GetIndexCount() const { return kIndexCount; }
+
+private:
+	DirectXCom* directXCom = nullptr;
+
+private:
+	// 球体
+		const uint32_t kSubdivision = 16; // 16分割
+
+	// 経度分割1つ分の角度
+	const float kLonEvery = DirectX::XM_2PI / float(kSubdivision);
+	// 緯度分割1つ分の角度
+	const float kLatEvery = DirectX::XM_PI / float(kSubdivision);
+
+	// 頂点数・インデックス数
+	// 緯度方向と経度方向の両端に重複する頂点があるため、+1が必要
+	const uint32_t kVertexCount = (kSubdivision + 1) * (kSubdivision + 1);
+	const uint32_t kIndexCount = kSubdivision * kSubdivision * 6; // 各四角形に三角形2つ、各三角形に頂 vertex 3つで 2*3=6
+	// 頂点配列を確保
+	Sprite::VertexData* vertexData = new Sprite::VertexData[kVertexCount];
+
+	Microsoft::WRL::ComPtr<ID3D12Resource> vertexResourceSphere;
+	Microsoft::WRL::ComPtr<ID3D12Resource> indexResourceSphere;
+	D3D12_VERTEX_BUFFER_VIEW vertexBufferViewSphere{};
+	D3D12_INDEX_BUFFER_VIEW indexBufferViewSphere{};
+	Sprite::VertexData* mapped = nullptr;
+};
+

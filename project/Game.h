@@ -6,7 +6,7 @@
 #include"Object3d.h"
 #include"Object3dCom.h"
 #include"ParticleManager.h"
-
+#include"Sphere.h"
 #include"Sprite.h"
 #include"SpriteCom.h"
 #include"ResourceLeakCheak.h"
@@ -62,6 +62,8 @@ public:
 	const Object3dCom* GetObject3dCom() const { return object3dCom; }
 	ParticleManager* GetParticleManager() { return particleManager; }
 	const ParticleManager* GetParticleManager() const { return particleManager; }
+	Sphere* GetSphere() { return sphere; }
+	const Sphere* GetSphere() const { return sphere; }
 
 private:
 	ResourceLeakCheak leakChecker; //リソースリークチェック用のオブジェクト
@@ -73,7 +75,7 @@ private:
 	Object3d* object3d = nullptr;
 	Object3dCom* object3dCom = nullptr;
 	ParticleManager* particleManager = nullptr;
-	
+	Sphere* sphere = nullptr;
 private:
 	std::vector<Sprite*>sprites;
 	

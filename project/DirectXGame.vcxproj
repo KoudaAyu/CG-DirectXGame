@@ -40,6 +40,7 @@
     <ClCompile Include="Model.cpp" />
     <ClCompile Include="ModelCom.cpp" />
     <ClCompile Include="ModelManager.cpp" />
+    <ClCompile Include="Sphere.cpp" />
     <ClCompile Include="SRVManager.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -95,6 +96,7 @@
     <ClInclude Include="Model.h" />
     <ClInclude Include="ModelCom.h" />
     <ClInclude Include="ModelManager.h" />
+    <ClInclude Include="Sphere.h" />
     <ClInclude Include="SRVManager.h" />
   </ItemGroup>
   <ItemGroup>
