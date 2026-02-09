@@ -7,11 +7,22 @@
 #include "Transform.h"
 #include "Sprite.h"
 
+
+#include<assimp/Importer.hpp>
+#include<assimp/scene.h>
+#include<assimp/postprocess.h>
+
 class Object3dCom;
 
 class Object3d
 {
 public:
+	struct Node
+	{
+		Matrix4x4 localMatrix;
+		std::string name;
+		std::vector<Node> children;
+	};
 
 	struct Material
 	{
@@ -32,6 +43,7 @@ public:
 	{
 		std::vector<Sprite::VertexData> vertices; // 頂点データ
 		MaterialData material; // マテリアルデータ
+		Node rootNode; // ルートノード
 	};
 
 	struct VertexData
@@ -54,6 +66,8 @@ public:
 		float intensity;
 	};
 
+	
+
 	void Initialize(Object3dCom* object3dCom);
 
 	void Update();
@@ -72,7 +86,7 @@ public:
 	/// <param name="directoryPath">ファイルパス</param>
 	/// <param name="filename">.objパス</param>
 	/// <returns></returns>
-	static ModelData LoadObjFile(const std::string& directoryPath, const std::string& filename);
+	static ModelData LoadModeljFile(const std::string& directoryPath, const std::string& filename);
 
 	
 
@@ -99,7 +113,6 @@ public:
 		object3dCom_ = object3dCom;
 	}
 
-	// Expose transformation matrix CBV so external code can bind the correct constant buffer
 	const Microsoft::WRL::ComPtr<ID3D12Resource>& GetTransformationMatrixResource() const { return transformationMatrixResource; }
 
 	// Transform setters/getters to control from outside (e.g., ImGui)
@@ -113,6 +126,8 @@ public:
 private:
 	Transform transform;
 	Transform cameraTransform;
+
+	static Node ReadNode(aiNode* node);
 
 private:
 	Camera* camera_ = nullptr;

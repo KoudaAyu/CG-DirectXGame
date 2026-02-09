@@ -367,7 +367,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
 
 	//モデル読み込み
-	Object3d::ModelData modelData = object3d->LoadObjFile("Resources", "terrain.obj");
+	Object3d::ModelData modelData = object3d->LoadModeljFile("Resources", "plane.gltf");
 	//頂点リソースを作る
 	Microsoft::WRL::ComPtr<ID3D12Resource> vertexResourceModel = dxCommon->CreateBufferResource(dxCommon->GetDevice().Get(), sizeof(Sprite::VertexData) * modelData.vertices.size());
 	//頂点バッファービューを作成末う

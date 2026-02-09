@@ -6,9 +6,6 @@
 #include<sstream> // 追加: 行分解用
 #include<cstring> // 追加: memcpy 用
 
-#include<assimp/Importer.hpp>
-#include<assimp/scene.h>
-#include<assimp/postprocess.h>
 
 
 
@@ -42,38 +39,53 @@ void Object3d::Initialize(Object3dCom* object3dCom)
 
 void Object3d::Update()
 {
-	// 毎フレーム、Object3dCom から最新のカメラを取得（初期化後に設定されたケースへ対応）
 	if (object3dCom_)
 	{
 		camera_ = object3dCom_->GetDefaultCamera();
 	}
 
-	// 優先: Object3dComに設定されたカメラを使う
-	Matrix4x4 worldMatrix = MakeAffineMatrix(transform.GetScale(), transform.GetRotate(), transform.GetTranslate());
+	// 1. オブジェクト自身の Transform からワールド行列を作成 (SRT)
+	Matrix4x4 worldMatrix =
+		MakeAffineMatrix(transform.GetScale(), transform.GetRotate(), transform.GetTranslate());
 
+	// 2. ビュープロジェクション行列の取得
 	Matrix4x4 viewMatrix;
 	Matrix4x4 projectionMatrix;
 
 	if (camera_)
 	{
-		// カメラが有効な場合はそれを使う
 		viewMatrix = camera_->GetViewMatrix();
 		projectionMatrix = camera_->GetProjectionMatrix();
 	}
 	else
 	{
-		// フォールバック: 内部の簡易カメラで計算
-		Matrix4x4 cameraMatrix = MakeAffineMatrix(cameraTransform.GetScale(), cameraTransform.GetRotate(), cameraTransform.GetTranslate());
+		Matrix4x4 cameraMatrix = MakeAffineMatrix(
+			cameraTransform.GetScale(), cameraTransform.GetRotate(), cameraTransform.GetTranslate());
 		viewMatrix = Inverse(cameraMatrix);
 		projectionMatrix = MakePerspectiveFovMatrix(0.45f, 1.0f, 0.1f, 100.0f);
 	}
 
-	// WVP を更新
-	transformationMatrixData_->WVP = Multiply(worldMatrix, Multiply(viewMatrix, projectionMatrix));
-	transformationMatrixData_->World = worldMatrix;
-	// WorldInverseTranspose を計算して格納（法線変換用）
-	transformationMatrixData_->WorldInverseTranspose = Transpose(Inverse(worldMatrix));
+	Matrix4x4 viewProjectionMatrix = Multiply(viewMatrix, projectionMatrix);
+
+	// 3. スライドの式に基づき、RootNodeの行列を合成して定数バッファへ書き込み
+	// transformData->WVP = modelData.rootNode.localMatrix * worldMatrix * viewProjectionMatrix;
+	if (!modelData_.vertices.empty())
+	{
+		// 資料通りの合成順序
+		transformationMatrixData_->World = Multiply(modelData_.rootNode.localMatrix, worldMatrix);
+	}
+	else
+	{
+		transformationMatrixData_->World = worldMatrix;
+	}
+
+	// WVPの計算
+	transformationMatrixData_->WVP = Multiply(transformationMatrixData_->World, viewProjectionMatrix);
+
+	// 法線用行列の計算
+	transformationMatrixData_->WorldInverseTranspose = Transpose(Inverse(transformationMatrixData_->World));
 }
+
 
 Object3d::MaterialData Object3d::LoadMaterialTemplateFile(const std::string& direcrotyPath, const std::string& filename)
 {
@@ -106,7 +118,7 @@ Object3d::MaterialData Object3d::LoadMaterialTemplateFile(const std::string& dir
 	return materlialData;
 }
 
-Object3d::ModelData Object3d::LoadObjFile(const std::string& directoryPath, const std::string& filename)
+Object3d::ModelData Object3d::LoadModeljFile(const std::string& directoryPath, const std::string& filename)
 {
 	Object3d::ModelData modelData;
 	Assimp::Importer importer;
@@ -114,48 +126,35 @@ Object3d::ModelData Object3d::LoadObjFile(const std::string& directoryPath, cons
 
 	// aiProcess_Triangulate を追加して、三角形化を確実にする
 	const aiScene* scene = importer.ReadFile(filePath.c_str(),
-		aiProcess_FlipWindingOrder | aiProcess_FlipUVs | aiProcess_Triangulate);
+		aiProcess_FlipWindingOrder | aiProcess_FlipUVs );
 
-	if (!scene || !scene->HasMeshes())
-	{
-		assert(false && "Failed to load model");
-		return modelData;
-	}
+	assert(scene->HasMeshes());
 
 	for (uint32_t meshIndex = 0; meshIndex < scene->mNumMeshes; ++meshIndex)
 	{
 		aiMesh* mesh = scene->mMeshes[meshIndex];
 
+		assert(mesh->HasNormals());
+		assert(mesh->HasTextureCoords(0));
 		for (uint32_t faceIndex = 0; faceIndex < mesh->mNumFaces; ++faceIndex)
 		{
-			aiFace& face = mesh->mFaces[faceIndex];
+			aiFace face = mesh->mFaces[faceIndex];
+			assert(face.mNumIndices == 3); // 三角形であることを確認
+
 			for (uint32_t element = 0; element < face.mNumIndices; ++element)
 			{
-				uint32_t vertexIndex = face.mIndices[element];
+				uint32_t vectorIndex = face.mIndices[element];
+				aiVector3D& position = mesh->mVertices[vectorIndex];
+				aiVector3D& normal = mesh->mNormals[vectorIndex];
+				aiVector3D& texcoord = mesh->mTextureCoords[0][vectorIndex];
+				Sprite::VertexData vertexData;
+				vertexData.position = { position.x, position.y, position.z, 1.0f };
+				vertexData.normal = { normal.x, normal.y, normal.z };
+				vertexData.texcoord = { texcoord.x, 1.0f - texcoord.y };
 
-				Sprite::VertexData vertex{};
-
-				// 位置
-				aiVector3D& pos = mesh->mVertices[vertexIndex];
-				vertex.position = { pos.x, pos.y, pos.z, 1.0f };
-				vertex.position.x *= -1.0f; // 前のコードに合わせて反転
-
-				// 法線
-				if (mesh->HasNormals())
-				{
-					aiVector3D& norm = mesh->mNormals[vertexIndex];
-					vertex.normal = { norm.x, norm.y, norm.z };
-					vertex.normal.x *= -1.0f;
-				}
-
-				// UV
-				if (mesh->HasTextureCoords(0))
-				{
-					aiVector3D& tex = mesh->mTextureCoords[0][vertexIndex];
-					vertex.texcoord = { tex.x, tex.y };
-				}
-
-				modelData.vertices.push_back(vertex);
+				vertexData.position.x *= -1.0f;;
+				vertexData.normal.x *= -1.0f;
+				modelData.vertices.push_back(vertexData);
 			}
 		}
 	}
@@ -170,6 +169,8 @@ Object3d::ModelData Object3d::LoadObjFile(const std::string& directoryPath, cons
 			modelData.material.textureFilePath = directoryPath + "/" + std::string(texturePath.C_Str());
 		}
 	}
+
+	modelData.rootNode = ReadNode(scene->mRootNode);
 
 	return modelData;
 }
@@ -253,4 +254,22 @@ void Object3d::DirectionalLightResource()
 		// 必要に応じてアンマップ（頻繁に更新しない場合）
 		directionalLightResource->Unmap(0, nullptr);
 	}
+}
+
+Object3d::Node Object3d::ReadNode(aiNode* node)
+{
+	Node result;
+	aiMatrix4x4 aiLocalMatrix = node->mTransformation; //nodeのlocalMatrixを取得
+	aiLocalMatrix.Transpose(); //列ベクトル形式を行ベクトル形式に転置
+	
+	std::memcpy(&result.localMatrix, &aiLocalMatrix, sizeof(aiMatrix4x4));
+
+	result.name = node->mName.C_Str(); //nodeの名前を取得
+	result.children.resize(node->mNumChildren); //子ノードの数だけ配列をリサイズ
+	for(uint32_t childIndex = 0; childIndex < node->mNumChildren; ++childIndex)
+	{
+		result.children[childIndex] = ReadNode(node->mChildren[childIndex]); //再帰的に子ノードを読み込む
+	}
+
+	return result;
 }
