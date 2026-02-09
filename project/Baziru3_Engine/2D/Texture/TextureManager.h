@@ -29,6 +29,8 @@ public:
 		return textureDatas_[index].metadata_;
 	}
 
+	
+
 public:
 	D3D12_GPU_DESCRIPTOR_HANDLE GetSrvHandleGPU(uint32_t index) const
 	{

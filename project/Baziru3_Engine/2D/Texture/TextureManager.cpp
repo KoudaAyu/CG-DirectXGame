@@ -108,3 +108,4 @@ uint32_t TextureManager::GetTextureIndexByFilePath(const std::string& filePath) 
 	assert(0);
 	return 0;
 }
+
