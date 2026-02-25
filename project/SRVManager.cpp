@@ -8,7 +8,7 @@ void SRVManager::Initialize(DirectXCom* directXCom)
     directXCom_ = directXCom;
 
     // Use the DirectXCom's SRV descriptor heap instead of creating a separate heap
-    descriptirHeap = directXCom_->GetSrvDescriptorHeap();
+    descriptorHeap = directXCom_->GetSrvDescriptorHeap();
 
     //デスクリプタサイズ1個分のサイズを取得して記録
 	descriptorSize_ = directXCom_->GetDevice()->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
@@ -51,7 +51,7 @@ void SRVManager::CreateSRVforStructuredBuffer(uint32_t srvIndex, ID3D12Resource*
 void SRVManager::PreDraw()
 {
     //SRVデスクリプタヒープのセット
-    ID3D12DescriptorHeap* descriptorHeaps[] = { descriptirHeap.Get() };
+    ID3D12DescriptorHeap* descriptorHeaps[] = { descriptorHeap.Get() };
     directXCom_->GetCommandList()->SetDescriptorHeaps(1, descriptorHeaps);
 }
 
@@ -72,14 +72,14 @@ uint32_t SRVManager::Allocate()
 }
 D3D12_CPU_DESCRIPTOR_HANDLE SRVManager::GetCPUDescriptorHandle(uint32_t index)
 {
-    D3D12_CPU_DESCRIPTOR_HANDLE handleCPU = descriptirHeap->GetCPUDescriptorHandleForHeapStart();
+    D3D12_CPU_DESCRIPTOR_HANDLE handleCPU = descriptorHeap->GetCPUDescriptorHandleForHeapStart();
     handleCPU.ptr += (descriptorSize_ * index);
     return handleCPU;
 }
 
 D3D12_GPU_DESCRIPTOR_HANDLE SRVManager::GetGPUDescriptorHandle(uint32_t index)
 {
-    D3D12_GPU_DESCRIPTOR_HANDLE handleGPU = descriptirHeap->GetGPUDescriptorHandleForHeapStart();
+    D3D12_GPU_DESCRIPTOR_HANDLE handleGPU = descriptorHeap->GetGPUDescriptorHandleForHeapStart();
     handleGPU.ptr += (descriptorSize_ * index);
     return handleGPU;
 }

@@ -71,28 +71,28 @@ void Object3d::Update()
 	transformationMatrixData_->WorldInverseTranspose = Transpose(Inverse(worldMatrix));
 }
 
-Object3d::MaterialData Object3d::LoadMaterialTemplateFile(const std::string& direcrotyPath, const std::string& filename)
+Object3d::MaterialData Object3d::LoadMaterialTemplateFile(const std::string& directoryPath, const std::string& filename)
 {
 	//中で必要になる変数の宣言
 	Object3d::MaterialData materlialData;//構築するデータ
 	std::string line;//ファイルから読み込んだ1行を格納するもの
-	std::ifstream file(direcrotyPath + "/" + filename);//ファイルを開く
+	std::ifstream file(directoryPath + "/" + filename);//ファイルを開く
 	assert(file.is_open());//ファイルが開けなかったら停止
 
 	//MaterialDataを構築
 	while (std::getline(file, line))
 	{
-		std::string identifile;
+		std::string identifier;
 		std::istringstream s(line);
-		s >> identifile; //先頭の識別子を取得
+		s >> identifier; //先頭の識別子を取得
 
-		//identifileに応じた処理
-		if (identifile == "map_Kd")
+		//identifierに応じた処理
+		if (identifier == "map_Kd")
 		{
 			std::string textureFilename;
 			s >> textureFilename; //テクスチャファイル名を取得
 			//連結してファイルパスにする
-			materlialData.textureFilePath = direcrotyPath + "/" + textureFilename;
+			materlialData.textureFilePath = directoryPath + "/" + textureFilename;
 		}
 
 	}
@@ -117,12 +117,12 @@ Object3d::ModelData Object3d::LoadObjFile(const std::string& directoryPath, cons
 	//実際にファイルを読み込む。その後modelDataを構築する
 	while (std::getline(file, line))
 	{
-		std::string identifile;
+		std::string identifier;
 		std::istringstream s(line);
-		s >> identifile; //先頭の識別子を取得
+		s >> identifier; //先頭の識別子を取得
 
-		//identifileに応じた処理
-		if (identifile == "v")
+		//identifierに応じた処理
+		if (identifier == "v")
 		{
 			Vector4 position;
 			s >> position.x >> position.y >> position.z;
@@ -130,7 +130,7 @@ Object3d::ModelData Object3d::LoadObjFile(const std::string& directoryPath, cons
 			position.w = 1.0f;
 			positions.push_back(position);//位置を格納
 		}
-		else if (identifile == "vt")
+		else if (identifier == "vt")
 		{
 			Vector2 texcoord;
 			s >> texcoord.x >> texcoord.y;
@@ -138,14 +138,14 @@ Object3d::ModelData Object3d::LoadObjFile(const std::string& directoryPath, cons
 			texcoord.y = 1.0f - texcoord.y;
 			texcoords.push_back(texcoord);//テクスチャ座標を格納
 		}
-		else if (identifile == "vn")
+		else if (identifier == "vn")
 		{
 			Vector3 normal;
 			s >> normal.x >> normal.y >> normal.z;
 			// normal.x *= -1.0f; // 法線X反転を無効化
 			normals.push_back(normal);//法線を格納
 		}
-		else if (identifile == "f")
+		else if (identifier == "f")
 		{
 			//面は三角形限定。その他は未対応
 			Sprite::VertexData triangle[3];
@@ -175,7 +175,7 @@ Object3d::ModelData Object3d::LoadObjFile(const std::string& directoryPath, cons
 			modelData.vertices.push_back(triangle[1]);
 			modelData.vertices.push_back(triangle[2]);
 		}
-		else if (identifile == "mtllib")
+		else if (identifier == "mtllib")
 		{
 			//materialTemplateLibraryファイルの名前を取得する
 			std::string materialFilename;

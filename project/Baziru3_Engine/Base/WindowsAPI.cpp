@@ -80,7 +80,7 @@ void WindowAPI::Finalize()
 	CoUninitialize();
 }
 
-bool WindowAPI::ProcessMassage()
+bool WindowAPI::ProcessMessage()
 {
 	return false;
 }
