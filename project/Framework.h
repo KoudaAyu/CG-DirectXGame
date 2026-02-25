@@ -18,7 +18,7 @@ public:
 
 	virtual bool IsEndRequest() { return endRequest; }
 
-	// Returns true when application should quit (e.g. WM_QUIT received).
+	
 	virtual bool IsQuitRequested() { return false; }
 
 	void Run();
