@@ -3,6 +3,7 @@
 #include"Camera.h"
 #include"CrashDump.h"
 #include"DirectXCom.h"
+#include"Framework.h"
 #include"ImGuiManager.h"
 #include"Log.h"
 #include"Object3d.h"
@@ -20,13 +21,16 @@
 #include <vector>
 #include <random>
 
-class Game
+class Game : public Framework
 {
 public:
-	void Initialize();
-	void Finalize();
-	void Update();
-	void Draw();
+	void Initialize() override;
+	void Finalize() override;
+	void Update() override;
+	void Draw() override;
+
+	// Framework::Run will call this to check for WM_QUIT
+	bool IsQuitRequested() override;
 
 public:
 	std::ostream& logStream = log.GetLogStream();

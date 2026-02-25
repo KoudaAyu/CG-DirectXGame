@@ -1,13 +1,12 @@
 #include"Game.h"
 
-
-
-
 #include <combaseapi.h>
 
 
 void Game::Initialize()
 {
+	Framework::Initialize();
+
 	crashDump.Install();
 	log.Initialize();
 	windowAPI = new WindowAPI();
@@ -357,10 +356,12 @@ void Game::Finalize()
 
 	windowAPI->Finalize();
 	delete windowAPI;
+
+	Framework::Finalize();
 }
 void Game::Update()
 { 
-
+	Framework::Update();
 
 	//if (windowAPI->ProcessMassage())
 	//{
@@ -680,4 +681,12 @@ void Game::Draw()
 
 
 	directXCom->PostDraw();
+}
+bool Game::IsQuitRequested()
+{
+	if (directXCom)
+	{
+		return (directXCom->GetMsg().message == WM_QUIT);
+	}
+	return false;
 }
