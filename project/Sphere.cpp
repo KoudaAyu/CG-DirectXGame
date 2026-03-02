@@ -92,8 +92,30 @@ void Sphere::Initialize(DirectXCom* dxCommon)
 	memcpy(mapped, vertexData, sizeof(Sprite::VertexData) * kVertexCount);
 	vertexResourceSphere->Unmap(0, nullptr);
 
+}
 
-	
+void Sphere::Update()
+{
+	// 球の更新処理（必要に応じて）
+}
 
+void Sphere::Draw()
+{
+	/*directXCom->GetCommandList()->RSSetViewports(1, &directXCom->GetViewport());
+	directXCom->GetCommandList()->RSSetScissorRects(1, &directXCom->GetScissorRect());
 
+	directXCom->GetCommandList()->SetGraphicsRootSignature(object3dCom->GetRootSignature().Get());
+	directXCom->GetCommandList()->SetPipelineState(object3dCom->GetPipelineState().Get());
+	directXCom->GetCommandList()->IASetVertexBuffers(0, 1, &vertexBufferViewSphere);
+	directXCom->GetCommandList()->IASetIndexBuffer(&indexBufferViewSphere);
+	directXCom->GetCommandList()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+	directXCom->GetCommandList()->SetGraphicsRootConstantBufferView(0, materialResource->GetGPUVirtualAddress());
+
+	directXCom->GetCommandList()->SetGraphicsRootConstantBufferView(1, transformationMatrixResourceSphere->GetGPUVirtualAddress());
+	directXCom->GetCommandList()->SetGraphicsRootDescriptorTable(2, useMonsterBall ? textureSrvHandleGPU2 : textureSrvHandleGPU);
+
+	directXCom->GetCommandList()->SetGraphicsRootConstantBufferView(3, directionalLight->GetGPUVirtualAddress());
+
+	directXCom->GetCommandList()->DrawIndexedInstanced(GetIndexCount(), 1, 0, 0, 0);*/
 }

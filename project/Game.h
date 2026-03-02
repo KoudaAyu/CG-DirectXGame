@@ -127,13 +127,6 @@ private:
 
 	Object3d::ModelData modelData;
 
-	D3D12_VIEWPORT viewport{};
-	D3D12_RECT scissorRect{};
-
-	
-	
-	
-
 	const uint32_t kNumMaxInstances = 10;
 	uint32_t numInstance = 0;
 

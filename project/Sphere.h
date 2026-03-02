@@ -8,6 +8,8 @@ class Sphere
 {
 public:
 	void Initialize(DirectXCom* dxCommon);
+	void Update();
+	void Draw();
 
 public:
 	
@@ -21,17 +23,17 @@ private:
 
 private:
 	// 球体
-		const uint32_t kSubdivision = 16; // 16分割
+	static constexpr uint32_t kSubdivision = 16; // 16分割
 
 	// 経度分割1つ分の角度
-	const float kLonEvery = DirectX::XM_2PI / float(kSubdivision);
+	static constexpr float kLonEvery = DirectX::XM_2PI / float(kSubdivision);
 	// 緯度分割1つ分の角度
-	const float kLatEvery = DirectX::XM_PI / float(kSubdivision);
+	static constexpr float kLatEvery = DirectX::XM_PI / float(kSubdivision);
 
 	// 頂点数・インデックス数
 	// 緯度方向と経度方向の両端に重複する頂点があるため、+1が必要
-	const uint32_t kVertexCount = (kSubdivision + 1) * (kSubdivision + 1);
-	const uint32_t kIndexCount = kSubdivision * kSubdivision * 6; // 各四角形に三角形2つ、各三角形に頂 vertex 3つで 2*3=6
+	static constexpr uint32_t kVertexCount = (kSubdivision + 1) * (kSubdivision + 1);
+	static constexpr uint32_t kIndexCount = kSubdivision * kSubdivision * 6; // 各四角形に三角形2つ、各三角形に頂 vertex 3つで 2*3=6
 	// 頂点配列を確保
 	Sprite::VertexData* vertexData = new Sprite::VertexData[kVertexCount];
 

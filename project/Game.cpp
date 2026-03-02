@@ -59,6 +59,7 @@ void Game::Initialize()
 
 	//モデル読み込み
 	modelData = object3d->LoadObjFile("Resources", "plane.obj");
+
 	//頂点リソースを作る
 	vertexResourceModel = directXCom->CreateBufferResource(directXCom->GetDevice().Get(), sizeof(Sprite::VertexData) * modelData.vertices.size());
 	//頂点バッファービューを作成末う
@@ -86,7 +87,7 @@ void Game::Initialize()
 	materialData->enableLighting = false;
 	materialResource->Unmap(0, nullptr);
 
-	 directionalLight = directXCom->CreateBufferResource(directXCom->GetDevice().Get(), sizeof(Object3d::DirectionalLight));
+	directionalLight = directXCom->CreateBufferResource(directXCom->GetDevice().Get(), sizeof(Object3d::DirectionalLight));
 
 	// MapしてGPUリソースのCPU側の書き込み可能ポインタを取得する
 	
@@ -96,8 +97,6 @@ void Game::Initialize()
 	directionalLightData->color = { 1.0f, 1.0f, 1.0f, 1.0f };
 	directionalLightData->direction = { 0.0f, -1.0f, 0.0f };
 	directionalLightData->intensity = 1.0f;
-
-
 
 	// 書き込み完了後はUnmapを呼ぶ
 	directionalLight->Unmap(0, nullptr);
@@ -207,26 +206,6 @@ void Game::Initialize()
 	camera->SetTranslate({ 0.0f,0.0f,-10.0f });
 	object3dCom->SetDefaultCamera(camera);
 
-
-	//ビューポート
-	
-	//クライアント領域のサイズと一緒にして画面全体に表示
-	viewport.Width = static_cast<float>(windowAPI->GetClientWidth());
-	viewport.Height = static_cast<float>(windowAPI->GetClientHeight());
-	viewport.TopLeftX = 0.0f; //左上のX座標
-	viewport.TopLeftY = 0.0f; //左上のY座標
-	viewport.MinDepth = 0.0f; //最小の深度
-	viewport.MaxDepth = 1.0f; //最大の深度
-
-	//シザー矩形
-	
-	//基本的にビューポートと同じ矩形が構成されるようにする
-	scissorRect.left = 0; //左上のX座標
-	scissorRect.right = windowAPI->GetClientWidth(); //右下のX座標
-	scissorRect.top = 0; //左上のY座標
-	scissorRect.bottom = windowAPI->GetClientHeight(); //右下のY座標
-
-
 	transformSphere = { {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };
 
 	emitter.transform.SetTranslate({ 0.0f,0.0f,0.0f });
@@ -243,9 +222,6 @@ void Game::Initialize()
 	{
 		particles.push_back(particleManager->MakeNewParticles(randomEngine, emitter.transform.GetTranslate()));
 	}
-
-
-
 
 	//TransformationMatrix gTransformationMatrices[10];
 
@@ -286,16 +262,12 @@ void Game::Initialize()
 	instancingSrvHandleGPU = directXCom->GetGPUDescriptorHandle(directXCom->GetSrvDescriptorHeap(), directXCom->GetDescriptorSizeSRV(), 3);
 	directXCom->GetDevice()->CreateShaderResourceView(instancingResource.Get(), &instancingSrvDesc, instancingSrvHandleCPU);
 
-
-
-	
-
 	
 	imguiManager = new ImGuiManager();
 	imguiManager->Initialize(windowAPI, directXCom);
 
 	scene_ = new GamePlayScene();
-	scene_->Initialize();
+	scene_->Initialize(directXCom);
 }
 
 
@@ -480,6 +452,7 @@ void Game::Update()
 	}
 	ImGui::Checkbox("DrawObject", &drawObject);
 	ImGui::Checkbox("DrawSprite", &drawSprite);
+	ImGui::Checkbox("DrawSphere", &drawSphere);
 	ImGui::DragFloat3("LightDirection", &directionalLightData->direction.x, 0.01f, -10.0f, 10.0f);
 
 	ImGui::DragFloat3("Object Rotate", &transformObject.rotate.x, 0.01f, -10.0f, 10.0f);
@@ -619,8 +592,8 @@ void Game::Draw()
 	if (drawSphere)
 	{
 
-		directXCom->GetCommandList()->RSSetViewports(1, &viewport);
-		directXCom->GetCommandList()->RSSetScissorRects(1, &scissorRect);
+		directXCom->GetCommandList()->RSSetViewports(1, &directXCom->GetViewport());
+		directXCom->GetCommandList()->RSSetScissorRects(1, &directXCom->GetScissorRect());
 
 		directXCom->GetCommandList()->SetGraphicsRootSignature(object3dCom->GetRootSignature().Get());
 		directXCom->GetCommandList()->SetPipelineState(object3dCom->GetPipelineState().Get());

@@ -1,10 +1,17 @@
 #include"GamePlayScene.h"
 
-void GamePlayScene::Initialize()
+void GamePlayScene::Initialize(DirectXCom* dxCommon)
 {
+
+	directXCom = dxCommon;
+
 	//スプライト共通テクスチャ読み込み
 
 	//スプライトの生成
+
+	//球体の生成
+	sphere = new Sphere();
+	sphere->Initialize(directXCom);
 
 	//OBJからモデルデータを読み込む
 
@@ -21,6 +28,7 @@ void GamePlayScene::Initialize()
 
 void GamePlayScene::Finalize()
 {
+	delete sphere;
 }
 
 void GamePlayScene::Update()

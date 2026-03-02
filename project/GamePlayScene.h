@@ -1,10 +1,14 @@
 #pragma once
+
+#include"DirectXCom.h"
 #include"Sound.h"
+#include"Sphere.h"
+
 
 class GamePlayScene
 {
 public:
-	void Initialize();
+	void Initialize(DirectXCom* dxCommon);
 
 	void Finalize();
 
@@ -13,5 +17,8 @@ public:
 	void Draw();
 
 private:
+
+	DirectXCom* directXCom = nullptr;
 	Sound* sound = nullptr;
+	Sphere* sphere = nullptr;
 };

@@ -236,6 +236,8 @@ public:
 	D3D12_CPU_DESCRIPTOR_HANDLE GetSRVHandleCPU(uint32_t index);
 	D3D12_GPU_DESCRIPTOR_HANDLE GetSRVHandleGPU(uint32_t index);
 
+	
+
 
 private:
 	HRESULT hr;
