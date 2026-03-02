@@ -15,6 +15,29 @@
 #pragma comment(lib,"Mfreadwrite.lib")
 #pragma comment(lib,"mfuuid.lib")
 
+// シングルトン実体の定義
+Sound* Sound::instance = nullptr;
+
+Sound* Sound::GetInstance()
+{
+    if (!instance)
+    {
+        instance = new Sound();
+        instance->Initialize();
+    }
+    return instance;
+}
+
+void Sound::Destroy()
+{
+    if (instance)
+    {
+        instance->Finalize();
+        delete instance;
+        instance = nullptr;
+    }
+}
+
 void Sound::Initialize()
 {
 	HRESULT result = XAudio2Create(&xAudio2, 0, XAUDIO2_DEFAULT_PROCESSOR);

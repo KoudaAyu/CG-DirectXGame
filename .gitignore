@@ -56,7 +56,12 @@ ScaffoldingReadMe.txt
 StyleCopReport.xml
 
 # Files built by Visual Studio
-
+# Build results
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+[Aa]rm64/
 
 # Chutzpah Test files
 _Chutzpah*

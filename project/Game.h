@@ -1,5 +1,7 @@
 #pragma once
 
+#include"GamePlayScene.h"
+
 #include"Camera.h"
 #include"CrashDump.h"
 #include"DirectXCom.h"
@@ -75,6 +77,10 @@ public:
 	const Sphere* GetSphere() const { return sphere; }
 
 private:
+
+	GamePlayScene* scene_ = nullptr;
+
+private:
 	ResourceLeakCheek leakChecker; //リソースリークチェック用のオブジェクト
 	CrashDump crashDump; //クラッシュダンプ生成用のオブジェクト
 	Log log;
@@ -124,10 +130,9 @@ private:
 	D3D12_VIEWPORT viewport{};
 	D3D12_RECT scissorRect{};
 
-	float fovY;
-	float aspectRatio;
-	float nearZ;
-	float farZ;
+	
+	
+	
 
 	const uint32_t kNumMaxInstances = 10;
 	uint32_t numInstance = 0;

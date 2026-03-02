@@ -76,6 +76,13 @@ void ImGuiManager::Initialize(WindowAPI* windowAPI, DirectXCom* dxCommon)
 
 }
 
+void ImGuiManager::Update()
+{
+	ImGui_ImplWin32_NewFrame();
+	ImGui_ImplDX12_NewFrame();
+	ImGui::NewFrame();
+}
+
 void ImGuiManager::CreateContext()
 {
 	IMGUI_CHECKVERSION();

@@ -45,17 +45,33 @@ public:
 	{
 		transform_.SetTranslate(translate);
 	}
+	float GetFovY() const
+	{
+		return fovY_;
+	}
 	void SetFovY(float fovY)
 	{
 		fovY_ = fovY;
+	}
+	float GetAspectRatio() const
+	{
+		return aspectRatio_;
 	}
 	void SetAspectRatio(float aspectRatio)
 	{
 		aspectRatio_ = aspectRatio;
 	}
+	float GetNearZ() const
+	{
+		return nearZ_;
+	}
 	void SetNearZ(float nearZ)
 	{
 		nearZ_ = nearZ;
+	}
+	float GetFarZ() const
+	{
+		return farZ_;
 	}
 	void SetFarZ(float farZ)
 	{

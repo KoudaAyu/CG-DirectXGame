@@ -11,6 +11,7 @@ public:
 	~ImGuiManager();
 
 	void Initialize(WindowAPI* windowAPI, DirectXCom* dxCommon);
+	void Update();
 	void CreateContext();
 	void StyleColorsDark();
 

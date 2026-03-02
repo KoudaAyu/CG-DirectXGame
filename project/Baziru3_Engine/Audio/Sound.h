@@ -37,6 +37,10 @@ struct FormatChunk
 class Sound
 {
 public:
+    // シングルトン取得・破棄
+    static Sound* GetInstance();
+    static void Destroy();
+
     void Initialize();
     void Finalize();
 
@@ -61,4 +65,7 @@ private:
 
     // 読み込んだデータを保持する変数
     SoundData soundData;
+
+    // シングルトン実体
+    static Sound* instance;
 };

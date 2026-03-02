@@ -138,7 +138,7 @@ void Game::Initialize()
 
 	cameraTransform = { {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, -10.0f} };
 
-	//uvTrandform用の変数
+	//uvTransform用の変数
 	uvTransformSprite = {
 		{1.0f, 1.0f, 1.0f},
 		{0.0f, 0.0f, 0.0f},
@@ -147,12 +147,6 @@ void Game::Initialize()
 
 	//uvTransform行列の初期化
 	materialData->uvTransform = MakeIdentity4x4();
-
-
-	 fovY = 0.45f;  // 資料通り
-	 aspectRatio = static_cast<float>(windowAPI->GetClientWidth()) / static_cast<float>(windowAPI->GetClientHeight());
-	 nearZ = 0.1f;
-	 farZ = 100.0f;
 
 	//Textureを読んで転送する
 	DirectX::ScratchImage mipImages = directXCom->LoadTexture("./Resources/uvChecker.png");
@@ -201,8 +195,6 @@ void Game::Initialize()
 	//音声読み込み
 	sound_ = new Sound();
 	sound_->Initialize();
-	sound_->SoundLoadFile("Resources/Alarm01.wav");
-	sound_->SoundPlayWave();
 
 	
 	inputManager.Initialize(windowAPI);
@@ -237,10 +229,6 @@ void Game::Initialize()
 
 	transformSphere = { {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };
 
-	
-
-	
-	
 	emitter.transform.SetTranslate({ 0.0f,0.0f,0.0f });
 	emitter.transform.SetRotate({ 0.0f,0.0f,0.0f });
 	emitter.transform.SetScale({ 1.0f,1.0f,1.0f });
@@ -306,10 +294,17 @@ void Game::Initialize()
 	imguiManager = new ImGuiManager();
 	imguiManager->Initialize(windowAPI, directXCom);
 
-
+	scene_ = new GamePlayScene();
+	scene_->Initialize();
 }
+
+
 void Game::Finalize()
 {
+
+	scene_->Finalize();
+	delete scene_;
+
 	//ImGui終了処理
 	ImGui_ImplDX12_Shutdown();
 	ImGui_ImplWin32_Shutdown();
@@ -322,7 +317,7 @@ void Game::Finalize()
 	Logger::Log(logStream, StringUtil::ConvertString(std::format(L"WSTRING{}\n", wstringValue)));
 
 	//出力ウィンドウへの文字出力
-	OutputDebugStringA("Hello, DirextX!\n");
+	OutputDebugStringA("Hello, DirectX!\n");
 
 	// サウンドの終了処理
 	if (sound_)
@@ -363,6 +358,8 @@ void Game::Update()
 { 
 	Framework::Update();
 
+	scene_->Update();
+
 	//if (windowAPI->ProcessMassage())
 	//{
 	//	//ゲームループ抜ける
@@ -370,10 +367,8 @@ void Game::Update()
 	//}
 
 
-	//Imguiにここからフレームが始まる趣旨をつたえる
-	ImGui_ImplWin32_NewFrame();
-	ImGui_ImplDX12_NewFrame();
-	ImGui::NewFrame();
+	//ImGuiにここからフレームが始まる趣旨をつたえる
+	imguiManager->Update();
 
 	debugCamera_.Update();
 
@@ -407,7 +402,7 @@ void Game::Update()
 	Matrix4x4 worldMatrix = MakeAffineMatrix(transformSphere.scale, transformSphere.rotate, transformSphere.translate);
 	Matrix4x4 cameraMatrix = MakeAffineMatrix(cameraTransform.scale, cameraTransform.rotate, cameraTransform.translate);
 	Matrix4x4 viewMatrix = Inverse(cameraMatrix);
-	Matrix4x4 projectionMatrix = MakePerspectiveFovMatrix(fovY, aspectRatio, nearZ, farZ);
+	Matrix4x4 projectionMatrix = MakePerspectiveFovMatrix(camera->GetFovY(), camera->GetAspectRatio(), camera->GetNearZ(), camera->GetFarZ());
 	//WVPMatrixを作る
 	Matrix4x4 worldViewProjectMatrix = Multiply(worldMatrix, Multiply(viewMatrix, projectionMatrix));
 	transformationMatrixDataSphere->WVP = worldViewProjectMatrix;
@@ -556,18 +551,17 @@ void Game::Update()
 	// --- マテリアル（質感）の設定 ---
 	if (ImGui::CollapsingHeader("Material"))
 	{
-		// ライティングを有効にするかどうか
+		
 		bool enable = (materialData->enableLighting != 0);
 		if (ImGui::Checkbox("Enable Lighting", &enable))
 		{
 			materialData->enableLighting = enable ? 1 : 0;
 		}
 
-		// ★重要：Shininessのスライダー
-		// 0.1(鈍い) ～ 100.0(鋭いテカリ) までの範囲で調整
+		
 		ImGui::SliderFloat("Shininess", &materialData->shininess, 0.1f, 100.0f);
 
-		// 色も変えれるようにしておくと便利です
+		
 		ImGui::ColorEdit4("Color", &materialData->color.x);
 	}
 
@@ -598,6 +592,8 @@ void Game::Draw()
 	directXCom->PreDraw();
 
 	object3dCom->PreDraw();
+
+	
 
 	//RootSignatureを設定。PSOに設定しているけれど別途設定が必要
 	directXCom->GetCommandList()->SetGraphicsRootSignature(spriteCom->GetRootSignature().Get());
@@ -674,7 +670,7 @@ void Game::Draw()
 		directXCom->GetCommandList()->DrawInstanced(UINT(modelData.vertices.size()), numInstance, 0, 0);
 	}
 
-
+	scene_->Draw();
 
 	//実際のcommandListのImGuiの描画コマンドを積む
 	ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), directXCom->GetCommandList().Get());
