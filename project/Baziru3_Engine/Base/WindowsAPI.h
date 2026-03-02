@@ -18,7 +18,7 @@ public:
 	void Finalize();
 
 	//メッセージ処理
-	bool ProcessMassage();
+	bool ProcessMessage();
 
 	HWND GetHwnd() const { return hwnd_; }
 	HINSTANCE GetHInstance() const { return wc.hInstance; }
@@ -27,6 +27,7 @@ public:
 	static int32_t GetClientWidth() { return kClientWidth; }
 	static int32_t GetClientHeight() { return kClientHeight; }
 
+	
 	
 
 private:

@@ -14,7 +14,7 @@
 #include"Sphere.h"
 #include"Sprite.h"
 #include"SpriteCom.h"
-#include"ResourceLeakCheak.h"
+#include"ResourceLeakCheek.h"
 #include"TextureManager.h"
 #include"WindowsAPI.h"
 
@@ -75,7 +75,7 @@ public:
 	const Sphere* GetSphere() const { return sphere; }
 
 private:
-	ResourceLeakCheak leakChecker; //リソースリークチェック用のオブジェクト
+	ResourceLeakCheek leakChecker; //リソースリークチェック用のオブジェクト
 	CrashDump crashDump; //クラッシュダンプ生成用のオブジェクト
 	Log log;
 	WindowAPI* windowAPI = nullptr; //ウィンドウ関連のAPIをまとめたオブジェクト

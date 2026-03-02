@@ -1,10 +1,10 @@
-#include "ResourceLeakCheak.h"
+#include "ResourceLeakCheek.h"
 #include<dxgidebug.h>
 #include<d3d12.h>
 #include<dxgi1_6.h>
 #include<wrl.h>
 
-ResourceLeakCheak::~ResourceLeakCheak()
+ResourceLeakCheek::~ResourceLeakCheek()
 {
 	Microsoft::WRL::ComPtr<IDXGIDebug1> debug;
 	if (SUCCEEDED(DXGIGetDebugInterface1(0, IID_PPV_ARGS(&debug))))

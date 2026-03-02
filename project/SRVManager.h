@@ -33,7 +33,7 @@ private:
 	//SRV用のデスクリプタサイズ
 	uint32_t descriptorSize_;
 	//SRV用のデスクリプタヒープ
-	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> descriptirHeap;
+	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> descriptorHeap;
 
 	//次に使用するSRVインデックス
 	// index 0 is commonly reserved (e.g. for ImGui). Start at 1 to avoid overwriting reserved slot.
