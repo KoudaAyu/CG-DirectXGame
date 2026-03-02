@@ -7,6 +7,7 @@
 #include"DirectXCom.h"
 #include"Framework.h"
 #include"ImGuiManager.h"
+#include"Light.h"
 #include"Log.h"
 #include"Object3d.h"
 #include"Object3dCom.h"
@@ -89,6 +90,7 @@ private:
 	SpriteCom* spriteCom = nullptr;
 	Object3d* object3d = nullptr;
 	Object3dCom* object3dCom = nullptr;
+	Light* light = nullptr;
 	ParticleManager* particleManager = nullptr;
 	Sphere* sphere = nullptr;
 	ImGuiManager* imguiManager = nullptr;
@@ -106,8 +108,8 @@ private:
 	Sprite::Transform uvTransformSprite;
 	Sprite::Transform transformSphere;
 	Sprite::Transform cameraTransform;
-	Microsoft::WRL::ComPtr<ID3D12Resource> directionalLight;
-	Object3d::DirectionalLight* directionalLightData = nullptr;
+	/*Microsoft::WRL::ComPtr<ID3D12Resource> directionalLight;
+	Object3d::DirectionalLight* directionalLightData = nullptr;*/
 	TransformationMatrix* transformationMatrixDataSphere = nullptr;
 	Microsoft::WRL::ComPtr<ID3D12Resource> transformationMatrixResourceSphere;
 	Sprite::Material* materialData = nullptr;

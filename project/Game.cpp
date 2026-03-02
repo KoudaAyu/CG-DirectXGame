@@ -87,19 +87,8 @@ void Game::Initialize()
 	materialData->enableLighting = false;
 	materialResource->Unmap(0, nullptr);
 
-	directionalLight = directXCom->CreateBufferResource(directXCom->GetDevice().Get(), sizeof(Object3d::DirectionalLight));
-
-	// MapしてGPUリソースのCPU側の書き込み可能ポインタを取得する
-	
-	directionalLight->Map(0, nullptr, reinterpret_cast<void**>(&directionalLightData));
-
-	// directionalLightDataに値を書き込む
-	directionalLightData->color = { 1.0f, 1.0f, 1.0f, 1.0f };
-	directionalLightData->direction = { 0.0f, -1.0f, 0.0f };
-	directionalLightData->intensity = 1.0f;
-
-	// 書き込み完了後はUnmapを呼ぶ
-	directionalLight->Unmap(0, nullptr);
+	light = new Light();
+	light->Initialize(directXCom);
 
 	// --- カメラ用のリソース作成を追加 ---
 	cameraResource = directXCom->CreateBufferResource(directXCom->GetDevice().Get(), sizeof(CameraForGPU));
@@ -299,6 +288,8 @@ void Game::Finalize()
 		sound_ = nullptr;
 	}
 
+	delete light;
+
 	delete imguiManager;
 
 	for (auto* sprite : sprites)
@@ -368,7 +359,7 @@ void Game::Update()
 		sprite->SetUVTransform(uvTransformMatrix);
 	}
 
-	directionalLight->Map(0, nullptr, reinterpret_cast<void**>(&directionalLightData));
+	//directionalLight->Map(0, nullptr, reinterpret_cast<void**>(&directionalLightData));
 
 	transformSphere.rotate.y += 0.01f;
 	Matrix4x4 worldMatrix = MakeAffineMatrix(transformSphere.scale, transformSphere.rotate, transformSphere.translate);
@@ -441,7 +432,7 @@ void Game::Update()
 
 
 	ImGui::ColorEdit4("Material Color", &materialData->color.x);
-	ImGui::DragFloat("Light Intensity", &directionalLightData->intensity, 0.01f, 0.0f, 10.0f);
+	//ImGui::DragFloat("Light Intensity", &directionalLightData->intensity, 0.01f, 0.0f, 10.0f);
 
 
 	ImGui::Checkbox("useMonsterBall", &useMonsterBall);
@@ -453,7 +444,7 @@ void Game::Update()
 	ImGui::Checkbox("DrawObject", &drawObject);
 	ImGui::Checkbox("DrawSprite", &drawSprite);
 	ImGui::Checkbox("DrawSphere", &drawSphere);
-	ImGui::DragFloat3("LightDirection", &directionalLightData->direction.x, 0.01f, -10.0f, 10.0f);
+	//ImGui::DragFloat3("LightDirection", &directionalLightData->direction.x, 0.01f, -10.0f, 10.0f);
 
 	ImGui::DragFloat3("Object Rotate", &transformObject.rotate.x, 0.01f, -10.0f, 10.0f);
 
@@ -504,12 +495,12 @@ void Game::Update()
 	ImGui::DragFloat("Shininess", &materialData->shininess, 0.5f, 0.1f, 100.0f);
 
 	// 光の色 (DirectionalLight)
-	if (ImGui::CollapsingHeader("Light"))
+	/*if (ImGui::CollapsingHeader("Light"))
 	{
 		ImGui::ColorEdit4("Light Color", &directionalLightData->color.x);
 		ImGui::DragFloat3("Light Direction", &directionalLightData->direction.x, 0.01f, -1.0f, 1.0f);
 		ImGui::DragFloat("Intensity", &directionalLightData->intensity, 0.01f, 0.0f, 5.0f);
-	}
+	}*/
 
 	ImGui::End();
 
@@ -539,11 +530,11 @@ void Game::Update()
 	}
 
 	// --- 平行光源の設定 ---
-	if (ImGui::CollapsingHeader("Directional Light"))
+	/*if (ImGui::CollapsingHeader("Directional Light"))
 	{
 		ImGui::DragFloat3("Direction", &directionalLightData->direction.x, 0.01f, -1.0f, 1.0f);
 		ImGui::DragFloat("Intensity", &directionalLightData->intensity, 0.01f, 0.0f, 5.0f);
-	}
+	}*/
 
 	ImGui::End();
 
@@ -581,7 +572,7 @@ void Game::Draw()
 	// Use Object3d WVP updated above
 	directXCom->GetCommandList()->SetGraphicsRootConstantBufferView(1, object3d->GetTransformationMatrixResource()->GetGPUVirtualAddress());
 	directXCom->GetCommandList()->SetGraphicsRootDescriptorTable(2, useMonsterBall ? textureSrvHandleGPU2 : textureSrvHandleGPU);
-	directXCom->GetCommandList()->SetGraphicsRootConstantBufferView(3, directionalLight->GetGPUVirtualAddress());
+	directXCom->GetCommandList()->SetGraphicsRootConstantBufferView(3,light->GetDirectionalLightResource()->GetGPUVirtualAddress());
 	directXCom->GetCommandList()->SetGraphicsRootConstantBufferView(4, cameraResource->GetGPUVirtualAddress());
 	if (drawObject)
 	{
@@ -607,7 +598,7 @@ void Game::Draw()
 		directXCom->GetCommandList()->SetGraphicsRootConstantBufferView(1, transformationMatrixResourceSphere->GetGPUVirtualAddress());
 		directXCom->GetCommandList()->SetGraphicsRootDescriptorTable(2, useMonsterBall ? textureSrvHandleGPU2 : textureSrvHandleGPU);
 
-		directXCom->GetCommandList()->SetGraphicsRootConstantBufferView(3, directionalLight->GetGPUVirtualAddress());
+		directXCom->GetCommandList()->SetGraphicsRootConstantBufferView(3, light->GetDirectionalLightResource()->GetGPUVirtualAddress());
 
 		directXCom->GetCommandList()->DrawIndexedInstanced(sphere->GetIndexCount(), 1, 0, 0, 0);
 	}
@@ -634,7 +625,7 @@ void Game::Draw()
 	directXCom->GetCommandList()->SetGraphicsRootDescriptorTable(1, instancingSrvHandleGPU);
 	// Set descriptor table for texture (root parameter 2)
 	directXCom->GetCommandList()->SetGraphicsRootDescriptorTable(2, useMonsterBall ? textureSrvHandleGPU2 : textureSrvHandleGPU);
-	directXCom->GetCommandList()->SetGraphicsRootConstantBufferView(3, directionalLight->GetGPUVirtualAddress());
+	directXCom->GetCommandList()->SetGraphicsRootConstantBufferView(3, light->GetDirectionalLightResource()->GetGPUVirtualAddress());
 	directXCom->GetCommandList()->SetGraphicsRootConstantBufferView(4, cameraResource->GetGPUVirtualAddress());
 
 	/*commandList->DrawIndexedInstanced(kIndexCount, 1, 0, 0, 0);*/
