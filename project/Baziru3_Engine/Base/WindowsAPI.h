@@ -28,6 +28,7 @@ public:
 	static int32_t GetClientHeight() { return kClientHeight; }
 
 	
+	
 
 private:
 
