@@ -76,21 +76,9 @@ void Game::Initialize()
 	Sprite::VertexData* vertexDataModel = nullptr;
 	vertexResourceModel->Map(0, nullptr, reinterpret_cast<void**>(&vertexDataModel));
 	std::memcpy(vertexDataModel, modelData.vertices.data(), sizeof(Sprite::VertexData) * modelData.vertices.size());//頂点データをリソースにコピー
-	//マテリアル用のリソースを作る
-	materialResource = directXCom->CreateBufferResource(directXCom->GetDevice().Get(), sizeof(Sprite::Material));
-	//マテリアルにデータを書き込む
 	
-	//書き込む為のアドレス取得
-	materialResource->Map(0, nullptr, reinterpret_cast<void**>(&materialData));
-	// データを設定（赤色 RGBA: 1,0,0,1）
-	Vector4 temp{};
-	temp.x = 1.0f;
-	temp.y = 1.0f;
-	temp.z = 1.0f;
-	temp.w = 1.0f;
-	materialData->color = temp;
-	materialData->enableLighting = false;
-	materialResource->Unmap(0, nullptr);
+	materialManager = new MaterialManager();
+	materialManager->Initialize(directXCom);
 
 	light = new Light();
 	light->Initialize(directXCom);
@@ -139,7 +127,7 @@ void Game::Initialize()
 	};
 
 	//uvTransform行列の初期化
-	materialData->uvTransform = MakeIdentity4x4();
+	//materialData->uvTransform = MakeIdentity4x4();
 
 	//Textureを読んで転送する
 	DirectX::ScratchImage mipImages = directXCom->LoadTexture("./Resources/uvChecker.png");
@@ -295,6 +283,8 @@ void Game::Finalize()
 		sound_ = nullptr;
 	}
 
+	delete materialManager;
+
 	delete light;
 
 	delete imguiManager;
@@ -438,12 +428,12 @@ void Game::Update()
 	ImGui::Begin("Windows");
 
 
-	ImGui::ColorEdit4("Material Color", &materialData->color.x);
+	ImGui::ColorEdit4("Material Color", &materialManager->GetMaterialDataColor().x);
 	//ImGui::DragFloat("Light Intensity", &directionalLightData->intensity, 0.01f, 0.0f, 10.0f);
 
 
 	ImGui::Checkbox("useMonsterBall", &useMonsterBall);
-	ImGui::Checkbox("LightSprite Flag", (bool*)&materialData->enableLighting);
+	ImGui::Checkbox("LightSprite Flag", (bool*)&materialManager->GetMaterialDataEnableLighting());
 	for (auto* sprite : sprites)
 	{
 		ImGui::Checkbox("LightObject Flag", (bool*)&sprite->GetMaterialDataSprite()->enableLighting);
@@ -464,18 +454,18 @@ void Game::Update()
 	{
 		// ライティングのON/OFF切り替え
 		// boolからint32_tへ変換して代入
-		bool enableLock = (materialData->enableLighting != 0);
+		bool enableLock = (materialManager->GetMaterialDataEnableLighting() != 0);
 		if (ImGui::Checkbox("Enable Lighting", &enableLock))
 		{
-			materialData->enableLighting = enableLock ? 1 : 0;
+			materialManager->GetMaterialDataEnableLighting() = enableLock ? 1 : 0;
 		}
 
 		// Shininess（テカリ具合）のスライダー
 		// 0.1 ～ 100.0 くらいの範囲で調整できるようにします
-		ImGui::SliderFloat("Shininess", &materialData->shininess, 0.1f, 100.0f);
+		ImGui::SliderFloat("Shininess", &materialManager->GetMaterialDataShininess(), 0.1f, 100.0f);
 
 		// 色の調整もできるようにするとモンスターボールの赤が調整しやすいです
-		ImGui::ColorEdit4("Material Color", &materialData->color.x);
+		ImGui::ColorEdit4("Material Color", &materialManager->GetMaterialDataColor().x);
 	}
 
 	// --- ここまで追加 ---
@@ -491,15 +481,15 @@ void Game::Update()
 	ImGui::Begin("Material Settings"); // ウィンドウ名は既存のものに合わせてください
 
 	// ライティングの有効化フラグ
-	bool enableLighting = (materialData->enableLighting != 0);
+	bool enableLighting = (materialManager->GetMaterialDataEnableLighting() != 0);
 	if (ImGui::Checkbox("Enable Lighting", &enableLighting))
 	{
-		materialData->enableLighting = enableLighting ? 1 : 0;
+		materialManager->GetMaterialDataEnableLighting() = enableLighting ? 1 : 0;
 	}
 
 	// テカリ具合 (shininess)
 	// 0.1 ～ 100.0 くらいの範囲で調整できるようにします
-	ImGui::DragFloat("Shininess", &materialData->shininess, 0.5f, 0.1f, 100.0f);
+	ImGui::DragFloat("Shininess", &materialManager->GetMaterialDataShininess(), 0.5f, 0.1f, 100.0f);
 
 	// 光の色 (DirectionalLight)
 	/*if (ImGui::CollapsingHeader("Light"))
@@ -523,17 +513,16 @@ void Game::Update()
 	if (ImGui::CollapsingHeader("Material"))
 	{
 		
-		bool enable = (materialData->enableLighting != 0);
+		bool enable = (materialManager->GetMaterialDataEnableLighting() != 0);
 		if (ImGui::Checkbox("Enable Lighting", &enable))
 		{
-			materialData->enableLighting = enable ? 1 : 0;
+			materialManager->GetMaterialDataEnableLighting() = enable ? 1 : 0;
 		}
 
 		
-		ImGui::SliderFloat("Shininess", &materialData->shininess, 0.1f, 100.0f);
-
+		ImGui::SliderFloat("Shininess", &materialManager->GetMaterialDataShininess(), 0.1f, 100.0f);
 		
-		ImGui::ColorEdit4("Color", &materialData->color.x);
+		ImGui::ColorEdit4("Color", &materialManager->GetMaterialDataColor().x);
 	}
 
 	// --- 平行光源の設定 ---
@@ -577,7 +566,7 @@ void Game::Draw()
 	directXCom->GetCommandList()->IASetVertexBuffers(0, 1, &vertexBufferView);
 	// Note: object draw uses non-indexed DrawInstanced, so do not set an index buffer here
 	directXCom->GetCommandList()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-	directXCom->GetCommandList()->SetGraphicsRootConstantBufferView(0, materialResource->GetGPUVirtualAddress());
+	directXCom->GetCommandList()->SetGraphicsRootConstantBufferView(0, materialManager->GetMaterialResource()->GetGPUVirtualAddress());
 	// Use Object3d WVP updated above
 	directXCom->GetCommandList()->SetGraphicsRootConstantBufferView(1, object3d->GetTransformationMatrixResource()->GetGPUVirtualAddress());
 	directXCom->GetCommandList()->SetGraphicsRootDescriptorTable(2, useMonsterBall ? textureSrvHandleGPU2 : textureSrvHandleGPU);
@@ -602,7 +591,7 @@ void Game::Draw()
 		directXCom->GetCommandList()->IASetIndexBuffer(&sphere->GetIndexBufferViewSphere());
 		directXCom->GetCommandList()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-		directXCom->GetCommandList()->SetGraphicsRootConstantBufferView(0, materialResource->GetGPUVirtualAddress());
+		directXCom->GetCommandList()->SetGraphicsRootConstantBufferView(0, materialManager->GetMaterialResource()->GetGPUVirtualAddress());
 
 		directXCom->GetCommandList()->SetGraphicsRootConstantBufferView(1, transformationMatrixResourceSphere->GetGPUVirtualAddress());
 		directXCom->GetCommandList()->SetGraphicsRootDescriptorTable(2, useMonsterBall ? textureSrvHandleGPU2 : textureSrvHandleGPU);
@@ -628,7 +617,7 @@ void Game::Draw()
 	directXCom->GetCommandList()->IASetVertexBuffers(0, 1, &vertexBufferView);
 	// Particle draw uses non-indexed DrawInstanced, so do not set an index buffer here
 	directXCom->GetCommandList()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-	directXCom->GetCommandList()->SetGraphicsRootConstantBufferView(0, materialResource->GetGPUVirtualAddress());
+	directXCom->GetCommandList()->SetGraphicsRootConstantBufferView(0, materialManager->GetMaterialResource()->GetGPUVirtualAddress());
 	// Do NOT set a CBV at root parameter 1 because particle manager declares parameter 1 as a descriptor table.
 	// Set descriptor table for instance data (root parameter 1)
 	directXCom->GetCommandList()->SetGraphicsRootDescriptorTable(1, instancingSrvHandleGPU);

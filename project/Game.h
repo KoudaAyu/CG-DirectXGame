@@ -9,6 +9,7 @@
 #include"ImGuiManager.h"
 #include"Light.h"
 #include"Log.h"
+#include"MaterialManager.h"
 #include"Object3d.h"
 #include"Object3dCom.h"
 #include"ParticleEmitter.h"
@@ -102,20 +103,17 @@ private:
 	Emitter emitter;
 	KeyInput inputManager;
 	Sound* sound_ = nullptr;
+	MaterialManager* materialManager = nullptr;
 private:
 	std::vector<Sprite*>sprites;
 	Sprite::Transform transformObject;
 	Sprite::Transform uvTransformSprite;
 	Sprite::Transform transformSphere;
 	Sprite::Transform cameraTransform;
-	/*Microsoft::WRL::ComPtr<ID3D12Resource> directionalLight;
-	Object3d::DirectionalLight* directionalLightData = nullptr;*/
 	TransformationMatrix* transformationMatrixDataSphere = nullptr;
 	Microsoft::WRL::ComPtr<ID3D12Resource> transformationMatrixResourceSphere;
-	Sprite::Material* materialData = nullptr;
-
+	
 	D3D12_VERTEX_BUFFER_VIEW vertexBufferView{};
-	Microsoft::WRL::ComPtr<ID3D12Resource> materialResource;
 
 	D3D12_CPU_DESCRIPTOR_HANDLE textureSrvHandleCPU;
 	D3D12_CPU_DESCRIPTOR_HANDLE textureSrvHandleCPU2;

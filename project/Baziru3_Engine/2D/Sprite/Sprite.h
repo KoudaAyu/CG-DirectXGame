@@ -2,6 +2,7 @@
 
 #include"DebugCamera.h"
 #include"DirectXCom.h"
+#include"MaterialManager.h"
 #include"Matrix4x4.h"
 #include"Vector.h"
 
@@ -25,15 +26,7 @@ public:
 		Vector3 normal;
 	};
 
-	struct Material
-	{
-		Vector4 color;
-		int32_t enableLighting;
-		float padding[3]; // パディングを追加して16バイト境界に揃える
-		Matrix4x4 uvTransform; // UV変換行列
-		float shininess;
-		float padding2[3];
-	};
+
 
 	void Initialize(SpriteCom* spriteCom,std::string textureFilePath);
 	void Update(WindowAPI* windowAPI, DebugCamera* debugCamera_);

@@ -39,6 +39,7 @@
     <ClCompile Include="Baziru3_Engine\2D\Sprite\Sprite.cpp" />
     <ClCompile Include="Baziru3_Engine\2D\Sprite\SpriteCom.cpp" />
     <ClCompile Include="Baziru3_Engine\Particle\ParticleManager.cpp" />
+    <ClCompile Include="MaterialManager.cpp" />
     <ClCompile Include="Random.cpp" />
     <ClCompile Include="Model.cpp" />
     <ClCompile Include="ModelCom.cpp" />
@@ -98,6 +99,7 @@
     <ClInclude Include="Baziru3_Engine\Particle\ParticleEmitter.h" />
     <ClInclude Include="Baziru3_Engine\Particle\ParticleManager.h" />
     <ClInclude Include="Light.h" />
+    <ClInclude Include="MaterialManager.h" />
     <ClInclude Include="Random.h" />
     <ClInclude Include="Model.h" />
     <ClInclude Include="ModelCom.h" />
