@@ -1,6 +1,9 @@
 #pragma once
 #include "DirectXCom.h"
 #include "StringUtil.h"
+#include "SrvManager.h"
+
+#include<unordered_map>
 
 class TextureManager
 {
@@ -16,30 +19,37 @@ public:
 
 	void LoadTexture(const std::string& filePath);
 
+	
+
+	
+
+public:
 	// DirectXCom を設定するためのセッターを追加
 	void SetDirectXCom(DirectXCom* directXCom) { directXCom_ = directXCom; }
 
 	// 追加: ファイルパスからSRVインデックスを取得（見つからなければ -1）
 	uint32_t GetTextureIndexByFilePath(const std::string& filePath) const;
 
-	//メタデータ取得
-	const DirectX::TexMetadata& GetMetadata(uint32_t index) const
+	//メタデータ取得 (オーバーロード: ファイルパスまたはインデックスで取得可能)
+	const DirectX::TexMetadata& GetMetadata(const std::string& filePath) const
 	{
-		assert(index < textureDatas_.size());
-		return textureDatas_[index].metadata_;
+		auto it = textureDates_.find(filePath);
+		assert(it != textureDates_.end());
+		return it->second.metadata_;
 	}
+	const DirectX::TexMetadata& GetMetadata(uint32_t index) const;
 
-	
-
-public:
-	D3D12_GPU_DESCRIPTOR_HANDLE GetSrvHandleGPU(uint32_t index) const
+	D3D12_GPU_DESCRIPTOR_HANDLE GetSrvHandleGPU(const std::string& filePath) const
 	{
-		assert(index < textureDatas_.size());
-		return textureDatas_[index].srvHandleGPU_;
+		auto it = textureDates_.find(filePath);
+		assert(it != textureDates_.end());
+		return it->second.srvHandleGPU_;
 	}
+	D3D12_GPU_DESCRIPTOR_HANDLE GetSrvHandleGPU(uint32_t index) const;
 
 private:
 	static TextureManager* instance_;
+	SRVManager* srvManager_ = nullptr;
 
 	TextureManager() = default;
 	~TextureManager() = default;
@@ -57,10 +67,13 @@ private:
 		D3D12_GPU_DESCRIPTOR_HANDLE srvHandleGPU_{};
 	};
 
-	std::vector<TextureData> textureDatas_;
+	//テクスチャデータ
+	std::unordered_map<std::string,TextureData> textureDates_;
 
 	DirectXCom* directXCom_ = nullptr;
 
 	//SRVインデックスの開始番号
 	uint32_t kSRVIndexTop = 1;
+
+	
 };
