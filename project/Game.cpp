@@ -2,6 +2,11 @@
 
 #include <combaseapi.h>
 
+#ifdef USE_IMGUI
+#include <imgui.h>
+#include <imgui_impl_win32.h>
+#include <imgui_impl_dx12.h>
+#endif
 
 void Game::Initialize()
 {
@@ -170,7 +175,7 @@ void Game::Initialize()
 
 	textureSrvHandleCPU2 = directXCom->GetCPUDescroptirHandle(directXCom->GetSrvDescriptorHeap(), directXCom->GetDescriptorSizeSRV(), 2);
 	textureSrvHandleGPU2 = directXCom->GetGPUDescriptorHandle(directXCom->GetSrvDescriptorHeap(), directXCom->GetDescriptorSizeSRV(), 2);
-	//先頭はImGuiに使用しているためその次を使う
+	//先頭はImGuiに使用している為その次を使う
 	textureSrvHandleCPU.ptr += directXCom->GetDevice()->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 	textureSrvHandleGPU.ptr += directXCom->GetDevice()->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 	//SRVの生成
