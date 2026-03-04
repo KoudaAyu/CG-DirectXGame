@@ -3,26 +3,32 @@
 #include"DirectXCom.h"
 #include"SRVManager.h"
 
+#ifdef USE_IMGUI
 #include <imgui.h>
 #include <imgui_impl_win32.h>
 #include <imgui_impl_dx12.h>
-
+#endif
 
 static SRVManager* g_srvManager = nullptr;
 
 ImGuiManager::~ImGuiManager()
 {
-  
+#ifdef USE_IMGUI
     if (g_srvManager != nullptr)
     {
         delete g_srvManager;
         g_srvManager = nullptr;
     }
+#endif
 
 }
 
-void ImGuiManager::Initialize(WindowAPI* windowAPI, DirectXCom* dxCommon)
+void ImGuiManager::Initialize([[maybe_unused]]WindowAPI* windowAPI, [[maybe_unused]]DirectXCom* dxCommon)
 {
+#ifdef USE_IMGUI
+
+
+
 	this->windowAPI = windowAPI;
 	this->dxCommon = dxCommon;
 
@@ -73,18 +79,24 @@ void ImGuiManager::Initialize(WindowAPI* windowAPI, DirectXCom* dxCommon)
 
 	// フォントテクスチャ等のデバイス側オブジェクトを作成
 	ImGui_ImplDX12_CreateDeviceObjects();
+	initialized = true;
+#endif 
 
 }
 
 void ImGuiManager::Update()
 {
+#ifdef USE_IMGUI
+	if(!initialized) return;
 	ImGui_ImplWin32_NewFrame();
 	ImGui_ImplDX12_NewFrame();
 	ImGui::NewFrame();
+#endif
 }
 
 void ImGuiManager::CreateContext()
 {
+#ifdef USE_IMGUI
 	IMGUI_CHECKVERSION();
 	ImGui::CreateContext();
 	ImGuiIO& io = ImGui::GetIO();
@@ -92,10 +104,13 @@ void ImGuiManager::CreateContext()
 	{
 		io.Fonts->AddFontDefault();
 	}
-	// Do not call io.Fonts->Build() here. New backends handle font texture creation via CreateDeviceObjects().
+	
+#endif
 }
 
 void ImGuiManager::StyleColorsDark()
 {
+#ifdef USE_IMGUI
 	ImGui::StyleColorsDark();
+#endif
 }

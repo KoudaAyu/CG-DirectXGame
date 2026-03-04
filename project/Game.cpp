@@ -266,10 +266,12 @@ void Game::Finalize()
 	scene_->Finalize();
 	delete scene_;
 
+	#ifdef USE_IMGUI
 	//ImGui終了処理
 	ImGui_ImplDX12_Shutdown();
 	ImGui_ImplWin32_Shutdown();
 	ImGui::DestroyContext();
+	#endif
 
 
 	Logger::Log(logStream, "Application terminating.");
@@ -424,7 +426,7 @@ void Game::Update()
 
 	//開発用UIの処理、実際に開発用のUIを出す場合はここをゲーム固有の処理に置き換え
 
-#ifdef _DEBUG
+	#ifdef _DEBUG
 
 	ImGui::ShowDemoWindow();
 
@@ -538,10 +540,12 @@ void Game::Update()
 
 	ImGui::End();
 
-#endif // DEBUG
+	#endif // DEBUG
 
 	//ImGui内部コマンドを生成する
+	#ifdef USE_IMGUI
 	ImGui::Render();
+	#endif
 
 	inputManager.Update();
 
@@ -637,8 +641,9 @@ void Game::Draw()
 	scene_->Draw();
 
 	//実際のcommandListのImGuiの描画コマンドを積む
+	#ifdef USE_IMGUI
 	ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), directXCom->GetCommandList().Get());
-
+	#endif
 
 	directXCom->PostDraw();
 }

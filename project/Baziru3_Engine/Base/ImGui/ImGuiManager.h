@@ -15,7 +15,10 @@ public:
 	void CreateContext();
 	void StyleColorsDark();
 
+	bool IsInitialized() const { return initialized; }
+
 private:
 	WindowAPI* windowAPI = nullptr;
 	DirectXCom* dxCommon = nullptr;
+	bool initialized = false;
 };
