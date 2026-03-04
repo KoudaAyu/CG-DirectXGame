@@ -100,7 +100,7 @@ private:
 	ImGuiManager* imguiManager = nullptr;
 	DebugCamera debugCamera_;
 	Camera* camera = nullptr;
-	CameraForGPU* cameraData = nullptr;
+	
 	std::list<ParticleManager::Particle> particles;
 	ParticleEmitter particleEmitter;
 	Emitter emitter;
@@ -124,7 +124,7 @@ private:
 	D3D12_GPU_DESCRIPTOR_HANDLE textureSrvHandleGPU;
 	D3D12_GPU_DESCRIPTOR_HANDLE textureSrvHandleGPU2;
 
-	Microsoft::WRL::ComPtr<ID3D12Resource> cameraResource;
+	
 
 	D3D12_GPU_DESCRIPTOR_HANDLE instancingSrvHandleGPU;
 

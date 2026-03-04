@@ -79,14 +79,10 @@ void Game::Initialize()
 	light = new Light();
 	light->Initialize(directXCom);
 
-	// --- カメラ用のリソース作成を追加 ---
-	cameraResource = directXCom->CreateBufferResource(directXCom->GetDevice().Get(), sizeof(CameraForGPU));
+	camera = new Camera();
+	camera->Initialize(directXCom);
+
 	
-	cameraResource->Map(0, nullptr, reinterpret_cast<void**>(&cameraData));
-	// 初期値を設定
-	cameraData->worldPosition = { 0.0f, 0.0f, -10.0f };
-
-
 	//WVP用のリソースを作る。　Matrix4x4 1つのサイズを用意する
 	Microsoft::WRL::ComPtr<ID3D12Resource> wvpResource = directXCom->CreateBufferResource(directXCom->GetDevice().Get(), sizeof(TransformationMatrix));
 	//データを書き込む
@@ -179,7 +175,7 @@ void Game::Initialize()
 	
 	debugCamera_.Initialize(windowAPI);
 
-	camera = new Camera();
+	
 	camera->SetRotate({ 0.0f,0.0f,0.0f });
 	camera->SetTranslate({ 0.0f,0.0f,-10.0f });
 	object3dCom->SetDefaultCamera(camera);
@@ -207,7 +203,7 @@ void Game::Initialize()
 		directXCom->CreateBufferResource(directXCom->GetDevice(), sizeof(ParticleManager::ParticleForGPU) * kNumMaxInstances);
 	
 	instancingResource->Map(0, nullptr, reinterpret_cast<void**>(&instanceData));
-
+	
 
 	{
 		uint32_t writeIndex = 0;
@@ -292,7 +288,7 @@ void Game::Finalize()
 	sprites.clear();
 	delete particleManager;
 	delete object3d;
-	delete camera;
+	
 
 	// Delete model and its ModelCom if created
 	if (model_)
@@ -314,6 +310,14 @@ void Game::Finalize()
 
 	delete object3dCom;
 	delete spriteCom;
+
+	
+	if (camera)
+	{
+		camera->Finalize();
+		delete camera;
+		camera = nullptr;
+	}
 
 	CloseHandle(directXCom->GetFenceEvent());
 	delete directXCom;
@@ -343,7 +347,15 @@ void Game::Update()
 
 	camera->Update();
 
-	cameraData->worldPosition = camera->GetWorldPosition();
+	// Safely update mapped camera GPU data
+	if (camera && camera->GetCameraData())
+	{
+		camera->GetCameraData()->worldPosition = camera->GetWorldPosition();
+	}
+	else
+	{
+		Logger::Log(logStream, "Warning: camera GPU data is null.\n");
+	}
 
 	// Apply ImGui rotation to the object3d transform
 	object3d->SetRotate(transformObject.rotate);
@@ -579,8 +591,17 @@ void Game::Draw()
 	// Use Object3d WVP updated above
 	directXCom->GetCommandList()->SetGraphicsRootConstantBufferView(1, object3d->GetTransformationMatrixResource()->GetGPUVirtualAddress());
 	directXCom->GetCommandList()->SetGraphicsRootDescriptorTable(2, useMonsterBall ? textureSrvHandleGPU2 : textureSrvHandleGPU);
-	directXCom->GetCommandList()->SetGraphicsRootConstantBufferView(3,light->GetDirectionalLightResource()->GetGPUVirtualAddress());
-	directXCom->GetCommandList()->SetGraphicsRootConstantBufferView(4, cameraResource->GetGPUVirtualAddress());
+	directXCom->GetCommandList()->SetGraphicsRootConstantBufferView(3, light->GetDirectionalLightResource()->GetGPUVirtualAddress());
+	if (camera && camera->GetCameraResource())
+	{
+		directXCom->GetCommandList()->SetGraphicsRootConstantBufferView(4, camera->GetCameraResource()->GetGPUVirtualAddress());
+	}
+	else
+	{
+		// Bind a null GPU address to avoid crash and log the issue
+		directXCom->GetCommandList()->SetGraphicsRootConstantBufferView(4, 0);
+		Logger::Log(logStream, "Warning: camera GPU resource not available when drawing object.\n");
+	}
 	if (drawObject)
 	{
 		/*commandList->DrawIndexedInstanced(kIndexCount, 1, 0, 0, 0);*/
@@ -633,7 +654,15 @@ void Game::Draw()
 	// Set descriptor table for texture (root parameter 2)
 	directXCom->GetCommandList()->SetGraphicsRootDescriptorTable(2, useMonsterBall ? textureSrvHandleGPU2 : textureSrvHandleGPU);
 	directXCom->GetCommandList()->SetGraphicsRootConstantBufferView(3, light->GetDirectionalLightResource()->GetGPUVirtualAddress());
-	directXCom->GetCommandList()->SetGraphicsRootConstantBufferView(4, cameraResource->GetGPUVirtualAddress());
+	if (camera && camera->GetCameraResource())
+	{
+		directXCom->GetCommandList()->SetGraphicsRootConstantBufferView(4, camera->GetCameraResource()->GetGPUVirtualAddress());
+	}
+	else
+	{
+		directXCom->GetCommandList()->SetGraphicsRootConstantBufferView(4, 0);
+		Logger::Log(logStream, "Warning: camera GPU resource not available when drawing particles.\n");
+	}
 
 	/*commandList->DrawIndexedInstanced(kIndexCount, 1, 0, 0, 0);*/
 	if (numInstance > 0)

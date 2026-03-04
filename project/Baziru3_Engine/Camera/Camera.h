@@ -3,10 +3,15 @@
 #include"Transform.h"
 #include"Matrix4x4.h"
 
+#include <wrl.h>
+#include <d3d12.h>
+
 struct CameraForGPU
 {
 	Vector3 worldPosition;
 };
+
+class DirectXCom; // forward
 
 class Camera
 {
@@ -14,6 +19,11 @@ public:
 
 	Camera();
 	void Update();
+
+	// Initialize GPU resources for the camera
+	void Initialize(DirectXCom* directXCom);
+	// Release GPU resources
+	void Finalize();
 
 public:
 
@@ -78,6 +88,10 @@ public:
 		farZ_ = farZ;
 	}
 
+	// Access to GPU-side camera data and resource
+	CameraForGPU* GetCameraData() const { return cameraData; }
+	Microsoft::WRL::ComPtr<ID3D12Resource> GetCameraResource() const { return cameraResource; }
+
 private:
 	Transform transform_;
 	// 回転
@@ -99,5 +113,10 @@ private:
 	float nearZ_ = 0.1f;
 	//ファークリップ距離
 	float farZ_ = 100.0f;
+
+	// DirectX 関連
+	DirectXCom* directXCom_ = nullptr;
+	Microsoft::WRL::ComPtr<ID3D12Resource> cameraResource;
+	CameraForGPU* cameraData = nullptr;
 
 };
