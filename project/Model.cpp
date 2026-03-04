@@ -6,12 +6,12 @@
 
 #include"TextureManager.h"
 
-void Model::Initialize(ModelCom* modelCom, const std::string& directorypath, const std::string& filename)
+void Model::Initialize(ModelCom* modelCom, const std::string& directoryPath, const std::string& filename)
 {
     modelCom_ = modelCom;
 
     //Modelの読み込み
-    modelData_ = LoadObjFile(directorypath, filename);
+    modelData_ = LoadObjFile(directoryPath, filename);
 
     //頂点データとマテリアルの初期化
     VertexResource();
@@ -89,7 +89,7 @@ Model::ModelData Model::LoadObjFile(const std::string& directoryPath, const std:
         {
             Vector4 position;
             s >> position.x >> position.y >> position.z;
-            position.x *= -1.0f; //X軸を反転する
+            // position.x *= -1.0f; // X反転は Object3d 側の挙動と合わせるため無効化
             position.w = 1.0f;
             positions.push_back(position);//位置を格納
         }
@@ -104,7 +104,7 @@ Model::ModelData Model::LoadObjFile(const std::string& directoryPath, const std:
         {
             Vector3 normal;
             s >> normal.x >> normal.y >> normal.z;
-            normal.x *= -1.0f; //X軸を反転する
+            // normal.x *= -1.0f; // X反転は無効化
             normals.push_back(normal);//法線を格納
         }
         else if (identifile == "f")
@@ -132,9 +132,10 @@ Model::ModelData Model::LoadObjFile(const std::string& directoryPath, const std:
                 Vector3 normal = normals[elementIndices[2] - 1];
                 triangle[faceVertex] = { position, texcoord, normal };
             }
-            modelData.vertices.push_back(triangle[2]);
-            modelData.vertices.push_back(triangle[1]);
+            // Object3d 側と同じワインディング順で追加
             modelData.vertices.push_back(triangle[0]);
+            modelData.vertices.push_back(triangle[1]);
+            modelData.vertices.push_back(triangle[2]);
         }
         else if (identifile == "mtllib")
         {
@@ -191,6 +192,21 @@ void Model::VertexResource()
         size_t vertexCount = modelData_.vertices.size();
         if (vertexCount == 0) { vertexCount = 1; }
         size_t bufferSize = sizeof(Sprite::VertexData) * vertexCount;
+
+
+        //頂点リソースを作る
+        vertexResourceModel = dxCommon->CreateBufferResource(dxCommon->GetDevice().Get(), sizeof(Sprite::VertexData) * modelData_.vertices.size());
+
+        //頂点リソースにデータを書き込む
+        Sprite::VertexData* vertexDataModel = nullptr;
+        vertexResourceModel->Map(0, nullptr, reinterpret_cast<void**>(&vertexDataModel));
+        std::memcpy(vertexDataModel, modelData_.vertices.data(), sizeof(Sprite::VertexData) * modelData_.vertices.size());//頂点データをリソースにコピー
+
+
+        //頂点バッファービューを作成末う
+        vertexBufferView.BufferLocation = vertexResourceModel->GetGPUVirtualAddress();//リソースの先頭のアドレスから使う
+        vertexBufferView.SizeInBytes = UINT(sizeof(Sprite::VertexData) * modelData_.vertices.size()); //使用するリソースのサイズは頂点のサイズ
+        vertexBufferView.StrideInBytes = sizeof(Sprite::VertexData); //1頂点当たりのサイズ
 
         vertexResource = dxCommon->CreateBufferResource(dxCommon->GetDevice().Get(), bufferSize);
 

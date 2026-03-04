@@ -64,18 +64,14 @@ void Game::Initialize()
 
 	//モデル読み込み
 	modelData = object3d->LoadObjFile("Resources", "plane.obj");
+	
+	// Model を作成して初期化（Model が自分で頂点リソースを作る）
+	modelCom_ = new ModelCom();
+	modelCom_->Initialize(directXCom);
+	model_ = new Model();
+	model_->Initialize(modelCom_, "Resources", "plane.obj");
+	
 
-	//頂点リソースを作る
-	vertexResourceModel = directXCom->CreateBufferResource(directXCom->GetDevice().Get(), sizeof(Sprite::VertexData) * modelData.vertices.size());
-	//頂点バッファービューを作成末う
-
-	vertexBufferView.BufferLocation = vertexResourceModel->GetGPUVirtualAddress();//リソースの先頭のアドレスから使う
-	vertexBufferView.SizeInBytes = UINT(sizeof(Sprite::VertexData) * modelData.vertices.size()); //使用するリソースのサイズは頂点のサイズ
-	vertexBufferView.StrideInBytes = sizeof(Sprite::VertexData); //1頂点当たりのサイズ
-	//頂点リソースにデータを書き込む
-	Sprite::VertexData* vertexDataModel = nullptr;
-	vertexResourceModel->Map(0, nullptr, reinterpret_cast<void**>(&vertexDataModel));
-	std::memcpy(vertexDataModel, modelData.vertices.data(), sizeof(Sprite::VertexData) * modelData.vertices.size());//頂点データをリソースにコピー
 	
 	materialManager = new MaterialManager();
 	materialManager->Initialize(directXCom);
@@ -297,6 +293,19 @@ void Game::Finalize()
 	delete particleManager;
 	delete object3d;
 	delete camera;
+
+	// Delete model and its ModelCom if created
+	if (model_)
+	{
+		delete model_;
+		model_ = nullptr;
+	}
+	if (modelCom_)
+	{
+		delete modelCom_;
+		modelCom_ = nullptr;
+	}
+
 
 	TextureManager::GetInstance()->Finalize();
 
@@ -563,7 +572,7 @@ void Game::Draw()
 	directXCom->GetCommandList()->SetPipelineState(spriteCom->GetPipelineState().Get()); //パイプラインステートを設定
 	//Objectの描画
 
-	directXCom->GetCommandList()->IASetVertexBuffers(0, 1, &vertexBufferView);
+	directXCom->GetCommandList()->IASetVertexBuffers(0, 1, &model_->GetVertexBufferView());
 	// Note: object draw uses non-indexed DrawInstanced, so do not set an index buffer here
 	directXCom->GetCommandList()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 	directXCom->GetCommandList()->SetGraphicsRootConstantBufferView(0, materialManager->GetMaterialResource()->GetGPUVirtualAddress());
@@ -614,7 +623,7 @@ void Game::Draw()
 	directXCom->GetCommandList()->SetPipelineState(particleManager->GetPipelineState().Get()); // パイプラインステートを設定
 	//Objectの描画
 
-	directXCom->GetCommandList()->IASetVertexBuffers(0, 1, &vertexBufferView);
+	directXCom->GetCommandList()->IASetVertexBuffers(0, 1, &model_->GetVertexBufferView());
 	// Particle draw uses non-indexed DrawInstanced, so do not set an index buffer here
 	directXCom->GetCommandList()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 	directXCom->GetCommandList()->SetGraphicsRootConstantBufferView(0, materialManager->GetMaterialResource()->GetGPUVirtualAddress());

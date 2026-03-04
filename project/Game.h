@@ -10,6 +10,7 @@
 #include"Light.h"
 #include"Log.h"
 #include"MaterialManager.h"
+#include"Model.h"
 #include"Object3d.h"
 #include"Object3dCom.h"
 #include"ParticleEmitter.h"
@@ -89,6 +90,8 @@ private:
 	WindowAPI* windowAPI = nullptr; //ウィンドウ関連のAPIをまとめたオブジェクト
 	DirectXCom* directXCom = nullptr;
 	SpriteCom* spriteCom = nullptr;
+	Model* model_ = nullptr;
+	ModelCom* modelCom_ = nullptr;
 	Object3d* object3d = nullptr;
 	Object3dCom* object3dCom = nullptr;
 	Light* light = nullptr;
@@ -113,7 +116,7 @@ private:
 	TransformationMatrix* transformationMatrixDataSphere = nullptr;
 	Microsoft::WRL::ComPtr<ID3D12Resource> transformationMatrixResourceSphere;
 	
-	D3D12_VERTEX_BUFFER_VIEW vertexBufferView{};
+	//D3D12_VERTEX_BUFFER_VIEW vertexBufferView{};
 
 	D3D12_CPU_DESCRIPTOR_HANDLE textureSrvHandleCPU;
 	D3D12_CPU_DESCRIPTOR_HANDLE textureSrvHandleCPU2;
@@ -144,7 +147,7 @@ private:
 	bool drawSphere = false;
 
 	// Keep GPU resources alive beyond Initialize
-	Microsoft::WRL::ComPtr<ID3D12Resource> vertexResourceModel;
+	
 	Microsoft::WRL::ComPtr<ID3D12Resource> textureResource;
 	Microsoft::WRL::ComPtr<ID3D12Resource> textureResource2;
 	Microsoft::WRL::ComPtr<ID3D12Resource> intermediateResource;

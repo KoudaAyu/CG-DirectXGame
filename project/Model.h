@@ -49,19 +49,21 @@ public:
 	
 	
 
-	// Getters for main.cpp usage
+	
 	const ModelData& GetModelData() const { return modelData_; }
 	const D3D12_VERTEX_BUFFER_VIEW& GetVertexBufferView() const { return vertexBufferView_; }
 	ID3D12Resource* GetMaterialResource() const { return materialResource.Get(); }
 	Material* GetMaterialData() const { return materialData_; }
 
+	
+
 	/// <summary>
 	/// .mtlファイルの読み込み
 	/// </summary>
-	/// <param name="direcrotyPath"></param>
+	/// <param name="directoryPath"></param>
 	/// <param name="filename"></param>
 	/// <returns></returns>
-	static MaterialData LoadMaterialTemplateFile(const std::string& direcrotyPath, const std::string& filename);
+	static MaterialData LoadMaterialTemplateFile(const std::string& directoryPath, const std::string& filename);
 
 	/// <summary>
 	/// .objファイルの読み込み
@@ -98,4 +100,9 @@ private:
 	// マテリアル用リソース
 	Microsoft::WRL::ComPtr<ID3D12Resource> materialResource = nullptr;
 	Material* materialData_ = nullptr;
+
+	Microsoft::WRL::ComPtr<ID3D12Resource> vertexResourceModel;
+
+	D3D12_VERTEX_BUFFER_VIEW vertexBufferView{};
+
 };
