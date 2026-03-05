@@ -8,6 +8,8 @@
 #include"Log.h"
 #include"Random.h"
 
+class ParticleEmitter;
+
 class ParticleManager
 {
 public:
@@ -105,6 +107,17 @@ public:
 
 	DirectXCom* GetDxCommon() { return dxCommon; }
 
+	std::mt19937& GetRandomEngine() { return randomEngine; }
+
+	uint32_t GetNumMaxInstances() const { return kNumMaxInstances; }
+
+	ParticleManager::ParticleForGPU* GetInstanceData() { return instanceData; }
+
+	D3D12_GPU_DESCRIPTOR_HANDLE GetInstancingSrvHandleGPU() const { return instancingSrvHandleGPU; }
+
+private:
+	const uint32_t kNumMaxInstances = 10;
+
 
 private:
 	DirectXCom* dxCommon = nullptr;
@@ -126,6 +139,14 @@ private:
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC& graphicPipelineStateDesc = graphicPipeline_stateDesc;
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> pipelineState = nullptr;
 	D3D12_DEPTH_STENCIL_DESC depthStencilDesc{};
+	D3D12_GPU_DESCRIPTOR_HANDLE instancingSrvHandleGPU;
+	Microsoft::WRL::ComPtr<ID3D12Resource> instancingResource;
+
+	std::mt19937 randomEngine{ std::random_device{}() };
+	std::list<ParticleManager::Particle> particles;
+
+	Emitter emitter;
+	ParticleManager::ParticleForGPU* instanceData = nullptr;
 
 	std::ostream& logStream;
 };

@@ -17,6 +17,8 @@ public:
 	const D3D12_VERTEX_BUFFER_VIEW& GetVertexBufferViewSphere() const { return vertexBufferViewSphere; }
 	const D3D12_INDEX_BUFFER_VIEW& GetIndexBufferViewSphere() const { return indexBufferViewSphere; }
 	const uint32_t GetIndexCount() const { return kIndexCount; }
+	TransformationMatrix* GetTransformationMatrixDataSphere() const { return transformationMatrixDataSphere; }
+	Microsoft::WRL::ComPtr<ID3D12Resource> GetTransformationMatrixResourceSphere() const { return transformationMatrixResourceSphere; }
 
 private:
 	DirectXCom* directXCom = nullptr;
@@ -42,5 +44,9 @@ private:
 	D3D12_VERTEX_BUFFER_VIEW vertexBufferViewSphere{};
 	D3D12_INDEX_BUFFER_VIEW indexBufferViewSphere{};
 	Sprite::VertexData* mapped = nullptr;
+
+	TransformationMatrix* transformationMatrixDataSphere = nullptr;
+	Microsoft::WRL::ComPtr<ID3D12Resource> transformationMatrixResourceSphere;
+
 };
 

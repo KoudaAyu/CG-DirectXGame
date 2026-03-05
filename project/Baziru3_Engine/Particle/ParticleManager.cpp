@@ -1,4 +1,5 @@
 #include"ParticleManager.h"
+#include"ParticleEmitter.h"
 
 ParticleManager::ParticleManager(std::ostream& logStream, DirectXCom* dxCommon)
 	: logStream(logStream), dxCommon(dxCommon)
@@ -13,6 +14,54 @@ ParticleManager::~ParticleManager()
 void ParticleManager::Initialize()
 {
 	SetupDraw();
+
+	Random::SeedEngine();
+
+	for (uint32_t index = 0; index < kNumMaxInstances; ++index)
+	{
+		particles.push_back(MakeNewParticles(randomEngine, emitter.transform.GetTranslate()));
+	}
+
+	//TransformationMatrix gTransformationMatrices[10];
+
+	instancingResource =
+		dxCommon->CreateBufferResource(dxCommon->GetDevice(), sizeof(ParticleManager::ParticleForGPU) * kNumMaxInstances);
+
+	instancingResource->Map(0, nullptr, reinterpret_cast<void**>(&instanceData));
+
+
+	{
+		uint32_t writeIndex = 0;
+		for (const auto& p : particles)
+		{
+			if (writeIndex >= kNumMaxInstances) { break; }
+			instanceData[writeIndex].WVP = MakeIdentity4x4();
+			instanceData[writeIndex].World = MakeIdentity4x4();
+			instanceData[writeIndex].color = p.color;
+			++writeIndex;
+		}
+
+		for (; writeIndex < kNumMaxInstances; ++writeIndex)
+		{
+			instanceData[writeIndex].WVP = MakeIdentity4x4();
+			instanceData[writeIndex].World = MakeIdentity4x4();
+			instanceData[writeIndex].color = { 0,0,0,0 };
+		}
+	}
+
+	D3D12_SHADER_RESOURCE_VIEW_DESC instancingSrvDesc{};
+	instancingSrvDesc.Format = DXGI_FORMAT_UNKNOWN;
+	instancingSrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+	instancingSrvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+	instancingSrvDesc.Buffer.NumElements = 0;
+	instancingSrvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
+	instancingSrvDesc.Buffer.NumElements = kNumMaxInstances;
+	instancingSrvDesc.Buffer.StructureByteStride = sizeof(ParticleManager::ParticleForGPU);
+	D3D12_CPU_DESCRIPTOR_HANDLE instancingSrvHandleCPU = dxCommon->GetCPUDescroptirHandle(dxCommon->GetSrvDescriptorHeap(), dxCommon->GetDescriptorSizeSRV(), 3);
+	instancingSrvHandleGPU = dxCommon->GetGPUDescriptorHandle(dxCommon->GetSrvDescriptorHeap(), dxCommon->GetDescriptorSizeSRV(), 3);
+	dxCommon->GetDevice()->CreateShaderResourceView(instancingResource.Get(), &instancingSrvDesc, instancingSrvHandleCPU);
+
+
 }
 
 ParticleManager::Particle ParticleManager::MakeNewParticles(std::mt19937& randomEngine, const Vector3& translate)

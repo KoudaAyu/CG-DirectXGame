@@ -113,8 +113,6 @@ private:
 	Sprite::Transform uvTransformSprite;
 	Sprite::Transform transformSphere;
 	Sprite::Transform cameraTransform;
-	TransformationMatrix* transformationMatrixDataSphere = nullptr;
-	Microsoft::WRL::ComPtr<ID3D12Resource> transformationMatrixResourceSphere;
 	
 	//D3D12_VERTEX_BUFFER_VIEW vertexBufferView{};
 
@@ -126,18 +124,18 @@ private:
 
 	
 
-	D3D12_GPU_DESCRIPTOR_HANDLE instancingSrvHandleGPU;
+	//D3D12_GPU_DESCRIPTOR_HANDLE instancingSrvHandleGPU;
 
 	Object3d::ModelData modelData;
 
-	const uint32_t kNumMaxInstances = 10;
+	//const uint32_t kNumMaxInstances = 10;
 	uint32_t numInstance = 0;
 
 	const float kDeltaTime = 1.0f / 60.0f;
 
-	std::mt19937 randomEngine{ std::random_device{}() };
+	//std::mt19937 randomEngine{ std::random_device{}() };
 
-	ParticleManager::ParticleForGPU* instanceData = nullptr;
+	//ParticleManager::ParticleForGPU* instanceData = nullptr;
 
 	//SRVの切り替え
 	bool useMonsterBall = true;
@@ -152,7 +150,7 @@ private:
 	Microsoft::WRL::ComPtr<ID3D12Resource> textureResource2;
 	Microsoft::WRL::ComPtr<ID3D12Resource> intermediateResource;
 	Microsoft::WRL::ComPtr<ID3D12Resource> intermediateResource2;
-	Microsoft::WRL::ComPtr<ID3D12Resource> instancingResource;
+	//Microsoft::WRL::ComPtr<ID3D12Resource> instancingResource;
 
 };
 

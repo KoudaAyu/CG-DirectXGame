@@ -83,24 +83,9 @@ void Game::Initialize()
 	camera->Initialize(directXCom);
 
 	
-	//WVP用のリソースを作る。　Matrix4x4 1つのサイズを用意する
-	Microsoft::WRL::ComPtr<ID3D12Resource> wvpResource = directXCom->CreateBufferResource(directXCom->GetDevice().Get(), sizeof(TransformationMatrix));
-	//データを書き込む
-	TransformationMatrix* wvpData = nullptr;
-	//書き込む為のアドレス取得
-	wvpResource->Map(0, nullptr, reinterpret_cast<void**>(&wvpData));
-	//単位行列を書き込む
-	wvpData->World = MakeIdentity4x4();
-	wvpData->WVP = MakeIdentity4x4();
-
-	transformationMatrixResourceSphere = directXCom->CreateBufferResource(directXCom->GetDevice().Get(), sizeof(TransformationMatrix));
-
-	// データを書き込むためのポインタを取得
 	
-	transformationMatrixResourceSphere->Map(0, nullptr, reinterpret_cast<void**>(&transformationMatrixDataSphere));
-	transformationMatrixDataSphere->WVP = MakeIdentity4x4();
-	transformationMatrixDataSphere->World = MakeIdentity4x4();
-	// NOTE: Keep this buffer mapped for the program lifetime so we can update per-frame without remapping.
+
+
 
 	//Transform変数を作る
 	Sprite::Transform transform = { {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };
@@ -190,51 +175,6 @@ void Game::Initialize()
 	emitter.frequency = 0.5f;
 	emitter.frequencyTime = 0.0f;
 
-	Random::SeedEngine();
-	
-	for (uint32_t index = 0; index < kNumMaxInstances; ++index)
-	{
-		particles.push_back(particleManager->MakeNewParticles(randomEngine, emitter.transform.GetTranslate()));
-	}
-
-	//TransformationMatrix gTransformationMatrices[10];
-
-	instancingResource =
-		directXCom->CreateBufferResource(directXCom->GetDevice(), sizeof(ParticleManager::ParticleForGPU) * kNumMaxInstances);
-	
-	instancingResource->Map(0, nullptr, reinterpret_cast<void**>(&instanceData));
-	
-
-	{
-		uint32_t writeIndex = 0;
-		for (const auto& p : particles)
-		{
-			if (writeIndex >= kNumMaxInstances) { break; }
-			instanceData[writeIndex].WVP = MakeIdentity4x4();
-			instanceData[writeIndex].World = MakeIdentity4x4();
-			instanceData[writeIndex].color = p.color;
-			++writeIndex;
-		}
-
-		for (; writeIndex < kNumMaxInstances; ++writeIndex)
-		{
-			instanceData[writeIndex].WVP = MakeIdentity4x4();
-			instanceData[writeIndex].World = MakeIdentity4x4();
-			instanceData[writeIndex].color = { 0,0,0,0 };
-		}
-	}
-
-	D3D12_SHADER_RESOURCE_VIEW_DESC instancingSrvDesc{};
-	instancingSrvDesc.Format = DXGI_FORMAT_UNKNOWN;
-	instancingSrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-	instancingSrvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
-	instancingSrvDesc.Buffer.NumElements = 0;
-	instancingSrvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
-	instancingSrvDesc.Buffer.NumElements = kNumMaxInstances;
-	instancingSrvDesc.Buffer.StructureByteStride = sizeof(ParticleManager::ParticleForGPU);
-	D3D12_CPU_DESCRIPTOR_HANDLE instancingSrvHandleCPU = directXCom->GetCPUDescroptirHandle(directXCom->GetSrvDescriptorHeap(), directXCom->GetDescriptorSizeSRV(), 3);
-	instancingSrvHandleGPU = directXCom->GetGPUDescriptorHandle(directXCom->GetSrvDescriptorHeap(), directXCom->GetDescriptorSizeSRV(), 3);
-	directXCom->GetDevice()->CreateShaderResourceView(instancingResource.Get(), &instancingSrvDesc, instancingSrvHandleCPU);
 
 	
 	imguiManager = new ImGuiManager();
@@ -386,10 +326,10 @@ void Game::Update()
 	Matrix4x4 projectionMatrix = MakePerspectiveFovMatrix(camera->GetFovY(), camera->GetAspectRatio(), camera->GetNearZ(), camera->GetFarZ());
 	//WVPMatrixを作る
 	Matrix4x4 worldViewProjectMatrix = Multiply(worldMatrix, Multiply(viewMatrix, projectionMatrix));
-	transformationMatrixDataSphere->WVP = worldViewProjectMatrix;
-	transformationMatrixDataSphere->World = worldMatrix;
+	sphere->GetTransformationMatrixDataSphere()->WVP = worldViewProjectMatrix;
+	sphere->GetTransformationMatrixDataSphere()->World = worldMatrix;
 	// 法線変換用の逆転置行列も更新
-	transformationMatrixDataSphere->WorldInverseTranspose = Transpose(Inverse(worldMatrix));
+	sphere->GetTransformationMatrixDataSphere()->WorldInverseTranspose = Transpose(Inverse(worldMatrix));
 
 
 	numInstance = 0;
@@ -397,7 +337,7 @@ void Game::Update()
 	emitter.frequencyTime += kDeltaTime;
 	if (emitter.frequencyTime >= emitter.frequency)
 	{
-		particles.splice(particles.end(), particleEmitter.Emit(emitter, randomEngine, *particleManager));
+		particles.splice(particles.end(), particleEmitter.Emit(emitter, particleManager->GetRandomEngine(), *particleManager));
 		emitter.frequencyTime -= emitter.frequency;
 	}
 	{
@@ -424,13 +364,13 @@ void Game::Update()
 			Matrix4x4 ParticleViewProjectMatrix = Multiply(
 				ParticleWorldMatrix, Multiply(viewMatrix, projectionMatrix));
 
-			if (writeIndex < kNumMaxInstances)
+			if (writeIndex < particleManager->GetNumMaxInstances())
 			{
-				instanceData[writeIndex].WVP = ParticleViewProjectMatrix;
-				instanceData[writeIndex].World = ParticleWorldMatrix;
-				instanceData[writeIndex].color = p.color;
+				particleManager->GetInstanceData()[writeIndex].WVP = ParticleViewProjectMatrix;
+				particleManager->GetInstanceData()[writeIndex].World = ParticleWorldMatrix;
+				particleManager->GetInstanceData()[writeIndex].color = p.color;
 				float alpha = 1.0f - (p.currentTime / p.lifeTime);
-				instanceData[writeIndex].color.w = alpha;
+				particleManager->GetInstanceData()[writeIndex].color.w = alpha;
 				++writeIndex;
 			}
 
@@ -567,7 +507,7 @@ void Game::Update()
 	// ImGuiを使わずにSpaceキーでパーティクルを追加
 	if (inputManager.TriggerKey(DIK_SPACE))
 	{
-		particles.splice(particles.end(), ParticleEmitter{}.Emit(emitter, randomEngine, *particleManager));
+		particles.splice(particles.end(), ParticleEmitter{}.Emit(emitter, particleManager->GetRandomEngine(), *particleManager));
 	}
 }
 void Game::Draw()
@@ -623,7 +563,7 @@ void Game::Draw()
 
 		directXCom->GetCommandList()->SetGraphicsRootConstantBufferView(0, materialManager->GetMaterialResource()->GetGPUVirtualAddress());
 
-		directXCom->GetCommandList()->SetGraphicsRootConstantBufferView(1, transformationMatrixResourceSphere->GetGPUVirtualAddress());
+		directXCom->GetCommandList()->SetGraphicsRootConstantBufferView(1, sphere->GetTransformationMatrixResourceSphere()->GetGPUVirtualAddress());
 		directXCom->GetCommandList()->SetGraphicsRootDescriptorTable(2, useMonsterBall ? textureSrvHandleGPU2 : textureSrvHandleGPU);
 
 		directXCom->GetCommandList()->SetGraphicsRootConstantBufferView(3, light->GetDirectionalLightResource()->GetGPUVirtualAddress());
@@ -650,7 +590,7 @@ void Game::Draw()
 	directXCom->GetCommandList()->SetGraphicsRootConstantBufferView(0, materialManager->GetMaterialResource()->GetGPUVirtualAddress());
 	// Do NOT set a CBV at root parameter 1 because particle manager declares parameter 1 as a descriptor table.
 	// Set descriptor table for instance data (root parameter 1)
-	directXCom->GetCommandList()->SetGraphicsRootDescriptorTable(1, instancingSrvHandleGPU);
+	directXCom->GetCommandList()->SetGraphicsRootDescriptorTable(1, particleManager->GetInstancingSrvHandleGPU());
 	// Set descriptor table for texture (root parameter 2)
 	directXCom->GetCommandList()->SetGraphicsRootDescriptorTable(2, useMonsterBall ? textureSrvHandleGPU2 : textureSrvHandleGPU);
 	directXCom->GetCommandList()->SetGraphicsRootConstantBufferView(3, light->GetDirectionalLightResource()->GetGPUVirtualAddress());
