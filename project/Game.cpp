@@ -304,7 +304,7 @@ void Game::Update()
 
 	for (auto* sprite : sprites)
 	{
-		sprite->SetPosition({ 0.0f,0.0f });
+		sprite->SetPosition(uiSpritePosition);
 		sprite->Update(windowAPI, &debugCamera_);
 	}
 
@@ -392,6 +392,12 @@ void Game::Update()
 	ImGui::ColorEdit4("Material Color", &materialManager->GetMaterialDataColor().x);
 	//ImGui::DragFloat("Light Intensity", &directionalLightData->intensity, 0.01f, 0.0f, 10.0f);
 
+	// Sprite position window: size (500,100), sliders (x,y) with initial (100,100) and format integer 4 digits, decimal 1
+	ImGui::SetNextWindowSize(ImVec2(500.0f, 100.0f), ImGuiCond_Once);
+	ImGui::Begin("Sprite Position");
+	// Slider range chosen to allow 4 integer digits and 1 decimal place
+	ImGui::SliderFloat2("Position (X,Y)", &uiSpritePosition.x, 0.0f, 9999.9f, "%4.1f");
+	ImGui::End();
 
 	ImGui::Checkbox("useMonsterBall", &useMonsterBall);
 	ImGui::Checkbox("LightSprite Flag", (bool*)&materialManager->GetMaterialDataEnableLighting());

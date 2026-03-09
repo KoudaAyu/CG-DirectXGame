@@ -152,68 +152,8 @@ private:
 	Microsoft::WRL::ComPtr<ID3D12Resource> intermediateResource2;
 	//Microsoft::WRL::ComPtr<ID3D12Resource> instancingResource;
 
-};
+	// UI controlled sprite position (initial 100,100)
+	Vector2 uiSpritePosition = { 100.0f, 100.0f };
 
-//#include<Windows.h>
-//
-////自作h
-//#include"Camera.h"
-//#include"DebugCamera.h"
-//#include"DirectXCom.h"
-//#include"KeyInput.h"
-//#include"Matrix4x4.h"
-//#include"Random.h"
-//#include"ParticleEmitter.h"
-//#include"Sound.h"
-//#include"TextureManager.h"
-//#include"Vector.h"
-//#include"WindowsAPI.h"
-//
-//#include<chrono> //時間を扱うライブラリ
-//#include<filesystem> //ファイルやディレクトリに関する操作を行うライブラリ
-//#include<format> //文字列のフォーマットを行うライブラリ
-//#include<fstream> //ファイルにかいたり読んだりするライブラリ
-//#include<string> //文字列を扱うライブラリ
-//#include<strsafe.h>
-//
-//#include<d3d12.h>
-//#include<dxgi1_6.h>
-//#include<cassert>
-//
-//
-//
-////Comptr
-//#include<wrl.h>
-//
-////Debug用
-//#include<dbghelp.h>
-//#pragma comment(lib,"Dbghelp.lib")
-//
-////ファイル関係 / サウンド関係
-//#include<sstream>
-////#include <xaudio2.h>
-////#pragma comment(lib, "xaudio2.lib")
-//
-//
-////ReportLiveObjects
-//#include <dxgidebug.h>
-//#pragma comment(lib, "dxguid.lib")
-//
-////DXCの初期化
-//#include<dxcapi.h>
-//#pragma comment(lib, "dxcompiler.lib")
-//
-////Textureの転送
-//#include"externals/DirectXTex/d3dx12.h"
-//#include<vector>
-//
-//#include <DirectXMath.h>
-//#include<cmath>
-//#include "externals/DirectXTex/DirectXTex.h"
-//
-//#include<numbers>
-//#include<list>
-//
-//
-//#include"ImGuiManager.h"
+};
 

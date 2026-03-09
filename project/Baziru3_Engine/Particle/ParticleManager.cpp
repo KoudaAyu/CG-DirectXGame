@@ -19,7 +19,8 @@ void ParticleManager::Initialize()
 
 	for (uint32_t index = 0; index < kNumMaxInstances; ++index)
 	{
-		particles.push_back(MakeNewParticles(randomEngine, emitter.transform.GetTranslate()));
+		// Use origin translate when initializing particles (no local Emitter here)
+		particles.push_back(MakeNewParticles(randomEngine, Vector3{0.0f, 0.0f, 0.0f}));
 	}
 
 	//TransformationMatrix gTransformationMatrices[10];
@@ -88,7 +89,7 @@ void ParticleManager::RootSignature()
 	//RootSignatureの作成
 
 	descriptionRootSignature.Flags =
-		D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT; //入力アセンブラーでの使用を許可
+		D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT; //入力アセンブラでの使用を許可
 }
 
 void ParticleManager::CreateGraphicsPipeline()
@@ -155,7 +156,7 @@ void ParticleManager::CreateRootParameters()
 
 	rootParameters[4].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
 	rootParameters[4].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
-	rootParameters[4].Descriptor.ShaderRegister = 2; // b2: 
+	rootParameters[4].Descriptor.ShaderRegister = 2; // b2:
 
 
 	descriptionRootSignature.pParameters = rootParameters; //ルートパラメーター配列へのポインタ
@@ -186,8 +187,7 @@ void ParticleManager::SignatureBlob()
 	HRESULT hr = D3D12SerializeRootSignature(&descriptionRootSignature,
 		D3D_ROOT_SIGNATURE_VERSION_1, signatureBlob.GetAddressOf(), errorBlob.GetAddressOf());
 
-	
-	dxCommon->SetHr(hr);
+		dxCommon->SetHr(hr);
 
 	if (FAILED(hr))
 	{

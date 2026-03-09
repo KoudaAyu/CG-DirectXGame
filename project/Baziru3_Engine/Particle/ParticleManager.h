@@ -145,7 +145,6 @@ private:
 	std::mt19937 randomEngine{ std::random_device{}() };
 	std::list<ParticleManager::Particle> particles;
 
-	Emitter emitter;
 	ParticleManager::ParticleForGPU* instanceData = nullptr;
 
 	std::ostream& logStream;
