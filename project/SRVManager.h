@@ -36,10 +36,7 @@ private:
 	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> descriptorHeap;
 
 	//次に使用するSRVインデックス
-	// index 0 is commonly reserved (e.g. for ImGui). Start at 1 to avoid overwriting reserved slot.
-	uint32_t useIndex = 1;
-
-	
-
-	
+	// index 0,1 are reserved (e.g. for ImGui or engine global resources).
+	// Game and TextureManager allocations start from 2 to avoid overlap.
+	uint32_t useIndex = 2;
 };

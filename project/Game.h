@@ -100,7 +100,7 @@ private:
 	ImGuiManager* imguiManager = nullptr;
 	DebugCamera debugCamera_;
 	Camera* camera = nullptr;
-	
+	SRVManager* srvManager = nullptr;
 	std::list<ParticleManager::Particle> particles;
 	ParticleEmitter particleEmitter;
 	Emitter emitter;

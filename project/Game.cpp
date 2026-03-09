@@ -119,35 +119,30 @@ void Game::Initialize()
 	intermediateResource = directXCom->UploadTextureData(textureResource, mipImages, directXCom->GetDevice().Get(), directXCom->GetCommandList());
 	intermediateResource2 = directXCom->UploadTextureData(textureResource2, mipImages2, directXCom->GetDevice().Get(), directXCom->GetCommandList());
 
-	//metaDataを基にSRVの設定
-	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
-	srvDesc.Format = metadata.format;
-	srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;//2Dテクスチャ
-	srvDesc.Texture2D.MipLevels = UINT(metadata.mipLevels);
+	// SRV は SRVManager 経由で確保・作成する
+	SRVManager* srvManager = TextureManager::GetInstance()->GetSRVManager();
+	assert(srvManager);
 
-	//二つ目。metaDataを基にSRVの設定
-	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc2{};
-	srvDesc2.Format = metadata2.format;
-	srvDesc2.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-	srvDesc2.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;//2Dテクスチャ
-	srvDesc2.Texture2D.MipLevels = UINT(metadata2.mipLevels);
+	// ImGui 用に 0 番を空ける設計なので、SRVManager::Allocate は 1 以降を返す前提
+	uint32_t srvIndexUvChecker = srvManager->Allocate();
+	uint32_t srvIndexModelTex = srvManager->Allocate();
 
+	srvManager->CreateSRVforTexture2D(
+		srvIndexUvChecker,
+		textureResource.Get(),
+		metadata.format,
+		static_cast<UINT>(metadata.mipLevels));
 
-	//SRVを生成するDescriptorHeapの場所を決める
-	textureSrvHandleCPU = directXCom->GetSrvDescriptorHeap()->GetCPUDescriptorHandleForHeapStart();
-	textureSrvHandleGPU = directXCom->GetSrvDescriptorHeap()->GetGPUDescriptorHandleForHeapStart();
+	srvManager->CreateSRVforTexture2D(
+		srvIndexModelTex,
+		textureResource2.Get(),
+		metadata2.format,
+		static_cast<UINT>(metadata2.mipLevels));
 
-	textureSrvHandleCPU2 = directXCom->GetCPUDescroptirHandle(directXCom->GetSrvDescriptorHeap(), directXCom->GetDescriptorSizeSRV(), 2);
-	textureSrvHandleGPU2 = directXCom->GetGPUDescriptorHandle(directXCom->GetSrvDescriptorHeap(), directXCom->GetDescriptorSizeSRV(), 2);
-	//先頭はImGuiに使用している為その次を使う
-	textureSrvHandleCPU.ptr += directXCom->GetDevice()->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-	textureSrvHandleGPU.ptr += directXCom->GetDevice()->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-	//SRVの生成
-	directXCom->GetDevice()->CreateShaderResourceView(textureResource.Get(), &srvDesc, textureSrvHandleCPU);
-	//2つ目
-	directXCom->GetDevice()->CreateShaderResourceView(textureResource2.Get(), &srvDesc2, textureSrvHandleCPU2);
-	
+	// 後の Draw で使うのは GPU ハンドルだけなので、それを保存しておく
+	textureSrvHandleGPU = srvManager->GetGPUDescriptorHandle(srvIndexUvChecker);
+	textureSrvHandleGPU2 = srvManager->GetGPUDescriptorHandle(srvIndexModelTex);
+
 
 
 	//音声読み込み

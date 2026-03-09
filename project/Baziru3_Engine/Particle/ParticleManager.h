@@ -148,4 +148,6 @@ private:
 	ParticleManager::ParticleForGPU* instanceData = nullptr;
 
 	std::ostream& logStream;
+
+	uint32_t instancingSrvIndex_ = 0;
 };

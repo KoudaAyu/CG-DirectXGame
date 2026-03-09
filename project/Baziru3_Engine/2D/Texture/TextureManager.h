@@ -19,13 +19,11 @@ public:
 
 	void LoadTexture(const std::string& filePath);
 
-	
-
-	
-
-public:
 	// DirectXCom を設定するためのセッターを追加
 	void SetDirectXCom(DirectXCom* directXCom) { directXCom_ = directXCom; }
+
+	// 追加: SRVManager へのアクセサ（SRV インデックス管理を一元化するため）
+	SRVManager* GetSRVManager() const { return srvManager_; }
 
 	// 追加: ファイルパスからSRVインデックスを取得（見つからなければ -1）
 	uint32_t GetTextureIndexByFilePath(const std::string& filePath) const;

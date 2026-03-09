@@ -1,5 +1,6 @@
 #include"ParticleManager.h"
 #include"ParticleEmitter.h"
+#include"TextureManager.h"
 
 ParticleManager::ParticleManager(std::ostream& logStream, DirectXCom* dxCommon)
 	: logStream(logStream), dxCommon(dxCommon)
@@ -22,8 +23,6 @@ void ParticleManager::Initialize()
 		// Use origin translate when initializing particles (no local Emitter here)
 		particles.push_back(MakeNewParticles(randomEngine, Vector3{0.0f, 0.0f, 0.0f}));
 	}
-
-	//TransformationMatrix gTransformationMatrices[10];
 
 	instancingResource =
 		dxCommon->CreateBufferResource(dxCommon->GetDevice(), sizeof(ParticleManager::ParticleForGPU) * kNumMaxInstances);
@@ -50,19 +49,20 @@ void ParticleManager::Initialize()
 		}
 	}
 
-	D3D12_SHADER_RESOURCE_VIEW_DESC instancingSrvDesc{};
-	instancingSrvDesc.Format = DXGI_FORMAT_UNKNOWN;
-	instancingSrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-	instancingSrvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
-	instancingSrvDesc.Buffer.NumElements = 0;
-	instancingSrvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
-	instancingSrvDesc.Buffer.NumElements = kNumMaxInstances;
-	instancingSrvDesc.Buffer.StructureByteStride = sizeof(ParticleManager::ParticleForGPU);
-	D3D12_CPU_DESCRIPTOR_HANDLE instancingSrvHandleCPU = dxCommon->GetCPUDescroptirHandle(dxCommon->GetSrvDescriptorHeap(), dxCommon->GetDescriptorSizeSRV(), 3);
-	instancingSrvHandleGPU = dxCommon->GetGPUDescriptorHandle(dxCommon->GetSrvDescriptorHeap(), dxCommon->GetDescriptorSizeSRV(), 3);
-	dxCommon->GetDevice()->CreateShaderResourceView(instancingResource.Get(), &instancingSrvDesc, instancingSrvHandleCPU);
+	// インスタンシング用 StructuredBuffer の SRV を SRVManager 経由で作成する
+	SRVManager* srvManager = TextureManager::GetInstance()->GetSRVManager();
+	assert(srvManager);
 
+	instancingSrvIndex_ = srvManager->Allocate();
+	// StructuredBuffer 用 SRV を生成
+	srvManager->CreateSRVforStructuredBuffer(
+		instancingSrvIndex_,
+		instancingResource.Get(),
+		kNumMaxInstances,
+		sizeof(ParticleManager::ParticleForGPU));
 
+	// Draw で利用する GPU ハンドルを保持
+	instancingSrvHandleGPU = srvManager->GetGPUDescriptorHandle(instancingSrvIndex_);
 }
 
 ParticleManager::Particle ParticleManager::MakeNewParticles(std::mt19937& randomEngine, const Vector3& translate)

@@ -14,6 +14,18 @@ void SRVManager::Initialize(DirectXCom* directXCom)
 	descriptorSize_ = directXCom_->GetDevice()->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 }
 
+D3D12_CPU_DESCRIPTOR_HANDLE SRVManager::GetCPUDescriptorHandle(uint32_t index)
+{
+    // Delegate to DirectXCom helper to ensure consistent handle math
+    return directXCom_->GetSRVHandleCPU(index);
+}
+
+D3D12_GPU_DESCRIPTOR_HANDLE SRVManager::GetGPUDescriptorHandle(uint32_t index)
+{
+    // Delegate to DirectXCom helper to ensure consistent handle math
+    return directXCom_->GetSRVHandleGPU(index);
+}
+
 void SRVManager::CreateSRVforTexture2D(uint32_t srvIndex, ID3D12Resource* pResource, DXGI_FORMAT Format, UINT MipLeveles)
 {
     D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
@@ -68,18 +80,6 @@ uint32_t SRVManager::Allocate()
 
     uint32_t index = useIndex;
     ++useIndex;
-    return index;
-}
-D3D12_CPU_DESCRIPTOR_HANDLE SRVManager::GetCPUDescriptorHandle(uint32_t index)
-{
-    D3D12_CPU_DESCRIPTOR_HANDLE handleCPU = descriptorHeap->GetCPUDescriptorHandleForHeapStart();
-    handleCPU.ptr += (descriptorSize_ * index);
-    return handleCPU;
-}
-
-D3D12_GPU_DESCRIPTOR_HANDLE SRVManager::GetGPUDescriptorHandle(uint32_t index)
-{
-    D3D12_GPU_DESCRIPTOR_HANDLE handleGPU = descriptorHeap->GetGPUDescriptorHandleForHeapStart();
-    handleGPU.ptr += (descriptorSize_ * index);
-    return handleGPU;
+   
+	return index;
 }
