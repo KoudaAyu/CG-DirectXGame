@@ -1,20 +1,22 @@
 #pragma once
 
+#include "BaseScene.h"
 #include"DirectXCom.h"
 #include"Sound.h"
 #include"Sphere.h"
 
 
-class GamePlayScene
+class GamePlayScene : public BaseScene
 {
 public:
-	void Initialize(DirectXCom* dxCommon);
+	
+	void Initialize(DirectXCom* dxCommon) override;
 
-	void Finalize();
+	void Finalize() override;
 
-	void Update();
+	void Update() override;
 
-	void Draw();
+	void Draw() override;
 
 private:
 
