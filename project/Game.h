@@ -15,6 +15,7 @@
 #include"Object3dCom.h"
 #include"ParticleEmitter.h"
 #include"ParticleManager.h"
+#include"SceneManager.h"
 #include"Sound.h"
 #include"Sphere.h"
 #include"Sprite.h"
@@ -107,6 +108,8 @@ private:
 	KeyInput inputManager;
 	Sound* sound_ = nullptr;
 	MaterialManager* materialManager = nullptr;
+
+	SceneManager* sceneManager_ = nullptr;
 private:
 	std::vector<Sprite*>sprites;
 	Sprite::Transform transformObject;

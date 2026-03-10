@@ -177,11 +177,15 @@ void Game::Initialize()
 
 	scene_ = new GamePlayScene();
 	scene_->Initialize(directXCom);
+
+	sceneManager_ = new SceneManager();
 }
 
 
 void Game::Finalize()
 {
+
+	sceneManager_->~SceneManager();
 
 	scene_->Finalize();
 	delete scene_;
@@ -267,6 +271,8 @@ void Game::Update()
 	Framework::Update();
 
 	scene_->Update();
+
+	sceneManager_->Update();
 
 	//if (windowAPI->ProcessMassage())
 	//{
@@ -517,7 +523,7 @@ void Game::Draw()
 
 	object3dCom->PreDraw();
 
-	
+	sceneManager_->Draw();
 
 	//RootSignatureを設定。PSOに設定しているけれど別途設定が必要
 	directXCom->GetCommandList()->SetGraphicsRootSignature(spriteCom->GetRootSignature().Get());

@@ -2,6 +2,8 @@
 
 #include"DirectXCom.h"
 
+class SceneManager;
+
 class BaseScene
 {
 public:
@@ -12,6 +14,12 @@ public:
 	virtual void Update() = 0;
 	virtual void Draw() = 0;
 
-private:
+	virtual void SetSceneManager(SceneManager* sceneManager)
+	{
+		sceneManager_ = sceneManager;
+	}
+
+protected:
+	SceneManager* sceneManager_ = nullptr;
 };
 
