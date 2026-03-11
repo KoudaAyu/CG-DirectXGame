@@ -1,20 +1,25 @@
 #pragma once
 #include"DirectXCom.h"
+
+#include<vector>
+
 class SRVManager
 {
 public:
+	SRVManager() = default;
 	void Initialize(DirectXCom* directXCom);
 
 	//SRV作成
-	void CreateSRVforTexture2D(uint32_t srvIndex, ID3D12Resource* pResource, DXGI_FORMAT Format, UINT MipLeveles);
+	void CreateSRVForTexture2D(uint32_t srvIndex, ID3D12Resource* pResource, DXGI_FORMAT Format, UINT MipLeveles);
 
 	//SRV生成(Structured Buffer用)
-	void CreateSRVforStructuredBuffer(uint32_t srvIndex, ID3D12Resource* pResource, UINT numElements, UINT structureByteStride);
+	void CreateSRVForStructuredBuffer(uint32_t srvIndex, ID3D12Resource* pResource, UINT numElements, UINT structureByteStride);
 
 	void PreDraw();
 
-
 	uint32_t Allocate();
+
+	void Free(uint32_t index);
 
 public:
 	void SeTGraphicsRootDescriptorTable(UINT RootParameterIndex, uint32_t srvIndex)
@@ -26,6 +31,9 @@ public:
 	D3D12_GPU_DESCRIPTOR_HANDLE GetGPUDescriptorHandle(uint32_t index);
 
 private:
+
+	SRVManager(const SRVManager&) = delete;
+	SRVManager& operator=(const SRVManager&) = delete;
 	DirectXCom* directXCom_ = nullptr;
 
 	//最大SRV数(最大テクスチャ枚数)
@@ -36,7 +44,8 @@ private:
 	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> descriptorHeap;
 
 	//次に使用するSRVインデックス
-	// index 0,1 are reserved (e.g. for ImGui or engine global resources).
-	// Game and TextureManager allocations start from 2 to avoid overlap.
 	uint32_t useIndex = 2;
+
+	std::vector<uint32_t> freeIndices_;
+	std::vector<char> allocatedFlags_; // インデックスの使用状況を管理するマップ
 };

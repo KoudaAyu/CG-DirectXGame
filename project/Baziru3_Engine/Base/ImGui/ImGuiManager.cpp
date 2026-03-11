@@ -2,6 +2,7 @@
 #include"WindowsAPI.h"
 #include"DirectXCom.h"
 #include"SRVManager.h"
+#include <memory>
 
 #ifdef USE_IMGUI
 #include <imgui.h>
@@ -9,16 +10,13 @@
 #include <imgui_impl_dx12.h>
 #endif
 
-static SRVManager* g_srvManager = nullptr;
+static std::unique_ptr<SRVManager> g_srvManager;
 
 ImGuiManager::~ImGuiManager()
 {
 #ifdef USE_IMGUI
-    if (g_srvManager != nullptr)
-    {
-        delete g_srvManager;
-        g_srvManager = nullptr;
-    }
+   
+    g_srvManager.reset();
 #endif
 
 }
@@ -44,9 +42,9 @@ void ImGuiManager::Initialize([[maybe_unused]]WindowAPI* windowAPI, [[maybe_unus
 	ImGui_ImplDX12_InitInfo initInfo = {};
 
 
-	if (g_srvManager == nullptr)
+	if (!g_srvManager)
 	{
-		g_srvManager = new SRVManager();
+		g_srvManager = std::make_unique<SRVManager>();
 		g_srvManager->Initialize(dxCommon);
 	}
 

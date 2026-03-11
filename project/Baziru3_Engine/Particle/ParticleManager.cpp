@@ -55,7 +55,7 @@ void ParticleManager::Initialize()
 
 	instancingSrvIndex_ = srvManager->Allocate();
 	// StructuredBuffer 用 SRV を生成
-	srvManager->CreateSRVforStructuredBuffer(
+	srvManager->CreateSRVForStructuredBuffer(
 		instancingSrvIndex_,
 		instancingResource.Get(),
 		kNumMaxInstances,

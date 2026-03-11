@@ -132,13 +132,13 @@ void Game::Initialize()
 	uint32_t srvIndexUvChecker = srvManager->Allocate();
 	uint32_t srvIndexModelTex = srvManager->Allocate();
 
-	srvManager->CreateSRVforTexture2D(
+	srvManager->CreateSRVForTexture2D(
 		srvIndexUvChecker,
 		textureResource.Get(),
 		metadata.format,
 		static_cast<UINT>(metadata.mipLevels));
 
-	srvManager->CreateSRVforTexture2D(
+	srvManager->CreateSRVForTexture2D(
 		srvIndexModelTex,
 		textureResource2.Get(),
 		metadata2.format,
