@@ -23,6 +23,11 @@ void Game::Initialize()
 	windowAPI->Show();
 	directXCom->Initialize();
 
+	
+	SceneManager::GetInstance()->SetDirectXCom(directXCom);
+	
+	sceneManager_ = SceneManager::GetInstance();
+
 	// TextureManager は SRV ヒープに依存するので DX 初期化の後に初期化
 	TextureManager::GetInstance()->Initialize();
 	TextureManager::GetInstance()->SetDirectXCom(directXCom);
@@ -152,10 +157,10 @@ void Game::Initialize()
 	
 	inputManager.Initialize(windowAPI);
 
-	
+		
 	debugCamera_.Initialize(windowAPI);
 
-	
+		
 	camera->SetRotate({ 0.0f,0.0f,0.0f });
 	camera->SetTranslate({ 0.0f,0.0f,-10.0f });
 	object3dCom->SetDefaultCamera(camera);
@@ -175,20 +180,18 @@ void Game::Initialize()
 	imguiManager = new ImGuiManager();
 	imguiManager->Initialize(windowAPI, directXCom);
 
-	scene_ = new GamePlayScene();
-	scene_->Initialize(directXCom);
-
-	sceneManager_ = new SceneManager();
+	
+	
+	SceneRegistration::RegisterScenes();
+	SceneManager::GetInstance()->ChangeScene("TITLE");
 }
 
 
 void Game::Finalize()
 {
 
-	sceneManager_->~SceneManager();
 
-	scene_->Finalize();
-	delete scene_;
+	SceneManager::Destroy();
 
 	#ifdef USE_IMGUI
 	//ImGui終了処理
@@ -270,8 +273,7 @@ void Game::Update()
 { 
 	Framework::Update();
 
-	scene_->Update();
-
+	
 	sceneManager_->Update();
 
 	//if (windowAPI->ProcessMassage())
@@ -523,6 +525,7 @@ void Game::Draw()
 
 	object3dCom->PreDraw();
 
+	
 	sceneManager_->Draw();
 
 	//RootSignatureを設定。PSOに設定しているけれど別途設定が必要
@@ -616,8 +619,6 @@ void Game::Draw()
 	{
 		directXCom->GetCommandList()->DrawInstanced(UINT(modelData.vertices.size()), numInstance, 0, 0);
 	}
-
-	scene_->Draw();
 
 	//実際のcommandListのImGuiの描画コマンドを積む
 	#ifdef USE_IMGUI

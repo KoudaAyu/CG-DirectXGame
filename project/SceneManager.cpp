@@ -1,13 +1,44 @@
 #include "SceneManager.h"
+#include "SceneFactory.h"
+
+SceneManager* SceneManager::instance = nullptr;
 
 SceneManager::~SceneManager()
 {
 	if (scene_)
 	{
 		scene_->Finalize();
-		delete scene_;
-		scene_ = nullptr;
+		scene_.reset();
 	}
+}
+
+void SceneManager::ChangeScene(const std::string& sceneName)
+{
+
+	if (!sceneFactory_)
+	{
+		sceneFactory_.reset(new SceneFactory());
+	}
+
+	assert(nextScene_ == nullptr);
+	
+	BaseScene* newScene = sceneFactory_->CreateScene(sceneName);
+	nextScene_.reset(newScene);
+}
+
+SceneManager* SceneManager::GetInstance()
+{
+	if (!instance)
+	{
+		instance = new SceneManager();
+	}
+	return instance;
+}
+
+void SceneManager::Destroy()
+{
+	delete instance;
+	instance = nullptr;
 }
 
 void SceneManager::Update()
@@ -19,12 +50,11 @@ void SceneManager::Update()
 		if (scene_)
 		{
 			scene_->Finalize();
-			delete scene_;
+			scene_.reset();
 		}
 
 		//シーン切り替え
-		scene_ = nextScene_;
-		nextScene_ = nullptr;
+		scene_ = std::move(nextScene_);
 
 		scene_->SetSceneManager(this);
 

@@ -1,6 +1,6 @@
 #pragma once
 
-#include"GamePlayScene.h"
+
 
 #include"Camera.h"
 #include"CrashDump.h"
@@ -16,6 +16,7 @@
 #include"ParticleEmitter.h"
 #include"ParticleManager.h"
 #include"SceneManager.h"
+#include"SceneRegistration.h"
 #include"Sound.h"
 #include"Sphere.h"
 #include"Sprite.h"
@@ -35,7 +36,6 @@ public:
 	void Update() override;
 	void Draw() override;
 
-	// Framework::Run will call this to check for WM_QUIT
 	bool IsQuitRequested() override;
 
 public:
@@ -82,7 +82,6 @@ public:
 
 private:
 
-	GamePlayScene* scene_ = nullptr;
 
 private:
 	ResourceLeakCheek leakChecker; //リソースリークチェック用のオブジェクト

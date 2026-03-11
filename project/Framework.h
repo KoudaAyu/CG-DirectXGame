@@ -1,5 +1,7 @@
 #pragma once
 
+#include"AbstractSceneFactory.h"
+
 class Game;
 
 class Framework
@@ -27,5 +29,8 @@ private:
 	bool endRequest = false;
 
 	Game* game = nullptr;
+
+	//シーンファクトリー
+	AbstractSceneFactory* sceneFactory = nullptr;
 };
 
