@@ -17,24 +17,23 @@ void Game::Initialize()
 	windowAPI = new WindowAPI();
 	windowAPI->Initialize();
 
-	directXCom = new DirectXCom(windowAPI, logStream);
+	directXCom = std::make_unique<DirectXCom>(windowAPI, logStream);
 	directXCom->DebugLayer();
 	//ウィンドウを表示する
 	windowAPI->Show();
 	directXCom->Initialize();
 
-	
-	SceneManager::GetInstance()->SetDirectXCom(directXCom);
+	SceneManager::GetInstance()->SetDirectXCom(directXCom.get());
 	
 	sceneManager_ = SceneManager::GetInstance();
 
 	// TextureManager は SRV ヒープに依存するので DX 初期化の後に初期化
 	TextureManager::GetInstance()->Initialize();
-	TextureManager::GetInstance()->SetDirectXCom(directXCom);
+	TextureManager::GetInstance()->SetDirectXCom(directXCom.get());
 	// 作業ディレクトリが project/ である前提の相対パスを使う
 	TextureManager::GetInstance()->LoadTexture("Resources/uvChecker.png");
 
-	spriteCom = new SpriteCom(logStream, directXCom);
+	spriteCom = new SpriteCom(logStream, directXCom.get());
 	spriteCom->Initialize();
 
 
@@ -65,27 +64,27 @@ void Game::Initialize()
 	assert(SUCCEEDED(GetDirectXCom()->GetHr()));
 
 	sphere = new Sphere();
-	sphere->Initialize(directXCom);
+	sphere->Initialize(directXCom.get());
 
 	//モデル読み込み
 	modelData = object3d->LoadObjFile("Resources", "plane.obj");
 	
 	// Model を作成して初期化（Model が自分で頂点リソースを作る）
 	modelCom_ = new ModelCom();
-	modelCom_->Initialize(directXCom);
+	modelCom_->Initialize(directXCom.get());
 	model_ = new Model();
 	model_->Initialize(modelCom_, "Resources", "plane.obj");
 	
 
 	
 	materialManager = new MaterialManager();
-	materialManager->Initialize(directXCom);
+	materialManager->Initialize(directXCom.get());
 
 	light = new Light();
-	light->Initialize(directXCom);
+	light->Initialize(directXCom.get());
 
 	camera = new Camera();
-	camera->Initialize(directXCom);
+	camera->Initialize(directXCom.get());
 
 	
 	
@@ -178,7 +177,7 @@ void Game::Initialize()
 
 	
 	imguiManager = new ImGuiManager();
-	imguiManager->Initialize(windowAPI, directXCom);
+	imguiManager->Initialize(windowAPI, directXCom.get());
 
 	
 	
@@ -232,7 +231,7 @@ void Game::Finalize()
 	delete object3d;
 	
 
-	// Delete model and its ModelCom if created
+	
 	if (model_)
 	{
 		delete model_;
@@ -260,9 +259,15 @@ void Game::Finalize()
 		delete camera;
 		camera = nullptr;
 	}
-
-	CloseHandle(directXCom->GetFenceEvent());
-	delete directXCom;
+	if (directXCom)
+	{
+		HANDLE h = directXCom->GetFenceEvent();
+		if (h && h != INVALID_HANDLE_VALUE)
+		{
+			CloseHandle(h);
+		}
+	}
+	directXCom.reset();
 
 	windowAPI->Finalize();
 	delete windowAPI;

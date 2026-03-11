@@ -1,6 +1,6 @@
 #pragma once
 
-
+#include <memory>
 
 #include"Camera.h"
 #include"CrashDump.h"
@@ -43,8 +43,8 @@ public:
 
 	WindowAPI* GetWindowAPI() { return windowAPI; }
 	const WindowAPI* GetWindowAPI() const { return windowAPI; }
-	DirectXCom* GetDirectXCom() { return directXCom; }
-	const DirectXCom* GetDirectXCom() const { return directXCom; }
+	DirectXCom* GetDirectXCom() { return directXCom.get(); }
+	const DirectXCom* GetDirectXCom() const { return directXCom.get(); }
 	SpriteCom* GetSpriteCom() { return spriteCom; }
 	const SpriteCom* GetSpriteCom() const { return spriteCom; }
 	Sprite* GetSprites(size_t index)
@@ -88,7 +88,7 @@ private:
 	CrashDump crashDump; //クラッシュダンプ生成用のオブジェクト
 	Log log;
 	WindowAPI* windowAPI = nullptr; //ウィンドウ関連のAPIをまとめたオブジェクト
-	DirectXCom* directXCom = nullptr;
+	std::unique_ptr<DirectXCom> directXCom;
 	SpriteCom* spriteCom = nullptr;
 	Model* model_ = nullptr;
 	ModelCom* modelCom_ = nullptr;
