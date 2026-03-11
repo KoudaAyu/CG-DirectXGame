@@ -11,6 +11,7 @@ class ModelManager
 public:
 	// シングルトン取得・破棄
 	static ModelManager* GetInstance();
+	~ModelManager() = default;
 	static void Destroy();
 
 	void Initialize(DirectXCom* dxCommon);
@@ -30,7 +31,6 @@ public:
 
 private:
 	ModelManager() = default;
-	~ModelManager() = default;
 
 	// コピー・ムーブを禁止してインスタンスの複製を封印
 	ModelManager(const ModelManager&) = delete;
@@ -39,10 +39,10 @@ private:
 	ModelManager& operator=(ModelManager&&) = delete;
 
 	// シングルトンの実体
-	static ModelManager* instance;
+	static std::unique_ptr<ModelManager> instance;
 
 	std::map<std::string, std::unique_ptr<Model>> models_;
 
 	DirectXCom* dxCommon_ = nullptr;
-	ModelCom* modelCom_ = nullptr;
+	std::unique_ptr<ModelCom> modelCom_ = nullptr;
 };
