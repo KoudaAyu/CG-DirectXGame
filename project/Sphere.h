@@ -4,12 +4,18 @@
 #include"DirectXCom.h"
 #include"Sprite.h"
 
+class Object3dCom;
+class MaterialManager;
+class Light;
+class Camera;
+
 class Sphere
 {
 public:
 	void Initialize(DirectXCom* dxCommon);
-	void Update();
-	void Draw();
+	void Update(const Matrix4x4& cameraMatrix,const Matrix4x4& projectionMatrix);
+	void Draw(DirectXCom* dxCommon,Object3dCom* object3dCom,MaterialManager* materialManager,Light* light,
+		D3D12_GPU_DESCRIPTOR_HANDLE textureSrvHandle, Camera* camera);
 
 public:
 	
@@ -19,10 +25,16 @@ public:
 	const uint32_t GetIndexCount() const { return kIndexCount; }
 	TransformationMatrix* GetTransformationMatrixDataSphere() const { return transformationMatrixDataSphere; }
 	Microsoft::WRL::ComPtr<ID3D12Resource> GetTransformationMatrixResourceSphere() const { return transformationMatrixResourceSphere; }
+	void SetTransform(const Sprite::Transform& transform) { this->transform = transform; }
 
 private:
 	DirectXCom* directXCom = nullptr;
+	Object3dCom* object3dCom = nullptr;
+	MaterialManager* materialManager = nullptr;
+	Light* light = nullptr;
+	Camera* camera = nullptr;
 
+	D3D12_GPU_DESCRIPTOR_HANDLE textureSrvHandle{};
 private:
 	// 球体
 	static constexpr uint32_t kSubdivision = 16; // 16分割
@@ -48,5 +60,9 @@ private:
 	TransformationMatrix* transformationMatrixDataSphere = nullptr;
 	Microsoft::WRL::ComPtr<ID3D12Resource> transformationMatrixResourceSphere;
 
+	Sprite::Transform transform;
+	Matrix4x4 worldMatrix;
+	Matrix4x4 viewMatrix;
+	Matrix4x4 WVPMatrix;
 };
 

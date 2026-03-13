@@ -92,8 +92,12 @@ public:
 	
 	void SetDirectionalLightResource(const Microsoft::WRL::ComPtr<ID3D12Resource>& light) { directionalLightResource = light; }
 
+	
+	void SetUVParams(const Vector3& scale, float rotZ, const Vector3& translate);
+
 private:
 	void AdjustTextureSize();
+	void RecalculateUVMatrix();
 
 private:
 	Transform transform{ {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };
@@ -106,6 +110,10 @@ private:
 	//テクスチャ左上座標
 	Vector2 textureLeftTop = { 0.0f,0.0f };
 	Vector2 textureSize = { 100.0f,100.0f };
+
+	
+	Transform uvParams{ {1.0f,1.0f,1.0f}, {0.0f,0.0f,0.0f}, {0.0f,0.0f,0.0f} };
+	bool uvDirty = true;
 
 private:
 	DirectXCom* dxCommon = nullptr;

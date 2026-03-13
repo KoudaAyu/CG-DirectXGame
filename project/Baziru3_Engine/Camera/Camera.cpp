@@ -53,6 +53,7 @@ void Camera::Update()
 
 	viewProjectionMatrix_ = Multiply(viewMatrix_, projectionMatrix_);
 
+	assert(cameraData);
 	
 	if (cameraData)
 	{

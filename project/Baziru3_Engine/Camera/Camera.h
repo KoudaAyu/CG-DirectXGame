@@ -20,9 +20,8 @@ public:
 	Camera();
 	void Update();
 
-	// Initialize GPU resources for the camera
 	void Initialize(DirectXCom* directXCom);
-	// Release GPU resources
+	
 	void Finalize();
 
 public:

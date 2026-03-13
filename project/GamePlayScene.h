@@ -5,6 +5,9 @@
 #include"Sound.h"
 #include"Sphere.h"
 
+#include<vector>
+
+class SpriteCom;
 
 class GamePlayScene : public BaseScene
 {
@@ -18,9 +21,13 @@ public:
 
 	void Draw() override;
 
+	void SetSpriteCom(SpriteCom* spriteCom) { this->spriteCom = spriteCom; }
+
 private:
 
 	DirectXCom* directXCom = nullptr;
 	Sound* sound = nullptr;
-	Sphere* sphere = nullptr;
+	SpriteCom* spriteCom = nullptr;
+	std::unique_ptr<Sphere> sphere;
+	std::vector<std::unique_ptr<Sprite>> sprites;
 };

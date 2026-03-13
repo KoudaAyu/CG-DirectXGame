@@ -1,4 +1,8 @@
 #include "Sphere.h"
+#include"Object3dCom.h"
+#include"MaterialManager.h"
+#include"Camera.h"
+#include"Light.h"
 
 void Sphere::Initialize(DirectXCom* dxCommon)
 {
@@ -113,28 +117,72 @@ void Sphere::Initialize(DirectXCom* dxCommon)
 
 }
 
-void Sphere::Update()
+void Sphere::Update(const Matrix4x4& cameraMatrix, const Matrix4x4& projectionMatrix)
 {
-	// 球の更新処理（必要に応じて）
+	transform.rotate.y += 0.01f; // Y軸を中心に回転させる
+	worldMatrix = MakeAffineMatrix(transform.scale, transform.rotate, transform.translate);
+	viewMatrix = Inverse(cameraMatrix);
+	WVPMatrix = Multiply(worldMatrix, Multiply(viewMatrix, projectionMatrix));
+	transformationMatrixDataSphere->WVP = WVPMatrix;
+	transformationMatrixDataSphere->World = worldMatrix;
+	transformationMatrixDataSphere->WorldInverseTranspose = Transpose(Inverse(worldMatrix));
 }
 
-void Sphere::Draw()
+void Sphere::Draw(DirectXCom* dxCommon, Object3dCom* object3dCom, MaterialManager* materialManager, Light* light, D3D12_GPU_DESCRIPTOR_HANDLE textureSrvHandle, Camera* camera)
 {
-	/*directXCom->GetCommandList()->RSSetViewports(1, &directXCom->GetViewport());
-	directXCom->GetCommandList()->RSSetScissorRects(1, &directXCom->GetScissorRect());
+ 
+    if (!dxCommon || !object3dCom || !materialManager || !light) {
+        return;
+    }
 
-	directXCom->GetCommandList()->SetGraphicsRootSignature(object3dCom->GetRootSignature().Get());
-	directXCom->GetCommandList()->SetPipelineState(object3dCom->GetPipelineState().Get());
-	directXCom->GetCommandList()->IASetVertexBuffers(0, 1, &vertexBufferViewSphere);
-	directXCom->GetCommandList()->IASetIndexBuffer(&indexBufferViewSphere);
-	directXCom->GetCommandList()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    ID3D12GraphicsCommandList* commansList = dxCommon->GetCommandList().Get();
+    if (!commansList) {
+        return;
+    }
 
-	directXCom->GetCommandList()->SetGraphicsRootConstantBufferView(0, materialResource->GetGPUVirtualAddress());
+    commansList->RSSetViewports(1, &dxCommon->GetViewport());
+    commansList->RSSetScissorRects(1, &dxCommon->GetScissorRect());
 
-	directXCom->GetCommandList()->SetGraphicsRootConstantBufferView(1, transformationMatrixResourceSphere->GetGPUVirtualAddress());
-	directXCom->GetCommandList()->SetGraphicsRootDescriptorTable(2, useMonsterBall ? textureSrvHandleGPU2 : textureSrvHandleGPU);
+    commansList->SetGraphicsRootSignature(object3dCom->GetRootSignature().Get());
+    commansList->SetPipelineState(object3dCom->GetPipelineState().Get());
+    commansList->IASetVertexBuffers(0, 1, &vertexBufferViewSphere);
+    commansList->IASetIndexBuffer(&indexBufferViewSphere);
+    commansList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-	directXCom->GetCommandList()->SetGraphicsRootConstantBufferView(3, directionalLight->GetGPUVirtualAddress());
+    commansList->SetGraphicsRootConstantBufferView(0, materialManager->GetMaterialResource()->GetGPUVirtualAddress());
 
-	directXCom->GetCommandList()->DrawIndexedInstanced(GetIndexCount(), 1, 0, 0, 0);*/
+    commansList->SetGraphicsRootConstantBufferView(1, transformationMatrixResourceSphere->GetGPUVirtualAddress());
+
+    commansList->SetGraphicsRootDescriptorTable(2, textureSrvHandle);
+
+    commansList->SetGraphicsRootConstantBufferView(3, light->GetDirectionalLightResource()->GetGPUVirtualAddress());
+
+    if (camera && camera->GetCameraResource()) {
+        commansList->SetGraphicsRootConstantBufferView(4, camera->GetCameraResource()->GetGPUVirtualAddress());
+    } else {
+        commansList->SetGraphicsRootConstantBufferView(4, 0);
+    }
+
+    commansList->DrawIndexedInstanced(GetIndexCount(), 1, 0, 0, 0);
 }
+
+//void Sphere::Draw()
+//{
+//	/*directXCom->GetCommandList()->RSSetViewports(1, &directXCom->GetViewport());
+//	directXCom->GetCommandList()->RSSetScissorRects(1, &directXCom->GetScissorRect());
+//
+//	directXCom->GetCommandList()->SetGraphicsRootSignature(object3dCom->GetRootSignature().Get());
+//	directXCom->GetCommandList()->SetPipelineState(object3dCom->GetPipelineState().Get());
+//	directXCom->GetCommandList()->IASetVertexBuffers(0, 1, &vertexBufferViewSphere);
+//	directXCom->GetCommandList()->IASetIndexBuffer(&indexBufferViewSphere);
+//	directXCom->GetCommandList()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+//
+//	directXCom->GetCommandList()->SetGraphicsRootConstantBufferView(0, materialResource->GetGPUVirtualAddress());
+//
+//	directXCom->GetCommandList()->SetGraphicsRootConstantBufferView(1, transformationMatrixResourceSphere->GetGPUVirtualAddress());
+//	directXCom->GetCommandList()->SetGraphicsRootDescriptorTable(2, useMonsterBall ? textureSrvHandleGPU2 : textureSrvHandleGPU);
+//
+//	directXCom->GetCommandList()->SetGraphicsRootConstantBufferView(3, directionalLight->GetGPUVirtualAddress());
+//
+//	directXCom->GetCommandList()->DrawIndexedInstanced(GetIndexCount(), 1, 0, 0, 0);*/
+//}

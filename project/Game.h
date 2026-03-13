@@ -41,17 +41,17 @@ public:
 public:
 	std::ostream& logStream = log.GetLogStream();
 
-	WindowAPI* GetWindowAPI() { return windowAPI; }
-	const WindowAPI* GetWindowAPI() const { return windowAPI; }
+	WindowAPI* GetWindowAPI() { return windowAPI.get(); }
+	const WindowAPI* GetWindowAPI() const { return windowAPI.get(); }
 	DirectXCom* GetDirectXCom() { return directXCom.get(); }
 	const DirectXCom* GetDirectXCom() const { return directXCom.get(); }
-	SpriteCom* GetSpriteCom() { return spriteCom; }
-	const SpriteCom* GetSpriteCom() const { return spriteCom; }
+	SpriteCom* GetSpriteCom() { return spriteCom.get(); }
+	const SpriteCom* GetSpriteCom() const { return spriteCom.get(); }
 	Sprite* GetSprites(size_t index)
 	{
 		if (index < sprites.size())
 		{
-			return sprites[index];
+			return sprites[index].get();
 		}
 		return nullptr;
 	}
@@ -59,26 +59,26 @@ public:
 	{
 		if (index < sprites.size())
 		{
-			return sprites[index];
+			return sprites[index].get();
 		}
 		return nullptr;
 	}
-	std::vector<Sprite*>& GetSprites()
+	std::vector<std::unique_ptr<Sprite>>& GetSprites()
 	{
 		return sprites;
 	}
-	const std::vector<Sprite*>& GetSprites() const
+	const std::vector<std::unique_ptr<Sprite>>& GetSprites() const
 	{
 		return sprites;
 	}
-	Object3d* GetObject3d() { return object3d; }
-	const Object3d* GetObject3d() const { return object3d; }
-	Object3dCom* GetObject3dCom() { return object3dCom; }
-	const Object3dCom* GetObject3dCom() const { return object3dCom; }
-	ParticleManager* GetParticleManager() { return particleManager; }
-	const ParticleManager* GetParticleManager() const { return particleManager; }
-	Sphere* GetSphere() { return sphere; }
-	const Sphere* GetSphere() const { return sphere; }
+	Object3d* GetObject3d() { return object3d_.get(); }
+	const Object3d* GetObject3d() const { return object3d_.get(); }
+	Object3dCom* GetObject3dCom() { return object3dCom.get(); }
+	const Object3dCom* GetObject3dCom() const { return object3dCom.get(); }
+	ParticleManager* GetParticleManager() { return particleManager.get(); }
+	const ParticleManager* GetParticleManager() const { return particleManager.get(); }
+	Sphere* GetSphere() { return sphere_.get(); }
+	const Sphere* GetSphere() const { return sphere_.get(); }
 
 private:
 
@@ -87,36 +87,37 @@ private:
 	ResourceLeakCheek leakChecker; //リソースリークチェック用のオブジェクト
 	CrashDump crashDump; //クラッシュダンプ生成用のオブジェクト
 	Log log;
-	WindowAPI* windowAPI = nullptr; //ウィンドウ関連のAPIをまとめたオブジェクト
+	
+	std::unique_ptr<Camera> camera_;
 	std::unique_ptr<DirectXCom> directXCom;
-	SpriteCom* spriteCom = nullptr;
-	Model* model_ = nullptr;
-	ModelCom* modelCom_ = nullptr;
-	Object3d* object3d = nullptr;
-	Object3dCom* object3dCom = nullptr;
-	Light* light = nullptr;
-	ParticleManager* particleManager = nullptr;
-	Sphere* sphere = nullptr;
-	ImGuiManager* imguiManager = nullptr;
+	std::unique_ptr<ImGuiManager> imguiManager;
+	std::unique_ptr<Light> light;
+	std::unique_ptr<Model> model_;
+	std::unique_ptr<ModelCom>modelCom_;
+	std::unique_ptr<Object3d> object3d_;
+	std::unique_ptr<Object3dCom> object3dCom;
+	std::unique_ptr<ParticleManager> particleManager;
+	std::unique_ptr<Sphere> sphere_;
+	std::unique_ptr<SpriteCom> spriteCom;
+	std::unique_ptr<WindowAPI> windowAPI;//ウィンドウ関連のAPIをまとめたオブジェクト
+	
 	DebugCamera debugCamera_;
-	Camera* camera = nullptr;
-	SRVManager* srvManager = nullptr;
+	
+	SRVManager srvManager;
 	std::list<ParticleManager::Particle> particles;
 	ParticleEmitter particleEmitter;
 	Emitter emitter;
 	KeyInput inputManager;
-	Sound* sound_ = nullptr;
-	MaterialManager* materialManager = nullptr;
+	std::unique_ptr<Sound> sound_;
+	std::unique_ptr<MaterialManager> materialManager_;
 
-	SceneManager* sceneManager_ = nullptr;
+	std::unique_ptr<SceneManager> sceneManager_;
 private:
-	std::vector<Sprite*>sprites;
+	std::vector<std::unique_ptr<Sprite>>sprites;
 	Sprite::Transform transformObject;
 	Sprite::Transform uvTransformSprite;
 	Sprite::Transform transformSphere;
 	Sprite::Transform cameraTransform;
-	
-	//D3D12_VERTEX_BUFFER_VIEW vertexBufferView{};
 
 	D3D12_CPU_DESCRIPTOR_HANDLE textureSrvHandleCPU;
 	D3D12_CPU_DESCRIPTOR_HANDLE textureSrvHandleCPU2;
@@ -126,18 +127,13 @@ private:
 
 	
 
-	//D3D12_GPU_DESCRIPTOR_HANDLE instancingSrvHandleGPU;
+	
 
 	Object3d::ModelData modelData;
 
-	//const uint32_t kNumMaxInstances = 10;
 	uint32_t numInstance = 0;
 
 	const float kDeltaTime = 1.0f / 60.0f;
-
-	//std::mt19937 randomEngine{ std::random_device{}() };
-
-	//ParticleManager::ParticleForGPU* instanceData = nullptr;
 
 	//SRVの切り替え
 	bool useMonsterBall = true;

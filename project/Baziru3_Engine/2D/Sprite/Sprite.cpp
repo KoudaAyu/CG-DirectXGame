@@ -79,6 +79,12 @@ void Sprite::Update(WindowAPI* windowAPI, DebugCamera* debugCamera_)
 	Matrix4x4 worldViewProjectionmatrixSprite = Multiply(worldMatrixSprite, Multiply(debugCamera_->GetViewMatrix(), projectionMatrixSprite));
 	transformationMatrixDataSprite->WVP = worldViewProjectionmatrixSprite; 
 	transformationMatrixDataSprite->World = worldMatrixSprite;
+
+	if (uvDirty)
+	{
+		RecalculateUVMatrix();
+		uvDirty = false;
+	}
 }
 
 void Sprite::Draw()
@@ -184,4 +190,25 @@ void Sprite::AdjustTextureSize()
 	textureSize.y = static_cast<float>(metadata.height);
 
 	size = textureSize;
+}
+
+
+void Sprite::SetUVParams(const Vector3& scale, float rotZ, const Vector3& translate)
+{
+	uvParams.scale = scale;
+	uvParams.rotate.z = rotZ; 
+	uvParams.translate = translate;
+	uvDirty = true;
+}
+
+
+void Sprite::RecalculateUVMatrix()
+{
+	if (!materialData) return;
+
+	Matrix4x4 uvTransformMatrix = MakeScaleMatrix(uvParams.scale);
+	uvTransformMatrix = Multiply(uvTransformMatrix, MakeRotateZMatrix(uvParams.rotate.z));
+	uvTransformMatrix = Multiply(uvTransformMatrix, MakeTranslateMatrix(uvParams.translate));
+
+	materialData->uvTransform = uvTransformMatrix;
 }

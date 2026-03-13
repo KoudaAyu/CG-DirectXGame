@@ -14,18 +14,16 @@ void Game::Initialize()
 
 	crashDump.Install();
 	log.Initialize();
-	windowAPI = new WindowAPI();
+	windowAPI = std::make_unique<WindowAPI>();
 	windowAPI->Initialize();
 
-	directXCom = std::make_unique<DirectXCom>(windowAPI, logStream);
+	directXCom = std::make_unique<DirectXCom>(windowAPI.get(), logStream);
 	directXCom->DebugLayer();
 	//ウィンドウを表示する
 	windowAPI->Show();
 	directXCom->Initialize();
 
-	SceneManager::GetInstance()->SetDirectXCom(directXCom.get());
-	
-	sceneManager_ = SceneManager::GetInstance();
+	sceneManager_ = std::make_unique<SceneManager>(directXCom.get());
 
 	// TextureManager は SRV ヒープに依存するので DX 初期化の後に初期化
 	TextureManager::GetInstance()->Initialize();
@@ -33,63 +31,60 @@ void Game::Initialize()
 	// 作業ディレクトリが project/ である前提の相対パスを使う
 	TextureManager::GetInstance()->LoadTexture("Resources/uvChecker.png");
 
-	spriteCom = new SpriteCom(logStream, directXCom.get());
+	spriteCom = std::make_unique<SpriteCom>(logStream, directXCom.get());
 	spriteCom->Initialize();
 
 
-	for (uint32_t i = 0; i < 5; ++i)
-	{
-		Sprite* sprite = new Sprite();
-		// Resources フォルダ直下の uvChecker.png を指定
-		sprite->Initialize(spriteCom, "Resources/uvChecker.png");
-		sprites.push_back(sprite);
-	}
+	
+	
 
 	spriteCom->CreateGraphicsPipeline();
 
+	for (uint32_t i = 0; i < 5; ++i)
+	{
+		auto sprite = std::make_unique<Sprite>();
+		sprite->Initialize(spriteCom.get(), "Resources/uvChecker.png");
+		sprites.push_back(std::move(sprite));
+	}
+
 	// 既存の手動テクスチャ読み込みはそのまま利用（Sphere用）
 
-	object3dCom = new Object3dCom(logStream);
+	object3dCom = std::make_unique<Object3dCom>(logStream);
 	object3dCom->Initialize(GetDirectXCom());
 
 #pragma region 最初のシーンの初期化
-	object3d = new Object3d();
-	object3d->Initialize(object3dCom);
+	object3d_ = std::make_unique<Object3d>();
+	object3d_->Initialize(object3dCom.get());
 
-	particleManager = new ParticleManager(logStream, GetDirectXCom());
+	particleManager = std::make_unique<ParticleManager>(logStream, directXCom.get());
 	particleManager->Initialize();
 #pragma endregion 最初のシーン終了
 
 	//パイプラインステートの生成に失敗した場合はエラー
 	assert(SUCCEEDED(GetDirectXCom()->GetHr()));
 
-	sphere = new Sphere();
-	sphere->Initialize(directXCom.get());
+	sphere_ = std::make_unique<Sphere>();
+	sphere_->Initialize(directXCom.get());
 
 	//モデル読み込み
-	modelData = object3d->LoadObjFile("Resources", "plane.obj");
-	
+	modelData = object3d_->LoadObjFile("Resources", "plane.obj");
+
 	// Model を作成して初期化（Model が自分で頂点リソースを作る）
-	modelCom_ = new ModelCom();
+	modelCom_ = std::make_unique<ModelCom>();
 	modelCom_->Initialize(directXCom.get());
-	model_ = new Model();
-	model_->Initialize(modelCom_, "Resources", "plane.obj");
-	
+	model_ = std::make_unique<Model>();
+	model_->Initialize(modelCom_.get(), "Resources", "plane.obj");
 
-	
-	materialManager = new MaterialManager();
-	materialManager->Initialize(directXCom.get());
 
-	light = new Light();
+
+	materialManager_ = std::make_unique<MaterialManager>();
+	materialManager_->Initialize(directXCom.get());
+
+	light = std::make_unique<Light>();
 	light->Initialize(directXCom.get());
 
-	camera = new Camera();
-	camera->Initialize(directXCom.get());
-
-	
-	
-
-
+	camera_ = std::make_unique<Camera>();
+	camera_->Initialize(directXCom.get());
 
 	//Transform変数を作る
 	Sprite::Transform transform = { {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };
@@ -150,19 +145,19 @@ void Game::Initialize()
 
 
 	//音声読み込み
-	sound_ = new Sound();
+	sound_ = std::make_unique<Sound>();
 	sound_->Initialize();
 
-	
-	inputManager.Initialize(windowAPI);
 
-		
-	debugCamera_.Initialize(windowAPI);
+	inputManager.Initialize(windowAPI.get());
 
-		
-	camera->SetRotate({ 0.0f,0.0f,0.0f });
-	camera->SetTranslate({ 0.0f,0.0f,-10.0f });
-	object3dCom->SetDefaultCamera(camera);
+
+	debugCamera_.Initialize(windowAPI.get());
+
+
+	camera_->SetRotate({ 0.0f,0.0f,0.0f });
+	camera_->SetTranslate({ 0.0f,0.0f,-10.0f });
+	object3dCom->SetDefaultCamera(camera_.get());
 
 	transformSphere = { {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };
 
@@ -175,12 +170,12 @@ void Game::Initialize()
 	emitter.frequencyTime = 0.0f;
 
 
-	
-	imguiManager = new ImGuiManager();
-	imguiManager->Initialize(windowAPI, directXCom.get());
 
-	
-	
+	imguiManager = std::make_unique<ImGuiManager>();
+	imguiManager->Initialize(windowAPI.get(), directXCom.get());
+
+
+
 	SceneRegistration::RegisterScenes();
 	SceneManager::GetInstance()->ChangeScene("TITLE");
 }
@@ -192,12 +187,12 @@ void Game::Finalize()
 
 	SceneManager::Destroy();
 
-	#ifdef USE_IMGUI
+#ifdef USE_IMGUI
 	//ImGui終了処理
 	ImGui_ImplDX12_Shutdown();
 	ImGui_ImplWin32_Shutdown();
 	ImGui::DestroyContext();
-	#endif
+#endif
 
 
 	Logger::Log(logStream, "Application terminating.");
@@ -209,56 +204,12 @@ void Game::Finalize()
 	OutputDebugStringA("Hello, DirectX!\n");
 
 	// サウンドの終了処理
-	if (sound_)
-	{
-		sound_->Finalize();
-		delete sound_;
-		sound_ = nullptr;
-	}
-
-	delete materialManager;
-
-	delete light;
-
-	delete imguiManager;
-
-	for (auto* sprite : sprites)
-	{
-		delete sprite;
-	}
-	sprites.clear();
-	delete particleManager;
-	delete object3d;
-	
-
-	
-	if (model_)
-	{
-		delete model_;
-		model_ = nullptr;
-	}
-	if (modelCom_)
-	{
-		delete modelCom_;
-		modelCom_ = nullptr;
-	}
-
+	sound_->Finalize();
 
 	TextureManager::GetInstance()->Finalize();
 
+	camera_->Finalize();
 
-	delete sphere;
-
-	delete object3dCom;
-	delete spriteCom;
-
-	
-	if (camera)
-	{
-		camera->Finalize();
-		delete camera;
-		camera = nullptr;
-	}
 	if (directXCom)
 	{
 		HANDLE h = directXCom->GetFenceEvent();
@@ -270,15 +221,15 @@ void Game::Finalize()
 	directXCom.reset();
 
 	windowAPI->Finalize();
-	delete windowAPI;
+
 
 	Framework::Finalize();
 }
 void Game::Update()
-{ 
+{
 	Framework::Update();
 
-	
+
 	sceneManager_->Update();
 
 	//if (windowAPI->ProcessMassage())
@@ -293,52 +244,24 @@ void Game::Update()
 
 	debugCamera_.Update();
 
-	camera->Update();
+	camera_->Update();
 
-	// Safely update mapped camera GPU data
-	if (camera && camera->GetCameraData())
-	{
-		camera->GetCameraData()->worldPosition = camera->GetWorldPosition();
-	}
-	else
-	{
-		Logger::Log(logStream, "Warning: camera GPU data is null.\n");
-	}
-
-	// Apply ImGui rotation to the object3d transform
-	object3d->SetRotate(transformObject.rotate);
-	object3d->Update();
+	object3d_->SetRotate(transformObject.rotate);
+	object3d_->Update();
 
 
-	for (auto* sprite : sprites)
+	for (auto& sprite : sprites)
 	{
 		sprite->SetPosition(uiSpritePosition);
-		sprite->Update(windowAPI, &debugCamera_);
+		sprite->SetUVParams(uvTransformSprite.scale, uvTransformSprite.rotate.z, uvTransformSprite.translate);
+		sprite->Update(windowAPI.get(), &debugCamera_);
 	}
 
-	//UVTransform用
-	Matrix4x4 uvTransformMatrix = MakeScaleMatrix(uvTransformSprite.scale);
-	uvTransformMatrix = Multiply(uvTransformMatrix, MakeRotateZMatrix(uvTransformSprite.rotate.z));
-	uvTransformMatrix = Multiply(uvTransformMatrix, MakeTranslateMatrix(uvTransformSprite.translate));
-	for (auto* sprite : sprites)
-	{
-		sprite->SetUVTransform(uvTransformMatrix);
-	}
-
-	//directionalLight->Map(0, nullptr, reinterpret_cast<void**>(&directionalLightData));
-
+	
+	
 	transformSphere.rotate.y += 0.01f;
-	Matrix4x4 worldMatrix = MakeAffineMatrix(transformSphere.scale, transformSphere.rotate, transformSphere.translate);
-	Matrix4x4 cameraMatrix = MakeAffineMatrix(cameraTransform.scale, cameraTransform.rotate, cameraTransform.translate);
-	Matrix4x4 viewMatrix = Inverse(cameraMatrix);
-	Matrix4x4 projectionMatrix = MakePerspectiveFovMatrix(camera->GetFovY(), camera->GetAspectRatio(), camera->GetNearZ(), camera->GetFarZ());
-	//WVPMatrixを作る
-	Matrix4x4 worldViewProjectMatrix = Multiply(worldMatrix, Multiply(viewMatrix, projectionMatrix));
-	sphere->GetTransformationMatrixDataSphere()->WVP = worldViewProjectMatrix;
-	sphere->GetTransformationMatrixDataSphere()->World = worldMatrix;
-	// 法線変換用の逆転置行列も更新
-	sphere->GetTransformationMatrixDataSphere()->WorldInverseTranspose = Transpose(Inverse(worldMatrix));
-
+	sphere_->SetTransform(transformSphere);
+	sphere_->Update(camera_->GetWorldMatrix(), camera_->GetProjectionMatrix());
 
 	numInstance = 0;
 
@@ -361,16 +284,15 @@ void Game::Update()
 			}
 
 			Matrix4x4 backToFrontMatrix = MakeRotateYMatrix(0.0f);
-			//Matrix4x4 backToFrontMatrix = MakeRotateYMatrix(std::numbers::pi_v<float>);面が逆向きの場合
-			Matrix4x4 billboardMatrix = Multiply(backToFrontMatrix, cameraMatrix);
+			Matrix4x4 billboardMatrix = Multiply(backToFrontMatrix, camera_->GetWorldMatrix());
 			billboardMatrix.m[3][0] = 0.0f;
 			billboardMatrix.m[3][1] = 0.0f;
 			billboardMatrix.m[3][2] = 0.0f;
 
 			Matrix4x4 ParticleWorldMatrix = MakeAffineMatrix(
-			p.transform.GetScale(), billboardMatrix, p.transform.GetTranslate());
+				p.transform.GetScale(), billboardMatrix, p.transform.GetTranslate());
 			Matrix4x4 ParticleViewProjectMatrix = Multiply(
-				ParticleWorldMatrix, Multiply(viewMatrix, projectionMatrix));
+				ParticleWorldMatrix, Multiply(camera_->GetViewMatrix(), camera_->GetProjectionMatrix()));
 
 			if (writeIndex < particleManager->GetNumMaxInstances())
 			{
@@ -390,14 +312,16 @@ void Game::Update()
 
 	//開発用UIの処理、実際に開発用のUIを出す場合はここをゲーム固有の処理に置き換え
 
-	#ifdef _DEBUG
+
+
+#ifdef _DEBUG
 
 	ImGui::ShowDemoWindow();
 
 	ImGui::Begin("Windows");
 
 
-	ImGui::ColorEdit4("Material Color", &materialManager->GetMaterialDataColor().x);
+	ImGui::ColorEdit4("Material Color", &materialManager_->GetMaterialDataColor().x);
 	//ImGui::DragFloat("Light Intensity", &directionalLightData->intensity, 0.01f, 0.0f, 10.0f);
 
 	// Sprite position window: size (500,100), sliders (x,y) with initial (100,100) and format integer 4 digits, decimal 1
@@ -408,8 +332,8 @@ void Game::Update()
 	ImGui::End();
 
 	ImGui::Checkbox("useMonsterBall", &useMonsterBall);
-	ImGui::Checkbox("LightSprite Flag", (bool*)&materialManager->GetMaterialDataEnableLighting());
-	for (auto* sprite : sprites)
+	ImGui::Checkbox("LightSprite Flag", (bool*)&materialManager_->GetMaterialDataEnableLighting());
+	for (auto& sprite : sprites)
 	{
 		ImGui::Checkbox("LightObject Flag", (bool*)&sprite->GetMaterialDataSprite()->enableLighting);
 	}
@@ -429,26 +353,26 @@ void Game::Update()
 	{
 		// ライティングのON/OFF切り替え
 		// boolからint32_tへ変換して代入
-		bool enableLock = (materialManager->GetMaterialDataEnableLighting() != 0);
+		bool enableLock = (materialManager_->GetMaterialDataEnableLighting() != 0);
 		if (ImGui::Checkbox("Enable Lighting", &enableLock))
 		{
-			materialManager->GetMaterialDataEnableLighting() = enableLock ? 1 : 0;
+			materialManager_->GetMaterialDataEnableLighting() = enableLock ? 1 : 0;
 		}
 
 		// Shininess（テカリ具合）のスライダー
 		// 0.1 ～ 100.0 くらいの範囲で調整できるようにします
-		ImGui::SliderFloat("Shininess", &materialManager->GetMaterialDataShininess(), 0.1f, 100.0f);
+		ImGui::SliderFloat("Shininess", &materialManager_->GetMaterialDataShininess(), 0.1f, 100.0f);
 
 		// 色の調整もできるようにするとモンスターボールの赤が調整しやすいです
-		ImGui::ColorEdit4("Material Color", &materialManager->GetMaterialDataColor().x);
+		ImGui::ColorEdit4("Material Color", &materialManager_->GetMaterialDataColor().x);
 	}
 
 	// --- ここまで追加 ---
 
 	if (ImGui::Button("Reset Camera"))
 	{
-		camera->SetRotate({ 0.0f, 0.0f, 0.0f });
-		camera->SetTranslate({ 0.0f, 0.0f, -5.0f });
+		camera_->SetRotate({ 0.0f, 0.0f, 0.0f });
+		camera_->SetTranslate({ 0.0f, 0.0f, -5.0f });
 	}
 
 	ImGui::End();
@@ -456,15 +380,15 @@ void Game::Update()
 	ImGui::Begin("Material Settings"); // ウィンドウ名は既存のものに合わせてください
 
 	// ライティングの有効化フラグ
-	bool enableLighting = (materialManager->GetMaterialDataEnableLighting() != 0);
+	bool enableLighting = (materialManager_->GetMaterialDataEnableLighting() != 0);
 	if (ImGui::Checkbox("Enable Lighting", &enableLighting))
 	{
-		materialManager->GetMaterialDataEnableLighting() = enableLighting ? 1 : 0;
+		materialManager_->GetMaterialDataEnableLighting() = enableLighting ? 1 : 0;
 	}
 
 	// テカリ具合 (shininess)
 	// 0.1 ～ 100.0 くらいの範囲で調整できるようにします
-	ImGui::DragFloat("Shininess", &materialManager->GetMaterialDataShininess(), 0.5f, 0.1f, 100.0f);
+	ImGui::DragFloat("Shininess", &materialManager_->GetMaterialDataShininess(), 0.5f, 0.1f, 100.0f);
 
 	// 光の色 (DirectionalLight)
 	/*if (ImGui::CollapsingHeader("Light"))
@@ -487,17 +411,17 @@ void Game::Update()
 	// --- マテリアル（質感）の設定 ---
 	if (ImGui::CollapsingHeader("Material"))
 	{
-		
-		bool enable = (materialManager->GetMaterialDataEnableLighting() != 0);
+
+		bool enable = (materialManager_->GetMaterialDataEnableLighting() != 0);
 		if (ImGui::Checkbox("Enable Lighting", &enable))
 		{
-			materialManager->GetMaterialDataEnableLighting() = enable ? 1 : 0;
+			materialManager_->GetMaterialDataEnableLighting() = enable ? 1 : 0;
 		}
 
-		
-		ImGui::SliderFloat("Shininess", &materialManager->GetMaterialDataShininess(), 0.1f, 100.0f);
-		
-		ImGui::ColorEdit4("Color", &materialManager->GetMaterialDataColor().x);
+
+		ImGui::SliderFloat("Shininess", &materialManager_->GetMaterialDataShininess(), 0.1f, 100.0f);
+
+		ImGui::ColorEdit4("Color", &materialManager_->GetMaterialDataColor().x);
 	}
 
 	// --- 平行光源の設定 ---
@@ -509,12 +433,12 @@ void Game::Update()
 
 	ImGui::End();
 
-	#endif // DEBUG
+#endif // DEBUG
 
 	//ImGui内部コマンドを生成する
-	#ifdef USE_IMGUI
+#ifdef USE_IMGUI
 	ImGui::Render();
-	#endif
+#endif
 
 	inputManager.Update();
 
@@ -530,7 +454,7 @@ void Game::Draw()
 
 	object3dCom->PreDraw();
 
-	
+
 	sceneManager_->Draw();
 
 	//RootSignatureを設定。PSOに設定しているけれど別途設定が必要
@@ -542,14 +466,14 @@ void Game::Draw()
 	directXCom->GetCommandList()->IASetVertexBuffers(0, 1, &model_->GetVertexBufferView());
 	// Note: object draw uses non-indexed DrawInstanced, so do not set an index buffer here
 	directXCom->GetCommandList()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-	directXCom->GetCommandList()->SetGraphicsRootConstantBufferView(0, materialManager->GetMaterialResource()->GetGPUVirtualAddress());
+	directXCom->GetCommandList()->SetGraphicsRootConstantBufferView(0, materialManager_->GetMaterialResource()->GetGPUVirtualAddress());
 	// Use Object3d WVP updated above
-	directXCom->GetCommandList()->SetGraphicsRootConstantBufferView(1, object3d->GetTransformationMatrixResource()->GetGPUVirtualAddress());
+	directXCom->GetCommandList()->SetGraphicsRootConstantBufferView(1, object3d_->GetTransformationMatrixResource()->GetGPUVirtualAddress());
 	directXCom->GetCommandList()->SetGraphicsRootDescriptorTable(2, useMonsterBall ? textureSrvHandleGPU2 : textureSrvHandleGPU);
 	directXCom->GetCommandList()->SetGraphicsRootConstantBufferView(3, light->GetDirectionalLightResource()->GetGPUVirtualAddress());
-	if (camera && camera->GetCameraResource())
+	if (camera_ && camera_->GetCameraResource())
 	{
-		directXCom->GetCommandList()->SetGraphicsRootConstantBufferView(4, camera->GetCameraResource()->GetGPUVirtualAddress());
+		directXCom->GetCommandList()->SetGraphicsRootConstantBufferView(4, camera_->GetCameraResource()->GetGPUVirtualAddress());
 	}
 	else
 	{
@@ -559,36 +483,17 @@ void Game::Draw()
 	}
 	if (drawObject)
 	{
-		/*commandList->DrawIndexedInstanced(kIndexCount, 1, 0, 0, 0);*/
 		directXCom->GetCommandList()->DrawInstanced(UINT(modelData.vertices.size()), 1, 0, 0);
 	}
 
 	if (drawSphere)
 	{
-
-		directXCom->GetCommandList()->RSSetViewports(1, &directXCom->GetViewport());
-		directXCom->GetCommandList()->RSSetScissorRects(1, &directXCom->GetScissorRect());
-
-		directXCom->GetCommandList()->SetGraphicsRootSignature(object3dCom->GetRootSignature().Get());
-		directXCom->GetCommandList()->SetPipelineState(object3dCom->GetPipelineState().Get());
-		directXCom->GetCommandList()->IASetVertexBuffers(0, 1, &sphere->GetVertexBufferViewSphere());
-		// Use sphere's index buffer for indexed draw
-		directXCom->GetCommandList()->IASetIndexBuffer(&sphere->GetIndexBufferViewSphere());
-		directXCom->GetCommandList()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-
-		directXCom->GetCommandList()->SetGraphicsRootConstantBufferView(0, materialManager->GetMaterialResource()->GetGPUVirtualAddress());
-
-		directXCom->GetCommandList()->SetGraphicsRootConstantBufferView(1, sphere->GetTransformationMatrixResourceSphere()->GetGPUVirtualAddress());
-		directXCom->GetCommandList()->SetGraphicsRootDescriptorTable(2, useMonsterBall ? textureSrvHandleGPU2 : textureSrvHandleGPU);
-
-		directXCom->GetCommandList()->SetGraphicsRootConstantBufferView(3, light->GetDirectionalLightResource()->GetGPUVirtualAddress());
-
-		directXCom->GetCommandList()->DrawIndexedInstanced(sphere->GetIndexCount(), 1, 0, 0, 0);
+		sphere_->Draw(directXCom.get(), object3dCom.get(), materialManager_.get(), light.get(), useMonsterBall ? textureSrvHandleGPU2 : textureSrvHandleGPU, camera_.get());
 	}
 
 	if (drawSprite)
 	{
-		for (auto* sprite : sprites)
+		for (auto& sprite : sprites)
 		{
 			sprite->Draw();
 		}
@@ -602,16 +507,16 @@ void Game::Draw()
 	directXCom->GetCommandList()->IASetVertexBuffers(0, 1, &model_->GetVertexBufferView());
 	// Particle draw uses non-indexed DrawInstanced, so do not set an index buffer here
 	directXCom->GetCommandList()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-	directXCom->GetCommandList()->SetGraphicsRootConstantBufferView(0, materialManager->GetMaterialResource()->GetGPUVirtualAddress());
+	directXCom->GetCommandList()->SetGraphicsRootConstantBufferView(0, materialManager_->GetMaterialResource()->GetGPUVirtualAddress());
 	// Do NOT set a CBV at root parameter 1 because particle manager declares parameter 1 as a descriptor table.
 	// Set descriptor table for instance data (root parameter 1)
 	directXCom->GetCommandList()->SetGraphicsRootDescriptorTable(1, particleManager->GetInstancingSrvHandleGPU());
 	// Set descriptor table for texture (root parameter 2)
 	directXCom->GetCommandList()->SetGraphicsRootDescriptorTable(2, useMonsterBall ? textureSrvHandleGPU2 : textureSrvHandleGPU);
 	directXCom->GetCommandList()->SetGraphicsRootConstantBufferView(3, light->GetDirectionalLightResource()->GetGPUVirtualAddress());
-	if (camera && camera->GetCameraResource())
+	if (camera_ && camera_->GetCameraResource())
 	{
-		directXCom->GetCommandList()->SetGraphicsRootConstantBufferView(4, camera->GetCameraResource()->GetGPUVirtualAddress());
+		directXCom->GetCommandList()->SetGraphicsRootConstantBufferView(4, camera_->GetCameraResource()->GetGPUVirtualAddress());
 	}
 	else
 	{
@@ -626,9 +531,9 @@ void Game::Draw()
 	}
 
 	//実際のcommandListのImGuiの描画コマンドを積む
-	#ifdef USE_IMGUI
+#ifdef USE_IMGUI
 	ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), directXCom->GetCommandList().Get());
-	#endif
+#endif
 
 	directXCom->PostDraw();
 }
