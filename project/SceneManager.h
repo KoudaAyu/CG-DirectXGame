@@ -1,9 +1,9 @@
 #pragma once
-#include"AbstractSceneFactory.h"
-#include"BaseScene.h"
+#include "AbstractSceneFactory.h"
+#include "BaseScene.h"
 #include <memory>
 
-class DirectXCom; 
+class DirectXCom;
 
 class SceneManager
 {
@@ -24,8 +24,7 @@ public:
 
 	void SetDirectXCom(DirectXCom* dxCommon) { dxCommon_ = dxCommon; }
 
-	// Accept ownership of a factory (raw pointer transferred)
-	void SetSceneFactory(AbstractSceneFactory* sceneFactory) { sceneFactory_.reset(sceneFactory); }
+	void SetSceneFactory(std::unique_ptr<AbstractSceneFactory> sceneFactory) { sceneFactory_ = std::move(sceneFactory); }
 
 	static SceneManager* GetInstance();
 	static void Destroy();
@@ -36,7 +35,7 @@ private:
 	std::unique_ptr<BaseScene> nextScene_ = nullptr;
 	DirectXCom* dxCommon_ = nullptr;
 
-	// Singleton instance
-	static SceneManager* instance;
+	
+	static std::unique_ptr<SceneManager> instance;
 };
 

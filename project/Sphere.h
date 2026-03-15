@@ -26,7 +26,7 @@ public:
 	TransformationMatrix* GetTransformationMatrixDataSphere() const { return transformationMatrixDataSphere; }
 	Microsoft::WRL::ComPtr<ID3D12Resource> GetTransformationMatrixResourceSphere() const { return transformationMatrixResourceSphere; }
 	void SetTransform(const Sprite::Transform& transform) { this->transform = transform; }
-
+	Sprite::Transform& GetTransform() { return transform; }
 private:
 	DirectXCom* directXCom = nullptr;
 	Object3dCom* object3dCom = nullptr;
@@ -60,7 +60,7 @@ private:
 	TransformationMatrix* transformationMatrixDataSphere = nullptr;
 	Microsoft::WRL::ComPtr<ID3D12Resource> transformationMatrixResourceSphere;
 
-	Sprite::Transform transform;
+	Sprite::Transform transform = { {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };
 	Matrix4x4 worldMatrix;
 	Matrix4x4 viewMatrix;
 	Matrix4x4 WVPMatrix;

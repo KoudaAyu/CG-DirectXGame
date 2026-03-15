@@ -1,6 +1,8 @@
 #include "Framework.h"
 #include "Game.h"
 
+Framework::~Framework() = default;
+
 void Framework::Initialize()
 {
 }
@@ -16,10 +18,10 @@ void Framework::Update()
 void Framework::Run()
 {
     // Game インスタンスをここで生成し、メインループを管理する
-    Game game;
-    game.Initialize();
+    game = std::make_unique<Game>();
+    game->Initialize();
 
-    MSG& msg = game.GetDirectXCom()->GetMsg();
+    MSG& msg = game->GetDirectXCom()->GetMsg();
 
     // ウィンドウの x ボタンが押されて WM_QUIT が飛んでくるまでループ
     while (msg.message != WM_QUIT)
@@ -32,10 +34,11 @@ void Framework::Run()
         }
         else
         {
-            game.Update();
-            game.Draw();
+            game->Update();
+            game->Draw();
         }
     }
 
-    game.Finalize();
+    game->Finalize();
+    game.reset();
 }

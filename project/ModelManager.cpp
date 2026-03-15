@@ -1,19 +1,26 @@
 #include "ModelManager.h"
 
-std::unique_ptr<ModelManager> ModelManager::instance = nullptr;
+namespace {
+    static std::unique_ptr<ModelManager>& ModelManagerStorage()
+    {
+        static std::unique_ptr<ModelManager> instance;
+        return instance;
+    }
+}
 
 ModelManager* ModelManager::GetInstance()
 {
+    auto& instance = ModelManagerStorage();
     if (!instance)
     {
-		instance.reset(new ModelManager());
+        instance.reset(new ModelManager());
     }
     return instance.get();
 }
 
 void ModelManager::Destroy()
 {
-    instance.reset();
+    ModelManagerStorage().reset();
 }
 
 void ModelManager::Initialize(DirectXCom* dxCommon)

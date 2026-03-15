@@ -7,6 +7,7 @@
 #include <string>    
 #include <algorithm>
 #include <cctype>   
+#include <memory>
 
 #pragma comment(lib,"xaudio2.lib")
 
@@ -37,7 +38,7 @@ struct FormatChunk
 class Sound
 {
 public:
-   
+    
     static Sound* GetInstance();
     static void Destroy();
 
@@ -66,6 +67,4 @@ private:
     // 読み込んだデータを保持する変数
     SoundData soundData;
 
-    
-    static Sound* instance;
-};
+    };

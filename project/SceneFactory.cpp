@@ -4,10 +4,10 @@
 #include <format>
 #include <iostream>
 
-BaseScene* SceneFactory::CreateScene(const std::string& sceneName)
+std::unique_ptr<BaseScene> SceneFactory::CreateScene(const std::string& sceneName)
 {
     auto it = creators_.find(sceneName);
-     
+
     if (it == creators_.end())
     {
         Logger::Log(std::cout, std::format("SceneFactory: unknown scene '{}'\n", sceneName));
@@ -18,7 +18,7 @@ BaseScene* SceneFactory::CreateScene(const std::string& sceneName)
     return it->second();
 }
 
-void SceneFactory::Register(const std::string& sceneName, std::function<BaseScene* ()> creator)
+void SceneFactory::Register(const std::string& sceneName, std::function<std::unique_ptr<BaseScene>()> creator)
 {
     creators_[sceneName] = std::move(creator);
 }

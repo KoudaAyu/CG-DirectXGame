@@ -2,16 +2,17 @@
 #include "SceneFactory.h"
 #include "SceneManager.h"
 
-#include"TitleScene.h"
-#include"GamePlayScene.h"
+#include "TitleScene.h"
+#include "GamePlayScene.h"
 
 void SceneRegistration::RegisterScenes()
 {
-	//所有権をSceneManagerに移す
-	SceneFactory* factory = new SceneFactory();
+  
+    auto factory = std::make_unique<SceneFactory>();
 
-	factory->Register("TITLE", []() -> BaseScene* { return new TitleScene(); });
-	factory->Register("GAMEPLAY", []() -> BaseScene* { return new GamePlayScene(); });
+    factory->Register("TITLE", []() -> std::unique_ptr<BaseScene> { return std::make_unique<TitleScene>(); });
+    factory->Register("GAMEPLAY", []() -> std::unique_ptr<BaseScene> { return std::make_unique<GamePlayScene>(); });
 
-	SceneManager::GetInstance()->SetSceneFactory(factory);
+  
+    SceneManager::GetInstance()->SetSceneFactory(std::move(factory));
 }

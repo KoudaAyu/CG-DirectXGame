@@ -38,9 +38,6 @@ private:
 	ModelManager(ModelManager&&) = delete;
 	ModelManager& operator=(ModelManager&&) = delete;
 
-	// シングルトンの実体
-	static std::unique_ptr<ModelManager> instance;
-
 	std::map<std::string, std::unique_ptr<Model>> models_;
 
 	DirectXCom* dxCommon_ = nullptr;

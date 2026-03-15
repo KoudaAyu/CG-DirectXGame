@@ -1,6 +1,7 @@
 #pragma once
 
 #include"AbstractSceneFactory.h"
+#include <memory>
 
 class Game;
 
@@ -8,7 +9,7 @@ class Framework
 {
 public:
 
-	virtual ~Framework() = default;
+	virtual ~Framework();
 
 	virtual void Initialize();
 
@@ -28,7 +29,7 @@ public:
 private:
 	bool endRequest = false;
 
-	Game* game = nullptr;
+	std::unique_ptr<Game> game = nullptr;
 
 	//シーンファクトリー
 	AbstractSceneFactory* sceneFactory = nullptr;

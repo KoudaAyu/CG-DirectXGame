@@ -4,12 +4,14 @@
 #include "SrvManager.h"
 
 #include<unordered_map>
+#include <memory>
 
 class TextureManager
 {
 public:
 	//シングルトンインスタンスを取得
 	static TextureManager* GetInstance();
+	static void Destroy();
 
 	//終了
 	void Finalize();
@@ -23,7 +25,7 @@ public:
 	void SetDirectXCom(DirectXCom* directXCom) { directXCom_ = directXCom; }
 
 	// 追加: SRVManager へのアクセサ（SRV インデックス管理を一元化するため）
-	SRVManager* GetSRVManager() const { return srvManager_; }
+	SRVManager* GetSRVManager() const { return srvManager_.get(); }
 
 	// 追加: ファイルパスからSRVインデックスを取得（見つからなければ -1）
 	uint32_t GetTextureIndexByFilePath(const std::string& filePath) const;
@@ -46,11 +48,12 @@ public:
 	D3D12_GPU_DESCRIPTOR_HANDLE GetSrvHandleGPU(uint32_t index) const;
 
 private:
-	static TextureManager* instance_;
-	SRVManager* srvManager_ = nullptr;
+	std::unique_ptr<SRVManager> srvManager_ = nullptr;
 
 	TextureManager() = default;
-	~TextureManager() = default;
+public:
+	~TextureManager() = default; // Made public so unique_ptr can delete
+private:
 	TextureManager(TextureManager&) = delete;
 	TextureManager& operator=(TextureManager&) = delete;
 

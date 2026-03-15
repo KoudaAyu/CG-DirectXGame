@@ -40,12 +40,8 @@ void Game::Initialize()
 
 	spriteCom->CreateGraphicsPipeline();
 
-	for (uint32_t i = 0; i < 5; ++i)
-	{
-		auto sprite = std::make_unique<Sprite>();
-		sprite->Initialize(spriteCom.get(), "Resources/uvChecker.png");
-		sprites.push_back(std::move(sprite));
-	}
+	spriteManager_ = std::make_unique<SpriteManager>();
+	spriteManager_->Initialize(spriteCom.get(), "Resources/uvChecker.png", 5);
 
 	// 既存の手動テクスチャ読み込みはそのまま利用（Sphere用）
 
@@ -93,7 +89,7 @@ void Game::Initialize()
 	//Sphere用
 	transformObject = { {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };
 
-	cameraTransform = { {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, -10.0f} };
+	
 
 	//uvTransform用の変数
 	uvTransformSprite = {
@@ -154,12 +150,9 @@ void Game::Initialize()
 
 	debugCamera_.Initialize(windowAPI.get());
 
-
-	camera_->SetRotate({ 0.0f,0.0f,0.0f });
-	camera_->SetTranslate({ 0.0f,0.0f,-10.0f });
 	object3dCom->SetDefaultCamera(camera_.get());
 
-	transformSphere = { {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };
+	
 
 	emitter.transform.SetTranslate({ 0.0f,0.0f,0.0f });
 	emitter.transform.SetRotate({ 0.0f,0.0f,0.0f });
@@ -249,16 +242,10 @@ void Game::Update()
 	object3d_->SetRotate(transformObject.rotate);
 	object3d_->Update();
 
-
-	for (auto& sprite : sprites)
-	{
-		sprite->SetPosition(uiSpritePosition);
-		sprite->SetUVParams(uvTransformSprite.scale, uvTransformSprite.rotate.z, uvTransformSprite.translate);
-		sprite->Update(windowAPI.get(), &debugCamera_);
-	}
-
+	spriteManager_->Update(windowAPI.get(), &debugCamera_, uiSpritePosition, uvTransformSprite);
 	
 	
+	Sprite::Transform transformSphere = sphere_->GetTransform();
 	transformSphere.rotate.y += 0.01f;
 	sphere_->SetTransform(transformSphere);
 	sphere_->Update(camera_->GetWorldMatrix(), camera_->GetProjectionMatrix());
@@ -333,9 +320,9 @@ void Game::Update()
 
 	ImGui::Checkbox("useMonsterBall", &useMonsterBall);
 	ImGui::Checkbox("LightSprite Flag", (bool*)&materialManager_->GetMaterialDataEnableLighting());
-	for (auto& sprite : sprites)
+	for (auto& spritePtr : spriteManager_->GetSprites())
 	{
-		ImGui::Checkbox("LightObject Flag", (bool*)&sprite->GetMaterialDataSprite()->enableLighting);
+		ImGui::Checkbox("LightObject Flag", (bool*)&spritePtr->GetMaterialDataSprite()->enableLighting);
 	}
 	ImGui::Checkbox("DrawObject", &drawObject);
 	ImGui::Checkbox("DrawSprite", &drawSprite);
@@ -493,10 +480,7 @@ void Game::Draw()
 
 	if (drawSprite)
 	{
-		for (auto& sprite : sprites)
-		{
-			sprite->Draw();
-		}
+		spriteManager_->Draw();
 	}
 
 	//RootSignatureを設定。PSOに設定しているけれど別途設定が必要

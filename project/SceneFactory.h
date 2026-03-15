@@ -1,8 +1,9 @@
 #pragma once
 
-#include"AbstractSceneFactory.h"
-#include<unordered_map>
-#include<functional>
+#include "AbstractSceneFactory.h"
+#include <unordered_map>
+#include <functional>
+#include <memory>
 
 class SceneFactory : public AbstractSceneFactory
 {
@@ -12,11 +13,11 @@ public:
     /// </summary>
     /// <param name="sceneName">シーン名</param>
     /// <returns>生成したシーン</returns>
-    BaseScene* CreateScene(const std::string& sceneName) override;
+    std::unique_ptr<BaseScene> CreateScene(const std::string& sceneName) override;
 
-    void Register(const std::string& sceneName, std::function<BaseScene*()> creator) override;
+    void Register(const std::string& sceneName, std::function<std::unique_ptr<BaseScene>()> creator) override;
 
 private:
-    std::unordered_map<std::string, std::function<BaseScene* ()>> creators_;
+    std::unordered_map<std::string, std::function<std::unique_ptr<BaseScene>()>> creators_;
 };
 

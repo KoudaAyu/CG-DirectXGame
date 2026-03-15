@@ -2,23 +2,34 @@
 #include <cassert>
 #include <filesystem>
 
-TextureManager* TextureManager::instance_ = nullptr;
+namespace {
+    static std::unique_ptr<TextureManager>& TextureManagerStorage()
+    {
+        static std::unique_ptr<TextureManager> instance;
+        return instance;
+    }
+}
 
 TextureManager* TextureManager::GetInstance()
 {
-	if (instance_ == nullptr)
-	{
-		instance_ = new TextureManager();
-	}
-	return instance_;
+    auto& instance = TextureManagerStorage();
+    if (instance == nullptr)
+    {
+        instance.reset(new TextureManager());
+    }
+    return instance.get();
+}
+
+void TextureManager::Destroy()
+{
+    TextureManagerStorage().reset();
 }
 
 void TextureManager::Finalize()
 {
-	delete srvManager_;
-	srvManager_ = nullptr;
-	delete instance_;
-	instance_ = nullptr;
+
+	srvManager_.reset();
+	TextureManagerStorage().reset();
 }
 
 void TextureManager::Initialize()
@@ -46,7 +57,7 @@ void TextureManager::LoadTexture(const std::string& filePath)
 	if (!srvManager_)
 	{
 		
-		srvManager_ = new SRVManager();
+		srvManager_ = std::make_unique<SRVManager>();
 	
 		if (directXCom_)
 		{

@@ -51,6 +51,7 @@
     <ClCompile Include="SceneManager.cpp" />
     <ClCompile Include="SceneRegistration.cpp" />
     <ClCompile Include="Sphere.cpp" />
+    <ClCompile Include="SpriteManager.cpp" />
     <ClCompile Include="SRVManager.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -116,6 +117,7 @@
     <ClInclude Include="SceneManager.h" />
     <ClInclude Include="SceneRegistration.h" />
     <ClInclude Include="Sphere.h" />
+    <ClInclude Include="SpriteManager.h" />
     <ClInclude Include="SRVManager.h" />
     <ClInclude Include="Application\Scene\TitleScene\TitleScene.h" />
   </ItemGroup>

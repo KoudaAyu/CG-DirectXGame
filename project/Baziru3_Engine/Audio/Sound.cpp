@@ -15,26 +15,31 @@
 #pragma comment(lib,"Mfreadwrite.lib")
 #pragma comment(lib,"mfuuid.lib")
 
-// シングルトン実体の定義
-Sound* Sound::instance = nullptr;
+namespace {
+    static std::unique_ptr<Sound>& SoundStorage()
+    {
+        static std::unique_ptr<Sound> instance;
+        return instance;
+    }
+}
 
 Sound* Sound::GetInstance()
 {
+    auto& instance = SoundStorage();
     if (!instance)
     {
-        instance = new Sound();
+        instance = std::make_unique<Sound>();
         instance->Initialize();
     }
-    return instance;
+    return instance.get();
 }
 
 void Sound::Destroy()
 {
-    if (instance)
+    if (auto& inst = SoundStorage())
     {
-        instance->Finalize();
-        delete instance;
-        instance = nullptr;
+        inst->Finalize();
+        inst.reset();
     }
 }
 

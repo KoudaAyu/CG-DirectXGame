@@ -21,6 +21,7 @@
 #include"Sphere.h"
 #include"Sprite.h"
 #include"SpriteCom.h"
+#include"SpriteManager.h"
 #include"ResourceLeakCheek.h"
 #include"TextureManager.h"
 #include"WindowsAPI.h"
@@ -63,14 +64,8 @@ public:
 		}
 		return nullptr;
 	}
-	std::vector<std::unique_ptr<Sprite>>& GetSprites()
-	{
-		return sprites;
-	}
-	const std::vector<std::unique_ptr<Sprite>>& GetSprites() const
-	{
-		return sprites;
-	}
+	std::vector<std::unique_ptr<Sprite>>& GetSprites() { return spriteManager_->GetSprites(); }
+	const std::vector<std::unique_ptr<Sprite>>& GetSprites() const { return spriteManager_->GetSprites(); }
 	Object3d* GetObject3d() { return object3d_.get(); }
 	const Object3d* GetObject3d() const { return object3d_.get(); }
 	Object3dCom* GetObject3dCom() { return object3dCom.get(); }
@@ -99,6 +94,7 @@ private:
 	std::unique_ptr<ParticleManager> particleManager;
 	std::unique_ptr<Sphere> sphere_;
 	std::unique_ptr<SpriteCom> spriteCom;
+	std::unique_ptr<SpriteManager> spriteManager_;
 	std::unique_ptr<WindowAPI> windowAPI;//ウィンドウ関連のAPIをまとめたオブジェクト
 	
 	DebugCamera debugCamera_;
@@ -116,7 +112,7 @@ private:
 	std::vector<std::unique_ptr<Sprite>>sprites;
 	Sprite::Transform transformObject;
 	Sprite::Transform uvTransformSprite;
-	Sprite::Transform transformSphere;
+	
 	Sprite::Transform cameraTransform;
 
 	D3D12_CPU_DESCRIPTOR_HANDLE textureSrvHandleCPU;

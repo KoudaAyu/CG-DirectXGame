@@ -1,7 +1,15 @@
 #include "SceneManager.h"
 #include "SceneFactory.h"
 
-SceneManager* SceneManager::instance = nullptr;
+#include<memory>
+
+namespace {
+    static std::unique_ptr<SceneManager>& SceneManagerStorage()
+    {
+        static std::unique_ptr<SceneManager> instance;
+        return instance;
+    }
+}
 
 SceneManager::~SceneManager()
 {
@@ -21,24 +29,25 @@ void SceneManager::ChangeScene(const std::string& sceneName)
 	}
 
 	assert(nextScene_ == nullptr);
+
 	
-	BaseScene* newScene = sceneFactory_->CreateScene(sceneName);
-	nextScene_.reset(newScene);
+	auto newScene = sceneFactory_->CreateScene(sceneName);
+	nextScene_ = std::move(newScene);
 }
 
 SceneManager* SceneManager::GetInstance()
 {
-	if (!instance)
-	{
-		instance = new SceneManager();
-	}
-	return instance;
+    auto& instance = SceneManagerStorage();
+    if (!instance)
+    {
+        instance = std::make_unique<SceneManager>();
+    }
+    return instance.get();
 }
 
 void SceneManager::Destroy()
 {
-	delete instance;
-	instance = nullptr;
+    SceneManagerStorage().reset();
 }
 
 void SceneManager::Update()
