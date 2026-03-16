@@ -43,10 +43,11 @@ void Sphere::Initialize(DirectXCom* dxCommon)
 	vertexResourceSphere = directXCom->CreateBufferResource(directXCom->GetDevice().Get(), sizeof(Sprite::VertexData) * kVertexCount);
 	Sprite::VertexData* mappedVertex = nullptr;
 	vertexResourceSphere->Map(0, nullptr, reinterpret_cast<void**>(&mappedVertex));
-	memcpy(mappedVertex, vertexData, sizeof(Sprite::VertexData) * kVertexCount);
+	memcpy(mappedVertex, vertexData.data(), sizeof(Sprite::VertexData) * kVertexCount);
 	vertexResourceSphere->Unmap(0, nullptr);
 
-	uint32_t* indexData = new uint32_t[kIndexCount];
+	std::vector<uint32_t> indexData;
+	indexData.resize(kIndexCount);
 	uint32_t idx = 0; // ここを元のままの変数名に戻しました
 
 	for (uint32_t lat = 0; lat < kSubdivision; ++lat)
@@ -77,7 +78,7 @@ void Sphere::Initialize(DirectXCom* dxCommon)
 	indexResourceSphere = directXCom->CreateBufferResource(directXCom->GetDevice().Get(), sizeof(uint32_t) * kIndexCount);
 	uint32_t* mappedIndex = nullptr;
 	indexResourceSphere->Map(0, nullptr, reinterpret_cast<void**>(&mappedIndex));
-	memcpy(mappedIndex, indexData, sizeof(uint32_t) * kIndexCount);
+	memcpy(mappedIndex, indexData.data(), sizeof(uint32_t) * kIndexCount);
 	indexResourceSphere->Unmap(0, nullptr);
 
 	// --- バッファビュー設定 ---
@@ -92,10 +93,6 @@ void Sphere::Initialize(DirectXCom* dxCommon)
 	indexBufferViewSphere.Format = DXGI_FORMAT_R32_UINT;
 
 	
-	vertexResourceSphere->Map(0, nullptr, reinterpret_cast<void**>(&mapped));
-	memcpy(mapped, vertexData, sizeof(Sprite::VertexData) * kVertexCount);
-	vertexResourceSphere->Unmap(0, nullptr);
-
 	//WVP用のリソースを作る。　Matrix4x4 1つのサイズを用意する
 	Microsoft::WRL::ComPtr<ID3D12Resource> wvpResource = directXCom->CreateBufferResource(directXCom->GetDevice().Get(), sizeof(TransformationMatrix));
 	//データを書き込む
@@ -166,23 +163,3 @@ void Sphere::Draw(DirectXCom* dxCommon, Object3dCom* object3dCom, MaterialManage
     commansList->DrawIndexedInstanced(GetIndexCount(), 1, 0, 0, 0);
 }
 
-//void Sphere::Draw()
-//{
-//	/*directXCom->GetCommandList()->RSSetViewports(1, &directXCom->GetViewport());
-//	directXCom->GetCommandList()->RSSetScissorRects(1, &directXCom->GetScissorRect());
-//
-//	directXCom->GetCommandList()->SetGraphicsRootSignature(object3dCom->GetRootSignature().Get());
-//	directXCom->GetCommandList()->SetPipelineState(object3dCom->GetPipelineState().Get());
-//	directXCom->GetCommandList()->IASetVertexBuffers(0, 1, &vertexBufferViewSphere);
-//	directXCom->GetCommandList()->IASetIndexBuffer(&indexBufferViewSphere);
-//	directXCom->GetCommandList()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-//
-//	directXCom->GetCommandList()->SetGraphicsRootConstantBufferView(0, materialResource->GetGPUVirtualAddress());
-//
-//	directXCom->GetCommandList()->SetGraphicsRootConstantBufferView(1, transformationMatrixResourceSphere->GetGPUVirtualAddress());
-//	directXCom->GetCommandList()->SetGraphicsRootDescriptorTable(2, useMonsterBall ? textureSrvHandleGPU2 : textureSrvHandleGPU);
-//
-//	directXCom->GetCommandList()->SetGraphicsRootConstantBufferView(3, directionalLight->GetGPUVirtualAddress());
-//
-//	directXCom->GetCommandList()->DrawIndexedInstanced(GetIndexCount(), 1, 0, 0, 0);*/
-//}

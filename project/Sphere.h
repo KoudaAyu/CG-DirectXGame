@@ -3,6 +3,7 @@
 #include <DirectXMath.h>
 #include"DirectXCom.h"
 #include"Sprite.h"
+#include <vector>
 
 class Object3dCom;
 class MaterialManager;
@@ -49,7 +50,7 @@ private:
 	static constexpr uint32_t kVertexCount = (kSubdivision + 1) * (kSubdivision + 1);
 	static constexpr uint32_t kIndexCount = kSubdivision * kSubdivision * 6; // 各四角形に三角形2つ、各三角形に頂 vertex 3つで 2*3=6
 	// 頂点配列を確保
-	Sprite::VertexData* vertexData = new Sprite::VertexData[kVertexCount];
+	std::vector<Sprite::VertexData> vertexData = std::vector<Sprite::VertexData>(kVertexCount);
 
 	Microsoft::WRL::ComPtr<ID3D12Resource> vertexResourceSphere;
 	Microsoft::WRL::ComPtr<ID3D12Resource> indexResourceSphere;

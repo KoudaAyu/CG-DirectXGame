@@ -13,7 +13,7 @@ ModelManager* ModelManager::GetInstance()
     auto& instance = ModelManagerStorage();
     if (!instance)
     {
-        instance.reset(new ModelManager());
+        instance = std::make_unique<ModelManager>();
     }
     return instance.get();
 }

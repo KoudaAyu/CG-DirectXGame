@@ -29,7 +29,7 @@ public:
 	/// <returns>モデル</returns>
 	Model* FindModel(const std::string& filepath);
 
-private:
+public:
 	ModelManager() = default;
 
 	// コピー・ムーブを禁止してインスタンスの複製を封印
