@@ -11,7 +11,7 @@ struct CameraForGPU
 	Vector3 worldPosition;
 };
 
-class DirectXCom; // forward
+class DirectXCom; 
 
 class Camera
 {

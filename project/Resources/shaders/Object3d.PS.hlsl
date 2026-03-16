@@ -43,9 +43,9 @@ PixelShaderOutput main(VertexShaderOutput input)
     float32_t4 textureColor = gTexture.Sample(gSample, transformedUV.xy);
     output.color = gMaterial.color * textureColor;
     
-    //hals lambert
+   
     float NdotL = dot(normalize(input.normal), normalize(-gDirectionalLight.direction));
-    //float cos = pow(NdotL * 0.5f + 0.5f, 2.0f);
+   
 
     float32_t3 toEye = normalize(gCamera.worldPosition - input.worldPosition);
 
