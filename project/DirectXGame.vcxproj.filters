@@ -48,7 +48,7 @@
     <ClCompile Include="Baziru3_Engine\Base\Matrix4x4.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
-    <ClCompile Include="Baziru3_Engine\Base\Log.cpp">
+    <ClCompile Include="Baziru3_Engine\Base\Log\Log.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
     <ClCompile Include="main.cpp">
@@ -63,16 +63,16 @@
     <ClCompile Include="Baziru3_Engine\Base\StringUtil.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
-    <ClCompile Include="Baziru3_Engine\Base\WindowsAPI.cpp">
+    <ClCompile Include="Baziru3_Engine\Base\Windows\WindowsAPI.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
-    <ClCompile Include="ModelCom.cpp">
+    <ClCompile Include="Baziru3_Engine\3D\Model\ModelCom.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
-    <ClCompile Include="Model.cpp">
+    <ClCompile Include="Baziru3_Engine\3D\Model\Model.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
-    <ClCompile Include="ModelManager.cpp">
+    <ClCompile Include="Baziru3_Engine\3D\Model\ModelManager.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
     <ClCompile Include="SRVManager.cpp">
@@ -102,7 +102,7 @@
     <ClCompile Include="GamePlayScene.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
-    <ClCompile Include="Light.cpp">
+    <ClCompile Include="Baziru3_Engine\Light\Light.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
     <ClCompile Include="MaterialManager.cpp">
@@ -126,7 +126,7 @@
     <ClCompile Include="SceneRegistration.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
-    <ClCompile Include="SpriteManager.cpp">
+    <ClCompile Include="Baziru3_Engine\2D\Sprite\SpriteManager.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
   </ItemGroup>
@@ -146,7 +146,7 @@
     <ClInclude Include="Baziru3_Engine\Base\KeyInput.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
-    <ClInclude Include="Baziru3_Engine\Base\Log.h">
+    <ClInclude Include="Baziru3_Engine\Base\Log\Log.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
     <ClInclude Include="Baziru3_Engine\Base\Matrix4x4.h">
@@ -161,7 +161,7 @@
     <ClInclude Include="Baziru3_Engine\Base\Vector.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
-    <ClInclude Include="Baziru3_Engine\Base\WindowsAPI.h">
+    <ClInclude Include="Baziru3_Engine\Base\Windows\WindowsAPI.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
     <ClInclude Include="Baziru3_Engine\Audio\Sound.h">
@@ -191,13 +191,13 @@
     <ClInclude Include="Baziru3_Engine\3D\Object\Object3dCom.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
-    <ClInclude Include="Model.h">
+    <ClInclude Include="Baziru3_Engine\3D\Model\Model.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
-    <ClInclude Include="ModelCom.h">
+    <ClInclude Include="Baziru3_Engine\3D\Model\ModelCom.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
-    <ClInclude Include="ModelManager.h">
+    <ClInclude Include="Baziru3_Engine\3D\Model\ModelManager.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
     <ClInclude Include="SRVManager.h">
@@ -230,7 +230,7 @@
     <ClInclude Include="GamePlayScene.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
-    <ClInclude Include="Light.h">
+    <ClInclude Include="Baziru3_Engine\Light\Light.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
     <ClInclude Include="MaterialManager.h">
@@ -254,7 +254,7 @@
     <ClInclude Include="SceneRegistration.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
-    <ClInclude Include="SpriteManager.h">
+    <ClInclude Include="Baziru3_Engine\2D\Sprite\SpriteManager.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
   </ItemGroup>
