@@ -21,19 +21,16 @@ void Sprite::Initialize(SpriteCom* spriteCom, std::string textureFilePath)
 	CreateIndexData();
 
 	materialResourceSprite = dxCommon->CreateBufferResource(dxCommon->GetDevice().Get(), sizeof(Material));
-	materialResourceSprite->Map(0, nullptr, reinterpret_cast<void**>(&materialData));
+		materialResourceSprite->Map(0, nullptr, reinterpret_cast<void**>(&materialData));
 	materialData->color = { 1.0f, 1.0f, 1.0f, 1.0f }; // 白（テクスチャ色をそのまま出す用）
 	materialData->enableLighting = false;
 	materialData->uvTransform = MakeIdentity4x4();
-	// Note: keep mapped for lifetime so caller can update directly
-	// materialResourceSprite->Unmap(0, nullptr);
-
+	
 	//Sprite用のTransformationMatrix用のリソースを作る
 	transformationMatrixResourceSprite = dxCommon->CreateBufferResource(dxCommon->GetDevice().Get(), sizeof(TransformationMatrix));
-	//データを書き込む
-	//書き込むためのアドレス取得
+	// データを書き込むためにMapする。TransformationMatrixは毎フレーム更新されるため、ここでも永続的にMapしておく。
 	transformationMatrixResourceSprite->Map(0, nullptr, reinterpret_cast<void**>(&transformationMatrixDataSprite));
-	//単位行列を書き込んでおく
+	// 単位行列を書き込んでおく
 	transformationMatrixDataSprite->WVP = MakeIdentity4x4();
 	transformationMatrixDataSprite->World = MakeIdentity4x4();
 	

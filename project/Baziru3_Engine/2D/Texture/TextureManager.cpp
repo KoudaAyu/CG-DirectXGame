@@ -15,7 +15,7 @@ TextureManager* TextureManager::GetInstance()
     auto& instance = TextureManagerStorage();
     if (instance == nullptr)
     {
-        instance.reset(new TextureManager());
+        instance = std::make_unique<TextureManager>();
     }
     return instance.get();
 }
@@ -35,6 +35,7 @@ void TextureManager::Finalize()
 void TextureManager::Initialize()
 {
 	textureDates_.reserve(DirectXCom::kMaxSRVCount);
+	indexToFilePath_.reserve(DirectXCom::kMaxSRVCount);
 }
 
 void TextureManager::LoadTexture(const std::string& filePath)
@@ -94,6 +95,9 @@ void TextureManager::LoadTexture(const std::string& filePath)
 	textureData.resource_ =
 		directXCom_->CreateTextureResource(textureData.metadata_);
 
+	//  インデックス->ファイルパスの逆引き登録
+	indexToFilePath_.emplace(textureData.srvIndex_, filePath);
+
 	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
 	srvDesc.Format = textureData.metadata_.format;
 	srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
@@ -119,11 +123,12 @@ uint32_t TextureManager::GetTextureIndexByFilePath(const std::string& filePath) 
 
 const DirectX::TexMetadata& TextureManager::GetMetadata(uint32_t index) const
 {
-	// index から対応する TextureData を探す
-	for (const auto& pair : textureDates_)
-	{
-		if (pair.second.srvIndex_ == index) {
-			return pair.second.metadata_;
+	// 逆引きマップでファイルパスを探し、そこからメタデータを取得する
+	auto it = indexToFilePath_.find(index);
+	if (it != indexToFilePath_.end()) {
+		auto it2 = textureDates_.find(it->second);
+		if (it2 != textureDates_.end()) {
+			return it2->second.metadata_;
 		}
 	}
 
@@ -134,10 +139,12 @@ const DirectX::TexMetadata& TextureManager::GetMetadata(uint32_t index) const
 
 D3D12_GPU_DESCRIPTOR_HANDLE TextureManager::GetSrvHandleGPU(uint32_t index) const
 {
-	for (const auto& pair : textureDates_)
-	{
-		if (pair.second.srvIndex_ == index) {
-			return pair.second.srvHandleGPU_;
+	// 逆引きマップでファイルパスを探し、そこからGPUハンドルを取得する
+	auto it = indexToFilePath_.find(index);
+	if (it != indexToFilePath_.end()) {
+		auto it2 = textureDates_.find(it->second);
+		if (it2 != textureDates_.end()) {
+			return it2->second.srvHandleGPU_;
 		}
 	}
 

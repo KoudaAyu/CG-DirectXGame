@@ -71,6 +71,9 @@ private:
 	//テクスチャデータ
 	std::unordered_map<std::string,TextureData> textureDates_;
 
+	// 追加: SRVインデックスからファイルパスを引ける逆引きマップ (O(1) 検索)
+	std::unordered_map<uint32_t, std::string> indexToFilePath_;
+
 	DirectXCom* directXCom_ = nullptr;
 
 	//SRVインデックスの開始番号
