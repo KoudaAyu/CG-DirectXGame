@@ -444,10 +444,8 @@ void Game::Draw()
 
 	sceneManager_->Draw();
 
-	//RootSignatureを設定。PSOに設定しているけれど別途設定が必要
-	directXCom->GetCommandList()->SetGraphicsRootSignature(spriteCom->GetRootSignature().Get());
-	// Use pipeline state stored in SpriteCom
-	directXCom->GetCommandList()->SetPipelineState(spriteCom->GetPipelineState().Get()); //パイプラインステートを設定
+	spriteCom->SetupDraw(directXCom->GetCommandList().Get());
+
 	//Objectの描画
 
 	directXCom->GetCommandList()->IASetVertexBuffers(0, 1, &model_->GetVertexBufferView());

@@ -15,7 +15,10 @@ TextureManager* TextureManager::GetInstance()
     auto& instance = TextureManagerStorage();
     if (instance == nullptr)
     {
-        instance = std::make_unique<TextureManager>();
+        // std::make_unique cannot access a private constructor from here because
+        // access checking for templates happens in the template's scope.
+        // Allocate manually so the private ctor can be used by this member function.
+        instance.reset(new TextureManager());
     }
     return instance.get();
 }

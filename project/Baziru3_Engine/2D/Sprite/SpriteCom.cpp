@@ -252,7 +252,11 @@ void SpriteCom::DepthStencilDesc()
 	assert(GetPixelShaderBlob() && "ピクセルシェーダーの読み込み失敗！");
 }
 
-void SpriteCom::SetupDraw()
+void SpriteCom::SetupDraw(ID3D12GraphicsCommandList* commandList)
 {
-	CreateGraphicsPipeline();
+	//RootSignatureを設定。PSOに設定しているけれど別途設定が必要
+	commandList->SetGraphicsRootSignature(rootSignature.Get());
+	// Use pipeline state stored in SpriteCom
+	commandList->SetPipelineState(pipelineState.Get()); //パイプラインステートを設定
+
 }

@@ -52,7 +52,7 @@ public:
 	void InitializeGraphicPipeline();
 	void DepthStencilDesc();
 	
-	void SetupDraw();
+	void SetupDraw(ID3D12GraphicsCommandList* commandList);
 
 
 public:
