@@ -23,7 +23,7 @@ void Game::Initialize()
 	windowAPI->Show();
 	directXCom->Initialize();
 
-	sceneManager_ = std::make_unique<SceneManager>(directXCom.get());
+	SceneManager::GetInstance()->SetDirectXCom(directXCom.get());
 
 	// TextureManager は SRV ヒープに依存するので DX 初期化の後に初期化
 	TextureManager::GetInstance()->Initialize();
@@ -33,10 +33,6 @@ void Game::Initialize()
 
 	spriteCom = std::make_unique<SpriteCom>(logStream, directXCom.get());
 	spriteCom->Initialize();
-
-
-	
-	
 
 	spriteCom->CreateGraphicsPipeline();
 
@@ -199,7 +195,12 @@ void Game::Finalize()
 	OutputDebugStringA("Hello, DirectX!\n");
 
 	// サウンドの終了処理
-	sound_->Finalize();
+	if (sound_)
+	{
+		sound_->Finalize();
+		sound_.reset();
+	}
+	Sound::Destroy();
 
 	TextureManager::GetInstance()->Finalize();
 
@@ -220,12 +221,13 @@ void Game::Finalize()
 
 	Framework::Finalize();
 }
+
 void Game::Update()
 {
 	Framework::Update();
 
 
-	sceneManager_->Update();
+	SceneManager::GetInstance()->Update();
 
 	//if (windowAPI->ProcessMassage())
 	//{
@@ -405,7 +407,7 @@ void Game::Draw()
 	object3dCom->PreDraw();
 
 
-	sceneManager_->Draw();
+	SceneManager::GetInstance()->Draw();
 
 	spriteCom->SetupDraw(directXCom->GetCommandList().Get());
 

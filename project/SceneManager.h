@@ -36,6 +36,6 @@ private:
 	DirectXCom* dxCommon_ = nullptr;
 
 	
-	static std::unique_ptr<SceneManager> instance;
+	
 };
 

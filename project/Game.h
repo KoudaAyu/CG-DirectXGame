@@ -106,8 +106,6 @@ private:
 	KeyInput inputManager;
 	std::unique_ptr<Sound> sound_;
 	std::unique_ptr<MaterialManager> materialManager_;
-
-	std::unique_ptr<SceneManager> sceneManager_;
 private:
 	std::vector<std::unique_ptr<Sprite>>sprites;
 	Sprite::Transform transformObject;
