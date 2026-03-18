@@ -4,6 +4,12 @@
 #include <memory>
 
 class DirectXCom;
+class Camera;
+class Object3dCom;
+class MaterialManager;
+class Light;
+class ParticleManager;
+class SpriteCom;
 
 class SceneManager
 {
@@ -23,19 +29,38 @@ public:
 	void ChangeScene(const std::string& sceneName);
 
 	void SetDirectXCom(DirectXCom* dxCommon) { dxCommon_ = dxCommon; }
+	void SetCamera(Camera* camera) { camera_ = camera; }
 
 	void SetSceneFactory(std::unique_ptr<AbstractSceneFactory> sceneFactory) { sceneFactory_ = std::move(sceneFactory); }
 
 	static SceneManager* GetInstance();
 	static void Destroy();
 
+
+	void SetObject3dCom(Object3dCom* v) { object3dCom_ = v; }
+	Object3dCom* GetObject3dCom() const { return object3dCom_; }
+	void SetMaterialManager(MaterialManager* v) { materialManager_ = v; }
+	MaterialManager* GetMaterialManager() const { return materialManager_; }
+	void SetLight(Light* v) { light_ = v; }
+	Light* GetLight() const { return light_; }
+	void SetParticleManager(ParticleManager* v) { particleManager_ = v; }
+	ParticleManager* GetParticleManager() const { return particleManager_; }
+	void SetSpriteCom(SpriteCom* v) { spriteCom_ = v; }
+	SpriteCom* GetSpriteCom() const { return spriteCom_; }
+
 private:
 	std::unique_ptr<AbstractSceneFactory> sceneFactory_;
 	std::unique_ptr<BaseScene> scene_ = nullptr;
 	std::unique_ptr<BaseScene> nextScene_ = nullptr;
 	DirectXCom* dxCommon_ = nullptr;
+	Camera* camera_ = nullptr;
 
-	
-	
+	// Shared engine-managed resources
+	Object3dCom* object3dCom_ = nullptr;
+	MaterialManager* materialManager_ = nullptr;
+	Light* light_ = nullptr;
+	ParticleManager* particleManager_ = nullptr;
+	SpriteCom* spriteCom_ = nullptr;
+
 };
 

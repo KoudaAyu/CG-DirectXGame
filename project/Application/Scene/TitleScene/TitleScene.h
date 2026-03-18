@@ -4,11 +4,12 @@
 
 class DirectXCom;
 class KeyInput;
+class Camera;
 
 class TitleScene : public BaseScene
 {
 public:
-	void Initialize(DirectXCom* dxCommon) override;
+	void Initialize(DirectXCom* dxCommon, Camera* camera) override;
 	void Finalize() override;
 	void Update() override;
 	void Draw() override;

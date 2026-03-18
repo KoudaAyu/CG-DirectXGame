@@ -44,6 +44,9 @@ void Game::Initialize()
 	object3dCom = std::make_unique<Object3dCom>(logStream);
 	object3dCom->Initialize(GetDirectXCom());
 
+	// Make shared engine resources available to scenes
+	SceneManager::GetInstance()->SetObject3dCom(object3dCom.get());
+
 #pragma region 最初のシーンの初期化
 	object3d_ = std::make_unique<Object3d>();
 	object3d_->Initialize(object3dCom.get());
@@ -54,8 +57,7 @@ void Game::Initialize()
 	//パイプラインステートの生成に失敗した場合はエラー
 	assert(SUCCEEDED(GetDirectXCom()->GetHr()));
 
-	sphere_ = std::make_unique<Sphere>();
-	sphere_->Initialize(directXCom.get());
+
 
 	//モデル読み込み
 	modelData = object3d_->LoadObjFile("Resources", "plane.obj");
@@ -70,15 +72,18 @@ void Game::Initialize()
 
 	materialManager_ = std::make_unique<MaterialManager>();
 	materialManager_->Initialize(directXCom.get());
+	SceneManager::GetInstance()->SetMaterialManager(materialManager_.get());
 
 	light = std::make_unique<Light>();
 	light->Initialize(directXCom.get());
+	SceneManager::GetInstance()->SetLight(light.get());
 
 	camera_ = std::make_unique<Camera>();
 	camera_->Initialize(directXCom.get());
 
 	particleManager = std::make_unique<ParticleManager>(logStream, directXCom.get());
 	particleManager->Initialize(camera_.get());
+	SceneManager::GetInstance()->SetParticleManager(particleManager.get());
 
 	//Transform変数を作る
 	Sprite::Transform transform = { {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };
@@ -168,6 +173,7 @@ void Game::Initialize()
 
 
 	SceneRegistration::RegisterScenes();
+	SceneManager::GetInstance()->SetCamera(camera_.get());
 	SceneManager::GetInstance()->ChangeScene("TITLE");
 }
 
@@ -249,11 +255,7 @@ void Game::Update()
 	spriteManager_->Update(windowAPI.get(), &debugCamera_, uiSpritePosition, uvTransformSprite);
 	
 	
-	Sprite::Transform transformSphere = sphere_->GetTransform();
-	transformSphere.rotate.y += 0.01f;
-	sphere_->SetTransform(transformSphere);
-	sphere_->Update(camera_->GetWorldMatrix(), camera_->GetProjectionMatrix());
-
+	
 	
 	//パーティクルの更新
 	emitter.frequencyTime += kDeltaTime;
@@ -291,7 +293,7 @@ void Game::Update()
 	}
 	ImGui::Checkbox("DrawObject", &drawObject);
 	ImGui::Checkbox("DrawSprite", &drawSprite);
-	ImGui::Checkbox("DrawSphere", &drawSphere);
+	//ImGui::Checkbox("DrawSphere", &drawSphere);
 	//ImGui::DragFloat3("LightDirection", &directionalLightData->direction.x, 0.01f, -10.0f, 10.0f);
 
 	ImGui::DragFloat3("Object Rotate", &transformObject.rotate.x, 0.01f, -10.0f, 10.0f);
@@ -436,10 +438,7 @@ void Game::Draw()
 		directXCom->GetCommandList()->DrawInstanced(UINT(modelData.vertices.size()), 1, 0, 0);
 	}
 
-	if (drawSphere)
-	{
-		sphere_->Draw(directXCom.get(), object3dCom.get(), materialManager_.get(), light.get(), useMonsterBall ? textureSrvHandleGPU2 : textureSrvHandleGPU, camera_.get());
-	}
+	
 
 	if (drawSprite)
 	{

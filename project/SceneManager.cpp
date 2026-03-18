@@ -68,7 +68,8 @@ void SceneManager::Update()
 		scene_->SetSceneManager(this);
 
 		//次シーンの初期化
-		scene_->Initialize(dxCommon_);
+
+		scene_->Initialize(dxCommon_, camera_);
 	}
 
 

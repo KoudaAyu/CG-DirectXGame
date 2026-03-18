@@ -72,8 +72,7 @@ public:
 	const Object3dCom* GetObject3dCom() const { return object3dCom.get(); }
 	ParticleManager* GetParticleManager() { return particleManager.get(); }
 	const ParticleManager* GetParticleManager() const { return particleManager.get(); }
-	Sphere* GetSphere() { return sphere_.get(); }
-	const Sphere* GetSphere() const { return sphere_.get(); }
+
 
 private:
 
@@ -92,7 +91,6 @@ private:
 	std::unique_ptr<Object3d> object3d_;
 	std::unique_ptr<Object3dCom> object3dCom;
 	std::unique_ptr<ParticleManager> particleManager;
-	std::unique_ptr<Sphere> sphere_;
 	std::unique_ptr<SpriteCom> spriteCom;
 	std::unique_ptr<SpriteManager> spriteManager_;
 	std::unique_ptr<WindowAPI> windowAPI;//ウィンドウ関連のAPIをまとめたオブジェクト
@@ -134,7 +132,7 @@ private:
 	//Objectの描画切り替え
 	bool drawObject = false;
 	bool drawSprite = false;
-	bool drawSphere = false;
+	
 
 	// Keep GPU resources alive beyond Initialize
 	

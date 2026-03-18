@@ -5,18 +5,18 @@
 #include"Sprite.h"
 #include <vector>
 
+class Camera;
 class Object3dCom;
 class MaterialManager;
 class Light;
-class Camera;
+
 
 class Sphere
 {
 public:
-	void Initialize(DirectXCom* dxCommon);
-	void Update(const Matrix4x4& cameraMatrix,const Matrix4x4& projectionMatrix);
-	void Draw(DirectXCom* dxCommon,Object3dCom* object3dCom,MaterialManager* materialManager,Light* light,
-		D3D12_GPU_DESCRIPTOR_HANDLE textureSrvHandle, Camera* camera);
+	void Initialize(DirectXCom* dxCommon, Object3dCom* object3dCom, MaterialManager* materialManager, Light* light, Camera* camera);
+	void Update();
+	void Draw(D3D12_GPU_DESCRIPTOR_HANDLE textureSrvHandle);
 
 public:
 	
@@ -29,11 +29,11 @@ public:
 	void SetTransform(const Sprite::Transform& transform) { this->transform = transform; }
 	Sprite::Transform& GetTransform() { return transform; }
 private:
-	DirectXCom* directXCom = nullptr;
-	Object3dCom* object3dCom = nullptr;
-	MaterialManager* materialManager = nullptr;
-	Light* light = nullptr;
-	Camera* camera = nullptr;
+	DirectXCom* directXCom_ = nullptr;
+	Object3dCom* object3dCom_ = nullptr;
+	MaterialManager* materialManager_ = nullptr;
+	Light* light_ = nullptr;
+	Camera* camera_ = nullptr;
 
 	D3D12_GPU_DESCRIPTOR_HANDLE textureSrvHandle{};
 private:
