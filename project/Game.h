@@ -127,7 +127,7 @@ private:
 
 	Object3d::ModelData modelData;
 
-	uint32_t numInstance = 0;
+	
 
 	const float kDeltaTime = 1.0f / 60.0f;
 

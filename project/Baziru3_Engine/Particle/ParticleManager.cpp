@@ -2,6 +2,8 @@
 #include"ParticleEmitter.h"
 #include"TextureManager.h"
 
+#include "Camera.h"
+
 ParticleManager::ParticleManager(std::ostream& logStream, DirectXCom* dxCommon)
 	: logStream(logStream), dxCommon(dxCommon)
 {
@@ -12,15 +14,15 @@ ParticleManager::~ParticleManager()
 {
 }
 
-void ParticleManager::Initialize()
+void ParticleManager::Initialize(Camera* camera)
 {
+	camera_ = camera;
 	SetupDraw();
 
 	Random::SeedEngine();
 
 	for (uint32_t index = 0; index < kNumMaxInstances; ++index)
 	{
-		// Use origin translate when initializing particles (no local Emitter here)
 		particles.push_back(MakeNewParticles(randomEngine, Vector3{0.0f, 0.0f, 0.0f}));
 	}
 
@@ -63,6 +65,53 @@ void ParticleManager::Initialize()
 
 	// Draw で利用する GPU ハンドルを保持
 	instancingSrvHandleGPU = srvManager->GetGPUDescriptorHandle(instancingSrvIndex_);
+}
+
+void ParticleManager::Update(float deltaTime)
+{
+	numInstance = 0;
+	writeIndex = 0;
+
+	Matrix4x4 backToFrontMatrix = MakeRotateYMatrix(0.0f);
+	Matrix4x4 billboardMatrix = Multiply(backToFrontMatrix, camera_->GetWorldMatrix());
+	billboardMatrix.m[3][0] = 0.0f;
+	billboardMatrix.m[3][1] = 0.0f;
+	billboardMatrix.m[3][2] = 0.0f;
+
+	Matrix4x4 viewProjection = Multiply(camera_->GetViewMatrix(), camera_->GetProjectionMatrix());
+
+	auto it = particles.begin();
+	while (it != particles.end())
+	{
+		it->currentTime += deltaTime;
+
+		if (it->currentTime >= it->lifeTime)
+		{
+			it = particles.erase(it);
+			continue;
+		}
+
+		Matrix4x4 worldMatrix = MakeAffineMatrix(
+			it->transform.GetScale(), billboardMatrix, it->transform.GetTranslate());
+		Matrix4x4 wvpMatrix = Multiply(
+			worldMatrix, Multiply(camera_->GetViewMatrix(), camera_->GetProjectionMatrix()));
+
+		if (writeIndex < kNumMaxInstances)
+		{
+			instanceData[writeIndex].WVP = wvpMatrix;
+			instanceData[writeIndex].World = worldMatrix;
+			instanceData[writeIndex].color = it->color;
+			float alpha = 1.0f - (it->currentTime / it->lifeTime);
+			instanceData[writeIndex].color.w = alpha;
+			++writeIndex;
+		}
+
+		it->transform.SetTranslate(
+			it->transform.GetTranslate() + it->velocity * deltaTime);
+
+		++it;
+	}
+	numInstance = writeIndex;
 }
 
 ParticleManager::Particle ParticleManager::MakeNewParticles(std::mt19937& randomEngine, const Vector3& translate)
@@ -218,23 +267,23 @@ void ParticleManager::InputLayer()
 {
 	//InputLayer
 
-	inputElementDescs[0].SemanticName = "POSITION"; //セマンティック名
-	inputElementDescs[0].SemanticIndex = 0; //セマンティックインデックス
-	inputElementDescs[0].Format = DXGI_FORMAT_R32G32B32A32_FLOAT; //頂点のフォーマット
-	inputElementDescs[0].AlignedByteOffset = D3D12_APPEND_ALIGNED_ELEMENT;
+	inputElementDiscs[0].SemanticName = "POSITION"; //セマンティック名
+	inputElementDiscs[0].SemanticIndex = 0; //セマンティックインデックス
+	inputElementDiscs[0].Format = DXGI_FORMAT_R32G32B32A32_FLOAT; //頂点のフォーマット
+	inputElementDiscs[0].AlignedByteOffset = D3D12_APPEND_ALIGNED_ELEMENT;
 
-	inputElementDescs[1].SemanticName = "TEXCOORD";
-	inputElementDescs[1].SemanticIndex = 0;
-	inputElementDescs[1].Format = DXGI_FORMAT_R32G32_FLOAT;
-	inputElementDescs[1].AlignedByteOffset = D3D12_APPEND_ALIGNED_ELEMENT;
+	inputElementDiscs[1].SemanticName = "TEXCOORD";
+	inputElementDiscs[1].SemanticIndex = 0;
+	inputElementDiscs[1].Format = DXGI_FORMAT_R32G32_FLOAT;
+	inputElementDiscs[1].AlignedByteOffset = D3D12_APPEND_ALIGNED_ELEMENT;
 
-	inputElementDescs[2].SemanticName = "NORMAL";
-	inputElementDescs[2].SemanticIndex = 0;
-	inputElementDescs[2].Format = DXGI_FORMAT_R32G32B32_FLOAT;
-	inputElementDescs[2].AlignedByteOffset = D3D12_APPEND_ALIGNED_ELEMENT;
+	inputElementDiscs[2].SemanticName = "NORMAL";
+	inputElementDiscs[2].SemanticIndex = 0;
+	inputElementDiscs[2].Format = DXGI_FORMAT_R32G32B32_FLOAT;
+	inputElementDiscs[2].AlignedByteOffset = D3D12_APPEND_ALIGNED_ELEMENT;
 
-	inputLayoutDesc.pInputElementDescs = inputElementDescs; //入力要素の配列
-	inputLayoutDesc.NumElements = _countof(inputElementDescs); //入力要素の数
+	inputLayoutDesc.pInputElementDescs = inputElementDiscs; //入力要素の配列
+	inputLayoutDesc.NumElements = _countof(inputElementDiscs); //入力要素の数
 }
 
 void ParticleManager::InitializeBlend()

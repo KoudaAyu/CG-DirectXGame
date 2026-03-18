@@ -33,7 +33,7 @@ void GamePlayScene::Finalize()
 
 void GamePlayScene::Update()
 {
-
+	
 }
 
 void GamePlayScene::Draw()

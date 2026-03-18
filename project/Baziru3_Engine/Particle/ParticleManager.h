@@ -10,6 +10,8 @@
 
 class ParticleEmitter;
 
+class Camera;
+
 class ParticleManager
 {
 public:
@@ -35,7 +37,8 @@ public:
 	ParticleManager(std::ostream& logStream, DirectXCom* dxCommon);
 	~ParticleManager();
 
-	void Initialize();
+	void Initialize(Camera* camera);
+	void Update(float deltaTime);
 
 	Particle MakeNewParticles(std::mt19937& randomEngine,const Vector3& translate);
 
@@ -115,12 +118,17 @@ public:
 
 	D3D12_GPU_DESCRIPTOR_HANDLE GetInstancingSrvHandleGPU() const { return instancingSrvHandleGPU; }
 
+	uint32_t GetNumInstance() const { return numInstance; }
+
 private:
 	const uint32_t kNumMaxInstances = 10;
-
+	uint32_t numInstance = 0;
+	uint32_t writeIndex = 0;
 
 private:
 	DirectXCom* dxCommon = nullptr;
+
+	Camera* camera_ = nullptr;
 
 	D3D12_ROOT_SIGNATURE_DESC descriptionRootSignature{};
 	D3D12_DESCRIPTOR_RANGE descriptorRangeForInstancing[2] = {};
@@ -130,7 +138,7 @@ private:
 	Microsoft::WRL::ComPtr<ID3DBlob> errorBlob = nullptr;
 	Microsoft::WRL::ComPtr<ID3D12RootSignature> rootSignature = nullptr;
 	D3D12_BLEND_DESC blendDesc{};
-	D3D12_INPUT_ELEMENT_DESC inputElementDescs[3] = {};
+	D3D12_INPUT_ELEMENT_DESC inputElementDiscs[3] = {};
 	D3D12_INPUT_LAYOUT_DESC inputLayoutDesc{};
 	D3D12_RASTERIZER_DESC rasterizerDesc{};
 	Microsoft::WRL::ComPtr<IDxcBlob> vertexShaderBlob;

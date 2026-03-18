@@ -52,8 +52,7 @@ void Game::Initialize()
 	object3d_ = std::make_unique<Object3d>();
 	object3d_->Initialize(object3dCom.get());
 
-	particleManager = std::make_unique<ParticleManager>(logStream, directXCom.get());
-	particleManager->Initialize();
+	
 #pragma endregion 最初のシーン終了
 
 	//パイプラインステートの生成に失敗した場合はエラー
@@ -81,6 +80,9 @@ void Game::Initialize()
 
 	camera_ = std::make_unique<Camera>();
 	camera_->Initialize(directXCom.get());
+
+	particleManager = std::make_unique<ParticleManager>(logStream, directXCom.get());
+	particleManager->Initialize(camera_.get());
 
 	//Transform変数を作る
 	Sprite::Transform transform = { {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };
@@ -250,56 +252,17 @@ void Game::Update()
 	sphere_->SetTransform(transformSphere);
 	sphere_->Update(camera_->GetWorldMatrix(), camera_->GetProjectionMatrix());
 
-	numInstance = 0;
-
+	
+	//パーティクルの更新
 	emitter.frequencyTime += kDeltaTime;
+
 	if (emitter.frequencyTime >= emitter.frequency)
 	{
 		particles.splice(particles.end(), particleEmitter.Emit(emitter, particleManager->GetRandomEngine(), *particleManager));
 		emitter.frequencyTime -= emitter.frequency;
 	}
-	{
-		uint32_t writeIndex = 0;
-		for (auto it = particles.begin(); it != particles.end(); ++it)
-		{
-			ParticleManager::Particle& p = *it;
-			p.currentTime += kDeltaTime;
 
-			if (p.currentTime >= p.lifeTime)
-			{
-				continue;
-			}
-
-			Matrix4x4 backToFrontMatrix = MakeRotateYMatrix(0.0f);
-			Matrix4x4 billboardMatrix = Multiply(backToFrontMatrix, camera_->GetWorldMatrix());
-			billboardMatrix.m[3][0] = 0.0f;
-			billboardMatrix.m[3][1] = 0.0f;
-			billboardMatrix.m[3][2] = 0.0f;
-
-			Matrix4x4 ParticleWorldMatrix = MakeAffineMatrix(
-				p.transform.GetScale(), billboardMatrix, p.transform.GetTranslate());
-			Matrix4x4 ParticleViewProjectMatrix = Multiply(
-				ParticleWorldMatrix, Multiply(camera_->GetViewMatrix(), camera_->GetProjectionMatrix()));
-
-			if (writeIndex < particleManager->GetNumMaxInstances())
-			{
-				particleManager->GetInstanceData()[writeIndex].WVP = ParticleViewProjectMatrix;
-				particleManager->GetInstanceData()[writeIndex].World = ParticleWorldMatrix;
-				particleManager->GetInstanceData()[writeIndex].color = p.color;
-				float alpha = 1.0f - (p.currentTime / p.lifeTime);
-				particleManager->GetInstanceData()[writeIndex].color.w = alpha;
-				++writeIndex;
-			}
-
-			p.transform.SetTranslate(
-				p.transform.GetTranslate() + p.velocity * kDeltaTime);
-		}
-		numInstance = writeIndex;
-	}
-
-	//開発用UIの処理、実際に開発用のUIを出す場合はここをゲーム固有の処理に置き換え
-
-
+	particleManager->Update(kDeltaTime);
 
 #ifdef _DEBUG
 
@@ -507,9 +470,9 @@ void Game::Draw()
 	}
 
 	/*commandList->DrawIndexedInstanced(kIndexCount, 1, 0, 0, 0);*/
-	if (numInstance > 0)
+	if (particleManager->GetNumInstance() > 0)
 	{
-		directXCom->GetCommandList()->DrawInstanced(UINT(modelData.vertices.size()), numInstance, 0, 0);
+		directXCom->GetCommandList()->DrawInstanced(UINT(modelData.vertices.size()), particleManager->GetNumInstance(), 0, 0);
 	}
 
 	//実際のcommandListのImGuiの描画コマンドを積む
