@@ -13,6 +13,7 @@ public:
 	static TextureManager* GetInstance();
 	static void Destroy();
 
+	~TextureManager() = default;
 	//終了
 	void Finalize();
 
@@ -22,12 +23,12 @@ public:
 	void LoadTexture(const std::string& filePath);
 
 	// DirectXCom を設定するためのセッターを追加
-	void SetDirectXCom(DirectXCom* directXCom) { directXCom_ = directXCom; }
+	void SetDirectXCom(DirectXCom* directXCom);
 
-	// 追加: SRVManager へのアクセサ（SRV インデックス管理を一元化するため）
+	// SRVManager へのアクセサ（SRV インデックス管理を一元化するため）
 	SRVManager* GetSRVManager() const { return srvManager_.get(); }
 
-	// 追加: ファイルパスからSRVインデックスを取得（見つからなければ -1）
+	// ファイルパスからSRVインデックスを取得（見つからなければ -1）
 	uint32_t GetTextureIndexByFilePath(const std::string& filePath) const;
 
 	//メタデータ取得 (オーバーロード: ファイルパスまたはインデックスで取得可能)
@@ -47,12 +48,15 @@ public:
 	}
 	D3D12_GPU_DESCRIPTOR_HANDLE GetSrvHandleGPU(uint32_t index) const;
 
+	uint32_t Load(const std::string& filePath);
+
+	static constexpr uint32_t kInvalidTextureIndex = UINT32_MAX;
+
 private:
 	std::unique_ptr<SRVManager> srvManager_ = nullptr;
 
 	TextureManager() = default;
-public:
-	~TextureManager() = default; // Made public so unique_ptr can delete
+
 private:
 	TextureManager(TextureManager&) = delete;
 	TextureManager& operator=(TextureManager&) = delete;
@@ -66,12 +70,15 @@ private:
 		uint32_t srvIndex_;
 		D3D12_CPU_DESCRIPTOR_HANDLE srvHandleCPU_{};
 		D3D12_GPU_DESCRIPTOR_HANDLE srvHandleGPU_{};
+		// 保持: アップロード用中間バッファを保持しておき、GPUがコピーを終えるまで破棄しない
+		Microsoft::WRL::ComPtr<ID3D12Resource> uploadIntermediate_;
+
 	};
 
 	//テクスチャデータ
 	std::unordered_map<std::string,TextureData> textureDates_;
 
-	// 追加: SRVインデックスからファイルパスを引ける逆引きマップ (O(1) 検索)
+	// SRVインデックスからファイルパスを引ける逆引きマップ (O(1) 検索)
 	std::unordered_map<uint32_t, std::string> indexToFilePath_;
 
 	DirectXCom* directXCom_ = nullptr;

@@ -1,6 +1,8 @@
 #include"Game.h"
 
 #include <combaseapi.h>
+#include <sstream>
+#include <iomanip>
 
 #ifdef USE_IMGUI
 #include <imgui.h>
@@ -25,11 +27,10 @@ void Game::Initialize()
 
 	SceneManager::GetInstance()->SetDirectXCom(directXCom.get());
 
-	// TextureManager は SRV ヒープに依存するので DX 初期化の後に初期化
 	TextureManager::GetInstance()->Initialize();
 	TextureManager::GetInstance()->SetDirectXCom(directXCom.get());
 	// 作業ディレクトリが project/ である前提の相対パスを使う
-	TextureManager::GetInstance()->LoadTexture("Resources/uvChecker.png");
+	//TextureManager::GetInstance()->LoadTexture("Resources/uvChecker.png");
 
 	spriteCom = std::make_unique<SpriteCom>(logStream, directXCom.get());
 	spriteCom->Initialize();
@@ -56,8 +57,6 @@ void Game::Initialize()
 
 	//パイプラインステートの生成に失敗した場合はエラー
 	assert(SUCCEEDED(GetDirectXCom()->GetHr()));
-
-
 
 	//モデル読み込み
 	modelData = object3d_->LoadObjFile("Resources", "plane.obj");
@@ -101,47 +100,26 @@ void Game::Initialize()
 		{0.0f, 0.0f, 0.0f}
 	};
 
-	//uvTransform行列の初期化
-	//materialData->uvTransform = MakeIdentity4x4();
+	uint32_t srvIndexUvChecker = TextureManager::GetInstance()->Load("Resources/uvChecker.png");
+	uint32_t srvIndexModelTex = TextureManager::GetInstance()->Load(modelData.material.textureFilePath);
+	textureSrvHandleGPU = TextureManager::GetInstance()->GetSrvHandleGPU(srvIndexUvChecker);
+	textureSrvHandleGPU2 = TextureManager::GetInstance()->GetSrvHandleGPU(srvIndexModelTex);
 
-	//Textureを読んで転送する
-	DirectX::ScratchImage mipImages = directXCom->LoadTexture("./Resources/uvChecker.png");
-	const DirectX::TexMetadata& metadata = mipImages.GetMetadata();
-	textureResource = directXCom->CreateTextureResource(metadata);
-
-	//2枚目のTextureを読んで転送する
-	DirectX::ScratchImage mipImages2 = directXCom->LoadTexture(modelData.material.textureFilePath);
-	const DirectX::TexMetadata& metadata2 = mipImages2.GetMetadata();
-	textureResource2 = directXCom->CreateTextureResource(metadata2);
-
-	intermediateResource = directXCom->UploadTextureData(textureResource, mipImages, directXCom->GetDevice().Get(), directXCom->GetCommandList());
-	intermediateResource2 = directXCom->UploadTextureData(textureResource2, mipImages2, directXCom->GetDevice().Get(), directXCom->GetCommandList());
-
-	// SRV は SRVManager 経由で確保・作成する
-	SRVManager* srvManager = TextureManager::GetInstance()->GetSRVManager();
-	assert(srvManager);
-
-	// ImGui 用に 0 番を空ける設計なので、SRVManager::Allocate は 1 以降を返す前提
-	uint32_t srvIndexUvChecker = srvManager->Allocate();
-	uint32_t srvIndexModelTex = srvManager->Allocate();
-
-	srvManager->CreateSRVForTexture2D(
-		srvIndexUvChecker,
-		textureResource.Get(),
-		metadata.format,
-		static_cast<UINT>(metadata.mipLevels));
-
-	srvManager->CreateSRVForTexture2D(
-		srvIndexModelTex,
-		textureResource2.Get(),
-		metadata2.format,
-		static_cast<UINT>(metadata2.mipLevels));
-
-	// 後の Draw で使うのは GPU ハンドルだけなので、それを保存しておく
-	textureSrvHandleGPU = srvManager->GetGPUDescriptorHandle(srvIndexUvChecker);
-	textureSrvHandleGPU2 = srvManager->GetGPUDescriptorHandle(srvIndexModelTex);
-
-
+	// Debug: output indices and handles stored in Game
+	{
+		std::ostringstream oss;
+		oss << "Game::Initialize - srvIndexUvChecker=" << std::dec << srvIndexUvChecker << " srvIndexModelTex=" << srvIndexModelTex << "\n";
+		oss << "Game::Initialize - textureSrvHandleGPU=0x" << std::hex << (unsigned long long)textureSrvHandleGPU.ptr << " textureSrvHandleGPU2=0x" << (unsigned long long)textureSrvHandleGPU2.ptr << std::dec << "\n";
+		// Also log directXCom handle computation to cross-check
+		auto directHandle1 = directXCom->GetSRVHandleGPU(srvIndexUvChecker);
+		auto directHandle2 = directXCom->GetSRVHandleGPU(srvIndexModelTex);
+		oss << "DirectXCom::GetSRVHandleGPU computed: handle1=0x" << std::hex << (unsigned long long)directHandle1.ptr << " handle2=0x" << (unsigned long long)directHandle2.ptr << std::dec << "\n";
+		if (srvIndexUvChecker == srvIndexModelTex)
+		{
+			oss << "Warning: srvIndexUvChecker == srvIndexModelTex (duplicate index)\n";
+		}
+		OutputDebugStringA(oss.str().c_str());
+	}
 
 	//音声読み込み
 	sound_ = std::make_unique<Sound>();
@@ -155,22 +133,8 @@ void Game::Initialize()
 
 	object3dCom->SetDefaultCamera(camera_.get());
 
-	
-
-	//emitter.transform.SetTranslate({ 0.0f,0.0f,0.0f });
-	//emitter.transform.SetRotate({ 0.0f,0.0f,0.0f });
-	//emitter.transform.SetScale({ 1.0f,1.0f,1.0f });
-
-	//emitter.count = 3; // 初期値
-	//emitter.frequency = 0.5f;
-	//emitter.frequencyTime = 0.0f;
-
-
-
 	imguiManager = std::make_unique<ImGuiManager>();
 	imguiManager->Initialize(windowAPI.get(), directXCom.get());
-
-
 
 	SceneRegistration::RegisterScenes();
 	SceneManager::GetInstance()->SetCamera(camera_.get());
@@ -255,7 +219,6 @@ void Game::Update()
 	spriteManager_->Update(windowAPI.get(), &debugCamera_, uiSpritePosition, uvTransformSprite);
 	
 	
-
 #ifdef _DEBUG
 
 	ImGui::ShowDemoWindow();
@@ -403,6 +366,13 @@ void Game::Draw()
 
 	//Objectの描画
 
+	// Debug: log handle before object draw
+	{
+		std::ostringstream oss;
+		oss << "Game::Draw - object texture handle (selected) = 0x" << std::hex << (unsigned long long)(useMonsterBall ? textureSrvHandleGPU2.ptr : textureSrvHandleGPU.ptr) << std::dec << "\n";
+		OutputDebugStringA(oss.str().c_str());
+	}
+
 	directXCom->GetCommandList()->IASetVertexBuffers(0, 1, &model_->GetVertexBufferView());
 	// Note: object draw uses non-indexed DrawInstanced, so do not set an index buffer here
 	directXCom->GetCommandList()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
@@ -437,6 +407,13 @@ void Game::Draw()
 	directXCom->GetCommandList()->SetGraphicsRootSignature(particleManager->GetRootSignature().Get());
 	directXCom->GetCommandList()->SetPipelineState(particleManager->GetPipelineState().Get()); // パイプラインステートを設定
 	//Objectの描画
+
+	// Debug: log handle before particle draw
+	{
+		std::ostringstream oss;
+		oss << "Game::Draw - particle texture handle (selected) = 0x" << std::hex << (unsigned long long)(useMonsterBall ? textureSrvHandleGPU2.ptr : textureSrvHandleGPU.ptr) << std::dec << "\n";
+		OutputDebugStringA(oss.str().c_str());
+	}
 
 	directXCom->GetCommandList()->IASetVertexBuffers(0, 1, &model_->GetVertexBufferView());
 	// Particle draw uses non-indexed DrawInstanced, so do not set an index buffer here

@@ -34,8 +34,14 @@ void Sprite::Initialize(SpriteCom* spriteCom, std::string textureFilePath)
 	transformationMatrixDataSprite->WVP = MakeIdentity4x4();
 	transformationMatrixDataSprite->World = MakeIdentity4x4();
 	
-	textureIndex = TextureManager::GetInstance()->GetTextureIndexByFilePath(textureFilePath);
+	uint32_t index = TextureManager::GetInstance()->Load(textureFilePath);
 
+	assert(index != TextureManager::kInvalidTextureIndex);
+
+	textureIndex = index;
+
+	textureHandleGPU = TextureManager::GetInstance()->GetSrvHandleGPU(textureIndex);
+	
 	AdjustTextureSize();
 }
 
@@ -94,7 +100,7 @@ void Sprite::Draw()
 	dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(0, materialResourceSprite->GetGPUVirtualAddress());
 	dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(1, transformationMatrixResourceSprite->GetGPUVirtualAddress());
 	if (textureHandleGPU.ptr != 0) {
-		dxCommon->GetCommandList()->SetGraphicsRootDescriptorTable(2, TextureManager::GetInstance()->GetSrvHandleGPU(textureIndex));
+		dxCommon->GetCommandList()->SetGraphicsRootDescriptorTable(2, textureHandleGPU);
 	}
 	if (directionalLightResource) {
 		dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(3, directionalLightResource->GetGPUVirtualAddress());

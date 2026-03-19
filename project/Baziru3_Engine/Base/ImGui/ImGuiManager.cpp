@@ -2,6 +2,7 @@
 #include"WindowsAPI.h"
 #include"DirectXCom.h"
 #include"SRVManager.h"
+#include"../../2D/Texture/TextureManager.h"
 #include <memory>
 
 #ifdef USE_IMGUI
@@ -10,13 +11,17 @@
 #include <imgui_impl_dx12.h>
 #endif
 
-static std::unique_ptr<SRVManager> g_srvManager;
+// g_srvManagerOwned owns an SRVManager only if ImGui creates one itself.
+static std::unique_ptr<SRVManager> g_srvManagerOwned;
+// g_srvManager points to the SRVManager to use (either owned or from TextureManager)
+static SRVManager* g_srvManager = nullptr;
 
 ImGuiManager::~ImGuiManager()
 {
 #ifdef USE_IMGUI
-   
-    g_srvManager.reset();
+    // Only destroy owned manager; if we're using TextureManager's SRVManager do not free it
+    g_srvManagerOwned.reset();
+    g_srvManager = nullptr;
 #endif
 
 }
@@ -24,8 +29,6 @@ ImGuiManager::~ImGuiManager()
 void ImGuiManager::Initialize([[maybe_unused]]WindowAPI* windowAPI, [[maybe_unused]]DirectXCom* dxCommon)
 {
 #ifdef USE_IMGUI
-
-
 
 	this->windowAPI = windowAPI;
 	this->dxCommon = dxCommon;
@@ -41,11 +44,47 @@ void ImGuiManager::Initialize([[maybe_unused]]WindowAPI* windowAPI, [[maybe_unus
 	//DirectX12用の初期化情報
 	ImGui_ImplDX12_InitInfo initInfo = {};
 
+	// Prefer using TextureManager's SRVManager if available to avoid duplicate SRVManagers
+	if (TextureManager::GetInstance())
+	{
+		SRVManager* texSrvMgr = TextureManager::GetInstance()->GetSRVManager();
+		if (texSrvMgr)
+		{
+			g_srvManager = texSrvMgr;
+			// log selection
+			{
+				std::ostringstream oss;
+				oss << "ImGuiManager::Initialize - using TextureManager's SRVManager (this=0x" << std::hex << (unsigned long long)(uintptr_t)g_srvManager << ")\n";
+				OutputDebugStringA(oss.str().c_str());
+			}
+		}
+		else
+		{
+			// If TextureManager exists but has not yet created its SRVManager, request it to initialize one
+			TextureManager::GetInstance()->SetDirectXCom(dxCommon);
+			texSrvMgr = TextureManager::GetInstance()->GetSRVManager();
+			if (texSrvMgr)
+			{
+				g_srvManager = texSrvMgr;
+				std::ostringstream oss;
+				oss << "ImGuiManager::Initialize - forced TextureManager to create SRVManager (this=0x" << std::hex << (unsigned long long)(uintptr_t)g_srvManager << ")\n";
+				OutputDebugStringA(oss.str().c_str());
+			}
+		}
+	}
 
 	if (!g_srvManager)
 	{
-		g_srvManager = std::make_unique<SRVManager>();
-		g_srvManager->Initialize(dxCommon);
+		// Create and initialize our own SRVManager
+		g_srvManagerOwned = std::make_unique<SRVManager>();
+		g_srvManagerOwned->Initialize(dxCommon);
+		g_srvManager = g_srvManagerOwned.get();
+		// log creation
+		{
+			std::ostringstream oss;
+			oss << "ImGuiManager::Initialize - created owned SRVManager (this=0x" << std::hex << (unsigned long long)(uintptr_t)g_srvManager << ")\n";
+			OutputDebugStringA(oss.str().c_str());
+		}
 	}
 
 	//初期化情報の設定
@@ -70,7 +109,8 @@ void ImGuiManager::Initialize([[maybe_unused]]WindowAPI* windowAPI, [[maybe_unus
 	initInfo.SrvDescriptorFreeFn = [](ImGui_ImplDX12_InitInfo* info, D3D12_CPU_DESCRIPTOR_HANDLE cpu_handle,
 	D3D12_GPU_DESCRIPTOR_HANDLE gpu_handle)
 		{
-			//SRVManagerに解放機能を作っていないため、ここでは何も記載しない。
+			//SRVManager::Free is available but requires index; ImGui does not provide index here.
+			//We don't free here. If necessary, implement handle->index mapping in SRVManager.
 		};
 
 	ImGui_ImplDX12_Init(&initInfo);

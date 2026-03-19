@@ -69,7 +69,7 @@ void ParticleManager::Initialize(Camera* camera)
 
 void ParticleManager::AddParticles(std::list<Particle>& newParticles)
 {
-	// Append newParticles into internal list
+	
 	for (auto& p : newParticles)
 	{
 		particles.push_back(std::move(p));

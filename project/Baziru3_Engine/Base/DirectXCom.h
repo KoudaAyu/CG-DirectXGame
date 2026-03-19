@@ -94,6 +94,8 @@ public:
 
 	void PostDraw();
 
+	void ExecuteAndWaitForGPU();
+
 	Microsoft::WRL::ComPtr<IDxcBlob> CompileShader(
 		//CompilerするShaderファイルへのパス
 		const std::wstring& filePath,

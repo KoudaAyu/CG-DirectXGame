@@ -455,8 +455,8 @@ void DirectXCom::PreDraw()
 	commandList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 
 	//描画用のDescriptorHeapの設定
-	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> descriptorHeap[] = { srvDescriptorHeap.Get() };
-	commandList->SetDescriptorHeaps(1, descriptorHeap->GetAddressOf());
+	ID3D12DescriptorHeap* descriptorHeaps[] = { srvDescriptorHeap.Get() };
+	commandList->SetDescriptorHeaps(1, descriptorHeaps);
 
 	//コマンドを積む
 	commandList->RSSetViewports(1, &viewport); //ビューポートを設定
@@ -516,6 +516,32 @@ void DirectXCom::PostDraw()
 	//コマンドリストのリセットに失敗した場合はエラー
 	assert(SUCCEEDED(hr));
 
+}
+
+void DirectXCom::ExecuteAndWaitForGPU()
+{
+    // Close command list
+    hr = commandList->Close();
+    assert(SUCCEEDED(hr));
+
+    // Execute
+    ID3D12CommandList* lists[] = { commandList.Get() };
+    commandQueue->ExecuteCommandLists(1, lists);
+
+    // Signal and wait
+    fenceValue++;
+    commandQueue->Signal(fence.Get(), fenceValue);
+    if (fence->GetCompletedValue() < fenceValue)
+    {
+        fence->SetEventOnCompletion(fenceValue, fenceEvent);
+        WaitForSingleObject(fenceEvent, INFINITE);
+    }
+
+    // Reset allocator and list for further recording
+    hr = commandAllocator->Reset();
+    assert(SUCCEEDED(hr));
+    hr = commandList->Reset(commandAllocator.Get(), nullptr);
+    assert(SUCCEEDED(hr));
 }
 
 Microsoft::WRL::ComPtr<IDxcBlob> DirectXCom::CompileShader(const std::wstring& filePath, const wchar_t* profile, Microsoft::WRL::ComPtr<IDxcUtils> dxcUtils, Microsoft::WRL::ComPtr<IDxcCompiler3> dxcCompiler, Microsoft::WRL::ComPtr<IDxcIncludeHandler> includeHandler, std::ostream& logStream)

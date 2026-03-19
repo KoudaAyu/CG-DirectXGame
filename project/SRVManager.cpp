@@ -1,5 +1,7 @@
 #include"SRVManager.h"
 #include <cassert>
+#include <sstream>
+#include <Windows.h>
 
 const uint32_t SRVManager::kMaxSRVCount = 512;
 
@@ -17,9 +19,20 @@ void SRVManager::Initialize(DirectXCom* directXCom)
 	descriptorSize_ = directXCom_->GetDevice()->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
 	allocatedFlags_.assign(kMaxSRVCount, 0);
-	for (uint32_t i = kMaxSRVCount; i-- > 2;)
+	freeIndices_.clear();
+	// Fill freeIndices so that the first Allocate() returns index 3 (reserve 0..2)
+	for (uint32_t i = kMaxSRVCount - 1; ; --i)
 	{
 		freeIndices_.push_back(i);
+		if (i == 3) break;
+	}
+
+	// Debug: log descriptor heap GPU start and descriptor size and this pointer
+	{
+		D3D12_GPU_DESCRIPTOR_HANDLE gpuStart = descriptorHeap->GetGPUDescriptorHandleForHeapStart();
+		std::ostringstream oss;
+		oss << "SRVManager::Initialize (this=0x" << std::hex << (unsigned long long)(uintptr_t)this << ") - descriptorHeap GPU start=0x" << (unsigned long long)gpuStart.ptr << " descriptorSize=" << std::dec << descriptorSize_ << " firstFreeIndex=" << (freeIndices_.empty() ? 0 : freeIndices_.back()) << "\n";
+		OutputDebugStringA(oss.str().c_str());
 	}
 }
 
@@ -89,8 +102,42 @@ uint32_t SRVManager::Allocate()
 	uint32_t index = freeIndices_.back();
 	freeIndices_.pop_back();
 
-	//安全の溜めにフラグをセットする
+	//安全のためにフラグをセットする
 	allocatedFlags_[index] = 1;
+
+	// Debug log allocation with this pointer
+	{
+		std::ostringstream oss;
+		oss << "SRVManager::Allocate (this=0x" << std::hex << (unsigned long long)(uintptr_t)this << ") - index=" << std::dec << index << " remaining=" << freeIndices_.size() << "\n";
+		OutputDebugStringA(oss.str().c_str());
+	}
+
+	return index;
+}
+
+uint32_t SRVManager::AllocateAt(uint32_t index)
+{
+	if (index < 0 || index >= kMaxSRVCount) {
+		assert(false && "SRVManager::AllocateAt - invalid index");
+		return UINT32_MAX;
+	}
+	// If already allocated, error
+	if (allocatedFlags_[index]) {
+		assert(false && "SRVManager::AllocateAt - index already allocated");
+		return UINT32_MAX;
+	}
+
+	// Remove index from freeIndices_ if present
+	auto it = std::find(freeIndices_.begin(), freeIndices_.end(), index);
+	if (it != freeIndices_.end()) {
+		freeIndices_.erase(it);
+	}
+
+	allocatedFlags_[index] = 1;
+
+	std::ostringstream oss;
+	oss << "SRVManager::AllocateAt (this=0x" << std::hex << (unsigned long long)(uintptr_t)this << ") - index=" << std::dec << index << " remaining=" << freeIndices_.size() << "\n";
+	OutputDebugStringA(oss.str().c_str());
 
 	return index;
 }
@@ -113,4 +160,8 @@ void SRVManager::Free(uint32_t index)
 
 	allocatedFlags_[index] = 0;
 	freeIndices_.push_back(index);
+
+	std::ostringstream oss;
+	oss << "SRVManager::Free (this=0x" << std::hex << (unsigned long long)(uintptr_t)this << ") - index=" << std::dec << index << " remaining=" << freeIndices_.size() << "\n";
+	OutputDebugStringA(oss.str().c_str());
 }

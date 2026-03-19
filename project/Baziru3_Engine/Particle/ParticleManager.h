@@ -43,7 +43,6 @@ public:
 
 	Particle MakeNewParticles(std::mt19937& randomEngine,const Vector3& translate);
 
-	// Allow external code (eg. scenes) to add newly emitted particles into the manager
 	void AddParticles(std::list<Particle>& newParticles);
 
 	void RootSignature();

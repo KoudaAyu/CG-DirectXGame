@@ -19,6 +19,9 @@ public:
 
 	uint32_t Allocate();
 
+	// Allocate a specific index (useful for binding t0/t1 fixed slots)
+	uint32_t AllocateAt(uint32_t index);
+
 	void Free(uint32_t index);
 
 public:
