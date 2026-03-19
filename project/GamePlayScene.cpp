@@ -12,8 +12,10 @@ bool GamePlayScene::TryInitializeSphere()
 	object3dCom = SceneManager::GetInstance()->GetObject3dCom();
 	materialManager = SceneManager::GetInstance()->GetMaterialManager();
 	light = SceneManager::GetInstance()->GetLight();
+	particleManager = SceneManager::GetInstance()->GetParticleManager();
 	
-	if (!object3dCom || !materialManager || !light) return false;
+	// 必要な依存が揃っているか確認
+	if (!object3dCom || !materialManager || !light || !particleManager) return false;
 
 
 	sphere_ = std::make_unique<Sphere>();
@@ -36,8 +38,7 @@ void GamePlayScene::Initialize(DirectXCom* dxCommon,Camera* camera)
 
 	//スプライト共通テクスチャ読み込み
 
-	//スプライトの生成
-	
+	//スプライトの生成	
 	//OBJからモデルデータを読み込む
 
 	//3Dオブジェクトの生成
@@ -49,6 +50,18 @@ void GamePlayScene::Initialize(DirectXCom* dxCommon,Camera* camera)
 
 	//必要なら音声生成
 	sound->SoundPlayWave();
+
+	//パーティクルの初期化
+
+	//エミッターの数値
+
+	emitter.transform.SetTranslate({ 0.0f,0.0f,0.0f });
+	emitter.transform.SetRotate({ 0.0f,0.0f,0.0f });
+	emitter.transform.SetScale({ 1.0f,1.0f,1.0f });
+
+	emitter.count = 3; // 初期値
+	emitter.frequency = 0.5f;
+	emitter.frequencyTime = 0.0f;
 }
 
 void GamePlayScene::Finalize()
@@ -72,6 +85,17 @@ void GamePlayScene::Update()
 		sphere_->Update();
 	}
 
+	//パーティクルの更新
+	emitter.frequencyTime += kDeltaTime;
+
+	if (emitter.frequencyTime >= emitter.frequency)
+	{
+		auto newParticles = particleEmitter.Emit(emitter, particleManager->GetRandomEngine(), *particleManager);
+		particleManager->AddParticles(newParticles);
+		emitter.frequencyTime -= emitter.frequency;
+	}
+
+	particleManager->Update(kDeltaTime);
 }
 
 void GamePlayScene::Draw()

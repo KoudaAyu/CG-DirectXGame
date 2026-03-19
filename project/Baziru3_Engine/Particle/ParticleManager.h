@@ -7,6 +7,7 @@
 #include"Transform.h"
 #include"Log.h"
 #include"Random.h"
+#include <list>
 
 class ParticleEmitter;
 
@@ -41,6 +42,9 @@ public:
 	void Update(float deltaTime);
 
 	Particle MakeNewParticles(std::mt19937& randomEngine,const Vector3& translate);
+
+	// Allow external code (eg. scenes) to add newly emitted particles into the manager
+	void AddParticles(std::list<Particle>& newParticles);
 
 	void RootSignature();
 	void CreateGraphicsPipeline();

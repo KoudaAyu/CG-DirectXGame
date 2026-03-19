@@ -157,13 +157,13 @@ void Game::Initialize()
 
 	
 
-	emitter.transform.SetTranslate({ 0.0f,0.0f,0.0f });
-	emitter.transform.SetRotate({ 0.0f,0.0f,0.0f });
-	emitter.transform.SetScale({ 1.0f,1.0f,1.0f });
+	//emitter.transform.SetTranslate({ 0.0f,0.0f,0.0f });
+	//emitter.transform.SetRotate({ 0.0f,0.0f,0.0f });
+	//emitter.transform.SetScale({ 1.0f,1.0f,1.0f });
 
-	emitter.count = 3; // 初期値
-	emitter.frequency = 0.5f;
-	emitter.frequencyTime = 0.0f;
+	//emitter.count = 3; // 初期値
+	//emitter.frequency = 0.5f;
+	//emitter.frequencyTime = 0.0f;
 
 
 
@@ -255,18 +255,6 @@ void Game::Update()
 	spriteManager_->Update(windowAPI.get(), &debugCamera_, uiSpritePosition, uvTransformSprite);
 	
 	
-	
-	
-	//パーティクルの更新
-	emitter.frequencyTime += kDeltaTime;
-
-	if (emitter.frequencyTime >= emitter.frequency)
-	{
-		particles.splice(particles.end(), particleEmitter.Emit(emitter, particleManager->GetRandomEngine(), *particleManager));
-		emitter.frequencyTime -= emitter.frequency;
-	}
-
-	particleManager->Update(kDeltaTime);
 
 #ifdef _DEBUG
 
@@ -396,11 +384,11 @@ void Game::Update()
 
 	inputManager.Update();
 
-	// ImGuiを使わずにSpaceキーでパーティクルを追加
-	if (inputManager.TriggerKey(DIK_SPACE))
-	{
-		particles.splice(particles.end(), ParticleEmitter{}.Emit(emitter, particleManager->GetRandomEngine(), *particleManager));
-	}
+	//// ImGuiを使わずにSpaceキーでパーティクルを追加
+	//if (inputManager.TriggerKey(DIK_SPACE))
+	//{
+	//	particles.splice(particles.end(), ParticleEmitter{}.Emit(emitter, particleManager->GetRandomEngine(), *particleManager));
+	//}
 }
 void Game::Draw()
 {
@@ -445,7 +433,7 @@ void Game::Draw()
 		spriteManager_->Draw();
 	}
 
-	//RootSignatureを設定。PSOに設定しているけれど別途設定が必要
+	
 	directXCom->GetCommandList()->SetGraphicsRootSignature(particleManager->GetRootSignature().Get());
 	directXCom->GetCommandList()->SetPipelineState(particleManager->GetPipelineState().Get()); // パイプラインステートを設定
 	//Objectの描画

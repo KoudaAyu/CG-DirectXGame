@@ -100,7 +100,7 @@ private:
 	SRVManager srvManager;
 	std::list<ParticleManager::Particle> particles;
 	ParticleEmitter particleEmitter;
-	Emitter emitter;
+	//Emitter emitter;
 	KeyInput inputManager;
 	std::unique_ptr<Sound> sound_;
 	std::unique_ptr<MaterialManager> materialManager_;
