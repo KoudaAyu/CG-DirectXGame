@@ -50,6 +50,12 @@ public:
 
 	uint32_t Load(const std::string& filePath);
 
+	// 便利ヘルパー: 作業ディレクトリ基準の単純ロード
+	static uint32_t LoadTextureHandle(const std::string& filePath)
+	{
+		return GetInstance()->Load(filePath);
+	}
+
 	static constexpr uint32_t kInvalidTextureIndex = UINT32_MAX;
 
 private:

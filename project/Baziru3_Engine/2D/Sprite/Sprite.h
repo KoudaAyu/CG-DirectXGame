@@ -7,6 +7,7 @@
 #include"Vector.h"
 
 class SpriteCom;
+class TextureManager;
 
 class Sprite
 {
@@ -38,6 +39,11 @@ public:
 	void CreateIndexData();
 
 	void ReflectionProcessing();
+
+	// インデックスから生成する簡易ヘルパー
+	static Sprite* Create(SpriteCom* spriteCom,
+		uint32_t textureHandle,
+		const Vector2& position);
 
 public:
 

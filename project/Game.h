@@ -2,6 +2,7 @@
 
 #include <memory>
 
+#include"AudioManager.h"
 #include"Camera.h"
 #include"CrashDump.h"
 #include"DirectXCom.h"
@@ -101,12 +102,12 @@ private:
 	std::list<ParticleManager::Particle> particles;
 	ParticleEmitter particleEmitter;
 	KeyInput inputManager;
-	std::unique_ptr<Sound> sound_;
+	std::unique_ptr<AudioManager> audioManager_;
 	std::unique_ptr<MaterialManager> materialManager_;
 private:
 	std::vector<std::unique_ptr<Sprite>>sprites;
 	Sprite::Transform transformObject;
-	Sprite::Transform uvTransformSprite;
+	//Sprite::Transform uvTransformSprite;
 	
 	Sprite::Transform cameraTransform;
 
@@ -141,8 +142,8 @@ private:
 	Microsoft::WRL::ComPtr<ID3D12Resource> intermediateResource2;
 	//Microsoft::WRL::ComPtr<ID3D12Resource> instancingResource;
 
-	// UI controlled sprite position (initial 100,100)
-	Vector2 uiSpritePosition = { 100.0f, 100.0f };
+
+	
 
 };
 

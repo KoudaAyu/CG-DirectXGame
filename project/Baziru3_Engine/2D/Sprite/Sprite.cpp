@@ -45,6 +45,41 @@ void Sprite::Initialize(SpriteCom* spriteCom, std::string textureFilePath)
 	AdjustTextureSize();
 }
 
+Sprite* Sprite::Create(SpriteCom* spriteCom, uint32_t textureHandle, const Vector2& position)
+{
+	Sprite* sprite = new Sprite();
+	// 既存 Initialize とほぼ同じ初期化を行うが、テクスチャはインデックスから設定する
+	sprite->spriteCom = spriteCom;
+	assert(spriteCom);
+	sprite->dxCommon = spriteCom->GetDxCommon();
+	assert(sprite->dxCommon);
+
+	sprite->CreateVertexBufferView();
+	sprite->CreateIndexBufferView();
+	sprite->CreateVertexData();
+	sprite->ReflectionProcessing();
+	sprite->CreateIndexData();
+
+	sprite->materialResourceSprite = sprite->dxCommon->CreateBufferResource(sprite->dxCommon->GetDevice().Get(), sizeof(Material));
+	sprite->materialResourceSprite->Map(0, nullptr, reinterpret_cast<void**>(&sprite->materialData));
+	sprite->materialData->color = { 1.0f, 1.0f, 1.0f, 1.0f };
+	sprite->materialData->enableLighting = false;
+	sprite->materialData->uvTransform = MakeIdentity4x4();
+
+	sprite->transformationMatrixResourceSprite = sprite->dxCommon->CreateBufferResource(sprite->dxCommon->GetDevice().Get(), sizeof(TransformationMatrix));
+	sprite->transformationMatrixResourceSprite->Map(0, nullptr, reinterpret_cast<void**>(&sprite->transformationMatrixDataSprite));
+	sprite->transformationMatrixDataSprite->WVP = MakeIdentity4x4();
+	sprite->transformationMatrixDataSprite->World = MakeIdentity4x4();
+
+	// テクスチャハンドルを直接設定
+	sprite->textureHandleGPU = TextureManager::GetInstance()->GetSrvHandleGPU(textureHandle);
+	sprite->textureIndex = textureHandle;
+
+	sprite->SetPosition(position);
+	sprite->AdjustTextureSize();
+	return sprite;
+}
+
 void Sprite::Update(WindowAPI* windowAPI, DebugCamera* debugCamera_)
 {
 

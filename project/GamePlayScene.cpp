@@ -5,7 +5,8 @@
 #include "MaterialManager.h"
 #include "Light.h"
 #include "ParticleManager.h"
-
+#include "SpriteManager.h"
+#include "AudioManager.h"
 bool GamePlayScene::TryInitializeSphere()
 {
 
@@ -21,6 +22,14 @@ bool GamePlayScene::TryInitializeSphere()
 	sphere_ = std::make_unique<Sphere>();
 	sphere_->Initialize(directXCom, object3dCom, materialManager, light, camera_);
 	sphereInitialized = true;
+
+	//uvTextureSpriteの座標
+	uvTransformSprite = {
+		{1.0f, 1.0f, 1.0f},
+		{0.0f, 0.0f, 0.0f},
+		{0.0f, 0.0f, 0.0f}
+	};
+
 	return true;
 }
 
@@ -38,18 +47,33 @@ void GamePlayScene::Initialize(DirectXCom* dxCommon,Camera* camera)
 
 	//スプライト共通テクスチャ読み込み
 
-	//スプライトの生成	
+	// スプライトマネージャが未設定なら SceneManager 経由で初期化を試みる
+	if (!spriteManager_)
+	{
+		SpriteCom* sc = SceneManager::GetInstance()->GetSpriteCom();
+		if (sc)
+		{
+			spriteManager_ = std::make_unique<SpriteManager>();
+			spriteManager_->Initialize(sc, "Resources/uvChecker.png", 5);
+		}
+	}
+
 	//OBJからモデルデータを読み込む
 
 	//3Dオブジェクトの生成
 
 	//音声読み込み
 
-	sound = Sound::GetInstance();
-	sound->SoundLoadFile("Resources/Alarm01.wav");
-
-	//必要なら音声生成
-	sound->SoundPlayWave();
+	
+	auto am = SceneManager::GetInstance()->GetAudioManager();
+	if (am)
+	{
+		int32_t id = am->Load("Resources/Alarm01.wav");
+		if (id >= 0)
+		{
+			am->Play(id);
+		}
+	}
 
 	//パーティクルの初期化
 
@@ -96,6 +120,13 @@ void GamePlayScene::Update()
 	}
 
 	particleManager->Update(kDeltaTime);
+
+	// スプライトの毎フレーム更新はここで行う（必要な依存を持っている場合）
+	if (spriteManager_)
+	{
+		WindowAPI* windowAPI = nullptr;
+		DebugCamera* debugCamera = nullptr;
+	}
 }
 
 void GamePlayScene::Draw()

@@ -3,7 +3,6 @@
 #include "BaseScene.h"
 #include"DirectXCom.h"
 #include"ParticleEmitter.h"
-#include"Sound.h"
 #include"Sphere.h"
 
 #include <vector>
@@ -13,6 +12,7 @@
 #include "MaterialManager.h"
 #include "ParticleManager.h"
 #include "Sprite.h"
+#include "Baziru3_Engine/2D/Sprite/SpriteManager.h" // ensure complete type for unique_ptr
 
 class Camera;
 class SpriteCom;
@@ -36,7 +36,6 @@ private:
     Camera* camera_ = nullptr;
     DirectXCom* directXCom = nullptr;
     Emitter emitter;
-    Sound* sound = nullptr;
     SpriteCom* spriteCom = nullptr;
     ParticleEmitter particleEmitter;
     Light* light = nullptr;
@@ -46,14 +45,17 @@ private:
     std::unique_ptr<Sphere> sphere;
     std::unique_ptr<Sphere> sphere_;
     std::vector<std::unique_ptr<Sprite>> sprites;
+    std::unique_ptr<SpriteManager> spriteManager_;
     std::list<ParticleManager::Particle> particles;
 
     bool pendingSphereInit = false;
     bool sphereInitialized = false;
 
-    // Try to obtain engine resources and initialize the sphere; returns true on success
     bool TryInitializeSphere();
 
+private:
+    Sprite::Transform uvTransformSprite;
+    Vector2 uiSpritePosition = { 100.0f, 100.0f };
 private:
     const float kDeltaTime = 1.0f / 60.0f;
     bool drawSphere = false;

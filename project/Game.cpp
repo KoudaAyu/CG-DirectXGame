@@ -91,21 +91,20 @@ void Game::Initialize()
 	//Sphere用
 	transformObject = { {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };
 
-	
-
-	//uvTransform用の変数
-	uvTransformSprite = {
-		{1.0f, 1.0f, 1.0f},
-		{0.0f, 0.0f, 0.0f},
-		{0.0f, 0.0f, 0.0f}
-	};
+	// ユーザー指定の API 形式でのテクスチャ読み込み＆スプライト生成例
+	{
+		uint32_t textureHandle = TextureManager::GetInstance()->Load("Resources/uvChecker.png");
+		Sprite* sprite = Sprite::Create(spriteCom.get(), textureHandle, { 100.0f,100.0f });
+		// 必要に応じて管理用コンテナへ登録
+		sprites.emplace_back(sprite);
+	}
 
 	uint32_t srvIndexUvChecker = TextureManager::GetInstance()->Load("Resources/uvChecker.png");
 	uint32_t srvIndexModelTex = TextureManager::GetInstance()->Load(modelData.material.textureFilePath);
 	textureSrvHandleGPU = TextureManager::GetInstance()->GetSrvHandleGPU(srvIndexUvChecker);
 	textureSrvHandleGPU2 = TextureManager::GetInstance()->GetSrvHandleGPU(srvIndexModelTex);
 
-	// Debug: output indices and handles stored in Game
+	
 	{
 		std::ostringstream oss;
 		oss << "Game::Initialize - srvIndexUvChecker=" << std::dec << srvIndexUvChecker << " srvIndexModelTex=" << srvIndexModelTex << "\n";
@@ -122,8 +121,8 @@ void Game::Initialize()
 	}
 
 	//音声読み込み
-	sound_ = std::make_unique<Sound>();
-	sound_->Initialize();
+	audioManager_ = std::make_unique<AudioManager>(logStream);
+	audioManager_->Initialize();
 
 
 	inputManager.Initialize(windowAPI.get());
@@ -165,12 +164,11 @@ void Game::Finalize()
 	OutputDebugStringA("Hello, DirectX!\n");
 
 	// サウンドの終了処理
-	if (sound_)
+	if (audioManager_)
 	{
-		sound_->Finalize();
-		sound_.reset();
+		audioManager_->Finalize();
+		audioManager_.reset();
 	}
-	Sound::Destroy();
 
 	TextureManager::GetInstance()->Finalize();
 
@@ -216,7 +214,6 @@ void Game::Update()
 	object3d_->SetRotate(transformObject.rotate);
 	object3d_->Update();
 
-	spriteManager_->Update(windowAPI.get(), &debugCamera_, uiSpritePosition, uvTransformSprite);
 	
 	
 #ifdef _DEBUG
@@ -233,7 +230,7 @@ void Game::Update()
 	ImGui::SetNextWindowSize(ImVec2(500.0f, 100.0f), ImGuiCond_Once);
 	ImGui::Begin("Sprite Position");
 	// Slider range chosen to allow 4 integer digits and 1 decimal place
-	ImGui::SliderFloat2("Position (X,Y)", &uiSpritePosition.x, 0.0f, 9999.9f, "%4.1f");
+	//ImGui::SliderFloat2("Position (X,Y)", &uiSpritePosition.x, 0.0f, 9999.9f, "%4.1f");
 	ImGui::End();
 
 	ImGui::Checkbox("useMonsterBall", &useMonsterBall);
@@ -249,9 +246,9 @@ void Game::Update()
 
 	ImGui::DragFloat3("Object Rotate", &transformObject.rotate.x, 0.01f, -10.0f, 10.0f);
 
-	ImGui::DragFloat2("UVTranslate", &uvTransformSprite.translate.x, 0.01f, -10.0f, 10.0f);
-	ImGui::DragFloat2("UVScale", &uvTransformSprite.scale.x, 0.01f, -10.0f, 10.0f);
-	ImGui::DragFloat("UVRotate", &uvTransformSprite.rotate.z, 0.01f);
+	//ImGui::DragFloat2("UVTranslate", &uvTransformSprite.translate.x, 0.01f, -10.0f, 10.0f);
+	//ImGui::DragFloat2("UVScale", &uvTransformSprite.scale.x, 0.01f, -10.0f, 10.0f);
+	//ImGui::DragFloat("UVRotate", &uvTransformSprite.rotate.z, 0.01f);
 
 	// --- ここから追加：マテリアル調整 ---
 	if (ImGui::CollapsingHeader("Material"))
@@ -400,7 +397,17 @@ void Game::Draw()
 
 	if (drawSprite)
 	{
+		// 既存の SpriteManager 管理スプライト
 		spriteManager_->Draw();
+
+		// API 経由で Game::sprites に格納したスプライトも描画
+		for (auto& s : sprites)
+		{
+			if (!s) { continue; }
+			// 個別スプライト用の行列更新
+			s->Update(windowAPI.get(), &debugCamera_);
+			s->Draw();
+		}
 	}
 
 	

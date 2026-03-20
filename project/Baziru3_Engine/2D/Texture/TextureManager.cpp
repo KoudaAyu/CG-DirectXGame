@@ -5,6 +5,7 @@
 #include <Windows.h>
 #include <sstream>
 #include <iomanip>
+#include "AudioManager.h"
 
 namespace {
     static std::unique_ptr<TextureManager>& TextureManagerStorage()
@@ -160,13 +161,12 @@ const DirectX::TexMetadata& TextureManager::GetMetadata(uint32_t index) const
 
 D3D12_GPU_DESCRIPTOR_HANDLE TextureManager::GetSrvHandleGPU(uint32_t index) const
 {
-	// If DirectXCom is available, compute handle directly to avoid stale stored values
 	if (directXCom_)
 	{
 		return directXCom_->GetSRVHandleGPU(index);
 	}
 
-	// Fallback: look up stored handle
+
 	auto it = indexToFilePath_.find(index);
 	if (it != indexToFilePath_.end()) {
 		auto it2 = textureDates_.find(it->second);
@@ -264,7 +264,6 @@ void TextureManager::SetDirectXCom(DirectXCom* directXCom)
 {
 	directXCom_ = directXCom;
 
-	// If a SRVManager already exists, reset it to avoid duplicate managers
 	if (srvManager_)
 	{
 		srvManager_.reset();

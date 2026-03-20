@@ -10,6 +10,7 @@ class MaterialManager;
 class Light;
 class ParticleManager;
 class SpriteCom;
+class AudioManager; // forward declaration
 
 class SceneManager
 {
@@ -48,6 +49,10 @@ public:
 	void SetSpriteCom(SpriteCom* v) { spriteCom_ = v; }
 	SpriteCom* GetSpriteCom() const { return spriteCom_; }
 
+	
+	void SetAudioManager(AudioManager* v) { audioManager_ = v; }
+	AudioManager* GetAudioManager() const { return audioManager_; }
+
 private:
 	std::unique_ptr<AbstractSceneFactory> sceneFactory_;
 	std::unique_ptr<BaseScene> scene_ = nullptr;
@@ -55,12 +60,15 @@ private:
 	DirectXCom* dxCommon_ = nullptr;
 	Camera* camera_ = nullptr;
 
-	// Shared engine-managed resources
+	
 	Object3dCom* object3dCom_ = nullptr;
 	MaterialManager* materialManager_ = nullptr;
 	Light* light_ = nullptr;
 	ParticleManager* particleManager_ = nullptr;
 	SpriteCom* spriteCom_ = nullptr;
+
+
+	AudioManager* audioManager_ = nullptr;
 
 };
 

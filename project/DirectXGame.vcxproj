@@ -17,6 +17,7 @@
   <ItemGroup>
     <ClCompile Include="AbstractSceneFactory.cpp" />
     <ClCompile Include="Application\Scene\TitleScene\TitleScene.cpp" />
+    <ClCompile Include="AudioManager.cpp" />
     <ClCompile Include="BaseScene.cpp" />
     <ClCompile Include="Baziru3_Engine\2D\Texture\TextureManager.cpp" />
     <ClCompile Include="Baziru3_Engine\3D\Object\Object3d.cpp" />
@@ -81,6 +82,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="AbstractSceneFactory.h" />
+    <ClInclude Include="AudioManager.h" />
     <ClInclude Include="BaseScene.h" />
     <ClInclude Include="Baziru3_Engine\3D\Object\Object3d.h" />
     <ClInclude Include="Baziru3_Engine\3D\Object\Object3dCom.h" />
