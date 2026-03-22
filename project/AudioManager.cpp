@@ -57,14 +57,16 @@ void AudioManager::Finalize()
         std::lock_guard<std::mutex> lk(mutex_);
         for (auto& p : playingVoices_)
         {
-            if (p.second)
+            if (p.second.voice)
             {
-                p.second->Stop();
-                p.second->DestroyVoice();
-                p.second = nullptr;
+                p.second.voice->Stop();
+                p.second.voice->DestroyVoice();
+                p.second.voice = nullptr;
             }
+            p.second.soundData.reset();
         }
         playingVoices_.clear();
+        loadedSounds_.clear();
     }
 
     if (masterVoice_)
@@ -94,14 +96,14 @@ int32_t AudioManager::Load(const std::string& filename)
         return -1;
     }
 
-    SoundData data;
-    if (!Sound::LoadFileToSoundData(filename, data))
+    auto data = std::make_shared<SoundData>();
+    if (!Sound::LoadFileToSoundData(filename, *data))
     {
         logStream_ << "AudioManager::Load - failed to load audio file: " << filename << "\n";
         return -1;
     }
 
-    if (data.buffer.empty())
+    if (data->buffer.empty())
     {
         logStream_ << "AudioManager::Load - no audio data loaded: " << filename << "\n";
         return -1;
@@ -125,7 +127,7 @@ int32_t AudioManager::Play(int32_t soundId)
         return -1;
     }
 
-    SoundData data;
+    std::shared_ptr<SoundData> data;
     {
         std::lock_guard<std::mutex> lk(mutex_);
         auto it = loadedSounds_.find(soundId);
@@ -138,7 +140,7 @@ int32_t AudioManager::Play(int32_t soundId)
     }
 
     IXAudio2SourceVoice* src = nullptr;
-    HRESULT hr = xAudio2_->CreateSourceVoice(&src, &data.wfex);
+    HRESULT hr = xAudio2_->CreateSourceVoice(&src, &data->wfex);
     if (FAILED(hr) || src == nullptr)
     {
         logStream_ << "AudioManager::Play - CreateSourceVoice failed hr=" << std::hex << hr << std::dec << "\n";
@@ -147,8 +149,8 @@ int32_t AudioManager::Play(int32_t soundId)
 
     XAUDIO2_BUFFER buf{};
     buf.Flags = XAUDIO2_END_OF_STREAM;
-    buf.pAudioData = data.buffer.data();
-    buf.AudioBytes = static_cast<UINT32>(data.buffer.size());
+    buf.pAudioData = data->buffer.data();
+    buf.AudioBytes = static_cast<UINT32>(data->buffer.size());
 
     hr = src->SubmitSourceBuffer(&buf);
     if (FAILED(hr))
@@ -169,7 +171,7 @@ int32_t AudioManager::Play(int32_t soundId)
     int32_t playId = nextPlayId_.fetch_add(1);
     {
         std::lock_guard<std::mutex> lk(mutex_);
-        playingVoices_.emplace(playId, src);
+        playingVoices_.emplace(playId, PlayingVoice{ src, std::move(data) });
     }
 
     logStream_ << "AudioManager::Play - playing playId=" << playId << " soundId=" << soundId << "\n";
@@ -185,13 +187,14 @@ void AudioManager::Stop(int32_t playId)
         return;
     }
 
-    auto& voice = it->second;
-    if (voice)
+    auto& playing = it->second;
+    if (playing.voice)
     {
-        voice->Stop();
-        voice->DestroyVoice();
-        voice = nullptr;
+        playing.voice->Stop();
+        playing.voice->DestroyVoice();
+        playing.voice = nullptr;
     }
+    playing.soundData.reset();
     playingVoices_.erase(it);
     logStream_ << "AudioManager::Stop - stopped playId=" << playId << "\n";
 }
@@ -204,7 +207,7 @@ void AudioManager::Update()
         std::lock_guard<std::mutex> lk(mutex_);
         for (auto& p : playingVoices_)
         {
-            auto* voice = p.second;
+            auto* voice = p.second.voice;
             if (!voice) { finished.push_back(p.first); continue; }
 
             XAUDIO2_VOICE_STATE state{};
@@ -220,11 +223,12 @@ void AudioManager::Update()
             auto it = playingVoices_.find(id);
             if (it != playingVoices_.end())
             {
-                if (it->second)
+                if (it->second.voice)
                 {
-                    it->second->DestroyVoice();
-                    it->second = nullptr;
+                    it->second.voice->DestroyVoice();
+                    it->second.voice = nullptr;
                 }
+                it->second.soundData.reset();
                 playingVoices_.erase(it);
                 logStream_ << "AudioManager::Update - voice finished playId=" << id << "\n";
             }

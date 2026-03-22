@@ -10,6 +10,7 @@
 #include <cstdint>
 #include <unordered_map>
 #include <memory>
+#include <vector>
 
 class WindowsAPI;
 
@@ -33,6 +34,12 @@ private:
 	std::unique_ptr<Sound> sound_;
 
 private:
+	struct PlayingVoice
+	{
+		IXAudio2SourceVoice* voice = nullptr;
+		std::shared_ptr<SoundData> soundData;
+	};
+
 	Sound* GetSound()
 	{
 		return sound_.get();
@@ -41,8 +48,8 @@ private:
 	std::ostream& logStream_;
 	Microsoft::WRL::ComPtr<IXAudio2> xAudio2_;
 	IXAudio2MasteringVoice* masterVoice_ = nullptr;
-	std::unordered_map<int32_t, SoundData> loadedSounds_;
-	std::unordered_map<int32_t, IXAudio2SourceVoice*> playingVoices_;
+	std::unordered_map<int32_t, std::shared_ptr<SoundData>> loadedSounds_;
+	std::unordered_map<int32_t, PlayingVoice> playingVoices_;
 	std::atomic<int32_t> nextSoundId_{ 1 };
 	std::atomic<int32_t> nextPlayId_{ 1 };
 	std::mutex mutex_;

@@ -29,9 +29,7 @@ void Game::Initialize()
 
 	TextureManager::GetInstance()->Initialize();
 	TextureManager::GetInstance()->SetDirectXCom(directXCom.get());
-	// 作業ディレクトリが project/ である前提の相対パスを使う
-	//TextureManager::GetInstance()->LoadTexture("Resources/uvChecker.png");
-
+	
 	spriteCom = std::make_unique<SpriteCom>(logStream, directXCom.get());
 	spriteCom->Initialize();
 
@@ -99,30 +97,11 @@ void Game::Initialize()
 		sprites.emplace_back(sprite);
 	}
 
-	uint32_t srvIndexUvChecker = TextureManager::GetInstance()->Load("Resources/uvChecker.png");
-	uint32_t srvIndexModelTex = TextureManager::GetInstance()->Load(modelData.material.textureFilePath);
-	textureSrvHandleGPU = TextureManager::GetInstance()->GetSrvHandleGPU(srvIndexUvChecker);
-	textureSrvHandleGPU2 = TextureManager::GetInstance()->GetSrvHandleGPU(srvIndexModelTex);
-
 	
-	{
-		std::ostringstream oss;
-		oss << "Game::Initialize - srvIndexUvChecker=" << std::dec << srvIndexUvChecker << " srvIndexModelTex=" << srvIndexModelTex << "\n";
-		oss << "Game::Initialize - textureSrvHandleGPU=0x" << std::hex << (unsigned long long)textureSrvHandleGPU.ptr << " textureSrvHandleGPU2=0x" << (unsigned long long)textureSrvHandleGPU2.ptr << std::dec << "\n";
-		// Also log directXCom handle computation to cross-check
-		auto directHandle1 = directXCom->GetSRVHandleGPU(srvIndexUvChecker);
-		auto directHandle2 = directXCom->GetSRVHandleGPU(srvIndexModelTex);
-		oss << "DirectXCom::GetSRVHandleGPU computed: handle1=0x" << std::hex << (unsigned long long)directHandle1.ptr << " handle2=0x" << (unsigned long long)directHandle2.ptr << std::dec << "\n";
-		if (srvIndexUvChecker == srvIndexModelTex)
-		{
-			oss << "Warning: srvIndexUvChecker == srvIndexModelTex (duplicate index)\n";
-		}
-		OutputDebugStringA(oss.str().c_str());
-	}
-
 	//音声読み込み
 	audioManager_ = std::make_unique<AudioManager>(logStream);
 	audioManager_->Initialize();
+	SceneManager::GetInstance()->SetAudioManager(audioManager_.get());
 
 
 	inputManager.Initialize(windowAPI.get());
@@ -138,6 +117,9 @@ void Game::Initialize()
 	SceneRegistration::RegisterScenes();
 	SceneManager::GetInstance()->SetCamera(camera_.get());
 	SceneManager::GetInstance()->ChangeScene("TITLE");
+
+	textureIndexUvChecker = TextureManager::GetInstance()->Load("Resources/uvChecker.png");
+	textureIndexModelTex = TextureManager::GetInstance()->Load(modelData.material.textureFilePath);
 }
 
 
@@ -166,6 +148,7 @@ void Game::Finalize()
 	// サウンドの終了処理
 	if (audioManager_)
 	{
+		SceneManager::GetInstance()->SetAudioManager(nullptr);
 		audioManager_->Finalize();
 		audioManager_.reset();
 	}
@@ -193,6 +176,11 @@ void Game::Finalize()
 void Game::Update()
 {
 	Framework::Update();
+
+	if (audioManager_)
+	{
+		audioManager_->Update();
+	}
 
 
 	SceneManager::GetInstance()->Update();
@@ -363,10 +351,22 @@ void Game::Draw()
 
 	//Objectの描画
 
-	// Debug: log handle before object draw
+	// Debug: determine handle before object draw and log index + handle
 	{
+		uint32_t chosenIndex = useMonsterBall ? textureIndexModelTex : textureIndexUvChecker;
+		D3D12_GPU_DESCRIPTOR_HANDLE chosenHandle{};
+		if (chosenIndex != TextureManager::kInvalidTextureIndex)
+		{
+			chosenHandle = TextureManager::GetInstance()->GetSrvHandleGPU(chosenIndex);
+		}
+		else
+		{
+			Logger::Log(logStream, "Warning: invalid texture index when selecting object texture.\n");
+		}
+
 		std::ostringstream oss;
-		oss << "Game::Draw - object texture handle (selected) = 0x" << std::hex << (unsigned long long)(useMonsterBall ? textureSrvHandleGPU2.ptr : textureSrvHandleGPU.ptr) << std::dec << "\n";
+		oss << "Game::Draw - object texture index=" << std::dec << chosenIndex
+		    << " handle=0x" << std::hex << (unsigned long long)chosenHandle.ptr << std::dec << "\n";
 		OutputDebugStringA(oss.str().c_str());
 	}
 
@@ -376,7 +376,16 @@ void Game::Draw()
 	directXCom->GetCommandList()->SetGraphicsRootConstantBufferView(0, materialManager_->GetMaterialResource()->GetGPUVirtualAddress());
 	// Use Object3d WVP updated above
 	directXCom->GetCommandList()->SetGraphicsRootConstantBufferView(1, object3d_->GetTransformationMatrixResource()->GetGPUVirtualAddress());
-	directXCom->GetCommandList()->SetGraphicsRootDescriptorTable(2, useMonsterBall ? textureSrvHandleGPU2 : textureSrvHandleGPU);
+	// Use index->GPU handle lookup here
+	{
+		uint32_t chosenIndex = useMonsterBall ? textureIndexModelTex : textureIndexUvChecker;
+		D3D12_GPU_DESCRIPTOR_HANDLE chosenHandle{};
+		if (chosenIndex != TextureManager::kInvalidTextureIndex)
+		{
+			chosenHandle = TextureManager::GetInstance()->GetSrvHandleGPU(chosenIndex);
+		}
+		directXCom->GetCommandList()->SetGraphicsRootDescriptorTable(2, chosenHandle);
+	}
 	directXCom->GetCommandList()->SetGraphicsRootConstantBufferView(3, light->GetDirectionalLightResource()->GetGPUVirtualAddress());
 	if (camera_ && camera_->GetCameraResource())
 	{
@@ -415,10 +424,17 @@ void Game::Draw()
 	directXCom->GetCommandList()->SetPipelineState(particleManager->GetPipelineState().Get()); // パイプラインステートを設定
 	//Objectの描画
 
-	// Debug: log handle before particle draw
+	// Debug: determine handle before particle draw and log index + handle
 	{
+		uint32_t chosenIndex = useMonsterBall ? textureIndexModelTex : textureIndexUvChecker;
+		D3D12_GPU_DESCRIPTOR_HANDLE chosenHandle{};
+		if (chosenIndex != TextureManager::kInvalidTextureIndex)
+		{
+			chosenHandle = TextureManager::GetInstance()->GetSrvHandleGPU(chosenIndex);
+		}
 		std::ostringstream oss;
-		oss << "Game::Draw - particle texture handle (selected) = 0x" << std::hex << (unsigned long long)(useMonsterBall ? textureSrvHandleGPU2.ptr : textureSrvHandleGPU.ptr) << std::dec << "\n";
+		oss << "Game::Draw - particle texture index=" << std::dec << chosenIndex
+		    << " handle=0x" << std::hex << (unsigned long long)chosenHandle.ptr << std::dec << "\n";
 		OutputDebugStringA(oss.str().c_str());
 	}
 
@@ -429,8 +445,16 @@ void Game::Draw()
 	// Do NOT set a CBV at root parameter 1 because particle manager declares parameter 1 as a descriptor table.
 	// Set descriptor table for instance data (root parameter 1)
 	directXCom->GetCommandList()->SetGraphicsRootDescriptorTable(1, particleManager->GetInstancingSrvHandleGPU());
-	// Set descriptor table for texture (root parameter 2)
-	directXCom->GetCommandList()->SetGraphicsRootDescriptorTable(2, useMonsterBall ? textureSrvHandleGPU2 : textureSrvHandleGPU);
+	// Set descriptor table for texture (root parameter 2) using index->handle lookup
+	{
+		uint32_t chosenIndex = useMonsterBall ? textureIndexModelTex : textureIndexUvChecker;
+		D3D12_GPU_DESCRIPTOR_HANDLE chosenHandle{};
+		if (chosenIndex != TextureManager::kInvalidTextureIndex)
+		{
+			chosenHandle = TextureManager::GetInstance()->GetSrvHandleGPU(chosenIndex);
+		}
+		directXCom->GetCommandList()->SetGraphicsRootDescriptorTable(2, chosenHandle);
+	}
 	directXCom->GetCommandList()->SetGraphicsRootConstantBufferView(3, light->GetDirectionalLightResource()->GetGPUVirtualAddress());
 	if (camera_ && camera_->GetCameraResource())
 	{
@@ -448,6 +472,7 @@ void Game::Draw()
 		directXCom->GetCommandList()->DrawInstanced(UINT(modelData.vertices.size()), particleManager->GetNumInstance(), 0, 0);
 	}
 
+	
 	//実際のcommandListのImGuiの描画コマンドを積む
 #ifdef USE_IMGUI
 	ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), directXCom->GetCommandList().Get());

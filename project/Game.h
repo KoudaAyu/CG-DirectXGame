@@ -111,15 +111,6 @@ private:
 	
 	Sprite::Transform cameraTransform;
 
-	D3D12_CPU_DESCRIPTOR_HANDLE textureSrvHandleCPU;
-	D3D12_CPU_DESCRIPTOR_HANDLE textureSrvHandleCPU2;
-
-	D3D12_GPU_DESCRIPTOR_HANDLE textureSrvHandleGPU;
-	D3D12_GPU_DESCRIPTOR_HANDLE textureSrvHandleGPU2;
-
-	
-
-	
 
 	Object3d::ModelData modelData;
 
@@ -134,16 +125,11 @@ private:
 	bool drawSprite = false;
 	
 
-	// Keep GPU resources alive beyond Initialize
 	
-	Microsoft::WRL::ComPtr<ID3D12Resource> textureResource;
-	Microsoft::WRL::ComPtr<ID3D12Resource> textureResource2;
-	Microsoft::WRL::ComPtr<ID3D12Resource> intermediateResource;
-	Microsoft::WRL::ComPtr<ID3D12Resource> intermediateResource2;
-	//Microsoft::WRL::ComPtr<ID3D12Resource> instancingResource;
+	// Texture resources are owned and managed by TextureManager now.
 
-
-	
+	uint32_t textureIndexUvChecker = TextureManager::kInvalidTextureIndex;
+	uint32_t textureIndexModelTex = TextureManager::kInvalidTextureIndex;
 
 };
 

@@ -25,10 +25,16 @@ void Object3d::Initialize(Object3dCom* object3dCom)
 	// テクスチャロードはパスが有効なときのみ実行
 	if (!modelData_.material.textureFilePath.empty())
 	{
-		// TextureManagerにDirectXコンテキストが渡っていることを前提にする
-		TextureManager::GetInstance()->LoadTexture(modelData_.material.textureFilePath);
-		modelData_.material.textureIndex =
-			TextureManager::GetInstance()->GetTextureIndexByFilePath(modelData_.material.textureFilePath);
+		uint32_t index = TextureManager::GetInstance()->Load(modelData_.material.textureFilePath);
+		if(index != TextureManager::kInvalidTextureIndex)
+		{
+			modelData_.material.textureIndex = index;
+		}
+		else
+		{
+			OutputDebugStringA(("Texture load failed: " + modelData_.material.textureFilePath + "\n").c_str());
+		}
+	
 	}
 
 	//Transform変数の生成

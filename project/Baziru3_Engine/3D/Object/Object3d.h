@@ -61,7 +61,7 @@ public:
 	/// <summary>
 	/// .mtlファイルの読み込み
 	/// </summary>
-	/// <param name="direcrotyPath"></param>
+	/// <param name="directoryPath"></param>
 	/// <param name="filename"></param>
 	/// <returns></returns>
 	static MaterialData LoadMaterialTemplateFile(const std::string& direcrotyPath, const std::string& filename);
@@ -99,10 +99,8 @@ public:
 		object3dCom_ = object3dCom;
 	}
 
-	// Expose transformation matrix CBV so external code can bind the correct constant buffer
 	const Microsoft::WRL::ComPtr<ID3D12Resource>& GetTransformationMatrixResource() const { return transformationMatrixResource; }
 
-	// Transform setters/getters to control from outside (e.g., ImGui)
 	void SetRotate(const Vector3& r) { transform.SetRotate(r); }
 	void SetTranslate(const Vector3& t) { transform.SetTranslate(t); }
 	void SetScale(const Vector3& s) { transform.SetScale(s); }
