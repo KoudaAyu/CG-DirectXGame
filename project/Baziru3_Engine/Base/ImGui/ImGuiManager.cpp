@@ -18,7 +18,12 @@ static SRVManager* g_srvManager = nullptr;
 
 ImGuiManager::~ImGuiManager()
 {
+    // Ensure finalization if not already done
 #ifdef USE_IMGUI
+    if (initialized)
+    {
+        Finalize();
+    }
     // Only destroy owned manager; if we're using TextureManager's SRVManager do not free it
     g_srvManagerOwned.reset();
     g_srvManager = nullptr;
@@ -150,5 +155,16 @@ void ImGuiManager::StyleColorsDark()
 {
 #ifdef USE_IMGUI
 	ImGui::StyleColorsDark();
+#endif
+}
+
+void ImGuiManager::Finalize()
+{
+#ifdef USE_IMGUI
+	if (!initialized) return;
+	ImGui_ImplDX12_Shutdown();
+	ImGui_ImplWin32_Shutdown();
+	ImGui::DestroyContext();
+	initialized = false;
 #endif
 }

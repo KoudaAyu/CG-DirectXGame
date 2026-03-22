@@ -1,4 +1,5 @@
 #include"Game.h"
+#include "DebugUI.h"
 
 #include <combaseapi.h>
 #include <sstream>
@@ -114,6 +115,10 @@ void Game::Initialize()
 	imguiManager = std::make_unique<ImGuiManager>();
 	imguiManager->Initialize(windowAPI.get(), directXCom.get());
 
+	// Create DebugUI and pass pointers to relevant state
+	debugUI = std::make_unique<DebugUI>(materialManager_.get(), spriteManager_.get(), camera_.get(), &transformObject, &useMonsterBall, &drawObject, &drawSprite);
+	debugUI->Initialize();
+
 	SceneRegistration::RegisterScenes();
 	SceneManager::GetInstance()->SetCamera(camera_.get());
 	SceneManager::GetInstance()->ChangeScene("TITLE");
@@ -130,10 +135,11 @@ void Game::Finalize()
 	SceneManager::Destroy();
 
 #ifdef USE_IMGUI
-	//ImGui終了処理
-	ImGui_ImplDX12_Shutdown();
-	ImGui_ImplWin32_Shutdown();
-	ImGui::DestroyContext();
+	//ImGui終了処理 is delegated to ImGuiManager
+	if (imguiManager)
+	{
+		imguiManager->Finalize();
+	}
 #endif
 
 
@@ -194,7 +200,7 @@ void Game::Update()
 
 	//ImGuiにここからフレームが始まる趣旨をつたえる
 	imguiManager->Update();
-
+	
 	debugCamera_.Update();
 
 	camera_->Update();
@@ -205,123 +211,12 @@ void Game::Update()
 	
 	
 #ifdef _DEBUG
-
-	ImGui::ShowDemoWindow();
-
-	ImGui::Begin("Windows");
-
-
-	ImGui::ColorEdit4("Material Color", &materialManager_->GetMaterialDataColor().x);
-	//ImGui::DragFloat("Light Intensity", &directionalLightData->intensity, 0.01f, 0.0f, 10.0f);
-
-	// Sprite position window: size (500,100), sliders (x,y) with initial (100,100) and format integer 4 digits, decimal 1
-	ImGui::SetNextWindowSize(ImVec2(500.0f, 100.0f), ImGuiCond_Once);
-	ImGui::Begin("Sprite Position");
-	// Slider range chosen to allow 4 integer digits and 1 decimal place
-	//ImGui::SliderFloat2("Position (X,Y)", &uiSpritePosition.x, 0.0f, 9999.9f, "%4.1f");
-	ImGui::End();
-
-	ImGui::Checkbox("useMonsterBall", &useMonsterBall);
-	ImGui::Checkbox("LightSprite Flag", (bool*)&materialManager_->GetMaterialDataEnableLighting());
-	for (auto& spritePtr : spriteManager_->GetSprites())
+	if (debugUI)
 	{
-		ImGui::Checkbox("LightObject Flag", (bool*)&spritePtr->GetMaterialDataSprite()->enableLighting);
-	}
-	ImGui::Checkbox("DrawObject", &drawObject);
-	ImGui::Checkbox("DrawSprite", &drawSprite);
-	//ImGui::Checkbox("DrawSphere", &drawSphere);
-	//ImGui::DragFloat3("LightDirection", &directionalLightData->direction.x, 0.01f, -10.0f, 10.0f);
-
-	ImGui::DragFloat3("Object Rotate", &transformObject.rotate.x, 0.01f, -10.0f, 10.0f);
-
-	//ImGui::DragFloat2("UVTranslate", &uvTransformSprite.translate.x, 0.01f, -10.0f, 10.0f);
-	//ImGui::DragFloat2("UVScale", &uvTransformSprite.scale.x, 0.01f, -10.0f, 10.0f);
-	//ImGui::DragFloat("UVRotate", &uvTransformSprite.rotate.z, 0.01f);
-
-	// --- ここから追加：マテリアル調整 ---
-	if (ImGui::CollapsingHeader("Material"))
-	{
-		// ライティングのON/OFF切り替え
-		// boolからint32_tへ変換して代入
-		bool enableLock = (materialManager_->GetMaterialDataEnableLighting() != 0);
-		if (ImGui::Checkbox("Enable Lighting", &enableLock))
-		{
-			materialManager_->GetMaterialDataEnableLighting() = enableLock ? 1 : 0;
-		}
-
-		// Shininess（テカリ具合）のスライダー
-		// 0.1 ～ 100.0 くらいの範囲で調整できるようにします
-		ImGui::SliderFloat("Shininess", &materialManager_->GetMaterialDataShininess(), 0.1f, 100.0f);
-
-		// 色の調整もできるようにするとモンスターボールの赤が調整しやすいです
-		ImGui::ColorEdit4("Material Color", &materialManager_->GetMaterialDataColor().x);
+		debugUI->Update();
 	}
 
-	// --- ここまで追加 ---
-
-	if (ImGui::Button("Reset Camera"))
-	{
-		camera_->SetRotate({ 0.0f, 0.0f, 0.0f });
-		camera_->SetTranslate({ 0.0f, 0.0f, -5.0f });
-	}
-
-	ImGui::End();
-
-	ImGui::Begin("Material Settings"); // ウィンドウ名は既存のものに合わせてください
-
-	// ライティングの有効化フラグ
-	bool enableLighting = (materialManager_->GetMaterialDataEnableLighting() != 0);
-	if (ImGui::Checkbox("Enable Lighting", &enableLighting))
-	{
-		materialManager_->GetMaterialDataEnableLighting() = enableLighting ? 1 : 0;
-	}
-
-	// テカリ具合 (shininess)
-	// 0.1 ～ 100.0 くらいの範囲で調整できるようにします
-	ImGui::DragFloat("Shininess", &materialManager_->GetMaterialDataShininess(), 0.5f, 0.1f, 100.0f);
-
-	// 光の色 (DirectionalLight)
-	/*if (ImGui::CollapsingHeader("Light"))
-	{
-		ImGui::ColorEdit4("Light Color", &directionalLightData->color.x);
-		ImGui::DragFloat3("Light Direction", &directionalLightData->direction.x, 0.01f, -1.0f, 1.0f);
-		ImGui::DragFloat("Intensity", &directionalLightData->intensity, 0.01f, 0.0f, 5.0f);
-	}*/
-
-	ImGui::End();
-
-	// --- main.cpp ---
-	ImGui::Begin("Settings");
-
-	// モンスターボールのテクスチャ切り替え（既存のコードがある場合）
-	ImGui::Checkbox("Use Monster Ball", &useMonsterBall);
-
-	ImGui::Separator(); // 区切り線
-
-	// --- マテリアル（質感）の設定 ---
-	if (ImGui::CollapsingHeader("Material"))
-	{
-
-		bool enable = (materialManager_->GetMaterialDataEnableLighting() != 0);
-		if (ImGui::Checkbox("Enable Lighting", &enable))
-		{
-			materialManager_->GetMaterialDataEnableLighting() = enable ? 1 : 0;
-		}
-
-
-		ImGui::SliderFloat("Shininess", &materialManager_->GetMaterialDataShininess(), 0.1f, 100.0f);
-
-		ImGui::ColorEdit4("Color", &materialManager_->GetMaterialDataColor().x);
-	}
-
-	// --- 平行光源の設定 ---
-	/*if (ImGui::CollapsingHeader("Directional Light"))
-	{
-		ImGui::DragFloat3("Direction", &directionalLightData->direction.x, 0.01f, -1.0f, 1.0f);
-		ImGui::DragFloat("Intensity", &directionalLightData->intensity, 0.01f, 0.0f, 5.0f);
-	}*/
-
-	ImGui::End();
+	
 
 #endif // DEBUG
 

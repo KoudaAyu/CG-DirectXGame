@@ -26,6 +26,7 @@
 #include"ResourceLeakCheek.h"
 #include"TextureManager.h"
 #include"WindowsAPI.h"
+#include "DebugUI.h"
 
 #include <vector>
 #include <random>
@@ -104,6 +105,7 @@ private:
 	KeyInput inputManager;
 	std::unique_ptr<AudioManager> audioManager_;
 	std::unique_ptr<MaterialManager> materialManager_;
+	std::unique_ptr<DebugUI> debugUI; // debug UI
 private:
 	std::vector<std::unique_ptr<Sprite>>sprites;
 	Sprite::Transform transformObject;

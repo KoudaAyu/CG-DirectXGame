@@ -14,6 +14,7 @@ public:
 	void Update();
 	void CreateContext();
 	void StyleColorsDark();
+	void Finalize();
 
 	bool IsInitialized() const { return initialized; }
 
