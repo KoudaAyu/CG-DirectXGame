@@ -8,9 +8,10 @@
 
 
 
-void Object3d::Initialize(Object3dCom* object3dCom)
+void Object3d::Initialize(Object3dCom* object3dCom, const ModelData& modelData)
 {
 	object3dCom_ = object3dCom;
+	modelData_ = modelData; // store model data
 	// object3dCom_ が未設定の場合は何もしない(デフォルトカメラは取得しない)
 	if (object3dCom_)
 	{
@@ -75,6 +76,20 @@ void Object3d::Update()
 	transformationMatrixData_->World = worldMatrix;
 	// WorldInverseTranspose を計算して格納（法線変換用）
 	transformationMatrixData_->WorldInverseTranspose = Transpose(Inverse(worldMatrix));
+}
+
+void Object3d::Draw(ID3D12GraphicsCommandList* commandList)
+{
+	// Bind vertex buffer and topology owned by this object
+	commandList->IASetVertexBuffers(0, 1, &vertexBufferView_);
+	commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+	// Bind object-specific CBVs
+	commandList->SetGraphicsRootConstantBufferView(1, transformationMatrixResource->GetGPUVirtualAddress());
+	commandList->SetGraphicsRootConstantBufferView(3, directionalLightResource->GetGPUVirtualAddress());
+
+	// If material is per-object, bind it here as b0
+	commandList->SetGraphicsRootConstantBufferView(0, materialResource->GetGPUVirtualAddress());
 }
 
 Object3d::MaterialData Object3d::LoadMaterialTemplateFile(const std::string& directoryPath, const std::string& filename)
@@ -222,6 +237,7 @@ void Object3d::VertexResource()
 		{
 			std::memcpy(vertexData_, modelData_.vertices.data(), sizeof(Sprite::VertexData) * modelData_.vertices.size());
 		}
+		// leave mapped for update
 	}
 }
 

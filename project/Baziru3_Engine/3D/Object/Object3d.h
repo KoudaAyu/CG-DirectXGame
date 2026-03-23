@@ -54,9 +54,11 @@ public:
 		float intensity;
 	};
 
-	void Initialize(Object3dCom* object3dCom);
+	void Initialize(Object3dCom* object3dCom, const ModelData& modelData);
 
 	void Update();
+
+	void Draw(ID3D12GraphicsCommandList* commandList);
 
 	/// <summary>
 	/// .mtlファイルの読み込み
@@ -117,7 +119,7 @@ private:
 	Object3dCom* object3dCom_ = nullptr;
 	Transform transform_;
 
-	ModelData modelData_;
+	ModelData modelData_; // store model data
 
 	//バッファリソース
 	Microsoft::WRL::ComPtr<ID3D12Resource> vertexResource = nullptr;

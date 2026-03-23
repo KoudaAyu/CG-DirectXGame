@@ -17,7 +17,7 @@ ParticleManager::~ParticleManager()
 void ParticleManager::Initialize(Camera* camera)
 {
 	camera_ = camera;
-	SetupDraw();
+	SetupDraw(dxCommon->GetCommandList().Get());
 
 	Random::SeedEngine();
 
@@ -395,8 +395,16 @@ void ParticleManager::InitializeGraphicPipeline()
 	graphicPipelineStateDesc.DSVFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
 }
 
-void ParticleManager::SetupDraw()
+void ParticleManager::SetupDraw(ID3D12GraphicsCommandList* commandList)
 {
-	CreateGraphicsPipeline();
-	assert(pipelineState != nullptr && "ParticleManager pipeline state creation failed");
+	if (!pipelineState)
+	{
+		CreateGraphicsPipeline();
+		assert(pipelineState != nullptr && "ParticleManager pipeline state creation failed");
+	}
+
+	
+	commandList->SetGraphicsRootSignature(rootSignature.Get());
+	commandList->SetPipelineState(pipelineState.Get()); // パイプラインステートを設定
+
 }

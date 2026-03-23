@@ -49,11 +49,8 @@ void Game::Initialize()
 
 #pragma region 最初のシーンの初期化
 	object3d_ = std::make_unique<Object3d>();
-	object3d_->Initialize(object3dCom.get());
-
-	
+	object3d_->Initialize(object3dCom.get(), object3d_->LoadObjFile("Resources", "plane.obj"));
 #pragma endregion 最初のシーン終了
-
 	//パイプラインステートの生成に失敗した場合はエラー
 	assert(SUCCEEDED(GetDirectXCom()->GetHr()));
 
@@ -114,7 +111,6 @@ void Game::Initialize()
 	imguiManager = std::make_unique<ImGuiManager>();
 	imguiManager->Initialize(windowAPI.get(), directXCom.get());
 
-	// Create DebugUI and pass pointers to relevant state
 	debugUI = std::make_unique<DebugUI>(materialManager_.get(), spriteManager_.get(), camera_.get(), &transformObject, &useMonsterBall, &drawObject, &drawSprite);
 	debugUI->Initialize();
 
@@ -232,6 +228,7 @@ void Game::Update()
 	//	particles.splice(particles.end(), ParticleEmitter{}.Emit(emitter, particleManager->GetRandomEngine(), *particleManager));
 	//}
 }
+
 void Game::Draw()
 {
 	directXCom->PreDraw();
@@ -262,13 +259,10 @@ void Game::Draw()
 		OutputDebugStringA(oss.str().c_str());
 	}
 
-	directXCom->GetCommandList()->IASetVertexBuffers(0, 1, &model_->GetVertexBufferView());
-	// Note: object draw uses non-indexed DrawInstanced, so do not set an index buffer here
-	directXCom->GetCommandList()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+	object3d_->Draw(directXCom->GetCommandList().Get());
+
 	directXCom->GetCommandList()->SetGraphicsRootConstantBufferView(0, materialManager_->GetMaterialResource()->GetGPUVirtualAddress());
-	// Use Object3d WVP updated above
 	directXCom->GetCommandList()->SetGraphicsRootConstantBufferView(1, object3d_->GetTransformationMatrixResource()->GetGPUVirtualAddress());
-	// Use index->GPU handle lookup here
 	{
 		uint32_t chosenIndex = useMonsterBall ? textureIndexModelTex : textureIndexUvChecker;
 		D3D12_GPU_DESCRIPTOR_HANDLE chosenHandle{};
@@ -311,12 +305,9 @@ void Game::Draw()
 		}
 	}
 
-	
-	directXCom->GetCommandList()->SetGraphicsRootSignature(particleManager->GetRootSignature().Get());
-	directXCom->GetCommandList()->SetPipelineState(particleManager->GetPipelineState().Get()); // パイプラインステートを設定
+	particleManager->SetupDraw(directXCom->GetCommandList().Get());
 	//Objectの描画
 
-	// Debug: determine handle before particle draw and log index + handle
 	{
 		uint32_t chosenIndex = useMonsterBall ? textureIndexModelTex : textureIndexUvChecker;
 		D3D12_GPU_DESCRIPTOR_HANDLE chosenHandle{};
@@ -331,13 +322,9 @@ void Game::Draw()
 	}
 
 	directXCom->GetCommandList()->IASetVertexBuffers(0, 1, &model_->GetVertexBufferView());
-	// Particle draw uses non-indexed DrawInstanced, so do not set an index buffer here
 	directXCom->GetCommandList()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 	directXCom->GetCommandList()->SetGraphicsRootConstantBufferView(0, materialManager_->GetMaterialResource()->GetGPUVirtualAddress());
-	// Do NOT set a CBV at root parameter 1 because particle manager declares parameter 1 as a descriptor table.
-	// Set descriptor table for instance data (root parameter 1)
 	directXCom->GetCommandList()->SetGraphicsRootDescriptorTable(1, particleManager->GetInstancingSrvHandleGPU());
-	// Set descriptor table for texture (root parameter 2) using index->handle lookup
 	{
 		uint32_t chosenIndex = useMonsterBall ? textureIndexModelTex : textureIndexUvChecker;
 		D3D12_GPU_DESCRIPTOR_HANDLE chosenHandle{};

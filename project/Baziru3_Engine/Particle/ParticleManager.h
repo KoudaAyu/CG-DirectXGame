@@ -58,7 +58,7 @@ public:
 	void ShaderCompile();
 	void InitializeGraphicPipeline();
 
-	void SetupDraw();
+	void SetupDraw(ID3D12GraphicsCommandList* commandList);
 
 	
 	const Microsoft::WRL::ComPtr<ID3D12PipelineState>& GetPipelineState() const { return pipelineState; }
