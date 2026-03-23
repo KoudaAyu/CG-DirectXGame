@@ -80,15 +80,12 @@ void Object3d::Update()
 
 void Object3d::Draw(ID3D12GraphicsCommandList* commandList)
 {
-	// Bind vertex buffer and topology owned by this object
 	commandList->IASetVertexBuffers(0, 1, &vertexBufferView_);
 	commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-
-	// Bind object-specific CBVs
+	commandList->SetGraphicsRootConstantBufferView(0, materialResource->GetGPUVirtualAddress());
+	commandList->SetGraphicsRootConstantBufferView(1, transformationMatrixResource->GetGPUVirtualAddress());
 	commandList->SetGraphicsRootConstantBufferView(1, transformationMatrixResource->GetGPUVirtualAddress());
 	commandList->SetGraphicsRootConstantBufferView(3, directionalLightResource->GetGPUVirtualAddress());
-
-	// If material is per-object, bind it here as b0
 	commandList->SetGraphicsRootConstantBufferView(0, materialResource->GetGPUVirtualAddress());
 }
 

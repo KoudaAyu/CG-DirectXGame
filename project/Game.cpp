@@ -261,8 +261,6 @@ void Game::Draw()
 
 	object3d_->Draw(directXCom->GetCommandList().Get());
 
-	directXCom->GetCommandList()->SetGraphicsRootConstantBufferView(0, materialManager_->GetMaterialResource()->GetGPUVirtualAddress());
-	directXCom->GetCommandList()->SetGraphicsRootConstantBufferView(1, object3d_->GetTransformationMatrixResource()->GetGPUVirtualAddress());
 	{
 		uint32_t chosenIndex = useMonsterBall ? textureIndexModelTex : textureIndexUvChecker;
 		D3D12_GPU_DESCRIPTOR_HANDLE chosenHandle{};
