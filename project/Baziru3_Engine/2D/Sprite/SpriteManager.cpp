@@ -12,16 +12,16 @@ void SpriteManager::Initialize(SpriteCom* spriteCom, const std::string& textureP
     {
         auto s = std::make_unique<Sprite>();
         s->Initialize(spriteCom_, texturePath_);
+        // Ensure initial position matches assignment requirement
+        s->SetPosition({ 100.0f, 100.0f });
         sprites_.push_back(std::move(s));
     }
 }
 
-void SpriteManager::Update(WindowAPI* windowAPI, DebugCamera* debugCamera, const Vector2& uiPosition, const Sprite::Transform& uvTransform)
+void SpriteManager::Update(WindowAPI* windowAPI, DebugCamera* debugCamera)
 {
     for (auto& s : sprites_)
     {
-        s->SetPosition(uiPosition);
-        s->SetUVParams(uvTransform.scale, uvTransform.rotate.z, uvTransform.translate);
         s->Update(windowAPI, debugCamera);
     }
 }

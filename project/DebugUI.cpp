@@ -29,6 +29,27 @@ void DebugUI::Update()
     // Sprite position window: size (500,100), sliders (x,y) with initial (100,100) and format integer 4 digits, decimal 1
     ImGui::SetNextWindowSize(ImVec2(500.0f, 100.0f), ImGuiCond_Once);
     ImGui::Begin("Sprite Position");
+    if (spriteManager_)
+    {
+        auto& sprites = spriteManager_->GetSprites();
+        for (size_t i = 0; i < sprites.size(); ++i)
+        {
+            Sprite* s = sprites[i].get();
+            if (!s) continue;
+
+            // Get current position
+            const Vector2& p = s->GetPosition();
+            float posArr[2] = { p.x, p.y };
+            char label[64];
+            // Label each slider so ImGui state is unique per sprite
+            std::snprintf(label, sizeof(label), "Sprite %zu Position", i);
+            // Slider range chosen to cover typical window coordinates; format "%4.1f" meets the integer 4 digits and 1 decimal requirement
+            if (ImGui::SliderFloat2(label, posArr, 0.0f, 2000.0f, "%4.1f"))
+            {
+                s->SetPosition({ posArr[0], posArr[1] });
+            }
+        }
+    }
     ImGui::End();
 
     if (useMonsterBall_)

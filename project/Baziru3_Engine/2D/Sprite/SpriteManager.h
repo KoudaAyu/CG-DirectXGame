@@ -13,7 +13,8 @@ class SpriteManager
 {
 public:
 	void Initialize(SpriteCom* spriteCom,const std::string& texturePath, size_t count);
-	void Update(WindowAPI* windowAPI, DebugCamera* debugCamera, const Vector2& uiPosition, const Sprite::Transform& uvTransform);
+	// Update now only advances sprite state (position is controlled externally via DebugUI)
+	void Update(WindowAPI* windowAPI, DebugCamera* debugCamera);
 	void Draw();
 
 	std::vector<std::unique_ptr<Sprite>>& GetSprites();
