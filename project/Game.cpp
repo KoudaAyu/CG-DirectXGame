@@ -86,7 +86,6 @@ void Game::Initialize()
 	//Transform変数を作る
 	Sprite::Transform transform = { {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };
 
-
 	//Sphere用
 	transformObject = { {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };
 
@@ -239,14 +238,12 @@ void Game::Draw()
 
 	object3dCom->PreDraw();
 
-
 	SceneManager::GetInstance()->Draw();
 
 	spriteCom->SetupDraw(directXCom->GetCommandList().Get());
 
 	//Objectの描画
 
-	// Debug: determine handle before object draw and log index + handle
 	{
 		uint32_t chosenIndex = useMonsterBall ? textureIndexModelTex : textureIndexUvChecker;
 		D3D12_GPU_DESCRIPTOR_HANDLE chosenHandle{};
@@ -375,6 +372,7 @@ void Game::Draw()
 
 	directXCom->PostDraw();
 }
+
 bool Game::IsQuitRequested()
 {
 	if (directXCom)
