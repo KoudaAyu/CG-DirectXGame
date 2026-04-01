@@ -88,6 +88,7 @@
     <ClInclude Include="Baziru3_Engine\3D\Object\Object3d.h" />
     <ClInclude Include="Baziru3_Engine\3D\Object\Object3dCom.h" />
     <ClInclude Include="Baziru3_Engine\Audio\Sound.h" />
+    <ClInclude Include="Baziru3_Engine\Base\RootParam.h" />
     <ClInclude Include="Baziru3_Engine\Camera\DebugCamera\DebugCamera.h" />
     <ClInclude Include="Baziru3_Engine\Base\DirectXCom.h" />
     <ClInclude Include="Baziru3_Engine\Base\ImGui\ImGuiManager.h" />

@@ -5,6 +5,8 @@
 #include <sstream>
 #include <iomanip>
 
+#include"RootParam.h"
+
 #ifdef USE_IMGUI
 #include <imgui.h>
 #include <imgui_impl_win32.h>
@@ -277,7 +279,6 @@ void Game::Draw()
 	}
 	else
 	{
-		// Bind a null GPU address to avoid crash and log the issue
 		directXCom->GetCommandList()->SetGraphicsRootConstantBufferView(4, 0);
 		Logger::Log(logStream, "Warning: camera GPU resource not available when drawing object.\n");
 	}
@@ -319,31 +320,24 @@ void Game::Draw()
 		OutputDebugStringA(oss.str().c_str());
 	}
 
-	directXCom->GetCommandList()->IASetVertexBuffers(0, 1, &model_->GetVertexBufferView());
-	directXCom->GetCommandList()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-	directXCom->GetCommandList()->SetGraphicsRootConstantBufferView(0, materialManager_->GetMaterialResource()->GetGPUVirtualAddress());
-	directXCom->GetCommandList()->SetGraphicsRootDescriptorTable(1, particleManager->GetInstancingSrvHandleGPU());
-	{
-		uint32_t chosenIndex = useMonsterBall ? textureIndexModelTex : textureIndexUvChecker;
-		D3D12_GPU_DESCRIPTOR_HANDLE chosenHandle{};
-		if (chosenIndex != TextureManager::kInvalidTextureIndex)
-		{
-			chosenHandle = TextureManager::GetInstance()->GetSrvHandleGPU(chosenIndex);
-		}
-		directXCom->GetCommandList()->SetGraphicsRootDescriptorTable(2, chosenHandle);
-	}
-	directXCom->GetCommandList()->SetGraphicsRootConstantBufferView(3, light->GetDirectionalLightResource()->GetGPUVirtualAddress());
-	if (camera_ && camera_->GetCameraResource())
-	{
-		directXCom->GetCommandList()->SetGraphicsRootConstantBufferView(4, camera_->GetCameraResource()->GetGPUVirtualAddress());
-	}
-	else
-	{
-		directXCom->GetCommandList()->SetGraphicsRootConstantBufferView(4, 0);
-		Logger::Log(logStream, "Warning: camera GPU resource not available when drawing particles.\n");
-	}
+    model_->Bind(directXCom->GetCommandList().Get());
 
-	/*commandList->DrawIndexedInstanced(kIndexCount, 1, 0, 0, 0);*/
+  
+    particleManager->BindResources(directXCom->GetCommandList().Get(), materialManager_->GetMaterialResource()->GetGPUVirtualAddress());
+
+    uint32_t chosenIndex = useMonsterBall ? textureIndexModelTex : textureIndexUvChecker;
+    D3D12_GPU_DESCRIPTOR_HANDLE chosenHandle{};
+    if (chosenIndex != TextureManager::kInvalidTextureIndex)
+    {
+        chosenHandle = TextureManager::GetInstance()->GetSrvHandleGPU(chosenIndex);
+    }
+    directXCom->GetCommandList()->SetGraphicsRootDescriptorTable(RootParam::Particle::kTextureTable, chosenHandle);
+
+   
+    directXCom->GetCommandList()->SetGraphicsRootConstantBufferView(RootParam::Particle::kLight, light->GetDirectionalLightResource()->GetGPUVirtualAddress());
+    directXCom->GetCommandList()->SetGraphicsRootConstantBufferView(RootParam::Particle::kCamera, camera_ && camera_->GetCameraResource() ? camera_->GetCameraResource()->GetGPUVirtualAddress() : 0);
+
+	
 	if (particleManager->GetNumInstance() > 0)
 	{
 		directXCom->GetCommandList()->DrawInstanced(UINT(modelData.vertices.size()), particleManager->GetNumInstance(), 0, 0);

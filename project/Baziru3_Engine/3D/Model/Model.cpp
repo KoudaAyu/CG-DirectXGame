@@ -32,6 +32,13 @@ void Model::Update()
     //今の所特に更新処理は無し
 }
 
+void Model::Bind(ID3D12GraphicsCommandList* commandList)
+{
+    commandList->IASetVertexBuffers(0, 1, &vertexBufferView_);
+    commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+}
+
 void Model::Draw()
 {
  

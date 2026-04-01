@@ -2,12 +2,15 @@
 #include"ParticleEmitter.h"
 #include"TextureManager.h"
 
+#include "RootParam.h"
+
 #include "Camera.h"
 
 ParticleManager::ParticleManager(std::ostream& logStream, DirectXCom* dxCommon)
 	: logStream(logStream), dxCommon(dxCommon)
 {
 }
+
 
 
 ParticleManager::~ParticleManager()
@@ -407,4 +410,14 @@ void ParticleManager::SetupDraw(ID3D12GraphicsCommandList* commandList)
 	commandList->SetGraphicsRootSignature(rootSignature.Get());
 	commandList->SetPipelineState(pipelineState.Get()); // パイプラインステートを設定
 
+}
+
+void ParticleManager::BindResources(ID3D12GraphicsCommandList* commandList, D3D12_GPU_VIRTUAL_ADDRESS materialCBV)
+{
+	assert(commandList != nullptr);
+
+	commandList->SetGraphicsRootConstantBufferView(RootParam::Particle::kMaterial, materialCBV);
+
+	// インスタンシング用の SRV をルートパラメーターにバインド
+	commandList->SetGraphicsRootDescriptorTable(RootParam::Particle::kInstancing, instancingSrvHandleGPU);
 }

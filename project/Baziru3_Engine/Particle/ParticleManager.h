@@ -61,6 +61,9 @@ public:
 	void SetupDraw(ID3D12GraphicsCommandList* commandList);
 
 	
+	void BindResources(ID3D12GraphicsCommandList* commandList, D3D12_GPU_VIRTUAL_ADDRESS materialCBV);
+
+	
 	const Microsoft::WRL::ComPtr<ID3D12PipelineState>& GetPipelineState() const { return pipelineState; }
 
 public:

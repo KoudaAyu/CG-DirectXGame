@@ -40,6 +40,8 @@ public:
 
 	void Update();
 
+	void Bind(ID3D12GraphicsCommandList* commandList);
+
 	void Draw();
 
 	void SetModelCom(ModelCom* modelCom) { modelCom_ = modelCom; }
@@ -90,7 +92,7 @@ private:
 	std::string directoryPath_{};
 	std::string filename_{};
 
-	// GPU resources
+	// GPU リソース
 	Microsoft::WRL::ComPtr<ID3D12Resource> vertexResource = nullptr;
 	// バッファリソース内のデータを指すポインタ (nullptr when unmapped)
 	Sprite::VertexData* vertexData_ = nullptr;
