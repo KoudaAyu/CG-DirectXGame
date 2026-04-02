@@ -5,6 +5,18 @@
 
 
 
+Sprite::Sprite()
+{
+}
+
+Sprite::~Sprite()
+{
+   
+    Finalize();
+}
+
+
+
 void Sprite::Initialize(SpriteCom* spriteCom, std::string textureFilePath)
 {
 	this->spriteCom = spriteCom;
@@ -143,6 +155,32 @@ void Sprite::Draw()
 
 	// draw quad
 	dxCommon->GetCommandList()->DrawIndexedInstanced(6, 1, 0, 0, 0);
+}
+
+void Sprite::Finalize()
+{
+    
+    if (vertexResourceSprite && vertexData != nullptr)
+    {
+        D3D12_RANGE written = { 0, sizeof(VertexData) * 6 };
+        vertexResourceSprite->Unmap(0, &written);
+        vertexData = nullptr;
+    }
+
+    if (materialResourceSprite && materialData != nullptr)
+    {
+        D3D12_RANGE written = { 0, sizeof(Material) };
+        materialResourceSprite->Unmap(0, &written);
+        materialData = nullptr;
+    }
+
+    if (transformationMatrixResourceSprite && transformationMatrixDataSprite != nullptr)
+    {
+        D3D12_RANGE written = { 0, sizeof(TransformationMatrix) };
+        transformationMatrixResourceSprite->Unmap(0, &written);
+        transformationMatrixDataSprite = nullptr;
+    }
+	// indexResourceSprite は既に Unmap 済み
 }
 
 void Sprite::CreateIndexBufferView()

@@ -27,11 +27,14 @@ public:
 		Vector3 normal;
 	};
 
-
+	Sprite();
+	~Sprite();
 
 	void Initialize(SpriteCom* spriteCom,std::string textureFilePath);
 	void Update(WindowAPI* windowAPI, DebugCamera* debugCamera_);
 	void Draw();
+
+	void Finalize();
 
 	void CreateIndexBufferView();
 	void CreateVertexBufferView();

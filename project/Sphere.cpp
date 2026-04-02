@@ -4,6 +4,20 @@
 #include"Camera.h"
 #include"Light.h"
 
+Sphere::Sphere()
+{
+}
+
+Sphere::~Sphere()
+{
+	if (transformationMatrixResourceSphere && transformationMatrixDataSphere)
+	{
+		D3D12_RANGE written = { 0, sizeof(TransformationMatrix) };
+		transformationMatrixResourceSphere->Unmap(0, &written);
+		transformationMatrixDataSphere = nullptr;
+	}
+}
+
 void Sphere::Initialize(DirectXCom* dxCommon, Object3dCom* object3dCom, MaterialManager* materialManager, Light* light, Camera* camera)
 {
 	directXCom_ = dxCommon;

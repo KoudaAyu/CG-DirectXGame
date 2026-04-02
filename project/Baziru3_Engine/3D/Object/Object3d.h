@@ -86,6 +86,9 @@ public:
 
 	void DirectionalLightResource();
 
+   
+    ~Object3d();
+
 public:
 	void SetCamera(Camera* camera)
 	{

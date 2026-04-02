@@ -233,8 +233,45 @@ void Object3d::VertexResource()
 		{
 			std::memcpy(vertexData_, modelData_.vertices.data(), sizeof(Sprite::VertexData) * modelData_.vertices.size());
 		}
-		// leave mapped for update
+		
+		D3D12_RANGE written = { 0, static_cast<SIZE_T>(bufferSize) };
+		vertexResource->Unmap(0, &written);
+		vertexData_ = nullptr;
+
 	}
+}
+
+Object3d::~Object3d()
+{
+    // Ensure any persistently-mapped resources are safely unmapped.
+    // Unmap only when the CPU-side pointer is non-null to avoid double-unmap.
+    if (transformationMatrixResource && transformationMatrixData_ != nullptr)
+    {
+        D3D12_RANGE written = { 0, sizeof(TransformationMatrix) };
+        transformationMatrixResource->Unmap(0, &written);
+        transformationMatrixData_ = nullptr;
+    }
+
+    if (vertexResource && vertexData_ != nullptr)
+    {
+        D3D12_RANGE written = { 0, static_cast<SIZE_T>(vertexBufferView_.SizeInBytes) };
+        vertexResource->Unmap(0, &written);
+        vertexData_ = nullptr;
+    }
+
+    if (materialResource && materialData_ != nullptr)
+    {
+        D3D12_RANGE written = { 0, sizeof(Material) };
+        materialResource->Unmap(0, &written);
+        materialData_ = nullptr;
+    }
+
+    if (directionalLightResource && directionalLightData_ != nullptr)
+    {
+        D3D12_RANGE written = { 0, sizeof(DirectionalLight) };
+        directionalLightResource->Unmap(0, &written);
+        directionalLightData_ = nullptr;
+    }
 }
 
 void Object3d::MaterialResource()
@@ -250,6 +287,13 @@ void Object3d::MaterialResource()
 		materialData_->color = { 1.0f,1.0f,1.0f,1.0f };
 		materialData_->enableLighting = false;
 		materialData_->uvTransform = MakeIdentity4x4();
+
+		// マテリアルは初期化時に一度だけ書き込む想定のため、MapしたらすぐにUnmapする
+		// 書き込み範囲を指定してGPUへ変更を通知する
+		D3D12_RANGE writtenRange = {0, sizeof(Material)};
+		materialResource->Unmap(0, &writtenRange);
+		
+		materialData_ = nullptr;
 	}
 }
 
@@ -286,5 +330,6 @@ void Object3d::DirectionalLightResource()
 
 		// 必要に応じてアンマップ（頻繁に更新しない場合）
 		directionalLightResource->Unmap(0, nullptr);
+		directionalLightData_ = nullptr;
 	}
 }

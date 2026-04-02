@@ -14,6 +14,10 @@ class Light;
 class Sphere
 {
 public:
+
+	Sphere();
+	~Sphere();
+
 	void Initialize(DirectXCom* dxCommon, Object3dCom* object3dCom, MaterialManager* materialManager, Light* light, Camera* camera);
 	void Update();
 	void Draw(D3D12_GPU_DESCRIPTOR_HANDLE textureSrvHandle);

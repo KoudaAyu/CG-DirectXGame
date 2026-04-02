@@ -94,9 +94,11 @@ void Game::Initialize()
 	// ユーザー指定の API 形式でのテクスチャ読み込み＆スプライト生成例
 	{
 		uint32_t textureHandle = TextureManager::GetInstance()->Load("Resources/uvChecker.png");
-		Sprite* sprite = Sprite::Create(spriteCom.get(), textureHandle, { 100.0f,100.0f });
-		// 必要に応じて管理用コンテナへ登録
-		sprites.emplace_back(sprite);
+	
+		auto sp = std::make_unique<Sprite>();
+		sp->Initialize(spriteCom.get(), "Resources/uvChecker.png");
+		
+		sprites.emplace_back(std::move(sp));
 	}
 
 	
