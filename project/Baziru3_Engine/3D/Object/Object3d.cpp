@@ -1,6 +1,7 @@
 #include"Object3d.h"
 #include"Object3dCom.h"
 #include"Matrix4x4.h"
+#include "RootParam.h"
 #include<cassert>
 #include<fstream> // 追加: mtlファイル読み込み
 #include<sstream> // 追加: 行分解用
@@ -82,11 +83,9 @@ void Object3d::Draw(ID3D12GraphicsCommandList* commandList)
 {
 	commandList->IASetVertexBuffers(0, 1, &vertexBufferView_);
 	commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-	commandList->SetGraphicsRootConstantBufferView(0, materialResource->GetGPUVirtualAddress());
-	commandList->SetGraphicsRootConstantBufferView(1, transformationMatrixResource->GetGPUVirtualAddress());
-	commandList->SetGraphicsRootConstantBufferView(1, transformationMatrixResource->GetGPUVirtualAddress());
-	commandList->SetGraphicsRootConstantBufferView(3, directionalLightResource->GetGPUVirtualAddress());
-	commandList->SetGraphicsRootConstantBufferView(0, materialResource->GetGPUVirtualAddress());
+	commandList->SetGraphicsRootConstantBufferView(RootParam::Object3D::kMaterial, materialResource->GetGPUVirtualAddress());
+	commandList->SetGraphicsRootConstantBufferView(RootParam::Object3D::kTransform, transformationMatrixResource->GetGPUVirtualAddress());
+	commandList->SetGraphicsRootConstantBufferView(RootParam::Object3D::kLight, directionalLightResource->GetGPUVirtualAddress());
 }
 
 Object3d::MaterialData Object3d::LoadMaterialTemplateFile(const std::string& directoryPath, const std::string& filename)

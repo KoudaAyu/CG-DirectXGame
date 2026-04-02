@@ -193,31 +193,30 @@ void ParticleManager::Descriptor()
 
 void ParticleManager::CreateRootParameters()
 {
-	//RootParemeter生成PuxelShaderのMaterialとVertexShaderのTransform
+	//RootParameters生成PixelShaderのMaterialとVertexShaderのTransform
 
-	rootParameters[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;//CBVを使う
-	rootParameters[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL; //PixelShaderで使う
-	rootParameters[0].Descriptor.ShaderRegister = 0;
-
-
-	rootParameters[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-	rootParameters[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
-	rootParameters[1].DescriptorTable.pDescriptorRanges = &descriptorRangeForInstancing[0];
-	rootParameters[1].DescriptorTable.NumDescriptorRanges = 1;
+	rootParameters[RootParam::Particle::kMaterial].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;//CBVを使う
+	rootParameters[RootParam::Particle::kMaterial].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL; //PixelShaderで使う
+	rootParameters[RootParam::Particle::kMaterial].Descriptor.ShaderRegister = 0;
 
 
-	rootParameters[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-	rootParameters[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
-	rootParameters[2].DescriptorTable.pDescriptorRanges = &descriptorRangeForInstancing[1];
-	rootParameters[2].DescriptorTable.NumDescriptorRanges = 1;
+	rootParameters[RootParam::Particle::kInstancing].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+	rootParameters[RootParam::Particle::kInstancing].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
+	rootParameters[RootParam::Particle::kInstancing].DescriptorTable.pDescriptorRanges = &descriptorRangeForInstancing[0];
+	rootParameters[RootParam::Particle::kInstancing].DescriptorTable.NumDescriptorRanges = 1;
 
-	rootParameters[3].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
-	rootParameters[3].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
-	rootParameters[3].Descriptor.ShaderRegister = 1; 
+	rootParameters[RootParam::Particle::kTextureTable].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+	rootParameters[RootParam::Particle::kTextureTable].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+	rootParameters[RootParam::Particle::kTextureTable].DescriptorTable.pDescriptorRanges = &descriptorRangeForInstancing[1];
+	rootParameters[RootParam::Particle::kTextureTable].DescriptorTable.NumDescriptorRanges = 1;
 
-	rootParameters[4].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
-	rootParameters[4].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
-	rootParameters[4].Descriptor.ShaderRegister = 2; // b2:
+	rootParameters[RootParam::Particle::kLight].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+	rootParameters[RootParam::Particle::kLight].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+	rootParameters[RootParam::Particle::kLight].Descriptor.ShaderRegister = 1; 
+
+	rootParameters[RootParam::Particle::kCamera].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+	rootParameters[RootParam::Particle::kCamera].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+	rootParameters[RootParam::Particle::kCamera].Descriptor.ShaderRegister = 2; // b2:
 
 
 	descriptionRootSignature.pParameters = rootParameters; //ルートパラメーター配列へのポインタ

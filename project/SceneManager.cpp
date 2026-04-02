@@ -2,6 +2,7 @@
 #include "SceneFactory.h"
 
 #include<memory>
+#include <Log.h>
 
 namespace {
     static std::unique_ptr<SceneManager>& SceneManagerStorage()
@@ -50,8 +51,19 @@ void SceneManager::Destroy()
     SceneManagerStorage().reset();
 }
 
+void SceneManager::Initialize(DirectXCom* dxCommon)
+{
+	dxCommon_ = dxCommon;
+}
+
 void SceneManager::Update()
 {
+	if (!dxCommon_)
+	{
+        Logger::Log(logStream_, "SceneManager::Update() called before DirectXCom is set.");
+		return;
+	}
+
 	if ((nextScene_))
 	{
 

@@ -1,4 +1,5 @@
 #pragma once
+#include <iostream>
 #include "AbstractSceneFactory.h"
 #include "BaseScene.h"
 #include <memory>
@@ -16,8 +17,11 @@ class SceneManager
 {
 
 public:
-	SceneManager(DirectXCom* dxCommon = nullptr) : dxCommon_(dxCommon) {}
+    SceneManager(DirectXCom* dxCommon = nullptr, std::ostream& logStream = std::cerr)
+        : dxCommon_(dxCommon), logStream_(logStream) {}
 	~SceneManager();
+
+	void Initialize(DirectXCom* dxCommon);
 
 	void Update();
 
@@ -69,6 +73,8 @@ private:
 
 
 	AudioManager* audioManager_ = nullptr;
+
+    std::ostream& logStream_ = std::cerr;
 
 };
 

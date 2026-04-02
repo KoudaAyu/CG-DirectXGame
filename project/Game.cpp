@@ -28,7 +28,7 @@ void Game::Initialize()
 	windowAPI->Show();
 	directXCom->Initialize();
 
-	SceneManager::GetInstance()->SetDirectXCom(directXCom.get());
+	SceneManager::GetInstance()->Initialize(directXCom.get());
 
 	TextureManager::GetInstance()->Initialize();
 	TextureManager::GetInstance()->SetDirectXCom(directXCom.get());
@@ -38,6 +38,8 @@ void Game::Initialize()
 
 	spriteCom->CreateGraphicsPipeline();
 
+	SceneManager::GetInstance()->SetSpriteCom(spriteCom.get());
+
 	spriteManager_ = std::make_unique<SpriteManager>();
 	spriteManager_->Initialize(spriteCom.get(), "Resources/uvChecker.png", 5);
 
@@ -46,7 +48,7 @@ void Game::Initialize()
 	object3dCom = std::make_unique<Object3dCom>(logStream);
 	object3dCom->Initialize(GetDirectXCom());
 
-	// Make shared engine resources available to scenes
+	
 	SceneManager::GetInstance()->SetObject3dCom(object3dCom.get());
 
 #pragma region 最初のシーンの初期化
@@ -77,6 +79,7 @@ void Game::Initialize()
 
 	camera_ = std::make_unique<Camera>();
 	camera_->Initialize(directXCom.get());
+	SceneManager::GetInstance()->SetCamera(camera_.get());
 
 	particleManager = std::make_unique<ParticleManager>(logStream, directXCom.get());
 	particleManager->Initialize(camera_.get());
@@ -117,7 +120,6 @@ void Game::Initialize()
 	debugUI->Initialize();
 
 	SceneRegistration::RegisterScenes();
-	SceneManager::GetInstance()->SetCamera(camera_.get());
 	SceneManager::GetInstance()->ChangeScene("TITLE");
 
 	textureIndexUvChecker = TextureManager::GetInstance()->Load("Resources/uvChecker.png");
