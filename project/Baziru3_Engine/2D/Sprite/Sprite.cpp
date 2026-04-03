@@ -57,9 +57,9 @@ void Sprite::Initialize(SpriteCom* spriteCom, std::string textureFilePath)
 	AdjustTextureSize();
 }
 
-Sprite* Sprite::Create(SpriteCom* spriteCom, uint32_t textureHandle, const Vector2& position)
+std::unique_ptr<Sprite> Sprite::Create(SpriteCom* spriteCom, uint32_t textureHandle, const Vector2& position)
 {
-	Sprite* sprite = new Sprite();
+	std::unique_ptr<Sprite> sprite = std::make_unique<Sprite>();
 	// 既存 Initialize とほぼ同じ初期化を行うが、テクスチャはインデックスから設定する
 	sprite->spriteCom = spriteCom;
 	assert(spriteCom);

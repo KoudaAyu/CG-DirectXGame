@@ -5,6 +5,7 @@
 #include"MaterialManager.h"
 #include"Matrix4x4.h"
 #include"Vector.h"
+#include <memory>
 
 class SpriteCom;
 class TextureManager;
@@ -44,7 +45,7 @@ public:
 	void ReflectionProcessing();
 
 	// インデックスから生成する簡易ヘルパー
-	static Sprite* Create(SpriteCom* spriteCom,
+	static std::unique_ptr<Sprite> Create(SpriteCom* spriteCom,
 		uint32_t textureHandle,
 		const Vector2& position);
 
