@@ -5,6 +5,7 @@
 #include "MaterialManager.h"
 #include "Light.h"
 #include "ParticleManager.h"
+#include "RenderContext.h"
 #include "SpriteManager.h"
 #include "AudioManager.h"
 #include <cassert>
@@ -150,23 +151,38 @@ void GamePlayScene::Update()
 
 void GamePlayScene::Draw()
 {
-	for (auto& sprite : sprites)
+	RenderContext ctx{};
+	if (directXCom)
 	{
-		sprite->Draw();
+		ctx.commandList = directXCom->GetCommandList().Get();
+		ctx.windowAPI = directXCom->GetWindowAPI();
+		ctx.camera = camera_;
+		ctx.light = SceneManager::GetInstance()->GetLight(); // or use member 'light' if set
 	}
 
-    if (sphereInitialized && sphere_)
-    {
-        if (drawSphere)
-        {
-          
-            D3D12_GPU_DESCRIPTOR_HANDLE handle{};
-          
-            sphere_->Draw(handle);
-        }
-		else
+	if (spriteManager_)
+	{
+		spriteManager_->DrawAll(ctx, &debugCamera_, &sprites);
+	}
+	else
+	{
+	
+		for (auto& sprite : sprites)
 		{
-			//sphere_->Draw(useMonsterBall ? textureSrvHandleGPU2 : textureSrvHandleGPU);
+			if (sprite)
+			{
+				sprite->Update(ctx.windowAPI, &debugCamera_);
+				sprite->Draw();
+			}
 		}
-    }
+	}
+
+	if (sphereInitialized && sphere_)
+	{
+		if (drawSphere)
+		{
+			D3D12_GPU_DESCRIPTOR_HANDLE handle{}; 
+			sphere_->Draw(handle);
+		}
+	}
 }

@@ -272,6 +272,9 @@
     <ClInclude Include="Baziru3_Engine\Base\RootParam.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
+    <ClInclude Include="Baziru3_Engine\Base\RenderContext.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="Resources\shaders\Object3d.hlsli" />

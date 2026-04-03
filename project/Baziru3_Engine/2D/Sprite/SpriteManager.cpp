@@ -2,6 +2,7 @@
 #include "DebugCamera.h"
 #include "SpriteCom.h"
 #include "WindowsAPI.h"
+#include "Light.h"
 
 void SpriteManager::Initialize(SpriteCom* spriteCom, const std::string& texturePath, size_t count)
 {
@@ -28,7 +29,44 @@ void SpriteManager::Update(WindowAPI* windowAPI, DebugCamera* debugCamera)
 
 void SpriteManager::Draw()
 {
-    for (auto& s : sprites_) s->Draw();
+     if (!spriteCom_)
+    {
+        for (auto& s : sprites_) s->Draw();
+        return;
+    }
+    RenderContext ctx{};
+    ctx.commandList = spriteCom_->GetDxCommon()->GetCommandList().Get();
+    ctx.windowAPI = spriteCom_->GetDxCommon()->GetWindowAPI();
+    DrawAll(ctx, nullptr, nullptr);
+}
+
+void SpriteManager::DrawAll(const RenderContext& ctx, DebugCamera* debugCamera, const std::vector<std::unique_ptr<Sprite>>* externalSprites)
+{
+    if (!ctx.commandList)
+    {
+        return;
+    }
+    spriteCom_->SetupDraw(ctx.commandList);
+
+    for (auto& sp : sprites_)
+    {
+        if (!sp) continue;
+        sp->Update(ctx.windowAPI, debugCamera);
+        if (ctx.light) sp->SetDirectionalLightResource(ctx.light->GetDirectionalLightResource());
+        sp->Draw();
+    }
+
+    // 外部スプライト群（Gameが持つやつ）も同じ処理
+    if (externalSprites)
+    {
+        for (auto& sp : *externalSprites)
+        {
+            if (!sp) continue;
+            sp->Update(ctx.windowAPI, debugCamera);
+            if (ctx.light) sp->SetDirectionalLightResource(ctx.light->GetDirectionalLightResource());
+            sp->Draw();
+        }
+    }
 }
 
 std::vector<std::unique_ptr<Sprite>>& SpriteManager::GetSprites()

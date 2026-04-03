@@ -1,4 +1,5 @@
 #include"Object3dCom.h"
+#include "Light.h"
 
 
 // 参照メンバー logStream を初期化するコンストラクタ定義
@@ -61,6 +62,50 @@ void Object3dCom::PreDraw()
 	auto CommandList = dxCommon->GetCommandList();
 	CommandList->SetGraphicsRootSignature(rootSignature.Get());
 	CommandList->SetPipelineState(pipelineState.Get());
+}
+
+
+
+void Object3dCom::Draw(Object3d* object, const ::RenderContext& ctx, const Object3d::ModelData& modelData, bool drawObject)
+{
+    if (!ctx.commandList) return;
+
+   
+    if (ctx.textureHandle.ptr != 0)
+    {
+        ctx.commandList->SetGraphicsRootDescriptorTable(2, ctx.textureHandle);
+    }
+
+   
+    if (ctx.light)
+    {
+        ctx.commandList->SetGraphicsRootConstantBufferView(3, ctx.light->GetDirectionalLightResource()->GetGPUVirtualAddress());
+    }
+    else
+    {
+        ctx.commandList->SetGraphicsRootConstantBufferView(3, 0);
+    }
+
+   
+    if (ctx.camera && ctx.camera->GetCameraResource())
+    {
+        ctx.commandList->SetGraphicsRootConstantBufferView(4, ctx.camera->GetCameraResource()->GetGPUVirtualAddress());
+    }
+    else
+    {
+        ctx.commandList->SetGraphicsRootConstantBufferView(4, 0);
+    }
+
+   
+    if (object)
+    {
+        object->Draw(ctx.commandList);
+    }
+
+    if (drawObject)
+    {
+        ctx.commandList->DrawInstanced(UINT(modelData.vertices.size()), 1, 0, 0);
+    }
 }
 
 void Object3dCom::Descriptor()

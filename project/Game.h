@@ -31,6 +31,8 @@
 #include <vector>
 #include <random>
 
+#include "RenderContext.h"
+
 class Game : public Framework
 {
 public:
@@ -77,7 +79,9 @@ public:
 
 
 private:
-
+    void DrawObjects(const RenderContext& ctx);
+    void DrawSprites(const RenderContext& ctx);
+    void DrawParticles(const RenderContext& ctx);
 
 private:
 	ResourceLeakCheek leakChecker; //リソースリークチェック用のオブジェクト
