@@ -213,13 +213,14 @@ void Game::Update()
 	
 	
 #ifdef _DEBUG
+
+
 	if (debugUI)
 	{
 		debugUI->Update();
 	}
 
 	
-
 #endif // DEBUG
 
 	//ImGui内部コマンドを生成する
@@ -259,7 +260,16 @@ void Game::Draw()
     }
     ctx.materialGPUAddress = materialManager_->GetMaterialResource() ? materialManager_->GetMaterialResource()->GetGPUVirtualAddress() : 0;
 
-	SceneManager::GetInstance()->Draw();
+    if (camera_ && camera_->GetCameraResource())
+    {
+        directXCom->GetCommandList()->SetGraphicsRootConstantBufferView(4, camera_->GetCameraResource()->GetGPUVirtualAddress());
+    }
+    else
+    {
+        Logger::Log(logStream, "Warning: camera GPU resource not available before SceneManager draw.\n");
+    }
+
+    SceneManager::GetInstance()->Draw();
 
 	
 
@@ -309,16 +319,11 @@ bool Game::IsQuitRequested()
 
 void Game::DrawObjects(const RenderContext& ctx)
 {
-  
-    object3d_->Draw(ctx.commandList);
-
-  
     if (ctx.textureHandle.ptr != 0)
     {
         ctx.commandList->SetGraphicsRootDescriptorTable(2, ctx.textureHandle);
     }
 
-   
     if (ctx.light)
     {
         ctx.commandList->SetGraphicsRootConstantBufferView(3, ctx.light->GetDirectionalLightResource()->GetGPUVirtualAddress());
@@ -328,16 +333,17 @@ void Game::DrawObjects(const RenderContext& ctx)
         ctx.commandList->SetGraphicsRootConstantBufferView(3, 0);
     }
 
-  
     if (ctx.camera && ctx.camera->GetCameraResource())
     {
         ctx.commandList->SetGraphicsRootConstantBufferView(4, ctx.camera->GetCameraResource()->GetGPUVirtualAddress());
     }
     else
     {
-        ctx.commandList->SetGraphicsRootConstantBufferView(4, 0);
-        Logger::Log(logStream, "Warning: camera GPU resource not available when drawing object.\n");
+         Logger::Log(logStream, "Warning: camera GPU resource not available when drawing object.\n");
+        return;
     }
+
+     object3d_->Draw(ctx.commandList);
 
     if (drawObject)
     {

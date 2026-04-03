@@ -20,15 +20,18 @@ void Camera::Initialize(DirectXCom* directXCom)
 {
 	directXCom_ = directXCom;
 
-	// --- カメラ用のリソース作成を追加 ---
-	cameraResource = directXCom_->CreateBufferResource(directXCom_->GetDevice().Get(), sizeof(CameraForGPU));
+	//カメラ用のGPU定義バッファサイズは256バイト境界に揃える
+	const size_t cameraBufferSize = (sizeof(CameraForGPU) + 255) & ~size_t(255);
 
+    // --- カメラ用のリソース作成を追加 ---
+    // 256 バイト境界に揃えたサイズを使う
+    cameraResource = directXCom_->CreateBufferResource(directXCom_->GetDevice().Get(), cameraBufferSize);
 	
 	cameraResource->Map(0, nullptr, reinterpret_cast<void**>(&cameraData));
 	// 初期値を設定
 	if (cameraData)
 	{
-		// Use the transform's translate as the initial GPU camera world position
+		*cameraData = CameraForGPU{};
 		cameraData->worldPosition = transform_.GetTranslate();
 	}
 }

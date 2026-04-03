@@ -93,7 +93,9 @@ void Object3dCom::Draw(Object3d* object, const ::RenderContext& ctx, const Objec
     }
     else
     {
-        ctx.commandList->SetGraphicsRootConstantBufferView(4, 0);
+        // Camera GPU resource not available: skip drawing to avoid uninitialized root argument on GPU
+        Logger::Log(logStream, "Warning: camera GPU resource not available when drawing object. Skipping draw.\n");
+        return;
     }
 
    
