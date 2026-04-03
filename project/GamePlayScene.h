@@ -12,7 +12,8 @@
 #include "MaterialManager.h"
 #include "ParticleManager.h"
 #include "Sprite.h"
-#include "Baziru3_Engine/2D/Sprite/SpriteManager.h" // ensure complete type for unique_ptr
+#include "SpriteManager.h" 
+#include "DebugCamera.h"
 
 class Camera;
 class SpriteCom;
@@ -31,6 +32,10 @@ public:
 
     void SetSpriteCom(SpriteCom* spriteCom) { this->spriteCom = spriteCom; }
 
+    void SetDrawSphere(bool enable) { drawSphere = enable; }
+    void ToggleDrawSphere() { drawSphere = !drawSphere; }
+    bool IsDrawSphere() const { return drawSphere; }
+
 private:
 
     Camera* camera_ = nullptr;
@@ -42,8 +47,8 @@ private:
     MaterialManager* materialManager = nullptr;
     Object3dCom* object3dCom = nullptr;
     ParticleManager* particleManager = nullptr;
-    std::unique_ptr<Sphere> sphere;
     std::unique_ptr<Sphere> sphere_;
+    DebugCamera debugCamera_;
     std::vector<std::unique_ptr<Sprite>> sprites;
     std::unique_ptr<SpriteManager> spriteManager_;
     std::list<ParticleManager::Particle> particles;

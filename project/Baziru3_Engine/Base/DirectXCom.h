@@ -288,6 +288,10 @@ private:
 
 	WindowAPI* windowAPI = nullptr;
 
+public:
+    // Provide access to WindowAPI for callers that need window information
+    WindowAPI* GetWindowAPI() const { return windowAPI; }
+
 
 	//最大SRV数(Texture枚数)
 	static const uint32_t kMacSRVCount = 512;

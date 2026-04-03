@@ -7,6 +7,9 @@
 #include "ParticleManager.h"
 #include "SpriteManager.h"
 #include "AudioManager.h"
+#include <cassert>
+#include <Windows.h>
+
 bool GamePlayScene::TryInitializeSphere()
 {
 
@@ -36,7 +39,8 @@ bool GamePlayScene::TryInitializeSphere()
 void GamePlayScene::Initialize(DirectXCom* dxCommon,Camera* camera)
 {
 	camera_ = camera;
-	directXCom = dxCommon;
+     assert(dxCommon != nullptr);
+    this->directXCom = dxCommon;
 
 
 	if (!TryInitializeSphere())
@@ -121,12 +125,27 @@ void GamePlayScene::Update()
 
 	particleManager->Update(kDeltaTime);
 
-	// スプライトの毎フレーム更新はここで行う（必要な依存を持っている場合）
-	if (spriteManager_)
-	{
-		WindowAPI* windowAPI = nullptr;
-		DebugCamera* debugCamera = nullptr;
-	}
+    // スプライトの毎フレーム更新はここで行う（必要な依存を持っている場合）
+    if (spriteManager_ && directXCom)
+    {
+        WindowAPI* windowAPI = directXCom->GetWindowAPI();
+        DebugCamera* debugCamera = &debugCamera_;
+        if (windowAPI && debugCamera)
+        {
+            spriteManager_->Update(windowAPI, debugCamera);
+        }
+    }
+
+ 
+    {
+        static bool prevF1 = false;
+        bool curF1 = (GetAsyncKeyState(VK_F1) & 0x8000) != 0;
+        if (curF1 && !prevF1)
+        {
+            ToggleDrawSphere();
+        }
+        prevF1 = curF1;
+    }
 }
 
 void GamePlayScene::Draw()
@@ -136,8 +155,18 @@ void GamePlayScene::Draw()
 		sprite->Draw();
 	}
 
-	if (drawSphere && sphereInitialized && sphere_)
-	{
-		//sphere_->Draw(useMonsterBall ? textureSrvHandleGPU2 : textureSrvHandleGPU);
-	}
+    if (sphereInitialized && sphere_)
+    {
+        if (drawSphere)
+        {
+          
+            D3D12_GPU_DESCRIPTOR_HANDLE handle{};
+          
+            sphere_->Draw(handle);
+        }
+		else
+		{
+			//sphere_->Draw(useMonsterBall ? textureSrvHandleGPU2 : textureSrvHandleGPU);
+		}
+    }
 }
