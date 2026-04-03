@@ -1,5 +1,6 @@
 #include"Object3d.h"
 #include"Object3dCom.h"
+#include "GpuResourceUtils.h"
 #include"Matrix4x4.h"
 #include "RootParam.h"
 #include<cassert>
@@ -13,6 +14,7 @@ void Object3d::Initialize(Object3dCom* object3dCom, const ModelData& modelData)
 {
 	object3dCom_ = object3dCom;
 	modelData_ = modelData; // store model data
+	isWorldMatrixDirty_ = true;
 	// object3dCom_ が未設定の場合は何もしない(デフォルトカメラは取得しない)
 	if (object3dCom_)
 	{
@@ -44,6 +46,18 @@ void Object3d::Initialize(Object3dCom* object3dCom, const ModelData& modelData)
 	cameraTransform = { {1.0f,1.0f,1.0f}, {0.0f,0.0f,0.0f}, {0.0f,0.0f,-10.0f} };
 }
 
+void Object3d::UpdateWorldMatrixCache()
+{
+	if (!isWorldMatrixDirty_)
+	{
+		return;
+	}
+
+	cachedWorldMatrix_ = MakeAffineMatrix(transform.GetScale(), transform.GetRotate(), transform.GetTranslate());
+	cachedWorldInverseTranspose_ = Transpose(Inverse(cachedWorldMatrix_));
+	isWorldMatrixDirty_ = false;
+}
+
 void Object3d::Update()
 {
 	// 毎フレーム、Object3dCom から最新のカメラを取得（初期化後に設定されたケースへ対応）
@@ -52,8 +66,7 @@ void Object3d::Update()
 		camera_ = object3dCom_->GetDefaultCamera();
 	}
 
-	// 優先: Object3dComに設定されたカメラを使う
-	Matrix4x4 worldMatrix = MakeAffineMatrix(transform.GetScale(), transform.GetRotate(), transform.GetTranslate());
+	UpdateWorldMatrixCache();
 
 	Matrix4x4 viewMatrix;
 	Matrix4x4 projectionMatrix;
@@ -73,10 +86,9 @@ void Object3d::Update()
 	}
 
 	// WVP を更新
-	transformationMatrixData_->WVP = Multiply(worldMatrix, Multiply(viewMatrix, projectionMatrix));
-	transformationMatrixData_->World = worldMatrix;
-	// WorldInverseTranspose を計算して格納（法線変換用）
-	transformationMatrixData_->WorldInverseTranspose = Transpose(Inverse(worldMatrix));
+	transformationMatrixData_->WVP = Multiply(cachedWorldMatrix_, Multiply(viewMatrix, projectionMatrix));
+	transformationMatrixData_->World = cachedWorldMatrix_;
+	transformationMatrixData_->WorldInverseTranspose = cachedWorldInverseTranspose_;
 }
 
 void Object3d::Draw(ID3D12GraphicsCommandList* commandList)
@@ -279,21 +291,8 @@ void Object3d::MaterialResource()
 	if (object3dCom_ && object3dCom_->GetDirectXCom())
 	{
 		DirectXCom* dxCommon = object3dCom_->GetDirectXCom();
-		// マテリアル用のリソースを作成（1個分）
-		materialResource = dxCommon->CreateBufferResource(dxCommon->GetDevice().Get(), sizeof(Material));
-		// 書き込み用アドレスを取得してメンバーに保持
-		materialResource->Map(0, nullptr, reinterpret_cast<void**>(&materialData_));
-		// 初期値を設定
-		materialData_->color = { 1.0f,1.0f,1.0f,1.0f };
-		materialData_->enableLighting = false;
-		materialData_->uvTransform = MakeIdentity4x4();
-
-		// マテリアルは初期化時に一度だけ書き込む想定のため、MapしたらすぐにUnmapする
-		// 書き込み範囲を指定してGPUへ変更を通知する
-		D3D12_RANGE writtenRange = {0, sizeof(Material)};
-		materialResource->Unmap(0, &writtenRange);
-		
-		materialData_ = nullptr;
+		materialResource = GpuResourceUtils::CreateMappedBuffer(dxCommon, materialData_);
+		GpuResourceUtils::InitializeMaterial(materialData_);
 	}
 }
 
@@ -302,13 +301,8 @@ void Object3d::TransformationMatrixResource()
 	if (object3dCom_ && object3dCom_->GetDirectXCom())
 	{
 		DirectXCom* dxCommon = object3dCom_->GetDirectXCom();
-		// Transformation
-		transformationMatrixResource = dxCommon->CreateBufferResource(dxCommon->GetDevice().Get(), sizeof(TransformationMatrix));
-		// 書き込み用アドレスを取得してメンバーに保持
-		transformationMatrixResource->Map(0, nullptr, reinterpret_cast<void**>(&transformationMatrixData_));
-
-		transformationMatrixData_->WVP = MakeIdentity4x4();
-		transformationMatrixData_->World = MakeIdentity4x4();
+		transformationMatrixResource = GpuResourceUtils::CreateMappedBuffer(dxCommon, transformationMatrixData_);
+		GpuResourceUtils::InitializeTransformationMatrix(transformationMatrixData_);
 	}
 }
 

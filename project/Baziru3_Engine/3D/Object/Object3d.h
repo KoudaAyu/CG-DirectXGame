@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 #include "Camera.h"
+#include "Material.h"
 #include"TextureManager.h"
 #include "Transform.h"
 #include "Sprite.h"
@@ -12,14 +13,7 @@ class Object3dCom;
 class Object3d
 {
 public:
-
-	struct Material
-	{
-		Vector4 color;
-		int32_t enableLighting;
-		float padding[3]; // パディングを追加して16バイト境界に揃える
-		Matrix4x4 uvTransform; // UV変換行列
-	};
+	using VertexData = Sprite::VertexData;
 
 	struct MaterialData
 	{
@@ -32,13 +26,6 @@ public:
 	{
 		std::vector<Sprite::VertexData> vertices; // 頂点データ
 		MaterialData material; // マテリアルデータ
-	};
-
-	struct VertexData
-	{
-		Vector4 position;
-		Vector2 texcoord;
-		Vector3 normal;
 	};
 
 	struct TransformationMatrixData
@@ -86,6 +73,8 @@ public:
 
 	void DirectionalLightResource();
 
+	void UpdateWorldMatrixCache();
+
    
     ~Object3d();
 
@@ -105,10 +94,47 @@ public:
 	}
 
 	const Microsoft::WRL::ComPtr<ID3D12Resource>& GetTransformationMatrixResource() const { return transformationMatrixResource; }
+	Material* GetMaterialData() { return materialData_; }
+	const Material* GetMaterialData() const { return materialData_; }
+	void SetEnableLighting(bool enable)
+	{
+		if (materialData_)
+		{
+			materialData_->enableLighting = enable ? 1 : 0;
+		}
+	}
+	void SetShininess(float shininess)
+	{
+		if (materialData_)
+		{
+			materialData_->shininess = shininess;
+		}
+	}
+	void SetShadingModel(int32_t shadingModel)
+	{
+		if (materialData_)
+		{
+			materialData_->shadingModel = shadingModel;
+		}
+	}
+	void SetAlphaThreshold(float alphaThreshold)
+	{
+		if (materialData_)
+		{
+			materialData_->alphaThreshold = alphaThreshold;
+		}
+	}
+	void SetSpecularIntensity(float specularIntensity)
+	{
+		if (materialData_)
+		{
+			materialData_->specularIntensity = specularIntensity;
+		}
+	}
 
-	void SetRotate(const Vector3& r) { transform.SetRotate(r); }
-	void SetTranslate(const Vector3& t) { transform.SetTranslate(t); }
-	void SetScale(const Vector3& s) { transform.SetScale(s); }
+	void SetRotate(const Vector3& r) { transform.SetRotate(r); isWorldMatrixDirty_ = true; }
+	void SetTranslate(const Vector3& t) { transform.SetTranslate(t); isWorldMatrixDirty_ = true; }
+	void SetScale(const Vector3& s) { transform.SetScale(s); isWorldMatrixDirty_ = true; }
 	Vector3 GetRotate() const { return transform.GetRotate(); }
 	Vector3 GetTranslate() const { return transform.GetTranslate(); }
 	Vector3 GetScale() const { return transform.GetScale(); }
@@ -145,4 +171,8 @@ private:
 	Microsoft::WRL::ComPtr<ID3D12Resource> directionalLightResource = nullptr;
 	// バッファリソース内のデータを指すポインタ
 	DirectionalLight* directionalLightData_ = nullptr;
+
+	Matrix4x4 cachedWorldMatrix_ = MakeIdentity4x4();
+	Matrix4x4 cachedWorldInverseTranspose_ = MakeIdentity4x4();
+	bool isWorldMatrixDirty_ = true;
 };

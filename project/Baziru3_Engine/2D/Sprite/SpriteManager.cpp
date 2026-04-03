@@ -53,6 +53,14 @@ void SpriteManager::DrawAll(const RenderContext& ctx, DebugCamera* debugCamera, 
         if (!sp) continue;
         sp->Update(ctx.windowAPI, debugCamera);
         if (ctx.light) sp->SetDirectionalLightResource(ctx.light->GetDirectionalLightResource());
+        if (ctx.camera && ctx.camera->GetCameraResource())
+        {
+            ctx.commandList->SetGraphicsRootConstantBufferView(4, ctx.camera->GetCameraResource()->GetGPUVirtualAddress());
+        }
+        else
+        {
+            ctx.commandList->SetGraphicsRootConstantBufferView(4, 0);
+        }
         sp->Draw();
     }
 
@@ -64,6 +72,14 @@ void SpriteManager::DrawAll(const RenderContext& ctx, DebugCamera* debugCamera, 
             if (!sp) continue;
             sp->Update(ctx.windowAPI, debugCamera);
             if (ctx.light) sp->SetDirectionalLightResource(ctx.light->GetDirectionalLightResource());
+            if (ctx.camera && ctx.camera->GetCameraResource())
+            {
+                ctx.commandList->SetGraphicsRootConstantBufferView(4, ctx.camera->GetCameraResource()->GetGPUVirtualAddress());
+            }
+            else
+            {
+                ctx.commandList->SetGraphicsRootConstantBufferView(4, 0);
+            }
             sp->Draw();
         }
     }

@@ -1,6 +1,7 @@
 #include"Sprite.h"
 #include"SpriteCom.h"
 #include"TextureManager.h"
+#include "GpuResourceUtils.h"
 #include<cassert>
 
 
@@ -32,19 +33,11 @@ void Sprite::Initialize(SpriteCom* spriteCom, std::string textureFilePath)
 	ReflectionProcessing();
 	CreateIndexData();
 
-	materialResourceSprite = dxCommon->CreateBufferResource(dxCommon->GetDevice().Get(), sizeof(Material));
-		materialResourceSprite->Map(0, nullptr, reinterpret_cast<void**>(&materialData));
-	materialData->color = { 1.0f, 1.0f, 1.0f, 1.0f }; // 白（テクスチャ色をそのまま出す用）
-	materialData->enableLighting = false;
-	materialData->uvTransform = MakeIdentity4x4();
+	materialResourceSprite = GpuResourceUtils::CreateMappedBuffer(dxCommon, materialData);
+	GpuResourceUtils::InitializeMaterial(materialData);
 	
-	//Sprite用のTransformationMatrix用のリソースを作る
-	transformationMatrixResourceSprite = dxCommon->CreateBufferResource(dxCommon->GetDevice().Get(), sizeof(TransformationMatrix));
-	// データを書き込むためにMapする。TransformationMatrixは毎フレーム更新されるため、ここでも永続的にMapしておく。
-	transformationMatrixResourceSprite->Map(0, nullptr, reinterpret_cast<void**>(&transformationMatrixDataSprite));
-	// 単位行列を書き込んでおく
-	transformationMatrixDataSprite->WVP = MakeIdentity4x4();
-	transformationMatrixDataSprite->World = MakeIdentity4x4();
+	transformationMatrixResourceSprite = GpuResourceUtils::CreateMappedBuffer(dxCommon, transformationMatrixDataSprite);
+	GpuResourceUtils::InitializeTransformationMatrix(transformationMatrixDataSprite);
 	
 	uint32_t index = TextureManager::GetInstance()->Load(textureFilePath);
 
@@ -72,16 +65,11 @@ std::unique_ptr<Sprite> Sprite::Create(SpriteCom* spriteCom, uint32_t textureHan
 	sprite->ReflectionProcessing();
 	sprite->CreateIndexData();
 
-	sprite->materialResourceSprite = sprite->dxCommon->CreateBufferResource(sprite->dxCommon->GetDevice().Get(), sizeof(Material));
-	sprite->materialResourceSprite->Map(0, nullptr, reinterpret_cast<void**>(&sprite->materialData));
-	sprite->materialData->color = { 1.0f, 1.0f, 1.0f, 1.0f };
-	sprite->materialData->enableLighting = false;
-	sprite->materialData->uvTransform = MakeIdentity4x4();
+	sprite->materialResourceSprite = GpuResourceUtils::CreateMappedBuffer(sprite->dxCommon, sprite->materialData);
+	GpuResourceUtils::InitializeMaterial(sprite->materialData);
 
-	sprite->transformationMatrixResourceSprite = sprite->dxCommon->CreateBufferResource(sprite->dxCommon->GetDevice().Get(), sizeof(TransformationMatrix));
-	sprite->transformationMatrixResourceSprite->Map(0, nullptr, reinterpret_cast<void**>(&sprite->transformationMatrixDataSprite));
-	sprite->transformationMatrixDataSprite->WVP = MakeIdentity4x4();
-	sprite->transformationMatrixDataSprite->World = MakeIdentity4x4();
+	sprite->transformationMatrixResourceSprite = GpuResourceUtils::CreateMappedBuffer(sprite->dxCommon, sprite->transformationMatrixDataSprite);
+	GpuResourceUtils::InitializeTransformationMatrix(sprite->transformationMatrixDataSprite);
 
 	// テクスチャハンドルを直接設定
 	sprite->textureHandleGPU = TextureManager::GetInstance()->GetSrvHandleGPU(textureHandle);
@@ -129,6 +117,7 @@ void Sprite::Update(WindowAPI* windowAPI, DebugCamera* debugCamera_)
 	Matrix4x4 worldViewProjectionmatrixSprite = Multiply(worldMatrixSprite, Multiply(debugCamera_->GetViewMatrix(), projectionMatrixSprite));
 	transformationMatrixDataSprite->WVP = worldViewProjectionmatrixSprite; 
 	transformationMatrixDataSprite->World = worldMatrixSprite;
+	transformationMatrixDataSprite->WorldInverseTranspose = MakeIdentity4x4();
 
 	if (uvDirty)
 	{

@@ -1,12 +1,13 @@
 #include "DebugUI.h"
 #include "MaterialManager.h"
+#include "Object3d.h"
 #include "SpriteManager.h"
 #include "Camera.h"
 #include <imgui.h>
 
 DebugUI::DebugUI(MaterialManager* materialManager, SpriteManager* spriteManager, Camera* camera,
-    Sprite::Transform* transformObject, bool* useMonsterBall, bool* drawObject, bool* drawSprite)
-    : materialManager_(materialManager), spriteManager_(spriteManager), camera_(camera), transformObject_(transformObject), useMonsterBall_(useMonsterBall), drawObject_(drawObject), drawSprite_(drawSprite)
+    Sprite::Transform* transformObject, bool* useMonsterBall, bool* drawObject, bool* drawSprite, Object3d* object3d)
+    : materialManager_(materialManager), spriteManager_(spriteManager), camera_(camera), transformObject_(transformObject), useMonsterBall_(useMonsterBall), drawObject_(drawObject), drawSprite_(drawSprite), object3d_(object3d)
 {
 }
 
@@ -95,6 +96,26 @@ void DebugUI::Update()
     {
         camera_->SetRotate({ 0.0f, 0.0f, 0.0f });
         camera_->SetTranslate({ 0.0f, 0.0f, -5.0f });
+    }
+
+    if (ImGui::CollapsingHeader("Object Material") && object3d_ && object3d_->GetMaterialData())
+    {
+        auto* material = object3d_->GetMaterialData();
+
+        bool enableLighting = (material->enableLighting != 0);
+        if (ImGui::Checkbox("Object Enable Lighting", &enableLighting))
+        {
+            object3d_->SetEnableLighting(enableLighting);
+        }
+
+        ImGui::SliderFloat("Object Shininess", &material->shininess, 0.1f, 100.0f);
+
+        const char* shadingModels[] = { "Phong", "Blinn-Phong" };
+        int shadingModel = material->shadingModel;
+        if (ImGui::Combo("Object Shading Model", &shadingModel, shadingModels, IM_ARRAYSIZE(shadingModels)))
+        {
+            object3d_->SetShadingModel(shadingModel);
+        }
     }
 
     ImGui::End();

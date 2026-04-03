@@ -2,6 +2,7 @@
 
 #include"DebugCamera.h"
 #include"DirectXCom.h"
+#include"Material.h"
 #include"MaterialManager.h"
 #include"Matrix4x4.h"
 #include"Vector.h"

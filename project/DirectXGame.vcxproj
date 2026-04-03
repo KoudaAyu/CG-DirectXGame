@@ -88,6 +88,8 @@
     <ClInclude Include="Baziru3_Engine\3D\Object\Object3d.h" />
     <ClInclude Include="Baziru3_Engine\3D\Object\Object3dCom.h" />
     <ClInclude Include="Baziru3_Engine\Audio\Sound.h" />
+    <ClInclude Include="Baziru3_Engine\Base\GpuResourceUtils.h" />
+    <ClInclude Include="Baziru3_Engine\Base\Material.h" />
     <ClInclude Include="Baziru3_Engine\Base\RenderContext.h" />
     <ClInclude Include="Baziru3_Engine\Base\RootParam.h" />
     <ClInclude Include="Baziru3_Engine\Camera\DebugCamera\DebugCamera.h" />
@@ -133,6 +135,7 @@
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
+    <None Include="Resources\shaders\Material.hlsli" />
     <None Include="Resources\shaders\Particle.hlsli" />
     <None Include="Resources\shaders\Object3d.hlsli" />
   </ItemGroup>

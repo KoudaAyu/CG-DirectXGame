@@ -1,14 +1,5 @@
 #include "Resources/shaders/Object3d.hlsli"
-
-struct Material
-{
-    float32_t4 color;
-    int32_t enableLighting;
-    float32_t3 padding;
-    float32_t4x4 uvTransform;
-    float32_t shininess;
-    float32_t3 padding2;
-};
+#include "Resources/shaders/Material.hlsli"
 
 ConstantBuffer<Material> gMaterial : register(b0);
 
@@ -39,40 +30,30 @@ ConstantBuffer<Camera> gCamera : register(b2);
 PixelShaderOutput main(VertexShaderOutput input)
 {
     PixelShaderOutput output;
-    float3 transformedUV = mul(float32_t4(input.texcoord, 0.0f, 1.0f), gMaterial.uvTransform);
+    float4 transformedUV = mul(float32_t4(input.texcoord, 0.0f, 1.0f), gMaterial.uvTransform);
     float32_t4 textureColor = gTexture.Sample(gSample, transformedUV.xy);
     output.color = gMaterial.color * textureColor;
-    
-   
-    float NdotL = dot(normalize(input.normal), normalize(-gDirectionalLight.direction));
-   
 
-    float32_t3 toEye = normalize(gCamera.worldPosition - input.worldPosition);
+    float32_t3 normal = normalize(input.normal);
+    float32_t3 lightDirection = normalize(-gDirectionalLight.direction);
+    float NdotL = dot(normal, lightDirection);
 
-
-
-    if (textureColor.a <= 0.1 || output.color.a == 0.0)
+    if (textureColor.a <= gMaterial.alphaThreshold || output.color.a <= gMaterial.alphaThreshold)
     {
         discard;
     }
     
 if (gMaterial.enableLighting != 0)
 {
-    float32_t3 halfVector = normalize(-gDirectionalLight.direction + toEye);
-    float NDotH = dot(normalize(input.normal), halfVector);
-    float specularPow = pow(saturate(NDotH), gMaterial.shininess);
+    float32_t3 toEye = normalize(gCamera.worldPosition - input.worldPosition);
+    float specularPow = CalculateSpecularPow(gMaterial, normal, lightDirection, toEye);
     
-    // 3. ハーフランバート
-    float cos = pow(NdotL * 0.5f + 0.5f, 2.0f);
+    float cos = pow(NdotL * 0.5f + 0.5f, HALF_LAMBERT_EXPONENT);
 
-    
-    // 4. 拡散反射
     float32_t3 diffuse = gMaterial.color.rgb * textureColor.rgb * gDirectionalLight.color.rgb * cos * gDirectionalLight.intensity;
     
-    // 5. 鏡面反射 (saturate(NdotL)を掛けて裏側の漏れを防ぐ)
-    float32_t3 specular = gDirectionalLight.color.rgb * gDirectionalLight.intensity * specularPow * saturate(NdotL);
+    float32_t3 specular = gDirectionalLight.color.rgb * gDirectionalLight.intensity * specularPow * saturate(NdotL) * gMaterial.specularIntensity;
 
-    // 6. 合体！
     output.color.rgb = diffuse + specular;
 }
     else

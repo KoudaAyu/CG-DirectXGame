@@ -119,7 +119,7 @@ void Game::Initialize()
 	imguiManager = std::make_unique<ImGuiManager>();
 	imguiManager->Initialize(windowAPI.get(), directXCom.get());
 
-	debugUI = std::make_unique<DebugUI>(materialManager_.get(), spriteManager_.get(), camera_.get(), &transformObject, &useMonsterBall, &drawObject, &drawSprite);
+	debugUI = std::make_unique<DebugUI>(materialManager_.get(), spriteManager_.get(), camera_.get(), &transformObject, &useMonsterBall, &drawObject, &drawSprite, object3d_.get());
 	debugUI->Initialize();
 
 	SceneRegistration::RegisterScenes();

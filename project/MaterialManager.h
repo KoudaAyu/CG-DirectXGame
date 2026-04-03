@@ -4,19 +4,10 @@
 #include<wrl.h>
 #include<d3d12.h>
 
+#include"Material.h"
 #include"Transform.h"
 
 class DirectXCom;
-
-struct Material
-{
-	Vector4 color;
-	int32_t enableLighting;
-	float padding[3]; // パディングを追加して16バイト境界に揃える
-	Matrix4x4 uvTransform; // UV変換行列
-	float shininess;
-	float padding2[3];
-};
 
 class MaterialManager
 {
@@ -35,6 +26,12 @@ public:
 	int32_t& GetMaterialDataEnableLighting() { return materialData->enableLighting; }
 
 	float& GetMaterialDataShininess() { return materialData->shininess; }
+
+	int32_t& GetMaterialDataShadingModel() { return materialData->shadingModel; }
+
+	float& GetMaterialDataAlphaThreshold() { return materialData->alphaThreshold; }
+
+	float& GetMaterialDataSpecularIntensity() { return materialData->specularIntensity; }
 
 	Microsoft::WRL::ComPtr<ID3D12Resource> GetMaterialResource() { return materialResource; }
 
