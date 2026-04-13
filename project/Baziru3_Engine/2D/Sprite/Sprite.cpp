@@ -38,6 +38,8 @@ void Sprite::Initialize(SpriteCom* spriteCom, std::string textureFilePath)
     materialData = materialMap.get();
     materialData->color = { 1.0f, 1.0f, 1.0f, 1.0f }; // 白（テクスチャ色をそのまま出す用）
     materialData->enableLighting = false;
+    materialData->specularModel = 0; // Blinn-Phong default
+    materialData->shininess = 16.0f;
     materialData->uvTransform = MakeIdentity4x4();
 	
 	//Sprite用のTransformationMatrix用のリソースを作る
@@ -81,6 +83,8 @@ std::unique_ptr<Sprite> Sprite::Create(SpriteCom* spriteCom, uint32_t textureHan
 	sprite->materialData = sprite->materialMap.get();
 	sprite->materialData->color = { 1.0f, 1.0f, 1.0f, 1.0f };
 	sprite->materialData->enableLighting = false;
+	sprite->materialData->specularModel = 0;
+	sprite->materialData->shininess = 16.0f;
 	sprite->materialData->uvTransform = MakeIdentity4x4();
 
 	sprite->transformationMatrixResourceSprite = sprite->dxCommon->CreateBufferResource(sprite->dxCommon->GetDevice().Get(), sizeof(TransformationMatrix));

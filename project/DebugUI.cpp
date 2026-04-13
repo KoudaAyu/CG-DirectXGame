@@ -110,6 +110,13 @@ void DebugUI::Update()
         }
 
         ImGui::DragFloat("Shininess", &materialManager_->GetMaterialDataShininess(), 0.5f, 0.1f, 100.0f);
+        // Specular model selection
+        int specModel = materialManager_->GetMaterialSpecularModel();
+        const char* items = "Blinn-Phong\0Phong\0";
+        if (ImGui::Combo("Specular Model", &specModel, items))
+        {
+            materialManager_->GetMaterialSpecularModel() = specModel;
+        }
     }
 
     ImGui::End();

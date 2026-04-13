@@ -12,7 +12,8 @@ struct Material
 {
 	Vector4 color;
 	int32_t enableLighting;
-	float padding[3]; // パディングを追加して16バイト境界に揃える
+    int32_t specularModel; // 0: Blinn-Phong, 1: Phong
+    float padding[2]; // パディングを追加して16バイト境界に揃える
 	Matrix4x4 uvTransform; // UV変換行列
 	float shininess;
 	float padding2[3];
@@ -35,6 +36,8 @@ public:
 	int32_t& GetMaterialDataEnableLighting() { return materialData->enableLighting; }
 
 	float& GetMaterialDataShininess() { return materialData->shininess; }
+
+	int32_t& GetMaterialSpecularModel() { return materialData->specularModel; }
 
 	Microsoft::WRL::ComPtr<ID3D12Resource> GetMaterialResource() { return materialResource; }
 

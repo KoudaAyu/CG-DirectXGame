@@ -18,8 +18,9 @@ void  MaterialManager::Initialize(DirectXCom* directXCom)
 	temp.w = 1.0f;
 	materialData->color = temp;
 	materialData->enableLighting = false;
-	materialResource->Unmap(0, nullptr);
-
-	//uvTransform行列の初期化
-	materialData->uvTransform = MakeIdentity4x4();
+    materialData->specularModel = 0; // デフォルトは Blinn-Phong
+    materialData->shininess = 16.0f;
+    //uvTransform行列の初期化
+    materialData->uvTransform = MakeIdentity4x4();
+    materialResource->Unmap(0, nullptr);
 }

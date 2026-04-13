@@ -4,7 +4,8 @@ struct Material
 {
     float32_t4 color;
     int32_t enableLighting;
-    float32_t3 padding;
+    int32_t specularModel; // 0: Blinn-Phong, 1: Phong
+    float32_t2 padding;
     float32_t4x4 uvTransform;
     float32_t shininess;
     float32_t3 padding2;
@@ -21,9 +22,7 @@ struct DirectionalLight
 ConstantBuffer<DirectionalLight> gDirectionalLight : register(b1);
 
 Texture2D<float32_t4> gTexture : register(t3);
-
 SamplerState gSample : register(s0);
-
 
 struct PixelShaderOutput
 {
@@ -32,54 +31,54 @@ struct PixelShaderOutput
 
 struct Camera
 {
-   float32_t3 worldPosition;
+    float32_t3 worldPosition;
 };
 ConstantBuffer<Camera> gCamera : register(b2);
 
 PixelShaderOutput main(VertexShaderOutput input)
 {
     PixelShaderOutput output;
-    float3 transformedUV = mul(float32_t4(input.texcoord, 0.0f, 1.0f), gMaterial.uvTransform);
-    float32_t4 textureColor = gTexture.Sample(gSample, transformedUV.xy);
+    float32_t4 uv4 = mul(float32_t4(input.texcoord, 0.0f, 1.0f), gMaterial.uvTransform);
+    float32_t2 uv = uv4.xy;
+    float32_t4 textureColor = gTexture.Sample(gSample, uv);
     output.color = gMaterial.color * textureColor;
-    
-   
-    float NdotL = dot(normalize(input.normal), normalize(-gDirectionalLight.direction));
-   
 
-    float32_t3 toEye = normalize(gCamera.worldPosition - input.worldPosition);
-
-
-
-    if (textureColor.a <= 0.1 || output.color.a == 0.0)
+    if (textureColor.a <= 0.1f || output.color.a == 0.0f)
     {
         discard;
     }
-    
-if (gMaterial.enableLighting != 0)
-{
-    float32_t3 halfVector = normalize(-gDirectionalLight.direction + toEye);
-    float NDotH = dot(normalize(input.normal), halfVector);
-    float specularPow = pow(saturate(NDotH), gMaterial.shininess);
-    
-    // 3. ハーフランバート
-    float cos = pow(NdotL * 0.5f + 0.5f, 2.0f);
 
-    
-    // 4. 拡散反射
-    float32_t3 diffuse = gMaterial.color.rgb * textureColor.rgb * gDirectionalLight.color.rgb * cos * gDirectionalLight.intensity;
-    
-    // 5. 鏡面反射 (saturate(NdotL)を掛けて裏側の漏れを防ぐ)
-    float32_t3 specular = gDirectionalLight.color.rgb * gDirectionalLight.intensity * specularPow * saturate(NdotL);
-
-    // 6. 合体！
-    output.color.rgb = diffuse + specular;
-}
-    else
+    if (gMaterial.enableLighting != 0)
     {
-        output.color = gMaterial.color * textureColor;
+        float32_t3 N = normalize(input.normal);
+        float32_t3 L = normalize(-gDirectionalLight.direction);
+        float32_t NdotL = max(dot(N, L), 0.0f);
+        float32_t3 V = normalize(gCamera.worldPosition - input.worldPosition);
+
+        float32_t specularPow = 0.0f;
+        if (gMaterial.specularModel == 0)
+        {
+            // Blinn-Phong
+            float32_t3 H = normalize(L + V);
+            float32_t NdotH = max(dot(N, H), 0.0f);
+            specularPow = pow(NdotH, gMaterial.shininess);
+        }
+        else
+        {
+            // Phong
+            float32_t3 R = reflect(-L, N);
+            float32_t RdotV = max(dot(R, V), 0.0f);
+            specularPow = pow(RdotV, gMaterial.shininess);
+        }
+
+        // diffuse (half-Lambert approximation kept)
+        float32_t diffuseFactor = pow(NdotL * 0.5f + 0.5f, 2.0f);
+        float32_t3 diffuse = gMaterial.color.rgb * textureColor.rgb * gDirectionalLight.color.rgb * diffuseFactor * gDirectionalLight.intensity;
+
+        float32_t3 specular = gDirectionalLight.color.rgb * gDirectionalLight.intensity * specularPow * saturate(NdotL);
+
+        output.color.rgb = diffuse + specular;
     }
-    
-  
+
     return output;
 }

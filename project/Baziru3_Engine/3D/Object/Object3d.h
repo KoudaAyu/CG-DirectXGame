@@ -4,6 +4,7 @@
 #include <vector>
 #include "Camera.h"
 #include"TextureManager.h"
+#include"MaterialManager.h"
 #include "Transform.h"
 #include "Sprite.h"
 
@@ -13,13 +14,7 @@ class Object3d
 {
 public:
 
-	struct Material
-	{
-		Vector4 color;
-		int32_t enableLighting;
-		float padding[3]; // パディングを追加して16バイト境界に揃える
-		Matrix4x4 uvTransform; // UV変換行列
-	};
+    // Use global `Material` from MaterialManager.h for GPU CB layout
 
 	struct MaterialData
 	{
