@@ -38,7 +38,7 @@ private:
 	struct PlayingVoice
 	{
 		IXAudio2SourceVoice* voice = nullptr;
-		SoundData* soundData = nullptr;
+        int32_t soundId = 0;
 	};
 
 	Sound* GetSound()

@@ -63,7 +63,7 @@ void AudioManager::Finalize()
                 p.second.voice->DestroyVoice();
                 p.second.voice = nullptr;
             }
-			p.second.soundData = nullptr;
+            p.second.soundId = 0;
         }
         playingVoices_.clear();
         loadedSounds_.clear();
@@ -168,7 +168,7 @@ int32_t AudioManager::Play(int32_t soundId)
         }
 
         playId = nextPlayId_.fetch_add(1);
-        playingVoices_.emplace(playId, PlayingVoice{ src, data });
+        playingVoices_.emplace(playId, PlayingVoice{ src, soundId });
     }
 
     logStream_ << "AudioManager::Play - playing playId=" << playId << " soundId=" << soundId << "\n";
@@ -191,7 +191,7 @@ void AudioManager::Stop(int32_t playId)
         playing.voice->DestroyVoice();
         playing.voice = nullptr;
     }
-    playing.soundData = nullptr;
+    playing.soundId = 0;
     playingVoices_.erase(it);
     logStream_ << "AudioManager::Stop - stopped playId=" << playId << "\n";
 }
@@ -207,7 +207,7 @@ void AudioManager::StopAll()
             p.second.voice->DestroyVoice();
             p.second.voice = nullptr;
         }
-        p.second.soundData = nullptr;
+        p.second.soundId = 0;
     }
     playingVoices_.clear();
 }
@@ -218,7 +218,7 @@ void AudioManager::Unload(int32_t soundId)
 
     for (auto it = playingVoices_.begin(); it != playingVoices_.end(); )
     {
-        if (it->second.soundData && loadedSounds_.count(soundId) && loadedSounds_[soundId].get() == it->second.soundData)
+        if (it->second.soundId != 0 && it->second.soundId == soundId)
         {
             if (it->second.voice)
             {
@@ -226,7 +226,7 @@ void AudioManager::Unload(int32_t soundId)
                 it->second.voice->DestroyVoice();
                 it->second.voice = nullptr;
             }
-            it->second.soundData = nullptr;
+            it->second.soundId = 0;
             it = playingVoices_.erase(it);
         }
         else
@@ -280,7 +280,7 @@ void AudioManager::Update()
                     it->second.voice->DestroyVoice();
                     it->second.voice = nullptr;
                 }
-				it->second.soundData = nullptr;
+                it->second.soundId = 0;
                 playingVoices_.erase(it);
                 logStream_ << "AudioManager::Update - voice finished playId=" << id << "\n";
             }
