@@ -101,12 +101,12 @@ void Object3dCom::Draw(Object3d* object, const ::RenderContext& ctx, const Objec
    
     if (object)
     {
-        object->Draw(ctx.commandList);
-    }
-
-    if (drawObject)
-    {
-        ctx.commandList->DrawInstanced(UINT(modelData.vertices.size()), 1, 0, 0);
+        object->Draw(ctx.commandList, ctx.materialGPUAddress);
+        if (drawObject)
+        {
+            // Use object's GPU vertex buffer size if available
+            ctx.commandList->DrawInstanced(UINT(object->GetVertexCount()), 1, 0, 0);
+        }
     }
 }
 
@@ -143,6 +143,14 @@ void Object3dCom::CreateRootParameters()
 	rootParameters[4].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
 	rootParameters[4].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL; // PixelShaderで使う 
 	rootParameters[4].Descriptor.ShaderRegister = 2; // b2 とバインド
+
+	rootParameters[5].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+	rootParameters[5].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+	rootParameters[5].Descriptor.ShaderRegister = 3; // b3 とバインド
+
+	rootParameters[6].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+	rootParameters[6].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+	rootParameters[6].Descriptor.ShaderRegister = 4; // b4 とバインド
 
 	descriptionRootSignature.pParameters = rootParameters; //ルートパラメーター配列へのポインタ
 	descriptionRootSignature.NumParameters = _countof(rootParameters);//配列の長さ
@@ -245,9 +253,9 @@ void Object3dCom::InitializeBlend()
 
 void Object3dCom::RasterizerState()
 {
-	//RasterizerStateの設定
-	//裏面(時計回り)を表示しない
-	rasterizerDesc.CullMode = D3D12_CULL_MODE_BACK;
+    //RasterizerStateの設定
+    // 裏面カリングを無効化して、ワインディング問題の影響を排除
+    rasterizerDesc.CullMode = D3D12_CULL_MODE_NONE;
 	//三角形の中を塗りつぶす
 	rasterizerDesc.FillMode = D3D12_FILL_MODE_SOLID;
 }

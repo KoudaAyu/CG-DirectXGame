@@ -49,11 +49,29 @@ public:
 		float intensity;
 	};
 
+	struct PointLight
+	{
+		Vector4 color;
+		Vector3 position;
+		float intensity;
+	};
+
+	struct SpotLight
+	{
+		Vector4 color;
+		Vector3 position;
+		float intensity;
+		Vector3 direction;
+		float outerCos;
+		float innerCos;
+		float padding[3];
+	};
+
 	void Initialize(Object3dCom* object3dCom, const ModelData& modelData);
 
 	void Update();
 
-	void Draw(ID3D12GraphicsCommandList* commandList);
+	void Draw(ID3D12GraphicsCommandList* commandList, D3D12_GPU_VIRTUAL_ADDRESS materialGPUAddress = 0);
 
 	/// <summary>
 	/// .mtlファイルの読み込み
@@ -80,6 +98,8 @@ public:
 	void TransformationMatrixResource();
 
 	void DirectionalLightResource();
+	void PointLightResource();
+	void SpotLightResource();
 
    
     ~Object3d();
@@ -100,6 +120,10 @@ public:
 	}
 
 	const Microsoft::WRL::ComPtr<ID3D12Resource>& GetTransformationMatrixResource() const { return transformationMatrixResource; }
+
+    // Expose model vertex count for draw calls
+    size_t GetVertexCount() const { return modelData_.vertices.size(); }
+    const ModelData& GetModelData() const { return modelData_; }
 
 	void SetRotate(const Vector3& r) { transform.SetRotate(r); }
 	void SetTranslate(const Vector3& t) { transform.SetTranslate(t); }
@@ -140,4 +164,10 @@ private:
 	Microsoft::WRL::ComPtr<ID3D12Resource> directionalLightResource = nullptr;
 	// バッファリソース内のデータを指すポインタ
 	DirectionalLight* directionalLightData_ = nullptr;
+
+	Microsoft::WRL::ComPtr<ID3D12Resource> pointLightResource = nullptr;
+	PointLight* pointLightData_ = nullptr;
+
+	Microsoft::WRL::ComPtr<ID3D12Resource> spotLightResource = nullptr;
+	SpotLight* spotLightData_ = nullptr;
 };

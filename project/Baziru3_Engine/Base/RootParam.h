@@ -10,6 +10,8 @@ namespace RootParam
             kTextureTable = 2,
             kLight = 3,
             kCamera = 4,
+            kPointLight = 5,
+            kSpotLight = 6,
         };
     }
 

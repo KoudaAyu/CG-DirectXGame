@@ -72,7 +72,11 @@ void DebugUI::Update()
         ImGui::Checkbox("DrawSprite", drawSprite_);
 
     if (transformObject_)
+    {
+        ImGui::DragFloat3("Object Scale", &transformObject_->scale.x, 0.01f, 0.01f, 10.0f);
         ImGui::DragFloat3("Object Rotate", &transformObject_->rotate.x, 0.01f, -10.0f, 10.0f);
+        ImGui::DragFloat3("Object Translate", &transformObject_->translate.x, 0.01f, -100.0f, 100.0f);
+    }
 
     // Material collapsing header
     if (ImGui::CollapsingHeader("Material"))
@@ -95,6 +99,27 @@ void DebugUI::Update()
     {
         camera_->SetRotate({ 0.0f, 0.0f, 0.0f });
         camera_->SetTranslate({ 0.0f, 0.0f, -5.0f });
+    }
+
+    if (camera_ && ImGui::CollapsingHeader("Camera"))
+    {
+        Vector3 cameraTranslate = camera_->GetWorldPosition();
+        if (ImGui::DragFloat3("Camera Translate", &cameraTranslate.x, 0.05f, -100.0f, 100.0f))
+        {
+            camera_->SetTranslate(cameraTranslate);
+        }
+
+        Vector3 cameraRotate = camera_->GetRotate();
+        if (ImGui::DragFloat3("Camera Rotate", &cameraRotate.x, 0.01f, -6.28318f, 6.28318f))
+        {
+            camera_->SetRotate(cameraRotate);
+        }
+
+        float fovY = camera_->GetFovY();
+        if (ImGui::SliderFloat("Camera FovY", &fovY, 0.1f, 1.8f))
+        {
+            camera_->SetFovY(fovY);
+        }
     }
 
     ImGui::End();

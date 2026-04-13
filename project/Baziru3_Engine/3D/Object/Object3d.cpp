@@ -23,6 +23,8 @@ void Object3d::Initialize(Object3dCom* object3dCom, const ModelData& modelData)
 	MaterialResource();
 	TransformationMatrixResource();
 	DirectionalLightResource();
+	PointLightResource();
+	SpotLightResource();
 
 	// テクスチャロードはパスが有効なときのみ実行
 	if (!modelData_.material.textureFilePath.empty())
@@ -79,13 +81,24 @@ void Object3d::Update()
 	transformationMatrixData_->WorldInverseTranspose = Transpose(Inverse(worldMatrix));
 }
 
-void Object3d::Draw(ID3D12GraphicsCommandList* commandList)
+void Object3d::Draw(ID3D12GraphicsCommandList* commandList, D3D12_GPU_VIRTUAL_ADDRESS materialGPUAddress)
 {
 	commandList->IASetVertexBuffers(0, 1, &vertexBufferView_);
 	commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-	commandList->SetGraphicsRootConstantBufferView(RootParam::Object3D::kMaterial, materialResource->GetGPUVirtualAddress());
+	commandList->SetGraphicsRootConstantBufferView(RootParam::Object3D::kMaterial,
+		materialGPUAddress != 0 ? materialGPUAddress : materialResource->GetGPUVirtualAddress());
 	commandList->SetGraphicsRootConstantBufferView(RootParam::Object3D::kTransform, transformationMatrixResource->GetGPUVirtualAddress());
 	commandList->SetGraphicsRootConstantBufferView(RootParam::Object3D::kLight, directionalLightResource->GetGPUVirtualAddress());
+	commandList->SetGraphicsRootConstantBufferView(RootParam::Object3D::kPointLight, pointLightResource->GetGPUVirtualAddress());
+	commandList->SetGraphicsRootConstantBufferView(RootParam::Object3D::kSpotLight, spotLightResource->GetGPUVirtualAddress());
+
+    // Debug: report vertex buffer info
+    {
+        std::ostringstream oss;
+        oss << "Object3d::Draw - VB GPUAddr=0x" << std::hex << vertexBufferView_.BufferLocation << std::dec
+            << " Size=" << vertexBufferView_.SizeInBytes << " Stride=" << vertexBufferView_.StrideInBytes << "\n";
+        OutputDebugStringA(oss.str().c_str());
+    }
 }
 
 Object3d::MaterialData Object3d::LoadMaterialTemplateFile(const std::string& directoryPath, const std::string& filename)
@@ -93,8 +106,13 @@ Object3d::MaterialData Object3d::LoadMaterialTemplateFile(const std::string& dir
 	//中で必要になる変数の宣言
 	Object3d::MaterialData materlialData;//構築するデータ
 	std::string line;//ファイルから読み込んだ1行を格納するもの
-	std::ifstream file(directoryPath + "/" + filename);//ファイルを開く
-	assert(file.is_open());//ファイルが開けなかったら停止
+    std::ifstream file(directoryPath + "/" + filename);//ファイルを開く
+    if (!file.is_open())
+    {
+        std::string msg = "Failed to open material file: " + directoryPath + "/" + filename + "\n";
+        OutputDebugStringA(msg.c_str());
+        return materlialData;
+    }
 
 	//MaterialDataを構築
 	while (std::getline(file, line))
@@ -236,6 +254,14 @@ void Object3d::VertexResource()
 		
 		D3D12_RANGE written = { 0, static_cast<SIZE_T>(bufferSize) };
 		vertexResource->Unmap(0, &written);
+
+		// Debug: report that vertex buffer was created and populated
+		{
+			std::ostringstream oss;
+			oss << "Object3d::VertexResource - created VB GPUAddr=0x" << std::hex << vertexBufferView_.BufferLocation << std::dec
+			    << " vertexCount=" << vertexCount << " bufferSize=" << bufferSize << "\n";
+			OutputDebugStringA(oss.str().c_str());
+		}
 		vertexData_ = nullptr;
 
 	}
@@ -272,6 +298,20 @@ Object3d::~Object3d()
         directionalLightResource->Unmap(0, &written);
         directionalLightData_ = nullptr;
     }
+
+    if (pointLightResource && pointLightData_ != nullptr)
+    {
+        D3D12_RANGE written = { 0, sizeof(PointLight) };
+        pointLightResource->Unmap(0, &written);
+        pointLightData_ = nullptr;
+    }
+
+    if (spotLightResource && spotLightData_ != nullptr)
+    {
+        D3D12_RANGE written = { 0, sizeof(SpotLight) };
+        spotLightResource->Unmap(0, &written);
+        spotLightData_ = nullptr;
+    }
 }
 
 void Object3d::MaterialResource()
@@ -286,7 +326,9 @@ void Object3d::MaterialResource()
 		// 初期値を設定
 		materialData_->color = { 1.0f,1.0f,1.0f,1.0f };
 		materialData_->enableLighting = false;
+		materialData_->specularModel = 0;
 		materialData_->uvTransform = MakeIdentity4x4();
+		materialData_->shininess = 16.0f;
 
 		// マテリアルは初期化時に一度だけ書き込む想定のため、MapしたらすぐにUnmapする
 		// 書き込み範囲を指定してGPUへ変更を通知する
@@ -294,6 +336,40 @@ void Object3d::MaterialResource()
 		materialResource->Unmap(0, &writtenRange);
 		
 		materialData_ = nullptr;
+	}
+}
+
+void Object3d::PointLightResource()
+{
+	if (object3dCom_ && object3dCom_->GetDirectXCom())
+	{
+		DirectXCom* dxCommon = object3dCom_->GetDirectXCom();
+		pointLightResource = dxCommon->CreateBufferResource(dxCommon->GetDevice().Get(), sizeof(PointLight));
+		pointLightResource->Map(0, nullptr, reinterpret_cast<void**>(&pointLightData_));
+
+		pointLightData_->color = { 1.0f, 1.0f, 1.0f, 1.0f };
+		pointLightData_->position = { 0.0f, 2.0f, -2.0f };
+		pointLightData_->intensity = 0.0f;
+	}
+}
+
+void Object3d::SpotLightResource()
+{
+	if (object3dCom_ && object3dCom_->GetDirectXCom())
+	{
+		DirectXCom* dxCommon = object3dCom_->GetDirectXCom();
+		spotLightResource = dxCommon->CreateBufferResource(dxCommon->GetDevice().Get(), sizeof(SpotLight));
+		spotLightResource->Map(0, nullptr, reinterpret_cast<void**>(&spotLightData_));
+
+		spotLightData_->color = { 1.0f, 1.0f, 1.0f, 1.0f };
+		spotLightData_->position = { 0.0f, 2.0f, -2.0f };
+		spotLightData_->intensity = 0.0f;
+		spotLightData_->direction = { 0.0f, -1.0f, 0.0f };
+		spotLightData_->outerCos = 0.8f;
+		spotLightData_->innerCos = 0.95f;
+		spotLightData_->padding[0] = 0.0f;
+		spotLightData_->padding[1] = 0.0f;
+		spotLightData_->padding[2] = 0.0f;
 	}
 }
 

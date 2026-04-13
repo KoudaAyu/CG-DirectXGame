@@ -49,6 +49,9 @@ void Camera::Finalize()
 
 void Camera::Update()
 {
+	rotation_ = transform_.GetRotate();
+	translation_ = transform_.GetTranslate();
+
 	worldMatrix_ = MakeAffineMatrix(transform_.GetScale(), transform_.GetRotate(), transform_.GetTranslate());
 	viewMatrix_ = Inverse(worldMatrix_);
 

@@ -49,20 +49,28 @@ void Game::Initialize()
 	SceneManager::GetInstance()->SetObject3dCom(object3dCom.get());
 
 #pragma region 最初のシーンの初期化
-	object3d_ = std::make_unique<Object3d>();
-	object3d_->Initialize(object3dCom.get(), object3d_->LoadObjFile("Resources", "plane.obj"));
+    // Load model data first, then initialize Object3d with that data
+    modelData = Object3d::LoadObjFile("Resources", "terrain.obj");
+    object3d_ = std::make_unique<Object3d>();
+    object3d_->Initialize(object3dCom.get(), modelData);
 #pragma endregion 最初のシーン終了
 	//パイプラインステートの生成に失敗した場合はエラー
 	assert(SUCCEEDED(GetDirectXCom()->GetHr()));
 
-	//モデル読み込み
-	modelData = object3d_->LoadObjFile("Resources", "plane.obj");
+    //モデル読み込み: already loaded above into modelData
+
+    // Debug: report loaded model info
+    {
+        std::ostringstream oss;
+        oss << "Model load: vertices=" << modelData.vertices.size() << ", texturePath=" << modelData.material.textureFilePath << "\n";
+        Logger::Log(logStream, oss.str());
+    }
 
 	// Model を作成して初期化（Model が自分で頂点リソースを作る）
 	modelCom_ = std::make_unique<ModelCom>();
 	modelCom_->Initialize(directXCom.get());
-	model_ = std::make_unique<Model>();
-	model_->Initialize(modelCom_.get(), "Resources", "plane.obj");
+    model_ = std::make_unique<Model>();
+    model_->Initialize(modelCom_.get(), "Resources", "terrain.obj");
 
 
 
@@ -213,7 +221,9 @@ void Game::Update()
 
 	camera_->Update();
 
+	object3d_->SetScale(transformObject.scale);
 	object3d_->SetRotate(transformObject.rotate);
+	object3d_->SetTranslate(transformObject.translate);
 	object3d_->Update();
 
 	
@@ -277,14 +287,21 @@ void Game::Draw()
 
     SceneManager::GetInstance()->Draw();
 
-	
+	object3dCom->PreDraw();
 
-	if (drawObject)
-	{
-		object3dCom->Draw(object3d_.get(), ctx, modelData, drawObject);
-	}
-	DrawSprites(ctx);
-	DrawParticles(ctx);
+    if (drawObject)
+    {
+        object3dCom->Draw(object3d_.get(), ctx, modelData, drawObject);
+    }
+    else
+    {
+        // debug: if drawObject is false, log vertex count to help investigation
+        std::ostringstream oss;
+        oss << "drawObject is false. model vertices=" << modelData.vertices.size() << "\n";
+        Logger::Log(logStream, oss.str());
+    }
+    DrawSprites(ctx);
+	//DrawParticles(ctx);
 
 	//Objectの描画
 
@@ -349,7 +366,7 @@ void Game::DrawObjects(const RenderContext& ctx)
         return;
     }
 
-     object3d_->Draw(ctx.commandList);
+	 object3d_->Draw(ctx.commandList, ctx.materialGPUAddress);
 
     if (drawObject)
     {

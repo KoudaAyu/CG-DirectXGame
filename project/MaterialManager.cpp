@@ -22,5 +22,4 @@ void  MaterialManager::Initialize(DirectXCom* directXCom)
     materialData->shininess = 16.0f;
     //uvTransform行列の初期化
     materialData->uvTransform = MakeIdentity4x4();
-    materialResource->Unmap(0, nullptr);
 }

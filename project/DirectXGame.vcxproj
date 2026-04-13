@@ -108,6 +108,7 @@
     <ClInclude Include="Baziru3_Engine\2D\Sprite\SpriteCom.h" />
     <ClInclude Include="Baziru3_Engine\Base\Operator.h" />
     <ClInclude Include="Baziru3_Engine\2D\Texture\TextureManager.h" />
+    <ClInclude Include="Baziru3_Engine\Light\PointLight.h" />
     <ClInclude Include="CrashDump.h" />
     <ClInclude Include="DebugUI.h" />
     <ClInclude Include="Framework.h" />
