@@ -67,17 +67,10 @@ void ImGuiManager::Initialize([[maybe_unused]]WindowAPI* windowAPI, [[maybe_unus
         }
         else
         {
-            // If TextureManager exists but has not yet created its SRVManager, request it to initialize one
-            TextureManager::GetInstance()->SetDirectXCom(dxCommon);
-            texSrvMgr = TextureManager::GetInstance()->GetSRVManager();
-            if (texSrvMgr)
-            {
-                srvManager_ = texSrvMgr;
-                s_srvManagerForCallback = srvManager_;
-                std::ostringstream oss;
-                oss << "ImGuiManager::Initialize - forced TextureManager to create SRVManager (this=0x" << std::hex << (unsigned long long)(uintptr_t)s_srvManagerForCallback << ")\n";
-                OutputDebugStringA(oss.str().c_str());
-            }
+          
+            std::ostringstream oss;
+            oss << "ImGuiManager::Initialize - TextureManager present but has no SRVManager; ImGuiManager will create its own SRVManager\n";
+            OutputDebugStringA(oss.str().c_str());
         }
     }
 
