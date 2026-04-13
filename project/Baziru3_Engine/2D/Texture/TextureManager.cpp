@@ -143,18 +143,21 @@ uint32_t TextureManager::Load(const std::string& filePath)
 	auto textureResource = directXCom_->CreateTextureResource(mateData);
 
 	//テクスチャデータのアップロード(CPU側ののイメージをGPUテクスチャへ転送)
-	// store intermediate resource inside TextureData to keep it alive until GPU consumes it
+	//テクスチャデータのアップロード(CPU側ののイメージをGPUテクスチャへ転送)
+	
 	TextureData& textureData = textureDates_[filePath];
 	textureData.filePath_ = filePath;
 	textureData.metadata_ = mateData;
 	textureData.resource_ = textureResource;
 
-	textureData.uploadIntermediate_ = directXCom_->UploadTextureData(
-		textureData.resource_, mipImages, directXCom_->GetDevice(), directXCom_->GetCommandList()
-	);
+	{
+		auto intermediate = directXCom_->UploadTextureData(
+			textureData.resource_, mipImages, directXCom_->GetDevice(), directXCom_->GetCommandList()
+		);
 
-	// Ensure upload commands are executed and completed on GPU before returning
-	directXCom_->ExecuteAndWaitForGPU();
+		
+		directXCom_->ExecuteAndWaitForGPU();
+	}
 
 	//SRVの割り当てと先性
 	uint32_t srvIndex = srvManager_->Allocate();

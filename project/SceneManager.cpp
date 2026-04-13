@@ -65,8 +65,7 @@ void SceneManager::Update()
 		return;
 	}
 
-    // Apply any pending scene change first. This is separated so callers can
-    // decide when to perform the actual swap (e.g. after a transition).
+
     ApplyPendingSceneChange();
 
     //実行中のシーンを更新

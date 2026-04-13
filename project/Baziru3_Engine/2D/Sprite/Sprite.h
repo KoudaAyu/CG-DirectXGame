@@ -6,6 +6,7 @@
 #include"Matrix4x4.h"
 #include"Vector.h"
 #include <memory>
+#include "MappedResource.h"
 
 class SpriteCom;
 class TextureManager;
@@ -128,8 +129,12 @@ private:
 private:
 	DirectXCom* dxCommon = nullptr;
 	SpriteCom* spriteCom = nullptr;
-	VertexData* vertexData = nullptr;
-	Material* materialData = nullptr;
+    VertexData* vertexData = nullptr;
+    Material* materialData = nullptr;
+  
+    Baziru3::PersistentMap<VertexData> vertexMap;
+    Baziru3::PersistentMap<Material> materialMap;
+    Baziru3::PersistentMap<TransformationMatrix> transformationMatrixMap;
 
 private:
 	Microsoft::WRL::ComPtr<ID3D12Resource> vertexResourceSprite = nullptr;

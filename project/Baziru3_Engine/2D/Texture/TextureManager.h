@@ -76,8 +76,7 @@ private:
 		uint32_t srvIndex_;
 		D3D12_CPU_DESCRIPTOR_HANDLE srvHandleCPU_{};
 		D3D12_GPU_DESCRIPTOR_HANDLE srvHandleGPU_{};
-		// 保持: アップロード用中間バッファを保持しておき、GPUがコピーを終えるまで破棄しない
-		Microsoft::WRL::ComPtr<ID3D12Resource> uploadIntermediate_;
+
 
 	};
 

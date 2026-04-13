@@ -32,16 +32,19 @@ void Sprite::Initialize(SpriteCom* spriteCom, std::string textureFilePath)
 	ReflectionProcessing();
 	CreateIndexData();
 
-	materialResourceSprite = dxCommon->CreateBufferResource(dxCommon->GetDevice().Get(), sizeof(Material));
-		materialResourceSprite->Map(0, nullptr, reinterpret_cast<void**>(&materialData));
-	materialData->color = { 1.0f, 1.0f, 1.0f, 1.0f }; // 白（テクスチャ色をそのまま出す用）
-	materialData->enableLighting = false;
-	materialData->uvTransform = MakeIdentity4x4();
+    materialResourceSprite = dxCommon->CreateBufferResource(dxCommon->GetDevice().Get(), sizeof(Material));
+    // Persistent map so materialData remains valid for the Sprite lifetime
+    materialMap.reset(materialResourceSprite);
+    materialData = materialMap.get();
+    materialData->color = { 1.0f, 1.0f, 1.0f, 1.0f }; // 白（テクスチャ色をそのまま出す用）
+    materialData->enableLighting = false;
+    materialData->uvTransform = MakeIdentity4x4();
 	
 	//Sprite用のTransformationMatrix用のリソースを作る
-	transformationMatrixResourceSprite = dxCommon->CreateBufferResource(dxCommon->GetDevice().Get(), sizeof(TransformationMatrix));
-	// データを書き込むためにMapする。TransformationMatrixは毎フレーム更新されるため、ここでも永続的にMapしておく。
-	transformationMatrixResourceSprite->Map(0, nullptr, reinterpret_cast<void**>(&transformationMatrixDataSprite));
+    transformationMatrixResourceSprite = dxCommon->CreateBufferResource(dxCommon->GetDevice().Get(), sizeof(TransformationMatrix));
+    // Persistent map for per-frame updated transformation matrix
+    transformationMatrixMap.reset(transformationMatrixResourceSprite);
+    transformationMatrixDataSprite = transformationMatrixMap.get();
 	// 単位行列を書き込んでおく
 	transformationMatrixDataSprite->WVP = MakeIdentity4x4();
 	transformationMatrixDataSprite->World = MakeIdentity4x4();
@@ -73,13 +76,17 @@ std::unique_ptr<Sprite> Sprite::Create(SpriteCom* spriteCom, uint32_t textureHan
 	sprite->CreateIndexData();
 
 	sprite->materialResourceSprite = sprite->dxCommon->CreateBufferResource(sprite->dxCommon->GetDevice().Get(), sizeof(Material));
-	sprite->materialResourceSprite->Map(0, nullptr, reinterpret_cast<void**>(&sprite->materialData));
+	
+	sprite->materialMap.reset(sprite->materialResourceSprite);
+	sprite->materialData = sprite->materialMap.get();
 	sprite->materialData->color = { 1.0f, 1.0f, 1.0f, 1.0f };
 	sprite->materialData->enableLighting = false;
 	sprite->materialData->uvTransform = MakeIdentity4x4();
 
 	sprite->transformationMatrixResourceSprite = sprite->dxCommon->CreateBufferResource(sprite->dxCommon->GetDevice().Get(), sizeof(TransformationMatrix));
-	sprite->transformationMatrixResourceSprite->Map(0, nullptr, reinterpret_cast<void**>(&sprite->transformationMatrixDataSprite));
+	
+	sprite->transformationMatrixMap.reset(sprite->transformationMatrixResourceSprite);
+	sprite->transformationMatrixDataSprite = sprite->transformationMatrixMap.get();
 	sprite->transformationMatrixDataSprite->WVP = MakeIdentity4x4();
 	sprite->transformationMatrixDataSprite->World = MakeIdentity4x4();
 
@@ -159,25 +166,17 @@ void Sprite::Draw()
 
 void Sprite::Finalize()
 {
-    
-    if (vertexResourceSprite && vertexData != nullptr)
-    {
-        D3D12_RANGE written = { 0, sizeof(VertexData) * 6 };
-        vertexResourceSprite->Unmap(0, &written);
+   
+    if (vertexMap) {
+        vertexMap.releaseWithWrittenRange(sizeof(VertexData) * 6);
         vertexData = nullptr;
     }
-
-    if (materialResourceSprite && materialData != nullptr)
-    {
-        D3D12_RANGE written = { 0, sizeof(Material) };
-        materialResourceSprite->Unmap(0, &written);
+    if (materialMap) {
+        materialMap.releaseWithWrittenRange(sizeof(Material));
         materialData = nullptr;
     }
-
-    if (transformationMatrixResourceSprite && transformationMatrixDataSprite != nullptr)
-    {
-        D3D12_RANGE written = { 0, sizeof(TransformationMatrix) };
-        transformationMatrixResourceSprite->Unmap(0, &written);
+    if (transformationMatrixMap) {
+        transformationMatrixMap.releaseWithWrittenRange(sizeof(TransformationMatrix));
         transformationMatrixDataSprite = nullptr;
     }
 	// indexResourceSprite は既に Unmap 済み
@@ -209,30 +208,33 @@ void Sprite::CreateVertexBufferView()
 
 void Sprite::CreateVertexData()
 {
-	vertexResourceSprite->Map(0, nullptr, reinterpret_cast<void**>(&vertexData));
-	vertexData[0].position = { 0.0f,360.0f,0.0f,1.0f }; // 左下
-	vertexData[1].position = { 0.0f,0.0f,0.0f,1.0f };   // 左上
-	vertexData[2].position = { 640.0f,360.0f,0.0f,1.0f }; // 右下
-	vertexData[3].position = { 640.0f,0.0f,0.0f,1.0f };   // 右上
+    // Persistently map vertex buffer for sprite lifetime
+    vertexMap.reset(vertexResourceSprite);
+    vertexData = vertexMap.get();
+    vertexData[0].position = { 0.0f,360.0f,0.0f,1.0f }; // 左下
+    vertexData[1].position = { 0.0f,0.0f,0.0f,1.0f };   // 左上
+    vertexData[2].position = { 640.0f,360.0f,0.0f,1.0f }; // 右下
+    vertexData[3].position = { 640.0f,0.0f,0.0f,1.0f };   // 右上
 
-	vertexData[0].texcoord = { 0.0f,1.0f };
-	vertexData[1].texcoord = { 0.0f,0.0f };
-	vertexData[2].texcoord = { 1.0f,1.0f };
-	vertexData[3].texcoord = { 1.0f,0.0f };
+    vertexData[0].texcoord = { 0.0f,1.0f };
+    vertexData[1].texcoord = { 0.0f,0.0f };
+    vertexData[2].texcoord = { 1.0f,1.0f };
+    vertexData[3].texcoord = { 1.0f,0.0f };
 }
 
 void Sprite::CreateIndexData()
 {
-	//インデックスリソースにデータを書き込む
-	indexResourceSprite->Map(0, nullptr, reinterpret_cast<void**>(&indexDataSprite));
-	indexDataSprite[0] = 0; // 左下
-	indexDataSprite[1] = 1; // 左上
-	indexDataSprite[2] = 2; // 右下
-	indexDataSprite[3] = 2; // 右下
-	indexDataSprite[4] = 1; // 左上
-	indexDataSprite[5] = 3; // 右上
-
-	indexResourceSprite->Unmap(0, nullptr);
+    // インデックスリソースにデータを書き込む（スコープマップを使って即時Unmap）
+    {
+        Baziru3::ScopedMap<uint32_t> scopedIndexMap(indexResourceSprite);
+        uint32_t* idx = scopedIndexMap.get();
+        idx[0] = 0; // 左下
+        idx[1] = 1; // 左上
+        idx[2] = 2; // 右下
+        idx[3] = 2; // 右下
+        idx[4] = 1; // 左上
+        idx[5] = 3; // 右上
+    }
 }
 
 void Sprite::ReflectionProcessing()
