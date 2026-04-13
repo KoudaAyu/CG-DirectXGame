@@ -2,11 +2,13 @@
 #include "DebugUI.h"
 
 #include <combaseapi.h>
-#include"RenderContext.h"
+
 #include <sstream>
 #include <iomanip>
 
+#include"RenderContext.h"
 #include"RootParam.h"
+#include"SubsystemFactory.h"
 
 #ifdef USE_IMGUI
 #include <imgui.h>
@@ -20,30 +22,24 @@ void Game::Initialize()
 
 	crashDump.Install();
 	log.Initialize();
-	windowAPI = std::make_unique<WindowAPI>();
-	windowAPI->Initialize();
 
-	directXCom = std::make_unique<DirectXCom>(windowAPI.get(), logStream);
-	directXCom->DebugLayer();
-	//ウィンドウを表示する
-	windowAPI->Show();
-	directXCom->Initialize();
+	InitConfig cfg;
+	auto res = SubsystemFactory::InitializeAll(logStream, cfg);
+	if (!res.success)
+	{
+		Logger::Log(logStream, "Engine init failed: " + res.errorMessage + "\n");
+		return;
+	}
+
+	// 所有権を受け取る
+	windowAPI = std::move(res.windowAPI);
+	directXCom = std::move(res.directXCom);
+	spriteCom = std::move(res.spriteCom);
+	spriteManager_ = std::move(res.spriteManager);
 
 	SceneManager::GetInstance()->Initialize(directXCom.get());
 
-	TextureManager::GetInstance()->Initialize();
-	TextureManager::GetInstance()->SetDirectXCom(directXCom.get());
 	
-	spriteCom = std::make_unique<SpriteCom>(logStream, directXCom.get());
-	spriteCom->Initialize();
-
-	spriteCom->CreateGraphicsPipeline();
-
-	SceneManager::GetInstance()->SetSpriteCom(spriteCom.get());
-
-	spriteManager_ = std::make_unique<SpriteManager>();
-	spriteManager_->Initialize(spriteCom.get(), "Resources/uvChecker.png", 5);
-
 	// 既存の手動テクスチャ読み込みはそのまま利用（Sphere用）
 
 	object3dCom = std::make_unique<Object3dCom>(logStream);
@@ -132,28 +128,17 @@ void Game::Initialize()
 
 void Game::Finalize()
 {
-
-
 	SceneManager::Destroy();
 
+	
 #ifdef USE_IMGUI
-	//ImGui終了処理 is delegated to ImGuiManager
-	if (imguiManager)
-	{
-		imguiManager->Finalize();
-	}
+	if (imguiManager) { imguiManager->Finalize(); imguiManager.reset(); }
 #endif
 
+	
+	debugUI.reset();
 
-	Logger::Log(logStream, "Application terminating.");
-
-	std::wstring wstringValue = L"Hello, DirectX!";
-	Logger::Log(logStream, StringUtil::ConvertString(std::format(L"WSTRING{}\n", wstringValue)));
-
-	//出力ウィンドウへの文字出力
-	OutputDebugStringA("Hello, DirectX!\n");
-
-	// サウンドの終了処理
+	
 	if (audioManager_)
 	{
 		SceneManager::GetInstance()->SetAudioManager(nullptr);
@@ -161,22 +146,43 @@ void Game::Finalize()
 		audioManager_.reset();
 	}
 
+	SceneManager::GetInstance()->SetParticleManager(nullptr);
+	particleManager.reset();
+
+	SceneManager::GetInstance()->SetSpriteCom(nullptr);
+	spriteManager_.reset();
+	spriteCom.reset();
+
 	TextureManager::GetInstance()->Finalize();
 
+	SceneManager::GetInstance()->SetMaterialManager(nullptr);
+	materialManager_.reset();
+
+	model_.reset();
+	modelCom_.reset();
+
+	object3d_.reset();
+	object3dCom.reset();
+
+	SceneManager::GetInstance()->SetCamera(nullptr);
 	camera_->Finalize();
+	camera_.reset();
+
+	SceneManager::GetInstance()->SetLight(nullptr);
+	light.reset();
 
 	if (directXCom)
 	{
 		HANDLE h = directXCom->GetFenceEvent();
-		if (h && h != INVALID_HANDLE_VALUE)
-		{
-			CloseHandle(h);
-		}
+		if (h && h != INVALID_HANDLE_VALUE) CloseHandle(h);
 	}
 	directXCom.reset();
 
-	windowAPI->Finalize();
-
+	if (windowAPI)
+	{
+		windowAPI->Finalize();
+		windowAPI.reset();
+	}
 
 	Framework::Finalize();
 }

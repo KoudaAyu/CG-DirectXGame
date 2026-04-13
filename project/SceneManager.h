@@ -33,6 +33,9 @@ public:
 	/// <param name="sceneName">シーン名</param>
 	void ChangeScene(const std::string& sceneName);
 
+   
+    void ApplyPendingSceneChange();
+
 	void SetDirectXCom(DirectXCom* dxCommon) { dxCommon_ = dxCommon; }
 	void SetCamera(Camera* camera) { camera_ = camera; }
 

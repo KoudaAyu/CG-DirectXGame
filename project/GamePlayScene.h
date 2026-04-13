@@ -53,10 +53,7 @@ private:
     std::unique_ptr<SpriteManager> spriteManager_;
     std::list<ParticleManager::Particle> particles;
 
-    bool pendingSphereInit = false;
     bool sphereInitialized = false;
-
-    bool TryInitializeSphere();
 
 private:
     Sprite::Transform uvTransformSprite;

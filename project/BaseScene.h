@@ -1,7 +1,8 @@
 #pragma once
 
-#include"DirectXCom.h"
+#include <cstddef>
 
+class DirectXCom;
 class SceneManager;
 class Camera;
 

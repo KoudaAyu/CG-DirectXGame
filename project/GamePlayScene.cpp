@@ -11,31 +11,7 @@
 #include <cassert>
 #include <Windows.h>
 
-bool GamePlayScene::TryInitializeSphere()
-{
 
-	object3dCom = SceneManager::GetInstance()->GetObject3dCom();
-	materialManager = SceneManager::GetInstance()->GetMaterialManager();
-	light = SceneManager::GetInstance()->GetLight();
-	particleManager = SceneManager::GetInstance()->GetParticleManager();
-	
-	// 必要な依存が揃っているか確認
-	if (!object3dCom || !materialManager || !light || !particleManager) return false;
-
-
-	sphere_ = std::make_unique<Sphere>();
-	sphere_->Initialize(directXCom, object3dCom, materialManager, light, camera_);
-	sphereInitialized = true;
-
-	//uvTextureSpriteの座標
-	uvTransformSprite = {
-		{1.0f, 1.0f, 1.0f},
-		{0.0f, 0.0f, 0.0f},
-		{0.0f, 0.0f, 0.0f}
-	};
-
-	return true;
-}
 
 void GamePlayScene::Initialize(DirectXCom* dxCommon,Camera* camera)
 {
@@ -44,11 +20,24 @@ void GamePlayScene::Initialize(DirectXCom* dxCommon,Camera* camera)
     this->directXCom = dxCommon;
 
 
-	if (!TryInitializeSphere())
-	{
-		pendingSphereInit = true;
-		return;
-	}
+    object3dCom = SceneManager::GetInstance()->GetObject3dCom();
+    materialManager = SceneManager::GetInstance()->GetMaterialManager();
+    light = SceneManager::GetInstance()->GetLight();
+    particleManager = SceneManager::GetInstance()->GetParticleManager();
+
+  
+    if (object3dCom && materialManager && light && particleManager)
+    {
+        sphere_ = std::make_unique<Sphere>();
+        sphere_->Initialize(directXCom, object3dCom, materialManager, light, camera_);
+        sphereInitialized = true;
+
+        uvTransformSprite = {
+            {1.0f, 1.0f, 1.0f},
+            {0.0f, 0.0f, 0.0f},
+            {0.0f, 0.0f, 0.0f}
+        };
+    }
 
 	//スプライト共通テクスチャ読み込み
 
@@ -100,13 +89,8 @@ void GamePlayScene::Finalize()
 void GamePlayScene::Update()
 {
 	
-	if (pendingSphereInit && !sphereInitialized)
-	{
-		if (TryInitializeSphere()) pendingSphereInit = false;
-	}
-
-	//球体の更新
-	if (sphereInitialized && sphere_)
+    //球体の更新
+    if (sphereInitialized && sphere_)
 	{
 		Sprite::Transform transformSphere = sphere_->GetTransform();
 		transformSphere.rotate.y += 0.01f;

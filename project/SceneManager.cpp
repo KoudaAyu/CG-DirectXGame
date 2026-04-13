@@ -1,6 +1,7 @@
 #include "SceneManager.h"
 #include "SceneFactory.h"
 
+#include <cassert>
 #include<memory>
 #include <Log.h>
 
@@ -64,32 +65,35 @@ void SceneManager::Update()
 		return;
 	}
 
-	if ((nextScene_))
-	{
+    // Apply any pending scene change first. This is separated so callers can
+    // decide when to perform the actual swap (e.g. after a transition).
+    ApplyPendingSceneChange();
 
-		//旧シーンの終了処理
-		if (scene_)
-		{
-			scene_->Finalize();
-			scene_.reset();
-		}
+    //実行中のシーンを更新
+    if (scene_)
+    {
+        scene_->Update();
+    }
+}
 
-		//シーン切り替え
-		scene_ = std::move(nextScene_);
+void SceneManager::ApplyPendingSceneChange()
+{
+    if (!nextScene_) return;
 
-		scene_->SetSceneManager(this);
+    //旧シーンの終了処理
+    if (scene_)
+    {
+        scene_->Finalize();
+        scene_.reset();
+    }
 
-		//次シーンの初期化
+    //シーン切り替え
+    scene_ = std::move(nextScene_);
 
-		scene_->Initialize(dxCommon_, camera_);
-	}
+    scene_->SetSceneManager(this);
 
-
-	//実行中のシーンを更新
-	if (scene_)
-	{
-		scene_->Update();
-	}
+    //次シーンの初期化
+    scene_->Initialize(dxCommon_, camera_);
 }
 
 void SceneManager::Draw()

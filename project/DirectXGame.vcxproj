@@ -55,6 +55,7 @@
     <ClCompile Include="Sphere.cpp" />
     <ClCompile Include="Baziru3_Engine\2D\Sprite\SpriteManager.cpp" />
     <ClCompile Include="SRVManager.cpp" />
+    <ClCompile Include="SubsystemFactory.cpp" />
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="Resources\shaders\Object3d.PS.hlsl">
@@ -126,6 +127,7 @@
     <ClInclude Include="Baziru3_Engine\2D\Sprite\SpriteManager.h" />
     <ClInclude Include="SRVManager.h" />
     <ClInclude Include="Application\Scene\TitleScene\TitleScene.h" />
+    <ClInclude Include="SubsystemFactory.h" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="externals\DirectXTex\DirectXTex_Desktop_2022_Win10.vcxproj">
