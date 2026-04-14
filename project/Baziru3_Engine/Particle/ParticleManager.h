@@ -42,6 +42,10 @@ public:
 	void Update(float deltaTime);
 
 	Particle MakeNewParticles(std::mt19937& randomEngine,const Vector3& translate);
+	Particle MakeHieEffect(std::mt19937& randomEngine, const Vector3& translate);
+
+
+
 
 	void AddParticles(std::list<Particle>& newParticles);
 

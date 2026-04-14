@@ -143,6 +143,13 @@ ParticleManager::Particle ParticleManager::MakeNewParticles(std::mt19937& random
 	return particle;
 }
 
+ParticleManager::Particle ParticleManager::MakeHieEffect(std::mt19937& randomEngine, const Vector3& translate)
+{
+	Particle particle;
+
+	return Particle();
+}
+
 
 
 void ParticleManager::RootSignature()
