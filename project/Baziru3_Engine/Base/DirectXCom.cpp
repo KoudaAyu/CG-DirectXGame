@@ -659,19 +659,38 @@ Microsoft::WRL::ComPtr<ID3D12Resource> DirectXCom::UploadTextureData(Microsoft::
 DirectX::ScratchImage DirectXCom::LoadTexture(const std::string& filePath)
 {
 	//テクスチャファイルを読み込んでプログラムで使えるようにする
-	DirectX::ScratchImage image{};
-	std::wstring filePathW = StringUtil::ConvertString(filePath);
-	HRESULT hr = DirectX::LoadFromWICFile(filePathW.c_str(), DirectX::WIC_FLAGS_DEFAULT_SRGB, nullptr, image);
-	assert(SUCCEEDED(hr));
+    DirectX::ScratchImage image{};
+    std::wstring filePathW = StringUtil::ConvertString(filePath);
+    HRESULT hr = S_OK;
 
-	//ミニマップの作成
-	DirectX::ScratchImage mipImages{};
-	hr = DirectX::GenerateMipMaps(image.GetImages(), image.GetImageCount(), image.GetMetadata(),
-		DirectX::TEX_FILTER_SRGB, 0, mipImages);
-	assert(SUCCEEDED(hr));
+    // ファイル拡張子で読み込み方法を選択する (.dds は DirectXTex の DDS ローダーを使う)
+    if (filePathW.ends_with(L".dds") || filePathW.ends_with(L".DDS"))
+    {
+        hr = DirectX::LoadFromDDSFile(filePathW.c_str(), DirectX::DDS_FLAGS_NONE, nullptr, image);
+    }
+    else
+    {
+        // WIC で読み込む（SRGB を強制）
+        hr = DirectX::LoadFromWICFile(filePathW.c_str(), DirectX::WIC_FLAGS_FORCE_SRGB, nullptr, image);
+    }
+    assert(SUCCEEDED(hr));
 
-	//ミニマップ付きのデータを返す
-	return mipImages;
+    // ミニマップの作成／準備
+    DirectX::ScratchImage mipImages{};
+    if (DirectX::IsCompressed(image.GetMetadata().format))
+    {
+        // 圧縮フォーマットはそのまま使う（既にミップが含まれていることが多い）
+        mipImages = std::move(image);
+    }
+    else
+    {
+        // レベル 0 を指定するとフルチェーンを生成する
+        hr = DirectX::GenerateMipMaps(image.GetImages(), image.GetImageCount(), image.GetMetadata(), DirectX::TEX_FILTER_SRGB, 0, mipImages);
+        assert(SUCCEEDED(hr));
+    }
+
+    // ミニマップ付きのデータを返す
+    return mipImages;
 }
 
 Microsoft::WRL::ComPtr<ID3D12Resource> DirectXCom::CreateTextureResource(const DirectX::TexMetadata& metadata)
