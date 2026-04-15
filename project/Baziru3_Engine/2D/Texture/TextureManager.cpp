@@ -138,6 +138,17 @@ uint32_t TextureManager::Load(const std::string& filePath)
 	DirectX::ScratchImage mipImages = directXCom_->LoadTexture(filePath);
 
 	const DirectX::TexMetadata& mateData = mipImages.GetMetadata();
+	{
+		std::ostringstream oss;
+		oss << "TextureManager::Load metadata - file='" << filePath
+			<< "' width=" << mateData.width
+			<< " height=" << mateData.height
+			<< " arraySize=" << mateData.arraySize
+			<< " mipLevels=" << mateData.mipLevels
+			<< " isCubemap=" << (mateData.IsCubemap() ? "true" : "false")
+			<< " dimension=" << static_cast<int>(mateData.dimension) << "\n";
+		OutputDebugStringA(oss.str().c_str());
+	}
 
 	//テクスチャリソースの生成(GPU上のID3D12Resourceを作る)
 	auto textureResource = directXCom_->CreateTextureResource(mateData);
@@ -165,7 +176,7 @@ uint32_t TextureManager::Load(const std::string& filePath)
 	auto gpuHandle = srvManager_->GetGPUDescriptorHandle(srvIndex);
 
 	//SRV作成
-	srvManager_->CreateSRVForTexture2D(srvIndex,textureData.resource_.Get(),mateData.format,(UINT)mateData.mipLevels);
+	srvManager_->CreateSRVForTexture2D(srvIndex, textureData.resource_.Get(), mateData);
 
 	//TextureDataの格納と逆引き登録(将来的な参照を可能にする)
 	textureData.srvIndex_ = srvIndex;

@@ -78,6 +78,11 @@ void Game::Initialize()
 	camera_->Initialize(directXCom.get());
 	SceneManager::GetInstance()->SetCamera(camera_.get());
 
+	skyboxCom_ = std::make_unique<SkyboxCom>(logStream, directXCom.get());
+	skyboxCom_->Initialize();
+	skybox_ = std::make_unique<SkyBox>();
+	skybox_->Initialize(directXCom.get(), camera_.get());
+
 	particleManager = std::make_unique<ParticleManager>(logStream, directXCom.get());
 	particleManager->Initialize(camera_.get());
 	SceneManager::GetInstance()->SetParticleManager(particleManager.get());
@@ -123,6 +128,7 @@ void Game::Initialize()
 
 	textureIndexUvChecker = TextureManager::GetInstance()->Load("Resources/uvChecker.png");
 	textureIndexModelTex = TextureManager::GetInstance()->Load(modelData.material.textureFilePath);
+	textureIndexSkybox_ = TextureManager::GetInstance()->Load("Resources/CG4/rostock_laage_airport_4k.dds");
 }
 
 
@@ -160,6 +166,9 @@ void Game::Finalize()
 
 	model_.reset();
 	modelCom_.reset();
+
+	skybox_.reset();
+	skyboxCom_.reset();
 
 	object3d_.reset();
 	object3dCom.reset();
@@ -212,6 +221,10 @@ void Game::Update()
 	debugCamera_.Update();
 
 	camera_->Update();
+	if (skybox_)
+	{
+		skybox_->Update();
+	}
 
 	object3d_->SetRotate(transformObject.rotate);
 	object3d_->Update();
@@ -221,10 +234,10 @@ void Game::Update()
 #ifdef _DEBUG
 
 
-	if (debugUI)
-	{
-		debugUI->Update();
-	}
+    if (debugUI)
+    {
+        debugUI->Update();
+    }
 
 	
 #endif // DEBUG
@@ -274,6 +287,14 @@ void Game::Draw()
     {
         Logger::Log(logStream, "Warning: camera GPU resource not available before SceneManager draw.\n");
     }
+
+	if (skybox_ && skyboxCom_ && textureIndexSkybox_ != TextureManager::kInvalidTextureIndex)
+	{
+		skyboxCom_->SetupDraw(ctx.commandList);
+		skybox_->Draw(ctx.commandList, TextureManager::GetInstance()->GetSrvHandleGPU(textureIndexSkybox_));
+	}
+
+	object3dCom->PreDraw();
 
     SceneManager::GetInstance()->Draw();
 
