@@ -24,6 +24,7 @@
     <ClCompile Include="Baziru3_Engine\3D\Object\Object3dCom.cpp" />
     <ClCompile Include="Baziru3_Engine\Audio\Sound.cpp" />
     <ClCompile Include="Baziru3_Engine\Base\ImGui\ImGuiManager.cpp" />
+    <ClCompile Include="Baziru3_Engine\Base\OffScreenRendering\RenderTexture.cpp" />
     <ClCompile Include="Baziru3_Engine\Camera\Camera.cpp" />
     <ClCompile Include="Baziru3_Engine\Camera\DebugCamera\DebugCamera.cpp" />
     <ClCompile Include="Baziru3_Engine\Base\DirectXCom.cpp" />
@@ -90,6 +91,7 @@
     <ClInclude Include="Baziru3_Engine\3D\Object\Object3dCom.h" />
     <ClInclude Include="Baziru3_Engine\Audio\Sound.h" />
     <ClInclude Include="Baziru3_Engine\Base\MappedResource.h" />
+    <ClInclude Include="Baziru3_Engine\Base\OffScreenRendering\RenderTexture.h" />
     <ClInclude Include="Baziru3_Engine\Base\RenderContext.h" />
     <ClInclude Include="Baziru3_Engine\Base\RootParam.h" />
     <ClInclude Include="Baziru3_Engine\Camera\DebugCamera\DebugCamera.h" />
@@ -208,7 +210,7 @@
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <TreatWarningAsError>true</TreatWarningAsError>
-      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)\externals\DirectXTex;$(ProjectDir)\externals\imgui;$(ProjectDir)Application;$(ProjectDir)Application\Scene;$(ProjectDir)Application\Scene\TitleScene;$(ProjectDir)Baziru3_Engine\2D;$(ProjectDir)Baziru3_Engine\2D\Sprite;$(ProjectDir)Baziru3_Engine\2D\Texture;$(ProjectDir)Baziru3_Engine\3D\Model;$(ProjectDir)Baziru3_Engine\3D\Object;$(ProjectDir)Baziru3_Engine\Audio;$(ProjectDir)Baziru3_Engine\Base;$(ProjectDir)Baziru3_Engine\Base\ImGui;$(ProjectDir)Baziru3_Engine\Base\Log;$(ProjectDir)Baziru3_Engine\Base\Scene;$(ProjectDir)Baziru3_Engine\Base\Srv;$(ProjectDir)Baziru3_Engine\Base\Windows;$(ProjectDir)Baziru3_Engine\Camera;$(ProjectDir)Baziru3_Engine\Camera\DebugCamera;$(ProjectDir)Baziru3_Engine\Light;$(ProjectDir)Baziru3_Engine\Particle</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)\externals\DirectXTex;$(ProjectDir)\externals\imgui;$(ProjectDir)Application;$(ProjectDir)Application\Scene;$(ProjectDir)Application\Scene\TitleScene;$(ProjectDir)Baziru3_Engine\2D;$(ProjectDir)Baziru3_Engine\2D\Sprite;$(ProjectDir)Baziru3_Engine\2D\Texture;$(ProjectDir)Baziru3_Engine\3D\Model;$(ProjectDir)Baziru3_Engine\3D\Object;$(ProjectDir)Baziru3_Engine\Audio;$(ProjectDir)Baziru3_Engine\Base;$(ProjectDir)Baziru3_Engine\Base\ImGui;$(ProjectDir)Baziru3_Engine\Base\Log;$(ProjectDir)Baziru3_Engine\Base\OffScreenRendering;$(ProjectDir)Baziru3_Engine\Base\Scene;$(ProjectDir)Baziru3_Engine\Base\Srv;$(ProjectDir)Baziru3_Engine\Base\Windows;$(ProjectDir)Baziru3_Engine\Camera;$(ProjectDir)Baziru3_Engine\Camera\DebugCamera;$(ProjectDir)Baziru3_Engine\Light;$(ProjectDir)Baziru3_Engine\Particle</AdditionalIncludeDirectories>
       <BasicRuntimeChecks>Default</BasicRuntimeChecks>
     </ClCompile>
     <Link>
@@ -235,7 +237,7 @@
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <Optimization>MinSpace</Optimization>
-      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)\externals\DirectXTex;$(ProjectDir)\externals\imgui;$(ProjectDir)Application;$(ProjectDir)Application\Scene;$(ProjectDir)Application\Scene\TitleScene;$(ProjectDir)Baziru3_Engine\2D;$(ProjectDir)Baziru3_Engine\2D\Sprite;$(ProjectDir)Baziru3_Engine\2D\Texture;$(ProjectDir)Baziru3_Engine\3D\Model;$(ProjectDir)Baziru3_Engine\3D\Object;$(ProjectDir)Baziru3_Engine\Audio;$(ProjectDir)Baziru3_Engine\Base;$(ProjectDir)Baziru3_Engine\Base\ImGui;$(ProjectDir)Baziru3_Engine\Base\Log;$(ProjectDir)Baziru3_Engine\Base\Scene;$(ProjectDir)Baziru3_Engine\Base\Srv;$(ProjectDir)Baziru3_Engine\Base\Windows;$(ProjectDir)Baziru3_Engine\Camera;$(ProjectDir)Baziru3_Engine\Camera\DebugCamera;$(ProjectDir)Baziru3_Engine\Light;$(ProjectDir)Baziru3_Engine\Particle</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)\externals\DirectXTex;$(ProjectDir)\externals\imgui;$(ProjectDir)Application;$(ProjectDir)Application\Scene;$(ProjectDir)Application\Scene\TitleScene;$(ProjectDir)Baziru3_Engine\2D;$(ProjectDir)Baziru3_Engine\2D\Sprite;$(ProjectDir)Baziru3_Engine\2D\Texture;$(ProjectDir)Baziru3_Engine\3D\Model;$(ProjectDir)Baziru3_Engine\3D\Object;$(ProjectDir)Baziru3_Engine\Audio;$(ProjectDir)Baziru3_Engine\Base;$(ProjectDir)Baziru3_Engine\Base\ImGui;$(ProjectDir)Baziru3_Engine\Base\Log;$(ProjectDir)Baziru3_Engine\Base\OffScreenRendering;$(ProjectDir)Baziru3_Engine\Base\Scene;$(ProjectDir)Baziru3_Engine\Base\Srv;$(ProjectDir)Baziru3_Engine\Base\Windows;$(ProjectDir)Baziru3_Engine\Camera;$(ProjectDir)Baziru3_Engine\Camera\DebugCamera;$(ProjectDir)Baziru3_Engine\Light;$(ProjectDir)Baziru3_Engine\Particle</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -262,7 +264,7 @@
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)\externals\DirectXTex;$(ProjectDir)\externals\imgui;$(ProjectDir)Application;$(ProjectDir)Application\Scene;$(ProjectDir)Application\Scene\TitleScene;$(ProjectDir)Baziru3_Engine\2D;$(ProjectDir)Baziru3_Engine\2D\Sprite;$(ProjectDir)Baziru3_Engine\2D\Texture;$(ProjectDir)Baziru3_Engine\3D\Model;$(ProjectDir)Baziru3_Engine\3D\Object;$(ProjectDir)Baziru3_Engine\Audio;$(ProjectDir)Baziru3_Engine\Base;$(ProjectDir)Baziru3_Engine\Base\ImGui;$(ProjectDir)Baziru3_Engine\Base\Log;$(ProjectDir)Baziru3_Engine\Base\Scene;$(ProjectDir)Baziru3_Engine\Base\Srv;$(ProjectDir)Baziru3_Engine\Base\Windows;$(ProjectDir)Baziru3_Engine\Camera;$(ProjectDir)Baziru3_Engine\Camera\DebugCamera;$(ProjectDir)Baziru3_Engine\Light;$(ProjectDir)Baziru3_Engine\Particle</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)\externals\DirectXTex;$(ProjectDir)\externals\imgui;$(ProjectDir)Application;$(ProjectDir)Application\Scene;$(ProjectDir)Application\Scene\TitleScene;$(ProjectDir)Baziru3_Engine\2D;$(ProjectDir)Baziru3_Engine\2D\Sprite;$(ProjectDir)Baziru3_Engine\2D\Texture;$(ProjectDir)Baziru3_Engine\3D\Model;$(ProjectDir)Baziru3_Engine\3D\Object;$(ProjectDir)Baziru3_Engine\Audio;$(ProjectDir)Baziru3_Engine\Base;$(ProjectDir)Baziru3_Engine\Base\ImGui;$(ProjectDir)Baziru3_Engine\Base\Log;$(ProjectDir)Baziru3_Engine\Base\OffScreenRendering;$(ProjectDir)Baziru3_Engine\Base\Scene;$(ProjectDir)Baziru3_Engine\Base\Srv;$(ProjectDir)Baziru3_Engine\Base\Windows;$(ProjectDir)Baziru3_Engine\Camera;$(ProjectDir)Baziru3_Engine\Camera\DebugCamera;$(ProjectDir)Baziru3_Engine\Light;$(ProjectDir)Baziru3_Engine\Particle</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
