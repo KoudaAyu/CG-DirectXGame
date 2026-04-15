@@ -18,6 +18,8 @@
 #include"ParticleManager.h"
 #include"SceneManager.h"
 #include"SceneRegistration.h"
+#include"SkyBox.h"
+#include"SkyboxCom.h"
 #include"Sound.h"
 #include"Sphere.h"
 #include"Sprite.h"
@@ -97,6 +99,8 @@ private:
 	std::unique_ptr<Object3d> object3d_;
 	std::unique_ptr<Object3dCom> object3dCom;
 	std::unique_ptr<ParticleManager> particleManager;
+	std::unique_ptr<SkyBox> skybox_;
+	std::unique_ptr<SkyboxCom> skyboxCom_;
 	std::unique_ptr<SpriteCom> spriteCom;
 	std::unique_ptr<SpriteManager> spriteManager_;
 	std::unique_ptr<WindowAPI> windowAPI;//ウィンドウ関連のAPIをまとめたオブジェクト
@@ -136,6 +140,7 @@ private:
 
 	uint32_t textureIndexUvChecker = TextureManager::kInvalidTextureIndex;
 	uint32_t textureIndexModelTex = TextureManager::kInvalidTextureIndex;
+	uint32_t textureIndexSkybox_ = TextureManager::kInvalidTextureIndex;
 
 };
 

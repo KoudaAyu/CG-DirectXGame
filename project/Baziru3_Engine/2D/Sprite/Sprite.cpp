@@ -163,6 +163,10 @@ void Sprite::Draw()
 	if (directionalLightResource) {
 		dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(3, directionalLightResource->GetGPUVirtualAddress());
 	}
+	else {
+		dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(3, transformationMatrixResourceSprite->GetGPUVirtualAddress());
+	}
+	dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(4, transformationMatrixResourceSprite->GetGPUVirtualAddress());
 
 	// draw quad
 	dxCommon->GetCommandList()->DrawIndexedInstanced(6, 1, 0, 0, 0);

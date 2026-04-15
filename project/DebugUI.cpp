@@ -95,6 +95,53 @@ void DebugUI::Update()
     {
         camera_->SetRotate({ 0.0f, 0.0f, 0.0f });
         camera_->SetTranslate({ 0.0f, 0.0f, -5.0f });
+        camera_->Update();
+    }
+
+   
+    if (camera_)
+    {
+        ImGui::Separator();
+        if (ImGui::CollapsingHeader("Camera"))
+        {
+            // Position
+            auto pos = camera_->GetTranslate();
+            float posArr[3] = { pos.x, pos.y, pos.z };
+            if (ImGui::DragFloat3("Camera Position", posArr, 0.1f))
+            {
+                camera_->SetTranslate({ posArr[0], posArr[1], posArr[2] });
+                camera_->Update();
+            }
+
+            // Rotation
+            auto rot = camera_->GetRotate();
+            float rotArr[3] = { rot.x, rot.y, rot.z };
+            if (ImGui::DragFloat3("Camera Rotate", rotArr, 0.01f))
+            {
+                camera_->SetRotate({ rotArr[0], rotArr[1], rotArr[2] });
+                camera_->Update();
+            }
+
+            // FOV / near / far
+            float fov = camera_->GetFovY();
+            if (ImGui::SliderFloat("FOV (rad)", &fov, 0.1f, 1.5f))
+            {
+                camera_->SetFovY(fov);
+                camera_->Update();
+            }
+            float nearZ = camera_->GetNearZ();
+            if (ImGui::DragFloat("Near Z", &nearZ, 0.01f, 0.01f, 10.0f))
+            {
+                camera_->SetNearZ(nearZ);
+                camera_->Update();
+            }
+            float farZ = camera_->GetFarZ();
+            if (ImGui::DragFloat("Far Z", &farZ, 1.0f, 10.0f, 10000.0f))
+            {
+                camera_->SetFarZ(farZ);
+                camera_->Update();
+            }
+        }
     }
 
     ImGui::End();

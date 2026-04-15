@@ -11,6 +11,7 @@ public:
 
 	//SRV作成
 	void CreateSRVForTexture2D(uint32_t srvIndex, ID3D12Resource* pResource, DXGI_FORMAT Format, UINT MipLeveles);
+	void CreateSRVForTexture2D(uint32_t index, ID3D12Resource* resource, const DirectX::TexMetadata& meta);
 
 	//SRV生成(Structured Buffer用)
 	void CreateSRVForStructuredBuffer(uint32_t srvIndex, ID3D12Resource* pResource, UINT numElements, UINT structureByteStride);
