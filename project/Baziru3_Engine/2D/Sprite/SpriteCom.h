@@ -53,6 +53,10 @@ public:
 	void DepthStencilDesc();
 	
 	void SetupDraw(ID3D12GraphicsCommandList* commandList);
+    
+    // Runtime blend mode control
+    void SetBlendMode(BlendMode mode);
+    BlendMode GetBlendMode() const;
 
 
 public:
@@ -109,6 +113,10 @@ public:
 
 private:
 	DirectXCom* dxCommon = nullptr;
+
+  
+    BlendMode currentBlendMode = kBlendMode_Normal;
+    void ApplyBlendMode(BlendMode mode);
 
 	D3D12_ROOT_SIGNATURE_DESC descriptionRootSignature{};
 	D3D12_DESCRIPTOR_RANGE descriptorRange[1] = {};
