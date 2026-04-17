@@ -24,6 +24,7 @@ void DebugUI::Update()
     if (materialManager_)
     {
         ImGui::ColorEdit4("Material Color", &materialManager_->GetMaterialDataColor().x);
+        ImGui::SliderFloat("Environment Coefficient", &materialManager_->GetMaterialEnvironmentCoefficient(), 0.0f, 2.0f);
     }
 
     // Sprite position window: size (500,100), sliders (x,y) with initial (100,100) and format integer 4 digits, decimal 1
@@ -86,6 +87,7 @@ void DebugUI::Update()
             }
 
             ImGui::SliderFloat("Shininess", &materialManager_->GetMaterialDataShininess(), 0.1f, 100.0f);
+            ImGui::SliderFloat("Environment Coefficient", &materialManager_->GetMaterialEnvironmentCoefficient(), 0.0f, 2.0f);
 
             ImGui::ColorEdit4("Material Color", &materialManager_->GetMaterialDataColor().x);
         }
@@ -186,6 +188,7 @@ void DebugUI::Update()
             }
 
             ImGui::SliderFloat("Shininess", &materialManager_->GetMaterialDataShininess(), 0.1f, 100.0f);
+            ImGui::SliderFloat("Environment Coefficient", &materialManager_->GetMaterialEnvironmentCoefficient(), 0.0f, 2.0f);
 
             ImGui::ColorEdit4("Color", &materialManager_->GetMaterialDataColor().x);
         }

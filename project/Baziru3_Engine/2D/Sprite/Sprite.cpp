@@ -40,6 +40,7 @@ void Sprite::Initialize(SpriteCom* spriteCom, std::string textureFilePath)
     materialData->enableLighting = false;
     materialData->specularModel = 0; // Blinn-Phong default
     materialData->shininess = 16.0f;
+    materialData->environmentCoefficient = 0.2f;
     materialData->uvTransform = MakeIdentity4x4();
 	
 	//Sprite用のTransformationMatrix用のリソースを作る
@@ -85,6 +86,7 @@ std::unique_ptr<Sprite> Sprite::Create(SpriteCom* spriteCom, uint32_t textureHan
 	sprite->materialData->enableLighting = false;
 	sprite->materialData->specularModel = 0;
 	sprite->materialData->shininess = 16.0f;
+	sprite->materialData->environmentCoefficient = 0.2f;
 	sprite->materialData->uvTransform = MakeIdentity4x4();
 
 	sprite->transformationMatrixResourceSprite = sprite->dxCommon->CreateBufferResource(sprite->dxCommon->GetDevice().Get(), sizeof(TransformationMatrix));
@@ -157,16 +159,19 @@ void Sprite::Draw()
 
 	dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(0, materialResourceSprite->GetGPUVirtualAddress());
 	dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(1, transformationMatrixResourceSprite->GetGPUVirtualAddress());
+	if (environmentTextureHandleGPU.ptr != 0) {
+		dxCommon->GetCommandList()->SetGraphicsRootDescriptorTable(2, environmentTextureHandleGPU);
+	}
 	if (textureHandleGPU.ptr != 0) {
-		dxCommon->GetCommandList()->SetGraphicsRootDescriptorTable(2, textureHandleGPU);
+		dxCommon->GetCommandList()->SetGraphicsRootDescriptorTable(3, textureHandleGPU);
 	}
 	if (directionalLightResource) {
-		dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(3, directionalLightResource->GetGPUVirtualAddress());
+		dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(4, directionalLightResource->GetGPUVirtualAddress());
 	}
 	else {
-		dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(3, transformationMatrixResourceSprite->GetGPUVirtualAddress());
+		dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(4, transformationMatrixResourceSprite->GetGPUVirtualAddress());
 	}
-	dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(4, transformationMatrixResourceSprite->GetGPUVirtualAddress());
+	dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(5, transformationMatrixResourceSprite->GetGPUVirtualAddress());
 
 	// draw quad
 	dxCommon->GetCommandList()->DrawIndexedInstanced(6, 1, 0, 0, 0);

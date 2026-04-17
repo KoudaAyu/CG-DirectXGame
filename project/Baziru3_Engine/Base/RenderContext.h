@@ -13,6 +13,7 @@ struct RenderContext
 	WindowAPI* windowAPI = nullptr;
 	Camera* camera = nullptr;
 	Light* light = nullptr;
+	D3D12_GPU_DESCRIPTOR_HANDLE environmentTextureHandle{};
 	D3D12_GPU_DESCRIPTOR_HANDLE textureHandle{};
 	D3D12_GPU_VIRTUAL_ADDRESS materialGPUAddress = 0;
 };

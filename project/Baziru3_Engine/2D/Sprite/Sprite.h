@@ -99,6 +99,7 @@ public:
 
 	void SetTextureSize(const Vector2& size) { textureSize = size; }
 
+	void SetEnvironmentTextureHandle(D3D12_GPU_DESCRIPTOR_HANDLE handle) { environmentTextureHandleGPU = handle; }
 	void SetTextureHandle(D3D12_GPU_DESCRIPTOR_HANDLE handle) { textureHandleGPU = handle; }
 	
 	void SetDirectionalLightResource(const Microsoft::WRL::ComPtr<ID3D12Resource>& light) { directionalLightResource = light; }
@@ -147,6 +148,7 @@ private:
 	TransformationMatrix* transformationMatrixDataSprite = nullptr;
 
 	// 新規: 描画時に使うハンドル/リソース
+	D3D12_GPU_DESCRIPTOR_HANDLE environmentTextureHandleGPU{};
 	D3D12_GPU_DESCRIPTOR_HANDLE textureHandleGPU{};
 	Microsoft::WRL::ComPtr<ID3D12Resource> directionalLightResource = nullptr;
 

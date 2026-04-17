@@ -267,6 +267,10 @@ void Game::Draw()
     ctx.windowAPI = windowAPI.get();
     ctx.camera = camera_.get();
     ctx.light = light.get();
+	if (textureIndexSkybox_ != TextureManager::kInvalidTextureIndex)
+	{
+		ctx.environmentTextureHandle = TextureManager::GetInstance()->GetSrvHandleGPU(textureIndexSkybox_);
+	}
     uint32_t chosenIndex = useMonsterBall ? textureIndexModelTex : textureIndexUvChecker;
     if (chosenIndex != TextureManager::kInvalidTextureIndex)
     {
@@ -281,7 +285,7 @@ void Game::Draw()
 
     if (camera_ && camera_->GetCameraResource())
     {
-        directXCom->GetCommandList()->SetGraphicsRootConstantBufferView(4, camera_->GetCameraResource()->GetGPUVirtualAddress());
+		directXCom->GetCommandList()->SetGraphicsRootConstantBufferView(RootParam::Object3D::kCamera, camera_->GetCameraResource()->GetGPUVirtualAddress());
     }
     else
     {
@@ -346,23 +350,28 @@ bool Game::IsQuitRequested()
 
 void Game::DrawObjects(const RenderContext& ctx)
 {
+	if (ctx.environmentTextureHandle.ptr != 0)
+	{
+		ctx.commandList->SetGraphicsRootDescriptorTable(RootParam::Object3D::kEnvironmentTextureTable, ctx.environmentTextureHandle);
+	}
+
     if (ctx.textureHandle.ptr != 0)
     {
-        ctx.commandList->SetGraphicsRootDescriptorTable(2, ctx.textureHandle);
+		ctx.commandList->SetGraphicsRootDescriptorTable(RootParam::Object3D::kTextureTable, ctx.textureHandle);
     }
 
     if (ctx.light)
     {
-        ctx.commandList->SetGraphicsRootConstantBufferView(3, ctx.light->GetDirectionalLightResource()->GetGPUVirtualAddress());
+		ctx.commandList->SetGraphicsRootConstantBufferView(RootParam::Object3D::kLight, ctx.light->GetDirectionalLightResource()->GetGPUVirtualAddress());
     }
     else
     {
-        ctx.commandList->SetGraphicsRootConstantBufferView(3, 0);
+		ctx.commandList->SetGraphicsRootConstantBufferView(RootParam::Object3D::kLight, 0);
     }
 
     if (ctx.camera && ctx.camera->GetCameraResource())
     {
-        ctx.commandList->SetGraphicsRootConstantBufferView(4, ctx.camera->GetCameraResource()->GetGPUVirtualAddress());
+		ctx.commandList->SetGraphicsRootConstantBufferView(RootParam::Object3D::kCamera, ctx.camera->GetCameraResource()->GetGPUVirtualAddress());
     }
     else
     {

@@ -52,6 +52,7 @@ void SpriteManager::DrawAll(const RenderContext& ctx, DebugCamera* debugCamera, 
     {
         if (!sp) continue;
         sp->Update(ctx.windowAPI, debugCamera);
+        sp->SetEnvironmentTextureHandle(ctx.environmentTextureHandle);
         if (ctx.light) sp->SetDirectionalLightResource(ctx.light->GetDirectionalLightResource());
         sp->Draw();
     }
@@ -63,6 +64,7 @@ void SpriteManager::DrawAll(const RenderContext& ctx, DebugCamera* debugCamera, 
         {
             if (!sp) continue;
             sp->Update(ctx.windowAPI, debugCamera);
+            sp->SetEnvironmentTextureHandle(ctx.environmentTextureHandle);
             if (ctx.light) sp->SetDirectionalLightResource(ctx.light->GetDirectionalLightResource());
             sp->Draw();
         }

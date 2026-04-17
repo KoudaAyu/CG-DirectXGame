@@ -16,7 +16,8 @@ struct Material
     float padding[2]; // パディングを追加して16バイト境界に揃える
 	Matrix4x4 uvTransform; // UV変換行列
 	float shininess;
-	float padding2[3];
+	float environmentCoefficient;
+	float padding2[2];
 };
 
 class MaterialManager
@@ -36,6 +37,7 @@ public:
 	int32_t& GetMaterialDataEnableLighting() { return materialData->enableLighting; }
 
 	float& GetMaterialDataShininess() { return materialData->shininess; }
+	float& GetMaterialEnvironmentCoefficient() { return materialData->environmentCoefficient; }
 
 	int32_t& GetMaterialSpecularModel() { return materialData->specularModel; }
 

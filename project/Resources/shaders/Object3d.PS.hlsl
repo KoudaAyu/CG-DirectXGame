@@ -8,7 +8,8 @@ struct Material
     float32_t2 padding;
     float32_t4x4 uvTransform;
     float32_t shininess;
-    float32_t3 padding2;
+    float32_t environmentCoefficient;
+    float32_t2 padding2;
 };
 
 ConstantBuffer<Material> gMaterial : register(b0);
@@ -21,6 +22,7 @@ struct DirectionalLight
 };
 ConstantBuffer<DirectionalLight> gDirectionalLight : register(b1);
 
+TextureCube<float32_t4> gEnvironmentTexture : register(t1);
 Texture2D<float32_t4> gTexture : register(t3);
 SamplerState gSample : register(s0);
 
@@ -78,6 +80,12 @@ PixelShaderOutput main(VertexShaderOutput input)
         float32_t3 specular = gDirectionalLight.color.rgb * gDirectionalLight.intensity * specularPow * saturate(NdotL);
 
         output.color.rgb = diffuse + specular;
+
+        // 環境マップによる入射光の追加
+        // 既に計算済みの V, N を再利用
+        float32_t3 R = reflect(-V, N);
+        float32_t4 envColor = gEnvironmentTexture.Sample(gSample, R);
+        output.color.rgb += envColor.rgb * gMaterial.environmentCoefficient;
     }
 
     return output;

@@ -7,9 +7,10 @@ namespace RootParam
         enum {
             kMaterial = 0,
             kTransform = 1,
-            kTextureTable = 2,
-            kLight = 3,
-            kCamera = 4,
+			kEnvironmentTextureTable = 2,
+			kTextureTable = 3,
+			kLight = 4,
+			kCamera = 5,
         };
     }
 

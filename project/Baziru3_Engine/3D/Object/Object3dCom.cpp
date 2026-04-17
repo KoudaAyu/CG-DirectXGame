@@ -1,5 +1,6 @@
 #include"Object3dCom.h"
 #include "Light.h"
+#include "RootParam.h"
 
 
 // 参照メンバー logStream を初期化するコンストラクタ定義
@@ -70,26 +71,31 @@ void Object3dCom::Draw(Object3d* object, const ::RenderContext& ctx, const Objec
 {
     if (!ctx.commandList) return;
 
+    if (ctx.environmentTextureHandle.ptr != 0)
+    {
+        ctx.commandList->SetGraphicsRootDescriptorTable(RootParam::Object3D::kEnvironmentTextureTable, ctx.environmentTextureHandle);
+    }
+
    
     if (ctx.textureHandle.ptr != 0)
     {
-        ctx.commandList->SetGraphicsRootDescriptorTable(2, ctx.textureHandle);
+		ctx.commandList->SetGraphicsRootDescriptorTable(RootParam::Object3D::kTextureTable, ctx.textureHandle);
     }
 
    
     if (ctx.light)
     {
-        ctx.commandList->SetGraphicsRootConstantBufferView(3, ctx.light->GetDirectionalLightResource()->GetGPUVirtualAddress());
+		ctx.commandList->SetGraphicsRootConstantBufferView(RootParam::Object3D::kLight, ctx.light->GetDirectionalLightResource()->GetGPUVirtualAddress());
     }
     else
     {
-        ctx.commandList->SetGraphicsRootConstantBufferView(3, 0);
+		ctx.commandList->SetGraphicsRootConstantBufferView(RootParam::Object3D::kLight, 0);
     }
 
    
     if (ctx.camera && ctx.camera->GetCameraResource())
     {
-        ctx.commandList->SetGraphicsRootConstantBufferView(4, ctx.camera->GetCameraResource()->GetGPUVirtualAddress());
+		ctx.commandList->SetGraphicsRootConstantBufferView(RootParam::Object3D::kCamera, ctx.camera->GetCameraResource()->GetGPUVirtualAddress());
     }
     else
     {
@@ -112,13 +118,18 @@ void Object3dCom::Draw(Object3d* object, const ::RenderContext& ctx, const Objec
 
 void Object3dCom::Descriptor()
 {
-
-	// SRV: t3, t4
+	// SRV: t1(environment), t3(albedo)
 	descriptorRange[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
 	descriptorRange[0].NumDescriptors = 1;
-	descriptorRange[0].BaseShaderRegister = 3;
+	descriptorRange[0].BaseShaderRegister = 1;
 	descriptorRange[0].RegisterSpace = 0;
 	descriptorRange[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+
+	descriptorRange[1].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+	descriptorRange[1].NumDescriptors = 1;
+	descriptorRange[1].BaseShaderRegister = 3;
+	descriptorRange[1].RegisterSpace = 0;
+	descriptorRange[1].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 }
 
 void Object3dCom::CreateRootParameters()
@@ -132,17 +143,22 @@ void Object3dCom::CreateRootParameters()
 	rootParameters[1].Descriptor.ShaderRegister = 0;//レジスタ番号0を使用
 
 	rootParameters[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;//DescriptorTableを使う
-	rootParameters[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;//PixelShaderで使う
-	rootParameters[2].DescriptorTable.pDescriptorRanges = descriptorRange;//Tableの中身の配列を指定
-	rootParameters[2].DescriptorTable.NumDescriptorRanges = _countof(descriptorRange);//Tableで管理する数
+	rootParameters[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+	rootParameters[2].DescriptorTable.pDescriptorRanges = &descriptorRange[0];
+	rootParameters[2].DescriptorTable.NumDescriptorRanges = 1;
 
-	rootParameters[3].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+	rootParameters[3].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
 	rootParameters[3].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
-	rootParameters[3].Descriptor.ShaderRegister = 1;
+	rootParameters[3].DescriptorTable.pDescriptorRanges = &descriptorRange[1];
+	rootParameters[3].DescriptorTable.NumDescriptorRanges = 1;
 
 	rootParameters[4].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
-	rootParameters[4].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL; // PixelShaderで使う 
-	rootParameters[4].Descriptor.ShaderRegister = 2; // b2 とバインド
+	rootParameters[4].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+	rootParameters[4].Descriptor.ShaderRegister = 1;
+
+	rootParameters[5].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+	rootParameters[5].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL; // PixelShaderで使う 
+	rootParameters[5].Descriptor.ShaderRegister = 2; // b2 とバインド
 
 	descriptionRootSignature.pParameters = rootParameters; //ルートパラメーター配列へのポインタ
 	descriptionRootSignature.NumParameters = _countof(rootParameters);//配列の長さ

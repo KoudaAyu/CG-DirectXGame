@@ -20,6 +20,7 @@ void  MaterialManager::Initialize(DirectXCom* directXCom)
 	materialData->enableLighting = false;
     materialData->specularModel = 0; // デフォルトは Blinn-Phong
     materialData->shininess = 16.0f;
+    materialData->environmentCoefficient = 0.2f;
     //uvTransform行列の初期化
     materialData->uvTransform = MakeIdentity4x4();
     materialResource->Unmap(0, nullptr);
