@@ -128,7 +128,7 @@ void Game::Initialize()
 
 	textureIndexUvChecker = TextureManager::GetInstance()->Load("Resources/uvChecker.png");
 	textureIndexModelTex = TextureManager::GetInstance()->Load(modelData.material.textureFilePath);
-	textureIndexSkybox_ = TextureManager::GetInstance()->Load("Resources/CG4/rostock_laage_airport_4k.dds");
+	textureIndexSkybox_ = TextureManager::GetInstance()->Load("Resources/CG4/dds/CG4_test.dds");
 }
 
 
