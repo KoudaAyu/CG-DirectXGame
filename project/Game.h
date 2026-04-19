@@ -48,13 +48,8 @@ public:
 
 public:
 	std::ostream& logStream = log.GetLogStream();
-
-	WindowAPI* GetWindowAPI() { return engine_ ? engine_->GetWindowAPI() : windowAPI.get(); }
-	const WindowAPI* GetWindowAPI() const { return engine_ ? engine_->GetWindowAPI() : windowAPI.get(); }
-	DirectXCom* GetDirectXCom() { return engine_ ? engine_->GetDirectXCom() : directXCom.get(); }
-	const DirectXCom* GetDirectXCom() const { return engine_ ? engine_->GetDirectXCom() : directXCom.get(); }
-	SpriteCom* GetSpriteCom() { return engine_ ? engine_->GetSpriteCom() : spriteCom.get(); }
-	const SpriteCom* GetSpriteCom() const { return engine_ ? engine_->GetSpriteCom() : spriteCom.get(); }
+	DirectXCom* GetDirectXCom() { return engine_ ? engine_->GetDirectXCom() : nullptr; }
+	const DirectXCom* GetDirectXCom() const { return engine_ ? engine_->GetDirectXCom() : nullptr; }
 	Sprite* GetSprites(size_t index)
 	{
 		if (index < sprites.size())
@@ -71,20 +66,18 @@ public:
 		}
 		return nullptr;
 	}
-    std::vector<std::unique_ptr<Sprite>>& GetSprites()
-    {
-        if (engine_ && engine_->GetSpriteManager()) return engine_->GetSpriteManager()->GetSprites();
-        if (spriteManager_) return spriteManager_->GetSprites();
-        static std::vector<std::unique_ptr<Sprite>> empty;
-        return empty;
-    }
-    const std::vector<std::unique_ptr<Sprite>>& GetSprites() const
-    {
-        if (engine_ && engine_->GetSpriteManager()) return engine_->GetSpriteManager()->GetSprites();
-        if (spriteManager_) return spriteManager_->GetSprites();
-        static const std::vector<std::unique_ptr<Sprite>> empty;
-        return empty;
-    }
+	std::vector<std::unique_ptr<Sprite>>& GetSprites()
+	{
+		if (engine_ && engine_->GetSpriteManager()) return engine_->GetSpriteManager()->GetSprites();
+		static std::vector<std::unique_ptr<Sprite>> empty;
+		return empty;
+	}
+	const std::vector<std::unique_ptr<Sprite>>& GetSprites() const
+	{
+		if (engine_ && engine_->GetSpriteManager()) return engine_->GetSpriteManager()->GetSprites();
+		static const std::vector<std::unique_ptr<Sprite>> empty;
+		return empty;
+	}
 	Object3d* GetObject3d() { return object3d_.get(); }
 	const Object3d* GetObject3d() const { return object3d_.get(); }
 	Object3dCom* GetObject3dCom() { return object3dCom.get(); }
@@ -104,7 +97,6 @@ private:
 	Log log;
 	
 	std::unique_ptr<Camera> camera_;
-	std::unique_ptr<DirectXCom> directXCom;
 	std::unique_ptr<EngineContext> engine_;
 	std::unique_ptr<ImGuiManager> imguiManager;
 	std::unique_ptr<Light> light;
@@ -115,9 +107,6 @@ private:
 	std::unique_ptr<ParticleManager> particleManager;
 	std::unique_ptr<SkyBox> skybox_;
 	std::unique_ptr<SkyboxCom> skyboxCom_;
-	std::unique_ptr<SpriteCom> spriteCom;
-	std::unique_ptr<SpriteManager> spriteManager_;
-	std::unique_ptr<WindowAPI> windowAPI;
 	
 	DebugCamera debugCamera_;
 	
