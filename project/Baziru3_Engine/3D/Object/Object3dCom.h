@@ -4,6 +4,8 @@
 #include <d3d12.h>
 #include <ostream>
 #include"Log.h"
+#include "Object3d.h"
+#include "RenderContext.h"
 
 
 
@@ -30,7 +32,9 @@ public:
 	void InitializeGraphicPipeline();
 	void CreateGraphicsPipelineState();
 
-	void PreDraw();
+    void PreDraw();
+  
+    void Draw(Object3d* object, const RenderContext& ctx, const Object3d::ModelData& modelData, bool drawObject);
 
 public:
 	void SetDefaultCamera(Camera* camera)

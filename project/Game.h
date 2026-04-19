@@ -1,25 +1,40 @@
 #pragma once
 
+#include <memory>
+
+#include"AudioManager.h"
 #include"Camera.h"
 #include"CrashDump.h"
 #include"DirectXCom.h"
+#include"EngineContext.h"
 #include"Framework.h"
 #include"ImGuiManager.h"
+#include"Light.h"
 #include"Log.h"
+#include"MaterialManager.h"
+#include"Model.h"
 #include"Object3d.h"
 #include"Object3dCom.h"
 #include"ParticleEmitter.h"
 #include"ParticleManager.h"
+#include"SceneManager.h"
+#include"SceneRegistration.h"
+#include"SkyBox.h"
+#include"SkyboxCom.h"
 #include"Sound.h"
 #include"Sphere.h"
 #include"Sprite.h"
 #include"SpriteCom.h"
+#include"SpriteManager.h"
 #include"ResourceLeakCheek.h"
 #include"TextureManager.h"
 #include"WindowsAPI.h"
+#include "DebugUI.h"
 
 #include <vector>
 #include <random>
+
+#include "RenderContext.h"
 
 class Game : public Framework
 {
@@ -29,23 +44,17 @@ public:
 	void Update() override;
 	void Draw() override;
 
-	// Framework::Run will call this to check for WM_QUIT
 	bool IsQuitRequested() override;
 
 public:
 	std::ostream& logStream = log.GetLogStream();
-
-	WindowAPI* GetWindowAPI() { return windowAPI; }
-	const WindowAPI* GetWindowAPI() const { return windowAPI; }
-	DirectXCom* GetDirectXCom() { return directXCom; }
-	const DirectXCom* GetDirectXCom() const { return directXCom; }
-	SpriteCom* GetSpriteCom() { return spriteCom; }
-	const SpriteCom* GetSpriteCom() const { return spriteCom; }
+	DirectXCom* GetDirectXCom() { return engine_ ? engine_->GetDirectXCom() : nullptr; }
+	const DirectXCom* GetDirectXCom() const { return engine_ ? engine_->GetDirectXCom() : nullptr; }
 	Sprite* GetSprites(size_t index)
 	{
 		if (index < sprites.size())
 		{
-			return sprites[index];
+			return sprites[index].get();
 		}
 		return nullptr;
 	}
@@ -53,168 +62,86 @@ public:
 	{
 		if (index < sprites.size())
 		{
-			return sprites[index];
+			return sprites[index].get();
 		}
 		return nullptr;
 	}
-	std::vector<Sprite*>& GetSprites()
+	std::vector<std::unique_ptr<Sprite>>& GetSprites()
 	{
-		return sprites;
+		if (engine_ && engine_->GetSpriteManager()) return engine_->GetSpriteManager()->GetSprites();
+		static std::vector<std::unique_ptr<Sprite>> empty;
+		return empty;
 	}
-	const std::vector<Sprite*>& GetSprites() const
+	const std::vector<std::unique_ptr<Sprite>>& GetSprites() const
 	{
-		return sprites;
+		if (engine_ && engine_->GetSpriteManager()) return engine_->GetSpriteManager()->GetSprites();
+		static const std::vector<std::unique_ptr<Sprite>> empty;
+		return empty;
 	}
-	Object3d* GetObject3d() { return object3d; }
-	const Object3d* GetObject3d() const { return object3d; }
-	Object3dCom* GetObject3dCom() { return object3dCom; }
-	const Object3dCom* GetObject3dCom() const { return object3dCom; }
-	ParticleManager* GetParticleManager() { return particleManager; }
-	const ParticleManager* GetParticleManager() const { return particleManager; }
-	Sphere* GetSphere() { return sphere; }
-	const Sphere* GetSphere() const { return sphere; }
+	Object3d* GetObject3d() { return object3d_.get(); }
+	const Object3d* GetObject3d() const { return object3d_.get(); }
+	Object3dCom* GetObject3dCom() { return object3dCom.get(); }
+	const Object3dCom* GetObject3dCom() const { return object3dCom.get(); }
+	ParticleManager* GetParticleManager() { return particleManager.get(); }
+	const ParticleManager* GetParticleManager() const { return particleManager.get(); }
+
+
+private:
+    void DrawObjects(const RenderContext& ctx);
+    void DrawSprites(const RenderContext& ctx);
+    void DrawParticles(const RenderContext& ctx);
 
 private:
 	ResourceLeakCheek leakChecker; //リソースリークチェック用のオブジェクト
 	CrashDump crashDump; //クラッシュダンプ生成用のオブジェクト
 	Log log;
-	WindowAPI* windowAPI = nullptr; //ウィンドウ関連のAPIをまとめたオブジェクト
-	DirectXCom* directXCom = nullptr;
-	SpriteCom* spriteCom = nullptr;
-	Object3d* object3d = nullptr;
-	Object3dCom* object3dCom = nullptr;
-	ParticleManager* particleManager = nullptr;
-	Sphere* sphere = nullptr;
-	ImGuiManager* imguiManager = nullptr;
+	
+	std::unique_ptr<Camera> camera_;
+	std::unique_ptr<EngineContext> engine_;
+	std::unique_ptr<ImGuiManager> imguiManager;
+	std::unique_ptr<Light> light;
+	std::unique_ptr<Model> model_;
+	std::unique_ptr<ModelCom>modelCom_;
+	std::unique_ptr<Object3d> object3d_;
+	std::unique_ptr<Object3dCom> object3dCom;
+	std::unique_ptr<ParticleManager> particleManager;
+	std::unique_ptr<SkyBox> skybox_;
+	std::unique_ptr<SkyboxCom> skyboxCom_;
+	
 	DebugCamera debugCamera_;
-	Camera* camera = nullptr;
-	CameraForGPU* cameraData = nullptr;
+	
+	SRVManager srvManager;
 	std::list<ParticleManager::Particle> particles;
 	ParticleEmitter particleEmitter;
-	Emitter emitter;
 	KeyInput inputManager;
-	Sound* sound_ = nullptr;
+	std::unique_ptr<AudioManager> audioManager_;
+	std::unique_ptr<MaterialManager> materialManager_;
+	std::unique_ptr<DebugUI> debugUI; // debug UI
 private:
-	std::vector<Sprite*>sprites;
+	std::vector<std::unique_ptr<Sprite>>sprites;
 	Sprite::Transform transformObject;
-	Sprite::Transform uvTransformSprite;
-	Sprite::Transform transformSphere;
+	//Sprite::Transform uvTransformSprite;
+	
 	Sprite::Transform cameraTransform;
-	Microsoft::WRL::ComPtr<ID3D12Resource> directionalLight;
-	Object3d::DirectionalLight* directionalLightData = nullptr;
-	TransformationMatrix* transformationMatrixDataSphere = nullptr;
-	Microsoft::WRL::ComPtr<ID3D12Resource> transformationMatrixResourceSphere;
-	Sprite::Material* materialData = nullptr;
 
-	D3D12_VERTEX_BUFFER_VIEW vertexBufferView{};
-	Microsoft::WRL::ComPtr<ID3D12Resource> materialResource;
-
-	D3D12_CPU_DESCRIPTOR_HANDLE textureSrvHandleCPU;
-	D3D12_CPU_DESCRIPTOR_HANDLE textureSrvHandleCPU2;
-
-	D3D12_GPU_DESCRIPTOR_HANDLE textureSrvHandleGPU;
-	D3D12_GPU_DESCRIPTOR_HANDLE textureSrvHandleGPU2;
-
-	Microsoft::WRL::ComPtr<ID3D12Resource> cameraResource;
-
-	D3D12_GPU_DESCRIPTOR_HANDLE instancingSrvHandleGPU;
 
 	Object3d::ModelData modelData;
 
-	D3D12_VIEWPORT viewport{};
-	D3D12_RECT scissorRect{};
-
-	float fovY;
-	float aspectRatio;
-	float nearZ;
-	float farZ;
-
-	const uint32_t kNumMaxInstances = 10;
-	uint32_t numInstance = 0;
+	
 
 	const float kDeltaTime = 1.0f / 60.0f;
-
-	std::mt19937 randomEngine{ std::random_device{}() };
-
-	ParticleManager::ParticleForGPU* instanceData = nullptr;
 
 	//SRVの切り替え
 	bool useMonsterBall = true;
 	//Objectの描画切り替え
 	bool drawObject = false;
 	bool drawSprite = false;
-	bool drawSphere = false;
+	
+	// Texture resources are owned and managed by TextureManager now.
 
-	// Keep GPU resources alive beyond Initialize
-	Microsoft::WRL::ComPtr<ID3D12Resource> vertexResourceModel;
-	Microsoft::WRL::ComPtr<ID3D12Resource> textureResource;
-	Microsoft::WRL::ComPtr<ID3D12Resource> textureResource2;
-	Microsoft::WRL::ComPtr<ID3D12Resource> intermediateResource;
-	Microsoft::WRL::ComPtr<ID3D12Resource> intermediateResource2;
-	Microsoft::WRL::ComPtr<ID3D12Resource> instancingResource;
+	uint32_t textureIndexUvChecker = TextureManager::kInvalidTextureIndex;
+	uint32_t textureIndexModelTex = TextureManager::kInvalidTextureIndex;
+	uint32_t textureIndexSkybox_ = TextureManager::kInvalidTextureIndex;
 
 };
-
-//#include<Windows.h>
-//
-////自作h
-//#include"Camera.h"
-//#include"DebugCamera.h"
-//#include"DirectXCom.h"
-//#include"KeyInput.h"
-//#include"Matrix4x4.h"
-//#include"Random.h"
-//#include"ParticleEmitter.h"
-//#include"Sound.h"
-//#include"TextureManager.h"
-//#include"Vector.h"
-//#include"WindowsAPI.h"
-//
-//#include<chrono> //時間を扱うライブラリ
-//#include<filesystem> //ファイルやディレクトリに関する操作を行うライブラリ
-//#include<format> //文字列のフォーマットを行うライブラリ
-//#include<fstream> //ファイルにかいたり読んだりするライブラリ
-//#include<string> //文字列を扱うライブラリ
-//#include<strsafe.h>
-//
-//#include<d3d12.h>
-//#include<dxgi1_6.h>
-//#include<cassert>
-//
-//
-//
-////Comptr
-//#include<wrl.h>
-//
-////Debug用
-//#include<dbghelp.h>
-//#pragma comment(lib,"Dbghelp.lib")
-//
-////ファイル関係 / サウンド関係
-//#include<sstream>
-////#include <xaudio2.h>
-////#pragma comment(lib, "xaudio2.lib")
-//
-//
-////ReportLiveObjects
-//#include <dxgidebug.h>
-//#pragma comment(lib, "dxguid.lib")
-//
-////DXCの初期化
-//#include<dxcapi.h>
-//#pragma comment(lib, "dxcompiler.lib")
-//
-////Textureの転送
-//#include"externals/DirectXTex/d3dx12.h"
-//#include<vector>
-//
-//#include <DirectXMath.h>
-//#include<cmath>
-//#include "externals/DirectXTex/DirectXTex.h"
-//
-//#include<numbers>
-//#include<list>
-//
-//
-//#include"ImGuiManager.h"
 

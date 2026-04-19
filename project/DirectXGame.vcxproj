@@ -15,6 +15,10 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="Baziru3_Engine\Scene\Factory\AbstractSceneFactory.cpp" />
+    <ClCompile Include="Application\Scene\TitleScene\TitleScene.cpp" />
+    <ClCompile Include="Baziru3_Engine\Audio\AudioManager.cpp" />
+    <ClCompile Include="Baziru3_Engine\Scene\BaseScene.cpp" />
     <ClCompile Include="Baziru3_Engine\2D\Texture\TextureManager.cpp" />
     <ClCompile Include="Baziru3_Engine\3D\Object\Object3d.cpp" />
     <ClCompile Include="Baziru3_Engine\3D\Object\Object3dCom.cpp" />
@@ -24,28 +28,49 @@
     <ClCompile Include="Baziru3_Engine\Camera\DebugCamera\DebugCamera.cpp" />
     <ClCompile Include="Baziru3_Engine\Base\DirectXCom.cpp" />
     <ClCompile Include="Baziru3_Engine\Base\KeyInput.cpp" />
-    <ClCompile Include="Baziru3_Engine\Base\Log.cpp" />
+    <ClCompile Include="Baziru3_Engine\Base\Log\Log.cpp" />
     <ClCompile Include="Baziru3_Engine\Base\Matrix4x4.cpp" />
     <ClCompile Include="Baziru3_Engine\Base\ResourceLeakCheek.cpp" />
     <ClCompile Include="Baziru3_Engine\Base\StringUtil.cpp" />
     <ClCompile Include="Baziru3_Engine\Base\Transform.cpp" />
-    <ClCompile Include="Baziru3_Engine\Base\WindowsAPI.cpp" />
-    <ClCompile Include="CrashDump.cpp" />
-    <ClCompile Include="Framework.cpp" />
+    <ClCompile Include="Baziru3_Engine\Base\Windows\WindowsAPI.cpp" />
+    <ClCompile Include="Baziru3_Engine\SkyBox\SkyboxCom.cpp" />
+    <ClCompile Include="Baziru3_Engine\Platform\Windows\CrashDump.cpp" />
+    <ClCompile Include="Baziru3_Engine\Base\DebugUI.cpp" />
+    <ClCompile Include="Application\Framework.cpp" />
+    <ClCompile Include="EngineContext.cpp" />
     <ClCompile Include="Game.cpp" />
-    <ClCompile Include="GamePlayScene.cpp" />
+    <ClCompile Include="Application\Scene\GameScene\GamePlayScene.cpp" />
+    <ClCompile Include="Baziru3_Engine\Light\Light.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="Baziru3_Engine\2D\Sprite\Sprite.cpp" />
     <ClCompile Include="Baziru3_Engine\2D\Sprite\SpriteCom.cpp" />
     <ClCompile Include="Baziru3_Engine\Particle\ParticleManager.cpp" />
-    <ClCompile Include="Random.cpp" />
-    <ClCompile Include="Model.cpp" />
-    <ClCompile Include="ModelCom.cpp" />
-    <ClCompile Include="ModelManager.cpp" />
-    <ClCompile Include="Sphere.cpp" />
-    <ClCompile Include="SRVManager.cpp" />
+    <ClCompile Include="Baziru3_Engine\Graphics\Material\MaterialManager.cpp" />
+    <ClCompile Include="Baziru3_Engine\Math\Random.cpp" />
+    <ClCompile Include="Baziru3_Engine\3D\Model\Model.cpp" />
+    <ClCompile Include="Baziru3_Engine\3D\Model\ModelCom.cpp" />
+    <ClCompile Include="Baziru3_Engine\3D\Model\ModelManager.cpp" />
+    <ClCompile Include="Baziru3_Engine\Scene\Factory\SceneFactory.cpp" />
+    <ClCompile Include="Baziru3_Engine\Scene\Manager\SceneManager.cpp" />
+    <ClCompile Include="Baziru3_Engine\Scene\Factory\SceneRegistration.cpp" />
+    <ClCompile Include="Baziru3_Engine\SkyBox\SkyBox.cpp" />
+    <ClCompile Include="Baziru3_Engine\Shapes\Sphere\Sphere.cpp" />
+    <ClCompile Include="Baziru3_Engine\2D\Sprite\SpriteManager.cpp" />
+    <ClCompile Include="Baziru3_Engine\Base\Srv\SRVManager.cpp" />
+    <ClCompile Include="Application\Subsystem\SubsystemFactory.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <FxCompile Include="Resources\shaders\Skybox.PS.hlsl">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </FxCompile>
+    <FxCompile Include="Resources\shaders\Skybox.VS.hlsl">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </FxCompile>
     <FxCompile Include="Resources\shaders\Object3d.PS.hlsl">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
@@ -71,37 +96,55 @@
     </FxCompile>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Baziru3_Engine\Scene\Factory\AbstractSceneFactory.h" />
+    <ClInclude Include="Baziru3_Engine\Audio\AudioManager.h" />
+    <ClInclude Include="Baziru3_Engine\Scene\BaseScene.h" />
     <ClInclude Include="Baziru3_Engine\3D\Object\Object3d.h" />
     <ClInclude Include="Baziru3_Engine\3D\Object\Object3dCom.h" />
     <ClInclude Include="Baziru3_Engine\Audio\Sound.h" />
+    <ClInclude Include="Baziru3_Engine\Base\MappedResource.h" />
+    <ClInclude Include="Baziru3_Engine\Base\RenderContext.h" />
+    <ClInclude Include="Baziru3_Engine\Base\RootParam.h" />
     <ClInclude Include="Baziru3_Engine\Camera\DebugCamera\DebugCamera.h" />
     <ClInclude Include="Baziru3_Engine\Base\DirectXCom.h" />
     <ClInclude Include="Baziru3_Engine\Base\ImGui\ImGuiManager.h" />
     <ClInclude Include="Baziru3_Engine\Base\KeyInput.h" />
-    <ClInclude Include="Baziru3_Engine\Base\Log.h" />
+    <ClInclude Include="Baziru3_Engine\Base\Log\Log.h" />
     <ClInclude Include="Baziru3_Engine\Base\Matrix4x4.h" />
     <ClInclude Include="Baziru3_Engine\Base\ResourceLeakCheek.h" />
     <ClInclude Include="Baziru3_Engine\Base\StringUtil.h" />
     <ClInclude Include="Baziru3_Engine\Base\Transform.h" />
     <ClInclude Include="Baziru3_Engine\Base\Vector.h" />
-    <ClInclude Include="Baziru3_Engine\Base\WindowsAPI.h" />
+    <ClInclude Include="Baziru3_Engine\Base\Windows\WindowsAPI.h" />
     <ClInclude Include="Baziru3_Engine\Camera\Camera.h" />
     <ClInclude Include="Baziru3_Engine\2D\Sprite\Sprite.h" />
     <ClInclude Include="Baziru3_Engine\2D\Sprite\SpriteCom.h" />
     <ClInclude Include="Baziru3_Engine\Base\Operator.h" />
     <ClInclude Include="Baziru3_Engine\2D\Texture\TextureManager.h" />
-    <ClInclude Include="CrashDump.h" />
-    <ClInclude Include="Framework.h" />
+    <ClInclude Include="Baziru3_Engine\SkyBox\SkyboxCom.h" />
+    <ClInclude Include="Baziru3_Engine\Platform\Windows\CrashDump.h" />
+    <ClInclude Include="Baziru3_Engine\Base\DebugUI.h" />
+    <ClInclude Include="Application\Framework.h" />
+    <ClInclude Include="EngineContext.h" />
     <ClInclude Include="Game.h" />
-    <ClInclude Include="GamePlayScene.h" />
+    <ClInclude Include="Application\Scene\GameScene\GamePlayScene.h" />
     <ClInclude Include="Baziru3_Engine\Particle\ParticleEmitter.h" />
     <ClInclude Include="Baziru3_Engine\Particle\ParticleManager.h" />
-    <ClInclude Include="Random.h" />
-    <ClInclude Include="Model.h" />
-    <ClInclude Include="ModelCom.h" />
-    <ClInclude Include="ModelManager.h" />
-    <ClInclude Include="Sphere.h" />
-    <ClInclude Include="SRVManager.h" />
+    <ClInclude Include="Baziru3_Engine\Light\Light.h" />
+    <ClInclude Include="Baziru3_Engine\Graphics\Material\MaterialManager.h" />
+    <ClInclude Include="Baziru3_Engine\Math\Random.h" />
+    <ClInclude Include="Baziru3_Engine\3D\Model\Model.h" />
+    <ClInclude Include="Baziru3_Engine\3D\Model\ModelCom.h" />
+    <ClInclude Include="Baziru3_Engine\3D\Model\ModelManager.h" />
+    <ClInclude Include="Baziru3_Engine\Scene\Factory\SceneFactory.h" />
+    <ClInclude Include="Baziru3_Engine\Scene\Manager\SceneManager.h" />
+    <ClInclude Include="Baziru3_Engine\Scene\Factory\SceneRegistration.h" />
+    <ClInclude Include="Baziru3_Engine\SkyBox\SkyBox.h" />
+    <ClInclude Include="Baziru3_Engine\Shapes\Sphere\Sphere.h" />
+    <ClInclude Include="Baziru3_Engine\2D\Sprite\SpriteManager.h" />
+    <ClInclude Include="Baziru3_Engine\Base\Srv\SRVManager.h" />
+    <ClInclude Include="Application\Scene\TitleScene\TitleScene.h" />
+    <ClInclude Include="Application\Subsystem\SubsystemFactory.h" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="externals\DirectXTex\DirectXTex_Desktop_2022_Win10.vcxproj">
@@ -109,6 +152,7 @@
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
+    <None Include="Resources\shaders\Skybox.hlsli" />
     <None Include="Resources\shaders\Particle.hlsli" />
     <None Include="Resources\shaders\Object3d.hlsli" />
   </ItemGroup>
@@ -174,14 +218,14 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;_CONSOLE;USE_IMGUI;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <TreatWarningAsError>true</TreatWarningAsError>
-      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)\externals\DirectXTex;$(ProjectDir)\externals\imgui;$(ProjectDir)Baziru3_Engine\2D;$(ProjectDir)Baziru3_Engine\2D\Sprite;$(ProjectDir)Baziru3_Engine\2D\Texture;$(ProjectDir)Baziru3_Engine\3D\Object;$(ProjectDir)Baziru3_Engine\Audio;$(ProjectDir)Baziru3_Engine\Base;$(ProjectDir)Baziru3_Engine\Base\ImGui;$(ProjectDir)Baziru3_Engine\Camera;$(ProjectDir)Baziru3_Engine\Camera\DebugCamera;$(ProjectDir)Baziru3_Engine\Particle</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)\externals\DirectXTex;$(ProjectDir)\externals\imgui;$(ProjectDir)Application;$(ProjectDir)Application\Scene;$(ProjectDir)Application\Scene\GameScene;$(ProjectDir)Application\Scene\TitleScene;$(ProjectDir)Application\Subsystem;$(ProjectDir)Baziru3_Engine\2D;$(ProjectDir)Baziru3_Engine\2D\Sprite;$(ProjectDir)Baziru3_Engine\2D\Texture;$(ProjectDir)Baziru3_Engine\3D\Model;$(ProjectDir)Baziru3_Engine\3D\Object;$(ProjectDir)Baziru3_Engine\Audio;$(ProjectDir)Baziru3_Engine\Base;$(ProjectDir)Baziru3_Engine\Base\ImGui;$(ProjectDir)Baziru3_Engine\Base\Log;$(ProjectDir)Baziru3_Engine\Base\Scene;$(ProjectDir)Baziru3_Engine\Base\Srv;$(ProjectDir)Baziru3_Engine\Base\Windows;$(ProjectDir)Baziru3_Engine\Camera;$(ProjectDir)Baziru3_Engine\Camera\DebugCamera;$(ProjectDir)Baziru3_Engine\Graphics\Material;$(ProjectDir)Baziru3_Engine\Light;$(ProjectDir)Baziru3_Engine\Math;$(ProjectDir)Baziru3_Engine\Particle;$(ProjectDir)Baziru3_Engine\Platform\Windows;$(ProjectDir)Baziru3_Engine\Scene;$(ProjectDir)Baziru3_Engine\Scene\Factory;$(ProjectDir)Baziru3_Engine\Scene\Manager;$(ProjectDir)Baziru3_Engine\Shapes\Sphere;$(ProjectDir)Baziru3_Engine\SkyBox</AdditionalIncludeDirectories>
       <BasicRuntimeChecks>Default</BasicRuntimeChecks>
     </ClCompile>
     <Link>
@@ -208,14 +252,14 @@
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <Optimization>MinSpace</Optimization>
-      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)\externals\DirectXTex;$(ProjectDir)\externals\imgui;$(ProjectDir)Baziru3_Engine\2D;$(ProjectDir)Baziru3_Engine\2D\Sprite;$(ProjectDir)Baziru3_Engine\2D\Texture;$(ProjectDir)Baziru3_Engine\3D\Object;$(ProjectDir)Baziru3_Engine\Audio;$(ProjectDir)Baziru3_Engine\Base;$(ProjectDir)Baziru3_Engine\Base\ImGui;$(ProjectDir)Baziru3_Engine\Camera;$(ProjectDir)Baziru3_Engine\Camera\DebugCamera;$(ProjectDir)Baziru3_Engine\Particle</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)\externals\DirectXTex;$(ProjectDir)\externals\imgui;$(ProjectDir)Application;$(ProjectDir)Application\Scene;$(ProjectDir)Application\Scene\GameScene;$(ProjectDir)Application\Scene\TitleScene;$(ProjectDir)Application\Subsystem;$(ProjectDir)Baziru3_Engine\2D;$(ProjectDir)Baziru3_Engine\2D\Sprite;$(ProjectDir)Baziru3_Engine\2D\Texture;$(ProjectDir)Baziru3_Engine\3D\Model;$(ProjectDir)Baziru3_Engine\3D\Object;$(ProjectDir)Baziru3_Engine\Audio;$(ProjectDir)Baziru3_Engine\Base;$(ProjectDir)Baziru3_Engine\Base\ImGui;$(ProjectDir)Baziru3_Engine\Base\Log;$(ProjectDir)Baziru3_Engine\Base\Scene;$(ProjectDir)Baziru3_Engine\Base\Srv;$(ProjectDir)Baziru3_Engine\Base\Windows;$(ProjectDir)Baziru3_Engine\Camera;$(ProjectDir)Baziru3_Engine\Camera\DebugCamera;$(ProjectDir)Baziru3_Engine\Graphics\Material;$(ProjectDir)Baziru3_Engine\Light;$(ProjectDir)Baziru3_Engine\Math;$(ProjectDir)Baziru3_Engine\Particle;$(ProjectDir)Baziru3_Engine\Platform\Windows;$(ProjectDir)Baziru3_Engine\Scene;$(ProjectDir)Baziru3_Engine\Scene\Factory;$(ProjectDir)Baziru3_Engine\Scene\Manager;$(ProjectDir)Baziru3_Engine\Shapes\Sphere;$(ProjectDir)Baziru3_Engine\SkyBox</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>imgui.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(SolutionDir)..\generated\output\$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <PostBuildEvent>
@@ -235,7 +279,7 @@
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)\externals\DirectXTex;$(ProjectDir)\externals\imgui;$(ProjectDir)Baziru3_Engine\2D;$(ProjectDir)Baziru3_Engine\2D\Sprite;$(ProjectDir)Baziru3_Engine\2D\Texture;$(ProjectDir)Baziru3_Engine\3D\Object;$(ProjectDir)Baziru3_Engine\Audio;$(ProjectDir)Baziru3_Engine\Base;$(ProjectDir)Baziru3_Engine\Base\ImGui;$(ProjectDir)Baziru3_Engine\Camera;$(ProjectDir)Baziru3_Engine\Camera\DebugCamera;$(ProjectDir)Baziru3_Engine\Particle</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)\externals\DirectXTex;$(ProjectDir)\externals\imgui;$(ProjectDir)Application;$(ProjectDir)Application\Scene;$(ProjectDir)Application\Scene\GameScene;$(ProjectDir)Application\Scene\TitleScene;$(ProjectDir)Application\Subsystem;$(ProjectDir)Baziru3_Engine\2D;$(ProjectDir)Baziru3_Engine\2D\Sprite;$(ProjectDir)Baziru3_Engine\2D\Texture;$(ProjectDir)Baziru3_Engine\3D\Model;$(ProjectDir)Baziru3_Engine\3D\Object;$(ProjectDir)Baziru3_Engine\Audio;$(ProjectDir)Baziru3_Engine\Base;$(ProjectDir)Baziru3_Engine\Base\ImGui;$(ProjectDir)Baziru3_Engine\Base\Log;$(ProjectDir)Baziru3_Engine\Base\Scene;$(ProjectDir)Baziru3_Engine\Base\Srv;$(ProjectDir)Baziru3_Engine\Base\Windows;$(ProjectDir)Baziru3_Engine\Camera;$(ProjectDir)Baziru3_Engine\Camera\DebugCamera;$(ProjectDir)Baziru3_Engine\Graphics\Material;$(ProjectDir)Baziru3_Engine\Light;$(ProjectDir)Baziru3_Engine\Math;$(ProjectDir)Baziru3_Engine\Particle;$(ProjectDir)Baziru3_Engine\Platform\Windows;$(ProjectDir)Baziru3_Engine\Scene;$(ProjectDir)Baziru3_Engine\Scene\Factory;$(ProjectDir)Baziru3_Engine\Scene\Manager;$(ProjectDir)Baziru3_Engine\Shapes\Sphere;$(ProjectDir)Baziru3_Engine\SkyBox</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>

@@ -1,6 +1,7 @@
 #include"Object3d.h"
 #include"Object3dCom.h"
 #include"Matrix4x4.h"
+#include "RootParam.h"
 #include<cassert>
 #include<fstream> // 追加: mtlファイル読み込み
 #include<sstream> // 追加: 行分解用
@@ -8,9 +9,10 @@
 
 
 
-void Object3d::Initialize(Object3dCom* object3dCom)
+void Object3d::Initialize(Object3dCom* object3dCom, const ModelData& modelData)
 {
 	object3dCom_ = object3dCom;
+	modelData_ = modelData; // store model data
 	// object3dCom_ が未設定の場合は何もしない(デフォルトカメラは取得しない)
 	if (object3dCom_)
 	{
@@ -25,10 +27,16 @@ void Object3d::Initialize(Object3dCom* object3dCom)
 	// テクスチャロードはパスが有効なときのみ実行
 	if (!modelData_.material.textureFilePath.empty())
 	{
-		// TextureManagerにDirectXコンテキストが渡っていることを前提にする
-		TextureManager::GetInstance()->LoadTexture(modelData_.material.textureFilePath);
-		modelData_.material.textureIndex =
-			TextureManager::GetInstance()->GetTextureIndexByFilePath(modelData_.material.textureFilePath);
+		uint32_t index = TextureManager::GetInstance()->Load(modelData_.material.textureFilePath);
+		if(index != TextureManager::kInvalidTextureIndex)
+		{
+			modelData_.material.textureIndex = index;
+		}
+		else
+		{
+			OutputDebugStringA(("Texture load failed: " + modelData_.material.textureFilePath + "\n").c_str());
+		}
+	
 	}
 
 	//Transform変数の生成
@@ -69,6 +77,15 @@ void Object3d::Update()
 	transformationMatrixData_->World = worldMatrix;
 	// WorldInverseTranspose を計算して格納（法線変換用）
 	transformationMatrixData_->WorldInverseTranspose = Transpose(Inverse(worldMatrix));
+}
+
+void Object3d::Draw(ID3D12GraphicsCommandList* commandList)
+{
+	commandList->IASetVertexBuffers(0, 1, &vertexBufferView_);
+	commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+	commandList->SetGraphicsRootConstantBufferView(RootParam::Object3D::kMaterial, materialResource->GetGPUVirtualAddress());
+	commandList->SetGraphicsRootConstantBufferView(RootParam::Object3D::kTransform, transformationMatrixResource->GetGPUVirtualAddress());
+	commandList->SetGraphicsRootConstantBufferView(RootParam::Object3D::kLight, directionalLightResource->GetGPUVirtualAddress());
 }
 
 Object3d::MaterialData Object3d::LoadMaterialTemplateFile(const std::string& directoryPath, const std::string& filename)
@@ -216,7 +233,45 @@ void Object3d::VertexResource()
 		{
 			std::memcpy(vertexData_, modelData_.vertices.data(), sizeof(Sprite::VertexData) * modelData_.vertices.size());
 		}
+		
+		D3D12_RANGE written = { 0, static_cast<SIZE_T>(bufferSize) };
+		vertexResource->Unmap(0, &written);
+		vertexData_ = nullptr;
+
 	}
+}
+
+Object3d::~Object3d()
+{
+    // Ensure any persistently-mapped resources are safely unmapped.
+    // Unmap only when the CPU-side pointer is non-null to avoid double-unmap.
+    if (transformationMatrixResource && transformationMatrixData_ != nullptr)
+    {
+        D3D12_RANGE written = { 0, sizeof(TransformationMatrix) };
+        transformationMatrixResource->Unmap(0, &written);
+        transformationMatrixData_ = nullptr;
+    }
+
+    if (vertexResource && vertexData_ != nullptr)
+    {
+        D3D12_RANGE written = { 0, static_cast<SIZE_T>(vertexBufferView_.SizeInBytes) };
+        vertexResource->Unmap(0, &written);
+        vertexData_ = nullptr;
+    }
+
+    if (materialResource && materialData_ != nullptr)
+    {
+        D3D12_RANGE written = { 0, sizeof(Material) };
+        materialResource->Unmap(0, &written);
+        materialData_ = nullptr;
+    }
+
+    if (directionalLightResource && directionalLightData_ != nullptr)
+    {
+        D3D12_RANGE written = { 0, sizeof(DirectionalLight) };
+        directionalLightResource->Unmap(0, &written);
+        directionalLightData_ = nullptr;
+    }
 }
 
 void Object3d::MaterialResource()
@@ -232,6 +287,13 @@ void Object3d::MaterialResource()
 		materialData_->color = { 1.0f,1.0f,1.0f,1.0f };
 		materialData_->enableLighting = false;
 		materialData_->uvTransform = MakeIdentity4x4();
+
+		// マテリアルは初期化時に一度だけ書き込む想定のため、MapしたらすぐにUnmapする
+		// 書き込み範囲を指定してGPUへ変更を通知する
+		D3D12_RANGE writtenRange = {0, sizeof(Material)};
+		materialResource->Unmap(0, &writtenRange);
+		
+		materialData_ = nullptr;
 	}
 }
 
@@ -268,5 +330,6 @@ void Object3d::DirectionalLightResource()
 
 		// 必要に応じてアンマップ（頻繁に更新しない場合）
 		directionalLightResource->Unmap(0, nullptr);
+		directionalLightData_ = nullptr;
 	}
 }

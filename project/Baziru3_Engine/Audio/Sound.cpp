@@ -15,51 +15,49 @@
 #pragma comment(lib,"Mfreadwrite.lib")
 #pragma comment(lib,"mfuuid.lib")
 
-void Sound::Initialize()
-{
-	HRESULT result = XAudio2Create(&xAudio2, 0, XAUDIO2_DEFAULT_PROCESSOR);
-	assert(SUCCEEDED(result));
-
-	result = xAudio2->CreateMasteringVoice(&masterVoice);
-	assert(SUCCEEDED(result));
-
-	result = MFStartup(MF_VERSION, MFSTARTUP_NOSOCKET);
-	assert(SUCCEEDED(result));
+namespace {
+    static std::unique_ptr<Sound>& SoundStorage()
+    {
+        static std::unique_ptr<Sound> instance;
+        return instance;
+    }
 }
 
-void Sound::Finalize()
-{
-	// 実行中に明示的に呼ぶ終了処理用。ここで安全に後片付けを行う
-	SoundUnload();
+//void Sound::Initialize()
+//{
+//	HRESULT result = XAudio2Create(&xAudio2, 0, XAUDIO2_DEFAULT_PROCESSOR);
+//	assert(SUCCEEDED(result));
+//
+//	result = xAudio2->CreateMasteringVoice(&masterVoice);
+//	assert(SUCCEEDED(result));
+//
+//	result = MFStartup(MF_VERSION, MFSTARTUP_NOSOCKET);
+//	assert(SUCCEEDED(result));
+//}
 
-	if (masterVoice)
-	{
-		masterVoice->DestroyVoice();
-		masterVoice = nullptr;
-	}
+//void Sound::Finalize()
+//{
+//	// 実行中に明示的に呼ぶ終了処理用。ここで安全に後片付けを行う
+//	SoundUnload();
+//
+//	if (masterVoice)
+//	{
+//		masterVoice->DestroyVoice();
+//		masterVoice = nullptr;
+//	}
+//
+//	xAudio2.Reset();
+//	MFShutdown();
+//}
 
-	xAudio2.Reset();
-	MFShutdown();
-}
-
-void Sound::SoundUnload()
-{
-	// SourceVoice を安全に破棄
-	if (pSourceVoice)
-	{
-		pSourceVoice->Stop();
-		pSourceVoice->DestroyVoice();
-		pSourceVoice = nullptr;
-	}
-
-	soundData.buffer.clear();
-	soundData.wfex = {};
-}
-
-void Sound::SoundLoadFile(const std::string& filename)
+bool Sound::LoadFileToSoundData(const std::string& filename, SoundData& out)
 {
 	// 読み込み前に以前のデータをリセット
-	SoundUnload();
+	auto& storage = SoundStorage();
+	if (storage)
+	{
+		storage->SoundUnload();
+	}
 
 	std::string ext = "";
 	size_t pos = filename.find_last_of('.');
@@ -97,11 +95,11 @@ void Sound::SoundLoadFile(const std::string& filename)
 					}
 					if (strncmp(data.id, "data", 4) == 0)
 					{
-						this->soundData.wfex = format.fmt;
-						this->soundData.buffer.resize(data.size);
-						file.read(reinterpret_cast<char*>(this->soundData.buffer.data()), data.size);
+						out.wfex = format.fmt;
+						out.buffer.resize(data.size);
+						file.read(reinterpret_cast<char*>(out.buffer.data()), data.size);
 						file.close();
-						return;
+						return true;
 					}
 				}
 			}
@@ -125,7 +123,7 @@ void Sound::SoundLoadFile(const std::string& filename)
 
 	WAVEFORMATEX* waveFormat = nullptr;
 	MFCreateWaveFormatExFromMFMediaType(pOutType.Get(), &waveFormat, nullptr);
-	this->soundData.wfex = *waveFormat;
+	out.wfex = *waveFormat;
 	CoTaskMemFree(waveFormat);
 
 	while (true)
@@ -142,19 +140,19 @@ void Sound::SoundLoadFile(const std::string& filename)
 			BYTE* pData = nullptr;
 			DWORD currentLength = 0;
 			pBuffer->Lock(&pData, nullptr, &currentLength);
-			size_t oldSize = this->soundData.buffer.size();
-			this->soundData.buffer.resize(oldSize + currentLength);
-			memcpy(&this->soundData.buffer[oldSize], pData, currentLength);
+			size_t oldSize = out.buffer.size();
+			out.buffer.resize(oldSize + currentLength);
+			memcpy(&out.buffer[oldSize], pData, currentLength);
 			pBuffer->Unlock();
 		}
 	}
+
+	return false;
 }
 
-void Sound::SoundPlayWave()
+void Sound::SoundUnload()
 {
-	if (soundData.buffer.empty()) return;
-
-	// 前回のボイスが残っていれば一度停止してから破棄
+	// SourceVoice を安全に破棄
 	if (pSourceVoice)
 	{
 		pSourceVoice->Stop();
@@ -162,17 +160,33 @@ void Sound::SoundPlayWave()
 		pSourceVoice = nullptr;
 	}
 
-	HRESULT result = xAudio2->CreateSourceVoice(&pSourceVoice, &soundData.wfex);
-	assert(SUCCEEDED(result));
-
-	XAUDIO2_BUFFER buf = {};
-	buf.pAudioData = soundData.buffer.data();
-	buf.AudioBytes = (UINT32)soundData.buffer.size();
-	buf.Flags = XAUDIO2_END_OF_STREAM;
-
-	result = pSourceVoice->SubmitSourceBuffer(&buf);
-	assert(SUCCEEDED(result));
-
-	result = pSourceVoice->Start(0);
-	assert(SUCCEEDED(result));
+	soundData.buffer.clear();
+	soundData.wfex = {};
 }
+
+//void Sound::SoundPlayWave()
+//{
+//	if (soundData.buffer.empty()) return;
+//
+//	// 前回のボイスが残っていれば一度停止してから破棄
+//	if (pSourceVoice)
+//	{
+//		pSourceVoice->Stop();
+//		pSourceVoice->DestroyVoice();
+//		pSourceVoice = nullptr;
+//	}
+//
+//	HRESULT result = xAudio2->CreateSourceVoice(&pSourceVoice, &soundData.wfex);
+//	assert(SUCCEEDED(result));
+//
+//	XAUDIO2_BUFFER buf = {};
+//	buf.pAudioData = soundData.buffer.data();
+//	buf.AudioBytes = (UINT32)soundData.buffer.size();
+//	buf.Flags = XAUDIO2_END_OF_STREAM;
+//
+//	result = pSourceVoice->SubmitSourceBuffer(&buf);
+//	assert(SUCCEEDED(result));
+//
+//	result = pSourceVoice->Start(0);
+//	assert(SUCCEEDED(result));
+//}

@@ -4,8 +4,11 @@ struct Material
 {
     float32_t4 color;
     int32_t enableLighting;
-    float32_t3 padding;
+    int32_t specularModel; // 0: Blinn-Phong, 1: Phong
+    float32_t2 padding; // pad to 16 bytes
     float32_t4x4 uvTransform;
+    float32_t shininess;
+    float32_t3 padding2;
 };
 
 ConstantBuffer<Material> gMaterial : register(b0);

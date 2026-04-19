@@ -1,4 +1,10 @@
 #include"ParticleManager.h"
+#include"ParticleEmitter.h"
+#include"TextureManager.h"
+
+#include "RootParam.h"
+
+#include "Camera.h"
 
 ParticleManager::ParticleManager(std::ostream& logStream, DirectXCom* dxCommon)
 	: logStream(logStream), dxCommon(dxCommon)
@@ -6,13 +12,118 @@ ParticleManager::ParticleManager(std::ostream& logStream, DirectXCom* dxCommon)
 }
 
 
+
 ParticleManager::~ParticleManager()
 {
 }
 
-void ParticleManager::Initialize()
+void ParticleManager::Initialize(Camera* camera)
 {
-	SetupDraw();
+	camera_ = camera;
+	SetupDraw(dxCommon->GetCommandList().Get());
+
+	Random::SeedEngine();
+
+	for (uint32_t index = 0; index < kNumMaxInstances; ++index)
+	{
+		particles.push_back(MakeNewParticles(randomEngine, Vector3{0.0f, 0.0f, 0.0f}));
+	}
+
+	instancingResource =
+		dxCommon->CreateBufferResource(dxCommon->GetDevice(), sizeof(ParticleManager::ParticleForGPU) * kNumMaxInstances);
+
+	instancingResource->Map(0, nullptr, reinterpret_cast<void**>(&instanceData));
+
+
+	{
+		uint32_t writeIndex = 0;
+		for (const auto& p : particles)
+		{
+			if (writeIndex >= kNumMaxInstances) { break; }
+			instanceData[writeIndex].WVP = MakeIdentity4x4();
+			instanceData[writeIndex].World = MakeIdentity4x4();
+			instanceData[writeIndex].color = p.color;
+			++writeIndex;
+		}
+
+		for (; writeIndex < kNumMaxInstances; ++writeIndex)
+		{
+			instanceData[writeIndex].WVP = MakeIdentity4x4();
+			instanceData[writeIndex].World = MakeIdentity4x4();
+			instanceData[writeIndex].color = { 0,0,0,0 };
+		}
+	}
+
+	// インスタンシング用 StructuredBuffer の SRV を SRVManager 経由で作成する
+	SRVManager* srvManager = TextureManager::GetInstance()->GetSRVManager();
+	assert(srvManager);
+
+	instancingSrvIndex_ = srvManager->Allocate();
+	// StructuredBuffer 用 SRV を生成
+	srvManager->CreateSRVForStructuredBuffer(
+		instancingSrvIndex_,
+		instancingResource.Get(),
+		kNumMaxInstances,
+		sizeof(ParticleManager::ParticleForGPU));
+
+	// Draw で利用する GPU ハンドルを保持
+	instancingSrvHandleGPU = srvManager->GetGPUDescriptorHandle(instancingSrvIndex_);
+}
+
+void ParticleManager::AddParticles(std::list<Particle>& newParticles)
+{
+	
+	for (auto& p : newParticles)
+	{
+		particles.push_back(std::move(p));
+	}
+}
+
+void ParticleManager::Update(float deltaTime)
+{
+	numInstance = 0;
+	writeIndex = 0;
+
+	Matrix4x4 backToFrontMatrix = MakeRotateYMatrix(0.0f);
+	Matrix4x4 billboardMatrix = Multiply(backToFrontMatrix, camera_->GetWorldMatrix());
+	billboardMatrix.m[3][0] = 0.0f;
+	billboardMatrix.m[3][1] = 0.0f;
+	billboardMatrix.m[3][2] = 0.0f;
+
+	Matrix4x4 viewProjection = Multiply(camera_->GetViewMatrix(), camera_->GetProjectionMatrix());
+
+	auto it = particles.begin();
+	while (it != particles.end())
+	{
+		it->currentTime += deltaTime;
+
+		if (it->currentTime >= it->lifeTime)
+		{
+			it = particles.erase(it);
+			continue;
+		}
+
+		Matrix4x4 worldMatrix = MakeAffineMatrix(
+			it->transform.GetScale(), billboardMatrix, it->transform.GetTranslate());
+		Matrix4x4 wvpMatrix = Multiply(
+			worldMatrix, Multiply(camera_->GetViewMatrix(), camera_->GetProjectionMatrix()));
+
+		if (writeIndex < kNumMaxInstances)
+		{
+			instanceData[writeIndex].WVP = wvpMatrix;
+			instanceData[writeIndex].World = worldMatrix;
+			instanceData[writeIndex].color = it->color;
+			float alpha = 1.0f - (it->currentTime / it->lifeTime);
+			instanceData[writeIndex].color.w = alpha;
+			++writeIndex;
+		}
+
+		it->transform.SetTranslate(
+			it->transform.GetTranslate() + it->velocity * deltaTime);
+
+		++it;
+	}
+	numInstance = writeIndex;
 }
 
 ParticleManager::Particle ParticleManager::MakeNewParticles(std::mt19937& randomEngine, const Vector3& translate)
@@ -39,7 +150,7 @@ void ParticleManager::RootSignature()
 	//RootSignatureの作成
 
 	descriptionRootSignature.Flags =
-		D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT; //入力アセンブラーでの使用を許可
+		D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT; //入力アセンブラでの使用を許可
 }
 
 void ParticleManager::CreateGraphicsPipeline()
@@ -82,31 +193,30 @@ void ParticleManager::Descriptor()
 
 void ParticleManager::CreateRootParameters()
 {
-	//RootParemeter生成PuxelShaderのMaterialとVertexShaderのTransform
+	//RootParameters生成PixelShaderのMaterialとVertexShaderのTransform
 
-	rootParameters[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;//CBVを使う
-	rootParameters[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL; //PixelShaderで使う
-	rootParameters[0].Descriptor.ShaderRegister = 0;
-
-
-	rootParameters[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-	rootParameters[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
-	rootParameters[1].DescriptorTable.pDescriptorRanges = &descriptorRangeForInstancing[0];
-	rootParameters[1].DescriptorTable.NumDescriptorRanges = 1;
+	rootParameters[RootParam::Particle::kMaterial].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;//CBVを使う
+	rootParameters[RootParam::Particle::kMaterial].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL; //PixelShaderで使う
+	rootParameters[RootParam::Particle::kMaterial].Descriptor.ShaderRegister = 0;
 
 
-	rootParameters[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-	rootParameters[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
-	rootParameters[2].DescriptorTable.pDescriptorRanges = &descriptorRangeForInstancing[1];
-	rootParameters[2].DescriptorTable.NumDescriptorRanges = 1;
+	rootParameters[RootParam::Particle::kInstancing].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+	rootParameters[RootParam::Particle::kInstancing].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
+	rootParameters[RootParam::Particle::kInstancing].DescriptorTable.pDescriptorRanges = &descriptorRangeForInstancing[0];
+	rootParameters[RootParam::Particle::kInstancing].DescriptorTable.NumDescriptorRanges = 1;
 
-	rootParameters[3].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
-	rootParameters[3].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
-	rootParameters[3].Descriptor.ShaderRegister = 1; 
+	rootParameters[RootParam::Particle::kTextureTable].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+	rootParameters[RootParam::Particle::kTextureTable].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+	rootParameters[RootParam::Particle::kTextureTable].DescriptorTable.pDescriptorRanges = &descriptorRangeForInstancing[1];
+	rootParameters[RootParam::Particle::kTextureTable].DescriptorTable.NumDescriptorRanges = 1;
 
-	rootParameters[4].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
-	rootParameters[4].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
-	rootParameters[4].Descriptor.ShaderRegister = 2; // b2: 
+	rootParameters[RootParam::Particle::kLight].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+	rootParameters[RootParam::Particle::kLight].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+	rootParameters[RootParam::Particle::kLight].Descriptor.ShaderRegister = 1; 
+
+	rootParameters[RootParam::Particle::kCamera].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+	rootParameters[RootParam::Particle::kCamera].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+	rootParameters[RootParam::Particle::kCamera].Descriptor.ShaderRegister = 2; // b2:
 
 
 	descriptionRootSignature.pParameters = rootParameters; //ルートパラメーター配列へのポインタ
@@ -137,8 +247,7 @@ void ParticleManager::SignatureBlob()
 	HRESULT hr = D3D12SerializeRootSignature(&descriptionRootSignature,
 		D3D_ROOT_SIGNATURE_VERSION_1, signatureBlob.GetAddressOf(), errorBlob.GetAddressOf());
 
-	
-	dxCommon->SetHr(hr);
+		dxCommon->SetHr(hr);
 
 	if (FAILED(hr))
 	{
@@ -169,23 +278,23 @@ void ParticleManager::InputLayer()
 {
 	//InputLayer
 
-	inputElementDescs[0].SemanticName = "POSITION"; //セマンティック名
-	inputElementDescs[0].SemanticIndex = 0; //セマンティックインデックス
-	inputElementDescs[0].Format = DXGI_FORMAT_R32G32B32A32_FLOAT; //頂点のフォーマット
-	inputElementDescs[0].AlignedByteOffset = D3D12_APPEND_ALIGNED_ELEMENT;
+	inputElementDiscs[0].SemanticName = "POSITION"; //セマンティック名
+	inputElementDiscs[0].SemanticIndex = 0; //セマンティックインデックス
+	inputElementDiscs[0].Format = DXGI_FORMAT_R32G32B32A32_FLOAT; //頂点のフォーマット
+	inputElementDiscs[0].AlignedByteOffset = D3D12_APPEND_ALIGNED_ELEMENT;
 
-	inputElementDescs[1].SemanticName = "TEXCOORD";
-	inputElementDescs[1].SemanticIndex = 0;
-	inputElementDescs[1].Format = DXGI_FORMAT_R32G32_FLOAT;
-	inputElementDescs[1].AlignedByteOffset = D3D12_APPEND_ALIGNED_ELEMENT;
+	inputElementDiscs[1].SemanticName = "TEXCOORD";
+	inputElementDiscs[1].SemanticIndex = 0;
+	inputElementDiscs[1].Format = DXGI_FORMAT_R32G32_FLOAT;
+	inputElementDiscs[1].AlignedByteOffset = D3D12_APPEND_ALIGNED_ELEMENT;
 
-	inputElementDescs[2].SemanticName = "NORMAL";
-	inputElementDescs[2].SemanticIndex = 0;
-	inputElementDescs[2].Format = DXGI_FORMAT_R32G32B32_FLOAT;
-	inputElementDescs[2].AlignedByteOffset = D3D12_APPEND_ALIGNED_ELEMENT;
+	inputElementDiscs[2].SemanticName = "NORMAL";
+	inputElementDiscs[2].SemanticIndex = 0;
+	inputElementDiscs[2].Format = DXGI_FORMAT_R32G32B32_FLOAT;
+	inputElementDiscs[2].AlignedByteOffset = D3D12_APPEND_ALIGNED_ELEMENT;
 
-	inputLayoutDesc.pInputElementDescs = inputElementDescs; //入力要素の配列
-	inputLayoutDesc.NumElements = _countof(inputElementDescs); //入力要素の数
+	inputLayoutDesc.pInputElementDescs = inputElementDiscs; //入力要素の配列
+	inputLayoutDesc.NumElements = _countof(inputElementDiscs); //入力要素の数
 }
 
 void ParticleManager::InitializeBlend()
@@ -288,8 +397,26 @@ void ParticleManager::InitializeGraphicPipeline()
 	graphicPipelineStateDesc.DSVFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
 }
 
-void ParticleManager::SetupDraw()
+void ParticleManager::SetupDraw(ID3D12GraphicsCommandList* commandList)
 {
-	CreateGraphicsPipeline();
-	assert(pipelineState != nullptr && "ParticleManager pipeline state creation failed");
+	if (!pipelineState)
+	{
+		CreateGraphicsPipeline();
+		assert(pipelineState != nullptr && "ParticleManager pipeline state creation failed");
+	}
+
+	
+	commandList->SetGraphicsRootSignature(rootSignature.Get());
+	commandList->SetPipelineState(pipelineState.Get()); // パイプラインステートを設定
+
+}
+
+void ParticleManager::BindResources(ID3D12GraphicsCommandList* commandList, D3D12_GPU_VIRTUAL_ADDRESS materialCBV)
+{
+	assert(commandList != nullptr);
+
+	commandList->SetGraphicsRootConstantBufferView(RootParam::Particle::kMaterial, materialCBV);
+
+	// インスタンシング用の SRV をルートパラメーターにバインド
+	commandList->SetGraphicsRootDescriptorTable(RootParam::Particle::kInstancing, instancingSrvHandleGPU);
 }

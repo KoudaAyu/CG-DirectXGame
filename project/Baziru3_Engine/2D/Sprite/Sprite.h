@@ -2,10 +2,14 @@
 
 #include"DebugCamera.h"
 #include"DirectXCom.h"
+#include"MaterialManager.h"
 #include"Matrix4x4.h"
 #include"Vector.h"
+#include <memory>
+#include "MappedResource.h"
 
 class SpriteCom;
+class TextureManager;
 
 class Sprite
 {
@@ -25,19 +29,14 @@ public:
 		Vector3 normal;
 	};
 
-	struct Material
-	{
-		Vector4 color;
-		int32_t enableLighting;
-		float padding[3]; // パディングを追加して16バイト境界に揃える
-		Matrix4x4 uvTransform; // UV変換行列
-		float shininess;
-		float padding2[3];
-	};
+	Sprite();
+	~Sprite();
 
 	void Initialize(SpriteCom* spriteCom,std::string textureFilePath);
 	void Update(WindowAPI* windowAPI, DebugCamera* debugCamera_);
 	void Draw();
+
+	void Finalize();
 
 	void CreateIndexBufferView();
 	void CreateVertexBufferView();
@@ -45,6 +44,11 @@ public:
 	void CreateIndexData();
 
 	void ReflectionProcessing();
+
+	// インデックスから生成する簡易ヘルパー
+	static std::unique_ptr<Sprite> Create(SpriteCom* spriteCom,
+		uint32_t textureHandle,
+		const Vector2& position);
 
 public:
 
@@ -99,8 +103,12 @@ public:
 	
 	void SetDirectionalLightResource(const Microsoft::WRL::ComPtr<ID3D12Resource>& light) { directionalLightResource = light; }
 
+	
+	void SetUVParams(const Vector3& scale, float rotZ, const Vector3& translate);
+
 private:
 	void AdjustTextureSize();
+	void RecalculateUVMatrix();
 
 private:
 	Transform transform{ {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };
@@ -114,11 +122,19 @@ private:
 	Vector2 textureLeftTop = { 0.0f,0.0f };
 	Vector2 textureSize = { 100.0f,100.0f };
 
+	
+	Transform uvParams{ {1.0f,1.0f,1.0f}, {0.0f,0.0f,0.0f}, {0.0f,0.0f,0.0f} };
+	bool uvDirty = true;
+
 private:
 	DirectXCom* dxCommon = nullptr;
 	SpriteCom* spriteCom = nullptr;
-	VertexData* vertexData = nullptr;
-	Material* materialData = nullptr;
+    VertexData* vertexData = nullptr;
+    Material* materialData = nullptr;
+  
+    Baziru3::PersistentMap<VertexData> vertexMap;
+    Baziru3::PersistentMap<Material> materialMap;
+    Baziru3::PersistentMap<TransformationMatrix> transformationMatrixMap;
 
 private:
 	Microsoft::WRL::ComPtr<ID3D12Resource> vertexResourceSprite = nullptr;

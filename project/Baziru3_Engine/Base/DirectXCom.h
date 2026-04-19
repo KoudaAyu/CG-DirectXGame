@@ -39,6 +39,8 @@ public:
 
 	void Initialize();
 
+	void Finalize();
+
 	void DebugLayer();
 
 	void GraphicCreateDXGIFactory();
@@ -72,7 +74,7 @@ public:
 
 	void InitializeRenderTargetView();
 
-	D3D12_CPU_DESCRIPTOR_HANDLE GetCPUDescroptirHandle(Microsoft::WRL::ComPtr<ID3D12DescriptorHeap>& descriptorHeap,
+	D3D12_CPU_DESCRIPTOR_HANDLE GetCPUDescriptorHandle(Microsoft::WRL::ComPtr<ID3D12DescriptorHeap>& descriptorHeap,
 		uint32_t descriptorSize, uint32_t index);
 
 	D3D12_GPU_DESCRIPTOR_HANDLE GetGPUDescriptorHandle(Microsoft::WRL::ComPtr<ID3D12DescriptorHeap>& descriptorHeap,
@@ -93,6 +95,10 @@ public:
 	void PreDraw();
 
 	void PostDraw();
+
+	void ExecuteAndWaitForGPU();
+
+  
 
 	Microsoft::WRL::ComPtr<IDxcBlob> CompileShader(
 		//CompilerするShaderファイルへのパス
@@ -236,6 +242,8 @@ public:
 	D3D12_CPU_DESCRIPTOR_HANDLE GetSRVHandleCPU(uint32_t index);
 	D3D12_GPU_DESCRIPTOR_HANDLE GetSRVHandleGPU(uint32_t index);
 
+	
+
 
 private:
 	HRESULT hr;
@@ -283,6 +291,10 @@ private:
 	std::ostream& logStream;
 
 	WindowAPI* windowAPI = nullptr;
+
+public:
+    // Provide access to WindowAPI for callers that need window information
+    WindowAPI* GetWindowAPI() const { return windowAPI; }
 
 
 	//最大SRV数(Texture枚数)

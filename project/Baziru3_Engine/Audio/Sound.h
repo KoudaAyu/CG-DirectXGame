@@ -7,6 +7,7 @@
 #include <string>    
 #include <algorithm>
 #include <cctype>   
+#include <memory>
 
 #pragma comment(lib,"xaudio2.lib")
 
@@ -37,17 +38,11 @@ struct FormatChunk
 class Sound
 {
 public:
-    void Initialize();
-    void Finalize();
 
+    static bool LoadFileToSoundData(const std::string& filename, SoundData& out);
+    
     // 引数なしで内部の soundData をクリアするように変更
     void SoundUnload();
-
-    // ファイル読み込み
-    void SoundLoadFile(const std::string& filename);
-
-  
-    void SoundPlayWave();
 
     const SoundData& GetSoundData() const { return soundData; }
     Microsoft::WRL::ComPtr<IXAudio2>& GetXAudio2() { return xAudio2; }
@@ -61,4 +56,5 @@ private:
 
     // 読み込んだデータを保持する変数
     SoundData soundData;
+
 };

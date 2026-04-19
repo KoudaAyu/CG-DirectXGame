@@ -4,6 +4,7 @@
 #include <vector>
 #include "Camera.h"
 #include"TextureManager.h"
+#include"MaterialManager.h"
 #include "Transform.h"
 #include "Sprite.h"
 
@@ -13,13 +14,7 @@ class Object3d
 {
 public:
 
-	struct Material
-	{
-		Vector4 color;
-		int32_t enableLighting;
-		float padding[3]; // パディングを追加して16バイト境界に揃える
-		Matrix4x4 uvTransform; // UV変換行列
-	};
+    // Use global `Material` from MaterialManager.h for GPU CB layout
 
 	struct MaterialData
 	{
@@ -54,14 +49,16 @@ public:
 		float intensity;
 	};
 
-	void Initialize(Object3dCom* object3dCom);
+	void Initialize(Object3dCom* object3dCom, const ModelData& modelData);
 
 	void Update();
+
+	void Draw(ID3D12GraphicsCommandList* commandList);
 
 	/// <summary>
 	/// .mtlファイルの読み込み
 	/// </summary>
-	/// <param name="direcrotyPath"></param>
+	/// <param name="directoryPath"></param>
 	/// <param name="filename"></param>
 	/// <returns></returns>
 	static MaterialData LoadMaterialTemplateFile(const std::string& direcrotyPath, const std::string& filename);
@@ -84,6 +81,9 @@ public:
 
 	void DirectionalLightResource();
 
+   
+    ~Object3d();
+
 public:
 	void SetCamera(Camera* camera)
 	{
@@ -99,10 +99,8 @@ public:
 		object3dCom_ = object3dCom;
 	}
 
-	// Expose transformation matrix CBV so external code can bind the correct constant buffer
 	const Microsoft::WRL::ComPtr<ID3D12Resource>& GetTransformationMatrixResource() const { return transformationMatrixResource; }
 
-	// Transform setters/getters to control from outside (e.g., ImGui)
 	void SetRotate(const Vector3& r) { transform.SetRotate(r); }
 	void SetTranslate(const Vector3& t) { transform.SetTranslate(t); }
 	void SetScale(const Vector3& s) { transform.SetScale(s); }
@@ -119,7 +117,7 @@ private:
 	Object3dCom* object3dCom_ = nullptr;
 	Transform transform_;
 
-	ModelData modelData_;
+	ModelData modelData_; // store model data
 
 	//バッファリソース
 	Microsoft::WRL::ComPtr<ID3D12Resource> vertexResource = nullptr;

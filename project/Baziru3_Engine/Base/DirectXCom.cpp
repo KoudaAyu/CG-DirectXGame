@@ -81,6 +81,61 @@ void DirectXCom::Initialize()
 	InitializeImGui();
 }
 
+void DirectXCom::Finalize()
+{
+	// GPUが処理を終えるのを待つ
+	if (commandQueue)
+	{
+		if (commandList && commandAllocator && fence && fenceEvent)
+		{
+			// 終了/実行/待機/リセットを実。
+			ExecuteAndWaitForGPU();
+		}
+		else if (fence && fenceEvent)
+		{
+			fenceValue++;
+			commandQueue->Signal(fence.Get(), fenceValue);
+			if(fence->GetCompletedValue() < fenceValue)
+			{
+				fence->SetEventOnCompletion(fenceValue, fenceEvent);
+				WaitForSingleObject(fenceEvent, INFINITE);
+			}
+		}
+	}
+
+	// スワップチェーンのリソースを解放する前に、コマンドリストとコマンドアロケーターをリセットしておく
+	for (auto& res : swapChainResources) res.Reset();
+
+	rtvDescriptorHeap.Reset();
+	srvDescriptorHeap.Reset();
+	dsvDescriptorHeap.Reset();
+	descriptorHeap.Reset();
+	depthStencilResource.Reset();
+	commandList.Reset();
+	commandAllocator.Reset();
+	commandQueue.Reset();
+
+	// フェンスを解放しハンドルを閉じる
+	if (fenceEvent)
+	{
+		CloseHandle(fenceEvent);
+		fenceEvent = nullptr;
+	}
+	fence.Reset();
+
+	dxcCompiler.Reset();
+	dxcUtils.Reset();
+	includeHandler.Reset();
+	swapChain.Reset();
+	useAdapter.Reset();
+	device.Reset();
+	dxgiFactory.Reset();
+
+	// 生のポインタをクリア
+	infoQueue = nullptr;
+
+}
+
 void DirectXCom::DebugLayer()
 {
 #ifdef _DEBUG
@@ -343,7 +398,7 @@ void DirectXCom::InitializeRenderTargetView()
 
 }
 
-D3D12_CPU_DESCRIPTOR_HANDLE DirectXCom::GetCPUDescroptirHandle(Microsoft::WRL::ComPtr<ID3D12DescriptorHeap>& descriptorHeap, uint32_t descriptorSize, uint32_t index)
+D3D12_CPU_DESCRIPTOR_HANDLE DirectXCom::GetCPUDescriptorHandle(Microsoft::WRL::ComPtr<ID3D12DescriptorHeap>& descriptorHeap, uint32_t descriptorSize, uint32_t index)
 {
 	D3D12_CPU_DESCRIPTOR_HANDLE handleCPU = descriptorHeap->GetCPUDescriptorHandleForHeapStart();
 	handleCPU.ptr += (descriptorSize * index);
@@ -455,8 +510,8 @@ void DirectXCom::PreDraw()
 	commandList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 
 	//描画用のDescriptorHeapの設定
-	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> descriptorHeap[] = { srvDescriptorHeap.Get() };
-	commandList->SetDescriptorHeaps(1, descriptorHeap->GetAddressOf());
+	ID3D12DescriptorHeap* descriptorHeaps[] = { srvDescriptorHeap.Get() };
+	commandList->SetDescriptorHeaps(1, descriptorHeaps);
 
 	//コマンドを積む
 	commandList->RSSetViewports(1, &viewport); //ビューポートを設定
@@ -516,6 +571,32 @@ void DirectXCom::PostDraw()
 	//コマンドリストのリセットに失敗した場合はエラー
 	assert(SUCCEEDED(hr));
 
+}
+
+void DirectXCom::ExecuteAndWaitForGPU()
+{
+    // Close command list
+    hr = commandList->Close();
+    assert(SUCCEEDED(hr));
+
+    // Execute
+    ID3D12CommandList* lists[] = { commandList.Get() };
+    commandQueue->ExecuteCommandLists(1, lists);
+
+    // Signal and wait
+    fenceValue++;
+    commandQueue->Signal(fence.Get(), fenceValue);
+    if (fence->GetCompletedValue() < fenceValue)
+    {
+        fence->SetEventOnCompletion(fenceValue, fenceEvent);
+        WaitForSingleObject(fenceEvent, INFINITE);
+    }
+
+    // Reset allocator and list for further recording
+    hr = commandAllocator->Reset();
+    assert(SUCCEEDED(hr));
+    hr = commandList->Reset(commandAllocator.Get(), nullptr);
+    assert(SUCCEEDED(hr));
 }
 
 Microsoft::WRL::ComPtr<IDxcBlob> DirectXCom::CompileShader(const std::wstring& filePath, const wchar_t* profile, Microsoft::WRL::ComPtr<IDxcUtils> dxcUtils, Microsoft::WRL::ComPtr<IDxcCompiler3> dxcCompiler, Microsoft::WRL::ComPtr<IDxcIncludeHandler> includeHandler, std::ostream& logStream)
@@ -613,11 +694,11 @@ Microsoft::WRL::ComPtr<ID3D12Resource> DirectXCom::CreateBufferResource(const Mi
 
 Microsoft::WRL::ComPtr<ID3D12Resource> DirectXCom::UploadTextureData(Microsoft::WRL::ComPtr<ID3D12Resource>& texture, const DirectX::ScratchImage& mipImages, const Microsoft::WRL::ComPtr<ID3D12Device>& device, Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> commandList)
 {
-	std::vector<D3D12_SUBRESOURCE_DATA> subresources;
-	DirectX::PrepareUpload(device.Get(), mipImages.GetImages(), mipImages.GetImageCount(), mipImages.GetMetadata(), subresources);
-	uint64_t intermediateSize = GetRequiredIntermediateSize(texture.Get(), 0, UINT(subresources.size()));
+	std::vector<D3D12_SUBRESOURCE_DATA> subResources;
+	DirectX::PrepareUpload(device.Get(), mipImages.GetImages(), mipImages.GetImageCount(), mipImages.GetMetadata(), subResources);
+	uint64_t intermediateSize = GetRequiredIntermediateSize(texture.Get(), 0, UINT(subResources.size()));
 	Microsoft::WRL::ComPtr<ID3D12Resource> intermediateResource = CreateBufferResource(device, intermediateSize);
-	UpdateSubresources(commandList.Get(), texture.Get(), intermediateResource.Get(), 0, 0, UINT(subresources.size()), subresources.data());
+	UpdateSubresources(commandList.Get(), texture.Get(), intermediateResource.Get(), 0, 0, UINT(subResources.size()), subResources.data());
 	//textureへの転送後は利用できるよう、D3D12_RESOURCE_STATE_DESTからD3D12_RESOURCE_STATE_GENERIC_READへResourceStateを変更する
 	D3D12_RESOURCE_BARRIER barrier{};
 	barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
@@ -633,19 +714,38 @@ Microsoft::WRL::ComPtr<ID3D12Resource> DirectXCom::UploadTextureData(Microsoft::
 DirectX::ScratchImage DirectXCom::LoadTexture(const std::string& filePath)
 {
 	//テクスチャファイルを読み込んでプログラムで使えるようにする
-	DirectX::ScratchImage image{};
-	std::wstring filePathW = StringUtil::ConvertString(filePath);
-	HRESULT hr = DirectX::LoadFromWICFile(filePathW.c_str(), DirectX::WIC_FLAGS_DEFAULT_SRGB, nullptr, image);
-	assert(SUCCEEDED(hr));
+    DirectX::ScratchImage image{};
+    std::wstring filePathW = StringUtil::ConvertString(filePath);
+    HRESULT hr = S_OK;
 
-	//ミニマップの作成
-	DirectX::ScratchImage mipImages{};
-	hr = DirectX::GenerateMipMaps(image.GetImages(), image.GetImageCount(), image.GetMetadata(),
-		DirectX::TEX_FILTER_SRGB, 0, mipImages);
-	assert(SUCCEEDED(hr));
+    // ファイル拡張子で読み込み方法を選択する (.dds は DirectXTex の DDS ローダーを使う)
+    if (filePathW.ends_with(L".dds") || filePathW.ends_with(L".DDS"))
+    {
+        hr = DirectX::LoadFromDDSFile(filePathW.c_str(), DirectX::DDS_FLAGS_NONE, nullptr, image);
+    }
+    else
+    {
+        // WIC で読み込む（SRGB を強制）
+        hr = DirectX::LoadFromWICFile(filePathW.c_str(), DirectX::WIC_FLAGS_FORCE_SRGB, nullptr, image);
+    }
+    assert(SUCCEEDED(hr));
 
-	//ミニマップ付きのデータを返す
-	return mipImages;
+    // ミニマップの作成／準備
+    DirectX::ScratchImage mipImages{};
+    if (DirectX::IsCompressed(image.GetMetadata().format))
+    {
+        // 圧縮フォーマットはそのまま使う（既にミップが含まれていることが多い）
+        mipImages = std::move(image);
+    }
+    else
+    {
+        // レベル 0 を指定するとフルチェーンを生成する
+        hr = DirectX::GenerateMipMaps(image.GetImages(), image.GetImageCount(), image.GetMetadata(), DirectX::TEX_FILTER_SRGB, 0, mipImages);
+        assert(SUCCEEDED(hr));
+    }
+
+    // ミニマップ付きのデータを返す
+    return mipImages;
 }
 
 Microsoft::WRL::ComPtr<ID3D12Resource> DirectXCom::CreateTextureResource(const DirectX::TexMetadata& metadata)

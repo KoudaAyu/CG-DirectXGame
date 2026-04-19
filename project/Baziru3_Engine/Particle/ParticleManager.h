@@ -7,6 +7,11 @@
 #include"Transform.h"
 #include"Log.h"
 #include"Random.h"
+#include <list>
+
+class ParticleEmitter;
+
+class Camera;
 
 class ParticleManager
 {
@@ -33,9 +38,12 @@ public:
 	ParticleManager(std::ostream& logStream, DirectXCom* dxCommon);
 	~ParticleManager();
 
-	void Initialize();
+	void Initialize(Camera* camera);
+	void Update(float deltaTime);
 
 	Particle MakeNewParticles(std::mt19937& randomEngine,const Vector3& translate);
+
+	void AddParticles(std::list<Particle>& newParticles);
 
 	void RootSignature();
 	void CreateGraphicsPipeline();
@@ -50,7 +58,10 @@ public:
 	void ShaderCompile();
 	void InitializeGraphicPipeline();
 
-	void SetupDraw();
+	void SetupDraw(ID3D12GraphicsCommandList* commandList);
+
+	
+	void BindResources(ID3D12GraphicsCommandList* commandList, D3D12_GPU_VIRTUAL_ADDRESS materialCBV);
 
 	
 	const Microsoft::WRL::ComPtr<ID3D12PipelineState>& GetPipelineState() const { return pipelineState; }
@@ -105,9 +116,25 @@ public:
 
 	DirectXCom* GetDxCommon() { return dxCommon; }
 
+	std::mt19937& GetRandomEngine() { return randomEngine; }
+
+	uint32_t GetNumMaxInstances() const { return kNumMaxInstances; }
+
+	ParticleManager::ParticleForGPU* GetInstanceData() { return instanceData; }
+
+	D3D12_GPU_DESCRIPTOR_HANDLE GetInstancingSrvHandleGPU() const { return instancingSrvHandleGPU; }
+
+	uint32_t GetNumInstance() const { return numInstance; }
+
+private:
+	const uint32_t kNumMaxInstances = 10;
+	uint32_t numInstance = 0;
+	uint32_t writeIndex = 0;
 
 private:
 	DirectXCom* dxCommon = nullptr;
+
+	Camera* camera_ = nullptr;
 
 	D3D12_ROOT_SIGNATURE_DESC descriptionRootSignature{};
 	D3D12_DESCRIPTOR_RANGE descriptorRangeForInstancing[2] = {};
@@ -117,7 +144,7 @@ private:
 	Microsoft::WRL::ComPtr<ID3DBlob> errorBlob = nullptr;
 	Microsoft::WRL::ComPtr<ID3D12RootSignature> rootSignature = nullptr;
 	D3D12_BLEND_DESC blendDesc{};
-	D3D12_INPUT_ELEMENT_DESC inputElementDescs[3] = {};
+	D3D12_INPUT_ELEMENT_DESC inputElementDiscs[3] = {};
 	D3D12_INPUT_LAYOUT_DESC inputLayoutDesc{};
 	D3D12_RASTERIZER_DESC rasterizerDesc{};
 	Microsoft::WRL::ComPtr<IDxcBlob> vertexShaderBlob;
@@ -126,6 +153,15 @@ private:
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC& graphicPipelineStateDesc = graphicPipeline_stateDesc;
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> pipelineState = nullptr;
 	D3D12_DEPTH_STENCIL_DESC depthStencilDesc{};
+	D3D12_GPU_DESCRIPTOR_HANDLE instancingSrvHandleGPU;
+	Microsoft::WRL::ComPtr<ID3D12Resource> instancingResource;
+
+	std::mt19937 randomEngine{ std::random_device{}() };
+	std::list<ParticleManager::Particle> particles;
+
+	ParticleManager::ParticleForGPU* instanceData = nullptr;
 
 	std::ostream& logStream;
+
+	uint32_t instancingSrvIndex_ = 0;
 };
