@@ -38,6 +38,7 @@
     <ClCompile Include="Baziru3_Engine\Platform\Windows\CrashDump.cpp" />
     <ClCompile Include="Baziru3_Engine\Base\DebugUI.cpp" />
     <ClCompile Include="Application\Framework.cpp" />
+    <ClCompile Include="EngineContext.cpp" />
     <ClCompile Include="Game.cpp" />
     <ClCompile Include="Application\Scene\GameScene\GamePlayScene.cpp" />
     <ClCompile Include="Baziru3_Engine\Light\Light.cpp" />
@@ -124,6 +125,7 @@
     <ClInclude Include="Baziru3_Engine\Platform\Windows\CrashDump.h" />
     <ClInclude Include="Baziru3_Engine\Base\DebugUI.h" />
     <ClInclude Include="Application\Framework.h" />
+    <ClInclude Include="EngineContext.h" />
     <ClInclude Include="Game.h" />
     <ClInclude Include="Application\Scene\GameScene\GamePlayScene.h" />
     <ClInclude Include="Baziru3_Engine\Particle\ParticleEmitter.h" />

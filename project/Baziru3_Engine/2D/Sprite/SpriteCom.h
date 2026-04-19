@@ -58,6 +58,8 @@ public:
     void SetBlendMode(BlendMode mode);
     BlendMode GetBlendMode() const;
 
+    void Finalize();
+
 
 public:
 	const D3D12_ROOT_SIGNATURE_DESC& GetDescriptionRootSignature() const

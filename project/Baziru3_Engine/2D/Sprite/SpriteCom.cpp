@@ -5,6 +5,16 @@ SpriteCom::SpriteCom(std::ostream& logStream, DirectXCom* dxCommon)
 {
 }
 
+void SpriteCom::Finalize()
+{
+    pipelineState.Reset();
+    rootSignature.Reset();
+    signatureBlob.Reset();
+    errorBlob.Reset();
+    vertexShaderBlob.Reset();
+    pixelShaderBlob.Reset();
+}
+
 
 SpriteCom::~SpriteCom()
 {

@@ -6,6 +6,7 @@
 #include"Camera.h"
 #include"CrashDump.h"
 #include"DirectXCom.h"
+#include"EngineContext.h"
 #include"Framework.h"
 #include"ImGuiManager.h"
 #include"Light.h"
@@ -48,12 +49,12 @@ public:
 public:
 	std::ostream& logStream = log.GetLogStream();
 
-	WindowAPI* GetWindowAPI() { return windowAPI.get(); }
-	const WindowAPI* GetWindowAPI() const { return windowAPI.get(); }
-	DirectXCom* GetDirectXCom() { return directXCom.get(); }
-	const DirectXCom* GetDirectXCom() const { return directXCom.get(); }
-	SpriteCom* GetSpriteCom() { return spriteCom.get(); }
-	const SpriteCom* GetSpriteCom() const { return spriteCom.get(); }
+	WindowAPI* GetWindowAPI() { return engine_ ? engine_->GetWindowAPI() : windowAPI.get(); }
+	const WindowAPI* GetWindowAPI() const { return engine_ ? engine_->GetWindowAPI() : windowAPI.get(); }
+	DirectXCom* GetDirectXCom() { return engine_ ? engine_->GetDirectXCom() : directXCom.get(); }
+	const DirectXCom* GetDirectXCom() const { return engine_ ? engine_->GetDirectXCom() : directXCom.get(); }
+	SpriteCom* GetSpriteCom() { return engine_ ? engine_->GetSpriteCom() : spriteCom.get(); }
+	const SpriteCom* GetSpriteCom() const { return engine_ ? engine_->GetSpriteCom() : spriteCom.get(); }
 	Sprite* GetSprites(size_t index)
 	{
 		if (index < sprites.size())
@@ -70,8 +71,20 @@ public:
 		}
 		return nullptr;
 	}
-	std::vector<std::unique_ptr<Sprite>>& GetSprites() { return spriteManager_->GetSprites(); }
-	const std::vector<std::unique_ptr<Sprite>>& GetSprites() const { return spriteManager_->GetSprites(); }
+    std::vector<std::unique_ptr<Sprite>>& GetSprites()
+    {
+        if (engine_ && engine_->GetSpriteManager()) return engine_->GetSpriteManager()->GetSprites();
+        if (spriteManager_) return spriteManager_->GetSprites();
+        static std::vector<std::unique_ptr<Sprite>> empty;
+        return empty;
+    }
+    const std::vector<std::unique_ptr<Sprite>>& GetSprites() const
+    {
+        if (engine_ && engine_->GetSpriteManager()) return engine_->GetSpriteManager()->GetSprites();
+        if (spriteManager_) return spriteManager_->GetSprites();
+        static const std::vector<std::unique_ptr<Sprite>> empty;
+        return empty;
+    }
 	Object3d* GetObject3d() { return object3d_.get(); }
 	const Object3d* GetObject3d() const { return object3d_.get(); }
 	Object3dCom* GetObject3dCom() { return object3dCom.get(); }
@@ -92,6 +105,7 @@ private:
 	
 	std::unique_ptr<Camera> camera_;
 	std::unique_ptr<DirectXCom> directXCom;
+	std::unique_ptr<EngineContext> engine_;
 	std::unique_ptr<ImGuiManager> imguiManager;
 	std::unique_ptr<Light> light;
 	std::unique_ptr<Model> model_;
@@ -103,7 +117,7 @@ private:
 	std::unique_ptr<SkyboxCom> skyboxCom_;
 	std::unique_ptr<SpriteCom> spriteCom;
 	std::unique_ptr<SpriteManager> spriteManager_;
-	std::unique_ptr<WindowAPI> windowAPI;//ウィンドウ関連のAPIをまとめたオブジェクト
+	std::unique_ptr<WindowAPI> windowAPI;
 	
 	DebugCamera debugCamera_;
 	
@@ -133,8 +147,6 @@ private:
 	//Objectの描画切り替え
 	bool drawObject = false;
 	bool drawSprite = false;
-	
-
 	
 	// Texture resources are owned and managed by TextureManager now.
 

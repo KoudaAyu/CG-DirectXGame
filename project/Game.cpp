@@ -18,34 +18,45 @@
 
 void Game::Initialize()
 {
+	
 	Framework::Initialize();
-
 	crashDump.Install();
 	log.Initialize();
 
-	InitConfig cfg;
-	auto res = SubsystemFactory::InitializeAll(logStream, cfg);
-	if (!res.success)
+	engine_ = std::make_unique<EngineContext>();
+
+	if (!engine_->Initialize(logStream, InitConfig{}))
 	{
-		Logger::Log(logStream, "Engine init failed: " + res.errorMessage + "\n");
+		Logger::Log(logStream, "EngineContext initialization failed. Check previous logs for details.\n");
+		return;
+	}
+	
+	if (!engine_->GetDirectXCom())
+	{
+		Logger::Log(logStream, "Error: EngineContext initialized but DirectXCom is null.\n");
 		return;
 	}
 
-	// 所有権を受け取る
-	windowAPI = std::move(res.windowAPI);
-	directXCom = std::move(res.directXCom);
-	spriteCom = std::move(res.spriteCom);
-	spriteManager_ = std::move(res.spriteManager);
 
-	SceneManager::GetInstance()->Initialize(directXCom.get());
+	{
+		auto dx = engine_->GetDirectXCom();
+		std::ostringstream oss;
+		oss << "Diagnostics: DirectXCom=" << std::hex << (uintptr_t)dx;
+		oss << " device=" << (uintptr_t)(dx ? dx->GetDevice().Get() : nullptr);
+		oss << " commandList=" << (uintptr_t)(dx ? dx->GetCommandList().Get() : nullptr) << std::dec << "\n";
+		Logger::Log(logStream, oss.str());
+	}
 
-	
+
+	SceneManager::GetInstance()->Initialize(engine_->GetDirectXCom());
+
+
 	// 既存の手動テクスチャ読み込みはそのまま利用（Sphere用）
 
 	object3dCom = std::make_unique<Object3dCom>(logStream);
 	object3dCom->Initialize(GetDirectXCom());
 
-	
+
 	SceneManager::GetInstance()->SetObject3dCom(object3dCom.get());
 
 #pragma region 最初のシーンの初期化
@@ -60,30 +71,30 @@ void Game::Initialize()
 
 	// Model を作成して初期化（Model が自分で頂点リソースを作る）
 	modelCom_ = std::make_unique<ModelCom>();
-	modelCom_->Initialize(directXCom.get());
+	modelCom_->Initialize(GetDirectXCom());
 	model_ = std::make_unique<Model>();
 	model_->Initialize(modelCom_.get(), "Resources", "plane.obj");
 
 
 
 	materialManager_ = std::make_unique<MaterialManager>();
-	materialManager_->Initialize(directXCom.get());
+	materialManager_->Initialize(GetDirectXCom());
 	SceneManager::GetInstance()->SetMaterialManager(materialManager_.get());
 
 	light = std::make_unique<Light>();
-	light->Initialize(directXCom.get());
+	light->Initialize(GetDirectXCom());
 	SceneManager::GetInstance()->SetLight(light.get());
 
 	camera_ = std::make_unique<Camera>();
-	camera_->Initialize(directXCom.get());
+	camera_->Initialize(GetDirectXCom());
 	SceneManager::GetInstance()->SetCamera(camera_.get());
 
-	skyboxCom_ = std::make_unique<SkyboxCom>(logStream, directXCom.get());
+	skyboxCom_ = std::make_unique<SkyboxCom>(logStream, GetDirectXCom());
 	skyboxCom_->Initialize();
 	skybox_ = std::make_unique<SkyBox>();
-	skybox_->Initialize(directXCom.get(), camera_.get());
+	skybox_->Initialize(GetDirectXCom(), camera_.get());
 
-	particleManager = std::make_unique<ParticleManager>(logStream, directXCom.get());
+	particleManager = std::make_unique<ParticleManager>(logStream, GetDirectXCom());
 	particleManager->Initialize(camera_.get());
 	SceneManager::GetInstance()->SetParticleManager(particleManager.get());
 
@@ -96,39 +107,41 @@ void Game::Initialize()
 	// ユーザー指定の API 形式でのテクスチャ読み込み＆スプライト生成例
 	{
 		uint32_t textureHandle = TextureManager::GetInstance()->Load("Resources/uvChecker.png");
-	
+
 		auto sp = std::make_unique<Sprite>();
-		sp->Initialize(spriteCom.get(), "Resources/uvChecker.png");
-		
+		sp->Initialize(GetSpriteCom(), "Resources/uvChecker.png");
+
 		sprites.emplace_back(std::move(sp));
 	}
 
-	
+
 	//音声読み込み
 	audioManager_ = std::make_unique<AudioManager>(logStream);
 	audioManager_->Initialize();
 	SceneManager::GetInstance()->SetAudioManager(audioManager_.get());
 
 
-	inputManager.Initialize(windowAPI.get());
+	inputManager.Initialize(GetWindowAPI());
 
 
-	debugCamera_.Initialize(windowAPI.get());
+	debugCamera_.Initialize(GetWindowAPI());
 
 	object3dCom->SetDefaultCamera(camera_.get());
 
 	imguiManager = std::make_unique<ImGuiManager>();
-	imguiManager->Initialize(windowAPI.get(), directXCom.get());
+	imguiManager->Initialize(GetWindowAPI(), GetDirectXCom());
 
-	debugUI = std::make_unique<DebugUI>(materialManager_.get(), spriteManager_.get(), camera_.get(), &transformObject, &useMonsterBall, &drawObject, &drawSprite);
+
+	SpriteManager* uiSpriteManager = engine_ && engine_->GetSpriteManager() ? engine_->GetSpriteManager() : spriteManager_.get();
+	debugUI = std::make_unique<DebugUI>(materialManager_.get(), uiSpriteManager, camera_.get(), &transformObject, &useMonsterBall, &drawObject, &drawSprite);
 	debugUI->Initialize();
 
 	SceneRegistration::RegisterScenes();
 	SceneManager::GetInstance()->ChangeScene("TITLE");
 
-	textureIndexUvChecker = TextureManager::GetInstance()->Load("Resources/uvChecker.png");
-	textureIndexModelTex = TextureManager::GetInstance()->Load(modelData.material.textureFilePath);
-	textureIndexSkybox_ = TextureManager::GetInstance()->Load("Resources/CG4/dds/CG4_test.dds");
+	textureIndexUvChecker = TextureManager::GetInstance()->Load("Resources/uvChecker.png"); // Load UV Checker texture
+	textureIndexModelTex = TextureManager::GetInstance()->Load(modelData.material.textureFilePath); // Load model texture
+	textureIndexSkybox_ = TextureManager::GetInstance()->Load("Resources/CG4/dds/CG4_test.dds"); // Load skybox texture
 }
 
 
@@ -136,15 +149,15 @@ void Game::Finalize()
 {
 	SceneManager::Destroy();
 
-	
+
 #ifdef USE_IMGUI
 	if (imguiManager) { imguiManager->Finalize(); imguiManager.reset(); }
 #endif
 
-	
+
 	debugUI.reset();
 
-	
+
 	if (audioManager_)
 	{
 		SceneManager::GetInstance()->SetAudioManager(nullptr);
@@ -156,9 +169,19 @@ void Game::Finalize()
 	particleManager.reset();
 
 	SceneManager::GetInstance()->SetSpriteCom(nullptr);
-	spriteManager_.reset();
-	spriteCom.reset();
+	// SpriteCom/SpriteManager are owned by EngineContext now; do not reset here.
 
+	// Finalize and release any game-owned sprites that reference GPU resources
+	for (auto &sp : sprites)
+	{
+		if (sp)
+		{
+			sp->Finalize();
+		}
+	}
+	sprites.clear();
+
+	// Ensure TextureManager releases its GPU resources before engine teardown
 	TextureManager::GetInstance()->Finalize();
 
 	SceneManager::GetInstance()->SetMaterialManager(nullptr);
@@ -182,16 +205,14 @@ void Game::Finalize()
 
 	if (directXCom)
 	{
-		HANDLE h = directXCom->GetFenceEvent();
-		if (h && h != INVALID_HANDLE_VALUE) CloseHandle(h);
 	}
-	directXCom.reset();
 
-	if (windowAPI)
-	{
-		windowAPI->Finalize();
-		windowAPI.reset();
-	}
+   
+    if (engine_)
+    {
+        engine_->Finalize();
+        engine_.reset();
+    }
 
 	Framework::Finalize();
 }
@@ -217,7 +238,7 @@ void Game::Update()
 
 	//ImGuiにここからフレームが始まる趣旨をつたえる
 	imguiManager->Update();
-	
+
 	debugCamera_.Update();
 
 	camera_->Update();
@@ -229,17 +250,17 @@ void Game::Update()
 	object3d_->SetRotate(transformObject.rotate);
 	object3d_->Update();
 
-	
-	
+
+
 #ifdef _DEBUG
 
 
-    if (debugUI)
-    {
-        debugUI->Update();
-    }
+	if (debugUI)
+	{
+		debugUI->Update();
+	}
 
-	
+
 #endif // DEBUG
 
 	//ImGui内部コマンドを生成する
@@ -258,35 +279,36 @@ void Game::Update()
 
 void Game::Draw()
 {
-	directXCom->PreDraw();
 
-	object3dCom->PreDraw();
+	if (GetDirectXCom()) GetDirectXCom()->PreDraw();
 
-    RenderContext ctx{};
-    ctx.commandList = directXCom->GetCommandList().Get();
-    ctx.windowAPI = windowAPI.get();
-    ctx.camera = camera_.get();
-    ctx.light = light.get();
-    uint32_t chosenIndex = useMonsterBall ? textureIndexModelTex : textureIndexUvChecker;
-    if (chosenIndex != TextureManager::kInvalidTextureIndex)
-    {
-        ctx.textureHandle = TextureManager::GetInstance()->GetSrvHandleGPU(chosenIndex);
-    }
-    else
-    {
-        Logger::Log(logStream, "Warning: invalid texture index when preparing render context for drawing.\n");
-        ctx.textureHandle = {};
-    }
-    ctx.materialGPUAddress = materialManager_->GetMaterialResource() ? materialManager_->GetMaterialResource()->GetGPUVirtualAddress() : 0;
+	if (object3dCom) object3dCom->PreDraw();
 
-    if (camera_ && camera_->GetCameraResource())
-    {
-        directXCom->GetCommandList()->SetGraphicsRootConstantBufferView(4, camera_->GetCameraResource()->GetGPUVirtualAddress());
-    }
-    else
-    {
-        Logger::Log(logStream, "Warning: camera GPU resource not available before SceneManager draw.\n");
-    }
+	RenderContext ctx{};
+	ctx.commandList = GetDirectXCom() ? GetDirectXCom()->GetCommandList().Get() : nullptr;
+	ctx.windowAPI = GetWindowAPI();
+	ctx.camera = camera_.get();
+	ctx.light = light.get();
+	uint32_t chosenIndex = useMonsterBall ? textureIndexModelTex : textureIndexUvChecker;
+	if (chosenIndex != TextureManager::kInvalidTextureIndex)
+	{
+		ctx.textureHandle = TextureManager::GetInstance()->GetSrvHandleGPU(chosenIndex);
+	}
+	else
+	{
+		Logger::Log(logStream, "Warning: invalid texture index when preparing render context for drawing.\n");
+		ctx.textureHandle = {};
+	}
+	ctx.materialGPUAddress = materialManager_->GetMaterialResource() ? materialManager_->GetMaterialResource()->GetGPUVirtualAddress() : 0;
+
+	if (camera_ && camera_->GetCameraResource() && GetDirectXCom())
+	{
+		GetDirectXCom()->GetCommandList()->SetGraphicsRootConstantBufferView(4, camera_->GetCameraResource()->GetGPUVirtualAddress());
+	}
+	else
+	{
+		Logger::Log(logStream, "Warning: camera GPU resource not available before SceneManager draw.\n");
+	}
 
 	if (skybox_ && skyboxCom_ && textureIndexSkybox_ != TextureManager::kInvalidTextureIndex)
 	{
@@ -294,15 +316,21 @@ void Game::Draw()
 		skybox_->Draw(ctx.commandList, TextureManager::GetInstance()->GetSrvHandleGPU(textureIndexSkybox_));
 	}
 
-	object3dCom->PreDraw();
+	if (object3dCom) object3dCom->PreDraw();
 
-    SceneManager::GetInstance()->Draw();
+	if (SceneManager::GetInstance())
+	{
+		SceneManager::GetInstance()->Draw();
+	}
 
-	
+
 
 	if (drawObject)
 	{
-		object3dCom->Draw(object3d_.get(), ctx, modelData, drawObject);
+		if (object3dCom && object3d_)
+		{
+			object3dCom->Draw(object3d_.get(), ctx, modelData, drawObject);
+		}
 	}
 	DrawSprites(ctx);
 	DrawParticles(ctx);
@@ -323,99 +351,104 @@ void Game::Draw()
 
 		std::ostringstream oss;
 		oss << "Game::Draw - object texture index=" << std::dec << chosenIndex
-		    << " handle=0x" << std::hex << (unsigned long long)chosenHandle.ptr << std::dec << "\n";
+			<< " handle=0x" << std::hex << (unsigned long long)chosenHandle.ptr << std::dec << "\n";
 		OutputDebugStringA(oss.str().c_str());
 	}
-	
+
 	//実際のcommandListのImGuiの描画コマンドを積む
 #ifdef USE_IMGUI
-	ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), directXCom->GetCommandList().Get());
+	if (GetDirectXCom()) ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), GetDirectXCom()->GetCommandList().Get());
 #endif
 
-	directXCom->PostDraw();
+	if (GetDirectXCom()) GetDirectXCom()->PostDraw();
 }
 
 bool Game::IsQuitRequested()
 {
-	if (directXCom)
+	auto dx = GetDirectXCom();
+	if (dx)
 	{
-		return (directXCom->GetMsg().message == WM_QUIT);
+		return (dx->GetMsg().message == WM_QUIT);
 	}
 	return false;
 }
 
 void Game::DrawObjects(const RenderContext& ctx)
 {
-    if (ctx.textureHandle.ptr != 0)
-    {
-        ctx.commandList->SetGraphicsRootDescriptorTable(2, ctx.textureHandle);
-    }
+	if (ctx.textureHandle.ptr != 0)
+	{
+		ctx.commandList->SetGraphicsRootDescriptorTable(2, ctx.textureHandle);
+	}
 
-    if (ctx.light)
-    {
-        ctx.commandList->SetGraphicsRootConstantBufferView(3, ctx.light->GetDirectionalLightResource()->GetGPUVirtualAddress());
-    }
-    else
-    {
-        ctx.commandList->SetGraphicsRootConstantBufferView(3, 0);
-    }
+	if (ctx.light)
+	{
+		ctx.commandList->SetGraphicsRootConstantBufferView(3, ctx.light->GetDirectionalLightResource()->GetGPUVirtualAddress());
+	}
+	else
+	{
+		ctx.commandList->SetGraphicsRootConstantBufferView(3, 0);
+	}
 
-    if (ctx.camera && ctx.camera->GetCameraResource())
-    {
-        ctx.commandList->SetGraphicsRootConstantBufferView(4, ctx.camera->GetCameraResource()->GetGPUVirtualAddress());
-    }
-    else
-    {
-         Logger::Log(logStream, "Warning: camera GPU resource not available when drawing object.\n");
-        return;
-    }
+	if (ctx.camera && ctx.camera->GetCameraResource())
+	{
+		ctx.commandList->SetGraphicsRootConstantBufferView(4, ctx.camera->GetCameraResource()->GetGPUVirtualAddress());
+	}
+	else
+	{
+		Logger::Log(logStream, "Warning: camera GPU resource not available when drawing object.\n");
+		return;
+	}
 
-     object3d_->Draw(ctx.commandList);
+	object3d_->Draw(ctx.commandList);
 
-    if (drawObject)
-    {
-        ctx.commandList->DrawInstanced(UINT(modelData.vertices.size()), 1, 0, 0);
-    }
+	if (drawObject)
+	{
+		ctx.commandList->DrawInstanced(UINT(modelData.vertices.size()), 1, 0, 0);
+	}
 }
 
 void Game::DrawSprites(const RenderContext& ctx)
 {
-    if (drawSprite)
-    {
-        spriteManager_->DrawAll(ctx, &debugCamera_, &sprites);
-    }
+	if (!drawSprite) return;
+
+	
+	SpriteManager* sm = engine_ ? engine_->GetSpriteManager() : spriteManager_.get();
+	if (sm)
+	{
+		sm->DrawAll(ctx, &debugCamera_, &sprites);
+	}
 }
 
 void Game::DrawParticles(const RenderContext& ctx)
 {
-   
-    particleManager->SetupDraw(ctx.commandList);
 
-  
-    model_->Bind(ctx.commandList);
+	particleManager->SetupDraw(ctx.commandList);
 
-    particleManager->BindResources(ctx.commandList, ctx.materialGPUAddress);
 
- 
-    if (ctx.textureHandle.ptr != 0)
-    {
-        ctx.commandList->SetGraphicsRootDescriptorTable(RootParam::Particle::kTextureTable, ctx.textureHandle);
-    }
+	model_->Bind(ctx.commandList);
 
-  
-    if (ctx.light)
-    {
-        ctx.commandList->SetGraphicsRootConstantBufferView(RootParam::Particle::kLight, ctx.light->GetDirectionalLightResource()->GetGPUVirtualAddress());
-    }
-    else
-    {
-        ctx.commandList->SetGraphicsRootConstantBufferView(RootParam::Particle::kLight, 0);
-    }
-    ctx.commandList->SetGraphicsRootConstantBufferView(RootParam::Particle::kCamera,
-        ctx.camera && ctx.camera->GetCameraResource() ? ctx.camera->GetCameraResource()->GetGPUVirtualAddress() : 0);
+	particleManager->BindResources(ctx.commandList, ctx.materialGPUAddress);
 
-    if (particleManager->GetNumInstance() > 0)
-    {
-        ctx.commandList->DrawInstanced(UINT(modelData.vertices.size()), particleManager->GetNumInstance(), 0, 0);
-    }
+
+	if (ctx.textureHandle.ptr != 0)
+	{
+		ctx.commandList->SetGraphicsRootDescriptorTable(RootParam::Particle::kTextureTable, ctx.textureHandle);
+	}
+
+
+	if (ctx.light)
+	{
+		ctx.commandList->SetGraphicsRootConstantBufferView(RootParam::Particle::kLight, ctx.light->GetDirectionalLightResource()->GetGPUVirtualAddress());
+	}
+	else
+	{
+		ctx.commandList->SetGraphicsRootConstantBufferView(RootParam::Particle::kLight, 0);
+	}
+	ctx.commandList->SetGraphicsRootConstantBufferView(RootParam::Particle::kCamera,
+		ctx.camera && ctx.camera->GetCameraResource() ? ctx.camera->GetCameraResource()->GetGPUVirtualAddress() : 0);
+
+	if (particleManager->GetNumInstance() > 0)
+	{
+		ctx.commandList->DrawInstanced(UINT(modelData.vertices.size()), particleManager->GetNumInstance(), 0, 0);
+	}
 }

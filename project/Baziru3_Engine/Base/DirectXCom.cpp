@@ -81,6 +81,61 @@ void DirectXCom::Initialize()
 	InitializeImGui();
 }
 
+void DirectXCom::Finalize()
+{
+	// GPUが処理を終えるのを待つ
+	if (commandQueue)
+	{
+		if (commandList && commandAllocator && fence && fenceEvent)
+		{
+			// 終了/実行/待機/リセットを実。
+			ExecuteAndWaitForGPU();
+		}
+		else if (fence && fenceEvent)
+		{
+			fenceValue++;
+			commandQueue->Signal(fence.Get(), fenceValue);
+			if(fence->GetCompletedValue() < fenceValue)
+			{
+				fence->SetEventOnCompletion(fenceValue, fenceEvent);
+				WaitForSingleObject(fenceEvent, INFINITE);
+			}
+		}
+	}
+
+	// スワップチェーンのリソースを解放する前に、コマンドリストとコマンドアロケーターをリセットしておく
+	for (auto& res : swapChainResources) res.Reset();
+
+	rtvDescriptorHeap.Reset();
+	srvDescriptorHeap.Reset();
+	dsvDescriptorHeap.Reset();
+	descriptorHeap.Reset();
+	depthStencilResource.Reset();
+	commandList.Reset();
+	commandAllocator.Reset();
+	commandQueue.Reset();
+
+	// フェンスを解放しハンドルを閉じる
+	if (fenceEvent)
+	{
+		CloseHandle(fenceEvent);
+		fenceEvent = nullptr;
+	}
+	fence.Reset();
+
+	dxcCompiler.Reset();
+	dxcUtils.Reset();
+	includeHandler.Reset();
+	swapChain.Reset();
+	useAdapter.Reset();
+	device.Reset();
+	dxgiFactory.Reset();
+
+	// 生のポインタをクリア
+	infoQueue = nullptr;
+
+}
+
 void DirectXCom::DebugLayer()
 {
 #ifdef _DEBUG

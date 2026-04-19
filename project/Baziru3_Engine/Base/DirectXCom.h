@@ -39,6 +39,8 @@ public:
 
 	void Initialize();
 
+	void Finalize();
+
 	void DebugLayer();
 
 	void GraphicCreateDXGIFactory();
@@ -95,6 +97,8 @@ public:
 	void PostDraw();
 
 	void ExecuteAndWaitForGPU();
+
+  
 
 	Microsoft::WRL::ComPtr<IDxcBlob> CompileShader(
 		//CompilerするShaderファイルへのパス

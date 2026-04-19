@@ -21,6 +21,8 @@ public:
 
 	std::vector<std::unique_ptr<Sprite>>& GetSprites();
 
+    void Finalize();
+
 private:
 	SpriteCom* spriteCom_;
 	std::string texturePath_;

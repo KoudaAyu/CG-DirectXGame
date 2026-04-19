@@ -55,10 +55,33 @@ SubsystemResult SubsystemFactory::InitializeAll(std::ostream& logStream, const I
 
 void SubsystemFactory::FinalizeAll(SubsystemResult& r, std::ostream& logStream)
 {
+    SceneManager::GetInstance()->SetSpriteCom(nullptr);
+    SceneManager::GetInstance()->SetMaterialManager(nullptr);
+    SceneManager::GetInstance()->SetParticleManager(nullptr);
+    SceneManager::GetInstance()->SetAudioManager(nullptr);
+
+
     // 逆順で破棄する（unique_ptr の破棄順はここで明確にする）
+    if (r.spriteManager)
+    {
+        try { r.spriteManager->Finalize(); }
+        catch (...) {}
+        r.spriteManager.reset();
+        Logger::Log(logStream, "SpriteManager finalized\n");
+    }
+    if (r.spriteCom)
+    {
+        try { r.spriteCom->Finalize(); }
+        catch (...) {}
+        r.spriteCom.reset();
+        Logger::Log(logStream, "SpriteCom finalized\n");
+    }
+    try { TextureManager::GetInstance()->Finalize(); Logger::Log(logStream, "TextureManager finalized\n"); }
+    catch (...) {}
     if (r.directXCom)
     {
-        // DirectX 側で必要なクリーンナップは DirectXCom のデストラクタで行う想定
+        //  DirectX 側で必要なクリーンナップは DirectXCom のデストラクタで行う想定
+        try { r.directXCom->Finalize(); } catch (...) {}
         r.directXCom.reset();
         Logger::Log(logStream, "DirectXCom finalized\n");
     }
