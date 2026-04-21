@@ -131,6 +131,30 @@ void GamePlayScene::Update()
         }
         prevF1 = curF1;
     }
+
+    // 9キーで Hie エフェクトを発生させる
+    {
+        static bool prevF2 = false;
+        bool curF2 = (GetAsyncKeyState('9') & 0x8000) != 0;
+        if (curF2 && !prevF2)
+        {
+            if (particleManager)
+            {
+                std::list<ParticleManager::Particle> newParticles;
+                for (uint32_t i = 0; i < emitter.count; ++i)
+                {
+                    newParticles.push_back(
+                        particleManager->MakeHieEffect(
+                            particleManager->GetRandomEngine(),
+                            emitter.transform.GetTranslate()
+                        )
+                    );
+                }
+                particleManager->AddParticles(newParticles);
+            }
+        }
+        prevF2 = curF2;
+    }
 }
 
 void GamePlayScene::Draw()

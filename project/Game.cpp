@@ -523,6 +523,6 @@ void Game::DrawParticles(const RenderContext& ctx)
 
 	if (particleManager->GetNumInstance() > 0)
 	{
-		ctx.commandList->DrawInstanced(UINT(modelData.vertices.size()), particleManager->GetNumInstance(), 0, 0);
+        ctx.commandList->DrawInstanced(UINT(modelData.vertices.size()), particleManager->GetNumInstance(), 0, 0);
 	}
 }

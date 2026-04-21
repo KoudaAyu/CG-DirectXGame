@@ -22,12 +22,10 @@ void ParticleManager::Initialize(Camera* camera)
 	camera_ = camera;
 	SetupDraw(dxCommon->GetCommandList().Get());
 
-	Random::SeedEngine();
+    Random::SeedEngine();
 
-	for (uint32_t index = 0; index < kNumMaxInstances; ++index)
-	{
-		particles.push_back(MakeNewParticles(randomEngine, Vector3{0.0f, 0.0f, 0.0f}));
-	}
+
+    particles.clear();
 
 	instancingResource =
 		dxCommon->CreateBufferResource(dxCommon->GetDevice(), sizeof(ParticleManager::ParticleForGPU) * kNumMaxInstances);
@@ -150,8 +148,12 @@ void ParticleManager::Update(float deltaTime)
 			continue;
 		}
 
-		Matrix4x4 worldMatrix = MakeAffineMatrix(
-			it->transform.GetScale(), billboardMatrix, it->transform.GetTranslate());
+        // Apply per-particle rotation before billboard so each particle can be rotated independently
+        Vector3 rot = it->transform.GetRotate();
+        Matrix4x4 rotZ = MakeRotateZMatrix(rot.z);
+        Matrix4x4 finalRotation = Multiply(rotZ, billboardMatrix);
+        Matrix4x4 worldMatrix = MakeAffineMatrix(
+            it->transform.GetScale(), finalRotation, it->transform.GetTranslate());
 		Matrix4x4 wvpMatrix = Multiply(
 			worldMatrix, Multiply(camera_->GetViewMatrix(), camera_->GetProjectionMatrix()));
 
@@ -192,9 +194,35 @@ ParticleManager::Particle ParticleManager::MakeNewParticles(std::mt19937& random
 
 ParticleManager::Particle ParticleManager::MakeHieEffect(std::mt19937& randomEngine, const Vector3& translate)
 {
-	Particle particle;
+    Particle particle;
 
-	return Particle();
+    // ランダム回転
+    std::uniform_real_distribution<float> distRotate(0.0f, std::numbers::pi_v<float> * 2.0f);
+    float rotZ = distRotate(randomEngine);
+    particle.transform.SetRotate({ 0.0f, 0.0f, rotZ });
+
+    // 縦方向にばらつきを持たせた縦長パーティクル
+    std::uniform_real_distribution<float> distScaleX(0.03f, 0.08f); // 横幅
+    std::uniform_real_distribution<float> distScaleY(0.6f, 1.6f);   // 縦幅
+    float sx = distScaleX(randomEngine);
+    float sy = distScaleY(randomEngine);
+    particle.transform.SetScale({ sx, sy, 1.0f }); // Z は 1
+
+    // 発生位置
+    particle.transform.SetTranslate(translate);
+
+    // velocity を 0 に固定
+    particle.velocity = { 0.0f, 0.0f, 0.0f };
+
+    // 色は白
+    particle.color = { 1.0f, 1.0f, 1.0f, 1.0f };
+
+    // 寿命に少しばらつきを持たせる
+    std::uniform_real_distribution<float> distTime(0.7f, 1.3f);
+    particle.lifeTime = distTime(randomEngine);
+    particle.currentTime = 0.0f;
+
+    return particle;
 }
 
 
