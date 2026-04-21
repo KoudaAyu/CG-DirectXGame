@@ -3,8 +3,6 @@
 #include <sstream>
 #include <Windows.h>
 
-const uint32_t SRVManager::kMaxSRVCount = 512;
-
 void SRVManager::Initialize(DirectXCom* directXCom)
 {
 	assert(directXCom);

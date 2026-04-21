@@ -9,6 +9,9 @@ public:
 	SRVManager() = default;
 	void Initialize(DirectXCom* directXCom);
 
+
+	static constexpr uint32_t kMaxSRVCount = 512;
+
 	//SRV作成
 	void CreateSRVForTexture2D(uint32_t srvIndex, ID3D12Resource* pResource, DXGI_FORMAT Format, UINT MipLeveles);
 	void CreateSRVForTexture2D(uint32_t index, ID3D12Resource* resource, const DirectX::TexMetadata& meta);
@@ -40,8 +43,6 @@ private:
 	SRVManager& operator=(const SRVManager&) = delete;
 	DirectXCom* directXCom_ = nullptr;
 
-	//最大SRV数(最大テクスチャ枚数)
-	static const uint32_t kMaxSRVCount;
 	//SRV用のデスクリプタサイズ
 	uint32_t descriptorSize_;
 	//SRV用のデスクリプタヒープ

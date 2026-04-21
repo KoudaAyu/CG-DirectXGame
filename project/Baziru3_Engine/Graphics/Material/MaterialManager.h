@@ -24,6 +24,8 @@ class MaterialManager
 public:
 	void Initialize(DirectXCom* directXCom);
 
+	void Finalize();
+
 	Vector4& GetMaterialDataColor() { return materialData->color; }
 	void SetMaterialDataColor(const Vector4& color)
 	{
@@ -43,7 +45,8 @@ public:
 
 private:
 	Microsoft::WRL::ComPtr<ID3D12Resource> materialResource;
-	Material* materialData = nullptr;
+    Material hostMaterial_{};
+    Material* materialData = &hostMaterial_;
 	DirectXCom* directXCom = nullptr;
 };
 

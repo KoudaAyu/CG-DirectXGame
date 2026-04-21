@@ -46,6 +46,32 @@ public:
 
 	bool IsQuitRequested() override;
 
+	//初期化関係
+	bool InitializeEngine();
+
+	/// <summary>
+	/// DirectXComの診断Logを出す
+	/// </summary>
+	void LogEngineDiagnostics();
+
+	/// <summary>
+	/// SceneManagerに渡す基盤オブジェクトを用意する部分
+	/// </summary>
+	void InitializeSceneCore();
+
+
+	/// <summary>
+	/// 描画に必要な共通リソースを作る
+	/// </summary>
+	void InitializeModelResources();
+
+	void InitializeSceneResources();
+
+	/// <summary>
+	/// 音声、入力系の初期化
+	/// </summary>
+	void InitializeAudioAndInput();
+
 public:
 	std::ostream& logStream = log.GetLogStream();
 	DirectXCom* GetDirectXCom() { return engine_ ? engine_->GetDirectXCom() : nullptr; }

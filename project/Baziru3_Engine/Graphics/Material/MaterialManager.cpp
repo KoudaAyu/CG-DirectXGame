@@ -8,19 +8,34 @@ void  MaterialManager::Initialize(DirectXCom* directXCom)
 	materialResource = directXCom->CreateBufferResource(directXCom->GetDevice().Get(), sizeof(Material));
 	//マテリアルにデータを書き込む
 
-	//書き込む為のアドレス取得
-	materialResource->Map(0, nullptr, reinterpret_cast<void**>(&materialData));
+    // Initialize host-side material (used by UI)
+    hostMaterial_.color = {1.0f, 1.0f, 1.0f, 1.0f};
+    hostMaterial_.enableLighting = 0;
+    hostMaterial_.specularModel = 0; // Blinn-Phong
+    hostMaterial_.shininess = 16.0f;
+    hostMaterial_.uvTransform = MakeIdentity4x4();
 
-	Vector4 temp{};
-	temp.x = 1.0f;
-	temp.y = 1.0f;
-	temp.z = 1.0f;
-	temp.w = 1.0f;
-	materialData->color = temp;
-	materialData->enableLighting = false;
-    materialData->specularModel = 0; // デフォルトは Blinn-Phong
-    materialData->shininess = 16.0f;
-    //uvTransform行列の初期化
-    materialData->uvTransform = MakeIdentity4x4();
-    materialResource->Unmap(0, nullptr);
+    // Mapしたら書き込みして Unmap -> 生ポインタを残さない
+    Material* gpuPtr = nullptr;
+    materialResource->Map(0, nullptr, reinterpret_cast<void**>(&gpuPtr));
+    if (gpuPtr)
+    {
+        *gpuPtr = hostMaterial_;
+        materialResource->Unmap(0, nullptr);
+    }
+}
+
+void MaterialManager::Finalize()
+{
+    // materialData は Initialize() 内で Unmap() したなら nullptr にしておくべき
+    materialData = nullptr;
+
+    // GPUリソースを解放
+    if (materialResource)
+    {
+        materialResource.Reset();
+    }
+
+    // 依存ポインタをクリア
+    directXCom = nullptr;
 }

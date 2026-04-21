@@ -1,12 +1,36 @@
 #include"Sprite.h"
 #include"SpriteCom.h"
 #include"TextureManager.h"
+#include"Log.h"
 #include<cassert>
+#include <iostream>
 
 
 
 Sprite::Sprite()
 {
+}
+
+std::unique_ptr<Sprite> Sprite::Create(SpriteCom* spriteCom, const Sprite::Transform& transform, const std::string& texturePath)
+{
+    if (!spriteCom) return nullptr;
+
+    uint32_t texIndex = TextureManager::GetInstance()->Load(texturePath);
+    if (texIndex == TextureManager::kInvalidTextureIndex)
+    {
+        Logger::Log(std::string("Sprite::Create - failed to load texture: ") + texturePath);
+        return nullptr;
+    }
+
+    Vector2 pos{ transform.translate.x, transform.translate.y };
+    auto sp = Sprite::Create(spriteCom, texIndex, pos);
+    if (!sp) return nullptr;
+
+    Vector2 baseSize = sp->GetSize();
+    sp->SetSize({ baseSize.x * transform.scale.x, baseSize.y * transform.scale.y });
+    sp->SetRotation(transform.rotate.z);
+
+    return sp;
 }
 
 Sprite::~Sprite()
@@ -64,43 +88,54 @@ void Sprite::Initialize(SpriteCom* spriteCom, std::string textureFilePath)
 
 std::unique_ptr<Sprite> Sprite::Create(SpriteCom* spriteCom, uint32_t textureHandle, const Vector2& position)
 {
-	std::unique_ptr<Sprite> sprite = std::make_unique<Sprite>();
-	// 既存 Initialize とほぼ同じ初期化を行うが、テクスチャはインデックスから設定する
-	sprite->spriteCom = spriteCom;
-	assert(spriteCom);
-	sprite->dxCommon = spriteCom->GetDxCommon();
-	assert(sprite->dxCommon);
+    if (!spriteCom) return nullptr;
 
-	sprite->CreateVertexBufferView();
-	sprite->CreateIndexBufferView();
-	sprite->CreateVertexData();
-	sprite->ReflectionProcessing();
-	sprite->CreateIndexData();
+    auto sp = std::make_unique<Sprite>();
 
-	sprite->materialResourceSprite = sprite->dxCommon->CreateBufferResource(sprite->dxCommon->GetDevice().Get(), sizeof(Material));
-	
-	sprite->materialMap.reset(sprite->materialResourceSprite);
-	sprite->materialData = sprite->materialMap.get();
-	sprite->materialData->color = { 1.0f, 1.0f, 1.0f, 1.0f };
-	sprite->materialData->enableLighting = false;
-	sprite->materialData->specularModel = 0;
-	sprite->materialData->shininess = 16.0f;
-	sprite->materialData->uvTransform = MakeIdentity4x4();
+   
+    sp->spriteCom = spriteCom;
+    sp->dxCommon = spriteCom->GetDxCommon();
+    if (!sp->dxCommon)
+    {
+        Logger::Log(std::cout, std::string("Sprite::Create - invalid DirectXCom pointer\n"));
+        return nullptr;
+    }
 
-	sprite->transformationMatrixResourceSprite = sprite->dxCommon->CreateBufferResource(sprite->dxCommon->GetDevice().Get(), sizeof(TransformationMatrix));
-	
-	sprite->transformationMatrixMap.reset(sprite->transformationMatrixResourceSprite);
-	sprite->transformationMatrixDataSprite = sprite->transformationMatrixMap.get();
-	sprite->transformationMatrixDataSprite->WVP = MakeIdentity4x4();
-	sprite->transformationMatrixDataSprite->World = MakeIdentity4x4();
+	// GPUリソースとビューの作成
+    sp->CreateVertexBufferView();
+    sp->CreateIndexBufferView();
+    sp->CreateVertexData();
+    sp->ReflectionProcessing();
+    sp->CreateIndexData();
 
-	// テクスチャハンドルを直接設定
-	sprite->textureHandleGPU = TextureManager::GetInstance()->GetSrvHandleGPU(textureHandle);
-	sprite->textureIndex = textureHandle;
+    // マテリアルリソース
+    sp->materialResourceSprite = sp->dxCommon->CreateBufferResource(sp->dxCommon->GetDevice().Get(), sizeof(Material));
+    sp->materialMap.reset(sp->materialResourceSprite);
+    sp->materialData = sp->materialMap.get();
+    sp->materialData->color = { 1.0f,1.0f,1.0f,1.0f };
+    sp->materialData->enableLighting = false;
+    sp->materialData->specularModel = 0;
+    sp->materialData->shininess = 16.0f;
+    sp->materialData->uvTransform = MakeIdentity4x4();
 
-	sprite->SetPosition(position);
-	sprite->AdjustTextureSize();
-	return sprite;
+	// TransformationMatrixリソース
+    sp->transformationMatrixResourceSprite = sp->dxCommon->CreateBufferResource(sp->dxCommon->GetDevice().Get(), sizeof(TransformationMatrix));
+    sp->transformationMatrixMap.reset(sp->transformationMatrixResourceSprite);
+    sp->transformationMatrixDataSprite = sp->transformationMatrixMap.get();
+    sp->transformationMatrixDataSprite->WVP = MakeIdentity4x4();
+    sp->transformationMatrixDataSprite->World = MakeIdentity4x4();
+
+	// Textureのセット
+    sp->textureIndex = textureHandle;
+    sp->textureHandleGPU = TextureManager::GetInstance()->GetSrvHandleGPU(sp->textureIndex);
+
+	// positionのセット
+    sp->SetPosition(position);
+
+	// AnchorPointを中心にしている場合、テクスチャサイズに基づいてSpriteのサイズを調整
+    sp->AdjustTextureSize();
+
+    return sp;
 }
 
 void Sprite::Update(WindowAPI* windowAPI, DebugCamera* debugCamera_)

@@ -50,6 +50,12 @@ public:
 		uint32_t textureHandle,
 		const Vector2& position);
 
+	// オーバーロード: Transform とテクスチャパスで生成するヘルパー
+	static std::unique_ptr<Sprite> Create(SpriteCom* spriteCom,
+		const Sprite::Transform& transform,
+		const std::string& texturePath);
+
+
 public:
 
 
