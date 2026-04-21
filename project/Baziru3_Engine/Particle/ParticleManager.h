@@ -39,6 +39,7 @@ public:
 	~ParticleManager();
 
 	void Initialize(Camera* camera);
+	void Finalize();
 	void Update(float deltaTime);
 
 	Particle MakeNewParticles(std::mt19937& randomEngine,const Vector3& translate);
@@ -63,11 +64,8 @@ public:
 	void InitializeGraphicPipeline();
 
 	void SetupDraw(ID3D12GraphicsCommandList* commandList);
-
-	
 	void BindResources(ID3D12GraphicsCommandList* commandList, D3D12_GPU_VIRTUAL_ADDRESS materialCBV);
 
-	
 	const Microsoft::WRL::ComPtr<ID3D12PipelineState>& GetPipelineState() const { return pipelineState; }
 
 public:
@@ -168,4 +166,5 @@ private:
 	std::ostream& logStream;
 
 	uint32_t instancingSrvIndex_ = 0;
+    bool finalized_ = false;
 };

@@ -3,6 +3,7 @@
 #include "SpriteCom.h"
 #include "WindowsAPI.h"
 #include "Light.h"
+#include <iostream>
 
 void SpriteManager::Initialize(SpriteCom* spriteCom, const std::string& texturePath, size_t count)
 {
@@ -29,12 +30,21 @@ void SpriteManager::Update(WindowAPI* windowAPI, DebugCamera* debugCamera)
 
 void SpriteManager::Draw()
 {
-     if (!spriteCom_)
+    // If SpriteCom is not set we cannot render sprites here.
+    if (!spriteCom_)
     {
-        for (auto& s : sprites_) s->Draw();
+        Logger::Log(std::cout, "SpriteManager::Draw called but spriteCom_ is null. Skipping draw.\n");
         return;
     }
+
     RenderContext ctx{};
+    // Defensive: ensure dxCommon and command list are valid
+    if (!spriteCom_->GetDxCommon() || !spriteCom_->GetDxCommon()->GetCommandList())
+    {
+        Logger::Log(std::cout, "SpriteManager::Draw - dxCommon or commandList is null. Skipping draw.\n");
+        return;
+    }
+
     ctx.commandList = spriteCom_->GetDxCommon()->GetCommandList().Get();
     ctx.windowAPI = spriteCom_->GetDxCommon()->GetWindowAPI();
     DrawAll(ctx, nullptr, nullptr);
@@ -44,6 +54,7 @@ void SpriteManager::DrawAll(const RenderContext& ctx, DebugCamera* debugCamera, 
 {
     if (!ctx.commandList)
     {
+        Logger::Log(std::cout, "SpriteManager::DrawAll called with null commandList. Skipping.\n");
         return;
     }
     spriteCom_->SetupDraw(ctx.commandList);
@@ -72,4 +83,17 @@ void SpriteManager::DrawAll(const RenderContext& ctx, DebugCamera* debugCamera, 
 std::vector<std::unique_ptr<Sprite>>& SpriteManager::GetSprites()
 {
     return sprites_;
+}
+
+void SpriteManager::Finalize()
+{
+    for (auto& s : sprites_)
+    {
+        if (s)
+        {
+            s->Finalize();
+        }
+    }
+    sprites_.clear();
+    spriteCom_ = nullptr;
 }

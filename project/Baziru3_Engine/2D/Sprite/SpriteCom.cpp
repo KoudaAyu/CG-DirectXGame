@@ -5,6 +5,16 @@ SpriteCom::SpriteCom(std::ostream& logStream, DirectXCom* dxCommon)
 {
 }
 
+void SpriteCom::Finalize()
+{
+    pipelineState.Reset();
+    rootSignature.Reset();
+    signatureBlob.Reset();
+    errorBlob.Reset();
+    vertexShaderBlob.Reset();
+    pixelShaderBlob.Reset();
+}
+
 
 SpriteCom::~SpriteCom()
 {
@@ -143,45 +153,93 @@ void SpriteCom::InputLayer()
 
 void SpriteCom::InitializeBlend()
 {
-	//BlendStateの設定
-	//すべての色要素を書き込む
+	
 	blendDesc.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
-	blendDesc.RenderTarget[0].BlendEnable = TRUE;
-
-	//--ノーマルブレンド------------------------------
-	blendDesc.RenderTarget[0].SrcBlend = D3D12_BLEND_SRC_ALPHA;
-	blendDesc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
-	blendDesc.RenderTarget[0].DestBlend = D3D12_BLEND_INV_SRC_ALPHA;
-	//--------------------------------------------
-
-	//--加算ブレンド------------------------------
-	/*blendDesc.RenderTarget[0].SrcBlend = D3D12_BLEND_ONE;
-	blendDesc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
-	blendDesc.RenderTarget[0].DestBlend = D3D12_BLEND_ONE;*/
-	//--------------------------------------------
-
-	//--減算ブレンド------------------------------
-	/*blendDesc.RenderTarget[0].SrcBlend = D3D12_BLEND_ONE;
-	blendDesc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_REV_SUBTRACT;
-	blendDesc.RenderTarget[0].DestBlend = D3D12_BLEND_ONE;*/
-	//--------------------------------------------
-
-	//--乗算ブレンド------------------------------
-	/*blendDesc.RenderTarget[0].SrcBlend = D3D12_BLEND_DEST_COLOR;
-	blendDesc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
-	blendDesc.RenderTarget[0].DestBlend = D3D12_BLEND_ZERO;*/
-	//--------------------------------------------
-
-	//--スクリーン合成------------------------------
-	/*blendDesc.RenderTarget[0].SrcBlend = D3D12_BLEND_INV_DEST_COLOR;
-	blendDesc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
-	blendDesc.RenderTarget[0].DestBlend = D3D12_BLEND_ONE;*/
-	//--------------------------------------------
-
+    ApplyBlendMode(currentBlendMode);
 
 	blendDesc.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_ONE;
 	blendDesc.RenderTarget[0].BlendOpAlpha = D3D12_BLEND_OP_ADD;
 	blendDesc.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_ZERO;
+}
+
+void SpriteCom::ApplyBlendMode(BlendMode mode)
+{
+    // default write mask
+    blendDesc.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
+
+    switch (mode)
+    {
+    case kBlendMode_None:
+        blendDesc.RenderTarget[0].BlendEnable = FALSE;
+        blendDesc.RenderTarget[0].SrcBlend = D3D12_BLEND_ONE;
+        blendDesc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
+        blendDesc.RenderTarget[0].DestBlend = D3D12_BLEND_ZERO;
+        break;
+    case kBlendMode_Normal:
+        blendDesc.RenderTarget[0].BlendEnable = TRUE;
+        blendDesc.RenderTarget[0].SrcBlend = D3D12_BLEND_SRC_ALPHA;
+        blendDesc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
+        blendDesc.RenderTarget[0].DestBlend = D3D12_BLEND_INV_SRC_ALPHA;
+        break;
+    case kBlendMode_Add:
+        blendDesc.RenderTarget[0].BlendEnable = TRUE;
+        blendDesc.RenderTarget[0].SrcBlend = D3D12_BLEND_ONE;
+        blendDesc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
+        blendDesc.RenderTarget[0].DestBlend = D3D12_BLEND_ONE;
+        break;
+    case kBlendMode_Sub:
+        blendDesc.RenderTarget[0].BlendEnable = TRUE;
+        blendDesc.RenderTarget[0].SrcBlend = D3D12_BLEND_ONE;
+        blendDesc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_REV_SUBTRACT;
+        blendDesc.RenderTarget[0].DestBlend = D3D12_BLEND_ONE;
+        break;
+    case kBlendMode_Mul:
+        blendDesc.RenderTarget[0].BlendEnable = TRUE;
+        blendDesc.RenderTarget[0].SrcBlend = D3D12_BLEND_DEST_COLOR;
+        blendDesc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
+        blendDesc.RenderTarget[0].DestBlend = D3D12_BLEND_ZERO;
+        break;
+    case kBlendMode_Screen:
+        blendDesc.RenderTarget[0].BlendEnable = TRUE;
+        blendDesc.RenderTarget[0].SrcBlend = D3D12_BLEND_INV_DEST_COLOR;
+        blendDesc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
+        blendDesc.RenderTarget[0].DestBlend = D3D12_BLEND_ONE;
+        break;
+    default:
+        // fallback to normal
+        blendDesc.RenderTarget[0].BlendEnable = TRUE;
+        blendDesc.RenderTarget[0].SrcBlend = D3D12_BLEND_SRC_ALPHA;
+        blendDesc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
+        blendDesc.RenderTarget[0].DestBlend = D3D12_BLEND_INV_SRC_ALPHA;
+        break;
+    }
+
+    // keep alpha blending behavior consistent
+    blendDesc.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_ONE;
+    blendDesc.RenderTarget[0].BlendOpAlpha = D3D12_BLEND_OP_ADD;
+    blendDesc.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_ZERO;
+}
+
+void SpriteCom::SetBlendMode(BlendMode mode)
+{
+    if (mode == currentBlendMode) return;
+    currentBlendMode = mode;
+
+    ApplyBlendMode(currentBlendMode);
+
+    // Update graphic pipeline desc and recreate PSO if already created
+    graphicPipelineStateDesc.BlendState = blendDesc;
+    // ensure root signature is set
+    graphicPipelineStateDesc.pRootSignature = rootSignature.Get();
+
+    dxCommon->SetHr(dxCommon->GetDevice()->CreateGraphicsPipelineState(&graphicPipelineStateDesc,
+        IID_PPV_ARGS(&pipelineState)));
+    assert(SUCCEEDED(dxCommon->GetHr()));
+}
+
+BlendMode SpriteCom::GetBlendMode() const
+{
+    return currentBlendMode;
 }
 
 void SpriteCom::RasterizerState()

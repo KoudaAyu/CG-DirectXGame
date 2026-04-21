@@ -70,6 +70,53 @@ void ParticleManager::Initialize(Camera* camera)
 	instancingSrvHandleGPU = srvManager->GetGPUDescriptorHandle(instancingSrvIndex_);
 }
 
+void ParticleManager::Finalize()
+{
+    if (finalized_) return;
+    finalized_ = true;
+
+   
+    if (instancingResource && instanceData != nullptr)
+    {
+        D3D12_RANGE writtenRange = { 0, static_cast<SIZE_T>(sizeof(ParticleManager::ParticleForGPU) * kNumMaxInstances) };
+        instancingResource->Unmap(0, &writtenRange);
+        instanceData = nullptr;
+    }
+
+    
+    try
+    {
+        SRVManager* srvManager = TextureManager::GetInstance()->GetSRVManager();
+        if (srvManager)
+        {
+            if (instancingSrvIndex_ >= 3 && instancingSrvIndex_ < SRVManager::kMaxSRVCount)
+            {
+                srvManager->Free(instancingSrvIndex_);
+            }
+        }
+    }
+    catch (...) {}
+
+    instancingSrvHandleGPU = {};
+    instancingSrvIndex_ = 0;
+
+   
+    instancingResource.Reset();
+    pipelineState.Reset();
+    rootSignature.Reset();
+    signatureBlob.Reset();
+    errorBlob.Reset();
+    vertexShaderBlob.Reset();
+    pixelShaderBlob.Reset();
+
+   
+    particles.clear();
+    numInstance = 0;
+    writeIndex = 0;
+
+    Logger::Log(logStream, "ParticleManager finalized\n");
+}
+
 void ParticleManager::AddParticles(std::list<Particle>& newParticles)
 {
 	
