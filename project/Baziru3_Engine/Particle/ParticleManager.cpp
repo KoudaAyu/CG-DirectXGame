@@ -5,6 +5,7 @@
 #include "RootParam.h"
 
 #include "Camera.h"
+#include "Light.h"
 
 ParticleManager::ParticleManager(std::ostream& logStream, DirectXCom* dxCommon)
 	: logStream(logStream), dxCommon(dxCommon)
@@ -49,6 +50,7 @@ void ParticleManager::Initialize(Camera* camera)
 			instanceData[writeIndex].WVP = MakeIdentity4x4();
 			instanceData[writeIndex].World = MakeIdentity4x4();
 			instanceData[writeIndex].color = { 0,0,0,0 };
+			instanceData[writeIndex].textureIndex = TextureManager::kInvalidTextureIndex;
 		}
 	}
 
@@ -109,10 +111,32 @@ void ParticleManager::Finalize()
 
    
     particles.clear();
+	effectParticles.clear();
     numInstance = 0;
     writeIndex = 0;
+    instanceGroups.clear();
 
     Logger::Log(logStream, "ParticleManager finalized\n");
+}
+
+void ParticleManager::ClearParticles()
+{
+	particles.clear();
+	effectParticles.clear();
+	numInstance = 0;
+	writeIndex = 0;
+	instanceGroups.clear();
+
+	if (instanceData)
+	{
+		for (uint32_t i = 0; i < kNumMaxInstances; ++i)
+		{
+			instanceData[i].WVP = MakeIdentity4x4();
+			instanceData[i].World = MakeIdentity4x4();
+			instanceData[i].color = { 0,0,0,0 };
+			instanceData[i].textureIndex = TextureManager::kInvalidTextureIndex;
+		}
+	}
 }
 
 void ParticleManager::AddParticles(std::list<Particle>& newParticles)
@@ -121,6 +145,14 @@ void ParticleManager::AddParticles(std::list<Particle>& newParticles)
 	for (auto& p : newParticles)
 	{
 		particles.push_back(std::move(p));
+	}
+}
+
+void ParticleManager::AddEffectParticles(std::list<Particle>& newParticles)
+{
+	for (auto& p : newParticles)
+	{
+		effectParticles.push_back(std::move(p));
 	}
 }
 
@@ -137,42 +169,168 @@ void ParticleManager::Update(float deltaTime)
 
 	Matrix4x4 viewProjection = Multiply(camera_->GetViewMatrix(), camera_->GetProjectionMatrix());
 
-	auto it = particles.begin();
-	while (it != particles.end())
+	auto updateParticleList = [&](std::list<Particle>& targetParticles)
 	{
-		it->currentTime += deltaTime;
-
-		if (it->currentTime >= it->lifeTime)
+		auto it = targetParticles.begin();
+		while (it != targetParticles.end())
 		{
-			it = particles.erase(it);
-			continue;
+			it->currentTime += deltaTime;
+
+			if (it->currentTime >= it->lifeTime)
+			{
+				it = targetParticles.erase(it);
+				continue;
+			}
+
+			Vector3 rot = it->transform.GetRotate();
+			Matrix4x4 rotZ = MakeRotateZMatrix(rot.z);
+			Matrix4x4 finalRotation = Multiply(rotZ, billboardMatrix);
+			Matrix4x4 worldMatrix = MakeAffineMatrix(
+				it->transform.GetScale(), finalRotation, it->transform.GetTranslate());
+			Matrix4x4 wvpMatrix = Multiply(
+				worldMatrix, Multiply(camera_->GetViewMatrix(), camera_->GetProjectionMatrix()));
+
+			if (writeIndex < kNumMaxInstances)
+			{
+				instanceData[writeIndex].WVP = wvpMatrix;
+				instanceData[writeIndex].World = worldMatrix;
+				instanceData[writeIndex].color = it->color;
+				float alpha = 1.0f - (it->currentTime / it->lifeTime);
+				instanceData[writeIndex].color.w = alpha;
+				instanceData[writeIndex].textureIndex = it->textureIndex;
+				++writeIndex;
+			}
+
+			it->transform.SetTranslate(
+				it->transform.GetTranslate() + it->velocity * deltaTime);
+
+			++it;
 		}
+	};
 
-        // Apply per-particle rotation before billboard so each particle can be rotated independently
-        Vector3 rot = it->transform.GetRotate();
-        Matrix4x4 rotZ = MakeRotateZMatrix(rot.z);
-        Matrix4x4 finalRotation = Multiply(rotZ, billboardMatrix);
-        Matrix4x4 worldMatrix = MakeAffineMatrix(
-            it->transform.GetScale(), finalRotation, it->transform.GetTranslate());
-		Matrix4x4 wvpMatrix = Multiply(
-			worldMatrix, Multiply(camera_->GetViewMatrix(), camera_->GetProjectionMatrix()));
-
-		if (writeIndex < kNumMaxInstances)
-		{
-			instanceData[writeIndex].WVP = wvpMatrix;
-			instanceData[writeIndex].World = worldMatrix;
-			instanceData[writeIndex].color = it->color;
-			float alpha = 1.0f - (it->currentTime / it->lifeTime);
-			instanceData[writeIndex].color.w = alpha;
-			++writeIndex;
-		}
-
-		it->transform.SetTranslate(
-			it->transform.GetTranslate() + it->velocity * deltaTime);
-
-		++it;
-	}
+	updateParticleList(particles);
+	updateParticleList(effectParticles);
 	numInstance = writeIndex;
+
+    // テクスチャごとにインスタンスのグループを作る
+    instanceGroups.clear();
+    if (numInstance > 0)
+    {
+
+		// 単純なグルーピング: 書き込まれたインスタンスを順に見て、同じ textureIndex の連続範囲でまとめる
+		uint32_t curStart = 0;
+        uint32_t curTex = (instanceData[0].textureIndex == TextureManager::kInvalidTextureIndex) ? 0 : instanceData[0].textureIndex;
+        for (uint32_t i = 1; i < numInstance; ++i)
+        {
+            if (instanceData[i].textureIndex != curTex)
+            {
+                InstanceGroup g;
+                g.textureIndex = curTex;
+                g.start = curStart;
+                g.count = i - curStart;
+                // textureIndex が無効なら未初期化のデスクリプタをバインドしないようにデフォルト(0)を使う
+                if (curTex == TextureManager::kInvalidTextureIndex)
+                {
+                    g.srvHandle = {};
+                }
+                else
+                {
+                    g.srvHandle = TextureManager::GetInstance()->GetSrvHandleGPU(curTex);
+                }
+                instanceGroups.push_back(g);
+
+                curStart = i;
+                curTex = instanceData[i].textureIndex;
+            }
+        }
+        // 最後のグループを追加
+        InstanceGroup g;
+        g.textureIndex = curTex;
+        g.start = curStart;
+        g.count = numInstance - curStart;
+        if (curTex == TextureManager::kInvalidTextureIndex)
+        {
+            g.srvHandle = {};
+        }
+        else
+        {
+            g.srvHandle = TextureManager::GetInstance()->GetSrvHandleGPU(curTex);
+        }
+        instanceGroups.push_back(g);
+    }
+}
+
+void ParticleManager::Draw(ID3D12GraphicsCommandList* commandList, const RenderContext& ctx, UINT vertexCount)
+{
+	if (!commandList) return;
+
+	// PSOとルートシグネチャをセット
+	SetupDraw(commandList);
+
+	// マテリアルCBVとインスタンシング用SRVをセット
+	BindResources(commandList, ctx.materialGPUAddress);
+
+    // Light と Camera の CBV は呼び出し側でセット済みのはず（Game::Draw では camera を b2、light を b1 にしている）
+
+    // デスクリプタヒープをバインドする（SRVManager／DirectXCom の PreDraw で既にグローバルに設定されている）
+
+    // テクスチャごとに描画する
+    if (numInstance == 0) return;
+
+    // vertexCount が有効か確認する
+    UINT vc = vertexCount;
+    if (vc == 0)
+    {
+        // フォールバック: 呼び出し側が vertexCount を渡してないときは単一の四角 (6 頂点) を使う
+        vc = 6;
+    }
+
+    // デバッグ: インスタンスグループと最初のいくつかのインスタンスの textureIndex をログに出す
+	{
+		std::ostringstream oss;
+		oss << "ParticleManager::Draw - numInstance=" << numInstance << " groups=" << instanceGroups.size() << "\n";
+		for (size_t gi = 0; gi < instanceGroups.size(); ++gi)
+		{
+			const auto &gg = instanceGroups[gi];
+			oss << "  group[" << gi << "] start=" << gg.start << " count=" << gg.count << " tex=" << gg.textureIndex << " handle=0x" << std::hex << (unsigned long long)gg.srvHandle.ptr << std::dec << "\n";
+		}
+        // 最初の最大8個のインスタンスについて、textureIndex とワールド位置/スケールの概略を出力
+		oss << "  first textureIndex values:";
+		for (uint32_t i = 0; i < std::min<uint32_t>(numInstance, 8); ++i)
+		{
+			oss << " " << instanceData[i].textureIndex;
+		}
+		oss << "\n";
+		oss << "  instance World (tx,ty,tz) and diag-scale approx for first entries:";
+		for (uint32_t i = 0; i < std::min<uint32_t>(numInstance, 8); ++i)
+		{
+			auto &W = instanceData[i].World;
+			float tx = W.m[3][0];
+			float ty = W.m[3][1];
+			float tz = W.m[3][2];
+			float sx = W.m[0][0];
+			float sy = W.m[1][1];
+			float sz = W.m[2][2];
+			oss << " [" << tx << "," << ty << "," << tz << ",s=" << sx << "," << sy << "," << sz << "]";
+		}
+		oss << "\n";
+		OutputDebugStringA(oss.str().c_str());
+	}
+
+	for (const auto& g : instanceGroups)
+    {
+        if (g.count == 0) continue;
+        // このグループのテクスチャ SRV をテクスチャ用ルートパラメータにバインドする
+		// 有効な SRV がない場合は GPU 検証エラーを避けるためこのグループの描画をスキップする
+        if (g.srvHandle.ptr == 0)
+        {
+            continue;
+        }
+
+        commandList->SetGraphicsRoot32BitConstant(RootParam::Particle::kInstanceOffset, g.start, 0);
+        commandList->SetGraphicsRootDescriptorTable(RootParam::Particle::kTextureTable, g.srvHandle);
+        commandList->DrawInstanced(vc, g.count, 0, 0);
+    }
 }
 
 ParticleManager::Particle ParticleManager::MakeNewParticles(std::mt19937& randomEngine, const Vector3& translate)
@@ -300,6 +458,12 @@ void ParticleManager::CreateRootParameters()
 	rootParameters[RootParam::Particle::kCamera].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 	rootParameters[RootParam::Particle::kCamera].Descriptor.ShaderRegister = 2; // b2:
 
+	rootParameters[RootParam::Particle::kInstanceOffset].ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
+	rootParameters[RootParam::Particle::kInstanceOffset].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
+	rootParameters[RootParam::Particle::kInstanceOffset].Constants.ShaderRegister = 3; // b3
+	rootParameters[RootParam::Particle::kInstanceOffset].Constants.RegisterSpace = 0;
+	rootParameters[RootParam::Particle::kInstanceOffset].Constants.Num32BitValues = 1;
+
 
 	descriptionRootSignature.pParameters = rootParameters; //ルートパラメーター配列へのポインタ
 	descriptionRootSignature.NumParameters = _countof(rootParameters);//配列の長さ
@@ -358,7 +522,7 @@ void ParticleManager::RootSignatureFromBlob()
 
 void ParticleManager::InputLayer()
 {
-	//InputLayer
+    // 入力レイアウトの設定
 
 	inputElementDiscs[0].SemanticName = "POSITION"; //セマンティック名
 	inputElementDiscs[0].SemanticIndex = 0; //セマンティックインデックス

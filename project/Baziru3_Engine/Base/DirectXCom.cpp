@@ -535,12 +535,29 @@ void DirectXCom::PostDraw()
 
 	//コマンドリストの内容を下記率させる。すべてのコマンドを積んでからCloseする
 	hr = (commandList->Close());
-	//コマンドリストのCloseに失敗した場合はエラー
-	assert(SUCCEEDED(hr));
+	if (FAILED(hr))
+	{
+		Logger::Log(logStream, std::format("DirectXCom::PostDraw - commandList->Close failed hr=0x{:08X}\n", static_cast<unsigned int>(hr)));
+		// Do not attempt to execute a closed/invalid command list
+		return;
+	}
 
 	//GUPにコマンドリストの実行を行わせる
+	if (!commandList || !commandQueue)
+	{
+		Logger::Log(logStream, "DirectXCom::PostDraw - commandList or commandQueue is null. Skipping ExecuteCommandLists.\n");
+		return;
+	}
+
 	ID3D12CommandList* commandLists[] = { commandList.Get() };
 	commandQueue->ExecuteCommandLists(1, commandLists);
+
+	// Check for device removal after execute
+	HRESULT deviceRemoved = device->GetDeviceRemovedReason();
+	if (FAILED(deviceRemoved))
+	{
+		Logger::Log(logStream, std::format("DirectXCom::PostDraw - device removed or error after ExecuteCommandLists hr=0x{:08X}\n", static_cast<unsigned int>(deviceRemoved)));
+	}
 	//GUPとOSに画面の交換を要求する
 	swapChain->Present(1, 0);
 

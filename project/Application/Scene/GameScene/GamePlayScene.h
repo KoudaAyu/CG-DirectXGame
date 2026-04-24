@@ -52,8 +52,13 @@ private:
     std::vector<std::unique_ptr<Sprite>> sprites;
     std::unique_ptr<SpriteManager> spriteManager_;
     std::list<ParticleManager::Particle> particles;
+    std::list<ParticleManager::Particle> hitEffectParticles;
 
     bool sphereInitialized = false;
+
+	// テクスチャインデックスは TextureManager で管理されるため、ここではインデックスを保持するだけにする
+    uint32_t particleTextureA = TextureManager::kInvalidTextureIndex;
+    uint32_t particleTextureB = TextureManager::kInvalidTextureIndex;
 
 private:
     Sprite::Transform uvTransformSprite;

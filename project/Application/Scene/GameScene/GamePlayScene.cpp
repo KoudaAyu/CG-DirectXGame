@@ -80,6 +80,10 @@ void GamePlayScene::Initialize(DirectXCom* dxCommon,Camera* camera)
 	emitter.count = 3; // 初期値
 	emitter.frequency = 0.5f;
 	emitter.frequencyTime = 0.0f;
+
+    // デバッグ用に2つのパーティクル用のテクスチャを読み込む
+    particleTextureA = TextureManager::GetInstance()->Load("Resources/uvChecker.png");
+    particleTextureB = TextureManager::GetInstance()->Load("Resources/CG4/circle2.png");
 }
 
 void GamePlayScene::Finalize()
@@ -104,6 +108,10 @@ void GamePlayScene::Update()
 	if (emitter.frequencyTime >= emitter.frequency)
 	{
 		auto newParticles = particleEmitter.Emit(emitter, particleManager->GetRandomEngine(), *particleManager);
+		for (auto& p : newParticles)
+		{
+			p.textureIndex = particleTextureA;
+		}
 		particleManager->AddParticles(newParticles);
 		emitter.frequencyTime -= emitter.frequency;
 	}
@@ -143,14 +151,14 @@ void GamePlayScene::Update()
                 std::list<ParticleManager::Particle> newParticles;
                 for (uint32_t i = 0; i < emitter.count; ++i)
                 {
-                    newParticles.push_back(
-                        particleManager->MakeHieEffect(
-                            particleManager->GetRandomEngine(),
-                            emitter.transform.GetTranslate()
-                        )
-                    );
+					Vector3 effectTranslate = emitter.transform.GetTranslate();
+					effectTranslate.y += 1.5f;
+					auto p = particleManager->MakeHieEffect(particleManager->GetRandomEngine(), effectTranslate);
+					p.textureIndex = particleTextureB;
+					p.lifeTime = 0.35f;
+                        newParticles.push_back(p);
                 }
-                particleManager->AddParticles(newParticles);
+                particleManager->AddEffectParticles(newParticles);
             }
         }
         prevF2 = curF2;

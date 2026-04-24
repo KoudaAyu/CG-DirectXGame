@@ -428,6 +428,11 @@ void Game::InitializeSceneResources()
 	particleManager->Initialize(camera_.get());
 	SceneManager::GetInstance()->SetParticleManager(particleManager.get());
 
+	// Load example particle textures so they are available early
+	TextureManager::GetInstance()->Load("Resources/uvChecker.png");
+	// Load circle texture used by GamePlayScene for alternate particle appearance
+	TextureManager::GetInstance()->Load("Resources/CG4/circle2.png");
+
 }
 
 void Game::InitializeAudioAndInput()
@@ -496,33 +501,25 @@ void Game::DrawSprites(const RenderContext& ctx)
 void Game::DrawParticles(const RenderContext& ctx)
 {
 
-	particleManager->SetupDraw(ctx.commandList);
+    // Bind model vertex buffers
+    model_->Bind(ctx.commandList);
 
+    // Ensure light and camera CBVs are set for particle shaders (caller responsibility)
+    if (ctx.light)
+    {
+        ctx.commandList->SetGraphicsRootConstantBufferView(RootParam::Particle::kLight, ctx.light->GetDirectionalLightResource()->GetGPUVirtualAddress());
+    }
+    else
+    {
+        ctx.commandList->SetGraphicsRootConstantBufferView(RootParam::Particle::kLight, 0);
+    }
+    ctx.commandList->SetGraphicsRootConstantBufferView(RootParam::Particle::kCamera,
+        ctx.camera && ctx.camera->GetCameraResource() ? ctx.camera->GetCameraResource()->GetGPUVirtualAddress() : 0);
 
-	model_->Bind(ctx.commandList);
-
-	particleManager->BindResources(ctx.commandList, ctx.materialGPUAddress);
-
-
-	if (ctx.textureHandle.ptr != 0)
-	{
-		ctx.commandList->SetGraphicsRootDescriptorTable(RootParam::Particle::kTextureTable, ctx.textureHandle);
-	}
-
-
-	if (ctx.light)
-	{
-		ctx.commandList->SetGraphicsRootConstantBufferView(RootParam::Particle::kLight, ctx.light->GetDirectionalLightResource()->GetGPUVirtualAddress());
-	}
-	else
-	{
-		ctx.commandList->SetGraphicsRootConstantBufferView(RootParam::Particle::kLight, 0);
-	}
-	ctx.commandList->SetGraphicsRootConstantBufferView(RootParam::Particle::kCamera,
-		ctx.camera && ctx.camera->GetCameraResource() ? ctx.camera->GetCameraResource()->GetGPUVirtualAddress() : 0);
-
-	if (particleManager->GetNumInstance() > 0)
-	{
-        ctx.commandList->DrawInstanced(UINT(modelData.vertices.size()), particleManager->GetNumInstance(), 0, 0);
-	}
+    // Let ParticleManager perform grouped draws so each particle can use its assigned texture
+    if (particleManager && particleManager->GetNumInstance() > 0)
+    {
+        // Pass vertex count so ParticleManager can DrawInstanced correctly
+        particleManager->Draw(ctx.commandList, ctx, UINT(modelData.vertices.size()));
+    }
 }
