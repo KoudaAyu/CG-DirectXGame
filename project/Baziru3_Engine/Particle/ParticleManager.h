@@ -151,6 +151,8 @@ private:
 	const uint32_t kNumMaxInstances = 256;
 	uint32_t numInstance = 0;
 	uint32_t writeIndex = 0;
+	uint32_t normalInstanceCount_ = 0;
+	uint32_t effectInstanceCount_ = 0;
 
 private:
 	DirectXCom* dxCommon = nullptr;
@@ -177,6 +179,23 @@ private:
 	D3D12_GPU_DESCRIPTOR_HANDLE instancingSrvHandleGPU;
 	Microsoft::WRL::ComPtr<ID3D12Resource> instancingResource;
 
+	// Vertex buffer for ring mesh used to render particles (non-indexed triangle list)
+    struct Vertex
+	{
+		// Match input layout: POSITION (float4), TEXCOORD (float2), NORMAL (float3)
+		Vector4 pos; // x,y,z,w
+		Vector2 uv;
+		Vector3 normal;
+	};
+
+	Microsoft::WRL::ComPtr<ID3D12Resource> vertexBuffer;
+	D3D12_VERTEX_BUFFER_VIEW vertexBufferView{};
+	uint32_t vertexCount = 0;
+
+	// Ring mesh helpers
+	std::vector<Vertex> CreateRingMesh(uint32_t kRingDivide, float kOuterRadius, float kInnerRadius);
+	void CreateVertexBufferFromVerts(const std::vector<Vertex>& verts);
+
 	std::mt19937 randomEngine{ std::random_device{}() };
 	std::list<ParticleManager::Particle> particles;
 	std::list<ParticleManager::Particle> effectParticles;
@@ -184,9 +203,17 @@ private:
 	ParticleManager::ParticleForGPU* instanceData = nullptr;
 
     std::vector<InstanceGroup> instanceGroups;
+	std::vector<InstanceGroup> normalInstanceGroups_;
+	std::vector<InstanceGroup> effectInstanceGroups_;
 
 	std::ostream& logStream;
 
 	uint32_t instancingSrvIndex_ = 0;
     bool finalized_ = false;
+    enum class DrawMode
+	{
+		None,
+		Ring,
+		External
+	};
 };

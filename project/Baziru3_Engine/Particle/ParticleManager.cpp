@@ -28,6 +28,16 @@ void ParticleManager::Initialize(Camera* camera)
 
     particles.clear();
 
+	// Create a ring mesh and vertex buffer used for particle drawing
+	{
+		const uint32_t kRingDivide = 64;
+		const float kOuterRadius = 1.0f;
+		const float kInnerRadius = 0.2f;
+		auto verts = CreateRingMesh(kRingDivide, kOuterRadius, kInnerRadius);
+		CreateVertexBufferFromVerts(verts);
+		vertexCount = static_cast<uint32_t>(verts.size());
+	}
+
 	instancingResource =
 		dxCommon->CreateBufferResource(dxCommon->GetDevice(), sizeof(ParticleManager::ParticleForGPU) * kNumMaxInstances);
 
@@ -108,13 +118,20 @@ void ParticleManager::Finalize()
     errorBlob.Reset();
     vertexShaderBlob.Reset();
     pixelShaderBlob.Reset();
+	vertexBuffer.Reset();
+	vertexBufferView = {};
 
    
     particles.clear();
 	effectParticles.clear();
     numInstance = 0;
     writeIndex = 0;
+    normalInstanceCount_ = 0;
+	effectInstanceCount_ = 0;
     instanceGroups.clear();
+    normalInstanceGroups_.clear();
+	effectInstanceGroups_.clear();
+	vertexCount = 0;
 
     Logger::Log(logStream, "ParticleManager finalized\n");
 }
@@ -125,7 +142,11 @@ void ParticleManager::ClearParticles()
 	effectParticles.clear();
 	numInstance = 0;
 	writeIndex = 0;
+ normalInstanceCount_ = 0;
+	effectInstanceCount_ = 0;
 	instanceGroups.clear();
+	normalInstanceGroups_.clear();
+	effectInstanceGroups_.clear();
 
 	if (instanceData)
 	{
@@ -160,6 +181,8 @@ void ParticleManager::Update(float deltaTime)
 {
 	numInstance = 0;
 	writeIndex = 0;
+	normalInstanceCount_ = 0;
+	effectInstanceCount_ = 0;
 
 	Matrix4x4 backToFrontMatrix = MakeRotateYMatrix(0.0f);
 	Matrix4x4 billboardMatrix = Multiply(backToFrontMatrix, camera_->GetWorldMatrix());
@@ -208,61 +231,78 @@ void ParticleManager::Update(float deltaTime)
 		}
 	};
 
+  const uint32_t normalStart = writeIndex;
 	updateParticleList(particles);
+    normalInstanceCount_ = writeIndex - normalStart;
+
+	const uint32_t effectStart = writeIndex;
 	updateParticleList(effectParticles);
+   effectInstanceCount_ = writeIndex - effectStart;
 	numInstance = writeIndex;
 
-    // テクスチャごとにインスタンスのグループを作る
-    instanceGroups.clear();
-    if (numInstance > 0)
-    {
+   auto buildInstanceGroups = [&](uint32_t start, uint32_t count, std::vector<InstanceGroup>& outGroups)
+	{
+		outGroups.clear();
+		if (count == 0)
+		{
+			return;
+		}
 
-		// 単純なグルーピング: 書き込まれたインスタンスを順に見て、同じ textureIndex の連続範囲でまとめる
-		uint32_t curStart = 0;
-        uint32_t curTex = (instanceData[0].textureIndex == TextureManager::kInvalidTextureIndex) ? 0 : instanceData[0].textureIndex;
-        for (uint32_t i = 1; i < numInstance; ++i)
-        {
-            if (instanceData[i].textureIndex != curTex)
-            {
-                InstanceGroup g;
-                g.textureIndex = curTex;
-                g.start = curStart;
-                g.count = i - curStart;
-                // textureIndex が無効なら未初期化のデスクリプタをバインドしないようにデフォルト(0)を使う
-                if (curTex == TextureManager::kInvalidTextureIndex)
-                {
-                    g.srvHandle = {};
-                }
-                else
-                {
-                    g.srvHandle = TextureManager::GetInstance()->GetSrvHandleGPU(curTex);
-                }
-                instanceGroups.push_back(g);
+		uint32_t curStart = start;
+		uint32_t curTex = instanceData[start].textureIndex;
+		for (uint32_t i = start + 1; i < start + count; ++i)
+		{
+			if (instanceData[i].textureIndex != curTex)
+			{
+				InstanceGroup g;
+				g.textureIndex = curTex;
+				g.start = curStart;
+				g.count = i - curStart;
+				if (curTex == TextureManager::kInvalidTextureIndex)
+				{
+					g.srvHandle = {};
+				}
+				else
+				{
+					g.srvHandle = TextureManager::GetInstance()->GetSrvHandleGPU(curTex);
+				}
+				outGroups.push_back(g);
 
-                curStart = i;
-                curTex = instanceData[i].textureIndex;
-            }
-        }
-        // 最後のグループを追加
-        InstanceGroup g;
-        g.textureIndex = curTex;
-        g.start = curStart;
-        g.count = numInstance - curStart;
-        if (curTex == TextureManager::kInvalidTextureIndex)
-        {
-            g.srvHandle = {};
-        }
-        else
-        {
-            g.srvHandle = TextureManager::GetInstance()->GetSrvHandleGPU(curTex);
-        }
-        instanceGroups.push_back(g);
-    }
+				curStart = i;
+				curTex = instanceData[i].textureIndex;
+			}
+		}
+
+		InstanceGroup g;
+		g.textureIndex = curTex;
+		g.start = curStart;
+		g.count = start + count - curStart;
+		if (curTex == TextureManager::kInvalidTextureIndex)
+		{
+			g.srvHandle = {};
+		}
+		else
+		{
+			g.srvHandle = TextureManager::GetInstance()->GetSrvHandleGPU(curTex);
+		}
+		outGroups.push_back(g);
+	};
+
+	buildInstanceGroups(normalStart, normalInstanceCount_, normalInstanceGroups_);
+	buildInstanceGroups(effectStart, effectInstanceCount_, effectInstanceGroups_);
+	instanceGroups.clear();
+	instanceGroups.insert(instanceGroups.end(), normalInstanceGroups_.begin(), normalInstanceGroups_.end());
+	instanceGroups.insert(instanceGroups.end(), effectInstanceGroups_.begin(), effectInstanceGroups_.end());
 }
 
 void ParticleManager::Draw(ID3D12GraphicsCommandList* commandList, const RenderContext& ctx, UINT vertexCount)
 {
 	if (!commandList) return;
+
+   // Determine requested draw mode for this call.
+	DrawMode requestedMode = (vertexCount == 0) ? DrawMode::Ring : DrawMode::External;
+	const std::vector<InstanceGroup>* drawGroups = (requestedMode == DrawMode::Ring) ? &effectInstanceGroups_ : &normalInstanceGroups_;
+	const uint32_t drawInstanceCount = (requestedMode == DrawMode::Ring) ? effectInstanceCount_ : normalInstanceCount_;
 
 	// PSOとルートシグネチャをセット
 	SetupDraw(commandList);
@@ -270,41 +310,55 @@ void ParticleManager::Draw(ID3D12GraphicsCommandList* commandList, const RenderC
 	// マテリアルCBVとインスタンシング用SRVをセット
 	BindResources(commandList, ctx.materialGPUAddress);
 
+    // バーテックスバッファをバインド
+	// 呼び出し側が vertexCount を渡している場合はそちらが既に頂点バッファをバインドしているはずなので
+	// 内部のリング頂点バッファはバインドしない。
+	if (vertexCount == 0)
+	{
+		if (vertexBuffer && vertexBufferView.SizeInBytes > 0)
+		{
+			commandList->IASetVertexBuffers(0, 1, &vertexBufferView);
+		}
+	}
+
     // Light と Camera の CBV は呼び出し側でセット済みのはず（Game::Draw では camera を b2、light を b1 にしている）
 
     // デスクリプタヒープをバインドする（SRVManager／DirectXCom の PreDraw で既にグローバルに設定されている）
 
     // テクスチャごとに描画する
-    if (numInstance == 0) return;
+    if (drawInstanceCount == 0) return;
 
     // vertexCount が有効か確認する
     UINT vc = vertexCount;
     if (vc == 0)
     {
         // フォールバック: 呼び出し側が vertexCount を渡してないときは単一の四角 (6 頂点) を使う
-        vc = 6;
+        vc = (this->vertexCount > 0) ? this->vertexCount : 6u;
     }
 
     // デバッグ: インスタンスグループと最初のいくつかのインスタンスの textureIndex をログに出す
 	{
 		std::ostringstream oss;
-		oss << "ParticleManager::Draw - numInstance=" << numInstance << " groups=" << instanceGroups.size() << "\n";
-		for (size_t gi = 0; gi < instanceGroups.size(); ++gi)
+        oss << "ParticleManager::Draw - mode=" << ((requestedMode == DrawMode::Ring) ? "Ring" : "External")
+			<< " numInstance=" << drawInstanceCount << " groups=" << drawGroups->size() << "\n";
+		for (size_t gi = 0; gi < drawGroups->size(); ++gi)
 		{
-			const auto &gg = instanceGroups[gi];
+            const auto &gg = (*drawGroups)[gi];
 			oss << "  group[" << gi << "] start=" << gg.start << " count=" << gg.count << " tex=" << gg.textureIndex << " handle=0x" << std::hex << (unsigned long long)gg.srvHandle.ptr << std::dec << "\n";
 		}
         // 最初の最大8個のインスタンスについて、textureIndex とワールド位置/スケールの概略を出力
 		oss << "  first textureIndex values:";
-		for (uint32_t i = 0; i < std::min<uint32_t>(numInstance, 8); ++i)
+       for (uint32_t i = 0; i < std::min<uint32_t>(drawInstanceCount, 8); ++i)
 		{
-			oss << " " << instanceData[i].textureIndex;
+         const uint32_t instanceIndex = (*drawGroups)[0].start + i;
+			oss << " " << instanceData[instanceIndex].textureIndex;
 		}
 		oss << "\n";
 		oss << "  instance World (tx,ty,tz) and diag-scale approx for first entries:";
-		for (uint32_t i = 0; i < std::min<uint32_t>(numInstance, 8); ++i)
+       for (uint32_t i = 0; i < std::min<uint32_t>(drawInstanceCount, 8); ++i)
 		{
-			auto &W = instanceData[i].World;
+            const uint32_t instanceIndex = (*drawGroups)[0].start + i;
+			auto &W = instanceData[instanceIndex].World;
 			float tx = W.m[3][0];
 			float ty = W.m[3][1];
 			float tz = W.m[3][2];
@@ -317,7 +371,16 @@ void ParticleManager::Draw(ID3D12GraphicsCommandList* commandList, const RenderC
 		OutputDebugStringA(oss.str().c_str());
 	}
 
-	for (const auto& g : instanceGroups)
+ // Ring は通常 Particle と描画対象を分離したため、位置オフセットは行わない。
+	bool appliedOffset = false;
+	std::vector<Matrix4x4> originalWorld;
+	std::vector<Matrix4x4> originalWVP;
+	if (requestedMode == DrawMode::Ring)
+	{
+       appliedOffset = false;
+	}
+
+    for (const auto& g : *drawGroups)
     {
         if (g.count == 0) continue;
         // このグループのテクスチャ SRV をテクスチャ用ルートパラメータにバインドする
@@ -331,6 +394,18 @@ void ParticleManager::Draw(ID3D12GraphicsCommandList* commandList, const RenderC
         commandList->SetGraphicsRootDescriptorTable(RootParam::Particle::kTextureTable, g.srvHandle);
         commandList->DrawInstanced(vc, g.count, 0, 0);
     }
+
+	// restore instanceData if we modified it for ring offset
+	if (appliedOffset)
+	{
+      const uint32_t startIndex = drawGroups->empty() ? 0 : (*drawGroups)[0].start;
+		for (uint32_t i = 0; i < drawInstanceCount; ++i)
+		{
+            const uint32_t instanceIndex = startIndex + i;
+			instanceData[instanceIndex].World = originalWorld[i];
+			instanceData[instanceIndex].WVP = originalWVP[i];
+		}
+	}
 }
 
 ParticleManager::Particle ParticleManager::MakeNewParticles(std::mt19937& randomEngine, const Vector3& translate)
@@ -348,6 +423,60 @@ ParticleManager::Particle ParticleManager::MakeNewParticles(std::mt19937& random
 	particle.lifeTime = distTime(randomEngine);
 	particle.currentTime = 0.0f;
 	return particle;
+}
+
+
+std::vector<ParticleManager::Vertex> ParticleManager::CreateRingMesh(uint32_t kRingDivide, float kOuterRadius, float kInnerRadius)
+{
+	std::vector<Vertex> verts;
+	verts.reserve(kRingDivide * 6);
+	const float twoPi = std::numbers::pi_v<float> * 2.0f;
+	for (uint32_t i = 0; i < kRingDivide; ++i)
+	{
+		float a = float(i) * twoPi / float(kRingDivide);
+		float b = float(i + 1) * twoPi / float(kRingDivide);
+		float sinA = std::sin(a), cosA = std::cos(a);
+		float sinB = std::sin(b), cosB = std::cos(b);
+		float u = float(i) / float(kRingDivide);
+		float uNext = float(i + 1) / float(kRingDivide);
+
+        Vector3 vOuterA3 = { -sinA * kOuterRadius, cosA * kOuterRadius, 0.0f };
+		Vector3 vOuterB3 = { -sinB * kOuterRadius, cosB * kOuterRadius, 0.0f };
+		Vector3 vInnerA3 = { -sinA * kInnerRadius, cosA * kInnerRadius, 0.0f };
+		Vector3 vInnerB3 = { -sinB * kInnerRadius, cosB * kInnerRadius, 0.0f };
+		Vector3 n = { 0.0f, 0.0f, 1.0f };
+
+		Vector4 vOuterA = { vOuterA3.x, vOuterA3.y, vOuterA3.z, 1.0f };
+		Vector4 vOuterB = { vOuterB3.x, vOuterB3.y, vOuterB3.z, 1.0f };
+		Vector4 vInnerA = { vInnerA3.x, vInnerA3.y, vInnerA3.z, 1.0f };
+		Vector4 vInnerB = { vInnerB3.x, vInnerB3.y, vInnerB3.z, 1.0f };
+
+		// tri 1: outerA, outerB, innerA
+		verts.push_back({ vOuterA, { u, 1.0f }, n });
+		verts.push_back({ vOuterB, { uNext, 1.0f }, n });
+		verts.push_back({ vInnerA, { u, 0.0f }, n });
+
+		// tri 2: outerB, innerB, innerA
+		verts.push_back({ vOuterB, { uNext, 1.0f }, n });
+		verts.push_back({ vInnerB, { uNext, 0.0f }, n });
+		verts.push_back({ vInnerA, { u, 0.0f }, n });
+	}
+	return verts;
+}
+
+void ParticleManager::CreateVertexBufferFromVerts(const std::vector<Vertex>& verts)
+{
+	if (verts.empty()) return;
+	size_t sizeInBytes = verts.size() * sizeof(Vertex);
+	vertexBuffer = dxCommon->CreateBufferResource(dxCommon->GetDevice(), sizeInBytes);
+	void* mapped = nullptr;
+	vertexBuffer->Map(0, nullptr, &mapped);
+	memcpy(mapped, verts.data(), sizeInBytes);
+	vertexBuffer->Unmap(0, nullptr);
+
+	vertexBufferView.BufferLocation = vertexBuffer->GetGPUVirtualAddress();
+	vertexBufferView.SizeInBytes = static_cast<UINT>(sizeInBytes);
+	vertexBufferView.StrideInBytes = static_cast<UINT>(sizeof(Vertex));
 }
 
 ParticleManager::Particle ParticleManager::MakeHieEffect(std::mt19937& randomEngine, const Vector3& translate)
@@ -654,6 +783,8 @@ void ParticleManager::SetupDraw(ID3D12GraphicsCommandList* commandList)
 	
 	commandList->SetGraphicsRootSignature(rootSignature.Get());
 	commandList->SetPipelineState(pipelineState.Get()); // パイプラインステートを設定
+	// Set primitive topology expected by the input layout / PSO
+	commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
 }
 

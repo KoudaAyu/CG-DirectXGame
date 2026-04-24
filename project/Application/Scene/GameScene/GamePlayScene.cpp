@@ -5,6 +5,7 @@
 #include "MaterialManager.h"
 #include "Light.h"
 #include "ParticleManager.h"
+#include "RootParam.h"
 #include "RenderContext.h"
 #include "SpriteManager.h"
 #include "AudioManager.h"
@@ -116,8 +117,6 @@ void GamePlayScene::Update()
 		emitter.frequencyTime -= emitter.frequency;
 	}
 
-	particleManager->Update(kDeltaTime);
-
     // スプライトの毎フレーム更新はここで行う（必要な依存を持っている場合）
     if (spriteManager_ && directXCom)
     {
@@ -140,7 +139,7 @@ void GamePlayScene::Update()
         prevF1 = curF1;
     }
 
-    // 9キーで Hie エフェクトを発生させる
+    // 9キーで Ring を発生させる
     {
         static bool prevF2 = false;
         bool curF2 = (GetAsyncKeyState('9') & 0x8000) != 0;
@@ -156,24 +155,53 @@ void GamePlayScene::Update()
 					auto p = particleManager->MakeHieEffect(particleManager->GetRandomEngine(), effectTranslate);
 					p.textureIndex = particleTextureB;
 					p.lifeTime = 0.35f;
-                        newParticles.push_back(p);
+                  newParticles.push_back(p);
                 }
                 particleManager->AddEffectParticles(newParticles);
             }
         }
         prevF2 = curF2;
     }
+
+	// 8キーで HitEffect(Ringではないもの) を発生させる
+	{
+		static bool prevF3 = false;
+		bool curF3 = (GetAsyncKeyState('8') & 0x8000) != 0;
+		if (curF3 && !prevF3)
+		{
+			if (particleManager)
+			{
+				std::list<ParticleManager::Particle> newParticles;
+				for (uint32_t i = 0; i < emitter.count; ++i)
+				{
+					Vector3 effectTranslate = emitter.transform.GetTranslate();
+					effectTranslate.y += 1.5f;
+					auto p = particleManager->MakeHieEffect(particleManager->GetRandomEngine(), effectTranslate);
+					p.textureIndex = particleTextureB;
+					p.lifeTime = 0.35f;
+					newParticles.push_back(p);
+				}
+				particleManager->AddParticles(newParticles);
+			}
+		}
+		prevF3 = curF3;
+	}
+
+	particleManager->Update(kDeltaTime);
 }
 
 void GamePlayScene::Draw()
 {
-	RenderContext ctx{};
+    RenderContext ctx{};
 	if (directXCom)
 	{
 		ctx.commandList = directXCom->GetCommandList().Get();
 		ctx.windowAPI = directXCom->GetWindowAPI();
 		ctx.camera = camera_;
 		ctx.light = SceneManager::GetInstance()->GetLight(); // or use member 'light' if set
+		// provide material GPU address if available
+		ctx.materialGPUAddress = (materialManager && materialManager->GetMaterialResource()) ?
+			materialManager->GetMaterialResource()->GetGPUVirtualAddress() : 0;
 	}
 
 	if (spriteManager_)
@@ -200,5 +228,24 @@ void GamePlayScene::Draw()
 			D3D12_GPU_DESCRIPTOR_HANDLE handle{}; 
 			sphere_->Draw(handle);
 		}
+	}
+
+	// Draw particles for this scene (if any)
+	if (particleManager && directXCom && ctx.commandList)
+	{
+		// Ensure light and camera CBV are set for particle shaders (same slots as Game::DrawParticles)
+		if (ctx.light)
+		{
+			ctx.commandList->SetGraphicsRootConstantBufferView(RootParam::Particle::kLight, ctx.light->GetDirectionalLightResource()->GetGPUVirtualAddress());
+		}
+		else
+		{
+			ctx.commandList->SetGraphicsRootConstantBufferView(RootParam::Particle::kLight, 0);
+		}
+		ctx.commandList->SetGraphicsRootConstantBufferView(RootParam::Particle::kCamera,
+			ctx.camera && ctx.camera->GetCameraResource() ? ctx.camera->GetCameraResource()->GetGPUVirtualAddress() : 0);
+
+		// Let ParticleManager draw; pass 0 to allow it to use its internal vertexCount as fallback
+		particleManager->Draw(ctx.commandList, ctx, 0);
 	}
 }
