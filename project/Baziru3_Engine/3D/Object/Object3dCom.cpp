@@ -69,7 +69,17 @@ void Object3dCom::PreDraw()
 void Object3dCom::Draw(Object3d* object, const ::RenderContext& ctx, const Object3d::ModelData& modelData, bool drawObject)
 {
     if (!ctx.commandList) return;
-
+	// Ensure the correct root signature and PSO are bound before setting root parameters.
+	// PreDraw() should normally set these, but re-bind here to avoid mismatches
+	// if other components changed the root signature (e.g., skybox/sprite pipelines).
+	if (rootSignature)
+	{
+		ctx.commandList->SetGraphicsRootSignature(rootSignature.Get());
+	}
+	if (pipelineState)
+	{
+		ctx.commandList->SetPipelineState(pipelineState.Get());
+	}
    
     if (ctx.textureHandle.ptr != 0)
     {
@@ -246,8 +256,8 @@ void Object3dCom::InitializeBlend()
 void Object3dCom::RasterizerState()
 {
 	//RasterizerStateの設定
-	//裏面(時計回り)を表示しない
-	rasterizerDesc.CullMode = D3D12_CULL_MODE_BACK;
+    // モデルの頂点順が想定と逆でも見えるように一旦カリングしない
+	rasterizerDesc.CullMode = D3D12_CULL_MODE_NONE;
 	//三角形の中を塗りつぶす
 	rasterizerDesc.FillMode = D3D12_FILL_MODE_SOLID;
 }

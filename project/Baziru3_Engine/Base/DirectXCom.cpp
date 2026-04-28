@@ -3,6 +3,7 @@
 #include<cassert>
 #include <format>
 #include <thread>
+#include <vector>
 
 #include"d3dx12.h"
 #pragma comment(lib,"d3d12.lib")
@@ -631,21 +632,39 @@ Microsoft::WRL::ComPtr<IDxcBlob> DirectXCom::CompileShader(const std::wstring& f
 	shaderSourceBuffer.Size = shaderScore->GetBufferSize();
 	shaderSourceBuffer.Encoding = DXC_CP_UTF8;//UTF8の文字コードである事を通知する
 
-	LPCWSTR arguments[] = {
-		filePath.c_str(), //コンパイルするファイルのパス
-		L"-E", L"main", //エントリーポイントの指定。基本的にmain以外にはしない
-		L"-T", profile, //ShaderProfileの設定
-		L"-Zi",L"Qembed_debug",
-		L"-Od", //最適化を行わない
-		L"-Zpr", //メモリレイアウトは行優先
-	};
+    // Build compiler arguments. Include the shader's directory in include path so
+	// #include "..." resolves relative includes like "Object3d.hlsli".
+	std::wstring shaderDir;
+	size_t pos = filePath.find_last_of(L"/\\");
+	if (pos != std::wstring::npos)
+	{
+		shaderDir = filePath.substr(0, pos);
+	}
+
+	// Keep strings alive for the duration of the call
+	std::vector<std::wstring> argStrings;
+	argStrings.push_back(filePath);
+	argStrings.push_back(L"-E"); argStrings.push_back(L"main");
+	argStrings.push_back(L"-T"); argStrings.push_back(profile);
+	argStrings.push_back(L"-Zi"); argStrings.push_back(L"Qembed_debug");
+	argStrings.push_back(L"-Od");
+	argStrings.push_back(L"-Zpr");
+	if (!shaderDir.empty())
+	{
+		argStrings.push_back(L"-I");
+		argStrings.push_back(shaderDir);
+	}
+
+	std::vector<LPCWSTR> arguments;
+	arguments.reserve(argStrings.size());
+	for (auto& s : argStrings) arguments.push_back(s.c_str());
 
 	//実際にShaderをコンパイルする
 	Microsoft::WRL::ComPtr<IDxcResult> shaderResult = nullptr;
-	hr = dxcCompiler->Compile(
+    hr = dxcCompiler->Compile(
 		&shaderSourceBuffer, //コンパイルするシェーダーの内容
-		arguments, //コンパイル時の引数
-		_countof(arguments), //引数の数
+		arguments.data(), //コンパイル時の引数
+		static_cast<UINT32>(arguments.size()), //引数の数
 		includeHandler.Get(), //includeハンドラ
 		IID_PPV_ARGS(&shaderResult) //結果を受け取るポインタ
 	);

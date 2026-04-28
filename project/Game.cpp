@@ -227,7 +227,7 @@ void Game::Update()
 
 	//ImGui内部コマンドを生成する
 #ifdef USE_IMGUI
-	ImGui::Render();
+    if (imguiManager) imguiManager->Render();
 #endif
 
 	inputManager.Update();

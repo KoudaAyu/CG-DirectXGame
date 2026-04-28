@@ -758,18 +758,17 @@ void ParticleManager::InitializeGraphicPipeline()
 	graphicPipelineStateDesc.SampleDesc.Count = 1; //マルチサンプルしない
 	graphicPipelineStateDesc.SampleMask = D3D12_DEFAULT_SAMPLE_MASK; //サンプルマスクはデフォルト
 
-	dxCommon->SetHr(dxCommon->GetDevice()->CreateGraphicsPipelineState(&graphicPipelineStateDesc,
-		IID_PPV_ARGS(&pipelineState)));
-	assert(SUCCEEDED(dxCommon->GetHr()));
-
 	// DepthStencilState の設定（パーティクル向け）
 	// 深度テストは有効にして、深度書き込みは行わない（描画順やブレンドに依存するため）
 	depthStencilDesc.DepthEnable = TRUE;
-	depthStencilDesc.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO; 
+	depthStencilDesc.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO;
 	depthStencilDesc.DepthFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
-	// 生成する PSO の設定に適用
 	graphicPipelineStateDesc.DepthStencilState = depthStencilDesc;
 	graphicPipelineStateDesc.DSVFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
+
+	dxCommon->SetHr(dxCommon->GetDevice()->CreateGraphicsPipelineState(&graphicPipelineStateDesc,
+		IID_PPV_ARGS(&pipelineState)));
+	assert(SUCCEEDED(dxCommon->GetHr()));
 }
 
 void ParticleManager::SetupDraw(ID3D12GraphicsCommandList* commandList)
