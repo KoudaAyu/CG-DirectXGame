@@ -7,7 +7,10 @@
 #include"Transform.h"
 #include"Log.h"
 #include"Random.h"
+#include"RenderContext.h"
 #include <list>
+#include <vector>
+#include <unordered_map>
 
 class ParticleEmitter;
 
@@ -23,6 +26,7 @@ public:
 		Vector4 color;
 		float lifeTime;
 		float currentTime;
+		uint32_t textureIndex = 0;
 	};
 
 	struct ParticleForGPU
@@ -30,6 +34,8 @@ public:
 		Matrix4x4 WVP;
 		Matrix4x4 World;
 		Vector4 color;
+		uint32_t textureIndex;
+		uint32_t padding[3]; // 16バイトアラインメントのためのパディング
 	};
 
 
@@ -40,11 +46,18 @@ public:
 
 	void Initialize(Camera* camera);
 	void Finalize();
+	void ClearParticles();
 	void Update(float deltaTime);
+	void Draw(ID3D12GraphicsCommandList* commandList, const RenderContext& ctx, UINT vertexCount);
 
 	Particle MakeNewParticles(std::mt19937& randomEngine,const Vector3& translate);
+	Particle MakeHieEffect(std::mt19937& randomEngine, const Vector3& translate);
+
+
+
 
 	void AddParticles(std::list<Particle>& newParticles);
+	void AddEffectParticles(std::list<Particle>& newParticles);
 
 	void RootSignature();
 	void CreateGraphicsPipeline();
@@ -124,10 +137,22 @@ public:
 
 	uint32_t GetNumInstance() const { return numInstance; }
 
+    struct InstanceGroup
+    {
+        uint32_t textureIndex = 0;
+        uint32_t start = 0;
+        uint32_t count = 0;
+        D3D12_GPU_DESCRIPTOR_HANDLE srvHandle{};
+    };
+
+    const std::vector<InstanceGroup>& GetInstanceGroups() const { return instanceGroups; }
+
 private:
-	const uint32_t kNumMaxInstances = 10;
+	const uint32_t kNumMaxInstances = 256;
 	uint32_t numInstance = 0;
 	uint32_t writeIndex = 0;
+	uint32_t normalInstanceCount_ = 0;
+	uint32_t effectInstanceCount_ = 0;
 
 private:
 	DirectXCom* dxCommon = nullptr;
@@ -136,7 +161,7 @@ private:
 
 	D3D12_ROOT_SIGNATURE_DESC descriptionRootSignature{};
 	D3D12_DESCRIPTOR_RANGE descriptorRangeForInstancing[2] = {};
-	D3D12_ROOT_PARAMETER rootParameters[5] = {};
+	D3D12_ROOT_PARAMETER rootParameters[6] = {};
 	D3D12_STATIC_SAMPLER_DESC staticSamplers[1] = {};
 	Microsoft::WRL::ComPtr<ID3DBlob> signatureBlob = nullptr;
 	Microsoft::WRL::ComPtr<ID3DBlob> errorBlob = nullptr;
@@ -154,13 +179,41 @@ private:
 	D3D12_GPU_DESCRIPTOR_HANDLE instancingSrvHandleGPU;
 	Microsoft::WRL::ComPtr<ID3D12Resource> instancingResource;
 
+	// Vertex buffer for ring mesh used to render particles (non-indexed triangle list)
+    struct Vertex
+	{
+		// Match input layout: POSITION (float4), TEXCOORD (float2), NORMAL (float3)
+		Vector4 pos; // x,y,z,w
+		Vector2 uv;
+		Vector3 normal;
+	};
+
+	Microsoft::WRL::ComPtr<ID3D12Resource> vertexBuffer;
+	D3D12_VERTEX_BUFFER_VIEW vertexBufferView{};
+	uint32_t vertexCount = 0;
+
+	// Ring mesh helpers
+	std::vector<Vertex> CreateRingMesh(uint32_t kRingDivide, float kOuterRadius, float kInnerRadius);
+	void CreateVertexBufferFromVerts(const std::vector<Vertex>& verts);
+
 	std::mt19937 randomEngine{ std::random_device{}() };
 	std::list<ParticleManager::Particle> particles;
+	std::list<ParticleManager::Particle> effectParticles;
 
 	ParticleManager::ParticleForGPU* instanceData = nullptr;
+
+    std::vector<InstanceGroup> instanceGroups;
+	std::vector<InstanceGroup> normalInstanceGroups_;
+	std::vector<InstanceGroup> effectInstanceGroups_;
 
 	std::ostream& logStream;
 
 	uint32_t instancingSrvIndex_ = 0;
     bool finalized_ = false;
+    enum class DrawMode
+	{
+		None,
+		Ring,
+		External
+	};
 };

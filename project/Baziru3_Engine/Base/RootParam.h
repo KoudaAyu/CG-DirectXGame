@@ -20,6 +20,7 @@ namespace RootParam
             kTextureTable = 2,
             kLight = 3,
             kCamera = 4,
+            kInstanceOffset = 5,
         };
     }
 }

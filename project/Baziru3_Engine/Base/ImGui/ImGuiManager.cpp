@@ -146,6 +146,14 @@ void ImGuiManager::Update()
 #endif
 }
 
+void ImGuiManager::Render()
+{
+#ifdef USE_IMGUI
+    if (!initialized) return;
+    ImGui::Render();
+#endif
+}
+
 void ImGuiManager::CreateContext()
 {
 #ifdef USE_IMGUI

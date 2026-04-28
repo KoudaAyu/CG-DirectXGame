@@ -14,6 +14,7 @@ public:
 
 	void Initialize(WindowAPI* windowAPI, DirectXCom* dxCommon);
 	void Update();
+    void Render();
 	void CreateContext();
 	void StyleColorsDark();
 	void Finalize();
