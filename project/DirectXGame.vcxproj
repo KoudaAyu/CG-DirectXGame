@@ -15,6 +15,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="Application\Game.cpp" />
     <ClCompile Include="Baziru3_Engine\Graphics\Particle\ParticleRenderer.cpp" />
     <ClCompile Include="Baziru3_Engine\Graphics\Sphere\SphereRenderer.cpp" />
     <ClCompile Include="Baziru3_Engine\Scene\Factory\AbstractSceneFactory.cpp" />
