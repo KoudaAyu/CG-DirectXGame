@@ -31,7 +31,7 @@ void Sphere::Initialize(DirectXCom* dxCommon, Object3dCom* object3dCom, Material
 
 	light_ = light;
 	assert(light_ != nullptr);
-	
+
 	camera_ = camera;
 	assert(camera_ != nullptr);
 
@@ -55,6 +55,10 @@ void Sphere::Initialize(DirectXCom* dxCommon, Object3dCom* object3dCom, Material
 			// テクスチャ座標 (UV)
 			// U: 経度に比例 (0.0 から 1.0)
 			vertexData[idx].texcoord.x = float(lon) / kSubdivision;
+			if (lat == 0 || lat == kSubdivision)
+			{
+				vertexData[idx].texcoord.x = 0.5f;
+			}
 			// V: 緯度に比例 (1.0 から 0.0、上向きが正になるように反転)
 			vertexData[idx].texcoord.y = 1.0f - float(lat) / kSubdivision;
 
@@ -110,17 +114,17 @@ void Sphere::Initialize(DirectXCom* dxCommon, Object3dCom* object3dCom, Material
 	indexResourceSphere->Unmap(0, nullptr);
 
 	// --- バッファビュー設定 ---
-	
+
 	vertexBufferViewSphere.BufferLocation = vertexResourceSphere->GetGPUVirtualAddress();
 	vertexBufferViewSphere.SizeInBytes = sizeof(Sprite::VertexData) * kVertexCount;
 	vertexBufferViewSphere.StrideInBytes = sizeof(Sprite::VertexData);
 
-	
+
 	indexBufferViewSphere.BufferLocation = indexResourceSphere->GetGPUVirtualAddress();
 	indexBufferViewSphere.SizeInBytes = sizeof(uint32_t) * kIndexCount;
 	indexBufferViewSphere.Format = DXGI_FORMAT_R32_UINT;
 
-	
+
 	//WVP用のリソースを作る。　Matrix4x4 1つのサイズを用意する
 	Microsoft::WRL::ComPtr<ID3D12Resource> wvpResource = directXCom_->CreateBufferResource(directXCom_->GetDevice().Get(), sizeof(TransformationMatrix));
 	//データを書き込む
@@ -138,7 +142,7 @@ void Sphere::Initialize(DirectXCom* dxCommon, Object3dCom* object3dCom, Material
 	transformationMatrixResourceSphere->Map(0, nullptr, reinterpret_cast<void**>(&transformationMatrixDataSphere));
 	transformationMatrixDataSphere->WVP = MakeIdentity4x4();
 	transformationMatrixDataSphere->World = MakeIdentity4x4();
-	
+
 
 }
 
@@ -153,41 +157,51 @@ void Sphere::Update()
 	transformationMatrixDataSphere->WorldInverseTranspose = Transpose(Inverse(worldMatrix));
 }
 
-void Sphere::Draw( D3D12_GPU_DESCRIPTOR_HANDLE textureSrvHandle)
+void Sphere::Draw(D3D12_GPU_DESCRIPTOR_HANDLE textureSrvHandle)
 {
- 
-    if (!directXCom_ || !object3dCom_ || !materialManager_ || !light_) {
-        return;
-    }
 
-    ID3D12GraphicsCommandList* commandList = directXCom_->GetCommandList().Get();
-    if (!commandList) {
-        return;
-    }
+	if (!directXCom_ || !object3dCom_ || !materialManager_ || !light_)
+	{
+		return;
+	}
 
-    commandList->RSSetViewports(1, &directXCom_->GetViewport());
-    commandList->RSSetScissorRects(1, &directXCom_->GetScissorRect());
+	ID3D12GraphicsCommandList* commandList = directXCom_->GetCommandList().Get();
+	if (!commandList)
+	{
+		return;
+	}
 
-    commandList->SetGraphicsRootSignature(object3dCom_->GetRootSignature().Get());
-    commandList->SetPipelineState(object3dCom_->GetPipelineState().Get());
-    commandList->IASetVertexBuffers(0, 1, &vertexBufferViewSphere);
-    commandList->IASetIndexBuffer(&indexBufferViewSphere);
-    commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+	commandList->RSSetViewports(1, &directXCom_->GetViewport());
+	commandList->RSSetScissorRects(1, &directXCom_->GetScissorRect());
 
-    commandList->SetGraphicsRootConstantBufferView(0, materialManager_->GetMaterialResource()->GetGPUVirtualAddress());
+	commandList->SetGraphicsRootSignature(object3dCom_->GetRootSignature().Get());
+	commandList->SetPipelineState(object3dCom_->GetPipelineState().Get());
+	commandList->IASetVertexBuffers(0, 1, &vertexBufferViewSphere);
+	commandList->IASetIndexBuffer(&indexBufferViewSphere);
+	commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-    commandList->SetGraphicsRootConstantBufferView(1, transformationMatrixResourceSphere->GetGPUVirtualAddress());
+	commandList->SetGraphicsRootConstantBufferView(0, materialManager_->GetMaterialResource()->GetGPUVirtualAddress());
 
-    commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandle);
+	commandList->SetGraphicsRootConstantBufferView(1, transformationMatrixResourceSphere->GetGPUVirtualAddress());
 
-    commandList->SetGraphicsRootConstantBufferView(3, light_->GetDirectionalLightResource()->GetGPUVirtualAddress());
+	if (textureSrvHandle.ptr == 0)
+	{
+		return;
+	}
 
-    if (camera_ && camera_->GetCameraResource()) {
-        commandList->SetGraphicsRootConstantBufferView(4, camera_->GetCameraResource()->GetGPUVirtualAddress());
-    } else {
-        commandList->SetGraphicsRootConstantBufferView(4, 0);
-    }
+	commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandle);
 
-    commandList->DrawIndexedInstanced(GetIndexCount(), 1, 0, 0, 0);
+	commandList->SetGraphicsRootConstantBufferView(3, light_->GetDirectionalLightResource()->GetGPUVirtualAddress());
+
+	if (camera_ && camera_->GetCameraResource())
+	{
+		commandList->SetGraphicsRootConstantBufferView(4, camera_->GetCameraResource()->GetGPUVirtualAddress());
+	}
+	else
+	{
+		commandList->SetGraphicsRootConstantBufferView(4, 0);
+	}
+
+	commandList->DrawIndexedInstanced(GetIndexCount(), 1, 0, 0, 0);
 }
 

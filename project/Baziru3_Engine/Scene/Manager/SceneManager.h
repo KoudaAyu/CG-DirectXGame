@@ -11,7 +11,8 @@ class MaterialManager;
 class Light;
 class ParticleManager;
 class SpriteCom;
-class AudioManager; // forward declaration
+class AudioManager;
+struct SceneRenderRequests;
 
 class SceneManager
 {
@@ -25,7 +26,7 @@ public:
 
 	void Update();
 
-	void Draw();
+    void Draw(SceneRenderRequests& renderRequests);
 
 	/// <summary>
 	/// 次のシーン予約
@@ -40,6 +41,7 @@ public:
 	void SetCamera(Camera* camera) { camera_ = camera; }
 
 	void SetSceneFactory(std::unique_ptr<AbstractSceneFactory> sceneFactory) { sceneFactory_ = std::move(sceneFactory); }
+	BaseScene* GetCurrentScene() const { return scene_.get(); }
 
 	static SceneManager* GetInstance();
 	static void Destroy();

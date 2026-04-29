@@ -1,6 +1,8 @@
 #include "SceneManager.h"
 #include "SceneFactory.h"
 
+#include "Baziru3_Engine\Graphics\SceneRenderRequests.h"
+
 #include <cassert>
 #include<memory>
 #include <Log.h>
@@ -95,11 +97,11 @@ void SceneManager::ApplyPendingSceneChange()
     scene_->Initialize(dxCommon_, camera_);
 }
 
-void SceneManager::Draw()
+void SceneManager::Draw(SceneRenderRequests& renderRequests)
 {
 	//実行中のシーンを描画
 	if (scene_)
 	{
-		scene_->Draw();
+     scene_->Draw(renderRequests);
 	}
 }

@@ -5,6 +5,7 @@
 class DirectXCom;
 class SceneManager;
 class Camera;
+struct SceneRenderRequests;
 
 class BaseScene
 {
@@ -14,7 +15,7 @@ public:
 	virtual void Initialize(DirectXCom* dxCommon, Camera* camera) = 0;
 	virtual void Finalize() = 0;
 	virtual void Update() = 0;
-	virtual void Draw() = 0;
+    virtual void Draw(SceneRenderRequests& renderRequests) = 0;
 
 	virtual void SetSceneManager(SceneManager* sceneManager)
 	{

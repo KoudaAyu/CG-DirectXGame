@@ -6,6 +6,7 @@
 #include <sstream>
 #include <iomanip>
 
+#include "Baziru3_Engine\Graphics\SceneRenderRequests.h"
 #include"RenderContext.h"
 #include"RootParam.h"
 #include"SubsystemFactory.h"
@@ -18,7 +19,7 @@
 
 void Game::Initialize()
 {
-	
+
 	Framework::Initialize();
 	crashDump.Install();
 	log.Initialize();
@@ -227,7 +228,7 @@ void Game::Update()
 
 	//ImGui内部コマンドを生成する
 #ifdef USE_IMGUI
-    if (imguiManager) imguiManager->Render();
+	if (imguiManager) imguiManager->Render();
 #endif
 
 	inputManager.Update();
@@ -248,22 +249,8 @@ void Game::Draw()
 
 	if (object3dCom) object3dCom->PreDraw();
 
-	RenderContext ctx{};
-	ctx.commandList = dx ? dx->GetCommandList().Get() : nullptr;
-	ctx.windowAPI = window;
-	ctx.camera = camera_.get();
-	ctx.light = light.get();
-	uint32_t chosenIndex = useMonsterBall ? textureIndexModelTex : textureIndexUvChecker;
-	if (chosenIndex != TextureManager::kInvalidTextureIndex)
-	{
-		ctx.textureHandle = TextureManager::GetInstance()->GetSrvHandleGPU(chosenIndex);
-	}
-	else
-	{
-		Logger::Log(logStream, "Warning: invalid texture index when preparing render context for drawing.\n");
-		ctx.textureHandle = {};
-	}
-	ctx.materialGPUAddress = materialManager_->GetMaterialResource() ? materialManager_->GetMaterialResource()->GetGPUVirtualAddress() : 0;
+	RenderContext ctx = PrepareRenderContext();
+    SceneRenderRequests renderRequests{};
 
 	if (camera_ && camera_->GetCameraResource() && dx)
 	{
@@ -284,8 +271,9 @@ void Game::Draw()
 
 	if (SceneManager::GetInstance())
 	{
-		SceneManager::GetInstance()->Draw();
+        SceneManager::GetInstance()->Draw(renderRequests);
 	}
+  sphereRenderer_.Draw(ctx, renderRequests);
 
 
 
@@ -490,7 +478,7 @@ void Game::DrawSprites(const RenderContext& ctx)
 {
 	if (!drawSprite) return;
 
-	
+
 	SpriteManager* sm = engine_ ? engine_->GetSpriteManager() : nullptr;
 	if (sm)
 	{
@@ -500,26 +488,36 @@ void Game::DrawSprites(const RenderContext& ctx)
 
 void Game::DrawParticles(const RenderContext& ctx)
 {
-
-    // Bind model vertex buffers
-    model_->Bind(ctx.commandList);
-
-    // Ensure light and camera CBVs are set for particle shaders (caller responsibility)
-    if (ctx.light)
-    {
-        ctx.commandList->SetGraphicsRootConstantBufferView(RootParam::Particle::kLight, ctx.light->GetDirectionalLightResource()->GetGPUVirtualAddress());
-    }
-    else
-    {
-        ctx.commandList->SetGraphicsRootConstantBufferView(RootParam::Particle::kLight, 0);
-    }
-    ctx.commandList->SetGraphicsRootConstantBufferView(RootParam::Particle::kCamera,
-        ctx.camera && ctx.camera->GetCameraResource() ? ctx.camera->GetCameraResource()->GetGPUVirtualAddress() : 0);
-
-    // Let ParticleManager perform grouped draws so each particle can use its assigned texture
-    if (particleManager && particleManager->GetNumInstance() > 0)
-    {
-        // Pass vertex count so ParticleManager can DrawInstanced correctly
-        particleManager->Draw(ctx.commandList, ctx, UINT(modelData.vertices.size()));
-    }
+	particleRenderer_.Draw(ctx, particleManager.get(), model_.get(), UINT(modelData.vertices.size()));
 }
+
+RenderContext Game::PrepareRenderContext()
+{
+	RenderContext ctx{};
+	auto* dx = engine_ ? engine_->GetDirectXCom() : nullptr;
+	auto* window = engine_ ? engine_->GetWindowAPI() : nullptr;
+
+	ctx.commandList = dx ? dx->GetCommandList().Get() : nullptr;
+	ctx.windowAPI = window;
+	ctx.camera = camera_.get();
+	ctx.light = light.get();
+
+	uint32_t chosenIndex = useMonsterBall ? textureIndexModelTex : textureIndexUvChecker;
+	if (chosenIndex != TextureManager::kInvalidTextureIndex)
+	{
+		ctx.textureHandle = TextureManager::GetInstance()->GetSrvHandleGPU(chosenIndex);
+	}
+	else
+	{
+		Logger::Log(logStream, "Warning: invalid texture index when preparing render context for drawing.\n");
+		ctx.textureHandle = {};
+	}
+
+	ctx.materialGPUAddress = (materialManager_ && materialManager_->GetMaterialResource())
+		? materialManager_->GetMaterialResource()->GetGPUVirtualAddress()
+		: 0;
+
+	return ctx;
+}
+
+

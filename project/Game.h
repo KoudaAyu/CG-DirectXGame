@@ -17,6 +17,8 @@
 #include"Object3dCom.h"
 #include"ParticleEmitter.h"
 #include"ParticleManager.h"
+#include"Baziru3_Engine\Graphics\Particle\ParticleRenderer.h"
+#include"Baziru3_Engine\Graphics\Sphere\SphereRenderer.h"
 #include"SceneManager.h"
 #include"SceneRegistration.h"
 #include"SkyBox.h"
@@ -131,6 +133,8 @@ private:
 	std::unique_ptr<Object3d> object3d_;
 	std::unique_ptr<Object3dCom> object3dCom;
 	std::unique_ptr<ParticleManager> particleManager;
+    ParticleRenderer particleRenderer_;
+    SphereRenderer sphereRenderer_;
 	std::unique_ptr<SkyBox> skybox_;
 	std::unique_ptr<SkyboxCom> skyboxCom_;
 	
@@ -146,14 +150,11 @@ private:
 private:
 	std::vector<std::unique_ptr<Sprite>>sprites;
 	Sprite::Transform transformObject;
-	//Sprite::Transform uvTransformSprite;
-	
 	Sprite::Transform cameraTransform;
-
 
 	Object3d::ModelData modelData;
 
-	
+	RenderContext PrepareRenderContext();
 
 	const float kDeltaTime = 1.0f / 60.0f;
 
@@ -162,12 +163,9 @@ private:
 	//Objectの描画切り替え
 	bool drawObject = false;
 	bool drawSprite = false;
-	
-	// Texture resources are owned and managed by TextureManager now.
 
-	uint32_t textureIndexUvChecker = TextureManager::kInvalidTextureIndex;
+    uint32_t textureIndexUvChecker = TextureManager::kInvalidTextureIndex;
 	uint32_t textureIndexModelTex = TextureManager::kInvalidTextureIndex;
 	uint32_t textureIndexSkybox_ = TextureManager::kInvalidTextureIndex;
-
 };
 

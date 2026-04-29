@@ -17,6 +17,7 @@
 
 class Camera;
 class SpriteCom;
+struct SceneRenderRequests;
 
 class GamePlayScene : public BaseScene
 {
@@ -28,13 +29,9 @@ public:
 
     void Update() override;
 
-    void Draw() override;
+   void Draw(SceneRenderRequests& renderRequests) override;
 
     void SetSpriteCom(SpriteCom* spriteCom) { this->spriteCom = spriteCom; }
-
-    void SetDrawSphere(bool enable) { drawSphere = enable; }
-    void ToggleDrawSphere() { drawSphere = !drawSphere; }
-    bool IsDrawSphere() const { return drawSphere; }
 
 private:
 
@@ -65,5 +62,4 @@ private:
     Vector2 uiSpritePosition = { 100.0f, 100.0f };
 private:
     const float kDeltaTime = 1.0f / 60.0f;
-    bool drawSphere = false;
 };

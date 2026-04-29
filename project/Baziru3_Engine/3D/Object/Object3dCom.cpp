@@ -69,6 +69,11 @@ void Object3dCom::PreDraw()
 void Object3dCom::Draw(Object3d* object, const ::RenderContext& ctx, const Object3d::ModelData& modelData, bool drawObject)
 {
     if (!ctx.commandList) return;
+    if (!ctx.camera)
+	{
+		Logger::Log(logStream, "Warning: camera is null when drawing object. Skipping draw.\n");
+		return;
+	}
 	// Ensure the correct root signature and PSO are bound before setting root parameters.
 	// PreDraw() should normally set these, but re-bind here to avoid mismatches
 	// if other components changed the root signature (e.g., skybox/sprite pipelines).
@@ -97,7 +102,7 @@ void Object3dCom::Draw(Object3d* object, const ::RenderContext& ctx, const Objec
     }
 
    
-    if (ctx.camera && ctx.camera->GetCameraResource())
+    if (ctx.camera->GetCameraResource())
     {
         ctx.commandList->SetGraphicsRootConstantBufferView(4, ctx.camera->GetCameraResource()->GetGPUVirtualAddress());
     }
@@ -293,4 +298,10 @@ void Object3dCom::InitializeGraphicPipeline()
 	//どのように画面に色を打ち込むか設定(気にしなくていい？)
 	graphicPipelineStateDesc.SampleDesc.Count = 1; //マルチサンプルしない
 	graphicPipelineStateDesc.SampleMask = D3D12_DEFAULT_SAMPLE_MASK; //サンプルマスクはデフォルト
+
+	depthStencilDesc.DepthEnable = TRUE;
+	depthStencilDesc.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
+	depthStencilDesc.DepthFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
+	graphicPipelineStateDesc.DepthStencilState = depthStencilDesc;
+	graphicPipelineStateDesc.DSVFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
 }
