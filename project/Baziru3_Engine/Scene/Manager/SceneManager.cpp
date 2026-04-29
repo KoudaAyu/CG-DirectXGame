@@ -2,6 +2,9 @@
 #include "SceneFactory.h"
 
 #include "Baziru3_Engine\Graphics\SceneRenderRequests.h"
+#include "SkyBox.h"
+#include "SkyboxCom.h"
+#include "TextureManager.h"
 
 #include <cassert>
 #include<memory>
@@ -104,4 +107,15 @@ void SceneManager::Draw(SceneRenderRequests& renderRequests)
 	{
      scene_->Draw(renderRequests);
 	}
+}
+
+void SceneManager::DrawSkybox(ID3D12GraphicsCommandList* commandList) const
+{
+	if (!commandList || !skybox_ || !skyboxCom_ || skyboxTextureIndex_ == TextureManager::kInvalidTextureIndex)
+	{
+		return;
+	}
+
+	skyboxCom_->SetupDraw(commandList);
+	skybox_->Draw(commandList, TextureManager::GetInstance()->GetSrvHandleGPU(skyboxTextureIndex_));
 }

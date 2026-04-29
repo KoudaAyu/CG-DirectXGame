@@ -3,6 +3,7 @@
 #include "AbstractSceneFactory.h"
 #include "BaseScene.h"
 #include <memory>
+#include <cstdint>
 
 class DirectXCom;
 class Camera;
@@ -12,6 +13,9 @@ class Light;
 class ParticleManager;
 class SpriteCom;
 class AudioManager;
+class SkyBox;
+class SkyboxCom;
+struct ID3D12GraphicsCommandList;
 struct SceneRenderRequests;
 
 class SceneManager
@@ -61,6 +65,13 @@ public:
 	
 	void SetAudioManager(AudioManager* v) { audioManager_ = v; }
 	AudioManager* GetAudioManager() const { return audioManager_; }
+	void SetSkyBox(SkyBox* v) { skybox_ = v; }
+	SkyBox* GetSkyBox() const { return skybox_; }
+	void SetSkyboxCom(SkyboxCom* v) { skyboxCom_ = v; }
+	SkyboxCom* GetSkyboxCom() const { return skyboxCom_; }
+	void SetSkyboxTextureIndex(uint32_t v) { skyboxTextureIndex_ = v; }
+	uint32_t GetSkyboxTextureIndex() const { return skyboxTextureIndex_; }
+	void DrawSkybox(ID3D12GraphicsCommandList* commandList) const;
 
 private:
 	std::unique_ptr<AbstractSceneFactory> sceneFactory_;
@@ -78,6 +89,9 @@ private:
 
 
 	AudioManager* audioManager_ = nullptr;
+	SkyBox* skybox_ = nullptr;
+	SkyboxCom* skyboxCom_ = nullptr;
+	uint32_t skyboxTextureIndex_ = 0;
 
     std::ostream& logStream_ = std::cerr;
 

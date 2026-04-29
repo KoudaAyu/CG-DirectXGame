@@ -193,6 +193,8 @@ void GamePlayScene::Draw(SceneRenderRequests& renderRequests)
 			materialManager->GetMaterialResource()->GetGPUVirtualAddress() : 0;
 	}
 
+	SceneManager::GetInstance()->DrawSkybox(ctx.commandList);
+
 	if (spriteManager_)
 	{
 		spriteManager_->DrawAll(ctx, &debugCamera_, &sprites);

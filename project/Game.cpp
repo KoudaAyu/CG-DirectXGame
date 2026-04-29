@@ -76,6 +76,7 @@ void Game::Initialize()
 	textureIndexUvChecker = TextureManager::GetInstance()->Load("Resources/uvChecker.png"); // Load UV Checker texture
 	textureIndexModelTex = TextureManager::GetInstance()->Load(modelData.material.textureFilePath); // Load model texture
 	textureIndexSkybox_ = TextureManager::GetInstance()->Load("Resources/CG4/dds/CG4_test.dds"); // Load skybox texture
+   SceneManager::GetInstance()->SetSkyboxTextureIndex(textureIndexSkybox_);
 }
 
 
@@ -115,6 +116,9 @@ void Game::Finalize()
 		SceneManager::GetInstance()->SetCamera(nullptr);
 		SceneManager::GetInstance()->SetLight(nullptr);
 		SceneManager::GetInstance()->SetObject3dCom(nullptr);
+       SceneManager::GetInstance()->SetSkyboxCom(nullptr);
+		SceneManager::GetInstance()->SetSkyBox(nullptr);
+		SceneManager::GetInstance()->SetSkyboxTextureIndex(TextureManager::kInvalidTextureIndex);
 	}
 
 	// 4) Particle manager
@@ -261,18 +265,13 @@ void Game::Draw()
 		Logger::Log(logStream, "Warning: camera GPU resource not available before SceneManager draw.\n");
 	}
 
-	if (skybox_ && skyboxCom_ && textureIndexSkybox_ != TextureManager::kInvalidTextureIndex)
-	{
-		skyboxCom_->SetupDraw(ctx.commandList);
-		skybox_->Draw(ctx.commandList, TextureManager::GetInstance()->GetSrvHandleGPU(textureIndexSkybox_));
-	}
-
 	if (object3dCom) object3dCom->PreDraw();
 
 	if (SceneManager::GetInstance())
 	{
         SceneManager::GetInstance()->Draw(renderRequests);
 	}
+
   sphereRenderer_.Draw(ctx, renderRequests);
 
 
@@ -411,6 +410,8 @@ void Game::InitializeSceneResources()
 	skyboxCom_->Initialize();
 	skybox_ = std::make_unique<SkyBox>();
 	skybox_->Initialize(dx, camera_.get());
+	SceneManager::GetInstance()->SetSkyboxCom(skyboxCom_.get());
+	SceneManager::GetInstance()->SetSkyBox(skybox_.get());
 
 	particleManager = std::make_unique<ParticleManager>(logStream, dx);
 	particleManager->Initialize(camera_.get());

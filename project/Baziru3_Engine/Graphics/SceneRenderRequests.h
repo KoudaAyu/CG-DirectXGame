@@ -4,5 +4,7 @@
 
 struct SceneRenderRequests
 {
+
     SphereDrawRequests spheres;
+
 };
