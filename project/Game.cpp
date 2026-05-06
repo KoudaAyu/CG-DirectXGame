@@ -70,6 +70,10 @@ void Game::Initialize()
 	debugUI = std::make_unique<DebugUI>(materialManager_.get(), uiSpriteManager, camera_.get(), &transformObject, &useMonsterBall, &drawObject, &drawSprite);
 	debugUI->Initialize();
 
+	fadeApplication_ = std::make_unique<FadeApplication>();
+	fadeApplication_->Initialize(spriteCom, window);
+	SceneManager::GetInstance()->SetFadeApplication(fadeApplication_.get());
+
 	SceneRegistration::RegisterScenes();
 	SceneManager::GetInstance()->ChangeScene("TITLE");
 
@@ -96,6 +100,17 @@ void Game::Finalize()
 	if (debugUI)
 	{
 		debugUI.reset();
+	}
+
+	if (SceneManager::GetInstance())
+	{
+		SceneManager::GetInstance()->SetFadeApplication(nullptr);
+	}
+
+	if (fadeApplication_)
+	{
+		fadeApplication_->Finalize();
+		fadeApplication_.reset();
 	}
 
 	// AudioManagerの終了処理
@@ -193,6 +208,11 @@ void Game::Update()
 		audioManager_->Update();
 	}
 
+	if (fadeApplication_)
+	{
+		fadeApplication_->Update();
+	}
+
 
 	SceneManager::GetInstance()->Update();
 
@@ -285,6 +305,10 @@ void Game::Draw()
 	}
 	DrawSprites(ctx);
 	DrawParticles(ctx);
+	if (fadeApplication_)
+	{
+		fadeApplication_->Draw();
+	}
 
 	//Objectの描画
 

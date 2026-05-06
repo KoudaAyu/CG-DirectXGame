@@ -153,7 +153,7 @@
     <ClCompile Include="Baziru3_Engine\Graphics\Sphere\SphereRenderer.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
-    <ClCompile Include="Application\Game.cpp">
+    <ClCompile Include="Application\FadeApplication.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
   </ItemGroup>
@@ -323,6 +323,9 @@
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
     <ClInclude Include="Baziru3_Engine\Graphics\SceneRenderRequests.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="Application\FadeApplication.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
   </ItemGroup>

@@ -2,6 +2,7 @@
 #include "SceneFactory.h"
 
 #include "Baziru3_Engine\Graphics\SceneRenderRequests.h"
+#include "FadeApplication.h"
 #include "SkyBox.h"
 #include "SkyboxCom.h"
 #include "TextureManager.h"
@@ -35,10 +36,20 @@ void SceneManager::ChangeScene(const std::string& sceneName)
 		sceneFactory_.reset(new SceneFactory());
 	}
 
-	assert(nextScene_ == nullptr);
+  if (nextScene_ || isSceneTransitioning_)
+    {
+        Logger::Log(logStream_, "SceneManager::ChangeScene() ignored because a transition is already in progress.\n");
+        return;
+    }
 
 	
 	auto newScene = sceneFactory_->CreateScene(sceneName);
+   if (!newScene)
+    {
+        Logger::Log(logStream_, "SceneManager::ChangeScene() failed to create scene.\n");
+        return;
+    }
+
 	nextScene_ = std::move(newScene);
 }
 
@@ -78,11 +89,55 @@ void SceneManager::Update()
     {
         scene_->Update();
     }
+
+    ApplyPendingSceneChange();
 }
 
 void SceneManager::ApplyPendingSceneChange()
 {
     if (!nextScene_) return;
+
+   if (!scene_ || !fadeApplication_ || !fadeApplication_->IsAvailable())
+    {
+        CommitPendingSceneChange();
+        isSceneTransitioning_ = false;
+        hasSwitchedSceneDuringFade_ = false;
+        return;
+    }
+
+    if (!isSceneTransitioning_)
+    {
+        fadeApplication_->StartFadeOut();
+        isSceneTransitioning_ = true;
+        return;
+    }
+
+    if (!hasSwitchedSceneDuringFade_)
+    {
+        if (!fadeApplication_->IsFadeOutFinished())
+        {
+            return;
+        }
+
+        CommitPendingSceneChange();
+        hasSwitchedSceneDuringFade_ = true;
+        fadeApplication_->StartFadeIn();
+        return;
+    }
+
+    if (!fadeApplication_->IsBusy())
+    {
+        isSceneTransitioning_ = false;
+        hasSwitchedSceneDuringFade_ = false;
+    }
+}
+
+void SceneManager::CommitPendingSceneChange()
+{
+    if (!nextScene_)
+    {
+        return;
+    }
 
     //旧シーンの終了処理
     if (scene_)
