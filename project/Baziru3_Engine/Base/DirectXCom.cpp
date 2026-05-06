@@ -3,6 +3,7 @@
 #include<cassert>
 #include <format>
 #include <thread>
+#include <vector>
 
 #include"d3dx12.h"
 #pragma comment(lib,"d3d12.lib")
@@ -79,6 +80,61 @@ void DirectXCom::Initialize()
 	CerateScissorRect();
 	CreateDxcCompiler();
 	InitializeImGui();
+}
+
+void DirectXCom::Finalize()
+{
+	// GPUが処理を終えるのを待つ
+	if (commandQueue)
+	{
+		if (commandList && commandAllocator && fence && fenceEvent)
+		{
+			// 終了/実行/待機/リセットを実。
+			ExecuteAndWaitForGPU();
+		}
+		else if (fence && fenceEvent)
+		{
+			fenceValue++;
+			commandQueue->Signal(fence.Get(), fenceValue);
+			if(fence->GetCompletedValue() < fenceValue)
+			{
+				fence->SetEventOnCompletion(fenceValue, fenceEvent);
+				WaitForSingleObject(fenceEvent, INFINITE);
+			}
+		}
+	}
+
+	// スワップチェーンのリソースを解放する前に、コマンドリストとコマンドアロケーターをリセットしておく
+	for (auto& res : swapChainResources) res.Reset();
+
+	rtvDescriptorHeap.Reset();
+	srvDescriptorHeap.Reset();
+	dsvDescriptorHeap.Reset();
+	descriptorHeap.Reset();
+	depthStencilResource.Reset();
+	commandList.Reset();
+	commandAllocator.Reset();
+	commandQueue.Reset();
+
+	// フェンスを解放しハンドルを閉じる
+	if (fenceEvent)
+	{
+		CloseHandle(fenceEvent);
+		fenceEvent = nullptr;
+	}
+	fence.Reset();
+
+	dxcCompiler.Reset();
+	dxcUtils.Reset();
+	includeHandler.Reset();
+	swapChain.Reset();
+	useAdapter.Reset();
+	device.Reset();
+	dxgiFactory.Reset();
+
+	// 生のポインタをクリア
+	infoQueue = nullptr;
+
 }
 
 void DirectXCom::DebugLayer()
@@ -480,12 +536,29 @@ void DirectXCom::PostDraw()
 
 	//コマンドリストの内容を下記率させる。すべてのコマンドを積んでからCloseする
 	hr = (commandList->Close());
-	//コマンドリストのCloseに失敗した場合はエラー
-	assert(SUCCEEDED(hr));
+	if (FAILED(hr))
+	{
+		Logger::Log(logStream, std::format("DirectXCom::PostDraw - commandList->Close failed hr=0x{:08X}\n", static_cast<unsigned int>(hr)));
+		// Do not attempt to execute a closed/invalid command list
+		return;
+	}
 
 	//GUPにコマンドリストの実行を行わせる
+	if (!commandList || !commandQueue)
+	{
+		Logger::Log(logStream, "DirectXCom::PostDraw - commandList or commandQueue is null. Skipping ExecuteCommandLists.\n");
+		return;
+	}
+
 	ID3D12CommandList* commandLists[] = { commandList.Get() };
 	commandQueue->ExecuteCommandLists(1, commandLists);
+
+	// Check for device removal after execute
+	HRESULT deviceRemoved = device->GetDeviceRemovedReason();
+	if (FAILED(deviceRemoved))
+	{
+		Logger::Log(logStream, std::format("DirectXCom::PostDraw - device removed or error after ExecuteCommandLists hr=0x{:08X}\n", static_cast<unsigned int>(deviceRemoved)));
+	}
 	//GUPとOSに画面の交換を要求する
 	swapChain->Present(1, 0);
 
@@ -559,21 +632,39 @@ Microsoft::WRL::ComPtr<IDxcBlob> DirectXCom::CompileShader(const std::wstring& f
 	shaderSourceBuffer.Size = shaderScore->GetBufferSize();
 	shaderSourceBuffer.Encoding = DXC_CP_UTF8;//UTF8の文字コードである事を通知する
 
-	LPCWSTR arguments[] = {
-		filePath.c_str(), //コンパイルするファイルのパス
-		L"-E", L"main", //エントリーポイントの指定。基本的にmain以外にはしない
-		L"-T", profile, //ShaderProfileの設定
-		L"-Zi",L"Qembed_debug",
-		L"-Od", //最適化を行わない
-		L"-Zpr", //メモリレイアウトは行優先
-	};
+    // Build compiler arguments. Include the shader's directory in include path so
+	// #include "..." resolves relative includes like "Object3d.hlsli".
+	std::wstring shaderDir;
+	size_t pos = filePath.find_last_of(L"/\\");
+	if (pos != std::wstring::npos)
+	{
+		shaderDir = filePath.substr(0, pos);
+	}
+
+	// Keep strings alive for the duration of the call
+	std::vector<std::wstring> argStrings;
+	argStrings.push_back(filePath);
+	argStrings.push_back(L"-E"); argStrings.push_back(L"main");
+	argStrings.push_back(L"-T"); argStrings.push_back(profile);
+	argStrings.push_back(L"-Zi"); argStrings.push_back(L"Qembed_debug");
+	argStrings.push_back(L"-Od");
+	argStrings.push_back(L"-Zpr");
+	if (!shaderDir.empty())
+	{
+		argStrings.push_back(L"-I");
+		argStrings.push_back(shaderDir);
+	}
+
+	std::vector<LPCWSTR> arguments;
+	arguments.reserve(argStrings.size());
+	for (auto& s : argStrings) arguments.push_back(s.c_str());
 
 	//実際にShaderをコンパイルする
 	Microsoft::WRL::ComPtr<IDxcResult> shaderResult = nullptr;
-	hr = dxcCompiler->Compile(
+    hr = dxcCompiler->Compile(
 		&shaderSourceBuffer, //コンパイルするシェーダーの内容
-		arguments, //コンパイル時の引数
-		_countof(arguments), //引数の数
+		arguments.data(), //コンパイル時の引数
+		static_cast<UINT32>(arguments.size()), //引数の数
 		includeHandler.Get(), //includeハンドラ
 		IID_PPV_ARGS(&shaderResult) //結果を受け取るポインタ
 	);
@@ -659,19 +750,38 @@ Microsoft::WRL::ComPtr<ID3D12Resource> DirectXCom::UploadTextureData(Microsoft::
 DirectX::ScratchImage DirectXCom::LoadTexture(const std::string& filePath)
 {
 	//テクスチャファイルを読み込んでプログラムで使えるようにする
-	DirectX::ScratchImage image{};
-	std::wstring filePathW = StringUtil::ConvertString(filePath);
-	HRESULT hr = DirectX::LoadFromWICFile(filePathW.c_str(), DirectX::WIC_FLAGS_DEFAULT_SRGB, nullptr, image);
-	assert(SUCCEEDED(hr));
+    DirectX::ScratchImage image{};
+    std::wstring filePathW = StringUtil::ConvertString(filePath);
+    HRESULT hr = S_OK;
 
-	//ミニマップの作成
-	DirectX::ScratchImage mipImages{};
-	hr = DirectX::GenerateMipMaps(image.GetImages(), image.GetImageCount(), image.GetMetadata(),
-		DirectX::TEX_FILTER_SRGB, 0, mipImages);
-	assert(SUCCEEDED(hr));
+    // ファイル拡張子で読み込み方法を選択する (.dds は DirectXTex の DDS ローダーを使う)
+    if (filePathW.ends_with(L".dds") || filePathW.ends_with(L".DDS"))
+    {
+        hr = DirectX::LoadFromDDSFile(filePathW.c_str(), DirectX::DDS_FLAGS_NONE, nullptr, image);
+    }
+    else
+    {
+        // WIC で読み込む（SRGB を強制）
+        hr = DirectX::LoadFromWICFile(filePathW.c_str(), DirectX::WIC_FLAGS_FORCE_SRGB, nullptr, image);
+    }
+    assert(SUCCEEDED(hr));
 
-	//ミニマップ付きのデータを返す
-	return mipImages;
+    // ミニマップの作成／準備
+    DirectX::ScratchImage mipImages{};
+    if (DirectX::IsCompressed(image.GetMetadata().format))
+    {
+        // 圧縮フォーマットはそのまま使う（既にミップが含まれていることが多い）
+        mipImages = std::move(image);
+    }
+    else
+    {
+        // レベル 0 を指定するとフルチェーンを生成する
+        hr = DirectX::GenerateMipMaps(image.GetImages(), image.GetImageCount(), image.GetMetadata(), DirectX::TEX_FILTER_SRGB, 0, mipImages);
+        assert(SUCCEEDED(hr));
+    }
+
+    // ミニマップ付きのデータを返す
+    return mipImages;
 }
 
 Microsoft::WRL::ComPtr<ID3D12Resource> DirectXCom::CreateTextureResource(const DirectX::TexMetadata& metadata)

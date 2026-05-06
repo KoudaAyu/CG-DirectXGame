@@ -6,6 +6,7 @@
 #include"Camera.h"
 #include"CrashDump.h"
 #include"DirectXCom.h"
+#include"EngineContext.h"
 #include"Framework.h"
 #include"ImGuiManager.h"
 #include"Light.h"
@@ -16,8 +17,12 @@
 #include"Object3dCom.h"
 #include"ParticleEmitter.h"
 #include"ParticleManager.h"
+#include"Baziru3_Engine\Graphics\Particle\ParticleRenderer.h"
+#include"Baziru3_Engine\Graphics\Sphere\SphereRenderer.h"
 #include"SceneManager.h"
 #include"SceneRegistration.h"
+#include"SkyBox.h"
+#include"SkyboxCom.h"
 #include"Sound.h"
 #include"Sphere.h"
 #include"Sprite.h"
@@ -43,15 +48,36 @@ public:
 
 	bool IsQuitRequested() override;
 
+	//初期化関係
+	bool InitializeEngine();
+
+	/// <summary>
+	/// DirectXComの診断Logを出す
+	/// </summary>
+	void LogEngineDiagnostics();
+
+	/// <summary>
+	/// SceneManagerに渡す基盤オブジェクトを用意する部分
+	/// </summary>
+	void InitializeSceneCore();
+
+
+	/// <summary>
+	/// 描画に必要な共通リソースを作る
+	/// </summary>
+	void InitializeModelResources();
+
+	void InitializeSceneResources();
+
+	/// <summary>
+	/// 音声、入力系の初期化
+	/// </summary>
+	void InitializeAudioAndInput();
+
 public:
 	std::ostream& logStream = log.GetLogStream();
-
-	WindowAPI* GetWindowAPI() { return windowAPI.get(); }
-	const WindowAPI* GetWindowAPI() const { return windowAPI.get(); }
-	DirectXCom* GetDirectXCom() { return directXCom.get(); }
-	const DirectXCom* GetDirectXCom() const { return directXCom.get(); }
-	SpriteCom* GetSpriteCom() { return spriteCom.get(); }
-	const SpriteCom* GetSpriteCom() const { return spriteCom.get(); }
+	DirectXCom* GetDirectXCom() { return engine_ ? engine_->GetDirectXCom() : nullptr; }
+	const DirectXCom* GetDirectXCom() const { return engine_ ? engine_->GetDirectXCom() : nullptr; }
 	Sprite* GetSprites(size_t index)
 	{
 		if (index < sprites.size())
@@ -68,8 +94,18 @@ public:
 		}
 		return nullptr;
 	}
-	std::vector<std::unique_ptr<Sprite>>& GetSprites() { return spriteManager_->GetSprites(); }
-	const std::vector<std::unique_ptr<Sprite>>& GetSprites() const { return spriteManager_->GetSprites(); }
+	std::vector<std::unique_ptr<Sprite>>& GetSprites()
+	{
+		if (engine_ && engine_->GetSpriteManager()) return engine_->GetSpriteManager()->GetSprites();
+		static std::vector<std::unique_ptr<Sprite>> empty;
+		return empty;
+	}
+	const std::vector<std::unique_ptr<Sprite>>& GetSprites() const
+	{
+		if (engine_ && engine_->GetSpriteManager()) return engine_->GetSpriteManager()->GetSprites();
+		static const std::vector<std::unique_ptr<Sprite>> empty;
+		return empty;
+	}
 	Object3d* GetObject3d() { return object3d_.get(); }
 	const Object3d* GetObject3d() const { return object3d_.get(); }
 	Object3dCom* GetObject3dCom() { return object3dCom.get(); }
@@ -89,7 +125,7 @@ private:
 	Log log;
 	
 	std::unique_ptr<Camera> camera_;
-	std::unique_ptr<DirectXCom> directXCom;
+	std::unique_ptr<EngineContext> engine_;
 	std::unique_ptr<ImGuiManager> imguiManager;
 	std::unique_ptr<Light> light;
 	std::unique_ptr<Model> model_;
@@ -97,9 +133,10 @@ private:
 	std::unique_ptr<Object3d> object3d_;
 	std::unique_ptr<Object3dCom> object3dCom;
 	std::unique_ptr<ParticleManager> particleManager;
-	std::unique_ptr<SpriteCom> spriteCom;
-	std::unique_ptr<SpriteManager> spriteManager_;
-	std::unique_ptr<WindowAPI> windowAPI;//ウィンドウ関連のAPIをまとめたオブジェクト
+    ParticleRenderer particleRenderer_;
+    SphereRenderer sphereRenderer_;
+	std::unique_ptr<SkyBox> skybox_;
+	std::unique_ptr<SkyboxCom> skyboxCom_;
 	
 	DebugCamera debugCamera_;
 	
@@ -113,14 +150,11 @@ private:
 private:
 	std::vector<std::unique_ptr<Sprite>>sprites;
 	Sprite::Transform transformObject;
-	//Sprite::Transform uvTransformSprite;
-	
 	Sprite::Transform cameraTransform;
-
 
 	Object3d::ModelData modelData;
 
-	
+	RenderContext PrepareRenderContext();
 
 	const float kDeltaTime = 1.0f / 60.0f;
 
@@ -129,13 +163,9 @@ private:
 	//Objectの描画切り替え
 	bool drawObject = false;
 	bool drawSprite = false;
-	
 
-	
-	// Texture resources are owned and managed by TextureManager now.
-
-	uint32_t textureIndexUvChecker = TextureManager::kInvalidTextureIndex;
+    uint32_t textureIndexUvChecker = TextureManager::kInvalidTextureIndex;
 	uint32_t textureIndexModelTex = TextureManager::kInvalidTextureIndex;
-
+	uint32_t textureIndexSkybox_ = TextureManager::kInvalidTextureIndex;
 };
 

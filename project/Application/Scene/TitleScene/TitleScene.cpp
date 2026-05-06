@@ -18,6 +18,6 @@ void TitleScene::Update()
 
 }
 
-void TitleScene::Draw()
+void TitleScene::Draw(SceneRenderRequests& /*renderRequests*/)
 {
 }

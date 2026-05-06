@@ -1,4 +1,4 @@
-#include "Resources/shaders/Object3d.hlsli"
+#include "Object3d.hlsli"
 
 struct Material
 {
@@ -38,9 +38,9 @@ ConstantBuffer<Camera> gCamera : register(b2);
 PixelShaderOutput main(VertexShaderOutput input)
 {
     PixelShaderOutput output;
-    float32_t4 uv4 = mul(float32_t4(input.texcoord, 0.0f, 1.0f), gMaterial.uvTransform);
-    float32_t2 uv = uv4.xy;
-    float32_t4 textureColor = gTexture.Sample(gSample, uv);
+    float4 uv4 = mul(float4(input.texcoord, 0.0f, 1.0f), gMaterial.uvTransform);
+    float2 uv = uv4.xy;
+    float4 textureColor = gTexture.Sample(gSample, uv);
     output.color = gMaterial.color * textureColor;
 
     if (textureColor.a <= 0.1f || output.color.a == 0.0f)

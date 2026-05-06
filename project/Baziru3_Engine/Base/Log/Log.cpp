@@ -12,6 +12,16 @@ void Logger::Log(std::ostream& os, const std::string& message)
 	OutputDebugStringA(message.c_str()); //出力ウィンドウに文字を出力
 }
 
+void Logger::Log(const std::string& message)
+{
+    Logger::Log(std::cout, message);
+}
+
+void Logger::Log(const char* message)
+{
+    Logger::Log(std::cout, std::string(message));
+}
+
 void Log::Initialize()
 {
 	//ログファイル関係
