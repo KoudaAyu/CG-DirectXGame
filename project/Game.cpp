@@ -34,6 +34,8 @@ void Game::Initialize()
 	LogEngineDiagnostics();
 
 	InitializeSceneCore();
+	offScreenRendering_ = std::make_unique<OffScreenRendering>(logStream, dx);
+  offScreenRendering_->Initialize(0, 0, DXGI_FORMAT_R8G8B8A8_UNORM_SRGB, { 1.0f, 0.0f, 0.0f, 1.0f });
 
 	InitializeModelResources();
 
@@ -123,6 +125,13 @@ void Game::Finalize()
 		try { particleManager->Finalize(); }
 		catch (...) { Logger::Log(logStream, "particle finalize failed\n"); }
 		particleManager.reset();
+	}
+
+	if (offScreenRendering_)
+	{
+		try { offScreenRendering_->Finalize(); }
+		catch (...) { Logger::Log(logStream, "offscreen finalize failed\n"); }
+		offScreenRendering_.reset();
 	}
 
 	// 5) Game-owned sprites
@@ -246,6 +255,10 @@ void Game::Draw()
 	auto* window = engine_ ? engine_->GetWindowAPI() : nullptr;
 
 	if (dx) dx->PreDraw();
+	if (offScreenRendering_ && dx)
+	{
+		offScreenRendering_->Begin(dx->GetCommandList().Get());
+	}
 
 	if (object3dCom) object3dCom->PreDraw();
 
@@ -261,11 +274,13 @@ void Game::Draw()
 		Logger::Log(logStream, "Warning: camera GPU resource not available before SceneManager draw.\n");
 	}
 
+   /*
 	if (skybox_ && skyboxCom_ && textureIndexSkybox_ != TextureManager::kInvalidTextureIndex)
 	{
 		skyboxCom_->SetupDraw(ctx.commandList);
 		skybox_->Draw(ctx.commandList, TextureManager::GetInstance()->GetSrvHandleGPU(textureIndexSkybox_));
 	}
+	*/
 
 	if (object3dCom) object3dCom->PreDraw();
 
@@ -305,6 +320,13 @@ void Game::Draw()
 		oss << "Game::Draw - object texture index=" << std::dec << chosenIndex
 			<< " handle=0x" << std::hex << (unsigned long long)chosenHandle.ptr << std::dec << "\n";
 		OutputDebugStringA(oss.str().c_str());
+	}
+
+    if (offScreenRendering_ && dx)
+	{
+		offScreenRendering_->End(dx->GetCommandList().Get());
+		offScreenRendering_->SetMainRenderTarget(dx->GetCommandList().Get());
+		offScreenRendering_->DrawToBackBuffer(dx->GetCommandList().Get());
 	}
 
 	//実際のcommandListのImGuiの描画コマンドを積む
