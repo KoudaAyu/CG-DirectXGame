@@ -333,5 +333,6 @@
     <None Include="Resources\shaders\Object3d.hlsli" />
     <None Include="Resources\shaders\Particle.hlsli" />
     <None Include="Resources\shaders\Skybox.hlsli" />
+    <None Include="Resources\shaders\CopyImage.hlsli" />
   </ItemGroup>
 </Project>

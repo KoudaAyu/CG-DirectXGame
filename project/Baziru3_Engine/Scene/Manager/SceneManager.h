@@ -4,6 +4,7 @@
 #include "BaseScene.h"
 #include <memory>
 #include <cstdint>
+// RenderContext is not required by SceneManager Draw; keep scene-only draw signature
 
 class DirectXCom;
 class Camera;
@@ -29,7 +30,8 @@ public:
 
 	void Initialize(DirectXCom* dxCommon);
 
-	void Update();
+    // Update the scene manager and engine-level subsystems. deltaTime is in seconds.
+	void Update(float deltaTime);
 
     void Draw(SceneRenderRequests& renderRequests);
 

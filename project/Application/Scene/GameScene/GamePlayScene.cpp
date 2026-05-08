@@ -177,7 +177,7 @@ void GamePlayScene::Update()
 		prevF3 = curF3;
 	}
 
-	particleManager->Update(kDeltaTime);
+    // ParticleManager is updated by the engine (SceneManager) after the scene Update.
 }
 
 void GamePlayScene::Draw(SceneRenderRequests& renderRequests)

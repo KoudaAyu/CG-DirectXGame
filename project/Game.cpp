@@ -214,7 +214,8 @@ void Game::Update()
 	}
 
 
-	SceneManager::GetInstance()->Update();
+    // Update scenes and engine subsystems. Use fixed timestep here (same as scenes expect).
+	SceneManager::GetInstance()->Update(1.0f / 60.0f);
 
 	//if (windowAPI->ProcessMassage())
 	//{
@@ -285,14 +286,14 @@ void Game::Draw()
 		Logger::Log(logStream, "Warning: camera GPU resource not available before SceneManager draw.\n");
 	}
 
-	if (object3dCom) object3dCom->PreDraw();
+    // object3dCom PreDraw already called above
 
 	if (SceneManager::GetInstance())
 	{
-        SceneManager::GetInstance()->Draw(renderRequests);
+        //SceneManager::GetInstance()->Draw(renderRequests);
 	}
 
-  sphereRenderer_.Draw(ctx, renderRequests);
+	sphereRenderer_.Draw(ctx, renderRequests);
 
 
 
@@ -303,8 +304,13 @@ void Game::Draw()
 			object3dCom->Draw(object3d_.get(), ctx, modelData, drawObject);
 		}
 	}
-	DrawSprites(ctx);
-	DrawParticles(ctx);
+    DrawSprites(ctx);
+
+
+	if (renderRequests.sceneDrawn)
+	{
+		DrawParticles(ctx);
+	}
 	if (fadeApplication_)
 	{
 		fadeApplication_->Draw();

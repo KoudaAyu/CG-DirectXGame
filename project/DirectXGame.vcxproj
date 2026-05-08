@@ -160,6 +160,7 @@
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
+    <None Include="Resources\shaders\CopyImage.hlsli" />
     <None Include="Resources\shaders\Skybox.hlsli" />
     <None Include="Resources\shaders\Particle.hlsli" />
     <None Include="Resources\shaders\Object3d.hlsli" />

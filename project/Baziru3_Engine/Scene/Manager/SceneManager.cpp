@@ -6,6 +6,8 @@
 #include "SkyBox.h"
 #include "SkyboxCom.h"
 #include "TextureManager.h"
+// ParticleManager is used for engine-level particle updates/draws
+#include "Baziru3_Engine\Particle\ParticleManager.h"
 
 #include <cassert>
 #include<memory>
@@ -73,7 +75,7 @@ void SceneManager::Initialize(DirectXCom* dxCommon)
 	dxCommon_ = dxCommon;
 }
 
-void SceneManager::Update()
+void SceneManager::Update(float deltaTime)
 {
 	if (!dxCommon_)
 	{
@@ -88,6 +90,13 @@ void SceneManager::Update()
     if (scene_)
     {
         scene_->Update();
+    }
+
+    // Engine-level subsystems: update particle manager so that scenes may
+    // add particle definitions but the engine performs simulation.
+    if (particleManager_)
+    {
+        particleManager_->Update(deltaTime);
     }
 
     ApplyPendingSceneChange();
@@ -157,11 +166,19 @@ void SceneManager::CommitPendingSceneChange()
 
 void SceneManager::Draw(SceneRenderRequests& renderRequests)
 {
-	//実行中のシーンを描画
-	if (scene_)
-	{
-     scene_->Draw(renderRequests);
-	}
+    //実行中のシーンを描画
+    if (scene_)
+    {
+        // Clear flag before calling into scene. Scene will populate renderRequests
+        // if it produced any draw work.
+        renderRequests.sceneDrawn = false;
+        scene_->Draw(renderRequests);
+
+        if (!renderRequests.spheres.GetRequestedSpheres().empty())
+        {
+            renderRequests.sceneDrawn = true;
+        }
+    }
 }
 
 void SceneManager::DrawSkybox(ID3D12GraphicsCommandList* commandList) const
