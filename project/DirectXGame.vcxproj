@@ -17,6 +17,7 @@
   <ItemGroup>
     <ClCompile Include="Baziru3_Engine\Graphics\Particle\ParticleRenderer.cpp" />
     <ClCompile Include="Baziru3_Engine\Graphics\Sphere\SphereRenderer.cpp" />
+    <ClCompile Include="Baziru3_Engine\Particle\Ring.cpp" />
     <ClCompile Include="Baziru3_Engine\Scene\Factory\AbstractSceneFactory.cpp" />
     <ClCompile Include="Application\Scene\TitleScene\TitleScene.cpp" />
     <ClCompile Include="Baziru3_Engine\Audio\AudioManager.cpp" />
@@ -102,6 +103,7 @@
     <ClInclude Include="Baziru3_Engine\Graphics\SceneRenderRequests.h" />
     <ClInclude Include="Baziru3_Engine\Graphics\Sphere\SphereDrawRequests.h" />
     <ClInclude Include="Baziru3_Engine\Graphics\Sphere\SphereRenderer.h" />
+    <ClInclude Include="Baziru3_Engine\Particle\Ring.h" />
     <ClInclude Include="Baziru3_Engine\Scene\Factory\AbstractSceneFactory.h" />
     <ClInclude Include="Baziru3_Engine\Audio\AudioManager.h" />
     <ClInclude Include="Baziru3_Engine\Scene\BaseScene.h" />
