@@ -53,6 +53,11 @@ public:
 	{
 		return pipelineState;
 	}
+    // PipelineState for effect-like objects (no depth write)
+	const Microsoft::WRL::ComPtr<ID3D12PipelineState>& GetEffectPipelineState() const
+	{
+		return pipelineStateEffect;
+	}
 	const Microsoft::WRL::ComPtr<ID3D12RootSignature>& GetRootSignature() const
 	{
 		return rootSignature;
@@ -79,7 +84,8 @@ private:
 	Microsoft::WRL::ComPtr<IDxcBlob> pixelShaderBlob;
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC graphicPipelineStateDesc{};
 	// 追加: PSO本体
-	Microsoft::WRL::ComPtr<ID3D12PipelineState> pipelineState = nullptr;
+    Microsoft::WRL::ComPtr<ID3D12PipelineState> pipelineState = nullptr;
+	Microsoft::WRL::ComPtr<ID3D12PipelineState> pipelineStateEffect = nullptr;
 
 	std::ostream& logStream;
 };
