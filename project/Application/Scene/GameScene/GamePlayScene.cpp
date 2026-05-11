@@ -9,6 +9,7 @@
 #include "RenderContext.h"
 #include "Baziru3_Engine\Graphics\SceneRenderRequests.h"
 #include "SpriteManager.h"
+#include "TextureManager.h"
 #include "AudioManager.h"
 #include <cassert>
 #include <Windows.h>
@@ -30,6 +31,13 @@ void GamePlayScene::Initialize(DirectXCom* dxCommon, Camera* camera)
 
 	if (object3dCom && materialManager && light && particleManager)
 	{
+       cylinder_ = std::make_unique<Cylinder>();
+		cylinder_->Initialize(directXCom, object3dCom, materialManager, light, camera_, 32, 1.0f, 1.0f, 3.0f);
+		Sprite::Transform transformCylinder = { {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };
+		cylinder_->SetTransform(transformCylinder);
+		cylinder_->Update();
+		cylinderInitialized = true;
+
 		sphere_ = std::make_unique<Sphere>();
 		sphere_->Initialize(directXCom, object3dCom, materialManager, light, camera_);
 		sphereInitialized = true;
@@ -84,12 +92,19 @@ void GamePlayScene::Initialize(DirectXCom* dxCommon, Camera* camera)
 	emitter.frequencyTime = 0.0f;
 
 	// デバッグ用に2つのパーティクル用のテクスチャを読み込む
+  cylinderTextureIndex_ = TextureManager::GetInstance()->Load("Resources/CG4/gradationLine.png");
 	particleTextureA = TextureManager::GetInstance()->Load("Resources/uvChecker.png");
 	particleTextureB = TextureManager::GetInstance()->Load("Resources/CG4/circle2.png");
 }
 
 void GamePlayScene::Finalize()
 {
+   if (cylinder_)
+	{
+		cylinder_->Finalize();
+		cylinder_.reset();
+	}
+	cylinderInitialized = false;
 }
 
 void GamePlayScene::Update()
@@ -100,8 +115,18 @@ void GamePlayScene::Update()
 	{
 		Sprite::Transform transformSphere = sphere_->GetTransform();
 		transformSphere.rotate.y += 0.01f;
+     transformSphere.translate.x = -2.0f;
 		sphere_->SetTransform(transformSphere);
 		sphere_->Update();
+	}
+
+	if (cylinderInitialized && cylinder_)
+	{
+		Sprite::Transform transformCylinder = cylinder_->GetTransform();
+		transformCylinder.rotate.y += 0.01f;
+		transformCylinder.translate.x = 0.0f;
+		cylinder_->SetTransform(transformCylinder);
+		cylinder_->Update();
 	}
 
 	//パーティクルの更新
@@ -208,6 +233,11 @@ void GamePlayScene::Draw(SceneRenderRequests& renderRequests)
 				sprite->Draw();
 			}
 		}
+	}
+
+   if (cylinderInitialized && cylinder_ && cylinderTextureIndex_ != TextureManager::kInvalidTextureIndex)
+	{
+		cylinder_->Draw(TextureManager::GetInstance()->GetSrvHandleGPU(cylinderTextureIndex_));
 	}
 
 	if (sphereInitialized && sphere_)

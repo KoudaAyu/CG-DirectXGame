@@ -153,7 +153,8 @@
     <ClCompile Include="Baziru3_Engine\Graphics\Sphere\SphereRenderer.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
-    <ClCompile Include="Baziru3_Engine\Base\OffScreenRendering\RenderTexture.cpp">
+<ClCompile Include="Baziru3_Engine\Particle\Ring.cpp" />
+    <ClCompile Include="Baziru3_Engine\Base\OffScreenRendering\RenderTexture.cpp" />
       <Filter>ソース ファイル</Filter>
     </ClCompile>
   </ItemGroup>
@@ -327,6 +328,9 @@
 
     <ClInclude Include="Baziru3_Engine\Base\OffScreenRendering\RenderTexture.h">
 
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="Baziru3_Engine\Particle\Ring.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
   </ItemGroup>
