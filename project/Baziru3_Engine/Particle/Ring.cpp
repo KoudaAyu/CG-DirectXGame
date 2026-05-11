@@ -1,8 +1,18 @@
 #include "Ring.h"
 
+#include "Camera.h"
+#include "Light.h"
+#include "MaterialManager.h"
+#include "Object3dCom.h"
+
 #include <cmath>
 #include <cstring>
 #include <numbers>
+
+Ring::~Ring()
+{
+    Finalize();
+}
 
 void Ring::Initialize(DirectXCom* dxCommon, uint32_t ringDivide, float outerRadius, float innerRadius)
 {
@@ -19,12 +29,96 @@ void Ring::Initialize(DirectXCom* dxCommon, uint32_t ringDivide, float outerRadi
     vertexCount_ = static_cast<uint32_t>(verts.size());
 }
 
+void Ring::Initialize(DirectXCom* dxCommon, Object3dCom* object3dCom, MaterialManager* materialManager, Light* light, Camera* camera, uint32_t ringDivide, float outerRadius, float innerRadius)
+{
+    Initialize(dxCommon, ringDivide, outerRadius, innerRadius);
+
+    object3dCom_ = object3dCom;
+    materialManager_ = materialManager;
+    light_ = light;
+    camera_ = camera;
+
+    if (!dxCommon_)
+    {
+        return;
+    }
+
+    transformationMatrixResource_ = dxCommon_->CreateBufferResource(dxCommon_->GetDevice().Get(), sizeof(TransformationMatrix));
+    transformationMatrixResource_->Map(0, nullptr, reinterpret_cast<void**>(&transformationMatrixData_));
+    transformationMatrixData_->WVP = MakeIdentity4x4();
+    transformationMatrixData_->World = MakeIdentity4x4();
+    transformationMatrixData_->WorldInverseTranspose = MakeIdentity4x4();
+}
+
 void Ring::Finalize()
 {
+    if (transformationMatrixResource_ && transformationMatrixData_)
+    {
+        transformationMatrixResource_->Unmap(0, nullptr);
+        transformationMatrixData_ = nullptr;
+    }
+
     vertexBuffer_.Reset();
+    transformationMatrixResource_.Reset();
     vertexBufferView_ = {};
     vertexCount_ = 0;
+    object3dCom_ = nullptr;
+    materialManager_ = nullptr;
+    light_ = nullptr;
+    camera_ = nullptr;
     dxCommon_ = nullptr;
+}
+
+void Ring::Update()
+{
+    if (!camera_ || !transformationMatrixData_)
+    {
+        return;
+    }
+
+    worldMatrix_ = MakeAffineMatrix(transform_.scale, transform_.rotate, transform_.translate);
+    viewMatrix_ = Inverse(camera_->GetWorldMatrix());
+    wvpMatrix_ = Multiply(worldMatrix_, Multiply(viewMatrix_, camera_->GetProjectionMatrix()));
+    transformationMatrixData_->WVP = wvpMatrix_;
+    transformationMatrixData_->World = worldMatrix_;
+    transformationMatrixData_->WorldInverseTranspose = Transpose(Inverse(worldMatrix_));
+}
+
+void Ring::Draw(D3D12_GPU_DESCRIPTOR_HANDLE textureSrvHandle)
+{
+    if (!dxCommon_ || !object3dCom_ || !materialManager_ || !light_ || !camera_)
+    {
+        return;
+    }
+
+    ID3D12GraphicsCommandList* commandList = dxCommon_->GetCommandList().Get();
+    if (!commandList || vertexCount_ == 0 || textureSrvHandle.ptr == 0 || !transformationMatrixResource_)
+    {
+        return;
+    }
+
+    commandList->RSSetViewports(1, &dxCommon_->GetViewport());
+    commandList->RSSetScissorRects(1, &dxCommon_->GetScissorRect());
+
+    commandList->SetGraphicsRootSignature(object3dCom_->GetRootSignature().Get());
+    if (object3dCom_->GetEffectPipelineState())
+    {
+        commandList->SetPipelineState(object3dCom_->GetEffectPipelineState().Get());
+    }
+    else
+    {
+        commandList->SetPipelineState(object3dCom_->GetPipelineState().Get());
+    }
+    commandList->IASetVertexBuffers(0, 1, &vertexBufferView_);
+    commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+    commandList->SetGraphicsRootConstantBufferView(0, materialManager_->GetMaterialResource()->GetGPUVirtualAddress());
+    commandList->SetGraphicsRootConstantBufferView(1, transformationMatrixResource_->GetGPUVirtualAddress());
+    commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandle);
+    commandList->SetGraphicsRootConstantBufferView(3, light_->GetDirectionalLightResource()->GetGPUVirtualAddress());
+    commandList->SetGraphicsRootConstantBufferView(4, camera_->GetCameraResource()->GetGPUVirtualAddress());
+
+    commandList->DrawInstanced(vertexCount_, 1, 0, 0);
 }
 
 std::vector<Ring::Vertex> Ring::CreateMesh(uint32_t ringDivide, float outerRadius, float innerRadius) const

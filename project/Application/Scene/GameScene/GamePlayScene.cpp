@@ -31,12 +31,16 @@ void GamePlayScene::Initialize(DirectXCom* dxCommon, Camera* camera)
 
 	if (object3dCom && materialManager && light && particleManager)
 	{
-       cylinder_ = std::make_unique<Cylinder>();
-		cylinder_->Initialize(directXCom, object3dCom, materialManager, light, camera_, 32, 1.0f, 1.0f, 3.0f);
+        hitEffect_ = std::make_unique<HitEffect>();
+		hitEffect_->Initialize(directXCom, object3dCom, materialManager, light, camera_, 64, 1.0f, 0.2f, 32, 1.0f, 1.0f, 3.0f);
+       hitEffect_->SetParticleManager(particleManager);
+		hitEffect_->SetCylinderEnabled(true);
+      hitEffect_->SetRingEnabled(true);
+       hitEffect_->SetEffectDuration(0.35f);
 		Sprite::Transform transformCylinder = { {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };
-		cylinder_->SetTransform(transformCylinder);
-		cylinder_->Update();
-		cylinderInitialized = true;
+		hitEffect_->GetCylinderTransform() = transformCylinder;
+       hitEffect_->Update(kDeltaTime);
+		hitEffectInitialized = true;
 
 		sphere_ = std::make_unique<Sphere>();
 		sphere_->Initialize(directXCom, object3dCom, materialManager, light, camera_);
@@ -93,18 +97,24 @@ void GamePlayScene::Initialize(DirectXCom* dxCommon, Camera* camera)
 
 	// デバッグ用に2つのパーティクル用のテクスチャを読み込む
   cylinderTextureIndex_ = TextureManager::GetInstance()->Load("Resources/CG4/gradationLine.png");
-	particleTextureA = TextureManager::GetInstance()->Load("Resources/uvChecker.png");
-	particleTextureB = TextureManager::GetInstance()->Load("Resources/CG4/circle2.png");
+   particleTextureA = TextureManager::GetInstance()->Load("Resources/uvChecker.png");
+   particleTextureB = TextureManager::GetInstance()->Load("Resources/CG4/circle2.png");
+   if (hitEffect_)
+   {
+	   hitEffect_->SetPlaneParticleTextureIndex(particleTextureB);
+	   hitEffect_->SetPlaneParticleCount(emitter.count);
+	   hitEffect_->SetRingTextureIndex(particleTextureA);
+   }
 }
 
 void GamePlayScene::Finalize()
 {
-   if (cylinder_)
+   if (hitEffect_)
 	{
-		cylinder_->Finalize();
-		cylinder_.reset();
+      hitEffect_->Finalize();
+		hitEffect_.reset();
 	}
-	cylinderInitialized = false;
+    hitEffectInitialized = false;
 }
 
 void GamePlayScene::Update()
@@ -120,13 +130,10 @@ void GamePlayScene::Update()
 		sphere_->Update();
 	}
 
-	if (cylinderInitialized && cylinder_)
+   if (hitEffectInitialized && hitEffect_)
 	{
-		Sprite::Transform transformCylinder = cylinder_->GetTransform();
-		transformCylinder.rotate.y += 0.01f;
-		transformCylinder.translate.x = 0.0f;
-		cylinder_->SetTransform(transformCylinder);
-		cylinder_->Update();
+        hitEffect_->SetPlaneParticleCount(emitter.count);
+       hitEffect_->Update(kDeltaTime);
 	}
 
 	//パーティクルの更新
@@ -160,19 +167,11 @@ void GamePlayScene::Update()
 		bool curF2 = (GetAsyncKeyState('9') & 0x8000) != 0;
 		if (curF2 && !prevF2)
 		{
-			if (particleManager)
+            if (hitEffect_)
 			{
-				std::list<ParticleManager::Particle> newParticles;
-				for (uint32_t i = 0; i < emitter.count; ++i)
-				{
-					Vector3 effectTranslate = emitter.transform.GetTranslate();
-					effectTranslate.y += 1.5f;
-					auto p = particleManager->MakeHieEffect(particleManager->GetRandomEngine(), effectTranslate);
-					p.textureIndex = particleTextureB;
-					p.lifeTime = 0.35f;
-					newParticles.push_back(p);
-				}
-				particleManager->AddEffectParticles(newParticles);
+              Vector3 effectTranslate = emitter.transform.GetTranslate();
+				effectTranslate.y += 1.5f;
+				hitEffect_->Play(effectTranslate);
 			}
 		}
 		prevF2 = curF2;
@@ -235,9 +234,10 @@ void GamePlayScene::Draw(SceneRenderRequests& renderRequests)
 		}
 	}
 
-   if (cylinderInitialized && cylinder_ && cylinderTextureIndex_ != TextureManager::kInvalidTextureIndex)
+   if (hitEffectInitialized && hitEffect_ && cylinderTextureIndex_ != TextureManager::kInvalidTextureIndex)
 	{
-		cylinder_->Draw(TextureManager::GetInstance()->GetSrvHandleGPU(cylinderTextureIndex_));
+     hitEffect_->SetTextureIndex(cylinderTextureIndex_);
+		hitEffect_->Draw();
 	}
 
 	if (sphereInitialized && sphere_)

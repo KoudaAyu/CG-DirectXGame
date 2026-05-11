@@ -1,7 +1,7 @@
 #pragma once
 
 #include "BaseScene.h"
-#include"Cylinder.h"
+#include"Baziru3_Engine\Effect\HitEffect.h"
 #include"DirectXCom.h"
 #include"ParticleEmitter.h"
 #include"Sphere.h"
@@ -45,7 +45,7 @@ private:
     MaterialManager* materialManager = nullptr;
     Object3dCom* object3dCom = nullptr;
     ParticleManager* particleManager = nullptr;
-    std::unique_ptr<Cylinder> cylinder_;
+    std::unique_ptr<HitEffect> hitEffect_;
     std::unique_ptr<Sphere> sphere_;
     DebugCamera debugCamera_;
     std::vector<std::unique_ptr<Sprite>> sprites;
@@ -54,7 +54,7 @@ private:
     std::list<ParticleManager::Particle> hitEffectParticles;
 
     bool sphereInitialized = false;
-    bool cylinderInitialized = false;
+    bool hitEffectInitialized = false;
 
 	// テクスチャインデックスは TextureManager で管理されるため、ここではインデックスを保持するだけにする
     uint32_t cylinderTextureIndex_ = TextureManager::kInvalidTextureIndex;

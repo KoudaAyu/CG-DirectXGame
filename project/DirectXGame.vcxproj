@@ -15,6 +15,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="Baziru3_Engine\Effect\HitEffect.cpp" />
     <ClCompile Include="Baziru3_Engine\Graphics\Particle\ParticleRenderer.cpp" />
     <ClCompile Include="Baziru3_Engine\Graphics\Sphere\SphereRenderer.cpp" />
     <ClCompile Include="Baziru3_Engine\Primitive\Cylinder\Cylinder.cpp" />
@@ -100,6 +101,7 @@
     </FxCompile>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Baziru3_Engine\Effect\HitEffect.h" />
     <ClInclude Include="Baziru3_Engine\Graphics\Particle\ParticleRenderer.h" />
     <ClInclude Include="Baziru3_Engine\Graphics\SceneRenderRequests.h" />
     <ClInclude Include="Baziru3_Engine\Graphics\Sphere\SphereDrawRequests.h" />
