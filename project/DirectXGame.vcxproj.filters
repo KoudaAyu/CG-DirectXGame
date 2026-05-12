@@ -171,6 +171,9 @@
     <ClCompile Include="Baziru3_Engine\Animation\AnimationUtils.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
+    <ClCompile Include="Baziru3_Engine\3D\Scene\Node.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="Resources\shaders\Object3d.VS.hlsl" />
@@ -370,7 +373,10 @@
     <ClInclude Include="Baziru3_Engine\Math\Quaternion.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
-    <ClInclude Include="Baziru3_Engine\Base\Quaternion.h">
+    <ClInclude Include="Baziru3_Engine\Math\EulerTRansform.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="Baziru3_Engine\3D\Scene\Node.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
   </ItemGroup>

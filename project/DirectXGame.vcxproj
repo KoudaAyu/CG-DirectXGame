@@ -15,6 +15,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="Baziru3_Engine\3D\Scene\Node.cpp" />
     <ClCompile Include="Baziru3_Engine\Animation\Animation.cpp" />
     <ClCompile Include="Baziru3_Engine\Animation\AnimationUtils.cpp" />
     <ClCompile Include="Baziru3_Engine\Animation\Animator.cpp" />
@@ -104,18 +105,19 @@
     </FxCompile>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Baziru3_Engine\3D\Scene\Node.h" />
     <ClInclude Include="Baziru3_Engine\Animation\Animation.h" />
     <ClInclude Include="Baziru3_Engine\Animation\AnimationData.h" />
     <ClInclude Include="Baziru3_Engine\Animation\AnimationUtils.h" />
     <ClInclude Include="Baziru3_Engine\Animation\Animator.h" />
     <ClInclude Include="Baziru3_Engine\Animation\Keyframe\Keyframe.h" />
     <ClInclude Include="Baziru3_Engine\Animation\NodeAnimation\NodeAnimation.h" />
-    <ClInclude Include="Baziru3_Engine\Base\Quaternion.h" />
     <ClInclude Include="Baziru3_Engine\Effect\HitEffect.h" />
     <ClInclude Include="Baziru3_Engine\Graphics\Particle\ParticleRenderer.h" />
     <ClInclude Include="Baziru3_Engine\Graphics\SceneRenderRequests.h" />
     <ClInclude Include="Baziru3_Engine\Graphics\Sphere\SphereDrawRequests.h" />
     <ClInclude Include="Baziru3_Engine\Graphics\Sphere\SphereRenderer.h" />
+    <ClInclude Include="Baziru3_Engine\Math\EulerTRansform.h" />
     <ClInclude Include="Baziru3_Engine\Math\Quaternion.h" />
     <ClInclude Include="Baziru3_Engine\Primitive\Cylinder\Cylinder.h" />
     <ClInclude Include="Baziru3_Engine\Particle\Ring.h" />
