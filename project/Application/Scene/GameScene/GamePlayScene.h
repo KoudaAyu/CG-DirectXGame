@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "Object3dCom.h"
+#include "Object3d.h"
 #include "Light.h"
 #include "MaterialManager.h"
 #include "ParticleManager.h"
@@ -46,6 +47,7 @@ private:
     Object3dCom* object3dCom = nullptr;
     ParticleManager* particleManager = nullptr;
     std::unique_ptr<HitEffect> hitEffect_;
+    std::unique_ptr<Object3d> animatedCube_;
     std::unique_ptr<Sphere> sphere_;
     DebugCamera debugCamera_;
     std::vector<std::unique_ptr<Sprite>> sprites;
@@ -55,6 +57,7 @@ private:
 
     bool sphereInitialized = false;
     bool hitEffectInitialized = false;
+    bool animatedCubeInitialized_ = false;
 
 	// テクスチャインデックスは TextureManager で管理されるため、ここではインデックスを保持するだけにする
     uint32_t cylinderTextureIndex_ = TextureManager::kInvalidTextureIndex;

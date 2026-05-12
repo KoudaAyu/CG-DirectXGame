@@ -51,6 +51,18 @@ void GamePlayScene::Initialize(DirectXCom* dxCommon, Camera* camera)
 			{0.0f, 0.0f, 0.0f},
 			{0.0f, 0.0f, 0.0f}
 		};
+
+		Object3d::ModelData animatedCubeModelData = Object3d::LoadModelFile("Resources/CG4/AnimatedCube", "AnimatedCube.gltf");
+		if (!animatedCubeModelData.material.textureFilePath.empty())
+		{
+			animatedCubeModelData.material.textureIndex = TextureManager::GetInstance()->Load(animatedCubeModelData.material.textureFilePath);
+		}
+
+		animatedCube_ = std::make_unique<Object3d>();
+		animatedCube_->Initialize(object3dCom, animatedCubeModelData);
+		animatedCube_->SetTranslate({ 2.0f, 0.0f, 0.0f });
+		animatedCube_->SetScale({ 1.0f, 1.0f, 1.0f });
+		animatedCubeInitialized_ = true;
 	}
 
 	//スプライト共通テクスチャ読み込み
@@ -128,6 +140,14 @@ void GamePlayScene::Update()
      transformSphere.translate.x = -2.0f;
 		sphere_->SetTransform(transformSphere);
 		sphere_->Update();
+	}
+
+	if (animatedCubeInitialized_ && animatedCube_)
+	{
+		Vector3 rotate = animatedCube_->GetRotate();
+		rotate.y += 0.01f;
+		animatedCube_->SetRotate(rotate);
+		animatedCube_->Update();
 	}
 
    if (hitEffectInitialized && hitEffect_)
@@ -243,6 +263,21 @@ void GamePlayScene::Draw(SceneRenderRequests& renderRequests)
 	if (sphereInitialized && sphere_)
 	{
      renderRequests.spheres.Request(sphere_.get());
+	}
+
+	if (animatedCubeInitialized_ && animatedCube_ && object3dCom)
+	{
+		const auto& modelData = animatedCube_->GetModelData();
+		if (modelData.material.textureIndex != TextureManager::kInvalidTextureIndex)
+		{
+			ctx.textureHandle = TextureManager::GetInstance()->GetSrvHandleGPU(modelData.material.textureIndex);
+		}
+		else
+		{
+			ctx.textureHandle = {};
+		}
+
+		object3dCom->Draw(animatedCube_.get(), ctx, modelData, true);
 	}
 
 }
