@@ -1,6 +1,5 @@
 #pragma once
-#include "Transform.h"
-#include "Matrix4x4.h"
+#include "Vector.h"
 #include <cmath>
 
 struct Quaternion
@@ -12,7 +11,15 @@ struct Quaternion
 
     static Quaternion FromAxisAngle(const Vector3& axis, float angleRad)
     {
-        Vector3 a = axis.Normalized();
+        float length = std::sqrt(axis.x * axis.x + axis.y * axis.y + axis.z * axis.z);
+        Vector3 a = axis;
+        if (length > 0.0f)
+        {
+            float invLength = 1.0f / length;
+            a.x *= invLength;
+            a.y *= invLength;
+            a.z *= invLength;
+        }
         float s = std::sin(angleRad * 0.5f);
         return Quaternion(a.x * s, a.y * s, a.z * s, std::cos(angleRad * 0.5f));
     }

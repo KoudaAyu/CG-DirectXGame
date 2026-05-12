@@ -4,7 +4,7 @@
 #include <algorithm>
 #include "NodeAnimation/NodeAnimation.h"
 #include "../Base/Vector.h"
-#include "../Base/Quaternion.h"
+#include "../Math/Quaternion.h"
 #include "../Base/Matrix4x4.h"
 #include "../Animation/Keyframe/Keyframe.h"
 #include "AnimationUtils.h"

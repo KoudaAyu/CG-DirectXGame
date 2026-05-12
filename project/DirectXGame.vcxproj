@@ -110,11 +110,13 @@
     <ClInclude Include="Baziru3_Engine\Animation\Animator.h" />
     <ClInclude Include="Baziru3_Engine\Animation\Keyframe\Keyframe.h" />
     <ClInclude Include="Baziru3_Engine\Animation\NodeAnimation\NodeAnimation.h" />
+    <ClInclude Include="Baziru3_Engine\Base\Quaternion.h" />
     <ClInclude Include="Baziru3_Engine\Effect\HitEffect.h" />
     <ClInclude Include="Baziru3_Engine\Graphics\Particle\ParticleRenderer.h" />
     <ClInclude Include="Baziru3_Engine\Graphics\SceneRenderRequests.h" />
     <ClInclude Include="Baziru3_Engine\Graphics\Sphere\SphereDrawRequests.h" />
     <ClInclude Include="Baziru3_Engine\Graphics\Sphere\SphereRenderer.h" />
+    <ClInclude Include="Baziru3_Engine\Math\Quaternion.h" />
     <ClInclude Include="Baziru3_Engine\Primitive\Cylinder\Cylinder.h" />
     <ClInclude Include="Baziru3_Engine\Particle\Ring.h" />
     <ClInclude Include="Baziru3_Engine\Scene\Factory\AbstractSceneFactory.h" />
