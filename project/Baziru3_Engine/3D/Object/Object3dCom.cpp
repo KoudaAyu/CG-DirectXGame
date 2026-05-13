@@ -49,6 +49,19 @@ void Object3dCom::CreateGraphicsPipelineState()
 			dxCommon->SetHr(dxCommon->GetDevice()->CreateGraphicsPipelineState(&desc, IID_PPV_ARGS(&pipelineState)));
 			assert(SUCCEEDED(dxCommon->GetHr()));
 		}
+        // Create an alternative PSO for effect rendering where depth writes are disabled.
+		// Make a copy of the descriptor and adjust depth write mask.
+		if (pipelineStateEffect == nullptr)
+		{
+			D3D12_GRAPHICS_PIPELINE_STATE_DESC descEffect = desc;
+			// Ensure depth stencil state exists
+			descEffect.DepthStencilState.DepthEnable = TRUE;
+			descEffect.DepthStencilState.DepthFunc = depthStencilDesc.DepthFunc;
+			descEffect.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO; // disable depth writes for effects
+			descEffect.pRootSignature = rootSignature.Get();
+			dxCommon->SetHr(dxCommon->GetDevice()->CreateGraphicsPipelineState(&descEffect, IID_PPV_ARGS(&pipelineStateEffect)));
+			assert(SUCCEEDED(dxCommon->GetHr()));
+		}
 	}
 }
 

@@ -9,6 +9,7 @@
 #include "RenderContext.h"
 #include "Baziru3_Engine\Graphics\SceneRenderRequests.h"
 #include "SpriteManager.h"
+#include "TextureManager.h"
 #include "AudioManager.h"
 #include <cassert>
 #include <Windows.h>
@@ -30,6 +31,17 @@ void GamePlayScene::Initialize(DirectXCom* dxCommon, Camera* camera)
 
 	if (object3dCom && materialManager && light && particleManager)
 	{
+        hitEffect_ = std::make_unique<HitEffect>();
+		hitEffect_->Initialize(directXCom, object3dCom, materialManager, light, camera_, 64, 1.0f, 0.2f, 32, 1.0f, 1.0f, 3.0f);
+       hitEffect_->SetParticleManager(particleManager);
+		hitEffect_->SetCylinderEnabled(true);
+      hitEffect_->SetRingEnabled(true);
+       hitEffect_->SetEffectDuration(0.35f);
+		Sprite::Transform transformCylinder = { {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };
+		hitEffect_->GetCylinderTransform() = transformCylinder;
+       hitEffect_->Update(kDeltaTime);
+		hitEffectInitialized = true;
+
 		sphere_ = std::make_unique<Sphere>();
 		sphere_->Initialize(directXCom, object3dCom, materialManager, light, camera_);
 		sphereInitialized = true;
@@ -39,6 +51,18 @@ void GamePlayScene::Initialize(DirectXCom* dxCommon, Camera* camera)
 			{0.0f, 0.0f, 0.0f},
 			{0.0f, 0.0f, 0.0f}
 		};
+
+		Object3d::ModelData animatedCubeModelData = Object3d::LoadModelFile("Resources/CG4/AnimatedCube", "AnimatedCube.gltf");
+		if (!animatedCubeModelData.material.textureFilePath.empty())
+		{
+			animatedCubeModelData.material.textureIndex = TextureManager::GetInstance()->Load(animatedCubeModelData.material.textureFilePath);
+		}
+
+		animatedCube_ = std::make_unique<Object3d>();
+		animatedCube_->Initialize(object3dCom, animatedCubeModelData);
+		animatedCube_->SetTranslate({ 2.0f, 0.0f, 0.0f });
+		animatedCube_->SetScale({ 1.0f, 1.0f, 1.0f });
+		animatedCubeInitialized_ = true;
 	}
 
 	//スプライト共通テクスチャ読み込み
@@ -84,12 +108,25 @@ void GamePlayScene::Initialize(DirectXCom* dxCommon, Camera* camera)
 	emitter.frequencyTime = 0.0f;
 
 	// デバッグ用に2つのパーティクル用のテクスチャを読み込む
-	particleTextureA = TextureManager::GetInstance()->Load("Resources/uvChecker.png");
-	particleTextureB = TextureManager::GetInstance()->Load("Resources/CG4/circle2.png");
+  cylinderTextureIndex_ = TextureManager::GetInstance()->Load("Resources/CG4/gradationLine.png");
+   particleTextureA = TextureManager::GetInstance()->Load("Resources/uvChecker.png");
+   particleTextureB = TextureManager::GetInstance()->Load("Resources/CG4/circle2.png");
+   if (hitEffect_)
+   {
+	   hitEffect_->SetPlaneParticleTextureIndex(particleTextureB);
+	   hitEffect_->SetPlaneParticleCount(emitter.count);
+	   hitEffect_->SetRingTextureIndex(particleTextureA);
+   }
 }
 
 void GamePlayScene::Finalize()
 {
+   if (hitEffect_)
+	{
+      hitEffect_->Finalize();
+		hitEffect_.reset();
+	}
+    hitEffectInitialized = false;
 }
 
 void GamePlayScene::Update()
@@ -100,8 +137,23 @@ void GamePlayScene::Update()
 	{
 		Sprite::Transform transformSphere = sphere_->GetTransform();
 		transformSphere.rotate.y += 0.01f;
+     transformSphere.translate.x = -2.0f;
 		sphere_->SetTransform(transformSphere);
 		sphere_->Update();
+	}
+
+	if (animatedCubeInitialized_ && animatedCube_)
+	{
+		Vector3 rotate = animatedCube_->GetRotate();
+		rotate.y += 0.01f;
+		animatedCube_->SetRotate(rotate);
+		animatedCube_->Update();
+	}
+
+   if (hitEffectInitialized && hitEffect_)
+	{
+        hitEffect_->SetPlaneParticleCount(emitter.count);
+       hitEffect_->Update(kDeltaTime);
 	}
 
 	//パーティクルの更新
@@ -135,19 +187,11 @@ void GamePlayScene::Update()
 		bool curF2 = (GetAsyncKeyState('9') & 0x8000) != 0;
 		if (curF2 && !prevF2)
 		{
-			if (particleManager)
+            if (hitEffect_)
 			{
-				std::list<ParticleManager::Particle> newParticles;
-				for (uint32_t i = 0; i < emitter.count; ++i)
-				{
-					Vector3 effectTranslate = emitter.transform.GetTranslate();
-					effectTranslate.y += 1.5f;
-					auto p = particleManager->MakeHieEffect(particleManager->GetRandomEngine(), effectTranslate);
-					p.textureIndex = particleTextureB;
-					p.lifeTime = 0.35f;
-					newParticles.push_back(p);
-				}
-				particleManager->AddEffectParticles(newParticles);
+              Vector3 effectTranslate = emitter.transform.GetTranslate();
+				effectTranslate.y += 1.5f;
+				hitEffect_->Play(effectTranslate);
 			}
 		}
 		prevF2 = curF2;
@@ -210,9 +254,30 @@ void GamePlayScene::Draw(SceneRenderRequests& renderRequests)
 		}
 	}
 
+   if (hitEffectInitialized && hitEffect_ && cylinderTextureIndex_ != TextureManager::kInvalidTextureIndex)
+	{
+     hitEffect_->SetTextureIndex(cylinderTextureIndex_);
+		hitEffect_->Draw();
+	}
+
 	if (sphereInitialized && sphere_)
 	{
 		renderRequests.spheres.Request(sphere_.get());
+	}
+
+	if (animatedCubeInitialized_ && animatedCube_ && object3dCom)
+	{
+		const auto& modelData = animatedCube_->GetModelData();
+		if (modelData.material.textureIndex != TextureManager::kInvalidTextureIndex)
+		{
+			ctx.textureHandle = TextureManager::GetInstance()->GetSrvHandleGPU(modelData.material.textureIndex);
+		}
+		else
+		{
+			ctx.textureHandle = {};
+		}
+
+		object3dCom->Draw(animatedCube_.get(), ctx, modelData, true);
 	}
 
 }

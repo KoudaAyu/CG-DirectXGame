@@ -1,4 +1,5 @@
 #include "Matrix4x4.h"
+#include "Quaternion.h"
 
 #include<cmath>
 
@@ -328,6 +329,44 @@ Matrix4x4 MakeAffineMatrix(const Vector3& scale, const Matrix4x4& rotateMatrix, 
 	result.m[3][3] = 1.0f; // 最後の要素は1
 
 	return result;
+}
+
+// Quaternion を受け取るオーバーロード
+Matrix4x4 MakeAffineMatrix(const Vector3& scale, const Quaternion& rotation, const Vector3& translate)
+{
+	Quaternion q = rotation;
+	q.Normalize();
+	Matrix4x4 r = {};
+
+	float xx = q.x * q.x;
+	float yy = q.y * q.y;
+	float zz = q.z * q.z;
+	float xy = q.x * q.y;
+	float xz = q.x * q.z;
+	float yz = q.y * q.z;
+	float wx = q.w * q.x;
+	float wy = q.w * q.y;
+	float wz = q.w * q.z;
+
+	// Row-major 3x3 rotation
+	r.m[0][0] = 1.0f - 2.0f * (yy + zz);
+	r.m[0][1] = 2.0f * (xy + wz);
+	r.m[0][2] = 2.0f * (xz - wy);
+	r.m[0][3] = 0.0f;
+
+	r.m[1][0] = 2.0f * (xy - wz);
+	r.m[1][1] = 1.0f - 2.0f * (xx + zz);
+	r.m[1][2] = 2.0f * (yz + wx);
+	r.m[1][3] = 0.0f;
+
+	r.m[2][0] = 2.0f * (xz + wy);
+	r.m[2][1] = 2.0f * (yz - wx);
+	r.m[2][2] = 1.0f - 2.0f * (xx + yy);
+	r.m[2][3] = 0.0f;
+
+	r.m[3][0] = 0.0f; r.m[3][1] = 0.0f; r.m[3][2] = 0.0f; r.m[3][3] = 1.0f;
+
+	return MakeAffineMatrix(scale, r, translate);
 }
 
 Matrix4x4 MakePerspectiveFovMatrix(float fovY, float aspectRatio, float nearZ, float farZ)

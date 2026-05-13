@@ -1,5 +1,6 @@
 #include"ParticleManager.h"
 #include"ParticleEmitter.h"
+#include"Ring.h"
 #include"TextureManager.h"
 
 #include "RootParam.h"
@@ -28,15 +29,8 @@ void ParticleManager::Initialize(Camera* camera)
 
     particles.clear();
 
-	// Create a ring mesh and vertex buffer used for particle drawing
-	{
-		const uint32_t kRingDivide = 64;
-		const float kOuterRadius = 1.0f;
-		const float kInnerRadius = 0.2f;
-		auto verts = CreateRingMesh(kRingDivide, kOuterRadius, kInnerRadius);
-		CreateVertexBufferFromVerts(verts);
-		vertexCount = static_cast<uint32_t>(verts.size());
-	}
+   ring_ = std::make_unique<Ring>();
+	ring_->Initialize(dxCommon);
 
 	instancingResource =
 		dxCommon->CreateBufferResource(dxCommon->GetDevice(), sizeof(ParticleManager::ParticleForGPU) * kNumMaxInstances);
@@ -118,8 +112,11 @@ void ParticleManager::Finalize()
     errorBlob.Reset();
     vertexShaderBlob.Reset();
     pixelShaderBlob.Reset();
-	vertexBuffer.Reset();
-	vertexBufferView = {};
+   if (ring_)
+	{
+		ring_->Finalize();
+		ring_.reset();
+	}
 
    
     particles.clear();
@@ -131,7 +128,6 @@ void ParticleManager::Finalize()
     instanceGroups.clear();
     normalInstanceGroups_.clear();
 	effectInstanceGroups_.clear();
-	vertexCount = 0;
 
     Logger::Log(logStream, "ParticleManager finalized\n");
 }
@@ -315,9 +311,10 @@ void ParticleManager::Draw(ID3D12GraphicsCommandList* commandList, const RenderC
 	// 内部のリング頂点バッファはバインドしない。
 	if (vertexCount == 0)
 	{
-		if (vertexBuffer && vertexBufferView.SizeInBytes > 0)
+       if (ring_ && ring_->GetVertexBufferView().SizeInBytes > 0)
 		{
-			commandList->IASetVertexBuffers(0, 1, &vertexBufferView);
+           const auto& ringVertexBufferView = ring_->GetVertexBufferView();
+			commandList->IASetVertexBuffers(0, 1, &ringVertexBufferView);
 		}
 	}
 
@@ -332,8 +329,7 @@ void ParticleManager::Draw(ID3D12GraphicsCommandList* commandList, const RenderC
     UINT vc = vertexCount;
     if (vc == 0)
     {
-        // フォールバック: 呼び出し側が vertexCount を渡してないときは単一の四角 (6 頂点) を使う
-        vc = (this->vertexCount > 0) ? this->vertexCount : 6u;
+        vc = (ring_ && ring_->GetVertexCount() > 0) ? ring_->GetVertexCount() : 6u;
     }
 
     // デバッグ: インスタンスグループと最初のいくつかのインスタンスの textureIndex をログに出す
@@ -423,60 +419,6 @@ ParticleManager::Particle ParticleManager::MakeNewParticles(std::mt19937& random
 	particle.lifeTime = distTime(randomEngine);
 	particle.currentTime = 0.0f;
 	return particle;
-}
-
-
-std::vector<ParticleManager::Vertex> ParticleManager::CreateRingMesh(uint32_t kRingDivide, float kOuterRadius, float kInnerRadius)
-{
-	std::vector<Vertex> verts;
-	verts.reserve(kRingDivide * 6);
-	const float twoPi = std::numbers::pi_v<float> * 2.0f;
-	for (uint32_t i = 0; i < kRingDivide; ++i)
-	{
-		float a = float(i) * twoPi / float(kRingDivide);
-		float b = float(i + 1) * twoPi / float(kRingDivide);
-		float sinA = std::sin(a), cosA = std::cos(a);
-		float sinB = std::sin(b), cosB = std::cos(b);
-		float u = float(i) / float(kRingDivide);
-		float uNext = float(i + 1) / float(kRingDivide);
-
-        Vector3 vOuterA3 = { -sinA * kOuterRadius, cosA * kOuterRadius, 0.0f };
-		Vector3 vOuterB3 = { -sinB * kOuterRadius, cosB * kOuterRadius, 0.0f };
-		Vector3 vInnerA3 = { -sinA * kInnerRadius, cosA * kInnerRadius, 0.0f };
-		Vector3 vInnerB3 = { -sinB * kInnerRadius, cosB * kInnerRadius, 0.0f };
-		Vector3 n = { 0.0f, 0.0f, 1.0f };
-
-		Vector4 vOuterA = { vOuterA3.x, vOuterA3.y, vOuterA3.z, 1.0f };
-		Vector4 vOuterB = { vOuterB3.x, vOuterB3.y, vOuterB3.z, 1.0f };
-		Vector4 vInnerA = { vInnerA3.x, vInnerA3.y, vInnerA3.z, 1.0f };
-		Vector4 vInnerB = { vInnerB3.x, vInnerB3.y, vInnerB3.z, 1.0f };
-
-		// tri 1: outerA, outerB, innerA
-		verts.push_back({ vOuterA, { u, 1.0f }, n });
-		verts.push_back({ vOuterB, { uNext, 1.0f }, n });
-		verts.push_back({ vInnerA, { u, 0.0f }, n });
-
-		// tri 2: outerB, innerB, innerA
-		verts.push_back({ vOuterB, { uNext, 1.0f }, n });
-		verts.push_back({ vInnerB, { uNext, 0.0f }, n });
-		verts.push_back({ vInnerA, { u, 0.0f }, n });
-	}
-	return verts;
-}
-
-void ParticleManager::CreateVertexBufferFromVerts(const std::vector<Vertex>& verts)
-{
-	if (verts.empty()) return;
-	size_t sizeInBytes = verts.size() * sizeof(Vertex);
-	vertexBuffer = dxCommon->CreateBufferResource(dxCommon->GetDevice(), sizeInBytes);
-	void* mapped = nullptr;
-	vertexBuffer->Map(0, nullptr, &mapped);
-	memcpy(mapped, verts.data(), sizeInBytes);
-	vertexBuffer->Unmap(0, nullptr);
-
-	vertexBufferView.BufferLocation = vertexBuffer->GetGPUVirtualAddress();
-	vertexBufferView.SizeInBytes = static_cast<UINT>(sizeInBytes);
-	vertexBufferView.StrideInBytes = static_cast<UINT>(sizeof(Vertex));
 }
 
 ParticleManager::Particle ParticleManager::MakeHieEffect(std::mt19937& randomEngine, const Vector3& translate)

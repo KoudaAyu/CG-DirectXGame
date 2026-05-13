@@ -1,5 +1,6 @@
 #pragma once
 #include"Vector.h"
+#include "Quaternion.h"
 
 struct Matrix3x3
 {
@@ -61,6 +62,9 @@ Matrix4x4 MakeTranslateMatrix(const Vector3& translate);
 Matrix4x4 MakeAffineMatrix(const Vector3& scale, const Vector3& rotate, const Vector3& translate);
 
 Matrix4x4 MakeAffineMatrix(const Vector3& scale, const Matrix4x4& rotateMatrix, const Vector3& translate);
+
+// Quaternion 版の MakeAffineMatrix を追加
+Matrix4x4 MakeAffineMatrix(const Vector3& scale, const Quaternion& rotation, const Vector3& translate);
 
 
 Matrix4x4 MakePerspectiveFovMatrix(float fovY, float aspectRatio, float nearZ, float farZ);
