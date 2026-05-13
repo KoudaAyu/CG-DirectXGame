@@ -71,6 +71,14 @@ public:
 	/// <returns></returns>
 	static ModelData LoadObjFile(const std::string& directoryPath, const std::string& filename);
 
+	/// <summary>
+	/// Assimp対応モデルファイルの読み込み(.gltf など)
+	/// </summary>
+	/// <param name="directoryPath">ファイルパス</param>
+	/// <param name="filename">モデルファイル名</param>
+	/// <returns></returns>
+	static ModelData LoadModelFile(const std::string& directoryPath, const std::string& filename);
+
 
 
 	void VertexResource();
@@ -107,6 +115,7 @@ public:
 	Vector3 GetRotate() const { return transform.GetRotate(); }
 	Vector3 GetTranslate() const { return transform.GetTranslate(); }
 	Vector3 GetScale() const { return transform.GetScale(); }
+	const ModelData& GetModelData() const { return modelData_; }
 
 private:
 	Transform transform;

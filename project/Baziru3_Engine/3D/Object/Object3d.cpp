@@ -2,10 +2,89 @@
 #include"Object3dCom.h"
 #include"Matrix4x4.h"
 #include "RootParam.h"
+#include <assimp/Importer.hpp>
+#include <assimp/postprocess.h>
+#include <assimp/scene.h>
 #include<cassert>
 #include<fstream> // 追加: mtlファイル読み込み
 #include<sstream> // 追加: 行分解用
 #include<cstring> // 追加: memcpy 用
+
+namespace
+{
+	void AppendAssimpMeshToModelData(const aiMesh* mesh, Object3d::ModelData& modelData)
+	{
+		if (!mesh)
+		{
+			return;
+		}
+
+		for (uint32_t faceIndex = 0; faceIndex < mesh->mNumFaces; ++faceIndex)
+		{
+			const aiFace& face = mesh->mFaces[faceIndex];
+			for (uint32_t index = 0; index < face.mNumIndices; ++index)
+			{
+				uint32_t vertexIndex = face.mIndices[index];
+				Sprite::VertexData vertex{};
+
+				if (mesh->HasPositions())
+				{
+					const aiVector3D& position = mesh->mVertices[vertexIndex];
+					vertex.position = { position.x, position.y, position.z, 1.0f };
+				}
+
+				if (mesh->HasTextureCoords(0))
+				{
+					const aiVector3D& texcoord = mesh->mTextureCoords[0][vertexIndex];
+					vertex.texcoord = { texcoord.x, texcoord.y };
+				}
+
+				if (mesh->HasNormals())
+				{
+					const aiVector3D& normal = mesh->mNormals[vertexIndex];
+					vertex.normal = { normal.x, normal.y, normal.z };
+				}
+
+				modelData.vertices.push_back(vertex);
+			}
+		}
+	}
+
+	void AppendAssimpNodeMeshes(const aiNode* node, const aiScene* scene, Object3d::ModelData& modelData)
+	{
+		if (!node || !scene)
+		{
+			return;
+		}
+
+		for (uint32_t meshIndex = 0; meshIndex < node->mNumMeshes; ++meshIndex)
+		{
+			const aiMesh* mesh = scene->mMeshes[node->mMeshes[meshIndex]];
+			AppendAssimpMeshToModelData(mesh, modelData);
+		}
+
+		for (uint32_t childIndex = 0; childIndex < node->mNumChildren; ++childIndex)
+		{
+			AppendAssimpNodeMeshes(node->mChildren[childIndex], scene, modelData);
+		}
+	}
+
+	void LoadAssimpMaterial(const aiScene* scene, const std::string& directoryPath, Object3d::ModelData& modelData)
+	{
+		if (!scene || scene->mNumMaterials == 0)
+		{
+			return;
+		}
+
+		const aiMaterial* material = scene->mMaterials[0];
+		aiString texturePath;
+		if (material->GetTexture(aiTextureType_BASE_COLOR, 0, &texturePath) == aiReturn_SUCCESS ||
+			material->GetTexture(aiTextureType_DIFFUSE, 0, &texturePath) == aiReturn_SUCCESS)
+		{
+			modelData.material.textureFilePath = directoryPath + "/" + texturePath.C_Str();
+		}
+	}
+}
 
 
 
@@ -202,6 +281,22 @@ Object3d::ModelData Object3d::LoadObjFile(const std::string& directoryPath, cons
 		}
 
 	}
+
+	return modelData;
+}
+
+Object3d::ModelData Object3d::LoadModelFile(const std::string& directoryPath, const std::string& filename)
+{
+	Object3d::ModelData modelData;
+	Assimp::Importer importer;
+
+	const std::string fullPath = directoryPath + "/" + filename;
+	const aiScene* scene = importer.ReadFile(fullPath, aiProcess_Triangulate | aiProcess_FlipUVs | aiProcess_GenNormals);
+	assert(scene != nullptr);
+	assert(scene->mRootNode != nullptr);
+
+	AppendAssimpNodeMeshes(scene->mRootNode, scene, modelData);
+	LoadAssimpMaterial(scene, directoryPath, modelData);
 
 	return modelData;
 }
