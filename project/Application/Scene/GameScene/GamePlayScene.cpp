@@ -262,7 +262,7 @@ void GamePlayScene::Draw(SceneRenderRequests& renderRequests)
 
 	if (sphereInitialized && sphere_)
 	{
-     renderRequests.spheres.Request(sphere_.get());
+		renderRequests.spheres.Request(sphere_.get());
 	}
 
 	if (animatedCubeInitialized_ && animatedCube_ && object3dCom)

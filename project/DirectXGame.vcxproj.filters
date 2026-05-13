@@ -9,7 +9,7 @@
     <FxCompile Include="Resources\shaders\Object3d.VS.hlsl" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Baziru3_Engine\Animation\Animation.cpp" />
+<ClCompile Include="Baziru3_Engine\Animation\Animation.cpp" />
     <ClCompile Include="Baziru3_Engine\Animation\AnimationUtils.cpp" />
     <ClCompile Include="Baziru3_Engine\Animation\Animator.cpp" />
     <ClCompile Include="Baziru3_Engine\Effect\HitEffect.cpp" />
@@ -62,6 +62,7 @@
     <ClCompile Include="Baziru3_Engine\2D\Sprite\SpriteManager.cpp" />
     <ClCompile Include="Baziru3_Engine\Base\Srv\SRVManager.cpp" />
     <ClCompile Include="Application\Subsystem\SubsystemFactory.cpp" />
+<ClCompile Include="Baziru3_Engine\Base\OffScreenRendering\OffScreenRendering.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Baziru3_Engine\Animation\Animation.h" />
@@ -75,7 +76,7 @@
     <ClInclude Include="Baziru3_Engine\Graphics\SceneRenderRequests.h" />
     <ClInclude Include="Baziru3_Engine\Graphics\Sphere\SphereDrawRequests.h" />
     <ClInclude Include="Baziru3_Engine\Graphics\Sphere\SphereRenderer.h" />
-    <ClInclude Include="Baziru3_Engine\Math\Quaternion.h" />
+<ClInclude Include="Baziru3_Engine\Math\Quaternion.h" />
     <ClInclude Include="Baziru3_Engine\Primitive\Cylinder\Cylinder.h" />
     <ClInclude Include="Baziru3_Engine\Particle\Ring.h" />
     <ClInclude Include="Baziru3_Engine\Scene\Factory\AbstractSceneFactory.h" />
@@ -128,10 +129,16 @@
     <ClInclude Include="Baziru3_Engine\Base\Srv\SRVManager.h" />
     <ClInclude Include="Application\Scene\TitleScene\TitleScene.h" />
     <ClInclude Include="Application\Subsystem\SubsystemFactory.h" />
+
+    <ClInclude Include="Baziru3_Engine\Base\OffScreenRendering\OffScreenRendering.h" />
+
   </ItemGroup>
   <ItemGroup>
     <None Include="Resources\shaders\Skybox.hlsli" />
     <None Include="Resources\shaders\Particle.hlsli" />
     <None Include="Resources\shaders\Object3d.hlsli" />
+
+    <None Include="Resources\shaders\CopyImage.hlsli" />
+
   </ItemGroup>
 </Project>
