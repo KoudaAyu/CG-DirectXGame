@@ -212,7 +212,7 @@ void GamePlayScene::Draw(SceneRenderRequests& renderRequests)
 
 	if (sphereInitialized && sphere_)
 	{
-     renderRequests.spheres.Request(sphere_.get());
+		renderRequests.spheres.Request(sphere_.get());
 	}
 
 }
