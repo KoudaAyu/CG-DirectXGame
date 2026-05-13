@@ -1,5 +1,5 @@
 #include "Matrix4x4.h"
-#include "Quaternion.h"
+#include "../Math/Quaternion.h"
 
 #include<cmath>
 

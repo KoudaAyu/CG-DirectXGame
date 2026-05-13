@@ -31,6 +31,7 @@ public:
 	TransformationMatrix* GetTransformationMatrixDataSphere() const { return transformationMatrixDataSphere; }
 	Microsoft::WRL::ComPtr<ID3D12Resource> GetTransformationMatrixResourceSphere() const { return transformationMatrixResourceSphere; }
 	void SetTransform(const Sprite::Transform& transform) { this->transform = transform; }
+ void SetOverlayDraw(bool enabled) { overlayDraw_ = enabled; }
 	Sprite::Transform& GetTransform() { return transform; }
 private:
 	DirectXCom* directXCom_ = nullptr;
@@ -69,5 +70,6 @@ private:
 	Matrix4x4 worldMatrix;
 	Matrix4x4 viewMatrix;
 	Matrix4x4 WVPMatrix;
+  bool overlayDraw_ = false;
 };
 

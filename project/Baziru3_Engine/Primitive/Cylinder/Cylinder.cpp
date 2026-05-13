@@ -82,7 +82,10 @@ void Cylinder::Update()
         return;
     }
 
-    worldMatrix_ = MakeAffineMatrix(transform_.scale, transform_.rotate, transform_.translate);
+    if (!useCustomWorldMatrix_)
+    {
+        worldMatrix_ = MakeAffineMatrix(transform_.scale, transform_.rotate, transform_.translate);
+    }
     viewMatrix_ = Inverse(camera_->GetWorldMatrix());
     wvpMatrix_ = Multiply(worldMatrix_, Multiply(viewMatrix_, camera_->GetProjectionMatrix()));
     transformationMatrixData_->WVP = wvpMatrix_;
@@ -107,8 +110,11 @@ void Cylinder::Draw(D3D12_GPU_DESCRIPTOR_HANDLE textureSrvHandle)
     commandList->RSSetScissorRects(1, &dxCommon_->GetScissorRect());
 
     commandList->SetGraphicsRootSignature(object3dCom_->GetRootSignature().Get());
-    // Use effect pipeline (no depth write) so the cylinder can render as an effect
-    if (object3dCom_->GetEffectPipelineState())
+    if (overlayDraw_ && object3dCom_->GetOverlayPipelineState())
+    {
+        commandList->SetPipelineState(object3dCom_->GetOverlayPipelineState().Get());
+    }
+    else if (object3dCom_->GetEffectPipelineState())
     {
         commandList->SetPipelineState(object3dCom_->GetEffectPipelineState().Get());
     }

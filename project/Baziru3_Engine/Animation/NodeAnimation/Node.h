@@ -4,8 +4,8 @@
 #include <vector>
 #include <memory>
 
-#include "../../Base/Matrix4x4.h"
-#include "../../Base/Transform.h"
+#include "Matrix4x4.h"
+#include "Transform.h"
 
 class Node
 {

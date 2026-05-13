@@ -58,6 +58,10 @@ public:
 	{
 		return pipelineStateEffect;
 	}
+ const Microsoft::WRL::ComPtr<ID3D12PipelineState>& GetOverlayPipelineState() const
+	{
+		return pipelineStateOverlay;
+	}
 	const Microsoft::WRL::ComPtr<ID3D12RootSignature>& GetRootSignature() const
 	{
 		return rootSignature;
@@ -86,6 +90,7 @@ private:
 	// 追加: PSO本体
     Microsoft::WRL::ComPtr<ID3D12PipelineState> pipelineState = nullptr;
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> pipelineStateEffect = nullptr;
+	Microsoft::WRL::ComPtr<ID3D12PipelineState> pipelineStateOverlay = nullptr;
 
 	std::ostream& logStream;
 };
