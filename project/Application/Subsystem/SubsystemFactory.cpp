@@ -39,7 +39,7 @@ SubsystemResult SubsystemFactory::InitializeAll(std::ostream& logStream, const I
         SceneManager::GetInstance()->SetSpriteCom(res.spriteCom.get());
 
         res.spriteManager = std::make_unique<SpriteManager>();
-        res.spriteManager->Initialize(res.spriteCom.get(), "Resources/uvChecker.png", 5);
+       res.spriteManager->Initialize(res.spriteCom.get(), "Resources/uvChecker.png", 0);
         Logger::Log(logStream, "SpriteManager initialized\n");
 
         res.success = true;

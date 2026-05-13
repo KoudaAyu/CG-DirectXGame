@@ -1,5 +1,5 @@
 #include "Animation.h"
-#include "AnimationUtils.h"
+#include "Animation.h"
 #include "Keyframe.h"
 
 #include <assimp/Importer.hpp>
@@ -54,28 +54,5 @@ Animation LoadAnimationFile(const std::string& directoryPath, const std::string&
 
 	}
 
-	return animation;
+   return animation;
 };
-
-void ApplyAnimation(Skeleton& skeleton, const Animation& animation, float animationTime)
-{
-	for (Joint& joint : skeleton.joints)
-	{
-		if (auto it = animation.nodeAnimations.find(joint.name); it != animation.nodeAnimations.end())
-		{
-            const ::NodeAnimation& nodeAnimData = it->second;
-			if (!nodeAnimData.translate.empty())
-			{
-               joint.transform.translate = CalculateValue(nodeAnimData.translate.keyframes, animationTime);
-			}
-          if (!nodeAnimData.rotate.empty())
-			{
-             joint.transform.rotate = CalculateValue(nodeAnimData.rotate.keyframes, animationTime);
-			}
-           if (!nodeAnimData.scale.empty())
-			{
-               joint.transform.scale = CalculateValue(nodeAnimData.scale.keyframes, animationTime);
-			}
-		}
-	}
-}

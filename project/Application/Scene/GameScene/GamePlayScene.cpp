@@ -11,145 +11,8 @@
 #include "SpriteManager.h"
 #include "TextureManager.h"
 #include "AudioManager.h"
-#include <assimp/Importer.hpp>
-#include <assimp/postprocess.h>
-#include <assimp/scene.h>
-#include <cmath>
-#include <unordered_set>
 #include <cassert>
 #include <Windows.h>
-
-namespace
-{
-  Vector3 Subtract(const Vector3& a, const Vector3& b)
-	{
-		return { a.x - b.x, a.y - b.y, a.z - b.z };
-	}
-
-	float Length(const Vector3& v)
-	{
-		return std::sqrt(v.x * v.x + v.y * v.y + v.z * v.z);
-	}
-
-	Vector3 Normalize(const Vector3& v)
-	{
-		const float length = Length(v);
-		if (length <= 0.0001f)
-		{
-			return { 0.0f, 1.0f, 0.0f };
-		}
-
-		const float invLength = 1.0f / length;
-		return { v.x * invLength, v.y * invLength, v.z * invLength };
-	}
-
-	Vector3 Cross(const Vector3& a, const Vector3& b)
-	{
-		return {
-			a.y * b.z - a.z * b.y,
-			a.z * b.x - a.x * b.z,
-			a.x * b.y - a.y * b.x
-		};
-	}
-
-	Matrix4x4 MakeBoneSegmentMatrix(const Vector3& start, const Vector3& end, float radius)
-	{
-		const Vector3 direction = Subtract(end, start);
-		const float length = Length(direction);
-		const Vector3 yAxis = Normalize(direction);
-
-		Vector3 referenceAxis = { 0.0f, 0.0f, 1.0f };
-		if (std::fabs(yAxis.z) > 0.99f)
-		{
-			referenceAxis = { 1.0f, 0.0f, 0.0f };
-		}
-
-		const Vector3 xAxis = Normalize(Cross(referenceAxis, yAxis));
-		const Vector3 zAxis = Normalize(Cross(yAxis, xAxis));
-
-		Matrix4x4 rotateMatrix = MakeIdentity4x4();
-		rotateMatrix.m[0][0] = xAxis.x;
-		rotateMatrix.m[0][1] = xAxis.y;
-		rotateMatrix.m[0][2] = xAxis.z;
-		rotateMatrix.m[1][0] = yAxis.x;
-		rotateMatrix.m[1][1] = yAxis.y;
-		rotateMatrix.m[1][2] = yAxis.z;
-		rotateMatrix.m[2][0] = zAxis.x;
-		rotateMatrix.m[2][1] = zAxis.y;
-		rotateMatrix.m[2][2] = zAxis.z;
-
-		return MakeAffineMatrix({ radius, length, radius }, rotateMatrix, start);
-	}
-
-    std::unordered_set<std::string> CollectBoneNames(const aiScene* scene)
-	{
-      std::unordered_set<std::string> boneNames;
-		if (!scene)
-		{
-          return boneNames;
-		}
-
-     for (uint32_t meshIndex = 0; meshIndex < scene->mNumMeshes; ++meshIndex)
-		{
-			const aiMesh* mesh = scene->mMeshes[meshIndex];
-			if (!mesh)
-			{
-				continue;
-			}
-
-          for (uint32_t boneIndex = 0; boneIndex < mesh->mNumBones; ++boneIndex)
-			{
-				const aiBone* bone = mesh->mBones[boneIndex];
-				if (bone)
-				{
-					boneNames.insert(bone->mName.C_Str());
-				}
-			}
-		}
-
-		return boneNames;
-	}
-
-	bool ConvertAssimpNodeToAnimNode(const aiNode* node, const std::unordered_set<std::string>& boneNames, AnimNode& outNode)
-	{
-		if (!node)
-		{
-			return false;
-		}
-
-		aiVector3D scale{};
-		aiQuaternion rotate{};
-		aiVector3D translate{};
-		node->mTransformation.Decompose(scale, rotate, translate);
-
-		AnimNode result{};
-		result.name = node->mName.C_Str();
-		result.transform.scale = { scale.x, scale.y, scale.z };
-		result.transform.rotate = Quaternion(rotate.x, rotate.y, rotate.z, rotate.w);
-		result.transform.translate = { translate.x, translate.y, translate.z };
-		result.localMatrix = result.transform.MakeLocalMatrix();
-
-		const bool isBoneNode = boneNames.contains(result.name);
-		for (uint32_t childIndex = 0; childIndex < node->mNumChildren; ++childIndex)
-		{
-			AnimNode childNode{};
-			if (ConvertAssimpNodeToAnimNode(node->mChildren[childIndex], boneNames, childNode))
-			{
-				result.children.push_back(std::move(childNode));
-			}
-		}
-
-        if (!isBoneNode && result.children.empty())
-		{
-            return false;
-		}
-
-      outNode = std::move(result);
-		return true;
-	}
-}
-
-
 
 void GamePlayScene::Initialize(DirectXCom* dxCommon, Camera* camera)
 {
@@ -199,43 +62,16 @@ void GamePlayScene::Initialize(DirectXCom* dxCommon, Camera* camera)
 		animatedCube_->SetScale({ 1.0f, 1.0f, 1.0f });
 		animatedCubeInitialized_ = true;
 		animation_ = LoadAnimationFile("Resources/CG4/human", "walk.gltf");
-		animationTime_ = 0.0f;
-		animationInitialized_ = animation_.duration > 0.0f && !animation_.nodeAnimations.empty();
-
-		Assimp::Importer importer;
-		const aiScene* scene = importer.ReadFile("Resources/CG4/human/walk.gltf", aiProcess_Triangulate | aiProcess_FlipUVs | aiProcess_GenNormals);
-		if (scene && scene->mRootNode)
+      if (animation_.duration > 0.0f && !animation_.nodeAnimations.empty())
 		{
-          const std::unordered_set<std::string> boneNames = CollectBoneNames(scene);
-			SkeletonLoader skeletonLoader;
-			AnimNode rootNode{};
-			if (ConvertAssimpNodeToAnimNode(scene->mRootNode, boneNames, rootNode))
-			{
-				skeleton_ = skeletonLoader.CreateSkeleton(rootNode);
-				skeleton_.Update();
+			animator_.SetAnimation(&animation_);
+		}
 
-             jointDebugSpheres_.clear();
-                jointDebugCylinders_.clear();
-				jointDebugSpheres_.reserve(skeleton_.joints.size());
-             jointDebugCylinders_.reserve(skeleton_.joints.size());
-				for (size_t jointIndex = 0; jointIndex < skeleton_.joints.size(); ++jointIndex)
-				{
-					auto jointSphere = std::make_unique<Sphere>();
-					jointSphere->Initialize(directXCom, object3dCom, materialManager, light, camera_);
-					jointSphere->SetOverlayDraw(true);
-					Sprite::Transform jointTransform = jointSphere->GetTransform();
-                 jointTransform.scale = { 0.06f, 0.06f, 0.06f };
-					jointSphere->SetTransform(jointTransform);
-					jointDebugSpheres_.push_back(std::move(jointSphere));
-
-					auto jointCylinder = std::make_unique<Cylinder>();
-					jointCylinder->Initialize(directXCom, object3dCom, materialManager, light, camera_, 12, 1.0f, 1.0f, 1.0f);
-					jointCylinder->SetOverlayDraw(true);
-					jointDebugCylinders_.push_back(std::move(jointCylinder));
-				}
-
-             skeletonInitialized_ = !jointDebugSpheres_.empty();
-			}
+      skeleton_ = SkeletonLoader{}.LoadSkeletonFile("Resources/CG4/human", "walk.gltf");
+		if (!skeleton_.joints.empty())
+		{
+            skeleton_.Update();
+			skeletonDebug_.Initialize(directXCom, object3dCom, materialManager, light, camera_, skeleton_);
 		}
 	}
 
@@ -248,7 +84,7 @@ void GamePlayScene::Initialize(DirectXCom* dxCommon, Camera* camera)
 		if (sc)
 		{
 			spriteManager_ = std::make_unique<SpriteManager>();
-			spriteManager_->Initialize(sc, "Resources/uvChecker.png", 5);
+           spriteManager_->Initialize(sc, "Resources/uvChecker.png", 0);
 		}
 	}
 
@@ -324,20 +160,12 @@ void GamePlayScene::Update()
 		animatedCube_->Update();
 	}
 
-	if (skeletonInitialized_ && animatedCube_)
+  if (skeletonDebug_.IsInitialized() && animatedCube_)
 	{
-     if (animationInitialized_)
+     if (animator_.HasAnimation())
 		{
-			animationTime_ += kDeltaTime;
-			if (animation_.duration > 0.0f)
-			{
-				while (animationTime_ >= animation_.duration)
-				{
-					animationTime_ -= animation_.duration;
-				}
-			}
-
-			ApplyAnimation(skeleton_, animation_, animationTime_);
+           animator_.Update(kDeltaTime);
+			animator_.ApplyTo(skeleton_);
 		}
 
 		skeleton_.Update();
@@ -346,37 +174,7 @@ void GamePlayScene::Update()
 			animatedCube_->GetScale(),
 			animatedCube_->GetRotate(),
 			animatedCube_->GetTranslate());
-
-		const size_t debugSphereCount = (std::min)(skeleton_.joints.size(), jointDebugSpheres_.size());
-		for (size_t jointIndex = 0; jointIndex < debugSphereCount; ++jointIndex)
-		{
-			const Matrix4x4 jointWorldMatrix = Multiply(skeleton_.joints[jointIndex].skeletonMatrix, modelWorldMatrix);
-          const Vector3 jointPosition = {
-				jointWorldMatrix.m[3][0],
-				jointWorldMatrix.m[3][1],
-				jointWorldMatrix.m[3][2]
-			};
-			Sprite::Transform jointTransform = jointDebugSpheres_[jointIndex]->GetTransform();
-            jointTransform.translate = jointPosition;
-			jointDebugSpheres_[jointIndex]->SetTransform(jointTransform);
-			jointDebugSpheres_[jointIndex]->Update();
-
-			if (jointIndex < jointDebugCylinders_.size() && jointDebugCylinders_[jointIndex])
-			{
-				if (skeleton_.joints[jointIndex].parent)
-				{
-					const int32_t parentIndex = *skeleton_.joints[jointIndex].parent;
-					const Matrix4x4 parentWorldMatrix = Multiply(skeleton_.joints[parentIndex].skeletonMatrix, modelWorldMatrix);
-					const Vector3 parentPosition = {
-						parentWorldMatrix.m[3][0],
-						parentWorldMatrix.m[3][1],
-						parentWorldMatrix.m[3][2]
-					};
-                 jointDebugCylinders_[jointIndex]->SetWorldMatrix(MakeBoneSegmentMatrix(parentPosition, jointPosition, 0.03f));
-					jointDebugCylinders_[jointIndex]->Update();
-				}
-			}
-		}
+		skeletonDebug_.Sync(skeleton_, modelWorldMatrix);
 	}
 
    if (hitEffectInitialized && hitEffect_)
@@ -494,24 +292,9 @@ void GamePlayScene::Draw(SceneRenderRequests& renderRequests)
      renderRequests.spheres.Request(sphere_.get());
 	}
 
-	if (skeletonInitialized_)
+   if (skeletonDebug_.IsInitialized())
 	{
-      if (particleTextureA != TextureManager::kInvalidTextureIndex)
-		{
-			const D3D12_GPU_DESCRIPTOR_HANDLE debugTextureHandle = TextureManager::GetInstance()->GetSrvHandleGPU(particleTextureA);
-			for (size_t jointIndex = 0; jointIndex < jointDebugCylinders_.size(); ++jointIndex)
-			{
-				if (skeleton_.joints[jointIndex].parent && jointDebugCylinders_[jointIndex])
-				{
-					jointDebugCylinders_[jointIndex]->Draw(debugTextureHandle);
-				}
-			}
-		}
-
-		for (const auto& jointSphere : jointDebugSpheres_)
-		{
-			renderRequests.spheres.Request(jointSphere.get());
-		}
+      skeletonDebug_.Draw(renderRequests, {});
 	}
 
 	if (animatedCubeInitialized_ && animatedCube_ && object3dCom)
