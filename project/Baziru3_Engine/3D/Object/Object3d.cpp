@@ -70,18 +70,6 @@ namespace
 				}
 			}
 		}
-
-		for (uint32_t faceIndex = 0; faceIndex < mesh->mNumFaces; ++faceIndex)
-		{
-			aiFace& face = mesh->mFaces[faceIndex];
-			assert(face.mNumIndices == 3);
-
-			for (uint32_t element = 0; element < face.mNumIndices; ++element)
-			{
-				uint32_t vertexIndex = face.mIndices[element];
-				modelData.indices.push_back(vertexIndex);
-			}
-		}
 	}
 
 	void AppendAssimpNodeMeshes(const aiNode* node, const aiScene* scene, Object3d::ModelData& modelData)
@@ -196,9 +184,21 @@ void Object3d::Draw(ID3D12GraphicsCommandList* commandList)
 {
 	commandList->IASetVertexBuffers(0, 1, &vertexBufferView_);
 	commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+   if (indexResource && !modelData_.indices.empty())
+	{
+		commandList->IASetIndexBuffer(&indexBufferView_);
+	}
 	commandList->SetGraphicsRootConstantBufferView(RootParam::Object3D::kMaterial, materialResource->GetGPUVirtualAddress());
 	commandList->SetGraphicsRootConstantBufferView(RootParam::Object3D::kTransform, transformationMatrixResource->GetGPUVirtualAddress());
 	commandList->SetGraphicsRootConstantBufferView(RootParam::Object3D::kLight, directionalLightResource->GetGPUVirtualAddress());
+   if (indexResource && !modelData_.indices.empty())
+	{
+		commandList->DrawIndexedInstanced(static_cast<UINT>(modelData_.indices.size()), 1, 0, 0, 0);
+	}
+	else
+	{
+		commandList->DrawInstanced(static_cast<UINT>(modelData_.vertices.size()), 1, 0, 0);
+	}
 }
 
 Object3d::MaterialData Object3d::LoadMaterialTemplateFile(const std::string& directoryPath, const std::string& filename)
@@ -279,6 +279,7 @@ Object3d::ModelData Object3d::LoadObjFile(const std::string& directoryPath, cons
 		{
 			//面は三角形限定。その他は未対応
 			Sprite::VertexData triangle[3];
+			uint32_t triangleIndices[3];
 
 			for (int32_t faceVertex = 0; faceVertex < 3; ++faceVertex)
 			{
@@ -299,11 +300,15 @@ Object3d::ModelData Object3d::LoadObjFile(const std::string& directoryPath, cons
 				Vector2 texcoord = texcoords[elementIndices[1] - 1];
 				Vector3 normal = normals[elementIndices[2] - 1];
 				triangle[faceVertex] = { position, texcoord, normal };
+               triangleIndices[faceVertex] = static_cast<uint32_t>(modelData.vertices.size()) + static_cast<uint32_t>(faceVertex);
 			}
 			// OBJの元の頂点順を維持して追加（入れ替えない）
 			modelData.vertices.push_back(triangle[0]);
 			modelData.vertices.push_back(triangle[1]);
 			modelData.vertices.push_back(triangle[2]);
+           modelData.indices.push_back(triangleIndices[0]);
+			modelData.indices.push_back(triangleIndices[1]);
+			modelData.indices.push_back(triangleIndices[2]);
 		}
 		else if (identifier == "mtllib")
 		{
@@ -366,6 +371,21 @@ void Object3d::VertexResource()
 		D3D12_RANGE written = { 0, static_cast<SIZE_T>(bufferSize) };
 		vertexResource->Unmap(0, &written);
 		vertexData_ = nullptr;
+
+		if (!modelData_.indices.empty())
+		{
+			size_t indexBufferSize = sizeof(uint32_t) * modelData_.indices.size();
+			indexResource = dxCommon->CreateBufferResource(dxCommon->GetDevice().Get(), indexBufferSize);
+			uint32_t* mappedIndex = nullptr;
+			indexResource->Map(0, nullptr, reinterpret_cast<void**>(&mappedIndex));
+			std::memcpy(mappedIndex, modelData_.indices.data(), indexBufferSize);
+			D3D12_RANGE indexWritten = { 0, static_cast<SIZE_T>(indexBufferSize) };
+			indexResource->Unmap(0, &indexWritten);
+
+			indexBufferView_.BufferLocation = indexResource->GetGPUVirtualAddress();
+			indexBufferView_.SizeInBytes = static_cast<UINT>(indexBufferSize);
+			indexBufferView_.Format = DXGI_FORMAT_R32_UINT;
+		}
 
 	}
 }
