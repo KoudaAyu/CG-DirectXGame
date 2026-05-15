@@ -39,6 +39,9 @@ void Game::Initialize()
 
 	InitializeSceneResources();
 
+	offScreenRendering_ = std::make_unique<OffScreenRendering>(logStream, dx);
+	offScreenRendering_->Initialize();
+
 	//Transform変数を作る
 	Sprite::Transform transform = { {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };
 
@@ -162,6 +165,13 @@ void Game::Finalize()
 
 	if (light) { light.reset(); }
 
+	if (offScreenRendering_)
+	{
+		try { offScreenRendering_->Finalize(); }
+		catch (...) { Logger::Log(logStream, "offscreen finalize failed\n"); }
+		offScreenRendering_.reset();
+	}
+
 	// 7) Ensure TextureManager releases GPU resources before engine teardown
 	try { TextureManager::GetInstance()->Finalize(); }
 	catch (...) { Logger::Log(logStream, "TextureManager finalize failed\n"); }
@@ -247,6 +257,11 @@ void Game::Draw()
 
 	if (dx) dx->PreDraw();
 
+	if (dx && offScreenRendering_)
+	{
+		offScreenRendering_->Begin(dx->GetCommandList().Get());
+	}
+
 	if (object3dCom) object3dCom->PreDraw();
 
 	RenderContext ctx = PrepareRenderContext();
@@ -264,7 +279,7 @@ void Game::Draw()
 	if (skybox_ && skyboxCom_ && textureIndexSkybox_ != TextureManager::kInvalidTextureIndex)
 	{
 		skyboxCom_->SetupDraw(ctx.commandList);
-		skybox_->Draw(ctx.commandList, TextureManager::GetInstance()->GetSrvHandleGPU(textureIndexSkybox_));
+		//skybox_->Draw(ctx.commandList, TextureManager::GetInstance()->GetSrvHandleGPU(textureIndexSkybox_));
 	}
 
 	if (object3dCom) object3dCom->PreDraw();
@@ -308,6 +323,13 @@ void Game::Draw()
 	}
 
 	//実際のcommandListのImGuiの描画コマンドを積む
+    if (dx && offScreenRendering_)
+	{
+		offScreenRendering_->End(dx->GetCommandList().Get());
+		offScreenRendering_->SetMainRenderTarget(dx->GetCommandList().Get());
+		offScreenRendering_->DrawToBackBuffer(dx->GetCommandList().Get());
+	}
+
 #ifdef USE_IMGUI
 	if (dx) ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), dx->GetCommandList().Get());
 #endif

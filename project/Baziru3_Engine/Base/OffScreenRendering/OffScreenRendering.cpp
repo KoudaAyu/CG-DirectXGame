@@ -179,7 +179,7 @@ void OffScreenRendering::ShaderCompile()
     assert(vertexShaderBlob_ != nullptr);
 
     pixelShaderBlob_ = dxCommon_->CompileShader(
-        L"Resources/shaders/CopyImage.PS.hlsl",
+        L"Resources/shaders/GrayScale.PS.hlsl",
         L"ps_6_0",
         dxCommon_->GetDxcUtils().Get(),
         dxCommon_->GetDxcCompiler(),
