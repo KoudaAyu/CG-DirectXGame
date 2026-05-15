@@ -9,6 +9,8 @@
 #include <d3d12.h>
 #include <vector>
 #include <string>
+#include <map>
+#include <cstdint>
 
 class Model
 {
@@ -35,6 +37,20 @@ public:
 		std::vector<uint32_t> indices; // インデックスデータ
 		MaterialData material; // マテリアルデータ
 		NodeAnimation rootNode; // 階層構造のルートノード
+
+		// SkinCluster 用データ
+		struct VertexWeightData {
+			float weight;
+			std::uint32_t vertexIndex;
+		};
+
+		struct JointWeightData {
+			Matrix4x4 inverseBindPoseMatrix; // 関節の逆バインド行列
+			std::vector<VertexWeightData> vertexWeights; // このジョイントが影響する頂点とウェイト
+		};
+
+		// ジョイント名 -> ウェイトデータ
+		std::map<std::string, JointWeightData> skinClusterData;
 	};
 
 public:
