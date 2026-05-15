@@ -15,6 +15,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="3D\Model\Model.cpp" />
     <ClCompile Include="Baziru3_Engine\Base\OffScreenRendering\OffScreenRendering.cpp" />
     <ClCompile Include="Baziru3_Engine\Animation\Animation.cpp" />
     <ClCompile Include="Baziru3_Engine\Animation\AnimationUtils.cpp" />

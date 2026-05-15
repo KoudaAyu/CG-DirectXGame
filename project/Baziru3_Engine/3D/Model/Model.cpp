@@ -3,8 +3,10 @@
 #include<fstream>
 #include<sstream>
 #include<cstring>
+#include "TextureManager.h"
 
-#include"TextureManager.h"
+
+
 
 void Model::Initialize(ModelCom* modelCom, const std::string& directoryPath, const std::string& filename)
 {
@@ -46,7 +48,7 @@ void Model::Bind(ID3D12GraphicsCommandList* commandList)
 
 void Model::Draw()
 {
- 
+
     if (!modelCom_ || !modelCom_->GetDirectXCom())
     {
         return;
@@ -59,13 +61,13 @@ void Model::Draw()
         return;
     }
 
-   
+
     if (modelData_.vertices.empty())
     {
         return;
     }
 
- 
+
     commandList->IASetVertexBuffers(0, 1, &vertexBufferView_);
     commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
@@ -167,6 +169,51 @@ Model::ModelData Model::LoadObjFile(const std::string& directoryPath, const std:
             modelData.material = LoadMaterialTemplateFile(directoryPath, materialFilename);
         }
 
+    }
+
+    // Extract skin/bone data using Assimp when available (OBJ doesn't contain bones)
+    {
+        Assimp::Importer importer;
+        const aiScene* scene = importer.ReadFile(directoryPath + "/" + filename,
+            aiProcess_Triangulate | aiProcess_FlipUVs | aiProcess_CalcTangentSpace);
+
+        if (scene && scene->HasMeshes())
+        {
+            for (unsigned int meshIndex = 0; meshIndex < scene->mNumMeshes; ++meshIndex)
+            {
+                const aiMesh* mesh = scene->mMeshes[meshIndex];
+                if (!mesh || !mesh->HasBones())
+                    continue;
+
+                for (uint32_t boneIndex = 0; boneIndex < mesh->mNumBones; ++boneIndex)
+                {
+                    const aiBone* bone = mesh->mBones[boneIndex];
+                    if (!bone)
+                        continue;
+
+                    std::string jointName = bone->mName.C_Str();
+                    JointWeightData& jointWeightData = modelData.skinClusterData[jointName];
+
+                    aiMatrix4x4 bindPoseMatrixAssimp = bone->mOffsetMatrix;
+                    bindPoseMatrixAssimp.Inverse();
+
+                    aiVector3D scale, translate;
+                    aiQuaternion rotate;
+                    bindPoseMatrixAssimp.Decompose(scale, rotate, translate);
+
+                    Matrix4x4 bindPoseMatrix = MakeAffineMatrix({ scale.x, scale.y, scale.z },
+                        { rotate.x, -rotate.y, -rotate.z, rotate.w },
+                        { -translate.x, translate.y, translate.z });
+
+                    jointWeightData.inverseBindPoseMatrix = Inverse(bindPoseMatrix);
+
+                    for (uint32_t weightIndex = 0; weightIndex < bone->mNumWeights; ++weightIndex)
+                    {
+                        jointWeightData.vertexWeights.push_back({ bone->mWeights[weightIndex].mWeight, bone->mWeights[weightIndex].mVertexId });
+                    }
+                }
+            }
+        }
     }
 
     return modelData;
@@ -277,6 +324,6 @@ void Model::MaterialResource()
         materialData_->color = { 1.0f,1.0f,1.0f,1.0f };
         materialData_->enableLighting = false;
         materialData_->uvTransform = MakeIdentity4x4();
-        
+
     }
 }
