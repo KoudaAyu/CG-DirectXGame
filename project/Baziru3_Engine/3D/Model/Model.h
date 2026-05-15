@@ -1,7 +1,8 @@
 #pragma once
 
-#include"DirectXCom.h"
-#include"ModelCom.h"
+#include "DirectXCom.h"
+#include "ModelCom.h"
+#include "NodeAnimation.h"
 #include "Sprite.h"
 #include "Transform.h"
 #include <wrl.h>
@@ -31,13 +32,15 @@ public:
 	struct ModelData
 	{
 		std::vector<Sprite::VertexData> vertices; // 頂点データ
+		std::vector<uint32_t> indices; // インデックスデータ
 		MaterialData material; // マテリアルデータ
+		NodeAnimation rootNode; // 階層構造のルートノード
 	};
 
 public:
 
 	void Initialize(ModelCom* modelCom, const std::string& directorypath, const std::string& filename);
-
+	
 	void Update();
 
 	void Bind(ID3D12GraphicsCommandList* commandList);
@@ -48,16 +51,16 @@ public:
 	void SetDirectoryPath(const std::string& directory) { directoryPath_ = directory; }
 	void SetFilename(const std::string& filename) { filename_ = filename; }
 	void SetPath(const std::string& directory, const std::string& filename) { directoryPath_ = directory; filename_ = filename; }
-	
-	
 
-	
+
+
+
 	const ModelData& GetModelData() const { return modelData_; }
 	const D3D12_VERTEX_BUFFER_VIEW& GetVertexBufferView() const { return vertexBufferView_; }
 	ID3D12Resource* GetMaterialResource() const { return materialResource.Get(); }
 	Material* GetMaterialData() const { return materialData_; }
 
-	
+
 
 	/// <summary>
 	/// .mtlファイルの読み込み
@@ -80,9 +83,9 @@ public:
 	void MaterialResource();
 
 
-private: 
+private:
 
-	
+
 
 	ModelCom* modelCom_ = nullptr;
 
@@ -106,5 +109,10 @@ private:
 	Microsoft::WRL::ComPtr<ID3D12Resource> vertexResourceModel;
 
 	D3D12_VERTEX_BUFFER_VIEW vertexBufferView{};
+
+	// インデックスバッファ用リソース
+	Microsoft::WRL::ComPtr<ID3D12Resource> indexResource = nullptr;
+	// インデックスバッファービュー
+	D3D12_INDEX_BUFFER_VIEW indexBufferView{};
 
 };

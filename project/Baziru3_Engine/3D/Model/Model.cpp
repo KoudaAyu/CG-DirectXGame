@@ -36,6 +36,11 @@ void Model::Bind(ID3D12GraphicsCommandList* commandList)
 {
     commandList->IASetVertexBuffers(0, 1, &vertexBufferView_);
     commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    // インデックスバッファがある場合はバインド
+    if (indexResource && !modelData_.indices.empty())
+    {
+        commandList->IASetIndexBuffer(&indexBufferView);
+    }
 
 }
 
@@ -64,9 +69,18 @@ void Model::Draw()
     commandList->IASetVertexBuffers(0, 1, &vertexBufferView_);
     commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-  
-    UINT vertexCount = static_cast<UINT>(modelData_.vertices.size());
-    commandList->DrawInstanced(vertexCount, 1, 0, 0);
+    // インデックスがある場合はインデックス描画
+    if (!modelData_.indices.empty() && indexResource)
+    {
+        commandList->IASetIndexBuffer(&indexBufferView);
+        UINT indexCount = static_cast<UINT>(modelData_.indices.size());
+        commandList->DrawIndexedInstanced(indexCount, 1, 0, 0, 0);
+    }
+    else
+    {
+        UINT vertexCount = static_cast<UINT>(modelData_.vertices.size());
+        commandList->DrawInstanced(vertexCount, 1, 0, 0);
+    }
 }
 
 
@@ -232,6 +246,21 @@ void Model::VertexResource()
         }
 
         vertexResource->Unmap(0, nullptr);
+        // --- インデックスバッファの作成とアップロード ---
+        if (!modelData_.indices.empty())
+        {
+            size_t indexCount = modelData_.indices.size();
+            size_t indexBufferSize = sizeof(uint32_t) * indexCount;
+            indexResource = dxCommon->CreateBufferResource(dxCommon->GetDevice().Get(), indexBufferSize);
+            uint32_t* mappedIndex = nullptr;
+            indexResource->Map(0, nullptr, reinterpret_cast<void**>(&mappedIndex));
+            std::memcpy(mappedIndex, modelData_.indices.data(), indexBufferSize);
+            indexResource->Unmap(0, nullptr);
+
+            indexBufferView.BufferLocation = indexResource->GetGPUVirtualAddress();
+            indexBufferView.SizeInBytes = static_cast<UINT>(indexBufferSize);
+            indexBufferView.Format = DXGI_FORMAT_R32_UINT;
+        }
     }
 }
 
