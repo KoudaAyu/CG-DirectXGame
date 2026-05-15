@@ -137,6 +137,10 @@ private:
 	VertexData* vertexData_ = nullptr;
 	//バッファリソースの使い道を補足するバッファビュー
 	D3D12_VERTEX_BUFFER_VIEW vertexBufferView_{};
+	//インデックスバッファ用のリソース
+	Microsoft::WRL::ComPtr<ID3D12Resource> indexResource = nullptr;
+	//インデックスバッファビュー
+	D3D12_INDEX_BUFFER_VIEW indexBufferView_{};
 
 	//バッファリソース
 	Microsoft::WRL::ComPtr<ID3D12Resource> materialResource = nullptr;
