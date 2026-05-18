@@ -1,7 +1,10 @@
 #pragma once
 #include"Vector.h"
+
+
 #include "Quaternion.h"
 #include <initializer_list>
+
 
 struct Matrix3x3
 {

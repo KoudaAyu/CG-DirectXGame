@@ -1,5 +1,7 @@
 #include "Animator.h"
 
+#include "Skeleton/Skeleton.h"
+
 #include <cmath>
 #include <algorithm>
 #include "NodeAnimation/NodeAnimation.h"
@@ -41,4 +43,14 @@ void Animator::Update(float dt)
         Matrix4x4 local = MakeAffineMatrix(scale, rotate, translate);
         localMatrices_[nodeName] = local;
     }
+}
+
+void Animator::ApplyTo(Skeleton& skeleton) const
+{
+    if (!animation_)
+    {
+        return;
+    }
+
+    skeleton.ApplyAnimation(*animation_, animationTime_);
 }
