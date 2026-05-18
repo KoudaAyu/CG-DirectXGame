@@ -19,33 +19,55 @@ namespace
 			return;
 		}
 
-		for (uint32_t faceIndex = 0; faceIndex < mesh->mNumFaces; ++faceIndex)
+		// 法線やテクスチャ座標が必要な場合は存在を確認してください
+		// （Assimp のインポート時のフラグで提供されるはずです）。
+		// まずメッシュの頂点を追加し、インデックス用のベースオフセットを記憶します。
+		uint32_t baseIndex = static_cast<uint32_t>(modelData.vertices.size());
+		modelData.vertices.resize(baseIndex + mesh->mNumVertices);
+
+		for (uint32_t v = 0; v < mesh->mNumVertices; ++v)
 		{
-			const aiFace& face = mesh->mFaces[faceIndex];
-			for (uint32_t index = 0; index < face.mNumIndices; ++index)
+			Sprite::VertexData vertex{};
+
+			if (mesh->HasPositions())
 			{
-				uint32_t vertexIndex = face.mIndices[index];
-				Sprite::VertexData vertex{};
+				const aiVector3D& position = mesh->mVertices[v];
+				vertex.position = { position.x, position.y, position.z, 1.0f };
+			}
 
-				if (mesh->HasPositions())
+			if (mesh->HasTextureCoords(0))
+			{
+				const aiVector3D& texcoord = mesh->mTextureCoords[0][v];
+				vertex.texcoord = { texcoord.x, texcoord.y };
+			}
+
+			if (mesh->HasNormals())
+			{
+				const aiVector3D& normal = mesh->mNormals[v];
+				vertex.normal = { normal.x, normal.y, normal.z };
+			}
+
+			modelData.vertices[baseIndex + v] = vertex;
+		}
+
+		// ベースオフセットを使って面（フェース）をインデックスとして追加する
+		for (uint32_t fi = 0; fi < mesh->mNumFaces; ++fi)
+		{
+			const aiFace& face = mesh->mFaces[fi];
+			// 三角形化された面を想定
+			if (face.mNumIndices == 3)
+			{
+				modelData.indices.push_back(baseIndex + face.mIndices[0]);
+				modelData.indices.push_back(baseIndex + face.mIndices[1]);
+				modelData.indices.push_back(baseIndex + face.mIndices[2]);
+			}
+			else
+			{
+				// 三角形でない場合はスキップするか、適切に処理してください
+				for (uint32_t k = 0; k < face.mNumIndices; ++k)
 				{
-					const aiVector3D& position = mesh->mVertices[vertexIndex];
-					vertex.position = { position.x, position.y, position.z, 1.0f };
+					modelData.indices.push_back(baseIndex + face.mIndices[k]);
 				}
-
-				if (mesh->HasTextureCoords(0))
-				{
-					const aiVector3D& texcoord = mesh->mTextureCoords[0][vertexIndex];
-					vertex.texcoord = { texcoord.x, texcoord.y };
-				}
-
-				if (mesh->HasNormals())
-				{
-					const aiVector3D& normal = mesh->mNormals[vertexIndex];
-					vertex.normal = { normal.x, normal.y, normal.z };
-				}
-
-				modelData.vertices.push_back(vertex);
 			}
 		}
 	}
@@ -91,7 +113,7 @@ namespace
 void Object3d::Initialize(Object3dCom* object3dCom, const ModelData& modelData)
 {
 	object3dCom_ = object3dCom;
-	modelData_ = modelData; // store model data
+	modelData_ = modelData; // モデルデータを保存
 	// object3dCom_ が未設定の場合は何もしない(デフォルトカメラは取得しない)
 	if (object3dCom_)
 	{
@@ -107,7 +129,7 @@ void Object3d::Initialize(Object3dCom* object3dCom, const ModelData& modelData)
 	if (!modelData_.material.textureFilePath.empty())
 	{
 		uint32_t index = TextureManager::GetInstance()->Load(modelData_.material.textureFilePath);
-		if(index != TextureManager::kInvalidTextureIndex)
+		if (index != TextureManager::kInvalidTextureIndex)
 		{
 			modelData_.material.textureIndex = index;
 		}
@@ -115,7 +137,7 @@ void Object3d::Initialize(Object3dCom* object3dCom, const ModelData& modelData)
 		{
 			OutputDebugStringA(("Texture load failed: " + modelData_.material.textureFilePath + "\n").c_str());
 		}
-	
+
 	}
 
 	//Transform変数の生成
@@ -162,9 +184,21 @@ void Object3d::Draw(ID3D12GraphicsCommandList* commandList)
 {
 	commandList->IASetVertexBuffers(0, 1, &vertexBufferView_);
 	commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+   if (indexResource && !modelData_.indices.empty())
+	{
+		commandList->IASetIndexBuffer(&indexBufferView_);
+	}
 	commandList->SetGraphicsRootConstantBufferView(RootParam::Object3D::kMaterial, materialResource->GetGPUVirtualAddress());
 	commandList->SetGraphicsRootConstantBufferView(RootParam::Object3D::kTransform, transformationMatrixResource->GetGPUVirtualAddress());
 	commandList->SetGraphicsRootConstantBufferView(RootParam::Object3D::kLight, directionalLightResource->GetGPUVirtualAddress());
+   if (indexResource && !modelData_.indices.empty())
+	{
+		commandList->DrawIndexedInstanced(static_cast<UINT>(modelData_.indices.size()), 1, 0, 0, 0);
+	}
+	else
+	{
+		commandList->DrawInstanced(static_cast<UINT>(modelData_.vertices.size()), 1, 0, 0);
+	}
 }
 
 Object3d::MaterialData Object3d::LoadMaterialTemplateFile(const std::string& directoryPath, const std::string& filename)
@@ -245,6 +279,7 @@ Object3d::ModelData Object3d::LoadObjFile(const std::string& directoryPath, cons
 		{
 			//面は三角形限定。その他は未対応
 			Sprite::VertexData triangle[3];
+			uint32_t triangleIndices[3];
 
 			for (int32_t faceVertex = 0; faceVertex < 3; ++faceVertex)
 			{
@@ -265,11 +300,15 @@ Object3d::ModelData Object3d::LoadObjFile(const std::string& directoryPath, cons
 				Vector2 texcoord = texcoords[elementIndices[1] - 1];
 				Vector3 normal = normals[elementIndices[2] - 1];
 				triangle[faceVertex] = { position, texcoord, normal };
+               triangleIndices[faceVertex] = static_cast<uint32_t>(modelData.vertices.size()) + static_cast<uint32_t>(faceVertex);
 			}
 			// OBJの元の頂点順を維持して追加（入れ替えない）
 			modelData.vertices.push_back(triangle[0]);
 			modelData.vertices.push_back(triangle[1]);
 			modelData.vertices.push_back(triangle[2]);
+           modelData.indices.push_back(triangleIndices[0]);
+			modelData.indices.push_back(triangleIndices[1]);
+			modelData.indices.push_back(triangleIndices[2]);
 		}
 		else if (identifier == "mtllib")
 		{
@@ -328,45 +367,60 @@ void Object3d::VertexResource()
 		{
 			std::memcpy(vertexData_, modelData_.vertices.data(), sizeof(Sprite::VertexData) * modelData_.vertices.size());
 		}
-		
+
 		D3D12_RANGE written = { 0, static_cast<SIZE_T>(bufferSize) };
 		vertexResource->Unmap(0, &written);
 		vertexData_ = nullptr;
+
+		if (!modelData_.indices.empty())
+		{
+			size_t indexBufferSize = sizeof(uint32_t) * modelData_.indices.size();
+			indexResource = dxCommon->CreateBufferResource(dxCommon->GetDevice().Get(), indexBufferSize);
+			uint32_t* mappedIndex = nullptr;
+			indexResource->Map(0, nullptr, reinterpret_cast<void**>(&mappedIndex));
+			std::memcpy(mappedIndex, modelData_.indices.data(), indexBufferSize);
+			D3D12_RANGE indexWritten = { 0, static_cast<SIZE_T>(indexBufferSize) };
+			indexResource->Unmap(0, &indexWritten);
+
+			indexBufferView_.BufferLocation = indexResource->GetGPUVirtualAddress();
+			indexBufferView_.SizeInBytes = static_cast<UINT>(indexBufferSize);
+			indexBufferView_.Format = DXGI_FORMAT_R32_UINT;
+		}
 
 	}
 }
 
 Object3d::~Object3d()
 {
-    // Ensure any persistently-mapped resources are safely unmapped.
-    // Unmap only when the CPU-side pointer is non-null to avoid double-unmap.
-    if (transformationMatrixResource && transformationMatrixData_ != nullptr)
-    {
-        D3D12_RANGE written = { 0, sizeof(TransformationMatrix) };
-        transformationMatrixResource->Unmap(0, &written);
-        transformationMatrixData_ = nullptr;
-    }
+	// 持続的にマップされたリソースがある場合は安全にアンマップする
+	// 二重アンマップを避けるため、CPU側のポインタが nullptr でない場合のみ Unmap する
+	if (transformationMatrixResource && transformationMatrixData_ != nullptr)
+	{
+		D3D12_RANGE written = { 0, sizeof(TransformationMatrix) };
+		transformationMatrixResource->Unmap(0, &written);
+		transformationMatrixData_ = nullptr;
+	}
 
-    if (vertexResource && vertexData_ != nullptr)
-    {
-        D3D12_RANGE written = { 0, static_cast<SIZE_T>(vertexBufferView_.SizeInBytes) };
-        vertexResource->Unmap(0, &written);
-        vertexData_ = nullptr;
-    }
+	if (vertexResource && vertexData_ != nullptr)
+	{
+		D3D12_RANGE written = { 0, static_cast<SIZE_T>(vertexBufferView_.SizeInBytes) };
+		vertexResource->Unmap(0, &written);
+		vertexData_ = nullptr;
+	}
 
-    if (materialResource && materialData_ != nullptr)
-    {
-        D3D12_RANGE written = { 0, sizeof(Material) };
-        materialResource->Unmap(0, &written);
-        materialData_ = nullptr;
-    }
+	if (materialResource && materialData_ != nullptr)
+	{
+		D3D12_RANGE written = { 0, sizeof(Material) };
+		materialResource->Unmap(0, &written);
+		materialData_ = nullptr;
+	}
 
-    if (directionalLightResource && directionalLightData_ != nullptr)
-    {
-        D3D12_RANGE written = { 0, sizeof(DirectionalLight) };
-        directionalLightResource->Unmap(0, &written);
-        directionalLightData_ = nullptr;
-    }
+	if (directionalLightResource && directionalLightData_ != nullptr)
+	{
+		D3D12_RANGE written = { 0, sizeof(DirectionalLight) };
+		directionalLightResource->Unmap(0, &written);
+		directionalLightData_ = nullptr;
+	}
 }
 
 void Object3d::MaterialResource()
@@ -385,9 +439,9 @@ void Object3d::MaterialResource()
 
 		// マテリアルは初期化時に一度だけ書き込む想定のため、MapしたらすぐにUnmapする
 		// 書き込み範囲を指定してGPUへ変更を通知する
-		D3D12_RANGE writtenRange = {0, sizeof(Material)};
+		D3D12_RANGE writtenRange = { 0, sizeof(Material) };
 		materialResource->Unmap(0, &writtenRange);
-		
+
 		materialData_ = nullptr;
 	}
 }
@@ -409,7 +463,7 @@ void Object3d::TransformationMatrixResource()
 
 void Object3d::DirectionalLightResource()
 {
-	// Create buffer before mapping and add safety checks
+	// マッピング前にバッファを作成し、セーフティチェックを行う
 	if (object3dCom_ && object3dCom_->GetDirectXCom())
 	{
 		DirectXCom* dxCommon = object3dCom_->GetDirectXCom();
