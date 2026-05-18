@@ -14,8 +14,6 @@
 #include <cassert>
 #include <Windows.h>
 
-
-
 void GamePlayScene::Initialize(DirectXCom* dxCommon, Camera* camera)
 {
 	camera_ = camera;
@@ -52,7 +50,7 @@ void GamePlayScene::Initialize(DirectXCom* dxCommon, Camera* camera)
 			{0.0f, 0.0f, 0.0f}
 		};
 
-		Object3d::ModelData animatedCubeModelData = Object3d::LoadModelFile("Resources/CG4/AnimatedCube", "AnimatedCube.gltf");
+		Object3d::ModelData animatedCubeModelData = Object3d::LoadModelFile("Resources/CG4/human", "walk.gltf");
 		if (!animatedCubeModelData.material.textureFilePath.empty())
 		{
 			animatedCubeModelData.material.textureIndex = TextureManager::GetInstance()->Load(animatedCubeModelData.material.textureFilePath);
@@ -63,6 +61,18 @@ void GamePlayScene::Initialize(DirectXCom* dxCommon, Camera* camera)
 		animatedCube_->SetTranslate({ 2.0f, 0.0f, 0.0f });
 		animatedCube_->SetScale({ 1.0f, 1.0f, 1.0f });
 		animatedCubeInitialized_ = true;
+		animation_ = LoadAnimationFile("Resources/CG4/human", "walk.gltf");
+      if (animation_.duration > 0.0f && !animation_.nodeAnimations.empty())
+		{
+			animator_.SetAnimation(&animation_);
+		}
+
+      skeleton_ = SkeletonLoader{}.LoadSkeletonFile("Resources/CG4/human", "walk.gltf");
+		if (!skeleton_.joints.empty())
+		{
+            skeleton_.Update();
+			skeletonDebug_.Initialize(directXCom, object3dCom, materialManager, light, camera_, skeleton_);
+		}
 	}
 
 	//スプライト共通テクスチャ読み込み
@@ -74,7 +84,7 @@ void GamePlayScene::Initialize(DirectXCom* dxCommon, Camera* camera)
 		if (sc)
 		{
 			spriteManager_ = std::make_unique<SpriteManager>();
-			spriteManager_->Initialize(sc, "Resources/uvChecker.png", 5);
+           spriteManager_->Initialize(sc, "Resources/uvChecker.png", 0);
 		}
 	}
 
@@ -148,6 +158,23 @@ void GamePlayScene::Update()
 		rotate.y += 0.01f;
 		animatedCube_->SetRotate(rotate);
 		animatedCube_->Update();
+	}
+
+  if (skeletonDebug_.IsInitialized() && animatedCube_)
+	{
+     if (animator_.HasAnimation())
+		{
+           animator_.Update(kDeltaTime);
+			animator_.ApplyTo(skeleton_);
+		}
+
+		skeleton_.Update();
+
+		const Matrix4x4 modelWorldMatrix = MakeAffineMatrix(
+			animatedCube_->GetScale(),
+			animatedCube_->GetRotate(),
+			animatedCube_->GetTranslate());
+		skeletonDebug_.Sync(skeleton_, modelWorldMatrix);
 	}
 
    if (hitEffectInitialized && hitEffect_)
@@ -263,6 +290,11 @@ void GamePlayScene::Draw(SceneRenderRequests& renderRequests)
 	if (sphereInitialized && sphere_)
 	{
 		renderRequests.spheres.Request(sphere_.get());
+	}
+
+   if (skeletonDebug_.IsInitialized())
+	{
+      skeletonDebug_.Draw(renderRequests, {});
 	}
 
 	if (animatedCubeInitialized_ && animatedCube_ && object3dCom)

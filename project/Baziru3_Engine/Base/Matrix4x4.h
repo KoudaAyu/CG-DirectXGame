@@ -1,6 +1,6 @@
 #pragma once
 #include"Vector.h"
-#include "Quaternion.h"
+#include "../Math/Quaternion.h"
 
 struct Matrix3x3
 {

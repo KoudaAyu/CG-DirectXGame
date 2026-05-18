@@ -62,6 +62,15 @@ void Object3dCom::CreateGraphicsPipelineState()
 			dxCommon->SetHr(dxCommon->GetDevice()->CreateGraphicsPipelineState(&descEffect, IID_PPV_ARGS(&pipelineStateEffect)));
 			assert(SUCCEEDED(dxCommon->GetHr()));
 		}
+       if (pipelineStateOverlay == nullptr)
+		{
+			D3D12_GRAPHICS_PIPELINE_STATE_DESC descOverlay = desc;
+			descOverlay.DepthStencilState.DepthEnable = FALSE;
+			descOverlay.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO;
+			descOverlay.pRootSignature = rootSignature.Get();
+			dxCommon->SetHr(dxCommon->GetDevice()->CreateGraphicsPipelineState(&descOverlay, IID_PPV_ARGS(&pipelineStateOverlay)));
+			assert(SUCCEEDED(dxCommon->GetHr()));
+		}
 	}
 }
 

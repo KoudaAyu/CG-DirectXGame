@@ -7,6 +7,8 @@
 #include "AnimationData.h"
 #include "../Base/Matrix4x4.h"
 
+struct Skeleton;
+
 class Animator
 {
 public:
@@ -17,6 +19,10 @@ public:
 
     // Advance animation by dt seconds
     void Update(float dt);
+
+    void ApplyTo(Skeleton& skeleton) const;
+
+    bool HasAnimation() const { return animation_ != nullptr; }
 
     float GetTime() const { return animationTime_; }
 

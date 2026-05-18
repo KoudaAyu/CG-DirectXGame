@@ -37,7 +37,9 @@ public:
 
     const D3D12_VERTEX_BUFFER_VIEW& GetVertexBufferView() const { return vertexBufferView_; }
     uint32_t GetVertexCount() const { return vertexCount_; }
-    void SetTransform(const Sprite::Transform& transform) { transform_ = transform; }
+   void SetTransform(const Sprite::Transform& transform) { transform_ = transform; useCustomWorldMatrix_ = false; }
+    void SetWorldMatrix(const Matrix4x4& worldMatrix) { worldMatrix_ = worldMatrix; useCustomWorldMatrix_ = true; }
+    void SetOverlayDraw(bool enabled) { overlayDraw_ = enabled; }
     Sprite::Transform& GetTransform() { return transform_; }
 
 private:
@@ -59,4 +61,6 @@ private:
     Matrix4x4 worldMatrix_{};
     Matrix4x4 viewMatrix_{};
     Matrix4x4 wvpMatrix_{};
+  bool useCustomWorldMatrix_ = false;
+    bool overlayDraw_ = false;
 };
