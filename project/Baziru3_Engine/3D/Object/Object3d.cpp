@@ -423,6 +423,32 @@ Object3d::~Object3d()
 	}
 }
 
+void Object3d::SetEnableLighting(bool enable)
+{
+	if (!materialResource) return;
+	Material* data = nullptr;
+	materialResource->Map(0, nullptr, reinterpret_cast<void**>(&data));
+	if (data)
+	{
+		data->enableLighting = enable ? 1 : 0;
+		D3D12_RANGE written = { 0, sizeof(Material) };
+		materialResource->Unmap(0, &written);
+	}
+}
+
+void Object3d::SetColor(const Vector4& color)
+{
+	if (!materialResource) return;
+	Material* data = nullptr;
+	materialResource->Map(0, nullptr, reinterpret_cast<void**>(&data));
+	if (data)
+	{
+		data->color = color;
+		D3D12_RANGE written = { 0, sizeof(Material) };
+		materialResource->Unmap(0, &written);
+	}
+}
+
 void Object3d::MaterialResource()
 {
 	if (object3dCom_ && object3dCom_->GetDirectXCom())

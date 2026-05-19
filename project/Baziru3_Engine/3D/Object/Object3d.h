@@ -120,6 +120,9 @@ public:
 	Vector3 GetScale() const { return transform.GetScale(); }
 	const ModelData& GetModelData() const { return modelData_; }
 
+	void SetEnableLighting(bool enable);
+	void SetColor(const Vector4& color);
+
 private:
 	Transform transform;
 	Transform cameraTransform;

@@ -76,6 +76,10 @@ void Game::Initialize()
 	textureIndexUvChecker = TextureManager::GetInstance()->Load("Resources/uvChecker.png"); // Load UV Checker texture
 	textureIndexModelTex = TextureManager::GetInstance()->Load(modelData.material.textureFilePath); // Load model texture
 	textureIndexSkybox_ = TextureManager::GetInstance()->Load("Resources/CG4/dds/CG4_test.dds"); // Load skybox texture
+
+	// OffScreenRendering の初期化
+	offScreenRendering_ = std::make_unique<OffScreenRendering>(logStream, dx);
+	offScreenRendering_->Initialize(0, 0, DXGI_FORMAT_R8G8B8A8_UNORM_SRGB, { 1.0f, 0.0f, 0.0f, 1.0f });
 }
 
 
@@ -162,6 +166,13 @@ void Game::Finalize()
 
 	if (light) { light.reset(); }
 
+	// OffScreenRendering の終了処理
+	if (offScreenRendering_)
+	{
+		offScreenRendering_->Finalize();
+		offScreenRendering_.reset();
+	}
+
 	// 7) Ensure TextureManager releases GPU resources before engine teardown
 	try { TextureManager::GetInstance()->Finalize(); }
 	catch (...) { Logger::Log(logStream, "TextureManager finalize failed\n"); }
@@ -247,6 +258,11 @@ void Game::Draw()
 
 	if (dx) dx->PreDraw();
 
+	if (offScreenRendering_)
+	{
+		offScreenRendering_->Begin(dx->GetCommandList().Get());
+	}
+
 	if (object3dCom) object3dCom->PreDraw();
 
 	RenderContext ctx = PrepareRenderContext();
@@ -264,7 +280,7 @@ void Game::Draw()
 	if (skybox_ && skyboxCom_ && textureIndexSkybox_ != TextureManager::kInvalidTextureIndex)
 	{
 		skyboxCom_->SetupDraw(ctx.commandList);
-		skybox_->Draw(ctx.commandList, TextureManager::GetInstance()->GetSrvHandleGPU(textureIndexSkybox_));
+		//skybox_->Draw(ctx.commandList, TextureManager::GetInstance()->GetSrvHandleGPU(textureIndexSkybox_));
 	}
 
 	if (object3dCom) object3dCom->PreDraw();
@@ -284,8 +300,8 @@ void Game::Draw()
 			object3dCom->Draw(object3d_.get(), ctx, modelData, drawObject);
 		}
 	}
-	DrawSprites(ctx);
-	DrawParticles(ctx);
+	//DrawSprites(ctx);
+	//DrawParticles(ctx);
 
 	//Objectの描画
 
@@ -309,6 +325,13 @@ void Game::Draw()
 
 	//実際のcommandListのImGuiの描画コマンドを積む
 #ifdef USE_IMGUI
+	if (offScreenRendering_)
+	{
+		offScreenRendering_->End(dx->GetCommandList().Get());
+		offScreenRendering_->SetMainRenderTarget(dx->GetCommandList().Get());
+		offScreenRendering_->DrawToBackBuffer(dx->GetCommandList().Get());
+	}
+
 	if (dx) ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), dx->GetCommandList().Get());
 #endif
 

@@ -60,6 +60,7 @@ void GamePlayScene::Initialize(DirectXCom* dxCommon, Camera* camera)
 		animatedCube_->Initialize(object3dCom, animatedCubeModelData);
 		animatedCube_->SetTranslate({ 2.0f, 0.0f, 0.0f });
 		animatedCube_->SetScale({ 1.0f, 1.0f, 1.0f });
+		animatedCube_->SetEnableLighting(true);
 		animatedCubeInitialized_ = true;
 		animation_ = LoadAnimationFile("Resources/CG4/human", "walk.gltf");
       if (animation_.duration > 0.0f && !animation_.nodeAnimations.empty())
@@ -292,9 +293,9 @@ void GamePlayScene::Draw(SceneRenderRequests& renderRequests)
 		renderRequests.spheres.Request(sphere_.get());
 	}
 
-   if (skeletonDebug_.IsInitialized())
+   if (skeletonDebug_.IsInitialized() && showSkeletonDebug_)
 	{
-      skeletonDebug_.Draw(renderRequests, {});
+	  skeletonDebug_.Draw(renderRequests, {});
 	}
 
 	if (animatedCubeInitialized_ && animatedCube_ && object3dCom)

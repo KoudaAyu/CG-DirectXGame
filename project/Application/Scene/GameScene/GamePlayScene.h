@@ -66,6 +66,7 @@ private:
     bool sphereInitialized = false;
     bool hitEffectInitialized = false;
     bool animatedCubeInitialized_ = false;
+    bool showSkeletonDebug_ = false;
 
 	// テクスチャインデックスは TextureManager で管理されるため、ここではインデックスを保持するだけにする
     uint32_t cylinderTextureIndex_ = TextureManager::kInvalidTextureIndex;
