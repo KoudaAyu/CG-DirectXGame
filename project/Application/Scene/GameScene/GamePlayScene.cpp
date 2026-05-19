@@ -248,7 +248,7 @@ void GamePlayScene::Update()
 		prevF3 = curF3;
 	}
 
-	particleManager->Update(kDeltaTime);
+    // ParticleManager is updated by the engine (SceneManager) after the scene Update.
 }
 
 void GamePlayScene::Draw(SceneRenderRequests& renderRequests)
@@ -263,6 +263,8 @@ void GamePlayScene::Draw(SceneRenderRequests& renderRequests)
 		ctx.materialGPUAddress = (materialManager && materialManager->GetMaterialResource()) ?
 			materialManager->GetMaterialResource()->GetGPUVirtualAddress() : 0;
 	}
+
+	SceneManager::GetInstance()->DrawSkybox(ctx.commandList);
 
 	if (spriteManager_)
 	{

@@ -70,12 +70,17 @@ void Game::Initialize()
 	debugUI = std::make_unique<DebugUI>(materialManager_.get(), uiSpriteManager, camera_.get(), &transformObject, &useMonsterBall, &drawObject, &drawSprite);
 	debugUI->Initialize();
 
+	fadeApplication_ = std::make_unique<FadeApplication>();
+	fadeApplication_->Initialize(spriteCom, window);
+	SceneManager::GetInstance()->SetFadeApplication(fadeApplication_.get());
+
 	SceneRegistration::RegisterScenes();
 	SceneManager::GetInstance()->ChangeScene("TITLE");
 
 	textureIndexUvChecker = TextureManager::GetInstance()->Load("Resources/uvChecker.png"); // Load UV Checker texture
 	textureIndexModelTex = TextureManager::GetInstance()->Load(modelData.material.textureFilePath); // Load model texture
 	textureIndexSkybox_ = TextureManager::GetInstance()->Load("Resources/CG4/dds/CG4_test.dds"); // Load skybox texture
+   SceneManager::GetInstance()->SetSkyboxTextureIndex(textureIndexSkybox_);
 }
 
 
@@ -97,6 +102,17 @@ void Game::Finalize()
 		debugUI.reset();
 	}
 
+	if (SceneManager::GetInstance())
+	{
+		SceneManager::GetInstance()->SetFadeApplication(nullptr);
+	}
+
+	if (fadeApplication_)
+	{
+		fadeApplication_->Finalize();
+		fadeApplication_.reset();
+	}
+
 	// AudioManagerの終了処理
 	if (audioManager_)
 	{
@@ -115,6 +131,9 @@ void Game::Finalize()
 		SceneManager::GetInstance()->SetCamera(nullptr);
 		SceneManager::GetInstance()->SetLight(nullptr);
 		SceneManager::GetInstance()->SetObject3dCom(nullptr);
+       SceneManager::GetInstance()->SetSkyboxCom(nullptr);
+		SceneManager::GetInstance()->SetSkyBox(nullptr);
+		SceneManager::GetInstance()->SetSkyboxTextureIndex(TextureManager::kInvalidTextureIndex);
 	}
 
 	// 4) Particle manager
@@ -189,8 +208,14 @@ void Game::Update()
 		audioManager_->Update();
 	}
 
+	if (fadeApplication_)
+	{
+		fadeApplication_->Update();
+	}
 
-	SceneManager::GetInstance()->Update();
+
+    // Update scenes and engine subsystems. Use fixed timestep here (same as scenes expect).
+	SceneManager::GetInstance()->Update(1.0f / 60.0f);
 
 	//if (windowAPI->ProcessMassage())
 	//{
@@ -261,19 +286,14 @@ void Game::Draw()
 		Logger::Log(logStream, "Warning: camera GPU resource not available before SceneManager draw.\n");
 	}
 
-	if (skybox_ && skyboxCom_ && textureIndexSkybox_ != TextureManager::kInvalidTextureIndex)
-	{
-		skyboxCom_->SetupDraw(ctx.commandList);
-		skybox_->Draw(ctx.commandList, TextureManager::GetInstance()->GetSrvHandleGPU(textureIndexSkybox_));
-	}
-
-	if (object3dCom) object3dCom->PreDraw();
+    // object3dCom PreDraw already called above
 
 	if (SceneManager::GetInstance())
 	{
-        SceneManager::GetInstance()->Draw(renderRequests);
+        //SceneManager::GetInstance()->Draw(renderRequests);
 	}
-  sphereRenderer_.Draw(ctx, renderRequests);
+
+	sphereRenderer_.Draw(ctx, renderRequests);
 
 
 
@@ -284,8 +304,17 @@ void Game::Draw()
 			object3dCom->Draw(object3d_.get(), ctx, modelData, drawObject);
 		}
 	}
-	DrawSprites(ctx);
-	DrawParticles(ctx);
+    DrawSprites(ctx);
+
+
+	if (renderRequests.sceneDrawn)
+	{
+		DrawParticles(ctx);
+	}
+	if (fadeApplication_)
+	{
+		fadeApplication_->Draw();
+	}
 
 	//Objectの描画
 
@@ -411,6 +440,8 @@ void Game::InitializeSceneResources()
 	skyboxCom_->Initialize();
 	skybox_ = std::make_unique<SkyBox>();
 	skybox_->Initialize(dx, camera_.get());
+	SceneManager::GetInstance()->SetSkyboxCom(skyboxCom_.get());
+	SceneManager::GetInstance()->SetSkyBox(skybox_.get());
 
 	particleManager = std::make_unique<ParticleManager>(logStream, dx);
 	particleManager->Initialize(camera_.get());
