@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 #include "Camera.h"
+#include "NodeAnimation.h"
 #include"TextureManager.h"
 #include"MaterialManager.h"
 #include "Transform.h"
@@ -14,7 +15,7 @@ class Object3d
 {
 public:
 
-    // Use global `Material` from MaterialManager.h for GPU CB layout
+    // GPU用の定数バッファ(CB)レイアウトには MaterialManager.h のグローバルな `Material` を使用
 
 	struct MaterialData
 	{
@@ -26,7 +27,9 @@ public:
 	struct ModelData
 	{
 		std::vector<Sprite::VertexData> vertices; // 頂点データ
+		std::vector<uint32_t> indices; // インデックスデータ
 		MaterialData material; // マテリアルデータ
+		NodeAnimation rootNode; // 階層構造のルートノード
 	};
 
 	struct VertexData
@@ -71,6 +74,14 @@ public:
 	/// <returns></returns>
 	static ModelData LoadObjFile(const std::string& directoryPath, const std::string& filename);
 
+	/// <summary>
+	/// Assimp対応モデルファイルの読み込み(.gltf など)
+	/// </summary>
+	/// <param name="directoryPath">ファイルパス</param>
+	/// <param name="filename">モデルファイル名</param>
+	/// <returns></returns>
+	static ModelData LoadModelFile(const std::string& directoryPath, const std::string& filename);
+
 
 
 	void VertexResource();
@@ -107,6 +118,7 @@ public:
 	Vector3 GetRotate() const { return transform.GetRotate(); }
 	Vector3 GetTranslate() const { return transform.GetTranslate(); }
 	Vector3 GetScale() const { return transform.GetScale(); }
+	const ModelData& GetModelData() const { return modelData_; }
 
 private:
 	Transform transform;
@@ -117,7 +129,7 @@ private:
 	Object3dCom* object3dCom_ = nullptr;
 	Transform transform_;
 
-	ModelData modelData_; // store model data
+    ModelData modelData_; // モデルデータを保持
 
 	//バッファリソース
 	Microsoft::WRL::ComPtr<ID3D12Resource> vertexResource = nullptr;
@@ -125,6 +137,10 @@ private:
 	VertexData* vertexData_ = nullptr;
 	//バッファリソースの使い道を補足するバッファビュー
 	D3D12_VERTEX_BUFFER_VIEW vertexBufferView_{};
+	//インデックスバッファ用のリソース
+	Microsoft::WRL::ComPtr<ID3D12Resource> indexResource = nullptr;
+	//インデックスバッファビュー
+	D3D12_INDEX_BUFFER_VIEW indexBufferView_{};
 
 	//バッファリソース
 	Microsoft::WRL::ComPtr<ID3D12Resource> materialResource = nullptr;

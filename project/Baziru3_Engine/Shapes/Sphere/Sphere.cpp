@@ -174,8 +174,9 @@ void Sphere::Draw(D3D12_GPU_DESCRIPTOR_HANDLE textureSrvHandle)
 	commandList->RSSetViewports(1, &directXCom_->GetViewport());
 	commandList->RSSetScissorRects(1, &directXCom_->GetScissorRect());
 
-	commandList->SetGraphicsRootSignature(object3dCom_->GetRootSignature().Get());
-	commandList->SetPipelineState(object3dCom_->GetPipelineState().Get());
+  commandList->SetGraphicsRootSignature(object3dCom_->GetRootSignature().Get());
+	const auto& pipelineState = overlayDraw_ ? object3dCom_->GetOverlayPipelineState() : object3dCom_->GetPipelineState();
+	commandList->SetPipelineState(pipelineState.Get());
 	commandList->IASetVertexBuffers(0, 1, &vertexBufferViewSphere);
 	commandList->IASetIndexBuffer(&indexBufferViewSphere);
 	commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);

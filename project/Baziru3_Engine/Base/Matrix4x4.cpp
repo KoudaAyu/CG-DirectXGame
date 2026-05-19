@@ -1,6 +1,10 @@
 #include "Matrix4x4.h"
 
-#include<cmath>
+#include "Matrix4x4.h"
+#include "Quaternion.h"
+
+
+#include <cmath>
 
 Matrix4x4 MakeScaleMatrix(const Vector3& scale)
 {
@@ -328,6 +332,96 @@ Matrix4x4 MakeAffineMatrix(const Vector3& scale, const Matrix4x4& rotateMatrix, 
 	result.m[3][3] = 1.0f; // 最後の要素は1
 
 	return result;
+}
+
+// Quaternion を受け取るオーバーロード
+Matrix4x4 MakeAffineMatrix(const Vector3& scale, const Quaternion& rotation, const Vector3& translate)
+{
+	Quaternion q = rotation;
+	q.Normalize();
+	Matrix4x4 r = {};
+
+	float xx = q.x * q.x;
+	float yy = q.y * q.y;
+	float zz = q.z * q.z;
+	float xy = q.x * q.y;
+	float xz = q.x * q.z;
+	float yz = q.y * q.z;
+	float wx = q.w * q.x;
+	float wy = q.w * q.y;
+	float wz = q.w * q.z;
+
+	// Row-major 3x3 rotation
+	r.m[0][0] = 1.0f - 2.0f * (yy + zz);
+	r.m[0][1] = 2.0f * (xy + wz);
+	r.m[0][2] = 2.0f * (xz - wy);
+	r.m[0][3] = 0.0f;
+
+	r.m[1][0] = 2.0f * (xy - wz);
+	r.m[1][1] = 1.0f - 2.0f * (xx + zz);
+	r.m[1][2] = 2.0f * (yz + wx);
+	r.m[1][3] = 0.0f;
+
+	r.m[2][0] = 2.0f * (xz + wy);
+	r.m[2][1] = 2.0f * (yz - wx);
+	r.m[2][2] = 1.0f - 2.0f * (xx + yy);
+	r.m[2][3] = 0.0f;
+
+	r.m[3][0] = 0.0f; r.m[3][1] = 0.0f; r.m[3][2] = 0.0f; r.m[3][3] = 1.0f;
+
+	return MakeAffineMatrix(scale, r, translate);
+}
+
+// initializer_list オーバーロード: ブレース初期化子から Vector3/Quaternion/Matrix4x4 に変換して既存のオーバーロードへ中継します
+Matrix4x4 MakeAffineMatrix(std::initializer_list<float> scaleList, std::initializer_list<float> rotateList, std::initializer_list<float> translateList)
+{
+	auto toVector3 = [](std::initializer_list<float> lst)->Vector3 {
+		Vector3 v{0.0f,0.0f,0.0f};
+		size_t i = 0;
+		for (float f : lst)
+		{
+			if (i == 0) v.x = f;
+			else if (i == 1) v.y = f;
+			else if (i == 2) v.z = f;
+			++i;
+			if (i >= 3) break;
+		}
+		return v;
+	};
+
+	Vector3 scaleVec = toVector3(scaleList);
+	Vector3 translateVec = toVector3(translateList);
+
+	size_t rsz = rotateList.size();
+	if (rsz == 3)
+	{
+		Vector3 rotVec = toVector3(rotateList);
+		return MakeAffineMatrix(scaleVec, rotVec, translateVec);
+	}
+	else if (rsz == 4)
+	{
+		auto it = rotateList.begin();
+		Quaternion q{*it, *(++it), *(++it), *(++it)};
+		return MakeAffineMatrix(scaleVec, q, translateVec);
+	}
+	else if (rsz == 16)
+	{
+		Matrix4x4 rm = {};
+		auto it = rotateList.begin();
+		for (int i = 0; i < 4; ++i)
+		{
+			for (int j = 0; j < 4; ++j)
+			{
+				rm.m[i][j] = *it;
+				++it;
+			}
+		}
+		return MakeAffineMatrix(scaleVec, rm, translateVec);
+	}
+
+	// fallback: identity 回転
+	Matrix4x4 identity = MakeIdentity4x4();
+	return MakeAffineMatrix(scaleVec, identity, translateVec);
 }
 
 Matrix4x4 MakePerspectiveFovMatrix(float fovY, float aspectRatio, float nearZ, float farZ)

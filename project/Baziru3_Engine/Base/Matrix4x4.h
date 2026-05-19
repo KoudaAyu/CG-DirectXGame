@@ -1,6 +1,11 @@
 #pragma once
 #include"Vector.h"
 
+
+#include "Quaternion.h"
+#include <initializer_list>
+
+
 struct Matrix3x3
 {
 	float m[3][3];
@@ -61,6 +66,12 @@ Matrix4x4 MakeTranslateMatrix(const Vector3& translate);
 Matrix4x4 MakeAffineMatrix(const Vector3& scale, const Vector3& rotate, const Vector3& translate);
 
 Matrix4x4 MakeAffineMatrix(const Vector3& scale, const Matrix4x4& rotateMatrix, const Vector3& translate);
+
+// Quaternion 版の MakeAffineMatrix を追加
+Matrix4x4 MakeAffineMatrix(const Vector3& scale, const Quaternion& rotation, const Vector3& translate);
+
+// ブレース初期化子で呼べるようにするためのオーバーロード
+Matrix4x4 MakeAffineMatrix(std::initializer_list<float> scale, std::initializer_list<float> rotate, std::initializer_list<float> translate);
 
 
 Matrix4x4 MakePerspectiveFovMatrix(float fovY, float aspectRatio, float nearZ, float farZ);

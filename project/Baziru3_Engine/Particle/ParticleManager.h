@@ -9,12 +9,14 @@
 #include"Random.h"
 #include"RenderContext.h"
 #include <list>
+#include <memory>
 #include <vector>
 #include <unordered_map>
 
 class ParticleEmitter;
 
 class Camera;
+class Ring;
 
 class ParticleManager
 {
@@ -178,23 +180,7 @@ private:
 	D3D12_DEPTH_STENCIL_DESC depthStencilDesc{};
 	D3D12_GPU_DESCRIPTOR_HANDLE instancingSrvHandleGPU;
 	Microsoft::WRL::ComPtr<ID3D12Resource> instancingResource;
-
-	// Vertex buffer for ring mesh used to render particles (non-indexed triangle list)
-    struct Vertex
-	{
-		// Match input layout: POSITION (float4), TEXCOORD (float2), NORMAL (float3)
-		Vector4 pos; // x,y,z,w
-		Vector2 uv;
-		Vector3 normal;
-	};
-
-	Microsoft::WRL::ComPtr<ID3D12Resource> vertexBuffer;
-	D3D12_VERTEX_BUFFER_VIEW vertexBufferView{};
-	uint32_t vertexCount = 0;
-
-	// Ring mesh helpers
-	std::vector<Vertex> CreateRingMesh(uint32_t kRingDivide, float kOuterRadius, float kInnerRadius);
-	void CreateVertexBufferFromVerts(const std::vector<Vertex>& verts);
+	std::unique_ptr<Ring> ring_;
 
 	std::mt19937 randomEngine{ std::random_device{}() };
 	std::list<ParticleManager::Particle> particles;
