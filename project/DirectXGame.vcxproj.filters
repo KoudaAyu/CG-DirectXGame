@@ -1,18 +1,12 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <Filter Include="ソース ファイル">
-      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
-      <Extensions>cpp;c;cc;cxx;c++;cppm;ixx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
-    </Filter>
-    <Filter Include="ヘッダー ファイル">
-      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
-      <Extensions>h;hh;hpp;hxx;h++;hm;inl;inc;ipp;xsd</Extensions>
-    </Filter>
-    <Filter Include="リソース ファイル">
-      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
-      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
-    </Filter>
+    <FxCompile Include="Resources\shaders\Skybox.PS.hlsl" />
+    <FxCompile Include="Resources\shaders\Skybox.VS.hlsl" />
+    <FxCompile Include="Resources\shaders\Object3d.PS.hlsl" />
+    <FxCompile Include="Resources\shaders\Particle.PS.hlsl" />
+    <FxCompile Include="Resources\shaders\Particle.VS.hlsl" />
+    <FxCompile Include="Resources\shaders\Object3d.VS.hlsl" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Baziru3_Engine\Camera\DebugCamera\DebugCamera.cpp">
@@ -36,6 +30,7 @@
     <ClCompile Include="Baziru3_Engine\Camera\Camera.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
+    <ClCompile Include="3D\Object\Object3d.cpp" />
     <ClCompile Include="Baziru3_Engine\3D\Object\Object3d.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
@@ -153,7 +148,6 @@
     <ClCompile Include="Baziru3_Engine\Graphics\Sphere\SphereRenderer.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
-
     <ClCompile Include="Baziru3_Engine\Particle\Ring.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
@@ -185,22 +179,14 @@
       <Filter>ソース ファイル</Filter>
     </ClCompile>
     <ClCompile Include="Baziru3_Engine\3D\Model\SkinCluster\SkinCluster.cpp">
-
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
     <ClCompile Include="Application\FadeApplication.cpp">
-
       <Filter>ソース ファイル</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <FxCompile Include="Resources\shaders\Skybox.PS.hlsl" />
-    <FxCompile Include="Resources\shaders\Skybox.VS.hlsl" />
-    <FxCompile Include="Resources\shaders\Object3d.PS.hlsl" />
-    <FxCompile Include="Resources\shaders\Particle.PS.hlsl" />
-    <FxCompile Include="Resources\shaders\Particle.VS.hlsl" />
-    <FxCompile Include="Resources\shaders\Object3d.VS.hlsl" />
-  </ItemGroup>
-  <ItemGroup>
-<ClInclude Include="Baziru3_Engine\Camera\DebugCamera\DebugCamera.h">
+    <ClInclude Include="Baziru3_Engine\Camera\DebugCamera\DebugCamera.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
     <ClInclude Include="Baziru3_Engine\Base\DirectXCom.h">
@@ -260,9 +246,9 @@
     <ClInclude Include="Baziru3_Engine\3D\Model\ModelCom.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
-    <ClInclude Include="Baziru3_Engine\3D\Model\ModelManager.h">
+    <严重 Include="Baziru3_Engine\3D\Model\ModelManager.h">
       <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
+    </严重>
     <ClInclude Include="Baziru3_Engine\Base\Srv\SRVManager.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
@@ -333,7 +319,7 @@
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
     <ClInclude Include="Application\Subsystem\SubsystemFactory.h">
-      <Filter>·ヘッダー ファイル</Filter>
+      <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
     <ClInclude Include="Baziru3_Engine\Base\MappedResource.h">
       <Filter>ヘッダー ファイル</Filter>
@@ -367,7 +353,6 @@
     <None Include="Resources\shaders\Skybox.hlsli" />
     <None Include="Resources\shaders\Particle.hlsli" />
     <None Include="Resources\shaders\Object3d.hlsli" />
-
     <None Include="Resources\shaders\CopyImage.hlsli" />
   </ItemGroup>
 </Project>
