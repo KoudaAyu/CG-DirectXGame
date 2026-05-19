@@ -2,7 +2,7 @@
 
 #include "Matrix4x4.h"
 #include "Model.h"
-
+#include "Skeleton.h"
 
 #include <array>
 #include <d3d12.h>
@@ -34,9 +34,11 @@ struct SkinCluster
 	std::pair<D3D12_CPU_DESCRIPTOR_HANDLE, D3D12_GPU_DESCRIPTOR_HANDLE> paletteSrvHandle; // ジョイントのバインド行列をシェーダーで参照するためのSRVハンドル
 };
 
-class SkinCluster
+class DirectXCom;
+
+class SkinClusterLender
 {
 public:
-	SkinCluster CreateSkinCluster(const Microsoft::WRL::ComPtr<ID3D12Device>& device, const Skeleton& ekeleton,
-		const Model::ModelData& modelData, const Microsoft::WRL::ComPtr<ID3D12DescriptorHeap>& descriptorHeap, uint32_t descriptorSize);;
+    SkinCluster CreateSkinCluster(const Microsoft::WRL::ComPtr<ID3D12Device>& device, const Skeleton& skeleton,
+		const Model::ModelData& modelData, const Microsoft::WRL::ComPtr<ID3D12DescriptorHeap>& descriptorHeap, uint32_t descriptorSize, DirectXCom& directXCom);
 };

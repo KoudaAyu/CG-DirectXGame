@@ -1,7 +1,7 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-<Filter Include="ソース ファイル">
+    <Filter Include="ソース ファイル">
       <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
       <Extensions>cpp;c;cc;cxx;c++;cppm;ixx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
     </Filter>
@@ -183,6 +183,9 @@
     <ClCompile Include="Baziru3_Engine\Animation\Skeleton\SkeletonDebug.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
+    <ClCompile Include="Baziru3_Engine\3D\Model\SkinCluster\SkinCluster.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="Resources\shaders\Skybox.PS.hlsl" />
@@ -193,7 +196,7 @@
     <FxCompile Include="Resources\shaders\Object3d.VS.hlsl" />
   </ItemGroup>
   <ItemGroup>
-<ClCompile Include="Baziru3_Engine\Animation\Animation.cpp" />
+    <ClCompile Include="Baziru3_Engine\Animation\Animation.cpp" />
     <ClCompile Include="Baziru3_Engine\Animation\AnimationUtils.cpp" />
     <ClCompile Include="Baziru3_Engine\Animation\Animator.cpp" />
     <ClCompile Include="Baziru3_Engine\Effect\HitEffect.cpp" />
@@ -211,7 +214,6 @@
     <ClCompile Include="Baziru3_Engine\Audio\Sound.cpp" />
     <ClCompile Include="Baziru3_Engine\Base\ImGui\ImGuiManager.cpp" />
     <ClCompile Include="Baziru3_Engine\Base\OffScreenRendering\RenderTexture.cpp" />
-    <ClCompile Include="Camera\Camera.cpp" />
     <ClCompile Include="Baziru3_Engine\Camera\Camera.cpp" />
     <ClCompile Include="Baziru3_Engine\Camera\DebugCamera\DebugCamera.cpp" />
     <ClCompile Include="Baziru3_Engine\Base\DirectXCom.cpp" />

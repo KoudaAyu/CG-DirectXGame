@@ -15,14 +15,9 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-
-
+    <ClCompile Include="Baziru3_Engine\3D\Model\SkinCluster\SkinCluster.cpp" />
     <ClCompile Include="Baziru3_Engine\Animation\Joint\Joint.cpp" />
     <ClCompile Include="Baziru3_Engine\Animation\NodeAnimation\Node.cpp" />
-
-
-    <ClCompile Include="3D\Model\Model.cpp" />
-
     <ClCompile Include="Baziru3_Engine\Base\OffScreenRendering\OffScreenRendering.cpp" />
     <ClCompile Include="Baziru3_Engine\Animation\Animation.cpp" />
     <ClCompile Include="Baziru3_Engine\Animation\AnimationUtils.cpp" />
@@ -116,15 +111,9 @@
     </FxCompile>
   </ItemGroup>
   <ItemGroup>
-
-
     <ClInclude Include="Baziru3_Engine\Animation\NodeAnimation\Node.h" />
     <ClInclude Include="Baziru3_Engine\Animation\NodeAnimation\NodeStruct.h" />
-
-
-
     <ClInclude Include="Baziru3_Engine\3D\Model\SkinCluster\SkinCluster.h" />
-
     <ClInclude Include="Baziru3_Engine\Base\OffScreenRendering\OffScreenRendering.h" />
     <ClInclude Include="Baziru3_Engine\Animation\Animation.h" />
     <ClInclude Include="Baziru3_Engine\Animation\AnimationData.h" />
@@ -133,10 +122,8 @@
     <ClInclude Include="Baziru3_Engine\Animation\Joint\Joint.h" />
     <ClInclude Include="Baziru3_Engine\Animation\Keyframe\Keyframe.h" />
     <ClInclude Include="Baziru3_Engine\Animation\NodeAnimation\NodeAnimation.h" />
-
     <ClInclude Include="Baziru3_Engine\Animation\Skeleton\Skeleton.h" />
     <ClInclude Include="Baziru3_Engine\Animation\Skeleton\SkeletonDebug.h" />
-
     <ClInclude Include="Baziru3_Engine\Effect\HitEffect.h" />
     <ClInclude Include="Baziru3_Engine\Graphics\Particle\ParticleRenderer.h" />
     <ClInclude Include="Baziru3_Engine\Graphics\SceneRenderRequests.h" />
@@ -277,7 +264,7 @@
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <TreatWarningAsError>true</TreatWarningAsError>
-<AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)\externals\DirectXTex;$(ProjectDir)\externals\imgui;$(ProjectDir)Application;$(ProjectDir)Application\Scene;$(ProjectDir)Application\Scene\GameScene;$(ProjectDir)Application\Scene\TitleScene;$(ProjectDir)Application\Subsystem;$(ProjectDir)Baziru3_Engine\2D;$(ProjectDir)Baziru3_Engine\2D\Sprite;$(ProjectDir)Baziru3_Engine\2D\Texture;$(ProjectDir)Baziru3_Engine\3D\Model;$(ProjectDir)Baziru3_Engine\3D\Model\SkinCluster;$(ProjectDir)Baziru3_Engine\3D\Object;$(ProjectDir)Baziru3_Engine\Audio;$(ProjectDir)Baziru3_Engine\Animation;$(ProjectDir)Baziru3_Engine\Animation\Joint;$(ProjectDir)Baziru3_Engine\Animation\Keyframe;$(ProjectDir)Baziru3_Engine\Animation\NodeAnimation;$(ProjectDir)Baziru3_Engine\Animation\Skeleton;$(ProjectDir)Baziru3_Engine\Base;$(ProjectDir)Baziru3_Engine\Base\ImGui;$(ProjectDir)Baziru3_Engine\Base\Log;$(ProjectDir)Baziru3_Engine\Base\OffScreenRendering;$(ProjectDir)Baziru3_Engine\Base\Scene;$(ProjectDir)Baziru3_Engine\Base\Srv;$(ProjectDir)Baziru3_Engine\Base\Windows;$(ProjectDir)Baziru3_Engine\Camera;$(ProjectDir)Baziru3_Engine\Camera\DebugCamera;$(ProjectDir)Baziru3_Engine\Graphics\Material;$(ProjectDir)Baziru3_Engine\Light;$(ProjectDir)Baziru3_Engine\Math;$(ProjectDir)Baziru3_Engine\Particle;$(ProjectDir)Baziru3_Engine\Platform\Windows;$(ProjectDir)Baziru3_Engine\Primitive\Cylinder;$(ProjectDir)Baziru3_Engine\Scene;$(ProjectDir)Baziru3_Engine\Scene\Factory;$(ProjectDir)Baziru3_Engine\Scene\Manager;$(ProjectDir)Baziru3_Engine\Shapes\Sphere;$(ProjectDir)ProjectDir)Baziru3_Engine\SkyBox</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)\externals\DirectXTex;$(ProjectDir)\externals\imgui;$(ProjectDir)Application;$(ProjectDir)Application\Scene;$(ProjectDir)Application\Scene\GameScene;$(ProjectDir)Application\Scene\TitleScene;$(ProjectDir)Application\Subsystem;$(ProjectDir)Baziru3_Engine\2D;$(ProjectDir)Baziru3_Engine\2D\Sprite;$(ProjectDir)Baziru3_Engine\2D\Texture;$(ProjectDir)Baziru3_Engine\3D\Model;$(ProjectDir)Baziru3_Engine\3D\Model\SkinCluster;$(ProjectDir)Baziru3_Engine\3D\Object;$(ProjectDir)Baziru3_Engine\Audio;$(ProjectDir)Baziru3_Engine\Animation;$(ProjectDir)Baziru3_Engine\Animation\Joint;$(ProjectDir)Baziru3_Engine\Animation\Keyframe;$(ProjectDir)Baziru3_Engine\Animation\NodeAnimation;$(ProjectDir)Baziru3_Engine\Animation\Skeleton;$(ProjectDir)Baziru3_Engine\Base;$(ProjectDir)Baziru3_Engine\Base\ImGui;$(ProjectDir)Baziru3_Engine\Base\Log;$(ProjectDir)Baziru3_Engine\Base\OffScreenRendering;$(ProjectDir)Baziru3_Engine\Base\Scene;$(ProjectDir)Baziru3_Engine\Base\Srv;$(ProjectDir)Baziru3_Engine\Base\Windows;$(ProjectDir)Baziru3_Engine\Camera;$(ProjectDir)Baziru3_Engine\Camera\DebugCamera;$(ProjectDir)Baziru3_Engine\Graphics\Material;$(ProjectDir)Baziru3_Engine\Light;$(ProjectDir)Baziru3_Engine\Math;$(ProjectDir)Baziru3_Engine\Particle;$(ProjectDir)Baziru3_Engine\Platform\Windows;$(ProjectDir)Baziru3_Engine\Primitive\Cylinder;$(ProjectDir)Baziru3_Engine\Scene;$(ProjectDir)Baziru3_Engine\Scene\Factory;$(ProjectDir)Baziru3_Engine\Scene\Manager;$(ProjectDir)Baziru3_Engine\Shapes\Sphere;$(ProjectDir)Baziru3_Engine\SkyBox</AdditionalIncludeDirectories>
       <BasicRuntimeChecks>Default</BasicRuntimeChecks>
     </ClCompile>
     <Link>
