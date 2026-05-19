@@ -6,6 +6,7 @@ SkinCluster SkinClusterLender::CreateSkinCluster(const Microsoft::WRL::ComPtr<ID
 	const Model::ModelData& modelData, const Microsoft::WRL::ComPtr<ID3D12DescriptorHeap>& descriptorHeap, uint32_t descriptorSize, DirectXCom& directXCom)
 {
 	SkinCluster skinCluster;
+	skinCluster.paletteResource = directXCom.CreateBufferResource(device, sizeof(WellForGPU) * skeleton.joints.size());
 
 	
 	return skinCluster;
