@@ -17,6 +17,7 @@
 #include"Object3dCom.h"
 #include"ParticleEmitter.h"
 #include"ParticleManager.h"
+#include"Baziru3_Engine\Base\OffScreenRendering\OffScreenRendering.h"
 #include"Baziru3_Engine\Graphics\Particle\ParticleRenderer.h"
 #include"Baziru3_Engine\Graphics\Sphere\SphereRenderer.h"
 #include"SceneManager.h"
@@ -32,6 +33,7 @@
 #include"TextureManager.h"
 #include"WindowsAPI.h"
 #include "DebugUI.h"
+#include "FadeApplication.h"
 
 #include <vector>
 #include <random>
@@ -132,6 +134,7 @@ private:
 	std::unique_ptr<ModelCom>modelCom_;
 	std::unique_ptr<Object3d> object3d_;
 	std::unique_ptr<Object3dCom> object3dCom;
+   std::unique_ptr<OffScreenRendering> offScreenRendering_;
 	std::unique_ptr<ParticleManager> particleManager;
     ParticleRenderer particleRenderer_;
     SphereRenderer sphereRenderer_;
@@ -147,6 +150,7 @@ private:
 	std::unique_ptr<AudioManager> audioManager_;
 	std::unique_ptr<MaterialManager> materialManager_;
 	std::unique_ptr<DebugUI> debugUI; // debug UI
+    std::unique_ptr<FadeApplication> fadeApplication_;
 private:
 	std::vector<std::unique_ptr<Sprite>>sprites;
 	Sprite::Transform transformObject;

@@ -4,7 +4,6 @@
 #include"Baziru3_Engine\Effect\HitEffect.h"
 #include"DirectXCom.h"
 #include"ParticleEmitter.h"
-#include"Sphere.h"
 
 #include <vector>
 
@@ -13,6 +12,11 @@
 #include "Light.h"
 #include "MaterialManager.h"
 #include "ParticleManager.h"
+#include "Animation.h"
+#include "Animator.h"
+#include "Skeleton.h"
+#include "SkeletonDebug.h"
+#include "Sphere.h"
 #include "Sprite.h"
 #include "SpriteManager.h" 
 #include "DebugCamera.h"
@@ -49,6 +53,10 @@ private:
     std::unique_ptr<HitEffect> hitEffect_;
     std::unique_ptr<Object3d> animatedCube_;
     std::unique_ptr<Sphere> sphere_;
+    Skeleton skeleton_{};
+    Animation animation_{};
+    Animator animator_{};
+    SkeletonDebug skeletonDebug_{};
     DebugCamera debugCamera_;
     std::vector<std::unique_ptr<Sprite>> sprites;
     std::unique_ptr<SpriteManager> spriteManager_;
