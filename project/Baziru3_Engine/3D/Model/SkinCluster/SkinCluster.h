@@ -3,6 +3,7 @@
 #include "Matrix4x4.h"
 #include "Model.h"
 
+
 #include <array>
 #include <d3d12.h>
 #include <vector>
@@ -37,5 +38,5 @@ class SkinCluster
 {
 public:
 	SkinCluster CreateSkinCluster(const Microsoft::WRL::ComPtr<ID3D12Device>& device, const Skeleton& ekeleton,
-		const ModelData& modelData, const Microsoft::WRL::ComPtr<ID3D12DescriptorHeap>& descriptorHeap, uint32_t descriptorSize);;
+		const Model::ModelData& modelData, const Microsoft::WRL::ComPtr<ID3D12DescriptorHeap>& descriptorHeap, uint32_t descriptorSize);;
 };
