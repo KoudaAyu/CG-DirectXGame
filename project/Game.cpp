@@ -46,7 +46,7 @@ void Game::Initialize()
 	transformObject = { {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };
 
 	{
-		Sprite::Transform t = { {1.0f,1.0f,1.0f}, {0.0f,0.0f,0.0f}, {0.0f,0.0f,0.0f} };
+     Sprite::Transform t = { {1.0f,1.0f,1.0f}, {0.0f,0.0f,0.0f}, {0.0f,0.0f,0.0f} };
 		if (auto sp = Sprite::Create(spriteCom, t, "Resources/uvChecker.png"))
 		{
 			sprites.emplace_back(std::move(sp));
@@ -54,6 +54,17 @@ void Game::Initialize()
 		else
 		{
 			Logger::Log(logStream, "Failed to create sprite: Resources/uvChecker.png\n");
+		}
+
+		// Create a small cursor sprite and keep its index
+		Sprite::Transform tc = { {1.0f,1.0f,1.0f}, {0.0f,0.0f,0.0f}, {0.0f,0.0f,0.0f} };
+		if (auto cursor = Sprite::Create(spriteCom, tc, "Resources/CG4/circle2.png"))
+		{
+            cursor->SetSize({32.0f, 32.0f});
+			// Set anchor to top-left so sprite's top-left aligns with mouse position
+			cursor->SetAnchorPoint({0.0f, 0.0f});
+			sprites.emplace_back(std::move(cursor));
+			cursorSpriteIndex = static_cast<int>(sprites.size()) - 1;
 		}
 	}
 
@@ -258,6 +269,49 @@ void Game::Update()
 #endif
 
 	inputManager.Update();
+
+	// Update mouse input and move cursor sprite
+	mouseInput.Update();
+    if (cursorSpriteIndex >= 0 && cursorSpriteIndex < static_cast<int>(sprites.size()))
+	{
+		auto* cur = sprites[cursorSpriteIndex].get();
+		if (cur)
+		{
+			// convert to float Vector2
+            Vector2 pos{ static_cast<float>(mouseInput.GetX()), static_cast<float>(mouseInput.GetY()) };
+            // Scale mouse client coords into sprite projection space.
+			// Sprite projection uses WindowAPI::GetClientWidth()/GetClientHeight() constants.
+			if (engine_ && engine_->GetWindowAPI())
+			{
+				RECT rc{};
+				if (GetClientRect(engine_->GetWindowAPI()->GetHwnd(), &rc))
+				{
+					float clientW = float(rc.right - rc.left);
+					float clientH = float(rc.bottom - rc.top);
+					if (clientW > 0.0f && clientH > 0.0f)
+					{
+						float sx = float(engine_->GetWindowAPI()->GetClientWidth()) / clientW;
+						float sy = float(engine_->GetWindowAPI()->GetClientHeight()) / clientH;
+						pos.x *= sx;
+						pos.y *= sy;
+					}
+				}
+			}
+
+			cur->SetPosition(pos);
+			// lightweight transform update
+			cur->UpdateTransformOnly(engine_ ? engine_->GetWindowAPI() : nullptr);
+            // change color to red while left mouse button is pressed
+			if (mouseInput.PushButton(0))
+			{
+				cur->SetColor({ 1.0f, 0.0f, 0.0f, 1.0f });
+			}
+			else
+			{
+				cur->SetColor({ 1.0f, 1.0f, 1.0f, 1.0f });
+			}
+		}
+	}
 
 	//// ImGuiを使わずにSpaceキーでパーティクルを追加
 	//if (inputManager.TriggerKey(DIK_SPACE))
@@ -467,6 +521,8 @@ void Game::InitializeAudioAndInput()
 
 
 	inputManager.Initialize(window);
+	// initialize mouse input
+	mouseInput.Initialize(window);
 
 
 	debugCamera_.Initialize(window);
@@ -512,9 +568,10 @@ void Game::DrawSprites(const RenderContext& ctx)
 
 
 	SpriteManager* sm = engine_ ? engine_->GetSpriteManager() : nullptr;
-	if (sm)
+    if (sm)
 	{
-		sm->DrawAll(ctx, &debugCamera_, &sprites);
+		// external sprites updated separately for performance
+		sm->DrawAll(ctx, &debugCamera_, &sprites, false);
 	}
 }
 

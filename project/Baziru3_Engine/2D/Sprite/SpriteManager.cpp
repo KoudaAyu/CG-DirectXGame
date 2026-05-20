@@ -50,7 +50,7 @@ void SpriteManager::Draw()
     DrawAll(ctx, nullptr, nullptr);
 }
 
-void SpriteManager::DrawAll(const RenderContext& ctx, DebugCamera* debugCamera, const std::vector<std::unique_ptr<Sprite>>* externalSprites)
+void SpriteManager::DrawAll(const RenderContext& ctx, DebugCamera* debugCamera, const std::vector<std::unique_ptr<Sprite>>* externalSprites, bool updateExternal)
 {
     if (!ctx.commandList)
     {
@@ -73,7 +73,11 @@ void SpriteManager::DrawAll(const RenderContext& ctx, DebugCamera* debugCamera, 
         for (auto& sp : *externalSprites)
         {
             if (!sp) continue;
-            sp->Update(ctx.windowAPI, debugCamera);
+            if (updateExternal)
+            {
+                sp->Update(ctx.windowAPI, debugCamera);
+            }
+            // If not updating externally, caller is expected to have updated transform already
             if (ctx.light) sp->SetDirectionalLightResource(ctx.light->GetDirectionalLightResource());
             sp->Draw();
         }

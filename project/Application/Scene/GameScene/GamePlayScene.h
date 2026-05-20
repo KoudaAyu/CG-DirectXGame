@@ -20,6 +20,7 @@
 #include "Sprite.h"
 #include "SpriteManager.h" 
 #include "DebugCamera.h"
+#include "Baziru3_Engine/IO/Mouse/MouseInput.h"
 
 class Camera;
 class SpriteCom;
@@ -63,6 +64,10 @@ private:
     DebugCamera debugCamera_;
     std::vector<std::unique_ptr<Sprite>> sprites;
     std::unique_ptr<SpriteManager> spriteManager_;
+    // mouse input for cursor sprite
+    MouseInput mouseInput;
+    // index of cursor sprite in sprites vector, -1 if none
+    int cursorSpriteIndex = -1;
     std::list<ParticleManager::Particle> particles;
     std::list<ParticleManager::Particle> hitEffectParticles;
 

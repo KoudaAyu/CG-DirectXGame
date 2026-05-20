@@ -28,6 +28,7 @@
     <ClCompile Include="Application\FadeApplication.cpp" />
     <ClCompile Include="Baziru3_Engine\Graphics\Particle\ParticleRenderer.cpp" />
     <ClCompile Include="Baziru3_Engine\Graphics\Sphere\SphereRenderer.cpp" />
+    <ClCompile Include="Baziru3_Engine\IO\Mouse\MouseInput.cpp" />
     <ClCompile Include="Baziru3_Engine\Primitive\Cylinder\Cylinder.cpp" />
     <ClCompile Include="Baziru3_Engine\Particle\Ring.cpp" />
     <ClCompile Include="Baziru3_Engine\Scene\Factory\AbstractSceneFactory.cpp" />
@@ -132,6 +133,7 @@
     <ClInclude Include="Baziru3_Engine\Graphics\SceneRenderRequests.h" />
     <ClInclude Include="Baziru3_Engine\Graphics\Sphere\SphereDrawRequests.h" />
     <ClInclude Include="Baziru3_Engine\Graphics\Sphere\SphereRenderer.h" />
+    <ClInclude Include="Baziru3_Engine\IO\Mouse\MouseInput.h" />
     <ClInclude Include="Baziru3_Engine\Math\EulerTransform.h" />
     <ClInclude Include="Baziru3_Engine\Math\Quaternion.h" />
     <ClInclude Include="Baziru3_Engine\Primitive\Cylinder\Cylinder.h" />

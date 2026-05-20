@@ -17,7 +17,7 @@ public:
 	void Initialize(SpriteCom* spriteCom,const std::string& texturePath, size_t count);
 	void Update(WindowAPI* windowAPI, DebugCamera* debugCamera);
 	void Draw();
-	void DrawAll(const RenderContext& ctx, DebugCamera* debugCamera, const std::vector < std::unique_ptr<Sprite>>* externalSprites = nullptr );
+    void DrawAll(const RenderContext& ctx, DebugCamera* debugCamera, const std::vector < std::unique_ptr<Sprite>>* externalSprites = nullptr, bool updateExternal = true );
 
 	std::vector<std::unique_ptr<Sprite>>& GetSprites();
 

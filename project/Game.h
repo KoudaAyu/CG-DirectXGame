@@ -32,6 +32,7 @@
 #include"ResourceLeakCheek.h"
 #include"TextureManager.h"
 #include"WindowsAPI.h"
+#include "Baziru3_Engine/IO/Mouse/MouseInput.h"
 #include "DebugUI.h"
 #include "FadeApplication.h"
 
@@ -147,12 +148,16 @@ private:
 	std::list<ParticleManager::Particle> particles;
 	ParticleEmitter particleEmitter;
 	KeyInput inputManager;
+    // Mouse input for cursor sprite
+	MouseInput mouseInput;
 	std::unique_ptr<AudioManager> audioManager_;
 	std::unique_ptr<MaterialManager> materialManager_;
 	std::unique_ptr<DebugUI> debugUI; // debug UI
     std::unique_ptr<FadeApplication> fadeApplication_;
 private:
 	std::vector<std::unique_ptr<Sprite>>sprites;
+    // index of cursor sprite in sprites vector, -1 if none
+	int cursorSpriteIndex = -1;
 	Sprite::Transform transformObject;
 	Sprite::Transform cameraTransform;
 

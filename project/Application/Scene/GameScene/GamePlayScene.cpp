@@ -96,6 +96,29 @@ void GamePlayScene::Initialize(DirectXCom* dxCommon, Camera* camera)
 		}
 	}
 
+    // マウス入力初期化とカーソルスプライトの生成
+	if (directXCom)
+	{
+		mouseInput.Initialize(directXCom->GetWindowAPI());
+		// SpriteCom がメンバにセットされていない可能性があるため、SceneManager 経由で取得する
+		SpriteCom* sc = spriteCom ? spriteCom : SceneManager::GetInstance()->GetSpriteCom();
+		if (sc)
+		{
+			// 保持していなければメンバに設定
+			if (!spriteCom) spriteCom = sc;
+			// 小さなカーソル用スプライトを追加
+			Sprite::Transform tc = { {1.0f,1.0f,1.0f}, {0.0f,0.0f,0.0f}, {0.0f,0.0f,0.0f} };
+			if (auto cursor = Sprite::Create(sc, tc, "Resources/CG4/circle2.png"))
+			{
+                cursor->SetSize({ 24.0f, 24.0f });
+				// Use top-left anchor for cursor so the texture's top-left maps to mouse position
+				cursor->SetAnchorPoint({ 0.0f, 0.0f });
+				sprites.emplace_back(std::move(cursor));
+				cursorSpriteIndex = static_cast<int>(sprites.size()) - 1;
+			}
+		}
+	}
+
 	//OBJからモデルデータを読み込む
 
 	//3Dオブジェクトの生成
@@ -223,6 +246,46 @@ void GamePlayScene::Update()
 		}
 	}
 
+ // マウス更新とカーソルスプライトの位置反映
+	mouseInput.Update();
+	if (cursorSpriteIndex >= 0 && cursorSpriteIndex < static_cast<int>(sprites.size()))
+	{
+		auto* cur = sprites[cursorSpriteIndex].get();
+		if (cur)
+		{
+            Vector2 pos{ static_cast<float>(mouseInput.GetX()), static_cast<float>(mouseInput.GetY()) };
+         // Scale mouse client coords into sprite projection space (WindowAPI constants)
+			if (directXCom && directXCom->GetWindowAPI())
+			{
+				RECT rc{};
+				if (GetClientRect(directXCom->GetWindowAPI()->GetHwnd(), &rc))
+				{
+					float clientW = float(rc.right - rc.left);
+					float clientH = float(rc.bottom - rc.top);
+					if (clientW > 0.0f && clientH > 0.0f)
+					{
+						float sx = float(directXCom->GetWindowAPI()->GetClientWidth()) / clientW;
+						float sy = float(directXCom->GetWindowAPI()->GetClientHeight()) / clientH;
+						pos.x *= sx;
+						pos.y *= sy;
+					}
+				}
+			}
+			cur->SetPosition(pos);
+			// lightweight transform update to avoid heavy per-sprite metadata work
+			cur->UpdateTransformOnly(directXCom ? directXCom->GetWindowAPI() : nullptr);
+            // change color to red while left mouse button is pressed
+			if (mouseInput.PushButton(0))
+			{
+				cur->SetColor({ 1.0f, 0.0f, 0.0f, 1.0f });
+			}
+			else
+			{
+				cur->SetColor({ 1.0f, 1.0f, 1.0f, 1.0f });
+			}
+		}
+	}
+
 	// 9キーで Ring を発生させる
 	{
 		static bool prevF2 = false;
@@ -290,6 +353,13 @@ void GamePlayScene::Draw(SceneRenderRequests& renderRequests)
 	if (player_)
 	{
 		player_->Draw(ctx);
+	}
+
+	// Draw sprites (including cursor) via spriteManager
+    if (spriteManager_)
+	{
+		// external sprites (cursor) updated separately for performance
+		spriteManager_->DrawAll(ctx, &debugCamera_, &sprites, false);
 	}
 
 }

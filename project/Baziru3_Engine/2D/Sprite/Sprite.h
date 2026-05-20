@@ -34,6 +34,8 @@ public:
 
 	void Initialize(SpriteCom* spriteCom,std::string textureFilePath);
 	void Update(WindowAPI* windowAPI, DebugCamera* debugCamera_);
+    // Lightweight transform-only update that avoids texture/UV work.
+	void UpdateTransformOnly(WindowAPI* windowAPI);
 	void Draw();
 
 	void Finalize();

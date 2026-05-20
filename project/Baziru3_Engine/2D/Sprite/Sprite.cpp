@@ -11,6 +11,24 @@ Sprite::Sprite()
 {
 }
 
+void Sprite::UpdateTransformOnly(WindowAPI* windowAPI)
+{
+	// Only update transformation matrices to avoid heavy per-frame operations
+	transform.translate = { position.x, position.y, 0.0f };
+	transform.rotate = { 0.0f,0.0f,rotation };
+	transform.scale = { size.x, size.y,1.0f };
+
+	Matrix4x4 worldMatrixSprite = MakeAffineMatrix(transform.scale, transform.rotate, transform.translate);
+	Matrix4x4 viewMatrixSprite = MakeIdentity4x4();
+	Matrix4x4 projectionMatrixSprite = MakeOrthographicMatrix(0.0f, 0.0f, float(windowAPI->GetClientWidth()), float(windowAPI->GetClientHeight()), 0.0f, 100.0f);
+	Matrix4x4 worldViewProjectionmatrixSprite = Multiply(worldMatrixSprite, Multiply(viewMatrixSprite, projectionMatrixSprite));
+	if (transformationMatrixDataSprite)
+	{
+		transformationMatrixDataSprite->WVP = worldViewProjectionmatrixSprite;
+		transformationMatrixDataSprite->World = worldMatrixSprite;
+	}
+}
+
 std::unique_ptr<Sprite> Sprite::Create(SpriteCom* spriteCom, const Sprite::Transform& transform, const std::string& texturePath)
 {
     if (!spriteCom) return nullptr;
