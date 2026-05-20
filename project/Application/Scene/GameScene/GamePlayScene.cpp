@@ -11,6 +11,7 @@
 #include "SpriteManager.h"
 #include "TextureManager.h"
 #include "AudioManager.h"
+#include "Player.h"
 #include <cassert>
 #include <Windows.h>
 
@@ -75,6 +76,13 @@ void GamePlayScene::Initialize(DirectXCom* dxCommon, Camera* camera)
 		}
 	}
 
+    // プレイヤーの初期化は Player クラスへ移譲
+	if (!player_)
+	{
+		player_ = std::make_unique<Player>();
+		player_->Initialize(object3dCom, camera_);
+	}
+
 	//スプライト共通テクスチャ読み込み
 
 	// スプライトマネージャが未設定なら SceneManager 経由で初期化を試みる
@@ -137,6 +145,13 @@ void GamePlayScene::Finalize()
 		hitEffect_.reset();
 	}
     hitEffectInitialized = false;
+
+	// release player if created
+	if (player_)
+	{
+        player_->Finalize();
+		player_.reset();
+	}
 }
 
 void GamePlayScene::Update()
@@ -249,6 +264,12 @@ void GamePlayScene::Update()
 	}
 
     // ParticleManager is updated by the engine (SceneManager) after the scene Update.
+
+	// Player update
+	if (player_)
+	{
+		player_->Update();
+	}
 }
 
 void GamePlayScene::Draw(SceneRenderRequests& renderRequests)
@@ -264,54 +285,11 @@ void GamePlayScene::Draw(SceneRenderRequests& renderRequests)
 			materialManager->GetMaterialResource()->GetGPUVirtualAddress() : 0;
 	}
 
-	SceneManager::GetInstance()->DrawSkybox(ctx.commandList);
 
-	if (spriteManager_)
+    // Draw player if available
+	if (player_)
 	{
-		spriteManager_->DrawAll(ctx, &debugCamera_, &sprites);
-	}
-	else
-	{
-
-		for (auto& sprite : sprites)
-		{
-			if (sprite)
-			{
-				sprite->Update(ctx.windowAPI, &debugCamera_);
-				sprite->Draw();
-			}
-		}
-	}
-
-   if (hitEffectInitialized && hitEffect_ && cylinderTextureIndex_ != TextureManager::kInvalidTextureIndex)
-	{
-     hitEffect_->SetTextureIndex(cylinderTextureIndex_);
-		hitEffect_->Draw();
-	}
-
-	if (sphereInitialized && sphere_)
-	{
-		renderRequests.spheres.Request(sphere_.get());
-	}
-
-   if (skeletonDebug_.IsInitialized())
-	{
-      skeletonDebug_.Draw(renderRequests, {});
-	}
-
-	if (animatedCubeInitialized_ && animatedCube_ && object3dCom)
-	{
-		const auto& modelData = animatedCube_->GetModelData();
-		if (modelData.material.textureIndex != TextureManager::kInvalidTextureIndex)
-		{
-			ctx.textureHandle = TextureManager::GetInstance()->GetSrvHandleGPU(modelData.material.textureIndex);
-		}
-		else
-		{
-			ctx.textureHandle = {};
-		}
-
-		object3dCom->Draw(animatedCube_.get(), ctx, modelData, true);
+		player_->Draw(ctx);
 	}
 
 }

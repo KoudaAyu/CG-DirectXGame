@@ -24,6 +24,8 @@
 class Camera;
 class SpriteCom;
 struct SceneRenderRequests;
+// Player class definition
+#include "Player.h"
 
 class GamePlayScene : public BaseScene
 {
@@ -52,6 +54,7 @@ private:
     ParticleManager* particleManager = nullptr;
     std::unique_ptr<HitEffect> hitEffect_;
     std::unique_ptr<Object3d> animatedCube_;
+    std::unique_ptr<Player> player_;
     std::unique_ptr<Sphere> sphere_;
     Skeleton skeleton_{};
     Animation animation_{};
