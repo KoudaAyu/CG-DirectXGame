@@ -65,9 +65,10 @@ void Game::Initialize()
 	imguiManager = std::make_unique<ImGuiManager>();
 	imguiManager->Initialize(window, dx);
 
+	debugCamera_.Initialize(window);
 
 	SpriteManager* uiSpriteManager = engine_ ? engine_->GetSpriteManager() : nullptr;
-	debugUI = std::make_unique<DebugUI>(materialManager_.get(), uiSpriteManager, camera_.get(), &transformObject, &useMonsterBall, &drawObject, &drawSprite);
+	debugUI = std::make_unique<DebugUI>(materialManager_.get(), uiSpriteManager, camera_.get(), &transformObject, &useMonsterBall, &drawObject, &drawSprite, &debugCamera_);
 	debugUI->Initialize();
 
 	fadeApplication_ = std::make_unique<FadeApplication>();

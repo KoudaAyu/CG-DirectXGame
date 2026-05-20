@@ -2,22 +2,37 @@
 #include "MaterialManager.h"
 #include "SpriteManager.h"
 #include "Camera.h"
+#include "DebugCamera\DebugCamera.h"
 #include <imgui.h>
+#include <string>
+#include <fstream>
 
 DebugUI::DebugUI(MaterialManager* materialManager, SpriteManager* spriteManager, Camera* camera,
-    Sprite::Transform* transformObject, bool* useMonsterBall, bool* drawObject, bool* drawSprite)
-    : materialManager_(materialManager), spriteManager_(spriteManager), camera_(camera), transformObject_(transformObject), useMonsterBall_(useMonsterBall), drawObject_(drawObject), drawSprite_(drawSprite)
+    Sprite::Transform* transformObject, bool* useMonsterBall, bool* drawObject, bool* drawSprite,
+    DebugCamera* debugCamera)
+    : materialManager_(materialManager), spriteManager_(spriteManager), camera_(camera), transformObject_(transformObject), useMonsterBall_(useMonsterBall), drawObject_(drawObject), drawSprite_(drawSprite), debugCamera_(debugCamera)
 {
 }
 
 void DebugUI::Initialize()
 {
+    if (debugCamera_)
+    {
+        const std::string path = "debug_camera_save.bin";
+        std::ifstream ifs(path, std::ios::binary);
+        if (ifs)
+        {
+            debugCamera_->LoadFromFile(path);
+        }
+    }
 }
 
 void DebugUI::Update()
 {
 #ifdef USE_IMGUI
     ImGui::ShowDemoWindow();
+    // Debug: indicate which DebugUI implementation is running
+    OutputDebugStringA("[Resources/DebugUI.cpp] DebugUI::Update running\n");
 
     ImGui::Begin("Windows");
 
@@ -142,6 +157,59 @@ void DebugUI::Update()
                 camera_->Update();
             }
         }
+    }
+
+    if (debugCamera_)
+    {
+        ImGui::Begin("Debug Camera");
+        auto rot = debugCamera_->GetRotation();
+        float rotArr[3] = { rot.x, rot.y, rot.z };
+            if (ImGui::DragFloat3("DebugCam Rotate", rotArr, 0.01f))
+            {
+                // Update only DebugCamera rotation; do not copy into main Camera
+                debugCamera_->SetRotation({ rotArr[0], rotArr[1], rotArr[2] });
+            }
+
+        auto pos = debugCamera_->GetTranslation();
+        float posArr[3] = { pos.x, pos.y, pos.z };
+            if (ImGui::DragFloat3("DebugCam Position", posArr, 0.1f))
+            {
+                // Update only DebugCamera translation; do not copy into main Camera
+                debugCamera_->SetTranslation({ posArr[0], posArr[1], posArr[2] });
+            }
+
+        if (ImGui::Button("Save DebugCam"))
+        {
+            debugCamera_->SaveToFile("debug_camera_save.bin");
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Load DebugCam"))
+        {
+            debugCamera_->LoadFromFile("debug_camera_save.bin");
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Reset DebugCam"))
+        {
+            debugCamera_->Reset();
+        }
+
+        bool camMode = cameraMode_;
+            if (ImGui::Checkbox("Use DebugCamera for Rendering", &camMode))
+            {
+                // camMode = true means render using DebugCamera; false means render using main Camera
+                cameraMode_ = camMode;
+                if (camera_ && debugCamera_)
+                {
+                    // Debug camera receives input when rendering with it; main camera receives input otherwise
+                    camera_->SetControlEnabled(!cameraMode_);
+                    debugCamera_->SetControlEnabled(cameraMode_);
+
+                    // Configure Camera override to use DebugCamera view/projection when enabled
+                    camera_->SetDebugCameraOverride(debugCamera_);
+                    camera_->EnableDebugCameraOverride(cameraMode_);
+                }
+            }
+        ImGui::End();
     }
 
     ImGui::End();

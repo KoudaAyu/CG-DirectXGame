@@ -12,7 +12,8 @@ class DebugUI
 {
 public:
     DebugUI(MaterialManager* materialManager, SpriteManager* spriteManager, Camera* camera,
-            Sprite::Transform* transformObject, bool* useMonsterBall, bool* drawObject, bool* drawSprite);
+            Sprite::Transform* transformObject, bool* useMonsterBall, bool* drawObject, bool* drawSprite,
+            DebugCamera* debugCamera = nullptr);
 
     void Initialize();
     void Update();
@@ -28,6 +29,7 @@ private:
 private:
     Camera* camera_ = nullptr;
     DebugCamera* debugCamera_ = nullptr;
+    bool cameraMode_ = false;
     SpriteManager* spriteManager_ = nullptr;
     MaterialManager* materialManager_ = nullptr;
 
