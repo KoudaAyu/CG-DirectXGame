@@ -25,8 +25,8 @@
 class Camera;
 class SpriteCom;
 struct SceneRenderRequests;
-// Player class definition
-#include "Player.h"
+// Player クラスの定義
+#include "../../Player/Player.h"
 
 class GamePlayScene : public BaseScene
 {

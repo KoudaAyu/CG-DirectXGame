@@ -277,10 +277,10 @@ void Game::Update()
 		auto* cur = sprites[cursorSpriteIndex].get();
 		if (cur)
 		{
-			// convert to float Vector2
+            // float の Vector2 に変換
             Vector2 pos{ static_cast<float>(mouseInput.GetX()), static_cast<float>(mouseInput.GetY()) };
-            // Scale mouse client coords into sprite projection space.
-			// Sprite projection uses WindowAPI::GetClientWidth()/GetClientHeight() constants.
+            // マウスのクライアント座標をスプライト投影空間にスケーリングします。
+			// スプライト投影は WindowAPI::GetClientWidth()/GetClientHeight() を使用します。
 			if (engine_ && engine_->GetWindowAPI())
 			{
 				RECT rc{};
@@ -299,9 +299,9 @@ void Game::Update()
 			}
 
 			cur->SetPosition(pos);
-			// lightweight transform update
+            // 軽量な変換行列更新
 			cur->UpdateTransformOnly(engine_ ? engine_->GetWindowAPI() : nullptr);
-            // change color to red while left mouse button is pressed
+            // 左ボタン押下中は赤にする
 			if (mouseInput.PushButton(0))
 			{
 				cur->SetColor({ 1.0f, 0.0f, 0.0f, 1.0f });
@@ -489,6 +489,10 @@ void Game::InitializeSceneResources()
 
 	camera_ = std::make_unique<Camera>();
 	camera_->Initialize(dx);
+	// 斜め見下ろしカメラ設定（Escape from Dakkof スタイル）
+	// カメラを斜め上後方に配置し、X軸で約45度下向きに傾ける
+	camera_->SetTranslate({ 0.0f, 20.0f, -20.0f });
+	camera_->SetRotate({ 0.785f, 0.0f, 0.0f });
 	SceneManager::GetInstance()->SetCamera(camera_.get());
 
 	skyboxCom_ = std::make_unique<SkyboxCom>(logStream, dx);

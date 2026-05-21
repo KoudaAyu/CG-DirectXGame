@@ -14,7 +14,7 @@ void SpriteManager::Initialize(SpriteCom* spriteCom, const std::string& textureP
     {
         auto s = std::make_unique<Sprite>();
         s->Initialize(spriteCom_, texturePath_);
-        // Ensure initial position matches assignment requirement
+        // 初期位置を指定された値に合わせる
         s->SetPosition({ 100.0f, 100.0f });
         sprites_.push_back(std::move(s));
     }
@@ -38,7 +38,7 @@ void SpriteManager::Draw()
     }
 
     RenderContext ctx{};
-    // Defensive: ensure dxCommon and command list are valid
+    // 防御的チェック: dxCommon と command list が有効か確認
     if (!spriteCom_->GetDxCommon() || !spriteCom_->GetDxCommon()->GetCommandList())
     {
         Logger::Log(std::cout, "SpriteManager::Draw - dxCommon or commandList is null. Skipping draw.\n");
@@ -77,7 +77,7 @@ void SpriteManager::DrawAll(const RenderContext& ctx, DebugCamera* debugCamera, 
             {
                 sp->Update(ctx.windowAPI, debugCamera);
             }
-            // If not updating externally, caller is expected to have updated transform already
+            // updateExternal が false の場合、呼び出し側が既に変換を更新している前提です
             if (ctx.light) sp->SetDirectionalLightResource(ctx.light->GetDirectionalLightResource());
             sp->Draw();
         }

@@ -72,7 +72,7 @@ void MouseInput::Update()
         }
     }
 
-    // Try to get absolute cursor position from OS to match real cursor
+    // 実際のカーソルに合わせるため、OS の絶対座標を取得して反映を試みる
     POINT p{};
     if (GetCursorPos(&p))
     {
@@ -84,7 +84,7 @@ void MouseInput::Update()
     }
     else
     {
-        // Fallback to relative accumulation if GetCursorPos fails
+        // GetCursorPos が失敗した場合は相対移動の累積にフォールバック
         posX += mouseState.lX;
         posY += mouseState.lY;
     }

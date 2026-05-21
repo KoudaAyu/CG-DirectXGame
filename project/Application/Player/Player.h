@@ -9,7 +9,8 @@ class Player
 {
 public:
     void Initialize(Object3dCom* object3dCom, Camera* camera);
-    void Update();
+    // Update now accepts optional MouseInput pointer so player can face cursor
+    void Update(class MouseInput* mouseInput = nullptr);
     void Draw(const RenderContext& ctx);
     void Finalize();
 

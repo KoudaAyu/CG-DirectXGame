@@ -5,6 +5,9 @@
 #include "SceneManager.h"
 #include "RenderContext.h"
 #include <Windows.h>
+#include "../../Baziru3_Engine/IO/Mouse/MouseInput.h"
+#include "../../Baziru3_Engine/Base/Matrix4x4.h"
+#include <cmath>
 
 void Player::Initialize(Object3dCom* object3dCom, Camera* camera)
 {
@@ -28,7 +31,7 @@ void Player::Initialize(Object3dCom* object3dCom, Camera* camera)
     }
 }
 
-void Player::Update()
+void Player::Update(MouseInput* mouseInput)
 {
     if (!object3d_) return;
 
@@ -54,6 +57,70 @@ void Player::Update()
     }
 
     object3d_->SetTranslate(pos);
+    // If mouse input and camera available, rotate to face the mouse cursor projected onto the ground plane (y=0)
+    if (mouseInput && camera_)
+    {
+        WindowAPI* win = mouseInput->GetWindowAPI();
+        if (win)
+        {
+            int mx = mouseInput->GetX();
+            int my = mouseInput->GetY();
+            float clientW = static_cast<float>(win->GetClientWidth());
+            float clientH = static_cast<float>(win->GetClientHeight());
+            if (clientW > 0.0f && clientH > 0.0f)
+            {
+                // NDC coordinates
+                float nx = (static_cast<float>(mx) / clientW) * 2.0f - 1.0f;
+                float ny = 1.0f - (static_cast<float>(my) / clientH) * 2.0f;
+
+                // Prepare clip space positions at near and far (z in [0,1])
+                Vector4 clipNear = { nx, ny, 0.0f, 1.0f };
+                Vector4 clipFar = { nx, ny, 1.0f, 1.0f };
+
+                // Inverse of view * projection (matches WVP construction used elsewhere)
+                Matrix4x4 inv = Inverse(Multiply(camera_->GetViewMatrix(), camera_->GetProjectionMatrix()));
+
+                // このエンジンは行ベクトル方式（clip = pos * VP）なので
+                // 逆変換は world = clip * VP^-1 → r = c * inv の順で乗算する
+                auto transformClip = [&](const Vector4& c)->Vector3 {
+                    Vector3 r;
+                    r.x = c.x * inv.m[0][0] + c.y * inv.m[1][0] + c.z * inv.m[2][0] + c.w * inv.m[3][0];
+                    r.y = c.x * inv.m[0][1] + c.y * inv.m[1][1] + c.z * inv.m[2][1] + c.w * inv.m[3][1];
+                    r.z = c.x * inv.m[0][2] + c.y * inv.m[1][2] + c.z * inv.m[2][2] + c.w * inv.m[3][2];
+                    float w = c.x * inv.m[0][3] + c.y * inv.m[1][3] + c.z * inv.m[2][3] + c.w * inv.m[3][3];
+                    if (w != 0.0f)
+                    {
+                        r.x /= w; r.y /= w; r.z /= w;
+                    }
+                    return r;
+                };
+
+                Vector3 worldNear = transformClip(clipNear);
+                Vector3 worldFar = transformClip(clipFar);
+
+                // Ray from camera through mouse
+                Vector3 dir = { worldFar.x - worldNear.x, worldFar.y - worldNear.y, worldFar.z - worldNear.z };
+
+                // Intersect with ground plane y = 0
+                if (std::fabs(dir.y) > 1e-6f)
+                {
+                    float t = -worldNear.y / dir.y;
+                    if (t > 0.0f)
+                    {
+                        Vector3 hit = { worldNear.x + dir.x * t, 0.0f, worldNear.z + dir.z * t };
+                        Vector3 ppos = object3d_->GetTranslate();
+                        Vector3 to = { hit.x - ppos.x, 0.0f, hit.z - ppos.z };
+                        // Compute yaw; forward is +Z so use atan2(x, z)
+                        float yaw = std::atan2(to.x, to.z);
+                        Vector3 r = object3d_->GetRotate();
+                        r.y = yaw;
+                        object3d_->SetRotate(r);
+                    }
+                }
+            }
+        }
+    }
+
     object3d_->Update();
 }
 

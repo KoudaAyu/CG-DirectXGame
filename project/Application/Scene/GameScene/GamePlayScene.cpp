@@ -11,7 +11,7 @@
 #include "SpriteManager.h"
 #include "TextureManager.h"
 #include "AudioManager.h"
-#include "Player.h"
+#include "../../Player/Player.h"
 #include <cassert>
 #include <Windows.h>
 
@@ -30,15 +30,15 @@ void GamePlayScene::Initialize(DirectXCom* dxCommon, Camera* camera)
 
 	if (object3dCom && materialManager && light && particleManager)
 	{
-        hitEffect_ = std::make_unique<HitEffect>();
+		hitEffect_ = std::make_unique<HitEffect>();
 		hitEffect_->Initialize(directXCom, object3dCom, materialManager, light, camera_, 64, 1.0f, 0.2f, 32, 1.0f, 1.0f, 3.0f);
-       hitEffect_->SetParticleManager(particleManager);
+		hitEffect_->SetParticleManager(particleManager);
 		hitEffect_->SetCylinderEnabled(true);
-      hitEffect_->SetRingEnabled(true);
-       hitEffect_->SetEffectDuration(0.35f);
+		hitEffect_->SetRingEnabled(true);
+		hitEffect_->SetEffectDuration(0.35f);
 		Sprite::Transform transformCylinder = { {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };
 		hitEffect_->GetCylinderTransform() = transformCylinder;
-       hitEffect_->Update(kDeltaTime);
+		hitEffect_->Update(kDeltaTime);
 		hitEffectInitialized = true;
 
 		sphere_ = std::make_unique<Sphere>();
@@ -63,20 +63,20 @@ void GamePlayScene::Initialize(DirectXCom* dxCommon, Camera* camera)
 		animatedCube_->SetScale({ 1.0f, 1.0f, 1.0f });
 		animatedCubeInitialized_ = true;
 		animation_ = LoadAnimationFile("Resources/CG4/human", "walk.gltf");
-      if (animation_.duration > 0.0f && !animation_.nodeAnimations.empty())
+		if (animation_.duration > 0.0f && !animation_.nodeAnimations.empty())
 		{
 			animator_.SetAnimation(&animation_);
 		}
 
-      skeleton_ = SkeletonLoader{}.LoadSkeletonFile("Resources/CG4/human", "walk.gltf");
+		skeleton_ = SkeletonLoader{}.LoadSkeletonFile("Resources/CG4/human", "walk.gltf");
 		if (!skeleton_.joints.empty())
 		{
-            skeleton_.Update();
+			skeleton_.Update();
 			skeletonDebug_.Initialize(directXCom, object3dCom, materialManager, light, camera_, skeleton_);
 		}
 	}
 
-    // プレイヤーの初期化は Player クラスへ移譲
+	// プレイヤーの初期化は Player クラスへ移譲
 	if (!player_)
 	{
 		player_ = std::make_unique<Player>();
@@ -92,11 +92,11 @@ void GamePlayScene::Initialize(DirectXCom* dxCommon, Camera* camera)
 		if (sc)
 		{
 			spriteManager_ = std::make_unique<SpriteManager>();
-           spriteManager_->Initialize(sc, "Resources/uvChecker.png", 0);
+			spriteManager_->Initialize(sc, "Resources/uvChecker.png", 0);
 		}
 	}
 
-    // マウス入力初期化とカーソルスプライトの生成
+	// マウス入力初期化とカーソルスプライトの生成
 	if (directXCom)
 	{
 		mouseInput.Initialize(directXCom->GetWindowAPI());
@@ -110,8 +110,8 @@ void GamePlayScene::Initialize(DirectXCom* dxCommon, Camera* camera)
 			Sprite::Transform tc = { {1.0f,1.0f,1.0f}, {0.0f,0.0f,0.0f}, {0.0f,0.0f,0.0f} };
 			if (auto cursor = Sprite::Create(sc, tc, "Resources/CG4/circle2.png"))
 			{
-                cursor->SetSize({ 24.0f, 24.0f });
-				// Use top-left anchor for cursor so the texture's top-left maps to mouse position
+				cursor->SetSize({ 24.0f, 24.0f });
+                // カーソル用テクスチャの左上がマウス位置に対応するよう、アンカーポイントを左上に設定
 				cursor->SetAnchorPoint({ 0.0f, 0.0f });
 				sprites.emplace_back(std::move(cursor));
 				cursorSpriteIndex = static_cast<int>(sprites.size()) - 1;
@@ -149,30 +149,30 @@ void GamePlayScene::Initialize(DirectXCom* dxCommon, Camera* camera)
 	emitter.frequencyTime = 0.0f;
 
 	// デバッグ用に2つのパーティクル用のテクスチャを読み込む
-  cylinderTextureIndex_ = TextureManager::GetInstance()->Load("Resources/CG4/gradationLine.png");
-   particleTextureA = TextureManager::GetInstance()->Load("Resources/uvChecker.png");
-   particleTextureB = TextureManager::GetInstance()->Load("Resources/CG4/circle2.png");
-   if (hitEffect_)
-   {
-	   hitEffect_->SetPlaneParticleTextureIndex(particleTextureB);
-	   hitEffect_->SetPlaneParticleCount(emitter.count);
-	   hitEffect_->SetRingTextureIndex(particleTextureA);
-   }
+	cylinderTextureIndex_ = TextureManager::GetInstance()->Load("Resources/CG4/gradationLine.png");
+	particleTextureA = TextureManager::GetInstance()->Load("Resources/uvChecker.png");
+	particleTextureB = TextureManager::GetInstance()->Load("Resources/CG4/circle2.png");
+	if (hitEffect_)
+	{
+		hitEffect_->SetPlaneParticleTextureIndex(particleTextureB);
+		hitEffect_->SetPlaneParticleCount(emitter.count);
+		hitEffect_->SetRingTextureIndex(particleTextureA);
+	}
 }
 
 void GamePlayScene::Finalize()
 {
-   if (hitEffect_)
+	if (hitEffect_)
 	{
-      hitEffect_->Finalize();
+		hitEffect_->Finalize();
 		hitEffect_.reset();
 	}
-    hitEffectInitialized = false;
+	hitEffectInitialized = false;
 
 	// release player if created
 	if (player_)
 	{
-        player_->Finalize();
+		player_->Finalize();
 		player_.reset();
 	}
 }
@@ -185,7 +185,7 @@ void GamePlayScene::Update()
 	{
 		Sprite::Transform transformSphere = sphere_->GetTransform();
 		transformSphere.rotate.y += 0.01f;
-     transformSphere.translate.x = -2.0f;
+		transformSphere.translate.x = -2.0f;
 		sphere_->SetTransform(transformSphere);
 		sphere_->Update();
 	}
@@ -198,11 +198,11 @@ void GamePlayScene::Update()
 		animatedCube_->Update();
 	}
 
-  if (skeletonDebug_.IsInitialized() && animatedCube_)
+	if (skeletonDebug_.IsInitialized() && animatedCube_)
 	{
-     if (animator_.HasAnimation())
+		if (animator_.HasAnimation())
 		{
-           animator_.Update(kDeltaTime);
+			animator_.Update(kDeltaTime);
 			animator_.ApplyTo(skeleton_);
 		}
 
@@ -215,10 +215,10 @@ void GamePlayScene::Update()
 		skeletonDebug_.Sync(skeleton_, modelWorldMatrix);
 	}
 
-   if (hitEffectInitialized && hitEffect_)
+	if (hitEffectInitialized && hitEffect_)
 	{
-        hitEffect_->SetPlaneParticleCount(emitter.count);
-       hitEffect_->Update(kDeltaTime);
+		hitEffect_->SetPlaneParticleCount(emitter.count);
+		hitEffect_->Update(kDeltaTime);
 	}
 
 	//パーティクルの更新
@@ -246,15 +246,15 @@ void GamePlayScene::Update()
 		}
 	}
 
- // マウス更新とカーソルスプライトの位置反映
+	// マウス更新とカーソルスプライトの位置反映
 	mouseInput.Update();
 	if (cursorSpriteIndex >= 0 && cursorSpriteIndex < static_cast<int>(sprites.size()))
 	{
 		auto* cur = sprites[cursorSpriteIndex].get();
 		if (cur)
 		{
-            Vector2 pos{ static_cast<float>(mouseInput.GetX()), static_cast<float>(mouseInput.GetY()) };
-         // Scale mouse client coords into sprite projection space (WindowAPI constants)
+			Vector2 pos{ static_cast<float>(mouseInput.GetX()), static_cast<float>(mouseInput.GetY()) };
+            // マウスのクライアント座標をスプライト投影空間（WindowAPIの定数）にスケーリング
 			if (directXCom && directXCom->GetWindowAPI())
 			{
 				RECT rc{};
@@ -272,9 +272,9 @@ void GamePlayScene::Update()
 				}
 			}
 			cur->SetPosition(pos);
-			// lightweight transform update to avoid heavy per-sprite metadata work
+            // 重いスプライトごとのメタデータ処理を避けるための軽量な変換更新
 			cur->UpdateTransformOnly(directXCom ? directXCom->GetWindowAPI() : nullptr);
-            // change color to red while left mouse button is pressed
+            // 左ボタン押下中は赤にする
 			if (mouseInput.PushButton(0))
 			{
 				cur->SetColor({ 1.0f, 0.0f, 0.0f, 1.0f });
@@ -292,9 +292,9 @@ void GamePlayScene::Update()
 		bool curF2 = (GetAsyncKeyState('9') & 0x8000) != 0;
 		if (curF2 && !prevF2)
 		{
-            if (hitEffect_)
+			if (hitEffect_)
 			{
-              Vector3 effectTranslate = emitter.transform.GetTranslate();
+				Vector3 effectTranslate = emitter.transform.GetTranslate();
 				effectTranslate.y += 1.5f;
 				hitEffect_->Play(effectTranslate);
 			}
@@ -326,12 +326,12 @@ void GamePlayScene::Update()
 		prevF3 = curF3;
 	}
 
-    // ParticleManager is updated by the engine (SceneManager) after the scene Update.
+	// ParticleManager is updated by the engine (SceneManager) after the scene Update.
 
-	// Player update
+    // Player update (pass mouse input so player can face cursor)
 	if (player_)
 	{
-		player_->Update();
+		player_->Update(&mouseInput);
 	}
 }
 
@@ -349,14 +349,14 @@ void GamePlayScene::Draw(SceneRenderRequests& renderRequests)
 	}
 
 
-    // Draw player if available
+	// Draw player if available
 	if (player_)
 	{
 		player_->Draw(ctx);
 	}
 
 	// Draw sprites (including cursor) via spriteManager
-    if (spriteManager_)
+	if (spriteManager_)
 	{
 		// external sprites (cursor) updated separately for performance
 		spriteManager_->DrawAll(ctx, &debugCamera_, &sprites, false);
