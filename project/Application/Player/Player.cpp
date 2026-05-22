@@ -5,8 +5,8 @@
 #include "SceneManager.h"
 #include "RenderContext.h"
 #include <Windows.h>
-#include "../../Baziru3_Engine/IO/Mouse/MouseInput.h"
-#include "../../Baziru3_Engine/Base/Matrix4x4.h"
+#include "MouseInput.h"
+#include "Matrix4x4.h"
 #include <cmath>
 
 void Player::Initialize(Object3dCom* object3dCom, Camera* camera)
@@ -57,8 +57,7 @@ void Player::Update(MouseInput* mouseInput)
     }
 
     object3d_->SetTranslate(pos);
-    // If mouse input and camera available, rotate to face the mouse cursor projected onto the ground plane (y=0)
-    if (mouseInput && camera_)
+     if (mouseInput && camera_)
     {
         WindowAPI* win = mouseInput->GetWindowAPI();
         if (win)

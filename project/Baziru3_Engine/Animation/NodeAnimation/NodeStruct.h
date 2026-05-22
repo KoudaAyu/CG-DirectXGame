@@ -4,8 +4,8 @@
 #include <string>
 #include <vector>
 
-#include "../../Base/Matrix4x4.h"
-#include "../../Base/Vector.h"
+#include "Matrix4x4.h"
+#include "Vector.h"
 #include"Quaternion.h"
 
 
