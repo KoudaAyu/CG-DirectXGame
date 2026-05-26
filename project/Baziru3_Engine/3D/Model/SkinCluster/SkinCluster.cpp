@@ -37,7 +37,7 @@ SkinCluster SkinClusterLender::CreateSkinCluster(const Microsoft::WRL::ComPtr<ID
 
 	//InverseBindPoseMatrixを格納する場所を生成して、単位行列を埋める
 	skinCluster.inverseBindPoseMatrices.resize(skeleton.joints.size());
-	std::generate(skinCluster.inverseBindPoseMatrices.begin(), skinCluster.inverseBindPoseMatrices.end(), MakeIdentity4x4());
+	std::generate(skinCluster.inverseBindPoseMatrices.begin(), skinCluster.inverseBindPoseMatrices.end(), [] { return MakeIdentity4x4(); });
 
 	for (const auto& jointWeight : modelData.skinClusterData)
 	{
