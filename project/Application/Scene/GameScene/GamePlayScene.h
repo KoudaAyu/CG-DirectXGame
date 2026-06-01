@@ -27,6 +27,7 @@ class SpriteCom;
 struct SceneRenderRequests;
 // Player クラスの定義
 #include "../../Player/Player.h"
+#include "../../Enemy/Enemy.h"
 
 class GamePlayScene : public BaseScene
 {
@@ -56,6 +57,7 @@ private:
     std::unique_ptr<HitEffect> hitEffect_;
     std::unique_ptr<Object3d> animatedCube_;
     std::unique_ptr<Player> player_;
+    std::unique_ptr<Enemy> enemy_;
     std::unique_ptr<Sphere> sphere_;
     Skeleton skeleton_{};
     Animation animation_{};

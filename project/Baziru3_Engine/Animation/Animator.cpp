@@ -7,7 +7,7 @@
 #include "NodeAnimation/NodeAnimation.h"
 #include "../Base/Vector.h"
 #include "../Math/Quaternion.h"
-#include "../Base/Matrix4x4.h"
+#include "Matrix4x4.h"
 #include "../Animation/Keyframe/Keyframe.h"
 #include "AnimationUtils.h"
 

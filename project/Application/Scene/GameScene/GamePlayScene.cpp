@@ -12,6 +12,7 @@
 #include "TextureManager.h"
 #include "AudioManager.h"
 #include "../../Player/Player.h"
+#include "../../Enemy/Enemy.h"
 #include <cassert>
 #include <Windows.h>
 
@@ -81,6 +82,13 @@ void GamePlayScene::Initialize(DirectXCom* dxCommon, Camera* camera)
 	{
 		player_ = std::make_unique<Player>();
 		player_->Initialize(object3dCom, camera_);
+	}
+
+	// Enemyの初期化
+	if (!enemy_)
+	{
+		enemy_ = std::make_unique<Enemy>();
+		enemy_->Initialize(object3dCom, camera_);
 	}
 
 	//スプライト共通テクスチャ読み込み
@@ -174,6 +182,13 @@ void GamePlayScene::Finalize()
 	{
 		player_->Finalize();
 		player_.reset();
+	}
+
+	// release enemy if created
+	if (enemy_)
+	{
+		enemy_->Finalize();
+		enemy_.reset();
 	}
 }
 
@@ -328,10 +343,16 @@ void GamePlayScene::Update()
 
 	// ParticleManager is updated by the engine (SceneManager) after the scene Update.
 
-    // Player update (pass mouse input so player can face cursor)
+	// Player update (pass mouse input so player can face cursor)
 	if (player_)
 	{
 		player_->Update(&mouseInput);
+	}
+
+	// Enemy update
+	if (enemy_)
+	{
+		enemy_->Update();
 	}
 }
 
@@ -353,6 +374,12 @@ void GamePlayScene::Draw(SceneRenderRequests& renderRequests)
 	if (player_)
 	{
 		player_->Draw(ctx);
+	}
+
+	// Draw enemy if available
+	if (enemy_)
+	{
+		enemy_->Draw(ctx);
 	}
 
 	// Draw sprites (including cursor) via spriteManager

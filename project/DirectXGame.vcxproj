@@ -15,6 +15,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="Application\Enemy\Enemy.cpp" />
     <ClCompile Include="Baziru3_Engine\3D\Model\SkinCluster\SkinCluster.cpp" />
     <ClCompile Include="Baziru3_Engine\Animation\Joint\Joint.cpp" />
     <ClCompile Include="Baziru3_Engine\Animation\NodeAnimation\Node.cpp" />
@@ -168,6 +169,7 @@
     <ClInclude Include="Baziru3_Engine\Platform\Windows\CrashDump.h" />
     <ClInclude Include="Baziru3_Engine\Base\DebugUI.h" />
     <ClInclude Include="Application\Fade\Framework.h" />
+    <ClInclude Include="Application\Enemy\Enemy.h" />
     <ClInclude Include="EngineContext.h" />
     <ClInclude Include="Game.h" />
     <ClInclude Include="Application\Scene\GameScene\GamePlayScene.h" />
