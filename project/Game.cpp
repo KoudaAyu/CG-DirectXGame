@@ -290,7 +290,7 @@ void Game::Draw()
 
 	if (SceneManager::GetInstance())
 	{
-        //SceneManager::GetInstance()->Draw(renderRequests);
+        SceneManager::GetInstance()->Draw(renderRequests);
 	}
 
 	sphereRenderer_.Draw(ctx, renderRequests);

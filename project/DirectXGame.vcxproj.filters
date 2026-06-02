@@ -7,6 +7,9 @@
     <FxCompile Include="Resources\shaders\Particle.PS.hlsl" />
     <FxCompile Include="Resources\shaders\Particle.VS.hlsl" />
     <FxCompile Include="Resources\shaders\Object3d.VS.hlsl" />
+    <FxCompile Include="Resources\shaders\CopyImage.PS.hlsl" />
+    <FxCompile Include="Resources\shaders\CopyImage.VS.hlsl" />
+    <FxCompile Include="Resources\shaders\BoxFilter.PS.hlsl" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Baziru3_Engine\3D\Model\SkinCluster\SkinCluster.cpp" />
