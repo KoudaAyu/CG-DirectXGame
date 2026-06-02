@@ -1,5 +1,6 @@
 #include"Object3dCom.h"
 #include "Light.h"
+#include "TextureManager.h"
 
 
 // 参照メンバー logStream を初期化するコンストラクタ定義
@@ -87,6 +88,32 @@ void Object3dCom::PreDraw()
 }
 
 
+
+void Object3dCom::Draw(Object3d* object, const ::RenderContext& ctx, bool drawObject, uint32_t defaultTextureIndex)
+{
+	if (!object)
+	{
+		return;
+	}
+
+	RenderContext resolvedCtx = ctx;
+	const Object3d::ModelData& modelData = object->GetModelData();
+
+	uint32_t textureIndex = modelData.material.textureIndex;
+	if ((textureIndex == 0 || textureIndex == TextureManager::kInvalidTextureIndex) &&
+		(defaultTextureIndex != 0 && defaultTextureIndex != TextureManager::kInvalidTextureIndex))
+	{
+		textureIndex = defaultTextureIndex;
+	}
+
+	if (resolvedCtx.textureHandle.ptr == 0 &&
+		textureIndex != 0 && textureIndex != TextureManager::kInvalidTextureIndex)
+	{
+		resolvedCtx.textureHandle = TextureManager::GetInstance()->GetSrvHandleGPU(textureIndex);
+	}
+
+	Draw(object, resolvedCtx, modelData, drawObject);
+}
 
 void Object3dCom::Draw(Object3d* object, const ::RenderContext& ctx, const Object3d::ModelData& modelData, bool drawObject)
 {

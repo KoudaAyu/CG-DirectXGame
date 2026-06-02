@@ -301,7 +301,7 @@ void Game::Draw()
 	{
 		if (object3dCom && object3d_)
 		{
-			object3dCom->Draw(object3d_.get(), ctx, modelData, drawObject);
+			object3dCom->Draw(object3d_.get(), ctx, drawObject);
 		}
 	}
     DrawSprites(ctx);
@@ -550,5 +550,6 @@ RenderContext Game::PrepareRenderContext()
 
 	return ctx;
 }
+
 
 

@@ -34,6 +34,7 @@ public:
 
 	void PreDraw();
 
+	void Draw(Object3d* object, const RenderContext& ctx, bool drawObject = true, uint32_t defaultTextureIndex = UINT32_MAX);
 	void Draw(Object3d* object, const RenderContext& ctx, const Object3d::ModelData& modelData, bool drawObject);
 
 public:

@@ -301,17 +301,7 @@ void GamePlayScene::Draw(SceneRenderRequests& renderRequests)
 
 	if (animatedCubeInitialized_ && animatedCube_ && object3dCom)
 	{
-		const auto& modelData = animatedCube_->GetModelData();
-		if (modelData.material.textureIndex != TextureManager::kInvalidTextureIndex)
-		{
-			ctx.textureHandle = TextureManager::GetInstance()->GetSrvHandleGPU(modelData.material.textureIndex);
-		}
-		else
-		{
-			ctx.textureHandle = {};
-		}
-
-		object3dCom->Draw(animatedCube_.get(), ctx, modelData, true);
+		object3dCom->Draw(animatedCube_.get(), ctx, true);
 	}
 
 }
