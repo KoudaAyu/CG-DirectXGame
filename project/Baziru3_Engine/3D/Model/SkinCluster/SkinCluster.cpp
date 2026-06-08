@@ -73,7 +73,7 @@ void SkinClusterLender::Update(SkinCluster& skinCluster, const Skeleton& skeleto
 		assert(jointIndex < skinCluster.inverseBindPoseMatrices.size());
 
 		skinCluster.mappedPalette[jointIndex].skeletonSpaceMatrix =
-			skinCluster.inverseBindPoseMatrices[jointIndex] * skeleton.joints[jointIndex].skeletonMatrix;
+			Multiply(skinCluster.inverseBindPoseMatrices[jointIndex], skeleton.joints[jointIndex].skeletonMatrix);
 		skinCluster.mappedPalette[jointIndex].skeletonSpaceInverseTransposeMatrix =
 			Transpose(Inverse(skinCluster.mappedPalette[jointIndex].skeletonSpaceMatrix));
 	}

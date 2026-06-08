@@ -295,7 +295,12 @@ void GamePlayScene::Draw(SceneRenderRequests& renderRequests)
 
    if (skeletonDebug_.IsInitialized() && showSkeletonDebug_)
 	{
-	  skeletonDebug_.Draw(renderRequests, {});
+		D3D12_GPU_DESCRIPTOR_HANDLE skeletonTexHandle = {};
+		if (cylinderTextureIndex_ != TextureManager::kInvalidTextureIndex)
+		{
+			skeletonTexHandle = TextureManager::GetInstance()->GetSrvHandleGPU(cylinderTextureIndex_);
+		}
+	  skeletonDebug_.Draw(renderRequests, skeletonTexHandle);
 	}
 
 	if (animatedCubeInitialized_ && animatedCube_ && object3dCom)

@@ -140,7 +140,7 @@ void SkeletonDebug::Sync(const Skeleton& skeleton, const Matrix4x4& skeletonRoot
 
 void SkeletonDebug::Draw(SceneRenderRequests& renderRequests, D3D12_GPU_DESCRIPTOR_HANDLE textureHandle) const
 {
-  /*  if (textureHandle.ptr != 0)
+    if (textureHandle.ptr != 0)
     {
         for (size_t jointIndex = 0; jointIndex < jointCylinders_.size(); ++jointIndex)
         {
@@ -149,10 +149,10 @@ void SkeletonDebug::Draw(SceneRenderRequests& renderRequests, D3D12_GPU_DESCRIPT
                 jointCylinders_[jointIndex]->Draw(textureHandle);
             }
         }
-    }*/
+    }
 
-   /* for (const auto& jointSphere : jointSpheres_)
+    for (const auto& jointSphere : jointSpheres_)
     {
         renderRequests.spheres.Request(jointSphere.get());
-    }*/
+    }
 }
