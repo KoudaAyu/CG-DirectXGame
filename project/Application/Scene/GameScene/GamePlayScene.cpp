@@ -1,6 +1,3 @@
-#include"GamePlayScene.h"
-#include"Camera.h"
-#include"Object3dCom.h"
 #include "SceneManager.h"
 #include "MaterialManager.h"
 #include "Light.h"
@@ -13,14 +10,19 @@
 #include "AudioManager.h"
 #include "../../Player/Player.h"
 #include "../../Enemy/Enemy.h"
+#include <algorithm>
 #include <cassert>
+#include <cmath>
 #include <Windows.h>
+
+#include "GamePlayScene.h"
 
 void GamePlayScene::Initialize(DirectXCom* dxCommon, Camera* camera)
 {
 	camera_ = camera;
 	assert(dxCommon != nullptr);
 	this->directXCom = dxCommon;
+	playerShotCooldownTimer_ = 0.0f;
 
 
 	object3dCom = SceneManager::GetInstance()->GetObject3dCom();
@@ -176,6 +178,15 @@ void GamePlayScene::Finalize()
 		hitEffect_.reset();
 	}
 	hitEffectInitialized = false;
+
+	for (auto& bullet : bullets_)
+	{
+		if (bullet)
+		{
+			bullet->Finalize();
+		}
+	}
+	bullets_.clear();
 
 	// release player if created
 	if (player_)
@@ -349,6 +360,92 @@ void GamePlayScene::Update()
 		player_->Update(&mouseInput);
 	}
 
+	if (playerShotCooldownTimer_ > 0.0f)
+	{
+		playerShotCooldownTimer_ -= kDeltaTime;
+		if (playerShotCooldownTimer_ < 0.0f)
+		{
+			playerShotCooldownTimer_ = 0.0f;
+		}
+	}
+
+	if (player_ && mouseInput.PushButton(0) && playerShotCooldownTimer_ <= 0.0f)
+	{
+		Vector3 playerPos = player_->GetPosition();
+		Vector3 playerRot = player_->GetRotation();
+		const float yaw = playerRot.y;
+		Vector3 forward = { std::sin(yaw), 0.0f, std::cos(yaw) };
+		Vector3 right = { forward.z, 0.0f, -forward.x };
+		Vector3 spawnPos = {
+			playerPos.x + right.x * bulletSpawnOffset_.x + forward.x * bulletSpawnOffset_.z,
+			playerPos.y + bulletSpawnOffset_.y,
+			playerPos.z + right.z * bulletSpawnOffset_.x + forward.z * bulletSpawnOffset_.z
+		};
+
+		auto bullet = std::make_unique<Bullet>();
+		bullet->Initialize(object3dCom, camera_, spawnPos, forward, bulletSpeed_, bulletLifeTime_, BulletOwner::Player);
+		bullets_.emplace_back(std::move(bullet));
+		playerShotCooldownTimer_ = playerShotCooldown_;
+	}
+
+	for (auto& bullet : bullets_)
+	{
+		if (bullet)
+		{
+			bullet->Update(kDeltaTime);
+		}
+	}
+
+	for (auto& bullet : bullets_)
+	{
+		if (!bullet || bullet->IsDead())
+		{
+			continue;
+		}
+
+		const Vector3 bulletPos = bullet->GetPosition();
+		if (bullet->GetOwner() == BulletOwner::Player && enemy_)
+		{
+			const Vector3 enemyPos = enemy_->GetPosition();
+			const float dx = bulletPos.x - enemyPos.x;
+			const float dy = bulletPos.y - enemyPos.y;
+			const float dz = bulletPos.z - enemyPos.z;
+			const float r = bulletHitRadius_ + enemyHitRadius_;
+			if ((dx * dx + dy * dy + dz * dz) <= (r * r))
+			{
+				if (hitEffect_)
+				{
+					hitEffect_->Play(enemyPos);
+				}
+				enemy_->OnHit();
+				bullet->Finalize();
+			}
+		}
+		else if (bullet->GetOwner() == BulletOwner::Enemy && player_)
+		{
+			const Vector3 playerPos = player_->GetPosition();
+			const float dx = bulletPos.x - playerPos.x;
+			const float dy = bulletPos.y - playerPos.y;
+			const float dz = bulletPos.z - playerPos.z;
+			const float r = bulletHitRadius_ + playerHitRadius_;
+			if ((dx * dx + dy * dy + dz * dz) <= (r * r))
+			{
+				if (hitEffect_)
+				{
+					hitEffect_->Play(playerPos);
+				}
+				bullet->Finalize();
+			}
+		}
+	}
+
+	bullets_.erase(
+		std::remove_if(bullets_.begin(), bullets_.end(), [](std::unique_ptr<Bullet>& bullet)
+			{
+				return !bullet || bullet->IsDead();
+			}),
+		bullets_.end());
+
 	// Enemy update
 	if (enemy_)
 	{
@@ -369,24 +466,26 @@ void GamePlayScene::Draw(SceneRenderRequests& renderRequests)
 			materialManager->GetMaterialResource()->GetGPUVirtualAddress() : 0;
 	}
 
-
-	// Draw player if available
 	if (player_)
 	{
 		player_->Draw(ctx);
 	}
 
-	// Draw enemy if available
+	for (auto& bullet : bullets_)
+	{
+		if (bullet)
+		{
+			bullet->Draw(ctx);
+		}
+	}
+
 	if (enemy_)
 	{
 		enemy_->Draw(ctx);
 	}
 
-	// Draw sprites (including cursor) via spriteManager
 	if (spriteManager_)
 	{
-		// external sprites (cursor) updated separately for performance
 		spriteManager_->DrawAll(ctx, &debugCamera_, &sprites, false);
 	}
-
 }

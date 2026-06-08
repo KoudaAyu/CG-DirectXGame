@@ -56,6 +56,7 @@
     <ClCompile Include="Baziru3_Engine\Platform\Windows\CrashDump.cpp" />
     <ClCompile Include="Baziru3_Engine\Base\DebugUI.cpp" />
     <ClCompile Include="Application\Fade\Framework.cpp" />
+    <ClCompile Include="Bullet.cpp" />
     <ClCompile Include="EngineContext.cpp" />
     <ClCompile Include="Game.cpp" />
     <ClCompile Include="Application\Scene\GameScene\GamePlayScene.cpp" />
@@ -170,6 +171,7 @@
     <ClInclude Include="Baziru3_Engine\Base\DebugUI.h" />
     <ClInclude Include="Application\Fade\Framework.h" />
     <ClInclude Include="Application\Enemy\Enemy.h" />
+    <ClInclude Include="Bullet.h" />
     <ClInclude Include="EngineContext.h" />
     <ClInclude Include="Game.h" />
     <ClInclude Include="Application\Scene\GameScene\GamePlayScene.h" />

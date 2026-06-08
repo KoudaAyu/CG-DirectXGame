@@ -433,7 +433,7 @@ void Object3d::MaterialResource()
 		// 書き込み用アドレスを取得してメンバーに保持
 		materialResource->Map(0, nullptr, reinterpret_cast<void**>(&materialData_));
 		// 初期値を設定
-		materialData_->color = { 1.0f,1.0f,1.0f,1.0f };
+		materialData_->color = color_;
 		materialData_->enableLighting = false;
 		materialData_->uvTransform = MakeIdentity4x4();
 
@@ -443,6 +443,23 @@ void Object3d::MaterialResource()
 		materialResource->Unmap(0, &writtenRange);
 
 		materialData_ = nullptr;
+	}
+}
+
+void Object3d::SetColor(const Vector4& color)
+{
+	color_ = color;
+	if (!materialResource)
+	{
+		return;
+	}
+
+	Material* mapped = nullptr;
+	if (SUCCEEDED(materialResource->Map(0, nullptr, reinterpret_cast<void**>(&mapped))) && mapped)
+	{
+		mapped->color = color_;
+		D3D12_RANGE writtenRange = { 0, sizeof(Material) };
+		materialResource->Unmap(0, &writtenRange);
 	}
 }
 

@@ -119,6 +119,8 @@ public:
 	Vector3 GetTranslate() const { return transform.GetTranslate(); }
 	Vector3 GetScale() const { return transform.GetScale(); }
 	const ModelData& GetModelData() const { return modelData_; }
+	void SetColor(const Vector4& color);
+	Vector4 GetColor() const { return color_; }
 
 private:
 	Transform transform;
@@ -130,6 +132,7 @@ private:
 	Transform transform_;
 
     ModelData modelData_; // モデルデータを保持
+	Vector4 color_ = { 1.0f, 1.0f, 1.0f, 1.0f };
 
 	//バッファリソース
 	Microsoft::WRL::ComPtr<ID3D12Resource> vertexResource = nullptr;

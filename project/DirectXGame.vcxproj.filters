@@ -72,6 +72,7 @@
     <ClCompile Include="Application\Player\Player.cpp" />
     <ClCompile Include="Baziru3_Engine\IO\Mouse\MouseInput.cpp" />
     <ClCompile Include="Application\Enemy\Enemy.cpp" />
+    <ClCompile Include="Bullet.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Baziru3_Engine\Animation\NodeAnimation\Node.h" />
@@ -150,6 +151,7 @@
     <ClInclude Include="Application\Player\Player.h" />
     <ClInclude Include="Baziru3_Engine\IO\Mouse\MouseInput.h" />
     <ClInclude Include="Application\Enemy\Enemy.h" />
+    <ClInclude Include="Bullet.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Resources\shaders\CopyImage.hlsli" />

@@ -15,6 +15,7 @@ void Enemy::Initialize(Object3dCom* object3dCom, Camera* camera)
 
     object3d_->SetTranslate({ 3.0f, 0.0f, 3.0f });
     object3d_->SetScale({ 1.0f, 1.0f, 1.0f });
+    object3d_->SetColor({ 1.0f, 1.0f, 1.0f, 1.0f });
 
     if (model.material.textureFilePath.empty())
     {
@@ -25,6 +26,16 @@ void Enemy::Initialize(Object3dCom* object3dCom, Camera* camera)
 void Enemy::Update()
 {
     if (!object3d_) return;
+
+    if (hitFlashTimer_ > 0.0f)
+    {
+        hitFlashTimer_ -= 1.0f / 60.0f;
+        if (hitFlashTimer_ <= 0.0f)
+        {
+            hitFlashTimer_ = 0.0f;
+            object3d_->SetColor({ 1.0f, 1.0f, 1.0f, 1.0f });
+        }
+    }
 
     object3d_->Update();
 }
@@ -46,6 +57,16 @@ void Enemy::Draw(const RenderContext& ctx)
     }
 
     object3dCom_->Draw(object3d_.get(), enemyCtx, modelData, true);
+}
+
+void Enemy::OnHit()
+{
+    if (!object3d_)
+    {
+        return;
+    }
+    hitFlashTimer_ = hitFlashDuration_;
+    object3d_->SetColor({ 1.0f, 0.2f, 0.2f, 1.0f });
 }
 
 void Enemy::Finalize()

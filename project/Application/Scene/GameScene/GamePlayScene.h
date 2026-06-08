@@ -28,6 +28,7 @@ struct SceneRenderRequests;
 // Player クラスの定義
 #include "../../Player/Player.h"
 #include "../../Enemy/Enemy.h"
+#include "../../../Bullet.h"
 
 class GamePlayScene : public BaseScene
 {
@@ -58,6 +59,7 @@ private:
     std::unique_ptr<Object3d> animatedCube_;
     std::unique_ptr<Player> player_;
     std::unique_ptr<Enemy> enemy_;
+    std::vector<std::unique_ptr<Bullet>> bullets_;
     std::unique_ptr<Sphere> sphere_;
     Skeleton skeleton_{};
     Animation animation_{};
@@ -85,6 +87,14 @@ private:
 private:
     Sprite::Transform uvTransformSprite;
     Vector2 uiSpritePosition = { 100.0f, 100.0f };
+    Vector3 bulletSpawnOffset_ = { 0.0f, 0.2f, 0.5f };
+    float bulletSpeed_ = 0.45f;
+    float bulletLifeTime_ = 2.0f;
+    float playerShotCooldown_ = 0.12f;
+    float playerShotCooldownTimer_ = 0.0f;
+    float bulletHitRadius_ = 0.25f;
+    float playerHitRadius_ = 0.6f;
+    float enemyHitRadius_ = 0.6f;
 private:
     const float kDeltaTime = 1.0f / 60.0f;
 };
