@@ -62,16 +62,18 @@ void GamePlayScene::Initialize(DirectXCom* dxCommon, Camera* camera)
 		animatedCube_->SetScale({ 1.0f, 1.0f, 1.0f });
 		animatedCube_->SetEnableLighting(true);
 		animatedCubeInitialized_ = true;
+
 		animation_ = LoadAnimationFile("Resources/CG4/human", "walk.gltf");
-      if (animation_.duration > 0.0f && !animation_.nodeAnimations.empty())
+		skeleton_ = SkeletonLoader{}.LoadSkeletonFile("Resources/CG4/human", "walk.gltf");
+
+		if (animation_.duration > 0.0f && !animation_.nodeAnimations.empty() && !skeleton_.joints.empty())
 		{
-			animator_.SetAnimation(&animation_);
+			const Model::ModelData modelDataForSkin = Model::ModelData{};
+			animatedCube_->SetupAnimation(&animation_, skeleton_, modelDataForSkin);
 		}
 
-      skeleton_ = SkeletonLoader{}.LoadSkeletonFile("Resources/CG4/human", "walk.gltf");
 		if (!skeleton_.joints.empty())
 		{
-            skeleton_.Update();
 			skeletonDebug_.Initialize(directXCom, object3dCom, materialManager, light, camera_, skeleton_);
 		}
 	}
@@ -158,24 +160,16 @@ void GamePlayScene::Update()
 		Vector3 rotate = animatedCube_->GetRotate();
 		rotate.y += 0.01f;
 		animatedCube_->SetRotate(rotate);
-		animatedCube_->Update();
+		animatedCube_->Update(); // ステップ1〜4はエンジン層で実行される
 	}
 
-  if (skeletonDebug_.IsInitialized() && animatedCube_)
+	if (skeletonDebug_.IsInitialized() && animatedCube_)
 	{
-     if (animator_.HasAnimation())
-		{
-           animator_.Update(kDeltaTime);
-			animator_.ApplyTo(skeleton_);
-		}
-
-		skeleton_.Update();
-
 		const Matrix4x4 modelWorldMatrix = MakeAffineMatrix(
 			animatedCube_->GetScale(),
 			animatedCube_->GetRotate(),
 			animatedCube_->GetTranslate());
-		skeletonDebug_.Sync(skeleton_, modelWorldMatrix);
+		skeletonDebug_.Sync(animatedCube_->GetSkeleton(), modelWorldMatrix);
 	}
 
    if (hitEffectInitialized && hitEffect_)

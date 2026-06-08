@@ -22,18 +22,19 @@ SkinCluster SkinClusterLender::CreateSkinCluster(const Microsoft::WRL::ComPtr<ID
 	paletteSrvDesc.Buffer.FirstElement = 0;
 	paletteSrvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
 	paletteSrvDesc.Buffer.NumElements = UINT(skeleton.joints.size());
+	paletteSrvDesc.Buffer.StructureByteStride = sizeof(WellForGPU);
 	device->CreateShaderResourceView(skinCluster.paletteResource.Get(), &paletteSrvDesc, skinCluster.paletteSrvHandle.first);
 
-	skinCluster.influenceResource = directXCom.CreateBufferResource(device, sizeof(VertexInfluence) * modelData.vertices.size());
+	skinCluster.influenceResource = directXCom.CreateBufferResource(device, sizeof(VertexInfluence) * std::max<size_t>(1, modelData.vertices.size()));
 	VertexInfluence* mappedInfluence = nullptr;
 	skinCluster.influenceResource->Map(0, nullptr, reinterpret_cast<void**>(&mappedInfluence));
-	std::memset(mappedInfluence, 0, sizeof(VertexInfluence) * modelData.vertices.size()); //0埋め。weightsは0、jointIndicesは-1で初期化される。
-	skinCluster.mappedInfluence = { mappedInfluence,modelData.vertices.size() };
+	std::memset(mappedInfluence, 0, sizeof(VertexInfluence) * std::max<size_t>(1, modelData.vertices.size())); //0埋め。weightsは0、jointIndicesは-1で初期化される。
+	skinCluster.mappedInfluence = { mappedInfluence, modelData.vertices.size() };
 
 	// Influence用のVBVを作成
 	skinCluster.influenceBufferView.BufferLocation = skinCluster.influenceResource->GetGPUVirtualAddress();
-	skinCluster.influenceBufferView.StrideInBytes = UINT(sizeof(VertexInfluence) * modelData.vertices.size());
-	skinCluster.influenceBufferView.SizeInBytes = UINT(sizeof(VertexInfluence) * modelData.vertices.size());
+	skinCluster.influenceBufferView.StrideInBytes = UINT(sizeof(VertexInfluence));
+	skinCluster.influenceBufferView.SizeInBytes = UINT(sizeof(VertexInfluence) * std::max<size_t>(1, modelData.vertices.size()));
 
 	//InverseBindPoseMatrixを格納する場所を生成して、単位行列を埋める
 	skinCluster.inverseBindPoseMatrices.resize(skeleton.joints.size());
