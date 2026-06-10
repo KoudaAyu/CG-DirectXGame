@@ -101,6 +101,11 @@ public:
 	/// <returns></returns>
 	static ModelData LoadObjFile(const std::string& directoryPath, const std::string& filename);
 
+	/// <summary>
+	/// GLTFなどAssimpによるモデル読み込み（スキンウェイト対応）
+	/// </summary>
+	static ModelData LoadModelFile(const std::string& directoryPath, const std::string& filename);
+
 	void VertexResource();
 
 	void MaterialResource();

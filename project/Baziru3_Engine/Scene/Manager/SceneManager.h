@@ -7,6 +7,7 @@
 class DirectXCom;
 class Camera;
 class Object3dCom;
+class SkinningObject3dCom;
 class MaterialManager;
 class Light;
 class ParticleManager;
@@ -49,6 +50,8 @@ public:
 
 	void SetObject3dCom(Object3dCom* v) { object3dCom_ = v; }
 	Object3dCom* GetObject3dCom() const { return object3dCom_; }
+	void SetSkinningObject3dCom(SkinningObject3dCom* v) { skinningObject3dCom_ = v; }
+	SkinningObject3dCom* GetSkinningObject3dCom() const { return skinningObject3dCom_; }
 	void SetMaterialManager(MaterialManager* v) { materialManager_ = v; }
 	MaterialManager* GetMaterialManager() const { return materialManager_; }
 	void SetLight(Light* v) { light_ = v; }
@@ -71,6 +74,7 @@ private:
 
 	
 	Object3dCom* object3dCom_ = nullptr;
+	SkinningObject3dCom* skinningObject3dCom_ = nullptr;
 	MaterialManager* materialManager_ = nullptr;
 	Light* light_ = nullptr;
 	ParticleManager* particleManager_ = nullptr;

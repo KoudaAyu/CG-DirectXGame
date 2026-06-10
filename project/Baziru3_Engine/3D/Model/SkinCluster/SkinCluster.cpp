@@ -50,6 +50,11 @@ SkinCluster SkinClusterLender::CreateSkinCluster(const Microsoft::WRL::ComPtr<ID
 		skinCluster.inverseBindPoseMatrices[(*it).second] = jointWeight.second.inverseBindPoseMatrix;
 		for (const auto& vertexWeight : jointWeight.second.vertexWeights)
 		{
+			// 頂点インデックスのバウンズチェック
+			if (vertexWeight.vertexIndex >= modelData.vertices.size())
+			{
+				continue;
+			}
 			auto& currentInfluence = skinCluster.mappedInfluence[vertexWeight.vertexIndex];
 			for (uint32_t index = 0; index < kNumMaxInfluences; ++index)
 			{
@@ -61,7 +66,32 @@ SkinCluster SkinClusterLender::CreateSkinCluster(const Microsoft::WRL::ComPtr<ID
 				}
 			}
 		}
+	}
 
+	// ウェイトの正規化と、どのジョイントにも紐付いていない頂点のフォールバック
+	for (size_t i = 0; i < modelData.vertices.size(); ++i)
+	{
+		auto& currentInfluence = skinCluster.mappedInfluence[i];
+		float totalWeight = 0.0f;
+		for (uint32_t index = 0; index < kNumMaxInfluences; ++index)
+		{
+			totalWeight += currentInfluence.weights[index];
+		}
+
+		if (totalWeight == 0.0f)
+		{
+			// ルートジョイント（0番）にウェイト1.0fを割り当てて引っ張られないようにする
+			currentInfluence.weights[0] = 1.0f;
+			currentInfluence.jointIndices[0] = 0;
+		}
+		else
+		{
+			// 合計が1.0fになるように正規化
+			for (uint32_t index = 0; index < kNumMaxInfluences; ++index)
+			{
+				currentInfluence.weights[index] /= totalWeight;
+			}
+		}
 	}
 
 	return skinCluster;

@@ -23,6 +23,7 @@
 
 class Camera;
 class SpriteCom;
+class SkinningObject3dCom;
 struct SceneRenderRequests;
 
 class GamePlayScene : public BaseScene
@@ -49,6 +50,7 @@ private:
     Light* light = nullptr;
     MaterialManager* materialManager = nullptr;
     Object3dCom* object3dCom = nullptr;
+    SkinningObject3dCom* skinningObject3dCom = nullptr;
     ParticleManager* particleManager = nullptr;
     std::unique_ptr<HitEffect> hitEffect_;
     std::unique_ptr<Object3d> animatedCube_;

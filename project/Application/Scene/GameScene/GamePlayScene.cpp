@@ -1,6 +1,8 @@
 #include"GamePlayScene.h"
 #include"Camera.h"
 #include"Object3dCom.h"
+#include"SkinningObject3dCom.h"
+#include"Model.h"
 #include "SceneManager.h"
 #include "MaterialManager.h"
 #include "Light.h"
@@ -22,6 +24,7 @@ void GamePlayScene::Initialize(DirectXCom* dxCommon, Camera* camera)
 
 
 	object3dCom = SceneManager::GetInstance()->GetObject3dCom();
+	skinningObject3dCom = SceneManager::GetInstance()->GetSkinningObject3dCom();
 	materialManager = SceneManager::GetInstance()->GetMaterialManager();
 	light = SceneManager::GetInstance()->GetLight();
 	particleManager = SceneManager::GetInstance()->GetParticleManager();
@@ -50,10 +53,18 @@ void GamePlayScene::Initialize(DirectXCom* dxCommon, Camera* camera)
 			{0.0f, 0.0f, 0.0f}
 		};
 
-		Object3d::ModelData animatedCubeModelData = Object3d::LoadModelFile("Resources/CG4/human", "walk.gltf");
+		// Model::LoadModelFile でボーンウェイト込みデータを取得
+		Model::ModelData skinModelData = Model::LoadModelFile("Resources/CG4/human", "walk.gltf");
+
+		// Object3d 用にコピー（頂点・インデックス・マテリアル）
+		Object3d::ModelData animatedCubeModelData;
+		animatedCubeModelData.vertices = skinModelData.vertices;
+		animatedCubeModelData.indices  = skinModelData.indices;
+		animatedCubeModelData.material.textureFilePath = skinModelData.material.textureFilePath;
 		if (!animatedCubeModelData.material.textureFilePath.empty())
 		{
 			animatedCubeModelData.material.textureIndex = TextureManager::GetInstance()->Load(animatedCubeModelData.material.textureFilePath);
+			skinModelData.material.textureIndex = animatedCubeModelData.material.textureIndex;
 		}
 
 		animatedCube_ = std::make_unique<Object3d>();
@@ -68,8 +79,8 @@ void GamePlayScene::Initialize(DirectXCom* dxCommon, Camera* camera)
 
 		if (animation_.duration > 0.0f && !animation_.nodeAnimations.empty() && !skeleton_.joints.empty())
 		{
-			const Model::ModelData modelDataForSkin = Model::ModelData{};
-			animatedCube_->SetupAnimation(&animation_, skeleton_, modelDataForSkin);
+			// skinModelData にボーンウェイトが入っているので正しく渡す
+			animatedCube_->SetupAnimation(&animation_, skeleton_, skinModelData);
 		}
 
 		if (!skeleton_.joints.empty())
@@ -297,7 +308,7 @@ void GamePlayScene::Draw(SceneRenderRequests& renderRequests)
 	  skeletonDebug_.Draw(renderRequests, skeletonTexHandle);
 	}
 
-	if (animatedCubeInitialized_ && animatedCube_ && object3dCom)
+	if (animatedCubeInitialized_ && animatedCube_)
 	{
 		const auto& modelData = animatedCube_->GetModelData();
 		if (modelData.material.textureIndex != TextureManager::kInvalidTextureIndex)
@@ -309,7 +320,15 @@ void GamePlayScene::Draw(SceneRenderRequests& renderRequests)
 			ctx.textureHandle = {};
 		}
 
-		object3dCom->Draw(animatedCube_.get(), ctx, modelData, true);
+		// ジョイントがあればスキニングシェーダー、なければ通常シェーダー
+		if (!animatedCube_->GetSkeleton().joints.empty() && skinningObject3dCom)
+		{
+			skinningObject3dCom->Draw(animatedCube_.get(), ctx, modelData, true);
+		}
+		else if (object3dCom)
+		{
+			object3dCom->Draw(animatedCube_.get(), ctx, modelData, true);
+		}
 	}
 
-}
+}

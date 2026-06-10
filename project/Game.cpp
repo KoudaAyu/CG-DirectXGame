@@ -119,6 +119,7 @@ void Game::Finalize()
 		SceneManager::GetInstance()->SetCamera(nullptr);
 		SceneManager::GetInstance()->SetLight(nullptr);
 		SceneManager::GetInstance()->SetObject3dCom(nullptr);
+		SceneManager::GetInstance()->SetSkinningObject3dCom(nullptr);
 	}
 
 	// 4) Particle manager
@@ -156,6 +157,7 @@ void Game::Finalize()
 
 	if (object3d_) { object3d_.reset(); }
 	if (object3dCom) { object3dCom.reset(); }
+	if (skinningObject3dCom) { skinningObject3dCom.reset(); }
 
 	if (camera_)
 	{
@@ -297,6 +299,9 @@ void Game::Draw()
 	{
 		if (object3dCom && object3d_)
 		{
+			// スキニング対応かどうかを判定（今後拡張）
+			// 現在は通常の object3dCom を使用
+			object3dCom->PreDraw();
 			object3dCom->Draw(object3d_.get(), ctx, modelData, drawObject);
 		}
 	}
@@ -391,8 +396,14 @@ void Game::InitializeSceneCore()
 	object3dCom = std::make_unique<Object3dCom>(logStream);
 	object3dCom->Initialize(dx);
 
+	// Skinning対応の Object3dCom も初期化
+	skinningObject3dCom = std::make_unique<SkinningObject3dCom>(logStream);
+	skinningObject3dCom->Initialize(dx);
+
 	SceneManager::GetInstance()->SetObject3dCom(object3dCom.get());
+	SceneManager::GetInstance()->SetSkinningObject3dCom(skinningObject3dCom.get());
 }
+
 
 void Game::InitializeModelResources()
 {
@@ -542,5 +553,12 @@ RenderContext Game::PrepareRenderContext()
 
 	return ctx;
 }
+
+
+
+
+
+
+
 
 

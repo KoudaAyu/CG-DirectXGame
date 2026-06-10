@@ -102,6 +102,12 @@ public:
 	void SetObject3dCom(Object3dCom* object3dCom) { object3dCom_ = object3dCom; }
 
 	const Microsoft::WRL::ComPtr<ID3D12Resource>& GetTransformationMatrixResource() const { return transformationMatrixResource; }
+	const Microsoft::WRL::ComPtr<ID3D12Resource>& GetMaterialResource() const { return materialResource; }
+	const Microsoft::WRL::ComPtr<ID3D12Resource>& GetDirectionalLightResource() const { return directionalLightResource; }
+
+	const D3D12_VERTEX_BUFFER_VIEW& GetVertexBufferView() const { return vertexBufferView_; }
+	const D3D12_INDEX_BUFFER_VIEW& GetIndexBufferView() const { return indexBufferView_; }
+	bool HasIndexBuffer() const { return indexResource != nullptr && !modelData_.indices.empty(); }
 
 	void SetRotate(const Vector3& r) { transform.SetRotate(r); }
 	void SetTranslate(const Vector3& t) { transform.SetTranslate(t); }
@@ -119,9 +125,11 @@ public:
 	bool HasAnimation() const { return animator_.HasAnimation(); }
 	const Skeleton& GetSkeleton() const { return skeleton_; }
 	Skeleton& GetSkeleton() { return skeleton_; }
+	const SkinCluster& GetSkinCluster() const { return skinCluster_; }
 
 private:
 	Transform transform;
+
 	Transform cameraTransform;
 
 private:
