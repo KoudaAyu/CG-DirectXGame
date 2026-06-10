@@ -57,6 +57,7 @@
     <ClCompile Include="EngineContext.cpp" />
     <ClCompile Include="Game.cpp" />
     <ClCompile Include="Application\Scene\GameScene\GamePlayScene.cpp" />
+    <ClCompile Include="Application\LevelEditor.cpp" />
     <ClCompile Include="Baziru3_Engine\Light\Light.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="Baziru3_Engine\2D\Sprite\Sprite.cpp" />
@@ -188,6 +189,7 @@
     <ClInclude Include="EngineContext.h" />
     <ClInclude Include="Game.h" />
     <ClInclude Include="Application\Scene\GameScene\GamePlayScene.h" />
+    <ClInclude Include="Application\LevelEditor.h" />
     <ClInclude Include="Baziru3_Engine\Particle\ParticleEmitter.h" />
     <ClInclude Include="Baziru3_Engine\Particle\ParticleManager.h" />
     <ClInclude Include="Baziru3_Engine\Light\Light.h" />

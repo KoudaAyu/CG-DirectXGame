@@ -105,3 +105,11 @@ void SceneManager::Draw(SceneRenderRequests& renderRequests)
      scene_->Draw(renderRequests);
 	}
 }
+
+void SceneManager::DrawImGui()
+{
+	if (scene_)
+	{
+		scene_->DrawImGui();
+	}
+}

@@ -254,7 +254,11 @@ Object3d::MaterialData Object3d::LoadMaterialTemplateFile(const std::string& dir
 	Object3d::MaterialData materlialData;//構築するデータ
 	std::string line;//ファイルから読み込んだ1行を格納するもの
 	std::ifstream file(directoryPath + "/" + filename);//ファイルを開く
-	assert(file.is_open());//ファイルが開けなかったら停止
+	if (!file.is_open())
+	{
+		OutputDebugStringA(("Warning: Material template file " + directoryPath + "/" + filename + " could not be opened.\n").c_str());
+		return materlialData; // ファイルが開けなかった場合は空のデータを返す（安全対策）
+	}
 
 	//MaterialDataを構築
 	while (std::getline(file, line))
@@ -289,7 +293,11 @@ Object3d::ModelData Object3d::LoadObjFile(const std::string& directoryPath, cons
 
 	//ファイルを開く
 	std::ifstream file(directoryPath + "/" + filename);//ファイルを開く
-	assert(file.is_open());//ファイルが開けなかったら停止
+	if (!file.is_open())
+	{
+		OutputDebugStringA(("Warning: Obj file " + directoryPath + "/" + filename + " could not be opened.\n").c_str());
+		return modelData; // ファイルが開けなかった場合は空のデータを返す（安全対策）
+	}
 
 	//実際にファイルを読み込む。その後modelDataを構築する
 	while (std::getline(file, line))
@@ -378,8 +386,11 @@ Object3d::ModelData Object3d::LoadModelFile(const std::string& directoryPath, co
 
 	const std::string fullPath = directoryPath + "/" + filename;
 	const aiScene* scene = importer.ReadFile(fullPath, aiProcess_Triangulate | aiProcess_FlipUVs | aiProcess_GenNormals);
-	assert(scene != nullptr);
-	assert(scene->mRootNode != nullptr);
+	if (!scene || !scene->mRootNode)
+	{
+		OutputDebugStringA(("Warning: Assimp failed to load model file " + fullPath + "\n").c_str());
+		return modelData; // ロード失敗時は空のデータを返す（安全対策）
+	}
 
 	AppendAssimpNodeMeshes(scene->mRootNode, scene, modelData);
 	LoadAssimpMaterial(scene, directoryPath, modelData);
@@ -508,6 +519,10 @@ void Object3d::MaterialResource()
 		// 初期値を設定
 		materialData_->color = { 1.0f,1.0f,1.0f,1.0f };
 		materialData_->enableLighting = false;
+		materialData_->specularModel = 0; // 0: Blinn-Phong
+		materialData_->shininess = 70.0f; // デフォルトの光沢度を設定
+		std::memset(materialData_->padding, 0, sizeof(materialData_->padding));
+		std::memset(materialData_->padding2, 0, sizeof(materialData_->padding2));
 		materialData_->uvTransform = MakeIdentity4x4();
 
 		// マテリアルは初期化時に一度だけ書き込む想定のため、MapしたらすぐにUnmapする

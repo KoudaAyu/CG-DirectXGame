@@ -20,6 +20,7 @@
 #include "Sprite.h"
 #include "SpriteManager.h" 
 #include "DebugCamera.h"
+#include "LevelEditor.h"
 
 class Camera;
 class SpriteCom;
@@ -37,6 +38,8 @@ public:
     void Update() override;
 
    void Draw(SceneRenderRequests& renderRequests) override;
+
+   void DrawImGui() override;
 
     void SetSpriteCom(SpriteCom* spriteCom) { this->spriteCom = spriteCom; }
 
@@ -62,6 +65,7 @@ private:
     DebugCamera debugCamera_;
     std::vector<std::unique_ptr<Sprite>> sprites;
     std::unique_ptr<SpriteManager> spriteManager_;
+    std::unique_ptr<LevelEditor> levelEditor_;
     std::list<ParticleManager::Particle> particles;
     std::list<ParticleManager::Particle> hitEffectParticles;
 

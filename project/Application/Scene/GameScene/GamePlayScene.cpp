@@ -87,6 +87,9 @@ void GamePlayScene::Initialize(DirectXCom* dxCommon, Camera* camera)
 		{
 			skeletonDebug_.Initialize(directXCom, object3dCom, materialManager, light, camera_, skeleton_);
 		}
+
+		levelEditor_ = std::make_unique<LevelEditor>();
+		levelEditor_->Initialize(directXCom, object3dCom);
 	}
 
 	//スプライト共通テクスチャ読み込み
@@ -151,6 +154,11 @@ void GamePlayScene::Finalize()
 		hitEffect_.reset();
 	}
     hitEffectInitialized = false;
+
+    if (levelEditor_)
+    {
+        levelEditor_.reset();
+    }
 }
 
 void GamePlayScene::Update()
@@ -255,6 +263,21 @@ void GamePlayScene::Update()
 	}
 
 	particleManager->Update(kDeltaTime);
+
+	if (levelEditor_)
+	{
+		levelEditor_->Update(kDeltaTime);
+	}
+}
+
+void GamePlayScene::DrawImGui()
+{
+#ifdef USE_IMGUI
+	if (levelEditor_)
+	{
+		levelEditor_->DrawImGui();
+	}
+#endif
 }
 
 void GamePlayScene::Draw(SceneRenderRequests& renderRequests)
@@ -331,4 +354,8 @@ void GamePlayScene::Draw(SceneRenderRequests& renderRequests)
 		}
 	}
 
-}
+	if (levelEditor_)
+	{
+		levelEditor_->Draw(ctx);
+	}
+}

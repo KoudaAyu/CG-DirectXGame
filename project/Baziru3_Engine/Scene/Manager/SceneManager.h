@@ -28,6 +28,7 @@ public:
 	void Update();
 
     void Draw(SceneRenderRequests& renderRequests);
+	void DrawImGui();
 
 	/// <summary>
 	/// 次のシーン予約

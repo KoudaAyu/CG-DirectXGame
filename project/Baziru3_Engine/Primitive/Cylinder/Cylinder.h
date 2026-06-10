@@ -37,6 +37,7 @@ public:
 
     const D3D12_VERTEX_BUFFER_VIEW& GetVertexBufferView() const { return vertexBufferView_; }
     uint32_t GetVertexCount() const { return vertexCount_; }
+    const Microsoft::WRL::ComPtr<ID3D12Resource>& GetTransformationMatrixResource() const { return transformationMatrixResource_; }
    void SetTransform(const Sprite::Transform& transform) { transform_ = transform; useCustomWorldMatrix_ = false; }
     void SetWorldMatrix(const Matrix4x4& worldMatrix) { worldMatrix_ = worldMatrix; useCustomWorldMatrix_ = true; }
     void SetOverlayDraw(bool enabled) { overlayDraw_ = enabled; }

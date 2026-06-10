@@ -16,6 +16,7 @@ public:
 	virtual void Finalize() = 0;
 	virtual void Update() = 0;
     virtual void Draw(SceneRenderRequests& renderRequests) = 0;
+	virtual void DrawImGui() {}
 
 	virtual void SetSceneManager(SceneManager* sceneManager)
 	{

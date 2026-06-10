@@ -215,6 +215,10 @@ void Game::Update()
 	//ImGuiにここからフレームが始まる趣旨をつたえる
 	imguiManager->Update();
 
+#ifdef USE_IMGUI
+	SceneManager::GetInstance()->DrawImGui();
+#endif
+
 	debugCamera_.Update();
 
 	camera_->Update();

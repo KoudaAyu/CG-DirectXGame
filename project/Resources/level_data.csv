@@ -1,0 +1,2 @@
+#Name,Directory,Filename,px,py,pz,rx,ry,rz,sx,sy,sz,isStatic
+GroundPlane,Resources,plane.obj,0,0,0,0,0,0,1,1,1,1
