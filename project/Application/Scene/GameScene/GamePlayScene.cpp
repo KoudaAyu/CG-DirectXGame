@@ -192,6 +192,7 @@ void GamePlayScene::Initialize(DirectXCom* dxCommon, Camera* camera)
 		hitEffect_->SetPlaneParticleTextureIndex(particleTextureB);
 		hitEffect_->SetPlaneParticleCount(emitter.count);
 		hitEffect_->SetRingTextureIndex(particleTextureA);
+		hitEffect_->SetTextureIndex(cylinderTextureIndex_);
 	}
 }
 
@@ -484,11 +485,12 @@ void GamePlayScene::Update()
 			const float r = bulletHitRadius_ + enemyHitRadius_;
 			if ((dx * dx + dy * dy + dz * dz) <= (r * r))
 			{
-				if (hitEffect_)
-				{
-					hitEffect_->Play(enemyPos);
-				}
 				enemy_->OnHit();
+				if (hitEffect_ && enemy_->IsDead())
+				{
+					// 敵を倒したとき（死亡時）のみ、星型のエフェクト（粒子）を発生させる
+					hitEffect_->SpawnPlaneParticles(enemyPos);
+				}
 				bullet->Finalize();
 			}
 		}
@@ -564,8 +566,18 @@ void GamePlayScene::Draw(SceneRenderRequests& renderRequests)
 		}
 	}
 
+	if (hitEffect_)
+	{
+		hitEffect_->Draw();
+	}
+
+
+
 	if (spriteManager_)
 	{
 		spriteManager_->DrawAll(ctx, &debugCamera_, &sprites, false);
 	}
+
+	// パーティクルが描画されるようにフラグを true に設定
+	renderRequests.sceneDrawn = true;
 }

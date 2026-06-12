@@ -120,6 +120,13 @@ void Player::Update(MouseInput* mouseInput)
         }
     }
 
+    if (camera_)
+    {
+        Vector3 playerPos = object3d_->GetTranslate();
+        Vector3 cameraOffset = { 0.0f, 20.0f, -20.0f };
+        camera_->SetTranslate(playerPos + cameraOffset);
+    }
+
     object3d_->Update();
 }
 
