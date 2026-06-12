@@ -2,6 +2,16 @@
 #include <cmath>
 #include "TextureManager.h"
 
+Vector3 Bullet::ComputeSpawnPosition(const Vector3& ownerPosition, const Vector3& forward, const Vector3& spawnOffset)
+{
+    const Vector3 right = { forward.z, 0.0f, -forward.x };
+    return {
+        ownerPosition.x + right.x * spawnOffset.x + forward.x * spawnOffset.z,
+        ownerPosition.y + spawnOffset.y,
+        ownerPosition.z + right.z * spawnOffset.x + forward.z * spawnOffset.z
+    };
+}
+
 void Bullet::Initialize(Object3dCom* object3dCom, Camera* camera, const Vector3& startPosition, const Vector3& direction, float speed, float lifeTime, BulletOwner owner)
 {
     object3dCom_ = object3dCom;

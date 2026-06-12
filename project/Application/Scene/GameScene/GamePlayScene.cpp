@@ -21,91 +21,92 @@ void GamePlayScene::Initialize(DirectXCom* dxCommon, Camera* camera)
 {
 	camera_ = camera;
 	assert(dxCommon != nullptr);
-	this->directXCom = dxCommon;
-	playerShotCooldownTimer_ = 0.0f;
-
+	directXCom = dxCommon;
+	lastTime_ = std::chrono::steady_clock::now();
 
 	object3dCom = SceneManager::GetInstance()->GetObject3dCom();
 	materialManager = SceneManager::GetInstance()->GetMaterialManager();
 	light = SceneManager::GetInstance()->GetLight();
 	particleManager = SceneManager::GetInstance()->GetParticleManager();
 
+	InitializeEnvironment();
+	InitializeCharacters();
+	InitializeSprites();
+	InitializeAudioAndParticles();
+}
 
-	if (object3dCom && materialManager && light && particleManager)
+void GamePlayScene::InitializeEnvironment()
+{
+	if (!object3dCom || !materialManager || !light || !particleManager)
 	{
-		hitEffect_ = std::make_unique<HitEffect>();
-		hitEffect_->Initialize(directXCom, object3dCom, materialManager, light, camera_, 64, 1.0f, 0.2f, 32, 1.0f, 1.0f, 3.0f);
-		hitEffect_->SetParticleManager(particleManager);
-		hitEffect_->SetCylinderEnabled(true);
-		hitEffect_->SetRingEnabled(true);
-		hitEffect_->SetEffectDuration(0.35f);
-		Sprite::Transform transformCylinder = { {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };
-		hitEffect_->GetCylinderTransform() = transformCylinder;
-		hitEffect_->Update(kDeltaTime);
-		hitEffectInitialized = true;
-
-		sphere_ = std::make_unique<Sphere>();
-		sphere_->Initialize(directXCom, object3dCom, materialManager, light, camera_);
-		sphereInitialized = true;
-
-		uvTransformSprite = {
-			{1.0f, 1.0f, 1.0f},
-			{0.0f, 0.0f, 0.0f},
-			{0.0f, 0.0f, 0.0f}
-		};
-
-		Object3d::ModelData animatedCubeModelData = Object3d::LoadModelFile("Resources/CG4/human", "walk.gltf");
-		if (!animatedCubeModelData.material.textureFilePath.empty())
-		{
-			animatedCubeModelData.material.textureIndex = TextureManager::GetInstance()->Load(animatedCubeModelData.material.textureFilePath);
-		}
-
-		animatedCube_ = std::make_unique<Object3d>();
-		animatedCube_->Initialize(object3dCom, animatedCubeModelData);
-		animatedCube_->SetTranslate({ 2.0f, 0.0f, 0.0f });
-		animatedCube_->SetScale({ 1.0f, 1.0f, 1.0f });
-		animatedCubeInitialized_ = true;
-		animation_ = LoadAnimationFile("Resources/CG4/human", "walk.gltf");
-		if (animation_.duration > 0.0f && !animation_.nodeAnimations.empty())
-		{
-			animator_.SetAnimation(&animation_);
-		}
-
-		skeleton_ = SkeletonLoader{}.LoadSkeletonFile("Resources/CG4/human", "walk.gltf");
-		if (!skeleton_.joints.empty())
-		{
-			skeleton_.Update();
-			skeletonDebug_.Initialize(directXCom, object3dCom, materialManager, light, camera_, skeleton_);
-		}
-
-		// ゴール用の Ring を初期化
-		goalRing_ = std::make_unique<Ring>();
-		goalRing_->Initialize(directXCom, object3dCom, materialManager, light, camera_, 64, 1.5f, 1.2f);
-		goalRingTransform_.rotate = { 1.570796f, 0.0f, 0.0f }; // 地面に水平に寝かせる
-		goalRingTransform_.scale = { 1.0f, 1.0f, 1.0f };
-		goalRingTransform_.translate = { 0.0f, 0.01f, 10.0f }; // 脱出ポイント座標
-		isGameCleared_ = false;
-		extractionTimer_ = 5.0f;
-		lastTime_ = std::chrono::steady_clock::now();
+		return;
 	}
 
-	// プレイヤーの初期化は Player クラスへ移譲
+	hitEffect_ = std::make_unique<HitEffect>();
+	hitEffect_->Initialize(directXCom, object3dCom, materialManager, light, camera_, 64, 1.0f, 0.2f, 32, 1.0f, 1.0f, 3.0f);
+	hitEffect_->SetParticleManager(particleManager);
+	hitEffect_->SetCylinderEnabled(true);
+	hitEffect_->SetRingEnabled(true);
+	hitEffect_->SetEffectDuration(0.35f);
+	hitEffect_->GetCylinderTransform() = { {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f} };
+	hitEffect_->Update(kFixedDeltaTime);
+	hitEffectInitialized = true;
+
+	sphere_ = std::make_unique<Sphere>();
+	sphere_->Initialize(directXCom, object3dCom, materialManager, light, camera_);
+	sphereInitialized = true;
+
+	Object3d::ModelData animatedCubeModelData = Object3d::LoadModelFile("Resources/CG4/human", "walk.gltf");
+	if (!animatedCubeModelData.material.textureFilePath.empty())
+	{
+		animatedCubeModelData.material.textureIndex = TextureManager::GetInstance()->Load(animatedCubeModelData.material.textureFilePath);
+	}
+
+	animatedCube_ = std::make_unique<Object3d>();
+	animatedCube_->Initialize(object3dCom, animatedCubeModelData);
+	animatedCube_->SetTranslate({ 2.0f, 0.0f, 0.0f });
+	animatedCube_->SetScale({ 1.0f, 1.0f, 1.0f });
+	animatedCubeInitialized_ = true;
+
+	animation_ = LoadAnimationFile("Resources/CG4/human", "walk.gltf");
+	if (animation_.duration > 0.0f && !animation_.nodeAnimations.empty())
+	{
+		animator_.SetAnimation(&animation_);
+	}
+
+	skeleton_ = SkeletonLoader{}.LoadSkeletonFile("Resources/CG4/human", "walk.gltf");
+	if (!skeleton_.joints.empty())
+	{
+		skeleton_.Update();
+		skeletonDebug_.Initialize(directXCom, object3dCom, materialManager, light, camera_, skeleton_);
+	}
+
+	goalRing_ = std::make_unique<Ring>();
+	goalRing_->Initialize(directXCom, object3dCom, materialManager, light, camera_, 64, 1.5f, 1.2f);
+	goalRingTransform_.rotate = { 1.570796f, 0.0f, 0.0f };
+	goalRingTransform_.scale = { 1.0f, 1.0f, 1.0f };
+	goalRingTransform_.translate = { 0.0f, 0.01f, 10.0f };
+	isGameCleared_ = false;
+	extractionTimer_ = 5.0f;
+}
+
+void GamePlayScene::InitializeCharacters()
+{
 	if (!player_)
 	{
 		player_ = std::make_unique<Player>();
 		player_->Initialize(object3dCom, camera_);
 	}
 
-	// Enemyの初期化
 	if (!enemy_)
 	{
 		enemy_ = std::make_unique<Enemy>();
 		enemy_->Initialize(object3dCom, camera_);
 	}
+}
 
-	//スプライト共通テクスチャ読み込み
-
-	// スプライトマネージャが未設定なら SceneManager 経由で初期化を試みる
+void GamePlayScene::InitializeSprites()
+{
 	if (!spriteManager_)
 	{
 		SpriteCom* sc = SceneManager::GetInstance()->GetSpriteCom();
@@ -116,100 +117,82 @@ void GamePlayScene::Initialize(DirectXCom* dxCommon, Camera* camera)
 		}
 	}
 
-	// マウス入力初期化とカーソルスプライトの生成
-	if (directXCom)
+	if (!directXCom)
 	{
-		mouseInput.Initialize(directXCom->GetWindowAPI());
-		// SpriteCom がメンバにセットされていない可能性があるため、SceneManager 経由で取得する
-		SpriteCom* sc = spriteCom ? spriteCom : SceneManager::GetInstance()->GetSpriteCom();
-		if (sc)
+		return;
+	}
+
+	mouseInput.Initialize(directXCom->GetWindowAPI());
+	SpriteCom* sc = spriteCom ? spriteCom : SceneManager::GetInstance()->GetSpriteCom();
+	if (!sc)
+	{
+		return;
+	}
+
+	if (!spriteCom)
+	{
+		spriteCom = sc;
+	}
+
+	Sprite::Transform defaultTransform = { {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f} };
+	if (auto cursor = Sprite::Create(sc, defaultTransform, "Resources/CG4/circle2.png"))
+	{
+		cursor->SetSize({ 24.0f, 24.0f });
+		cursor->SetAnchorPoint({ 0.0f, 0.0f });
+		sprites.emplace_back(std::move(cursor));
+		cursorSpriteIndex = static_cast<int>(sprites.size()) - 1;
+	}
+
+	auto hpBg = Sprite::Create(sc, defaultTransform, "Resources/CG4/human/white.png");
+	auto hpFg = Sprite::Create(sc, defaultTransform, "Resources/CG4/human/white.png");
+	if (hpBg && hpFg)
+	{
+		hpBg->SetAnchorPoint({ 0.0f, 0.0f });
+		hpFg->SetAnchorPoint({ 0.0f, 0.0f });
+		sprites.emplace_back(std::move(hpBg));
+		sprites.emplace_back(std::move(hpFg));
+		if (enemy_)
 		{
-			// 保持していなければメンバに設定
-			if (!spriteCom) spriteCom = sc;
-			// 小さなカーソル用スプライトを追加
-			Sprite::Transform tc = { {1.0f,1.0f,1.0f}, {0.0f,0.0f,0.0f}, {0.0f,0.0f,0.0f} };
-			if (auto cursor = Sprite::Create(sc, tc, "Resources/CG4/circle2.png"))
-			{
-				cursor->SetSize({ 24.0f, 24.0f });
-                // カーソル用テクスチャの左上がマウス位置に対応するよう、アンカーポイントを左上に設定
-				cursor->SetAnchorPoint({ 0.0f, 0.0f });
-				sprites.emplace_back(std::move(cursor));
-				cursorSpriteIndex = static_cast<int>(sprites.size()) - 1;
-			}
-
-			// 敵のHPバー用スプライトを追加
-			Sprite::Transform thp = { {1.0f,1.0f,1.0f}, {0.0f,0.0f,0.0f}, {0.0f,0.0f,0.0f} };
-			auto hpBg = Sprite::Create(sc, thp, "Resources/CG4/human/white.png");
-			auto hpFg = Sprite::Create(sc, thp, "Resources/CG4/human/white.png");
-			if (hpBg && hpFg)
-			{
-				hpBg->SetAnchorPoint({ 0.0f, 0.0f });
-				hpFg->SetAnchorPoint({ 0.0f, 0.0f });
-				sprites.emplace_back(std::move(hpBg));
-				sprites.emplace_back(std::move(hpFg));
-				if (enemy_)
-				{
-					enemy_->SetHPBarSprites(sprites[sprites.size() - 2].get(), sprites[sprites.size() - 1].get());
-				}
-			}
-
-			// プレイヤーのHPバー用スプライトを追加
-			Sprite::Transform tPlayerHp = { {1.0f,1.0f,1.0f}, {0.0f,0.0f,0.0f}, {0.0f,0.0f,0.0f} };
-			auto pBg = Sprite::Create(sc, tPlayerHp, "Resources/CG4/human/white.png");
-			auto pFg = Sprite::Create(sc, tPlayerHp, "Resources/CG4/human/white.png");
-			if (pBg && pFg)
-			{
-				pBg->SetAnchorPoint({ 0.0f, 0.0f });
-				pFg->SetAnchorPoint({ 0.0f, 0.0f });
-				
-				// 画面左上に配置
-				pBg->SetPosition({ 20.0f, 20.0f });
-				pBg->SetSize({ 200.0f, 16.0f });
-				pBg->SetColor({ 0.1f, 0.1f, 0.1f, 0.8f });
-				
-				pFg->SetPosition({ 20.0f, 20.0f });
-				pFg->SetSize({ 200.0f, 16.0f });
-				pFg->SetColor({ 1.0f, 0.0f, 0.0f, 1.0f }); // プレイヤーは赤色
-				
-				sprites.emplace_back(std::move(pBg));
-				sprites.emplace_back(std::move(pFg));
-				
-				playerHpBarBg_ = sprites[sprites.size() - 2].get();
-				playerHpBarFg_ = sprites[sprites.size() - 1].get();
-			}
+			enemy_->SetHPBarSprites(sprites[sprites.size() - 2].get(), sprites[sprites.size() - 1].get());
 		}
 	}
 
-	//OBJからモデルデータを読み込む
-
-	//3Dオブジェクトの生成
-
-	//音声読み込み
-
-
-	auto am = SceneManager::GetInstance()->GetAudioManager();
-	if (am)
+	auto pBg = Sprite::Create(sc, defaultTransform, "Resources/CG4/human/white.png");
+	auto pFg = Sprite::Create(sc, defaultTransform, "Resources/CG4/human/white.png");
+	if (pBg && pFg)
 	{
-		int32_t id = am->Load("Resources/Alarm01.wav");
-		if (id >= 0)
+		pBg->SetAnchorPoint({ 0.0f, 0.0f });
+		pFg->SetAnchorPoint({ 0.0f, 0.0f });
+		pBg->SetPosition({ 20.0f, 20.0f });
+		pBg->SetSize({ 200.0f, 16.0f });
+		pBg->SetColor({ 0.1f, 0.1f, 0.1f, 0.8f });
+		pFg->SetPosition({ 20.0f, 20.0f });
+		pFg->SetSize({ 200.0f, 16.0f });
+		pFg->SetColor({ 1.0f, 0.0f, 0.0f, 1.0f });
+		sprites.emplace_back(std::move(pBg));
+		sprites.emplace_back(std::move(pFg));
+		playerHpBarBg_ = sprites[sprites.size() - 2].get();
+		playerHpBarFg_ = sprites[sprites.size() - 1].get();
+	}
+}
+
+void GamePlayScene::InitializeAudioAndParticles()
+{
+	if (auto am = SceneManager::GetInstance()->GetAudioManager())
+	{
+		if (int32_t id = am->Load("Resources/Alarm01.wav"); id >= 0)
 		{
 			am->Play(id);
 		}
 	}
 
-	//パーティクルの初期化
-
-	//エミッターの数値
-
-	emitter.transform.SetTranslate({ 0.0f,0.0f,0.0f });
-	emitter.transform.SetRotate({ 0.0f,0.0f,0.0f });
-	emitter.transform.SetScale({ 1.0f,1.0f,1.0f });
-
-	emitter.count = 3; // 初期値
+	emitter.transform.SetTranslate({ 0.0f, 0.0f, 0.0f });
+	emitter.transform.SetRotate({ 0.0f, 0.0f, 0.0f });
+	emitter.transform.SetScale({ 1.0f, 1.0f, 1.0f });
+	emitter.count = 3;
 	emitter.frequency = 0.5f;
 	emitter.frequencyTime = 0.0f;
 
-	// デバッグ用に2つのパーティクル用のテクスチャを読み込む
 	cylinderTextureIndex_ = TextureManager::GetInstance()->Load("Resources/CG4/gradationLine.png");
 	particleTextureA = TextureManager::GetInstance()->Load("Resources/uvChecker.png");
 	particleTextureB = TextureManager::GetInstance()->Load("Resources/CG4/circle2.png");
@@ -246,14 +229,12 @@ void GamePlayScene::Finalize()
 	}
 	bullets_.clear();
 
-	// release player if created
 	if (player_)
 	{
 		player_->Finalize();
 		player_.reset();
 	}
 
-	// release enemy if created
 	if (enemy_)
 	{
 		enemy_->Finalize();
@@ -261,58 +242,60 @@ void GamePlayScene::Finalize()
 	}
 }
 
-void GamePlayScene::Update()
+float GamePlayScene::AdvanceDeltaTime()
 {
-	auto now = std::chrono::steady_clock::now();
-	float realDeltaTime = std::chrono::duration<float>(now - lastTime_).count();
+	const auto now = std::chrono::steady_clock::now();
+	float deltaTime = std::chrono::duration<float>(now - lastTime_).count();
 	lastTime_ = now;
-	if (realDeltaTime > 0.1f)
+	if (deltaTime > 0.1f)
 	{
-		realDeltaTime = 0.1f;
+		deltaTime = 0.1f;
 	}
+	return deltaTime;
+}
 
-	// ゴール（脱出地点）の更新とプレイヤーとの距離判定
+void GamePlayScene::UpdateExtractionGoal(float deltaTime)
+{
 	if (goalRing_)
 	{
-		// Y軸の回転を加算（X軸で90度倒しているため、Y軸回転が床面（XZ平面）での水平回転になる）
 		goalRingTransform_.rotate.y += 0.02f;
 		goalRing_->SetTransform(goalRingTransform_);
 		goalRing_->Update();
 	}
 
-	if (player_)
+	if (!player_)
 	{
-		Vector3 playerPos = player_->GetPosition();
-		Vector3 goalPos = goalRingTransform_.translate;
-		float dx = playerPos.x - goalPos.x;
-		float dz = playerPos.z - goalPos.z;
-		float dist = std::sqrt(dx * dx + dz * dz);
+		return;
+	}
 
-		const float kExtractionRadius = 1.5f;
-		if (dist <= kExtractionRadius)
+	const Vector3 playerPos = player_->GetPosition();
+	const Vector3 goalPos = goalRingTransform_.translate;
+	const float dx = playerPos.x - goalPos.x;
+	const float dz = playerPos.z - goalPos.z;
+	const float dist = std::sqrt(dx * dx + dz * dz);
+	constexpr float kExtractionRadius = 1.5f;
+
+	if (dist <= kExtractionRadius)
+	{
+		if (!isGameCleared_)
 		{
-			if (!isGameCleared_)
+			extractionTimer_ -= deltaTime;
+			if (extractionTimer_ <= 0.0f)
 			{
-				extractionTimer_ -= realDeltaTime;
-				if (extractionTimer_ <= 0.0f)
-				{
-					extractionTimer_ = 0.0f;
-					isGameCleared_ = true;
-					SceneManager::GetInstance()->ChangeScene("CLEAR");
-					return;
-				}
-			}
-		}
-		else
-		{
-			if (!isGameCleared_)
-			{
-				extractionTimer_ = 5.0f; // 範囲外に出たらリセット
+				extractionTimer_ = 0.0f;
+				isGameCleared_ = true;
+				SceneManager::GetInstance()->ChangeScene("CLEAR");
 			}
 		}
 	}
+	else if (!isGameCleared_)
+	{
+		extractionTimer_ = 5.0f;
+	}
+}
 
-	//球体の更新
+void GamePlayScene::UpdateEnvironment()
+{
 	if (sphereInitialized && sphere_)
 	{
 		Sprite::Transform transformSphere = sphere_->GetTransform();
@@ -334,7 +317,7 @@ void GamePlayScene::Update()
 	{
 		if (animator_.HasAnimation())
 		{
-			animator_.Update(kDeltaTime);
+			animator_.Update(kFixedDeltaTime);
 			animator_.ApplyTo(skeleton_);
 		}
 
@@ -350,158 +333,196 @@ void GamePlayScene::Update()
 	if (hitEffectInitialized && hitEffect_)
 	{
 		hitEffect_->SetPlaneParticleCount(emitter.count);
-		hitEffect_->Update(kDeltaTime);
+		hitEffect_->Update(kFixedDeltaTime);
 	}
+}
 
-	//パーティクルの更新
-	emitter.frequencyTime += kDeltaTime;
-
-	if (emitter.frequencyTime >= emitter.frequency)
+void GamePlayScene::UpdateParticles()
+{
+	emitter.frequencyTime += kFixedDeltaTime;
+	if (emitter.frequencyTime < emitter.frequency || !particleManager)
 	{
-		auto newParticles = particleEmitter.Emit(emitter, particleManager->GetRandomEngine(), *particleManager);
-		for (auto& p : newParticles)
-		{
-			p.textureIndex = particleTextureA;
-		}
-		particleManager->AddParticles(newParticles);
-		emitter.frequencyTime -= emitter.frequency;
+		return;
 	}
 
-	// スプライトの毎フレーム更新はここで行う（必要な依存を持っている場合）
+	auto newParticles = particleEmitter.Emit(emitter, particleManager->GetRandomEngine(), *particleManager);
+	for (auto& p : newParticles)
+	{
+		p.textureIndex = particleTextureA;
+	}
+	particleManager->AddParticles(newParticles);
+	emitter.frequencyTime -= emitter.frequency;
+}
+
+void GamePlayScene::UpdateSprites()
+{
 	if (spriteManager_ && directXCom)
 	{
 		WindowAPI* windowAPI = directXCom->GetWindowAPI();
-		DebugCamera* debugCamera = &debugCamera_;
-		if (windowAPI && debugCamera)
+		if (windowAPI)
 		{
-			spriteManager_->Update(windowAPI, debugCamera);
+			spriteManager_->Update(windowAPI, &debugCamera_);
 		}
 	}
 
-	// マウス更新とカーソルスプライトの位置反映
 	mouseInput.Update();
-	if (cursorSpriteIndex >= 0 && cursorSpriteIndex < static_cast<int>(sprites.size()))
+	if (cursorSpriteIndex < 0 || cursorSpriteIndex >= static_cast<int>(sprites.size()))
 	{
-		auto* cur = sprites[cursorSpriteIndex].get();
-		if (cur)
+		return;
+	}
+
+	auto* cur = sprites[cursorSpriteIndex].get();
+	if (!cur)
+	{
+		return;
+	}
+
+	Vector2 pos{ static_cast<float>(mouseInput.GetX()), static_cast<float>(mouseInput.GetY()) };
+	if (directXCom && directXCom->GetWindowAPI())
+	{
+		RECT rc{};
+		if (GetClientRect(directXCom->GetWindowAPI()->GetHwnd(), &rc))
 		{
-			Vector2 pos{ static_cast<float>(mouseInput.GetX()), static_cast<float>(mouseInput.GetY()) };
-            // マウスのクライアント座標をスプライト投影空間（WindowAPIの定数）にスケーリング
-			if (directXCom && directXCom->GetWindowAPI())
+			const float clientW = float(rc.right - rc.left);
+			const float clientH = float(rc.bottom - rc.top);
+			if (clientW > 0.0f && clientH > 0.0f)
 			{
-				RECT rc{};
-				if (GetClientRect(directXCom->GetWindowAPI()->GetHwnd(), &rc))
-				{
-					float clientW = float(rc.right - rc.left);
-					float clientH = float(rc.bottom - rc.top);
-					if (clientW > 0.0f && clientH > 0.0f)
-					{
-						float sx = float(directXCom->GetWindowAPI()->GetClientWidth()) / clientW;
-						float sy = float(directXCom->GetWindowAPI()->GetClientHeight()) / clientH;
-						pos.x *= sx;
-						pos.y *= sy;
-					}
-				}
-			}
-			cur->SetPosition(pos);
-            // 重いスプライトごとのメタデータ処理を避けるための軽量な変換更新
-			cur->UpdateTransformOnly(directXCom ? directXCom->GetWindowAPI() : nullptr);
-            // 左ボタン押下中は赤にする
-			if (mouseInput.PushButton(0))
-			{
-				cur->SetColor({ 1.0f, 0.0f, 0.0f, 1.0f });
-			}
-			else
-			{
-				cur->SetColor({ 1.0f, 1.0f, 1.0f, 1.0f });
+				const float sx = float(directXCom->GetWindowAPI()->GetClientWidth()) / clientW;
+				const float sy = float(directXCom->GetWindowAPI()->GetClientHeight()) / clientH;
+				pos.x *= sx;
+				pos.y *= sy;
 			}
 		}
 	}
 
-	// 9キーで Ring を発生させる
+	cur->SetPosition(pos);
+	cur->UpdateTransformOnly(directXCom ? directXCom->GetWindowAPI() : nullptr);
+	if (mouseInput.PushButton(0))
 	{
-		static bool prevF2 = false;
-		bool curF2 = (GetAsyncKeyState('9') & 0x8000) != 0;
-		if (curF2 && !prevF2)
+		cur->SetColor({ 1.0f, 0.0f, 0.0f, 1.0f });
+	}
+	else
+	{
+		cur->SetColor({ 1.0f, 1.0f, 1.0f, 1.0f });
+	}
+}
+
+void GamePlayScene::UpdateDebugInput()
+{
+	{
+		static bool prevKey9 = false;
+		const bool curKey9 = (GetAsyncKeyState('9') & 0x8000) != 0;
+		if (curKey9 && !prevKey9 && hitEffect_)
 		{
-			if (hitEffect_)
+			Vector3 effectTranslate = emitter.transform.GetTranslate();
+			effectTranslate.y += 1.5f;
+			hitEffect_->Play(effectTranslate);
+		}
+		prevKey9 = curKey9;
+	}
+
+	{
+		static bool prevKey8 = false;
+		const bool curKey8 = (GetAsyncKeyState('8') & 0x8000) != 0;
+		if (curKey8 && !prevKey8 && particleManager)
+		{
+			std::list<ParticleManager::Particle> newParticles;
+			for (uint32_t i = 0; i < emitter.count; ++i)
 			{
 				Vector3 effectTranslate = emitter.transform.GetTranslate();
 				effectTranslate.y += 1.5f;
-				hitEffect_->Play(effectTranslate);
+				auto p = particleManager->MakeHieEffect(particleManager->GetRandomEngine(), effectTranslate);
+				p.textureIndex = particleTextureB;
+				p.lifeTime = 0.35f;
+				newParticles.push_back(p);
 			}
+			particleManager->AddParticles(newParticles);
 		}
-		prevF2 = curF2;
+		prevKey8 = curKey8;
 	}
+}
 
-	// 8キーで HitEffect(Ringではないもの) を発生させる
-	{
-		static bool prevF3 = false;
-		bool curF3 = (GetAsyncKeyState('8') & 0x8000) != 0;
-		if (curF3 && !prevF3)
-		{
-			if (particleManager)
-			{
-				std::list<ParticleManager::Particle> newParticles;
-				for (uint32_t i = 0; i < emitter.count; ++i)
-				{
-					Vector3 effectTranslate = emitter.transform.GetTranslate();
-					effectTranslate.y += 1.5f;
-					auto p = particleManager->MakeHieEffect(particleManager->GetRandomEngine(), effectTranslate);
-					p.textureIndex = particleTextureB;
-					p.lifeTime = 0.35f;
-					newParticles.push_back(p);
-				}
-				particleManager->AddParticles(newParticles);
-			}
-		}
-		prevF3 = curF3;
-	}
-
-	// ParticleManager is updated by the engine (SceneManager) after the scene Update.
-
-	// Player update (pass mouse input so player can face cursor)
+void GamePlayScene::UpdateCharacters(float deltaTime)
+{
 	if (player_)
 	{
 		player_->Update(&mouseInput);
 	}
 
-	if (playerShotCooldownTimer_ > 0.0f)
+	WindowAPI* windowAPI = directXCom ? directXCom->GetWindowAPI() : nullptr;
+	if (!enemy_)
 	{
-		playerShotCooldownTimer_ -= kDeltaTime;
-		if (playerShotCooldownTimer_ < 0.0f)
-		{
-			playerShotCooldownTimer_ = 0.0f;
-		}
+		return;
 	}
 
-	if (player_ && mouseInput.PushButton(0) && playerShotCooldownTimer_ <= 0.0f)
+	const Vector3* target = nullptr;
+	Vector3 playerPos{};
+	if (player_ && !player_->IsDead())
 	{
-		Vector3 playerPos = player_->GetPosition();
-		Vector3 playerRot = player_->GetRotation();
-		const float yaw = playerRot.y;
-		Vector3 forward = { std::sin(yaw), 0.0f, std::cos(yaw) };
-		Vector3 right = { forward.z, 0.0f, -forward.x };
-		Vector3 spawnPos = {
-			playerPos.x + right.x * bulletSpawnOffset_.x + forward.x * bulletSpawnOffset_.z,
-			playerPos.y + bulletSpawnOffset_.y,
-			playerPos.z + right.z * bulletSpawnOffset_.x + forward.z * bulletSpawnOffset_.z
-		};
+		playerPos = player_->GetPosition();
+		target = &playerPos;
+	}
 
-		auto bullet = std::make_unique<Bullet>();
-		bullet->Initialize(object3dCom, camera_, spawnPos, forward, bulletSpeed_, bulletLifeTime_, BulletOwner::Player);
+	enemy_->Update(windowAPI, target, deltaTime);
+}
+
+void GamePlayScene::AddBullet(std::unique_ptr<Bullet> bullet)
+{
+	if (bullet)
+	{
 		bullets_.emplace_back(std::move(bullet));
-		playerShotCooldownTimer_ = playerShotCooldown_;
+	}
+}
+
+void GamePlayScene::UpdateCombat(float deltaTime)
+{
+	if (player_)
+	{
+		AddBullet(player_->TryShoot(&mouseInput, deltaTime));
 	}
 
+	if (enemy_ && player_ && !enemy_->IsDead() && !player_->IsDead())
+	{
+		AddBullet(enemy_->TryShoot(player_->GetPosition()));
+	}
+
+	UpdateBullets(deltaTime);
+	ResolveBulletCollisions();
+	RemoveDeadBullets();
+	ResolveContactDamage();
+}
+
+void GamePlayScene::UpdateBullets(float deltaTime)
+{
 	for (auto& bullet : bullets_)
 	{
 		if (bullet)
 		{
-			bullet->Update(kDeltaTime);
+			bullet->Update(deltaTime);
 		}
 	}
+}
 
+void GamePlayScene::RemoveDeadBullets()
+{
+	bullets_.erase(
+		std::remove_if(bullets_.begin(), bullets_.end(), [](const std::unique_ptr<Bullet>& bullet)
+			{
+				return !bullet || bullet->IsDead();
+			}),
+		bullets_.end());
+}
+
+bool GamePlayScene::IsWithinRadius(const Vector3& a, const Vector3& b, float radius)
+{
+	const float dx = a.x - b.x;
+	const float dy = a.y - b.y;
+	const float dz = a.z - b.z;
+	return (dx * dx + dy * dy + dz * dz) <= (radius * radius);
+}
+
+void GamePlayScene::ResolveBulletCollisions()
+{
 	for (auto& bullet : bullets_)
 	{
 		if (!bullet || bullet->IsDead())
@@ -513,98 +534,106 @@ void GamePlayScene::Update()
 		if (bullet->GetOwner() == BulletOwner::Player && enemy_ && !enemy_->IsDead())
 		{
 			const Vector3 enemyPos = enemy_->GetPosition();
-			const float dx = bulletPos.x - enemyPos.x;
-			const float dy = bulletPos.y - enemyPos.y;
-			const float dz = bulletPos.z - enemyPos.z;
-			const float r = bulletHitRadius_ + enemyHitRadius_;
-			if ((dx * dx + dy * dy + dz * dz) <= (r * r))
+			if (IsWithinRadius(bulletPos, enemyPos, bulletHitRadius_ + enemyHitRadius_))
 			{
 				enemy_->OnHit();
 				if (hitEffect_ && enemy_->IsDead())
 				{
-					// 敵を倒したとき（死亡時）のみ、星型のエフェクト（粒子）を発生させる
 					hitEffect_->SpawnPlaneParticles(enemyPos);
 				}
 				bullet->Finalize();
 			}
 		}
-		else if (bullet->GetOwner() == BulletOwner::Enemy && player_)
+		else if (bullet->GetOwner() == BulletOwner::Enemy && player_ && !player_->IsDead())
 		{
 			const Vector3 playerPos = player_->GetPosition();
-			const float dx = bulletPos.x - playerPos.x;
-			const float dy = bulletPos.y - playerPos.y;
-			const float dz = bulletPos.z - playerPos.z;
-			const float r = bulletHitRadius_ + playerHitRadius_;
-			if ((dx * dx + dy * dy + dz * dz) <= (r * r))
+			if (IsWithinRadius(bulletPos, playerPos, bulletHitRadius_ + playerHitRadius_))
 			{
 				if (hitEffect_)
 				{
 					hitEffect_->Play(playerPos);
 				}
-				player_->TakeDamage(10.0f); // 弾被弾時は10ダメージ
+				player_->TakeDamage(kEnemyBulletDamage);
 				bullet->Finalize();
 			}
 		}
 	}
+}
 
-	bullets_.erase(
-		std::remove_if(bullets_.begin(), bullets_.end(), [](std::unique_ptr<Bullet>& bullet)
-			{
-				return !bullet || bullet->IsDead();
-			}),
-		bullets_.end());
-
-	// Enemy update
-	if (enemy_)
+void GamePlayScene::ResolveContactDamage()
+{
+	if (!player_ || !enemy_ || enemy_->IsDead() || player_->IsDead())
 	{
-		enemy_->Update(directXCom ? directXCom->GetWindowAPI() : nullptr);
+		return;
 	}
 
-	// プレイヤーHPバーの更新
-	if (player_ && playerHpBarBg_ && playerHpBarFg_ && directXCom && directXCom->GetWindowAPI())
+	if (IsWithinRadius(player_->GetPosition(), enemy_->GetPosition(), playerHitRadius_ + enemyHitRadius_))
 	{
-		float ratio = player_->GetHPRatio();
-		playerHpBarFg_->SetSize({ 200.0f * ratio, 16.0f });
-		playerHpBarBg_->UpdateTransformOnly(directXCom->GetWindowAPI());
-		playerHpBarFg_->UpdateTransformOnly(directXCom->GetWindowAPI());
+		player_->TakeDamage(kContactDamage);
+	}
+}
+
+void GamePlayScene::UpdatePlayerHpBar()
+{
+	if (!player_ || !playerHpBarBg_ || !playerHpBarFg_ || !directXCom || !directXCom->GetWindowAPI())
+	{
+		return;
 	}
 
-	// プレイヤーと敵の接触判定（接触ダメージ）
-	if (player_ && enemy_ && !enemy_->IsDead() && !player_->IsDead())
-	{
-		Vector3 pPos = player_->GetPosition();
-		Vector3 ePos = enemy_->GetPosition();
-		float dx = pPos.x - ePos.x;
-		float dy = pPos.y - ePos.y;
-		float dz = pPos.z - ePos.z;
-		float distSq = dx * dx + dy * dy + dz * dz;
-		float hitRadius = playerHitRadius_ + enemyHitRadius_;
-		if (distSq <= hitRadius * hitRadius)
-		{
-			player_->TakeDamage(20.0f); // 1回あたり20ダメージ
-		}
-	}
+	const float ratio = player_->GetHPRatio();
+	playerHpBarFg_->SetSize({ 200.0f * ratio, 16.0f });
+	playerHpBarBg_->UpdateTransformOnly(directXCom->GetWindowAPI());
+	playerHpBarFg_->UpdateTransformOnly(directXCom->GetWindowAPI());
+}
 
-	// プレイヤー死亡判定 -> ゲームオーバーシーンへ切り替え
+void GamePlayScene::CheckGameOver()
+{
 	if (player_ && player_->IsDead())
 	{
 		SceneManager::GetInstance()->ChangeScene("GAMEOVER");
+	}
+}
+
+void GamePlayScene::Update()
+{
+	const float deltaTime = AdvanceDeltaTime();
+
+	UpdateExtractionGoal(deltaTime);
+	if (isGameCleared_)
+	{
 		return;
 	}
+
+	UpdateEnvironment();
+	UpdateParticles();
+	UpdateSprites();
+	UpdateDebugInput();
+	UpdateCharacters(kFixedDeltaTime);
+	UpdateCombat(kFixedDeltaTime);
+	UpdatePlayerHpBar();
+	CheckGameOver();
+}
+
+RenderContext GamePlayScene::BuildRenderContext() const
+{
+	RenderContext ctx{};
+	if (!directXCom)
+	{
+		return ctx;
+	}
+
+	ctx.commandList = directXCom->GetCommandList().Get();
+	ctx.windowAPI = directXCom->GetWindowAPI();
+	ctx.camera = camera_;
+	ctx.light = SceneManager::GetInstance()->GetLight();
+	ctx.materialGPUAddress = (materialManager && materialManager->GetMaterialResource()) ?
+		materialManager->GetMaterialResource()->GetGPUVirtualAddress() : 0;
+	return ctx;
 }
 
 void GamePlayScene::Draw(SceneRenderRequests& renderRequests)
 {
-	RenderContext ctx{};
-	if (directXCom)
-	{
-		ctx.commandList = directXCom->GetCommandList().Get();
-		ctx.windowAPI = directXCom->GetWindowAPI();
-		ctx.camera = camera_;
-		ctx.light = SceneManager::GetInstance()->GetLight();
-		ctx.materialGPUAddress = (materialManager && materialManager->GetMaterialResource()) ?
-			materialManager->GetMaterialResource()->GetGPUVirtualAddress() : 0;
-	}
+	const RenderContext ctx = BuildRenderContext();
 
 	if (player_)
 	{
@@ -638,13 +667,10 @@ void GamePlayScene::Draw(SceneRenderRequests& renderRequests)
 		hitEffect_->Draw();
 	}
 
-
-
 	if (spriteManager_)
 	{
 		spriteManager_->DrawAll(ctx, &debugCamera_, &sprites, false);
 	}
 
-	// パーティクルが描画されるようにフラグを true に設定
 	renderRequests.sceneDrawn = true;
 }

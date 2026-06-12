@@ -5,6 +5,7 @@
 #include "Camera.h"
 #include "RenderContext.h"
 
+class Bullet;
 class Sprite;
 class WindowAPI;
 
@@ -12,12 +13,14 @@ class Enemy
 {
 public:
     void Initialize(Object3dCom* object3dCom, Camera* camera);
-    void Update(WindowAPI* windowAPI = nullptr);
+    void Update(WindowAPI* windowAPI, const Vector3* targetPosition, float deltaTime);
     void Draw(const RenderContext& ctx);
     void Finalize();
     void OnHit();
+
+    std::unique_ptr<Bullet> TryShoot(const Vector3& targetPosition);
+
     Vector3 GetPosition() const { return object3d_ ? object3d_->GetTranslate() : Vector3{ 0.0f, 0.0f, 0.0f }; }
-    void SetRotation(const Vector3& rotate) { if (object3d_) object3d_->SetRotate(rotate); }
 
     int GetHP() const { return hp_; }
     int GetMaxHP() const { return maxHp_; }
@@ -25,6 +28,8 @@ public:
     void SetHPBarSprites(Sprite* bg, Sprite* fg) { hpBarBg_ = bg; hpBarFg_ = fg; }
 
 private:
+    bool FaceTarget(const Vector3& targetPosition);
+
     std::unique_ptr<Object3d> object3d_;
     Object3dCom* object3dCom_ = nullptr;
     Camera* camera_ = nullptr;
@@ -40,5 +45,11 @@ private:
 
     Sprite* hpBarBg_ = nullptr;
     Sprite* hpBarFg_ = nullptr;
+
+    Vector3 bulletSpawnOffset_ = { 0.0f, 0.2f, 0.5f };
+    float bulletSpeed_ = 0.45f;
+    float bulletLifeTime_ = 2.0f;
+    float shotCooldown_ = 2.0f;
+    float shotCooldownTimer_ = 2.0f;
 };
 

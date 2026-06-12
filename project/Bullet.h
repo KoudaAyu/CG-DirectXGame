@@ -15,6 +15,8 @@ enum class BulletOwner
 class Bullet
 {
 public:
+    static Vector3 ComputeSpawnPosition(const Vector3& ownerPosition, const Vector3& forward, const Vector3& spawnOffset);
+
     void Initialize(Object3dCom* object3dCom, Camera* camera, const Vector3& startPosition, const Vector3& direction, float speed = 0.35f, float lifeTime = 2.0f, BulletOwner owner = BulletOwner::Player);
     void Update(float deltaTime = 1.0f / 60.0f);
     void Draw(const RenderContext& ctx);

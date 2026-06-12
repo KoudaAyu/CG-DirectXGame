@@ -5,6 +5,8 @@
 #include "RenderContext.h"
 #include "WindowsAPI.h"
 #include "Sprite.h"
+#include "Bullet.h"
+#include <cmath>
 
 void Enemy::Initialize(Object3dCom* object3dCom, Camera* camera)
 {
@@ -27,13 +29,35 @@ void Enemy::Initialize(Object3dCom* object3dCom, Camera* camera)
     hp_ = maxHp_;
     isDead_ = false;
     respawnTimer_ = 0.0f;
+    shotCooldownTimer_ = shotCooldown_;
 }
 
-void Enemy::Update(WindowAPI* windowAPI)
+bool Enemy::FaceTarget(const Vector3& targetPosition)
+{
+    if (!object3d_)
+    {
+        return false;
+    }
+
+    const Vector3 enemyPos = GetPosition();
+    const Vector3 toTarget = { targetPosition.x - enemyPos.x, 0.0f, targetPosition.z - enemyPos.z };
+    const float lenSq = toTarget.x * toTarget.x + toTarget.z * toTarget.z;
+    if (lenSq <= 1e-6f)
+    {
+        return false;
+    }
+
+    const float invLen = 1.0f / std::sqrt(lenSq);
+    const float yaw = std::atan2(toTarget.x * invLen, toTarget.z * invLen);
+    object3d_->SetRotate({ 0.0f, yaw, 0.0f });
+    return true;
+}
+
+void Enemy::Update(WindowAPI* windowAPI, const Vector3* targetPosition, float deltaTime)
 {
     if (isDead_)
     {
-        respawnTimer_ -= 1.0f / 60.0f;
+        respawnTimer_ -= deltaTime;
         if (respawnTimer_ <= 0.0f)
         {
             isDead_ = false;
@@ -65,9 +89,23 @@ void Enemy::Update(WindowAPI* windowAPI)
 
     if (!object3d_) return;
 
+    if (targetPosition)
+    {
+        FaceTarget(*targetPosition);
+    }
+
+    if (shotCooldownTimer_ > 0.0f)
+    {
+        shotCooldownTimer_ -= deltaTime;
+        if (shotCooldownTimer_ < 0.0f)
+        {
+            shotCooldownTimer_ = 0.0f;
+        }
+    }
+
     if (hitFlashTimer_ > 0.0f)
     {
-        hitFlashTimer_ -= 1.0f / 60.0f;
+        hitFlashTimer_ -= deltaTime;
         if (hitFlashTimer_ <= 0.0f)
         {
             hitFlashTimer_ = 0.0f;
@@ -128,6 +166,31 @@ void Enemy::Update(WindowAPI* windowAPI)
             hpBarFg_->UpdateTransformOnly(windowAPI);
         }
     }
+}
+
+std::unique_ptr<Bullet> Enemy::TryShoot(const Vector3& targetPosition)
+{
+    if (isDead_ || !object3d_ || !object3dCom_ || !camera_ || shotCooldownTimer_ > 0.0f)
+    {
+        return nullptr;
+    }
+
+    if (!FaceTarget(targetPosition))
+    {
+        return nullptr;
+    }
+
+    const Vector3 enemyPos = GetPosition();
+    const Vector3 toTarget = { targetPosition.x - enemyPos.x, 0.0f, targetPosition.z - enemyPos.z };
+    const float lenSq = toTarget.x * toTarget.x + toTarget.z * toTarget.z;
+    const float invLen = 1.0f / std::sqrt(lenSq);
+    const Vector3 forward = { toTarget.x * invLen, 0.0f, toTarget.z * invLen };
+    const Vector3 spawnPos = Bullet::ComputeSpawnPosition(enemyPos, forward, bulletSpawnOffset_);
+
+    auto bullet = std::make_unique<Bullet>();
+    bullet->Initialize(object3dCom_, camera_, spawnPos, forward, bulletSpeed_, bulletLifeTime_, BulletOwner::Enemy);
+    shotCooldownTimer_ = shotCooldown_;
+    return bullet;
 }
 
 void Enemy::Draw(const RenderContext& ctx)

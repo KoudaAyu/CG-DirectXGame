@@ -5,18 +5,22 @@
 #include "Camera.h"
 #include "RenderContext.h"
 
+class Bullet;
+class MouseInput;
+
 class Player
 {
 public:
     void Initialize(Object3dCom* object3dCom, Camera* camera);
-    // Update now accepts optional MouseInput pointer so player can face cursor
-    void Update(class MouseInput* mouseInput = nullptr);
+    void Update(MouseInput* mouseInput = nullptr);
     void Draw(const RenderContext& ctx);
     void Finalize();
+
+    std::unique_ptr<Bullet> TryShoot(const MouseInput* mouseInput, float deltaTime);
+
     Vector3 GetPosition() const { return object3d_ ? object3d_->GetTranslate() : Vector3{ 0.0f, 0.0f, 0.0f }; }
     Vector3 GetRotation() const { return object3d_ ? object3d_->GetRotate() : Vector3{ 0.0f, 0.0f, 0.0f }; }
 
-    // 被弾・HP関連のメソッド
     void TakeDamage(float damage);
     float GetHP() const { return hp_; }
     float GetMaxHP() const { return maxHp_; }
@@ -30,11 +34,16 @@ private:
     Camera* camera_ = nullptr;
     uint32_t defaultTextureIndex_ = UINT32_MAX;
 
-    // プレイヤーのステータス
     float hp_ = 100.0f;
     float maxHp_ = 100.0f;
     bool isDead_ = false;
     float invincibilityTimer_ = 0.0f;
-    const float invincibilityDuration_ = 1.0f; // 被弾後の無敵時間（秒）
+    const float invincibilityDuration_ = 1.0f;
+
+    Vector3 bulletSpawnOffset_ = { 0.0f, 0.2f, 0.5f };
+    float bulletSpeed_ = 0.45f;
+    float bulletLifeTime_ = 2.0f;
+    float shotCooldown_ = 0.12f;
+    float shotCooldownTimer_ = 0.0f;
 };
 

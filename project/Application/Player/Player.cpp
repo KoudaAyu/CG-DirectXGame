@@ -4,6 +4,7 @@
 #include "TextureManager.h"
 #include "SceneManager.h"
 #include "RenderContext.h"
+#include "Bullet.h"
 #include <Windows.h>
 #include "MouseInput.h"
 #include "Matrix4x4.h"
@@ -165,6 +166,37 @@ void Player::Update(MouseInput* mouseInput)
     }
 
     object3d_->Update();
+}
+
+std::unique_ptr<Bullet> Player::TryShoot(const MouseInput* mouseInput, float deltaTime)
+{
+    if (shotCooldownTimer_ > 0.0f)
+    {
+        shotCooldownTimer_ -= deltaTime;
+        if (shotCooldownTimer_ < 0.0f)
+        {
+            shotCooldownTimer_ = 0.0f;
+        }
+    }
+
+    if (isDead_ || !object3d_ || !object3dCom_ || !camera_ || !mouseInput)
+    {
+        return nullptr;
+    }
+
+    if (!mouseInput->PushButton(0) || shotCooldownTimer_ > 0.0f)
+    {
+        return nullptr;
+    }
+
+    const float yaw = GetRotation().y;
+    const Vector3 forward = { std::sin(yaw), 0.0f, std::cos(yaw) };
+    const Vector3 spawnPos = Bullet::ComputeSpawnPosition(GetPosition(), forward, bulletSpawnOffset_);
+
+    auto bullet = std::make_unique<Bullet>();
+    bullet->Initialize(object3dCom_, camera_, spawnPos, forward, bulletSpeed_, bulletLifeTime_, BulletOwner::Player);
+    shotCooldownTimer_ = shotCooldown_;
+    return bullet;
 }
 
 void Player::Draw(const RenderContext& ctx)
