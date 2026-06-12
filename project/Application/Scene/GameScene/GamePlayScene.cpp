@@ -77,6 +77,15 @@ void GamePlayScene::Initialize(DirectXCom* dxCommon, Camera* camera)
 			skeleton_.Update();
 			skeletonDebug_.Initialize(directXCom, object3dCom, materialManager, light, camera_, skeleton_);
 		}
+
+		// ゴール用の Ring を初期化
+		goalRing_ = std::make_unique<Ring>();
+		goalRing_->Initialize(directXCom, object3dCom, materialManager, light, camera_, 64, 1.5f, 1.2f);
+		goalRingTransform_.rotate = { 1.570796f, 0.0f, 0.0f }; // 地面に水平に寝かせる
+		goalRingTransform_.scale = { 1.0f, 1.0f, 1.0f };
+		goalRingTransform_.translate = { 0.0f, 0.01f, 10.0f }; // 脱出ポイント座標
+		isGameCleared_ = false;
+		extractionTimer_ = 5.0f;
 	}
 
 	// プレイヤーの初期化は Player クラスへ移譲
@@ -179,6 +188,12 @@ void GamePlayScene::Finalize()
 	}
 	hitEffectInitialized = false;
 
+	if (goalRing_)
+	{
+		goalRing_->Finalize();
+		goalRing_.reset();
+	}
+
 	for (auto& bullet : bullets_)
 	{
 		if (bullet)
@@ -205,6 +220,46 @@ void GamePlayScene::Finalize()
 
 void GamePlayScene::Update()
 {
+	// ゴール（脱出地点）の更新とプレイヤーとの距離判定
+	if (goalRing_)
+	{
+		// Y軸の回転を加算（X軸で90度倒しているため、Y軸回転が床面（XZ平面）での水平回転になる）
+		goalRingTransform_.rotate.y += 0.02f;
+		goalRing_->SetTransform(goalRingTransform_);
+		goalRing_->Update();
+	}
+
+	if (player_)
+	{
+		Vector3 playerPos = player_->GetPosition();
+		Vector3 goalPos = goalRingTransform_.translate;
+		float dx = playerPos.x - goalPos.x;
+		float dz = playerPos.z - goalPos.z;
+		float dist = std::sqrt(dx * dx + dz * dz);
+
+		const float kExtractionRadius = 1.5f;
+		if (dist <= kExtractionRadius)
+		{
+			if (!isGameCleared_)
+			{
+				extractionTimer_ -= kDeltaTime;
+				if (extractionTimer_ <= 0.0f)
+				{
+					extractionTimer_ = 0.0f;
+					isGameCleared_ = true;
+					SceneManager::GetInstance()->ChangeScene("CLEAR");
+					return;
+				}
+			}
+		}
+		else
+		{
+			if (!isGameCleared_)
+			{
+				extractionTimer_ = 5.0f; // 範囲外に出たらリセット
+			}
+		}
+	}
 
 	//球体の更新
 	if (sphereInitialized && sphere_)
@@ -482,6 +537,15 @@ void GamePlayScene::Draw(SceneRenderRequests& renderRequests)
 	if (enemy_)
 	{
 		enemy_->Draw(ctx);
+	}
+
+	if (goalRing_)
+	{
+		D3D12_GPU_DESCRIPTOR_HANDLE handle = TextureManager::GetInstance()->GetSrvHandleGPU(cylinderTextureIndex_);
+		if (handle.ptr != 0)
+		{
+			goalRing_->Draw(handle);
+		}
 	}
 
 	if (spriteManager_)

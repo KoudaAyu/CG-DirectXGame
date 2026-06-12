@@ -6,6 +6,9 @@
 #include <imgui.h>
 #include <string>
 #include <fstream>
+#include "SceneManager.h"
+#include "GamePlayScene.h"
+#include "ClearScene/ClearScene.h"
 
 DebugUI::DebugUI(MaterialManager* materialManager, SpriteManager* spriteManager, Camera* camera,
     Sprite::Transform* transformObject, bool* useMonsterBall, bool* drawObject, bool* drawSprite,
@@ -32,8 +35,7 @@ void DebugUI::Update()
 {
 #ifdef USE_IMGUI
     ImGui::ShowDemoWindow();
-    // Debug: indicate which DebugUI implementation is running
-    OutputDebugStringA("[Base/DebugUI.cpp] DebugUI::Update running\n");
+    // Debug: indicate which DebugUI implementation is running (removed to avoid spam)
 
     ImGui::Begin("Windows");
 
@@ -262,6 +264,86 @@ void DebugUI::Update()
     }
 
     ImGui::End();
+
+	// ゲームプレイシーンの脱出状況を表示
+	BaseScene* currentScene = SceneManager::GetInstance()->GetCurrentScene();
+	if (currentScene && std::string(currentScene->GetSceneType()) == "GAMEPLAY")
+	{
+		GamePlayScene* gameplay = static_cast<GamePlayScene*>(currentScene);
+		ImGuiIO& io = ImGui::GetIO();
+
+		// 脱出ステータスウィンドウの設定
+		ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x * 0.5f, io.DisplaySize.y * 0.25f), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
+		ImGui::Begin("Extraction Status", nullptr, 
+			ImGuiWindowFlags_NoTitleBar | 
+			ImGuiWindowFlags_NoResize | 
+			ImGuiWindowFlags_NoMove | 
+			ImGuiWindowFlags_NoScrollbar | 
+			ImGuiWindowFlags_NoSavedSettings | 
+			ImGuiWindowFlags_NoInputs | 
+			ImGuiWindowFlags_AlwaysAutoResize | 
+			ImGuiWindowFlags_NoBackground);
+
+		float timer = gameplay->GetExtractionTimer();
+		if (timer < 5.0f) // プレイヤーがゾーン内にいてカウントダウン中の場合
+		{
+			ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.5f, 0.0f, 1.0f)); // オレンジ色
+			ImGui::SetWindowFontScale(2.0f);
+			ImGui::Text("EXTRACTING IN %.1fs...", timer);
+			ImGui::PopStyleColor();
+		}
+		else
+		{
+			// 通常プレイ時
+			ImGui::SetWindowFontScale(1.2f);
+			ImGui::TextColored(ImVec4(1.0f, 1.0f, 1.0f, 0.6f), "Goal (Extraction Point): Go to the Ring primitive!");
+		}
+
+		// デバッグ表示：現在のプレイヤー座標とゴール座標、距離を表示
+		Vector3 pPos = gameplay->GetPlayerPosition();
+		Vector3 goalPos = gameplay->GetGoalPosition();
+		float dx = pPos.x - goalPos.x;
+		float dz = pPos.z - goalPos.z;
+		float dist = std::sqrt(dx * dx + dz * dz);
+		
+		ImGui::Spacing();
+		ImGui::SetWindowFontScale(1.0f);
+		ImGui::TextColored(ImVec4(0.8f, 0.8f, 0.8f, 0.8f), "Player: (%.2f, %.2f, %.2f) | Goal: (%.2f, %.2f, %.2f)", pPos.x, pPos.y, pPos.z, goalPos.x, goalPos.y, goalPos.z);
+		ImGui::TextColored(ImVec4(0.8f, 0.8f, 0.8f, 0.8f), "Distance: %.2f / 1.50 (kExtractionRadius)", dist);
+
+		ImGui::End();
+	}
+
+	// クリアシーンの表示
+	if (currentScene && std::string(currentScene->GetSceneType()) == "CLEAR")
+	{
+		ImGuiIO& io = ImGui::GetIO();
+
+		// クリア表示ウィンドウの設定
+		ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x * 0.5f, io.DisplaySize.y * 0.4f), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
+		ImGui::Begin("Clear Status", nullptr, 
+			ImGuiWindowFlags_NoTitleBar | 
+			ImGuiWindowFlags_NoResize | 
+			ImGuiWindowFlags_NoMove | 
+			ImGuiWindowFlags_NoScrollbar | 
+			ImGuiWindowFlags_NoSavedSettings | 
+			ImGuiWindowFlags_NoInputs | 
+			ImGuiWindowFlags_AlwaysAutoResize | 
+			ImGuiWindowFlags_NoBackground);
+
+		ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.0f, 1.0f, 0.0f, 1.0f)); // 緑色
+		ImGui::SetWindowFontScale(3.5f);
+		ImGui::Text("★ GAME CLEAR ★");
+		ImGui::PopStyleColor();
+
+		ImGui::SetWindowFontScale(1.8f);
+		ImGui::TextColored(ImVec4(0.9f, 0.9f, 0.9f, 1.0f), "Successfully Extracted from Dakkofu!");
+		
+		ImGui::SetWindowFontScale(1.3f);
+		ImGui::TextColored(ImVec4(0.6f, 0.6f, 0.6f, 1.0f), "Press SPACE to return to Title");
+
+		ImGui::End();
+	}
 #endif
 }
 

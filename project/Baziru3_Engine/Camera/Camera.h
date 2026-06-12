@@ -48,22 +48,10 @@ public:
 	void SetRotate(const Vector3& rotate)
 	{
        transform_.SetRotate(rotate);
-		// Debug log when camera rotation is changed
-		{
-			char buf[128];
-			snprintf(buf, sizeof(buf), "Camera::SetRotate called: %f, %f, %f\n", rotate.x, rotate.y, rotate.z);
-			OutputDebugStringA(buf);
-		}
 	}
 	void SetTranslate(const Vector3& translate)
 	{
      transform_.SetTranslate(translate);
-		// Debug log when camera translation is changed
-		{
-			char buf[128];
-			snprintf(buf, sizeof(buf), "Camera::SetTranslate called: %f, %f, %f\n", translate.x, translate.y, translate.z);
-			OutputDebugStringA(buf);
-		}
 	}
 	float GetFovY() const
 	{

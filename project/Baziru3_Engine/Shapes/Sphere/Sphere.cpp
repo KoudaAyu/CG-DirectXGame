@@ -150,7 +150,7 @@ void Sphere::Update()
 {
 	transform.rotate.y += 0.01f; // Y軸を中心に回転させる
 	worldMatrix = MakeAffineMatrix(transform.scale, transform.rotate, transform.translate);
-	viewMatrix = Inverse(camera_->GetWorldMatrix());
+	viewMatrix = camera_->GetViewMatrix();
 	WVPMatrix = Multiply(worldMatrix, Multiply(viewMatrix, camera_->GetProjectionMatrix()));
 	transformationMatrixDataSphere->WVP = WVPMatrix;
 	transformationMatrixDataSphere->World = worldMatrix;

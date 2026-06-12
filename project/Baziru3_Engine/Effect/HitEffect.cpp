@@ -77,14 +77,7 @@ void HitEffect::Update(float deltaTime)
         }
     }
 
-    // デバッグ: アクティブ中は各 Update で状態を出力する
-    if (active_)
-    {
-        std::ostringstream oss;
-        oss << "HitEffect::Update active=" << active_ << " elapsed=" << elapsedTime_ << " ringScale=(" << ringTransform_.scale.x << "," << ringTransform_.scale.y << ")";
-        OutputDebugStringA(oss.str().c_str());
-        OutputDebugStringA("\n");
-    }
+    // Debug update log removed to reduce log spam
 }
 
 void HitEffect::Play(const Vector3& translate)
@@ -132,11 +125,7 @@ void HitEffect::Play(const Vector3& translate)
         particleManager_->AddParticles(newParticles);
     }
 
-    // デバッグ: Play 呼び出しをログ出力する
-    std::ostringstream oss;
-    oss << "HitEffect::Play called active=" << active_ << " ringTex=" << ringTextureIndex_ << " cylTex=" << textureIndex_ << " planeTex=" << planeParticleTextureIndex_;
-    OutputDebugStringA(oss.str().c_str());
-    OutputDebugStringA("\n");
+    // Debug play log removed to reduce log spam
 }
 
 void HitEffect::PlayRing(const Vector3& translate)
@@ -218,7 +207,6 @@ void HitEffect::Draw() const
             if (ringHandle.ptr != 0)
             {
                 ring_->Draw(ringHandle);
-                OutputDebugStringA("HitEffect::Draw ring drawn\n");
             }
         }
     }
@@ -231,7 +219,6 @@ void HitEffect::Draw() const
             if (cylinderHandle.ptr != 0)
             {
                 cylinder_->Draw(cylinderHandle);
-                OutputDebugStringA("HitEffect::Draw cylinder drawn\n");
             }
         }
     }

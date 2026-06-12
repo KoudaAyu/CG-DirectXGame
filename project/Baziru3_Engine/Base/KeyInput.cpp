@@ -46,10 +46,7 @@ void KeyInput::Update()
 	
 	keyboard->GetDeviceState(sizeof(key), key);
 
-	if (TriggerKey(DIK_0))
-	{
-		OutputDebugStringA("Hit 0\n");
-	}
+
 }
 
 bool KeyInput::PushKey(BYTE keyNumber)

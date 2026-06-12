@@ -332,8 +332,8 @@ void ParticleManager::Draw(ID3D12GraphicsCommandList* commandList, const RenderC
         vc = (ring_ && ring_->GetVertexCount() > 0) ? ring_->GetVertexCount() : 6u;
     }
 
-    // デバッグ: インスタンスグループと最初のいくつかのインスタンスの textureIndex をログに出す
-	{
+    // デバッグ: インスタンスグループと最初のいくつかのインスタンスの textureIndex をログに出す (disabled)
+	if constexpr (false) {
 		std::ostringstream oss;
         oss << "ParticleManager::Draw - mode=" << ((requestedMode == DrawMode::Ring) ? "Ring" : "External")
 			<< " numInstance=" << drawInstanceCount << " groups=" << drawGroups->size() << "\n";

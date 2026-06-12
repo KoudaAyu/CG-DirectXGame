@@ -14,10 +14,8 @@ public:
 	// Accessors for editor
 	const Vector3& GetRotation() const { return rotation_; }
   const Vector3& GetTranslation() const { return translation_; }
-	void SetRotation(const Vector3& r) { rotation_ = r; \
-		{ char buf[128]; std::snprintf(buf, sizeof(buf), "DebugCamera::SetRotation: %f, %f, %f\n", r.x, r.y, r.z); OutputDebugStringA(buf); } }
-	void SetTranslation(const Vector3& t) { translation_ = t; \
-		{ char buf[128]; std::snprintf(buf, sizeof(buf), "DebugCamera::SetTranslation: %f, %f, %f\n", t.x, t.y, t.z); OutputDebugStringA(buf); } }
+	void SetRotation(const Vector3& r) { rotation_ = r; }
+	void SetTranslation(const Vector3& t) { translation_ = t; }
 
 	// Persistence
 	bool LoadFromFile(const std::string& path);

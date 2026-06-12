@@ -374,21 +374,7 @@ void Game::Draw()
 	//Objectの描画
 
 	{
-		uint32_t chosenIndex = useMonsterBall ? textureIndexModelTex : textureIndexUvChecker;
-		D3D12_GPU_DESCRIPTOR_HANDLE chosenHandle{};
-		if (chosenIndex != TextureManager::kInvalidTextureIndex)
-		{
-			chosenHandle = TextureManager::GetInstance()->GetSrvHandleGPU(chosenIndex);
-		}
-		else
-		{
-			Logger::Log(logStream, "Warning: invalid texture index when selecting object texture.\n");
-		}
-
-		std::ostringstream oss;
-		oss << "Game::Draw - object texture index=" << std::dec << chosenIndex
-			<< " handle=0x" << std::hex << (unsigned long long)chosenHandle.ptr << std::dec << "\n";
-		OutputDebugStringA(oss.str().c_str());
+		// Removed debug print to reduce game loop log spam
 	}
 
 	//実際のcommandListのImGuiの描画コマンドを積む

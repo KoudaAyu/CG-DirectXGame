@@ -77,7 +77,7 @@ void Ring::Update()
     }
 
     worldMatrix_ = MakeAffineMatrix(transform_.scale, transform_.rotate, transform_.translate);
-    viewMatrix_ = Inverse(camera_->GetWorldMatrix());
+    viewMatrix_ = camera_->GetViewMatrix();
     wvpMatrix_ = Multiply(worldMatrix_, Multiply(viewMatrix_, camera_->GetProjectionMatrix()));
     transformationMatrixData_->WVP = wvpMatrix_;
     transformationMatrixData_->World = worldMatrix_;

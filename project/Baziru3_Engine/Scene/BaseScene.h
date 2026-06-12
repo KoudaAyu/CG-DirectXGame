@@ -22,6 +22,8 @@ public:
 		sceneManager_ = sceneManager;
 	}
 
+	virtual const char* GetSceneType() const { return "BaseScene"; }
+
 protected:
 	SceneManager* sceneManager_ = nullptr;
 };

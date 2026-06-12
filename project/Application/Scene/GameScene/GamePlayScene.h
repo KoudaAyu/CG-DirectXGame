@@ -21,6 +21,7 @@
 #include "SpriteManager.h" 
 #include "DebugCamera.h"
 #include "Baziru3_Engine/IO/Mouse/MouseInput.h"
+#include "Baziru3_Engine/Particle/Ring.h"
 
 class Camera;
 class SpriteCom;
@@ -84,6 +85,13 @@ private:
     uint32_t particleTextureA = TextureManager::kInvalidTextureIndex;
     uint32_t particleTextureB = TextureManager::kInvalidTextureIndex;
 
+public:
+    bool IsGameCleared() const { return isGameCleared_; }
+    float GetExtractionTimer() const { return extractionTimer_; }
+    const char* GetSceneType() const override { return "GAMEPLAY"; }
+    Vector3 GetPlayerPosition() const { return player_ ? player_->GetPosition() : Vector3{0.0f, 0.0f, 0.0f}; }
+    Vector3 GetGoalPosition() const { return goalRingTransform_.translate; }
+
 private:
     Sprite::Transform uvTransformSprite;
     Vector2 uiSpritePosition = { 100.0f, 100.0f };
@@ -97,4 +105,9 @@ private:
     float enemyHitRadius_ = 0.6f;
 private:
     const float kDeltaTime = 1.0f / 60.0f;
+
+    std::unique_ptr<Ring> goalRing_;
+    Sprite::Transform goalRingTransform_{};
+    bool isGameCleared_ = false;
+    float extractionTimer_ = 5.0f;
 };
