@@ -3,6 +3,8 @@
 #include "Object3dCom.h"
 #include "TextureManager.h"
 #include "RenderContext.h"
+#include "WindowsAPI.h"
+#include "Sprite.h"
 
 void Enemy::Initialize(Object3dCom* object3dCom, Camera* camera)
 {
@@ -21,10 +23,46 @@ void Enemy::Initialize(Object3dCom* object3dCom, Camera* camera)
     {
         defaultTextureIndex_ = TextureManager::GetInstance()->Load("Resources/uvChecker.png");
     }
+
+    hp_ = maxHp_;
+    isDead_ = false;
+    respawnTimer_ = 0.0f;
 }
 
-void Enemy::Update()
+void Enemy::Update(WindowAPI* windowAPI)
 {
+    if (isDead_)
+    {
+        respawnTimer_ -= 1.0f / 60.0f;
+        if (respawnTimer_ <= 0.0f)
+        {
+            isDead_ = false;
+            hp_ = maxHp_;
+            if (object3d_)
+            {
+                object3d_->SetTranslate({ 3.0f, 0.0f, 3.0f });
+                object3d_->SetColor({ 1.0f, 1.0f, 1.0f, 1.0f });
+            }
+        }
+
+        if (hpBarBg_ && windowAPI)
+        {
+            hpBarBg_->SetSize({ 0.0f, 0.0f });
+            hpBarBg_->UpdateTransformOnly(windowAPI);
+        }
+        if (hpBarFg_ && windowAPI)
+        {
+            hpBarFg_->SetSize({ 0.0f, 0.0f });
+            hpBarFg_->UpdateTransformOnly(windowAPI);
+        }
+
+        if (object3d_)
+        {
+            object3d_->Update();
+        }
+        return;
+    }
+
     if (!object3d_) return;
 
     if (hitFlashTimer_ > 0.0f)
@@ -38,10 +76,63 @@ void Enemy::Update()
     }
 
     object3d_->Update();
+
+    // HPバーの座標・サイズ更新
+    if (camera_ && hpBarBg_ && hpBarFg_ && windowAPI)
+    {
+        Vector3 enemyPos = GetPosition();
+        Vector3 barPos3D = enemyPos;
+        barPos3D.y += 1.5f; // 頭上
+
+        const Matrix4x4& vp = camera_->GetViewProjectionMatrix();
+        float x = barPos3D.x * vp.m[0][0] + barPos3D.y * vp.m[1][0] + barPos3D.z * vp.m[2][0] + vp.m[3][0];
+        float y = barPos3D.x * vp.m[0][1] + barPos3D.y * vp.m[1][1] + barPos3D.z * vp.m[2][1] + vp.m[3][1];
+        float z = barPos3D.x * vp.m[0][2] + barPos3D.y * vp.m[1][2] + barPos3D.z * vp.m[2][2] + vp.m[3][2];
+        float w = barPos3D.x * vp.m[0][3] + barPos3D.y * vp.m[1][3] + barPos3D.z * vp.m[2][3] + vp.m[3][3];
+
+        if (w > 0.0f)
+        {
+            x /= w;
+            y /= w;
+
+            float width = static_cast<float>(windowAPI->GetClientWidth());
+            float height = static_cast<float>(windowAPI->GetClientHeight());
+
+            float screenX = (x + 1.0f) * 0.5f * width;
+            float screenY = (1.0f - y) * 0.5f * height;
+
+            float bgWidth = 80.0f;
+            float bgHeight = 8.0f;
+
+            float hpRatio = static_cast<float>(hp_) / static_cast<float>(maxHp_);
+            if (hpRatio < 0.0f) hpRatio = 0.0f;
+            float fgWidth = bgWidth * hpRatio;
+
+            // 背景バー (左端揃え)
+            hpBarBg_->SetPosition({ screenX - bgWidth * 0.5f, screenY });
+            hpBarBg_->SetSize({ bgWidth, bgHeight });
+            hpBarBg_->SetColor({ 0.1f, 0.1f, 0.1f, 1.0f });
+            hpBarBg_->UpdateTransformOnly(windowAPI);
+
+            // 前景バー (左端揃えでゲージ変化)
+            hpBarFg_->SetPosition({ screenX - bgWidth * 0.5f, screenY });
+            hpBarFg_->SetSize({ fgWidth, bgHeight });
+            hpBarFg_->SetColor({ 0.0f, 1.0f, 0.0f, 1.0f });
+            hpBarFg_->UpdateTransformOnly(windowAPI);
+        }
+        else
+        {
+            hpBarBg_->SetSize({ 0.0f, 0.0f });
+            hpBarBg_->UpdateTransformOnly(windowAPI);
+            hpBarFg_->SetSize({ 0.0f, 0.0f });
+            hpBarFg_->UpdateTransformOnly(windowAPI);
+        }
+    }
 }
 
 void Enemy::Draw(const RenderContext& ctx)
 {
+    if (isDead_) return;
     if (!object3dCom_ || !object3d_) return;
 
     RenderContext enemyCtx = ctx;
@@ -61,10 +152,23 @@ void Enemy::Draw(const RenderContext& ctx)
 
 void Enemy::OnHit()
 {
-    if (!object3d_)
+    if (isDead_ || !object3d_)
     {
         return;
     }
+
+    hp_--;
+    if (hp_ <= 0)
+    {
+        hp_ = 0;
+        isDead_ = true;
+        respawnTimer_ = respawnDuration_;
+
+        if (hpBarBg_) hpBarBg_->SetSize({ 0.0f, 0.0f });
+        if (hpBarFg_) hpBarFg_->SetSize({ 0.0f, 0.0f });
+        return;
+    }
+
     hitFlashTimer_ = hitFlashDuration_;
     object3d_->SetColor({ 1.0f, 0.2f, 0.2f, 1.0f });
 }

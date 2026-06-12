@@ -135,6 +135,22 @@ void GamePlayScene::Initialize(DirectXCom* dxCommon, Camera* camera)
 				sprites.emplace_back(std::move(cursor));
 				cursorSpriteIndex = static_cast<int>(sprites.size()) - 1;
 			}
+
+			// 敵のHPバー用スプライトを追加
+			Sprite::Transform thp = { {1.0f,1.0f,1.0f}, {0.0f,0.0f,0.0f}, {0.0f,0.0f,0.0f} };
+			auto hpBg = Sprite::Create(sc, thp, "Resources/CG4/human/white.png");
+			auto hpFg = Sprite::Create(sc, thp, "Resources/CG4/human/white.png");
+			if (hpBg && hpFg)
+			{
+				hpBg->SetAnchorPoint({ 0.0f, 0.0f });
+				hpFg->SetAnchorPoint({ 0.0f, 0.0f });
+				sprites.emplace_back(std::move(hpBg));
+				sprites.emplace_back(std::move(hpFg));
+				if (enemy_)
+				{
+					enemy_->SetHPBarSprites(sprites[sprites.size() - 2].get(), sprites[sprites.size() - 1].get());
+				}
+			}
 		}
 	}
 
@@ -459,7 +475,7 @@ void GamePlayScene::Update()
 		}
 
 		const Vector3 bulletPos = bullet->GetPosition();
-		if (bullet->GetOwner() == BulletOwner::Player && enemy_)
+		if (bullet->GetOwner() == BulletOwner::Player && enemy_ && !enemy_->IsDead())
 		{
 			const Vector3 enemyPos = enemy_->GetPosition();
 			const float dx = bulletPos.x - enemyPos.x;
@@ -504,7 +520,7 @@ void GamePlayScene::Update()
 	// Enemy update
 	if (enemy_)
 	{
-		enemy_->Update();
+		enemy_->Update(directXCom ? directXCom->GetWindowAPI() : nullptr);
 	}
 }
 
