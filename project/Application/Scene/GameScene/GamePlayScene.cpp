@@ -86,6 +86,7 @@ void GamePlayScene::Initialize(DirectXCom* dxCommon, Camera* camera)
 		goalRingTransform_.translate = { 0.0f, 0.01f, 10.0f }; // 脱出ポイント座標
 		isGameCleared_ = false;
 		extractionTimer_ = 5.0f;
+		lastTime_ = std::chrono::steady_clock::now();
 	}
 
 	// プレイヤーの初期化は Player クラスへ移譲
@@ -150,6 +151,31 @@ void GamePlayScene::Initialize(DirectXCom* dxCommon, Camera* camera)
 				{
 					enemy_->SetHPBarSprites(sprites[sprites.size() - 2].get(), sprites[sprites.size() - 1].get());
 				}
+			}
+
+			// プレイヤーのHPバー用スプライトを追加
+			Sprite::Transform tPlayerHp = { {1.0f,1.0f,1.0f}, {0.0f,0.0f,0.0f}, {0.0f,0.0f,0.0f} };
+			auto pBg = Sprite::Create(sc, tPlayerHp, "Resources/CG4/human/white.png");
+			auto pFg = Sprite::Create(sc, tPlayerHp, "Resources/CG4/human/white.png");
+			if (pBg && pFg)
+			{
+				pBg->SetAnchorPoint({ 0.0f, 0.0f });
+				pFg->SetAnchorPoint({ 0.0f, 0.0f });
+				
+				// 画面左上に配置
+				pBg->SetPosition({ 20.0f, 20.0f });
+				pBg->SetSize({ 200.0f, 16.0f });
+				pBg->SetColor({ 0.1f, 0.1f, 0.1f, 0.8f });
+				
+				pFg->SetPosition({ 20.0f, 20.0f });
+				pFg->SetSize({ 200.0f, 16.0f });
+				pFg->SetColor({ 1.0f, 0.0f, 0.0f, 1.0f }); // プレイヤーは赤色
+				
+				sprites.emplace_back(std::move(pBg));
+				sprites.emplace_back(std::move(pFg));
+				
+				playerHpBarBg_ = sprites[sprites.size() - 2].get();
+				playerHpBarFg_ = sprites[sprites.size() - 1].get();
 			}
 		}
 	}
@@ -237,6 +263,14 @@ void GamePlayScene::Finalize()
 
 void GamePlayScene::Update()
 {
+	auto now = std::chrono::steady_clock::now();
+	float realDeltaTime = std::chrono::duration<float>(now - lastTime_).count();
+	lastTime_ = now;
+	if (realDeltaTime > 0.1f)
+	{
+		realDeltaTime = 0.1f;
+	}
+
 	// ゴール（脱出地点）の更新とプレイヤーとの距離判定
 	if (goalRing_)
 	{
@@ -259,7 +293,7 @@ void GamePlayScene::Update()
 		{
 			if (!isGameCleared_)
 			{
-				extractionTimer_ -= kDeltaTime;
+				extractionTimer_ -= realDeltaTime;
 				if (extractionTimer_ <= 0.0f)
 				{
 					extractionTimer_ = 0.0f;
@@ -507,6 +541,7 @@ void GamePlayScene::Update()
 				{
 					hitEffect_->Play(playerPos);
 				}
+				player_->TakeDamage(10.0f); // 弾被弾時は10ダメージ
 				bullet->Finalize();
 			}
 		}
@@ -523,6 +558,38 @@ void GamePlayScene::Update()
 	if (enemy_)
 	{
 		enemy_->Update(directXCom ? directXCom->GetWindowAPI() : nullptr);
+	}
+
+	// プレイヤーHPバーの更新
+	if (player_ && playerHpBarBg_ && playerHpBarFg_ && directXCom && directXCom->GetWindowAPI())
+	{
+		float ratio = player_->GetHPRatio();
+		playerHpBarFg_->SetSize({ 200.0f * ratio, 16.0f });
+		playerHpBarBg_->UpdateTransformOnly(directXCom->GetWindowAPI());
+		playerHpBarFg_->UpdateTransformOnly(directXCom->GetWindowAPI());
+	}
+
+	// プレイヤーと敵の接触判定（接触ダメージ）
+	if (player_ && enemy_ && !enemy_->IsDead() && !player_->IsDead())
+	{
+		Vector3 pPos = player_->GetPosition();
+		Vector3 ePos = enemy_->GetPosition();
+		float dx = pPos.x - ePos.x;
+		float dy = pPos.y - ePos.y;
+		float dz = pPos.z - ePos.z;
+		float distSq = dx * dx + dy * dy + dz * dz;
+		float hitRadius = playerHitRadius_ + enemyHitRadius_;
+		if (distSq <= hitRadius * hitRadius)
+		{
+			player_->TakeDamage(20.0f); // 1回あたり20ダメージ
+		}
+	}
+
+	// プレイヤー死亡判定 -> ゲームオーバーシーンへ切り替え
+	if (player_ && player_->IsDead())
+	{
+		SceneManager::GetInstance()->ChangeScene("GAMEOVER");
+		return;
 	}
 }
 

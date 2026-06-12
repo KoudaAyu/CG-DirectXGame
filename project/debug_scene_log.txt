@@ -10451,3 +10451,2826 @@ ApplyPendingSceneChange: nextScene_ is set
   isSceneTransitioning_: true
   hasSwitchedSceneDuringFade_: false
   Fade out finished. Committing scene and starting fade in
+ChangeScene called with: TITLE
+  successfully created scene, setting nextScene_
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: false
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: false
+  hasSwitchedSceneDuringFade_: false
+  Directly committing scene change (no fade or first scene)
+ChangeScene called with: GAMEPLAY
+  successfully created scene, setting nextScene_
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: false
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: false
+  hasSwitchedSceneDuringFade_: false
+  Starting fade out
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: true
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Fade out finished. Committing scene and starting fade in
+  Fade in finished. Completing transition.
+ChangeScene called with: CLEAR
+  successfully created scene, setting nextScene_
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: false
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: false
+  hasSwitchedSceneDuringFade_: false
+  Starting fade out
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: true
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Fade out finished. Committing scene and starting fade in
+  Fade in finished. Completing transition.
+ChangeScene called with: TITLE
+  successfully created scene, setting nextScene_
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: false
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: false
+  hasSwitchedSceneDuringFade_: false
+  Starting fade out
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: true
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Fade out finished. Committing scene and starting fade in
+ChangeScene called with: TITLE
+  successfully created scene, setting nextScene_
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: false
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: false
+  hasSwitchedSceneDuringFade_: false
+  Directly committing scene change (no fade or first scene)
+ChangeScene called with: GAMEPLAY
+  successfully created scene, setting nextScene_
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: false
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: false
+  hasSwitchedSceneDuringFade_: false
+  Starting fade out
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: true
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Fade out finished. Committing scene and starting fade in
+  Fade in finished. Completing transition.
+ChangeScene called with: GAMEOVER
+  successfully created scene, setting nextScene_
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: false
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: false
+  hasSwitchedSceneDuringFade_: false
+  Starting fade out
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ChangeScene called with: GAMEOVER
+  ignored because nextScene_ is not null
+  ignored because isSceneTransitioning_ is true
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ChangeScene called with: GAMEOVER
+  ignored because nextScene_ is not null
+  ignored because isSceneTransitioning_ is true
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ChangeScene called with: GAMEOVER
+  ignored because nextScene_ is not null
+  ignored because isSceneTransitioning_ is true
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ChangeScene called with: GAMEOVER
+  ignored because nextScene_ is not null
+  ignored because isSceneTransitioning_ is true
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ChangeScene called with: GAMEOVER
+  ignored because nextScene_ is not null
+  ignored because isSceneTransitioning_ is true
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ChangeScene called with: GAMEOVER
+  ignored because nextScene_ is not null
+  ignored because isSceneTransitioning_ is true
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ChangeScene called with: GAMEOVER
+  ignored because nextScene_ is not null
+  ignored because isSceneTransitioning_ is true
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ChangeScene called with: GAMEOVER
+  ignored because nextScene_ is not null
+  ignored because isSceneTransitioning_ is true
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ChangeScene called with: GAMEOVER
+  ignored because nextScene_ is not null
+  ignored because isSceneTransitioning_ is true
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ChangeScene called with: GAMEOVER
+  ignored because nextScene_ is not null
+  ignored because isSceneTransitioning_ is true
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ChangeScene called with: GAMEOVER
+  ignored because nextScene_ is not null
+  ignored because isSceneTransitioning_ is true
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ChangeScene called with: GAMEOVER
+  ignored because nextScene_ is not null
+  ignored because isSceneTransitioning_ is true
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ChangeScene called with: GAMEOVER
+  ignored because nextScene_ is not null
+  ignored because isSceneTransitioning_ is true
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ChangeScene called with: GAMEOVER
+  ignored because nextScene_ is not null
+  ignored because isSceneTransitioning_ is true
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ChangeScene called with: GAMEOVER
+  ignored because nextScene_ is not null
+  ignored because isSceneTransitioning_ is true
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ChangeScene called with: GAMEOVER
+  ignored because nextScene_ is not null
+  ignored because isSceneTransitioning_ is true
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ChangeScene called with: GAMEOVER
+  ignored because nextScene_ is not null
+  ignored because isSceneTransitioning_ is true
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ChangeScene called with: GAMEOVER
+  ignored because nextScene_ is not null
+  ignored because isSceneTransitioning_ is true
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ChangeScene called with: GAMEOVER
+  ignored because nextScene_ is not null
+  ignored because isSceneTransitioning_ is true
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ChangeScene called with: GAMEOVER
+  ignored because nextScene_ is not null
+  ignored because isSceneTransitioning_ is true
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ChangeScene called with: GAMEOVER
+  ignored because nextScene_ is not null
+  ignored because isSceneTransitioning_ is true
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ChangeScene called with: GAMEOVER
+  ignored because nextScene_ is not null
+  ignored because isSceneTransitioning_ is true
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ChangeScene called with: GAMEOVER
+  ignored because nextScene_ is not null
+  ignored because isSceneTransitioning_ is true
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ChangeScene called with: GAMEOVER
+  ignored because nextScene_ is not null
+  ignored because isSceneTransitioning_ is true
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ChangeScene called with: GAMEOVER
+  ignored because nextScene_ is not null
+  ignored because isSceneTransitioning_ is true
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ChangeScene called with: GAMEOVER
+  ignored because nextScene_ is not null
+  ignored because isSceneTransitioning_ is true
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ChangeScene called with: GAMEOVER
+  ignored because nextScene_ is not null
+  ignored because isSceneTransitioning_ is true
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ChangeScene called with: GAMEOVER
+  ignored because nextScene_ is not null
+  ignored because isSceneTransitioning_ is true
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ChangeScene called with: GAMEOVER
+  ignored because nextScene_ is not null
+  ignored because isSceneTransitioning_ is true
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: false
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Waiting for fade out to finish
+ApplyPendingSceneChange: nextScene_ is set
+  scene_: not null
+  fadeApplication_: not null
+  fade IsAvailable: true
+  fade IsBusy: true
+  fade IsFadeOutFinished: true
+  isSceneTransitioning_: true
+  hasSwitchedSceneDuringFade_: false
+  Fade out finished. Committing scene and starting fade in
+  Fade in finished. Completing transition.

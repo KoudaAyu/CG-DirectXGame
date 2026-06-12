@@ -17,6 +17,7 @@ public:
     void Finalize();
     void OnHit();
     Vector3 GetPosition() const { return object3d_ ? object3d_->GetTranslate() : Vector3{ 0.0f, 0.0f, 0.0f }; }
+    void SetRotation(const Vector3& rotate) { if (object3d_) object3d_->SetRotate(rotate); }
 
     int GetHP() const { return hp_; }
     int GetMaxHP() const { return maxHp_; }

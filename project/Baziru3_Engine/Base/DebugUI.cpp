@@ -344,6 +344,37 @@ void DebugUI::Update()
 
 		ImGui::End();
 	}
+
+	// ゲームオーバーシーンの表示
+	if (currentScene && std::string(currentScene->GetSceneType()) == "GAMEOVER")
+	{
+		ImGuiIO& io = ImGui::GetIO();
+
+		// ゲームオーバー表示ウィンドウの設定
+		ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x * 0.5f, io.DisplaySize.y * 0.4f), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
+		ImGui::Begin("GameOver Status", nullptr, 
+			ImGuiWindowFlags_NoTitleBar | 
+			ImGuiWindowFlags_NoResize | 
+			ImGuiWindowFlags_NoMove | 
+			ImGuiWindowFlags_NoScrollbar | 
+			ImGuiWindowFlags_NoSavedSettings | 
+			ImGuiWindowFlags_NoInputs | 
+			ImGuiWindowFlags_AlwaysAutoResize | 
+			ImGuiWindowFlags_NoBackground);
+
+		ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.0f, 0.0f, 1.0f)); // 赤色
+		ImGui::SetWindowFontScale(3.5f);
+		ImGui::Text("★ GAME OVER ★");
+		ImGui::PopStyleColor();
+
+		ImGui::SetWindowFontScale(1.8f);
+		ImGui::TextColored(ImVec4(0.9f, 0.9f, 0.9f, 1.0f), "You Died!");
+		
+		ImGui::SetWindowFontScale(1.3f);
+		ImGui::TextColored(ImVec4(0.6f, 0.6f, 0.6f, 1.0f), "Press SPACE to return to Title");
+
+		ImGui::End();
+	}
 #endif
 }
 

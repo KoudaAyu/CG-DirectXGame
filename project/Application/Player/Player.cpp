@@ -29,11 +29,48 @@ void Player::Initialize(Object3dCom* object3dCom, Camera* camera)
     {
         defaultTextureIndex_ = TextureManager::GetInstance()->Load("Resources/uvChecker.png");
     }
+
+    // プレイヤーのステータス初期化
+    hp_ = maxHp_ = 100.0f;
+    isDead_ = false;
+    invincibilityTimer_ = 0.0f;
 }
 
 void Player::Update(MouseInput* mouseInput)
 {
     if (!object3d_) return;
+
+    // 死亡時は入力を受け付けず、Updateのみ行って早期リターン
+    if (isDead_)
+    {
+        object3d_->Update();
+        return;
+    }
+
+    // 無敵時間タイマーと点滅処理の更新
+    if (invincibilityTimer_ > 0.0f)
+    {
+        invincibilityTimer_ -= 1.0f / 60.0f;
+        if (invincibilityTimer_ <= 0.0f)
+        {
+            invincibilityTimer_ = 0.0f;
+            object3d_->SetColor({ 1.0f, 1.0f, 1.0f, 1.0f });
+        }
+        else
+        {
+            // 5フレームごとに赤く点滅
+            static int flashCount = 0;
+            flashCount++;
+            if ((flashCount / 5) % 2 == 0)
+            {
+                object3d_->SetColor({ 1.0f, 0.3f, 0.3f, 0.5f }); // 赤みがかった半透明
+            }
+            else
+            {
+                object3d_->SetColor({ 1.0f, 1.0f, 1.0f, 1.0f });
+            }
+        }
+    }
 
     // WASD で移動（簡易実装）。フレーム当たりの移動量は固定値。
     const float kSpeed = 0.05f; // 1フレームあたりの移動量（必要に応じて調整）
@@ -156,5 +193,38 @@ void Player::Finalize()
     if (object3d_)
     {
         object3d_.reset();
+    }
+}
+
+void Player::TakeDamage(float damage)
+{
+    if (isDead_ || invincibilityTimer_ > 0.0f) return;
+
+    hp_ -= damage;
+    if (hp_ <= 0.0f)
+    {
+        hp_ = 0.0f;
+        isDead_ = true;
+        if (object3d_)
+        {
+            object3d_->SetColor({ 0.2f, 0.2f, 0.2f, 1.0f }); // 死亡時は暗い灰色にする
+        }
+    }
+    else
+    {
+        invincibilityTimer_ = invincibilityDuration_;
+    }
+}
+
+void Player::Reset()
+{
+    hp_ = maxHp_;
+    isDead_ = false;
+    invincibilityTimer_ = 0.0f;
+    if (object3d_)
+    {
+        object3d_->SetTranslate({ 0.0f, 0.0f, 0.0f });
+        object3d_->SetRotate({ 0.0f, 0.0f, 0.0f });
+        object3d_->SetColor({ 1.0f, 1.0f, 1.0f, 1.0f });
     }
 }

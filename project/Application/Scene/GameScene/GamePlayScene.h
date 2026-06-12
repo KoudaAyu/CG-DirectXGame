@@ -1,4 +1,5 @@
 #pragma once
+#include <chrono>
 
 #include "BaseScene.h"
 #include"Baziru3_Engine\Effect\HitEffect.h"
@@ -100,6 +101,8 @@ private:
     float bulletLifeTime_ = 2.0f;
     float playerShotCooldown_ = 0.12f;
     float playerShotCooldownTimer_ = 0.0f;
+    float enemyShotCooldown_ = 2.0f; // 2.0秒間隔
+    float enemyShotCooldownTimer_ = 0.0f;
     float bulletHitRadius_ = 0.25f;
     float playerHitRadius_ = 0.6f;
     float enemyHitRadius_ = 0.6f;
@@ -110,4 +113,9 @@ private:
     Sprite::Transform goalRingTransform_{};
     bool isGameCleared_ = false;
     float extractionTimer_ = 5.0f;
+    std::chrono::steady_clock::time_point lastTime_;
+
+    // プレイヤーHPバー用のスプライト
+    Sprite* playerHpBarBg_ = nullptr;
+    Sprite* playerHpBarFg_ = nullptr;
 };

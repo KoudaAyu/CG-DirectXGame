@@ -4,6 +4,9 @@
 #include <format>
 #include <thread>
 #include <vector>
+#include <timeapi.h>
+
+#pragma comment(lib, "winmm.lib")
 
 #include"d3dx12.h"
 #pragma comment(lib,"d3d12.lib")
@@ -35,8 +38,6 @@ void DirectXCom::UpdateFixFPS()
 {
 	// 1/60秒ぴったりの時間
 	const std::chrono::microseconds kMinTime(uint64_t(1000000.0f / 60.0f));
-	// 1/60秒よりわずかに短い時間
-	const std::chrono::microseconds kMinCheckTime(uint64_t(1000000.0f / 65.0f));
 
 	// 現在時間を取得
 	std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
@@ -44,14 +45,23 @@ void DirectXCom::UpdateFixFPS()
 	std::chrono::microseconds elapsed =
 		std::chrono::duration_cast<std::chrono::microseconds>(now - refrence_);
 
-	// 1/60秒(わずかに短い時間)経っていない場合
-	if (elapsed < kMinCheckTime)
+	// 1/60秒経っていない場合
+	if (elapsed < kMinTime)
 	{
-		// 1/60秒経過するまで微小なスリープを繰り返す
+		// 1/60秒経過するまでループ
 		while (std::chrono::steady_clock::now() - refrence_ < kMinTime)
 		{
-			// 1マイクロ秒スリープ
-			std::this_thread::sleep_for(std::chrono::microseconds(1));
+			auto remaining = kMinTime - std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - refrence_);
+			// 1.5ms以上残り時間があるなら1msスリープ (タイマー精度1ms設定を前提)
+			if (remaining > std::chrono::microseconds(1500))
+			{
+				std::this_thread::sleep_for(std::chrono::milliseconds(1));
+			}
+			else
+			{
+				// 残り僅かならスレッド譲渡してビジーウェイトを避ける
+				std::this_thread::yield();
+			}
 		}
 	}
 
@@ -63,6 +73,9 @@ void DirectXCom::Initialize()
 {
 	assert(windowAPI);
 	this->windowAPI = windowAPI;
+
+	// Windowsタイマーの分解能を1msに設定して高精度なFPS制御を可能にする
+	timeBeginPeriod(1);
 
 	InitializeFixFPS();
 
@@ -135,6 +148,8 @@ void DirectXCom::Finalize()
 	// 生のポインタをクリア
 	infoQueue = nullptr;
 
+	// Windowsタイマー分解能の設定を解除
+	timeEndPeriod(1);
 }
 
 void DirectXCom::DebugLayer()

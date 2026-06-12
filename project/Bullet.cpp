@@ -38,6 +38,12 @@ void Bullet::Initialize(Object3dCom* object3dCom, Camera* camera, const Vector3&
         defaultTextureIndex_ = TextureManager::GetInstance()->Load("Resources/uvChecker.png");
     }
 
+    // 敵の弾は赤色にして視覚的に判別しやすくする
+    if (owner_ == BulletOwner::Enemy)
+    {
+        object3d_->SetColor({ 1.0f, 0.2f, 0.2f, 1.0f });
+    }
+
     object3d_->Update();
 }
 
