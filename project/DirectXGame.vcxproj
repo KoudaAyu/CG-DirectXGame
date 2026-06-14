@@ -218,20 +218,20 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v143</PlatformToolset>
+    <PlatformToolset>v145</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v143</PlatformToolset>
+    <PlatformToolset>v145</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Development|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v143</PlatformToolset>
+    <PlatformToolset>v145</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
@@ -253,17 +253,17 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <OutDir>$(SolutionDir)..\generated\output\$(Configuration)\</OutDir>
     <IntDir>$(SolutionDir)..\generated\obj\$(ProjectName)\$(Configuration)\</IntDir>
-    <IncludePath>$(SolutionDir)..\externals\imgui;$(SolutionDir)..\externals\DirectXTex;$(IncludePath)</IncludePath>
+    <IncludePath>$(SolutionDir)..\externals\imgui;$(SolutionDir)..\externals\DirectXTex;$(SolutionDir)..\externals\assimp\include;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Development|x64'">
     <OutDir>$(SolutionDir)..\generated\output\$(Configuration)\</OutDir>
     <IntDir>$(SolutionDir)..\generated\obj\$(ProjectName)\$(Configuration)\</IntDir>
-    <IncludePath>$(SolutionDir)..\externals\imgui;$(SolutionDir)..\externals\DirectXTex;$(IncludePath)</IncludePath>
+    <IncludePath>$(SolutionDir)..\externals\imgui;$(SolutionDir)..\externals\DirectXTex;$(SolutionDir)..\externals\assimp\include;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <OutDir>$(SolutionDir)..\generated\output\$(Configuration)\</OutDir>
     <IntDir>$(SolutionDir)..\generated\obj\$(ProjectName)\$(Configuration)\</IntDir>
-    <IncludePath>$(SolutionDir)..\externals\imgui;$(SolutionDir)..\externals\DirectXTex;$(IncludePath)</IncludePath>
+    <IncludePath>$(SolutionDir)..\externals\imgui;$(SolutionDir)..\externals\DirectXTex;$(SolutionDir)..\externals\assimp\include;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
@@ -276,15 +276,15 @@
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <TreatWarningAsError>true</TreatWarningAsError>
-      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)\externals\DirectXTex;$(ProjectDir)\externals\imgui;$(ProjectDir)Application;$(ProjectDir)Application\Fade;$(ProjectDir)Application\Scene;$(ProjectDir)Application\Scene\GameScene;$(ProjectDir)Application\Scene\TitleScene;$(ProjectDir)Application\Subsystem;$(ProjectDir)Baziru3_Engine\2D;$(ProjectDir)Baziru3_Engine\2D\Sprite;$(ProjectDir)Baziru3_Engine\2D\Texture;$(ProjectDir)Baziru3_Engine\3D\Model;$(ProjectDir)Baziru3_Engine\3D\Model\SkinCluster;$(ProjectDir)Baziru3_Engine\3D\Object;$(ProjectDir)Baziru3_Engine\Audio;$(ProjectDir)Baziru3_Engine\Animation;$(ProjectDir)Baziru3_Engine\Animation\Joint;$(ProjectDir)Baziru3_Engine\Animation\Keyframe;$(ProjectDir)Baziru3_Engine\Animation\NodeAnimation;$(ProjectDir)Baziru3_Engine\Animation\Skeleton;$(ProjectDir)Baziru3_Engine\Base;$(ProjectDir)Baziru3_Engine\Base\ImGui;$(ProjectDir)Baziru3_Engine\Base\Log;$(ProjectDir)Baziru3_Engine\Base\OffScreenRendering;$(ProjectDir)Baziru3_Engine\Base\Scene;$(ProjectDir)Baziru3_Engine\Base\Srv;$(ProjectDir)Baziru3_Engine\Base\Windows;$(ProjectDir)Baziru3_Engine\Camera;$(ProjectDir)Baziru3_Engine\Camera\DebugCamera;$(ProjectDir)Baziru3_Engine\Graphics\Material;$(ProjectDir)Baziru3_Engine\IO;$(ProjectDir)Baziru3_Engine\IO\Key;$(ProjectDir)Baziru3_Engine\IO\Mouse;$(ProjectDir)Baziru3_Engine\Light;$(ProjectDir)Baziru3_Engine\Math;$(ProjectDir)Baziru3_Engine\Particle;$(ProjectDir)Baziru3_Engine\Platform\Windows;$(ProjectDir)Baziru3_Engine\Primitive\Cylinder;$(ProjectDir)Baziru3_Engine\Scene;$(ProjectDir)Baziru3_Engine\Scene\Factory;$(ProjectDir)Baziru3_Engine\Scene\Manager;$(ProjectDir)Baziru3_Engine\Shapes\Sphere;$(ProjectDir)Baziru3_Engine\SkyBox</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)\externals\DirectXTex;$(ProjectDir)\externals\imgui;$(ProjectDir)\externals\assimp\include;$(ProjectDir)Application;$(ProjectDir)Application\Fade;$(ProjectDir)Application\Player;$(ProjectDir)Application\Scene;$(ProjectDir)Application\Scene\GameScene;$(ProjectDir)Application\Scene\TitleScene;$(ProjectDir)Application\Subsystem;$(ProjectDir)Baziru3_Engine\2D;$(ProjectDir)Baziru3_Engine\2D\Sprite;$(ProjectDir)Baziru3_Engine\2D\Texture;$(ProjectDir)Baziru3_Engine\3D\Model;$(ProjectDir)Baziru3_Engine\3D\Model\SkinCluster;$(ProjectDir)Baziru3_Engine\3D\Object;$(ProjectDir)Baziru3_Engine\Audio;$(ProjectDir)Baziru3_Engine\Animation;$(ProjectDir)Baziru3_Engine\Animation\Joint;$(ProjectDir)Baziru3_Engine\Animation\Keyframe;$(ProjectDir)Baziru3_Engine\Animation\NodeAnimation;$(ProjectDir)Baziru3_Engine\Animation\Skeleton;$(ProjectDir)Baziru3_Engine\Base;$(ProjectDir)Baziru3_Engine\Base\ImGui;$(ProjectDir)Baziru3_Engine\Base\Log;$(ProjectDir)Baziru3_Engine\Base\OffScreenRendering;$(ProjectDir)Baziru3_Engine\Base\Scene;$(ProjectDir)Baziru3_Engine\Base\Srv;$(ProjectDir)Baziru3_Engine\Base\Windows;$(ProjectDir)Baziru3_Engine\Camera;$(ProjectDir)Baziru3_Engine\Camera\DebugCamera;$(ProjectDir)Baziru3_Engine\Graphics\Material;$(ProjectDir)Baziru3_Engine\IO;$(ProjectDir)Baziru3_Engine\IO\Key;$(ProjectDir)Baziru3_Engine\IO\Mouse;$(ProjectDir)Baziru3_Engine\Light;$(ProjectDir)Baziru3_Engine\Math;$(ProjectDir)Baziru3_Engine\Particle;$(ProjectDir)Baziru3_Engine\Platform\Windows;$(ProjectDir)Baziru3_Engine\Primitive\Cylinder;$(ProjectDir)Baziru3_Engine\Scene;$(ProjectDir)Baziru3_Engine\Scene\Factory;$(ProjectDir)Baziru3_Engine\Scene\Manager;$(ProjectDir)Baziru3_Engine\Shapes\Sphere;$(ProjectDir)Baziru3_Engine\SkyBox</AdditionalIncludeDirectories>
       <BasicRuntimeChecks>Default</BasicRuntimeChecks>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <TreatLinkerWarningAsErrors>true</TreatLinkerWarningAsErrors>
-      <AdditionalDependencies>imgui.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>$(SolutionDir)..\generated\output\$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>imgui.lib;assimp-vc143-mtd.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(SolutionDir)..\generated\output\$(Configuration);$(SolutionDir)externals\assimp\lib\$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <PostBuildEvent>
       <Command>if not exist "$(TargetDir)" mkdir "$(TargetDir)"</Command>
@@ -306,15 +306,15 @@
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <Optimization>MinSpace</Optimization>
-      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)externals\DirectXTex;$(ProjectDir)externals\imgui;$(ProjectDir)Application;$(ProjectDir)Application\Fade;$(ProjectDir)Application\Player;$(ProjectDir)Application\Scene;$(ProjectDir)Application\Scene\GameScene;$(ProjectDir)Application\Scene\TitleScene;$(ProjectDir)Application\Subsystem;$(ProjectDir)Baziru3_Engine\2D;$(ProjectDir)Baziru3_Engine\2D\Sprite;$(ProjectDir)Baziru3_Engine\2D\Texture;$(ProjectDir)Baziru3_Engine\3D\Model;$(ProjectDir)Baziru3_Engine\3D\Object;$(ProjectDir)Baziru3_Engine\Audio;$(ProjectDir)Baziru3_Engine\Animation;$(ProjectDir)Baziru3_Engine\Animation\Keyframe;$(ProjectDir)Baziru3_Engine\Animation\NodeAnimation;$(ProjectDir)Baziru3_Engine\Base;$(ProjectDir)Baziru3_Engine\Base\ImGui;$(ProjectDir)Baziru3_Engine\Base\Log;$(ProjectDir)Baziru3_Engine\Base\OffScreenRendering;$(ProjectDir)Baziru3_Engine\Base\Scene;$(ProjectDir)Baziru3_Engine\Base\Srv;$(ProjectDir)Baziru3_Engine\Base\Windows;$(ProjectDir)Baziru3_Engine\Camera;$(ProjectDir)Baziru3_Engine\Camera\DebugCamera;$(ProjectDir)Baziru3_Engine\Graphics\Material;$(ProjectDir)Baziru3_Engine\Light;$(ProjectDir)Baziru3_Engine\Math;$(ProjectDir)Baziru3_Engine\Particle;$(ProjectDir)Baziru3_Engine\Platform\Windows;$(ProjectDir)Baziru3_Engine\Primitive\Cylinder;$(ProjectDir)Baziru3_Engine\Scene;$(ProjectDir)Baziru3_Engine\Scene\Factory;$(ProjectDir)Baziru3_Engine\Scene\Manager;$(ProjectDir)Baziru3_Engine\Shapes\Sphere;$(ProjectDir)Baziru3_Engine\SkyBox</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)\externals\DirectXTex;$(ProjectDir)\externals\imgui;$(ProjectDir)\externals\assimp\include;$(ProjectDir)Application;$(ProjectDir)Application\Fade;$(ProjectDir)Application\Player;$(ProjectDir)Application\Scene;$(ProjectDir)Application\Scene\GameScene;$(ProjectDir)Application\Scene\TitleScene;$(ProjectDir)Application\Subsystem;$(ProjectDir)Baziru3_Engine\2D;$(ProjectDir)Baziru3_Engine\2D\Sprite;$(ProjectDir)Baziru3_Engine\2D\Texture;$(ProjectDir)Baziru3_Engine\3D\Model;$(ProjectDir)Baziru3_Engine\3D\Model\SkinCluster;$(ProjectDir)Baziru3_Engine\3D\Object;$(ProjectDir)Baziru3_Engine\Audio;$(ProjectDir)Baziru3_Engine\Animation;$(ProjectDir)Baziru3_Engine\Animation\Joint;$(ProjectDir)Baziru3_Engine\Animation\Keyframe;$(ProjectDir)Baziru3_Engine\Animation\NodeAnimation;$(ProjectDir)Baziru3_Engine\Animation\Skeleton;$(ProjectDir)Baziru3_Engine\Base;$(ProjectDir)Baziru3_Engine\Base\ImGui;$(ProjectDir)Baziru3_Engine\Base\Log;$(ProjectDir)Baziru3_Engine\Base\OffScreenRendering;$(ProjectDir)Baziru3_Engine\Base\Scene;$(ProjectDir)Baziru3_Engine\Base\Srv;$(ProjectDir)Baziru3_Engine\Base\Windows;$(ProjectDir)Baziru3_Engine\Camera;$(ProjectDir)Baziru3_Engine\Camera\DebugCamera;$(ProjectDir)Baziru3_Engine\Graphics\Material;$(ProjectDir)Baziru3_Engine\IO;$(ProjectDir)Baziru3_Engine\IO\Key;$(ProjectDir)Baziru3_Engine\IO\Mouse;$(ProjectDir)Baziru3_Engine\Light;$(ProjectDir)Baziru3_Engine\Math;$(ProjectDir)Baziru3_Engine\Particle;$(ProjectDir)Baziru3_Engine\Platform\Windows;$(ProjectDir)Baziru3_Engine\Primitive\Cylinder;$(ProjectDir)Baziru3_Engine\Scene;$(ProjectDir)Baziru3_Engine\Scene\Factory;$(ProjectDir)Baziru3_Engine\Scene\Manager;$(ProjectDir)Baziru3_Engine\Shapes\Sphere;$(ProjectDir)Baziru3_Engine\SkyBox</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>$(SolutionDir)..\generated\output\$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>assimp-vc143-mt.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(SolutionDir)..\generated\output\$(Configuration);$(SolutionDir)externals\assimp\lib\$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <PostBuildEvent>
       <Command>if not exist "$(TargetDir)" mkdir "$(TargetDir)"</Command>
@@ -333,7 +333,7 @@
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)\externals\DirectXTex;$(ProjectDir)\externals\imgui;$(ProjectDir)Application;$(ProjectDir)Application\Scene;$(ProjectDir)Application\Scene\GameScene;$(ProjectDir)Application\Scene\TitleScene;$(ProjectDir)Application\Subsystem;$(ProjectDir)Baziru3_Engine\2D;$(ProjectDir)Baziru3_Engine\2D\Sprite;$(ProjectDir)Baziru3_Engine\2D\Texture;$(ProjectDir)Baziru3_Engine\3D\Model;$(ProjectDir)Baziru3_Engine\3D\Object;$(ProjectDir)Baziru3_Engine\Audio;$(ProjectDir)Baziru3_Engine\Animation;$(ProjectDir)Baziru3_Engine\Animation\Keyframe;$(ProjectDir)Baziru3_Engine\Animation\NodeAnimation;$(ProjectDir)Baziru3_Engine\Base;$(ProjectDir)Baziru3_Engine\Base\ImGui;$(ProjectDir)Baziru3_Engine\Base\Log;$(ProjectDir)Baziru3_Engine\Base\OffScreenRendering;$(ProjectDir)Baziru3_Engine\Base\Scene;$(ProjectDir)Baziru3_Engine\Base\Srv;$(ProjectDir)Baziru3_Engine\Base\Windows;$(ProjectDir)Baziru3_Engine\Camera;$(ProjectDir)Baziru3_Engine\Camera\DebugCamera;$(ProjectDir)Baziru3_Engine\Graphics\Material;$(ProjectDir)Baziru3_Engine\Light;$(ProjectDir)Baziru3_Engine\Math;$(ProjectDir)Baziru3_Engine\Particle;$(ProjectDir)Baziru3_Engine\Platform\Windows;$(ProjectDir)Baziru3_Engine\Primitive\Cylinder;$(ProjectDir)Baziru3_Engine\Scene;$(ProjectDir)Baziru3_Engine\Scene\Factory;$(ProjectDir)Baziru3_Engine\Scene\Manager;$(ProjectDir)Baziru3_Engine\Shapes\Sphere;$(ProjectDir)Baziru3_Engine\SkyBox</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)\externals\DirectXTex;$(ProjectDir)\externals\imgui;$(ProjectDir)\externals\assimp\include;$(ProjectDir)Application;$(ProjectDir)Application\Fade;$(ProjectDir)Application\Player;$(ProjectDir)Application\Scene;$(ProjectDir)Application\Scene\GameScene;$(ProjectDir)Application\Scene\TitleScene;$(ProjectDir)Application\Subsystem;$(ProjectDir)Baziru3_Engine\2D;$(ProjectDir)Baziru3_Engine\2D\Sprite;$(ProjectDir)Baziru3_Engine\2D\Texture;$(ProjectDir)Baziru3_Engine\3D\Model;$(ProjectDir)Baziru3_Engine\3D\Model\SkinCluster;$(ProjectDir)Baziru3_Engine\3D\Object;$(ProjectDir)Baziru3_Engine\Audio;$(ProjectDir)Baziru3_Engine\Animation;$(ProjectDir)Baziru3_Engine\Animation\Joint;$(ProjectDir)Baziru3_Engine\Animation\Keyframe;$(ProjectDir)Baziru3_Engine\Animation\NodeAnimation;$(ProjectDir)Baziru3_Engine\Animation\Skeleton;$(ProjectDir)Baziru3_Engine\Base;$(ProjectDir)Baziru3_Engine\Base\ImGui;$(ProjectDir)Baziru3_Engine\Base\Log;$(ProjectDir)Baziru3_Engine\Base\OffScreenRendering;$(ProjectDir)Baziru3_Engine\Base\Scene;$(ProjectDir)Baziru3_Engine\Base\Srv;$(ProjectDir)Baziru3_Engine\Base\Windows;$(ProjectDir)Baziru3_Engine\Camera;$(ProjectDir)Baziru3_Engine\Camera\DebugCamera;$(ProjectDir)Baziru3_Engine\Graphics\Material;$(ProjectDir)Baziru3_Engine\IO;$(ProjectDir)Baziru3_Engine\IO\Key;$(ProjectDir)Baziru3_Engine\IO\Mouse;$(ProjectDir)Baziru3_Engine\Light;$(ProjectDir)Baziru3_Engine\Math;$(ProjectDir)Baziru3_Engine\Particle;$(ProjectDir)Baziru3_Engine\Platform\Windows;$(ProjectDir)Baziru3_Engine\Primitive\Cylinder;$(ProjectDir)Baziru3_Engine\Scene;$(ProjectDir)Baziru3_Engine\Scene\Factory;$(ProjectDir)Baziru3_Engine\Scene\Manager;$(ProjectDir)Baziru3_Engine\Shapes\Sphere;$(ProjectDir)Baziru3_Engine\SkyBox</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -341,8 +341,8 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <LinkTimeCodeGeneration />
-      <AdditionalDependencies>imgui.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>$(SolutionDir)..\generated\output\$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>assimp-vc143-mt.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(SolutionDir)..\generated\output\$(Configuration);$(SolutionDir)externals\assimp\lib\Release;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <PostBuildEvent>
       <Command>if not exist "$(TargetDir)" mkdir "$(TargetDir)"</Command>
