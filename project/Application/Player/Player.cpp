@@ -45,6 +45,9 @@ void Player::Initialize(Object3dCom* object3dCom, Camera* camera)
     isDodging_ = false;
     dodgeTimer_ = 0.0f;
     dodgeDirection_ = { 0.0f, 0.0f, 1.0f };
+
+    // スタミナの初期化
+    stamina_ = maxStamina_;
 }
 
 void Player::Update(MouseInput* mouseInput)
@@ -104,6 +107,16 @@ void Player::Update(MouseInput* mouseInput)
         }
     }
 
+    // スタミナの自動回復
+    if (!isDodging_ && !isDead_)
+    {
+        stamina_ += staminaRegenRate_ * (1.0f / 60.0f);
+        if (stamina_ > maxStamina_)
+        {
+            stamina_ = maxStamina_;
+        }
+    }
+
     // 回避処理の更新
     if (isDodging_)
     {
@@ -146,12 +159,20 @@ void Player::Update(MouseInput* mouseInput)
             moveDir.x /= len;
             moveDir.z /= len;
         }
-
-        // SPACEキーで回避開始
-        if ((GetAsyncKeyState(VK_SPACE) & 0x8000) != 0)
+        // SPACEキーで回避開始（スタミナが必要分あるかチェック）
+        if ((GetAsyncKeyState(VK_SPACE) & 0x8000) != 0 && stamina_ >= dodgeStaminaCost_)
         {
             isDodging_ = true;
             dodgeTimer_ = dodgeDuration_;
+            stamina_ -= dodgeStaminaCost_;
+
+            // リロードのキャンセル
+            if (isReloading_)
+            {
+                isReloading_ = false;
+                reloadTimer_ = 0.0f;
+            }
+
             if (len > 0.0f)
             {
                 dodgeDirection_ = moveDir;
@@ -362,6 +383,7 @@ void Player::Reset()
     isDodging_ = false;
     dodgeTimer_ = 0.0f;
     dodgeDirection_ = { 0.0f, 0.0f, 1.0f };
+    stamina_ = maxStamina_;
     if (object3d_)
     {
         object3d_->SetTranslate({ 0.0f, 0.0f, 0.0f });

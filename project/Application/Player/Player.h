@@ -33,6 +33,10 @@ public:
     bool IsReloading() const { return isReloading_; }
     float GetReloadProgress() const { return isReloading_ && reloadDuration_ > 0.0f ? (reloadDuration_ - reloadTimer_) / reloadDuration_ : 0.0f; }
 
+    float GetStamina() const { return stamina_; }
+    float GetMaxStamina() const { return maxStamina_; }
+    float GetStaminaRatio() const { return maxStamina_ > 0.0f ? stamina_ / maxStamina_ : 0.0f; }
+
 private:
     std::unique_ptr<Object3d> object3d_;
     Object3dCom* object3dCom_ = nullptr;
@@ -62,5 +66,10 @@ private:
     const float dodgeDuration_ = 0.4f;
     Vector3 dodgeDirection_ = { 0.0f, 0.0f, 1.0f };
     const float dodgeSpeed_ = 0.15f;
+
+    float stamina_ = 100.0f;
+    float maxStamina_ = 100.0f;
+    const float dodgeStaminaCost_ = 30.0f;
+    const float staminaRegenRate_ = 15.0f;
 };
 

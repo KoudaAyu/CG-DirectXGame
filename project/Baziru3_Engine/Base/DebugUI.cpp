@@ -1,4 +1,5 @@
 #include "DebugUI.h"
+#include "Matrix4x4.h"
 #include "MaterialManager.h"
 #include "SpriteManager.h"
 #include "Camera.h"
@@ -288,8 +289,8 @@ void DebugUI::Update()
 		Player* player = gameplay->GetPlayer();
 		if (player)
 		{
-			ImGui::SetNextWindowPos(ImVec2(20.0f, io.DisplaySize.y - 100.0f), ImGuiCond_Always);
-			ImGui::Begin("Ammo HUD", nullptr,
+			ImGui::SetNextWindowPos(ImVec2(20.0f, io.DisplaySize.y - 140.0f), ImGuiCond_Always);
+			ImGui::Begin("Player Status HUD", nullptr,
 				ImGuiWindowFlags_NoTitleBar |
 				ImGuiWindowFlags_NoResize |
 				ImGuiWindowFlags_NoMove |
@@ -298,11 +299,32 @@ void DebugUI::Update()
 				ImGuiWindowFlags_NoInputs |
 				ImGuiWindowFlags_AlwaysAutoResize |
 				ImGuiWindowFlags_NoBackground);
+
+			// HP Bar
+			float hpRatio = player->GetHPRatio();
+			float hp = player->GetHP();
+			float maxHp = player->GetMaxHP();
+			
+			ImGui::SetWindowFontScale(1.4f);
+			ImGui::TextColored(ImVec4(1.0f, 1.0f, 1.0f, 1.0f), "HP:");
+			ImGui::SameLine();
+			
+			// Style colors for the health bar
+			ImGui::PushStyleColor(ImGuiCol_PlotHistogram, ImVec4(0.8f, 0.1f, 0.1f, 1.0f)); // Red bar
+			ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.15f, 0.15f, 0.15f, 0.6f));    // Dark background
+			
+			char hpText[32];
+			std::snprintf(hpText, sizeof(hpText), "%.0f / %.0f", hp, maxHp);
+			ImGui::ProgressBar(hpRatio, ImVec2(200.0f, 20.0f), hpText);
+			ImGui::PopStyleColor(2);
+
+			ImGui::Spacing();
+
+			// Ammo
 			if (player->IsReloading())
 			{
 				ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.8f, 0.0f, 1.0f));
-				ImGui::SetWindowFontScale(1.8f);
-				ImGui::Text("RELOADING... %.1fs", (1.5f * (1.0f - player->GetReloadProgress())));
+				ImGui::Text("AMMO: RELOADING... %.1fs", (1.5f * (1.0f - player->GetReloadProgress())));
 				ImGui::PopStyleColor();
 			}
 			else
@@ -312,17 +334,63 @@ void DebugUI::Update()
 				if (ammo == 0)
 				{
 					ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.0f, 0.0f, 1.0f));
-					ImGui::SetWindowFontScale(1.8f);
-					ImGui::Text("OUT OF AMMO! (Press R)");
+					ImGui::Text("AMMO: OUT OF AMMO! (Press R)");
 					ImGui::PopStyleColor();
 				}
 				else
 				{
-					ImGui::SetWindowFontScale(1.8f);
 					ImGui::Text("AMMO: %d / %d", ammo, maxAmmo);
 				}
 			}
 			ImGui::End();
+
+			// Stamina Bar (Rendered floating under the Player model)
+			if (camera_)
+			{
+				Vector3 playerPos = player->GetPosition();
+				
+				// Project player 3D position to 2D screen space
+				Matrix4x4 vp = Multiply(camera_->GetViewMatrix(), camera_->GetProjectionMatrix());
+				
+				// Transform: clip = (playerPos.x, playerPos.y, playerPos.z, 1.0f) * vp
+				float cx = playerPos.x * vp.m[0][0] + playerPos.y * vp.m[1][0] + playerPos.z * vp.m[2][0] + vp.m[3][0];
+				float cy = playerPos.x * vp.m[0][1] + playerPos.y * vp.m[1][1] + playerPos.z * vp.m[2][1] + vp.m[3][1];
+				float cz = playerPos.x * vp.m[0][2] + playerPos.y * vp.m[1][2] + playerPos.z * vp.m[2][2] + vp.m[3][2];
+				float cw = playerPos.x * vp.m[0][3] + playerPos.y * vp.m[1][3] + playerPos.z * vp.m[2][3] + vp.m[3][3];
+				
+				if (cw > 0.0f)
+				{
+					// NDC coordinates
+					float ndcX = cx / cw;
+					float ndcY = cy / cw;
+					
+					// Screen coordinates
+					float screenX = (ndcX + 1.0f) * 0.5f * io.DisplaySize.x;
+					float screenY = (1.0f - ndcY) * 0.5f * io.DisplaySize.y;
+					
+					// Floating Stamina HUD (centered below the player, say 50px below the center)
+					ImGui::SetNextWindowPos(ImVec2(screenX - 50.0f, screenY + 40.0f), ImGuiCond_Always);
+					ImGui::SetNextWindowSize(ImVec2(100.0f, 12.0f));
+					ImGui::Begin("Floating Stamina HUD", nullptr,
+						ImGuiWindowFlags_NoTitleBar |
+						ImGuiWindowFlags_NoResize |
+						ImGuiWindowFlags_NoMove |
+						ImGuiWindowFlags_NoScrollbar |
+						ImGuiWindowFlags_NoSavedSettings |
+						ImGuiWindowFlags_NoInputs |
+						ImGuiWindowFlags_NoBackground);
+					
+					float staminaRatio = player->GetStaminaRatio();
+					
+					// Small progress bar with no text
+					ImGui::PushStyleColor(ImGuiCol_PlotHistogram, ImVec4(0.1f, 0.8f, 0.2f, 0.8f)); // Semi-transparent green
+					ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.15f, 0.15f, 0.15f, 0.4f));    // Semi-transparent dark bg
+					
+					ImGui::ProgressBar(staminaRatio, ImVec2(100.0f, 6.0f), "");
+					ImGui::PopStyleColor(2);
+					ImGui::End();
+				}
+			}
 		}
 
 		if (timer < 5.0f) // プレイヤーがゾーン内にいてカウントダウン中の場合
