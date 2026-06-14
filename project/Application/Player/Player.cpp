@@ -40,6 +40,11 @@ void Player::Initialize(Object3dCom* object3dCom, Camera* camera)
     magazineAmmo_ = maxMagazineAmmo_;
     isReloading_ = false;
     reloadTimer_ = 0.0f;
+
+    // 回避の初期化
+    isDodging_ = false;
+    dodgeTimer_ = 0.0f;
+    dodgeDirection_ = { 0.0f, 0.0f, 1.0f };
 }
 
 void Player::Update(MouseInput* mouseInput)
@@ -99,29 +104,92 @@ void Player::Update(MouseInput* mouseInput)
         }
     }
 
-    // WASD で移動（簡易実装）。フレーム当たりの移動量は固定値。
-    const float kSpeed = 0.05f; // 1フレームあたりの移動量（必要に応じて調整）
-    Vector3 pos = object3d_->GetTranslate();
+    // 回避処理の更新
+    if (isDodging_)
+    {
+        dodgeTimer_ -= 1.0f / 60.0f;
+        
+        // 移動処理
+        Vector3 pos = object3d_->GetTranslate();
+        pos.x += dodgeDirection_.x * dodgeSpeed_;
+        pos.z += dodgeDirection_.z * dodgeSpeed_;
+        object3d_->SetTranslate(pos);
 
-    if ((GetAsyncKeyState('W') & 0x8000) != 0)
-    {
-        pos.z += kSpeed;
+        // ビジュアル演出：X軸（前転方向）に1回転
+        float ratio = dodgeTimer_ / dodgeDuration_;
+        if (ratio < 0.0f) ratio = 0.0f;
+        Vector3 rot = object3d_->GetRotate();
+        rot.x = (1.0f - ratio) * 6.2831853f;
+        object3d_->SetRotate(rot);
+
+        if (dodgeTimer_ <= 0.0f)
+        {
+            isDodging_ = false;
+            dodgeTimer_ = 0.0f;
+            Vector3 finalRot = object3d_->GetRotate();
+            finalRot.x = 0.0f;
+            object3d_->SetRotate(finalRot);
+        }
     }
-    if ((GetAsyncKeyState('S') & 0x8000) != 0)
+    else
     {
-        pos.z -= kSpeed;
-    }
-    if ((GetAsyncKeyState('A') & 0x8000) != 0)
-    {
-        pos.x -= kSpeed;
-    }
-    if ((GetAsyncKeyState('D') & 0x8000) != 0)
-    {
-        pos.x += kSpeed;
+        // WASD入力方向の計算
+        Vector3 moveDir = { 0.0f, 0.0f, 0.0f };
+        if ((GetAsyncKeyState('W') & 0x8000) != 0) moveDir.z += 1.0f;
+        if ((GetAsyncKeyState('S') & 0x8000) != 0) moveDir.z -= 1.0f;
+        if ((GetAsyncKeyState('A') & 0x8000) != 0) moveDir.x -= 1.0f;
+        if ((GetAsyncKeyState('D') & 0x8000) != 0) moveDir.x += 1.0f;
+
+        float len = std::sqrt(moveDir.x * moveDir.x + moveDir.z * moveDir.z);
+        if (len > 0.0f)
+        {
+            moveDir.x /= len;
+            moveDir.z /= len;
+        }
+
+        // SPACEキーで回避開始
+        if ((GetAsyncKeyState(VK_SPACE) & 0x8000) != 0)
+        {
+            isDodging_ = true;
+            dodgeTimer_ = dodgeDuration_;
+            if (len > 0.0f)
+            {
+                dodgeDirection_ = moveDir;
+            }
+            else
+            {
+                // 移動入力がない場合はプレイヤーの前方方向
+                float yaw = GetRotation().y;
+                dodgeDirection_ = { std::sin(yaw), 0.0f, std::cos(yaw) };
+            }
+        }
+        else
+        {
+            // 通常のWASD移動処理
+            const float kSpeed = 0.05f;
+            Vector3 pos = object3d_->GetTranslate();
+
+            if ((GetAsyncKeyState('W') & 0x8000) != 0)
+            {
+                pos.z += kSpeed;
+            }
+            if ((GetAsyncKeyState('S') & 0x8000) != 0)
+            {
+                pos.z -= kSpeed;
+            }
+            if ((GetAsyncKeyState('A') & 0x8000) != 0)
+            {
+                pos.x -= kSpeed;
+            }
+            if ((GetAsyncKeyState('D') & 0x8000) != 0)
+            {
+                pos.x += kSpeed;
+            }
+            object3d_->SetTranslate(pos);
+        }
     }
 
-    object3d_->SetTranslate(pos);
-     if (mouseInput && camera_)
+    if (!isDodging_ && mouseInput && camera_)
     {
         WindowAPI* win = mouseInput->GetWindowAPI();
         if (win)
@@ -204,7 +272,7 @@ std::unique_ptr<Bullet> Player::TryShoot(const MouseInput* mouseInput, float del
         }
     }
 
-    if (isDead_ || !object3d_ || !object3dCom_ || !camera_ || !mouseInput)
+    if (isDead_ || isDodging_ || !object3d_ || !object3dCom_ || !camera_ || !mouseInput)
     {
         return nullptr;
     }
@@ -265,7 +333,7 @@ void Player::Finalize()
 
 void Player::TakeDamage(float damage)
 {
-    if (isDead_ || invincibilityTimer_ > 0.0f) return;
+    if (isDead_ || invincibilityTimer_ > 0.0f || isDodging_) return;
 
     hp_ -= damage;
     if (hp_ <= 0.0f)
@@ -291,6 +359,9 @@ void Player::Reset()
     magazineAmmo_ = maxMagazineAmmo_;
     isReloading_ = false;
     reloadTimer_ = 0.0f;
+    isDodging_ = false;
+    dodgeTimer_ = 0.0f;
+    dodgeDirection_ = { 0.0f, 0.0f, 1.0f };
     if (object3d_)
     {
         object3d_->SetTranslate({ 0.0f, 0.0f, 0.0f });

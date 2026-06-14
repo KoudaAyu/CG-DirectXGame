@@ -56,5 +56,11 @@ private:
     bool isReloading_ = false;
     float reloadTimer_ = 0.0f;
     const float reloadDuration_ = 1.5f;
+
+    bool isDodging_ = false;
+    float dodgeTimer_ = 0.0f;
+    const float dodgeDuration_ = 0.4f;
+    Vector3 dodgeDirection_ = { 0.0f, 0.0f, 1.0f };
+    const float dodgeSpeed_ = 0.15f;
 };
 
