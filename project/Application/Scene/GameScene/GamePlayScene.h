@@ -69,56 +69,70 @@ private:
     void ResolveBulletCollisions();
     void ResolveContactDamage();
 
+    // ヘルパーメソッド
     RenderContext BuildRenderContext() const;
     static bool IsWithinRadius(const Vector3& a, const Vector3& b, float radius);
 
-    Camera* camera_ = nullptr;
+    // --- コアシステム & エンジンコンテキスト ---
     DirectXCom* directXCom = nullptr;
-    Emitter emitter;
-    SpriteCom* spriteCom = nullptr;
-    ParticleEmitter particleEmitter;
+    Camera* camera_ = nullptr;
     Light* light = nullptr;
     MaterialManager* materialManager = nullptr;
     Object3dCom* object3dCom = nullptr;
     ParticleManager* particleManager = nullptr;
+    SpriteCom* spriteCom = nullptr;
 
-    std::unique_ptr<HitEffect> hitEffect_;
-    std::unique_ptr<Object3d> animatedCube_;
+    // --- ゲームエンティティ & オブジェクト ---
     std::unique_ptr<Player> player_;
     std::unique_ptr<Enemy> enemy_;
     std::vector<std::unique_ptr<Bullet>> bullets_;
     std::unique_ptr<Sphere> sphere_;
+    std::unique_ptr<Object3d> animatedCube_;
+    std::unique_ptr<Ring> goalRing_;
+    std::unique_ptr<HitEffect> hitEffect_;
+
+    // --- アニメーション & スケルトン ---
     Skeleton skeleton_{};
     Animation animation_{};
     Animator animator_{};
     SkeletonDebug skeletonDebug_{};
-    DebugCamera debugCamera_;
+
+    // --- パーティクルエミッター ---
+    Emitter emitter;
+    ParticleEmitter particleEmitter;
+
+    // --- スプライト & UI ---
     std::vector<std::unique_ptr<Sprite>> sprites;
     std::unique_ptr<SpriteManager> spriteManager_;
-    MouseInput mouseInput;
+    Sprite::Transform goalRingTransform_{};
+    Sprite* playerHpBarBg_ = nullptr;
+    Sprite* playerHpBarFg_ = nullptr;
     int cursorSpriteIndex = -1;
 
+    // --- インプット ---
+    MouseInput mouseInput;
+    DebugCamera debugCamera_;
+
+    // --- 初期化フラグ ---
     bool sphereInitialized = false;
     bool hitEffectInitialized = false;
     bool animatedCubeInitialized_ = false;
 
+    // --- テクスチャ ---
     uint32_t cylinderTextureIndex_ = TextureManager::kInvalidTextureIndex;
     uint32_t particleTextureA = TextureManager::kInvalidTextureIndex;
     uint32_t particleTextureB = TextureManager::kInvalidTextureIndex;
 
-    float bulletHitRadius_ = 0.25f;
-    float playerHitRadius_ = 0.6f;
-    float enemyHitRadius_ = 0.6f;
-    static constexpr float kFixedDeltaTime = 1.0f / 60.0f;
-    static constexpr float kEnemyBulletDamage = 10.0f;
-    static constexpr float kContactDamage = 20.0f;
-
-    std::unique_ptr<Ring> goalRing_;
-    Sprite::Transform goalRingTransform_{};
+    // --- ステート & タイマー ---
     bool isGameCleared_ = false;
     float extractionTimer_ = 5.0f;
     std::chrono::steady_clock::time_point lastTime_;
 
-    Sprite* playerHpBarBg_ = nullptr;
-    Sprite* playerHpBarFg_ = nullptr;
+    // --- ゲームプレイ定数 ---
+    static constexpr float kFixedDeltaTime = 1.0f / 60.0f;
+    static constexpr float kEnemyBulletDamage = 10.0f;
+    static constexpr float kContactDamage = 20.0f;
+    static constexpr float bulletHitRadius_ = 0.25f;
+    static constexpr float playerHitRadius_ = 0.6f;
+    static constexpr float enemyHitRadius_ = 0.6f;
 };

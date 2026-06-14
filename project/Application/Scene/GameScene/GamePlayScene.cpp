@@ -377,23 +377,7 @@ void GamePlayScene::UpdateSprites()
 		return;
 	}
 
-	Vector2 pos{ static_cast<float>(mouseInput.GetX()), static_cast<float>(mouseInput.GetY()) };
-	if (directXCom && directXCom->GetWindowAPI())
-	{
-		RECT rc{};
-		if (GetClientRect(directXCom->GetWindowAPI()->GetHwnd(), &rc))
-		{
-			const float clientW = float(rc.right - rc.left);
-			const float clientH = float(rc.bottom - rc.top);
-			if (clientW > 0.0f && clientH > 0.0f)
-			{
-				const float sx = float(directXCom->GetWindowAPI()->GetClientWidth()) / clientW;
-				const float sy = float(directXCom->GetWindowAPI()->GetClientHeight()) / clientH;
-				pos.x *= sx;
-				pos.y *= sy;
-			}
-		}
-	}
+	Vector2 pos = mouseInput.GetScaledPosition();
 
 	cur->SetPosition(pos);
 	cur->UpdateTransformOnly(directXCom ? directXCom->GetWindowAPI() : nullptr);

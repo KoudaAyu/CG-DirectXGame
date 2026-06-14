@@ -119,3 +119,26 @@ int MouseInput::GetMoveY() const
 {
     return mouseState.lY;
 }
+
+Vector2 MouseInput::GetScaledPosition() const
+{
+    Vector2 pos{ static_cast<float>(posX), static_cast<float>(posY) };
+    if (windowAPI)
+    {
+        RECT rc{};
+        if (GetClientRect(windowAPI->GetHwnd(), &rc))
+        {
+            float clientW = static_cast<float>(rc.right - rc.left);
+            float clientH = static_cast<float>(rc.bottom - rc.top);
+            if (clientW > 0.0f && clientH > 0.0f)
+            {
+                // ウィンドウの実サイズに対する仮想バックバッファサイズの比率でスケーリング
+                float sx = static_cast<float>(windowAPI->GetClientWidth()) / clientW;
+                float sy = static_cast<float>(windowAPI->GetClientHeight()) / clientH;
+                pos.x *= sx;
+                pos.y *= sy;
+            }
+        }
+    }
+    return pos;
+}

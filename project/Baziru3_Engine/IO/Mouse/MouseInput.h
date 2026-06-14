@@ -9,6 +9,7 @@
 #include <cassert>
 
 #include "WindowsAPI.h"
+#include "Baziru3_Engine/Base/Vector.h"
 
 using Microsoft::WRL::ComPtr;
 
@@ -33,6 +34,9 @@ public:
     // クライアント座標 (内部で累積・クランプされる)
     int GetX() const { return posX; }
     int GetY() const { return posY; }
+
+    // 仮想サイズ (WindowAPI::GetClientWidth/Height) にスケーリングされたクライアント座標を取得
+    Vector2 GetScaledPosition() const;
 
     WindowAPI* GetWindowAPI() const { return windowAPI; }
 

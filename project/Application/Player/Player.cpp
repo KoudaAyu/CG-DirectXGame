@@ -100,17 +100,16 @@ void Player::Update(MouseInput* mouseInput)
         WindowAPI* win = mouseInput->GetWindowAPI();
         if (win)
         {
-            int mx = mouseInput->GetX();
-            int my = mouseInput->GetY();
+            Vector2 mousePos = mouseInput->GetScaledPosition();
             float clientW = static_cast<float>(win->GetClientWidth());
             float clientH = static_cast<float>(win->GetClientHeight());
             if (clientW > 0.0f && clientH > 0.0f)
             {
-                // NDC coordinates
-                float nx = (static_cast<float>(mx) / clientW) * 2.0f - 1.0f;
-                float ny = 1.0f - (static_cast<float>(my) / clientH) * 2.0f;
+                // NDC (正規化デバイス座標) の計算
+                float nx = (mousePos.x / clientW) * 2.0f - 1.0f;
+                float ny = 1.0f - (mousePos.y / clientH) * 2.0f;
 
-                // Prepare clip space positions at near and far (z in [0,1])
+                // ニアプレーンとファープレーンでのクリップ空間座標を用意 (z は [0,1])
                 Vector4 clipNear = { nx, ny, 0.0f, 1.0f };
                 Vector4 clipFar = { nx, ny, 1.0f, 1.0f };
 
@@ -135,10 +134,10 @@ void Player::Update(MouseInput* mouseInput)
                 Vector3 worldNear = transformClip(clipNear);
                 Vector3 worldFar = transformClip(clipFar);
 
-                // Ray from camera through mouse
+                // マウスを通過するカメラからのレイ
                 Vector3 dir = { worldFar.x - worldNear.x, worldFar.y - worldNear.y, worldFar.z - worldNear.z };
 
-                // Intersect with ground plane y = 0
+                // 地面 (y = 0 平面) との交差判定
                 if (std::fabs(dir.y) > 1e-6f)
                 {
                     float t = -worldNear.y / dir.y;
@@ -147,7 +146,7 @@ void Player::Update(MouseInput* mouseInput)
                         Vector3 hit = { worldNear.x + dir.x * t, 0.0f, worldNear.z + dir.z * t };
                         Vector3 ppos = object3d_->GetTranslate();
                         Vector3 to = { hit.x - ppos.x, 0.0f, hit.z - ppos.z };
-                        // Compute yaw; forward is +Z so use atan2(x, z)
+                        // ヨーの計算。前方が +Z なので atan2(x, z) を使用
                         float yaw = std::atan2(to.x, to.z);
                         Vector3 r = object3d_->GetRotate();
                         r.y = yaw;
