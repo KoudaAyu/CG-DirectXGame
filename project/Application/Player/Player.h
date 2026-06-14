@@ -28,6 +28,11 @@ public:
     bool IsDead() const { return isDead_; }
     void Reset();
 
+    int GetMagazineAmmo() const { return magazineAmmo_; }
+    int GetMaxMagazineAmmo() const { return maxMagazineAmmo_; }
+    bool IsReloading() const { return isReloading_; }
+    float GetReloadProgress() const { return isReloading_ && reloadDuration_ > 0.0f ? (reloadDuration_ - reloadTimer_) / reloadDuration_ : 0.0f; }
+
 private:
     std::unique_ptr<Object3d> object3d_;
     Object3dCom* object3dCom_ = nullptr;
@@ -45,5 +50,11 @@ private:
     float bulletLifeTime_ = 2.0f;
     float shotCooldown_ = 0.12f;
     float shotCooldownTimer_ = 0.0f;
+
+    int maxMagazineAmmo_ = 30;
+    int magazineAmmo_ = 30;
+    bool isReloading_ = false;
+    float reloadTimer_ = 0.0f;
+    const float reloadDuration_ = 1.5f;
 };
 

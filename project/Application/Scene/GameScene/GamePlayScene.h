@@ -44,6 +44,7 @@ public:
     float GetExtractionTimer() const { return extractionTimer_; }
     const char* GetSceneType() const override { return "GAMEPLAY"; }
     Vector3 GetPlayerPosition() const { return player_ ? player_->GetPosition() : Vector3{ 0.0f, 0.0f, 0.0f }; }
+    Player* GetPlayer() const { return player_.get(); }
     Vector3 GetGoalPosition() const { return goalRingTransform_.translate; }
 
 private:

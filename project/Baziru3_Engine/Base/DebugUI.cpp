@@ -285,6 +285,46 @@ void DebugUI::Update()
 			ImGuiWindowFlags_NoBackground);
 
 		float timer = gameplay->GetExtractionTimer();
+		Player* player = gameplay->GetPlayer();
+		if (player)
+		{
+			ImGui::SetNextWindowPos(ImVec2(20.0f, io.DisplaySize.y - 100.0f), ImGuiCond_Always);
+			ImGui::Begin("Ammo HUD", nullptr,
+				ImGuiWindowFlags_NoTitleBar |
+				ImGuiWindowFlags_NoResize |
+				ImGuiWindowFlags_NoMove |
+				ImGuiWindowFlags_NoScrollbar |
+				ImGuiWindowFlags_NoSavedSettings |
+				ImGuiWindowFlags_NoInputs |
+				ImGuiWindowFlags_AlwaysAutoResize |
+				ImGuiWindowFlags_NoBackground);
+			if (player->IsReloading())
+			{
+				ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.8f, 0.0f, 1.0f));
+				ImGui::SetWindowFontScale(1.8f);
+				ImGui::Text("RELOADING... %.1fs", (1.5f * (1.0f - player->GetReloadProgress())));
+				ImGui::PopStyleColor();
+			}
+			else
+			{
+				int ammo = player->GetMagazineAmmo();
+				int maxAmmo = player->GetMaxMagazineAmmo();
+				if (ammo == 0)
+				{
+					ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.0f, 0.0f, 1.0f));
+					ImGui::SetWindowFontScale(1.8f);
+					ImGui::Text("OUT OF AMMO! (Press R)");
+					ImGui::PopStyleColor();
+				}
+				else
+				{
+					ImGui::SetWindowFontScale(1.8f);
+					ImGui::Text("AMMO: %d / %d", ammo, maxAmmo);
+				}
+			}
+			ImGui::End();
+		}
+
 		if (timer < 5.0f) // プレイヤーがゾーン内にいてカウントダウン中の場合
 		{
 			ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.5f, 0.0f, 1.0f)); // オレンジ色

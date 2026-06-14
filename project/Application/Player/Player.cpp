@@ -35,6 +35,11 @@ void Player::Initialize(Object3dCom* object3dCom, Camera* camera)
     hp_ = maxHp_ = 100.0f;
     isDead_ = false;
     invincibilityTimer_ = 0.0f;
+
+    // 弾薬の初期化
+    magazineAmmo_ = maxMagazineAmmo_;
+    isReloading_ = false;
+    reloadTimer_ = 0.0f;
 }
 
 void Player::Update(MouseInput* mouseInput)
@@ -46,6 +51,27 @@ void Player::Update(MouseInput* mouseInput)
     {
         object3d_->Update();
         return;
+    }
+
+    // リロード処理の更新
+    if (isReloading_)
+    {
+        reloadTimer_ -= 1.0f / 60.0f;
+        if (reloadTimer_ <= 0.0f)
+        {
+            magazineAmmo_ = maxMagazineAmmo_;
+            isReloading_ = false;
+            reloadTimer_ = 0.0f;
+        }
+    }
+    else
+    {
+        // Rキーでリロード開始
+        if ((GetAsyncKeyState('R') & 0x8000) != 0 && magazineAmmo_ < maxMagazineAmmo_)
+        {
+            isReloading_ = true;
+            reloadTimer_ = reloadDuration_;
+        }
     }
 
     // 無敵時間タイマーと点滅処理の更新
@@ -183,6 +209,12 @@ std::unique_ptr<Bullet> Player::TryShoot(const MouseInput* mouseInput, float del
         return nullptr;
     }
 
+    // リロード中、または弾薬切れの場合は射撃不可
+    if (isReloading_ || magazineAmmo_ <= 0)
+    {
+        return nullptr;
+    }
+
     if (!mouseInput->PushButton(0) || shotCooldownTimer_ > 0.0f)
     {
         return nullptr;
@@ -195,6 +227,10 @@ std::unique_ptr<Bullet> Player::TryShoot(const MouseInput* mouseInput, float del
     auto bullet = std::make_unique<Bullet>();
     bullet->Initialize(object3dCom_, camera_, spawnPos, forward, bulletSpeed_, bulletLifeTime_, BulletOwner::Player);
     shotCooldownTimer_ = shotCooldown_;
+    
+    // 弾薬を減算
+    magazineAmmo_--;
+
     return bullet;
 }
 
@@ -252,6 +288,9 @@ void Player::Reset()
     hp_ = maxHp_;
     isDead_ = false;
     invincibilityTimer_ = 0.0f;
+    magazineAmmo_ = maxMagazineAmmo_;
+    isReloading_ = false;
+    reloadTimer_ = 0.0f;
     if (object3d_)
     {
         object3d_->SetTranslate({ 0.0f, 0.0f, 0.0f });
