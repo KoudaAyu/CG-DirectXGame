@@ -81,6 +81,10 @@ void Game::Initialize()
 	textureIndexModelTex = TextureManager::GetInstance()->Load(modelData.material.textureFilePath); // Load model texture
 	textureIndexSkybox_ = TextureManager::GetInstance()->Load("Resources/CG4/dds/CG4_test.dds"); // Load skybox texture
    SceneManager::GetInstance()->SetSkyboxTextureIndex(textureIndexSkybox_);
+
+	// OffScreenRendering の初期化
+	offScreenRendering_ = std::make_unique<OffScreenRendering>(logStream, dx);
+	offScreenRendering_->Initialize(0, 0, DXGI_FORMAT_R8G8B8A8_UNORM_SRGB, { 1.0f, 0.0f, 0.0f, 1.0f });
 }
 
 
@@ -134,6 +138,7 @@ void Game::Finalize()
        SceneManager::GetInstance()->SetSkyboxCom(nullptr);
 		SceneManager::GetInstance()->SetSkyBox(nullptr);
 		SceneManager::GetInstance()->SetSkyboxTextureIndex(TextureManager::kInvalidTextureIndex);
+		SceneManager::GetInstance()->SetSkinningObject3dCom(nullptr);
 	}
 
 	// 4) Particle manager
@@ -171,6 +176,7 @@ void Game::Finalize()
 
 	if (object3d_) { object3d_.reset(); }
 	if (object3dCom) { object3dCom.reset(); }
+	if (skinningObject3dCom) { skinningObject3dCom.reset(); }
 
 	if (camera_)
 	{
@@ -180,6 +186,13 @@ void Game::Finalize()
 	}
 
 	if (light) { light.reset(); }
+
+	// OffScreenRendering の終了処理
+	if (offScreenRendering_)
+	{
+		offScreenRendering_->Finalize();
+		offScreenRendering_.reset();
+	}
 
 	// 7) Ensure TextureManager releases GPU resources before engine teardown
 	try { TextureManager::GetInstance()->Finalize(); }
@@ -272,6 +285,11 @@ void Game::Draw()
 
 	if (dx) dx->PreDraw();
 
+	if (offScreenRendering_)
+	{
+		offScreenRendering_->Begin(dx->GetCommandList().Get());
+	}
+
 	if (object3dCom) object3dCom->PreDraw();
 
 	RenderContext ctx = PrepareRenderContext();
@@ -286,7 +304,10 @@ void Game::Draw()
 		Logger::Log(logStream, "Warning: camera GPU resource not available before SceneManager draw.\n");
 	}
 
-    // object3dCom PreDraw already called above
+	if (skybox_ && skyboxCom_ && textureIndexSkybox_ != TextureManager::kInvalidTextureIndex)
+	{
+		skyboxCom_->SetupDraw(ctx.commandList);
+	}
 
 	if (SceneManager::GetInstance())
 	{
@@ -301,6 +322,9 @@ void Game::Draw()
 	{
 		if (object3dCom && object3d_)
 		{
+			// スキニング対応かどうかを判定（今後拡張）
+			// 現在は通常の object3dCom を使用
+			object3dCom->PreDraw();
 			object3dCom->Draw(object3d_.get(), ctx, modelData, drawObject);
 		}
 	}
@@ -338,6 +362,13 @@ void Game::Draw()
 
 	//実際のcommandListのImGuiの描画コマンドを積む
 #ifdef USE_IMGUI
+	if (offScreenRendering_)
+	{
+		offScreenRendering_->End(dx->GetCommandList().Get());
+		offScreenRendering_->SetMainRenderTarget(dx->GetCommandList().Get());
+		offScreenRendering_->DrawToBackBuffer(dx->GetCommandList().Get());
+	}
+
 	if (dx) ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), dx->GetCommandList().Get());
 #endif
 
@@ -397,8 +428,14 @@ void Game::InitializeSceneCore()
 	object3dCom = std::make_unique<Object3dCom>(logStream);
 	object3dCom->Initialize(dx);
 
+	// Skinning対応の Object3dCom も初期化
+	skinningObject3dCom = std::make_unique<SkinningObject3dCom>(logStream);
+	skinningObject3dCom->Initialize(dx);
+
 	SceneManager::GetInstance()->SetObject3dCom(object3dCom.get());
+	SceneManager::GetInstance()->SetSkinningObject3dCom(skinningObject3dCom.get());
 }
+
 
 void Game::InitializeModelResources()
 {
@@ -550,5 +587,12 @@ RenderContext Game::PrepareRenderContext()
 
 	return ctx;
 }
+
+
+
+
+
+
+
 
 

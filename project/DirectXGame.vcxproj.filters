@@ -1,5 +1,195 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="ソース ファイル">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;c++;cppm;ixx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="ヘッダー ファイル">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hh;hpp;hxx;h++;hm;inl;inc;ipp;xsd</Extensions>
+    </Filter>
+    <Filter Include="リソース ファイル">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="Baziru3_Engine\Camera\DebugCamera\DebugCamera.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Base\DirectXCom.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\2D\Sprite\Sprite.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\2D\Sprite\SpriteCom.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\2D\Texture\TextureManager.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Base\Transform.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Camera\Camera.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\3D\Object\Object3d.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\3D\Object\Object3dCom.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Base\KeyInput.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Base\Matrix4x4.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Base\Log\Log.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="main.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Base\ResourceLeakCheek.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Audio\Sound.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Base\StringUtil.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Base\Windows\WindowsAPI.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\3D\Model\ModelCom.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\3D\Model\Model.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\3D\Model\ModelManager.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Base\Srv\SRVManager.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Particle\ParticleManager.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Math\Random.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Base\ImGui\ImGuiManager.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="Game.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Platform\Windows\CrashDump.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Shapes\Sphere\Sphere.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="Application\Framework.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="Application\Scene\GameScene\GamePlayScene.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Light\Light.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Graphics\Material\MaterialManager.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Scene\BaseScene.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Scene\Manager\SceneManager.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Scene\Factory\AbstractSceneFactory.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Scene\Factory\SceneFactory.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="Application\Scene\TitleScene\TitleScene.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Scene\Factory\SceneRegistration.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\2D\Sprite\SpriteManager.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Audio\AudioManager.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Base\DebugUI.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="Application\Subsystem\SubsystemFactory.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\SkyBox\SkyBox.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\SkyBox\SkyboxCom.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineContext.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Graphics\Particle\ParticleRenderer.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Graphics\Sphere\SphereRenderer.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Particle\Ring.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Primitive\Cylinder\Cylinder.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Effect\HitEffect.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Animation\Animation.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Animation\Animator.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Animation\AnimationUtils.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Animation\NodeAnimation\Node.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Animation\Skeleton\Skeleton.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Animation\Joint\Joint.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Animation\Skeleton\SkeletonDebug.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\3D\Model\SkinCluster\SkinCluster.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\3D\Object\SkinningObject3dCom.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+  </ItemGroup>
   <ItemGroup>
     <FxCompile Include="Resources\shaders\Skybox.PS.hlsl" />
     <FxCompile Include="Resources\shaders\Skybox.VS.hlsl" />
@@ -7,68 +197,10 @@
     <FxCompile Include="Resources\shaders\Particle.PS.hlsl" />
     <FxCompile Include="Resources\shaders\Particle.VS.hlsl" />
     <FxCompile Include="Resources\shaders\Object3d.VS.hlsl" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClCompile Include="Baziru3_Engine\3D\Model\SkinCluster\SkinCluster.cpp" />
-    <ClCompile Include="Baziru3_Engine\Animation\Joint\Joint.cpp" />
-    <ClCompile Include="Baziru3_Engine\Animation\NodeAnimation\Node.cpp" />
-    <ClCompile Include="Baziru3_Engine\Base\OffScreenRendering\OffScreenRendering.cpp" />
-    <ClCompile Include="Baziru3_Engine\Animation\Animation.cpp" />
-    <ClCompile Include="Baziru3_Engine\Animation\AnimationUtils.cpp" />
-    <ClCompile Include="Baziru3_Engine\Animation\Animator.cpp" />
-    <ClCompile Include="Baziru3_Engine\Animation\Skeleton\Skeleton.cpp" />
-    <ClCompile Include="Baziru3_Engine\Animation\Skeleton\SkeletonDebug.cpp" />
-    <ClCompile Include="Baziru3_Engine\Effect\HitEffect.cpp" />
-    <ClCompile Include="Application\FadeApplication.cpp" />
-    <ClCompile Include="Baziru3_Engine\Graphics\Particle\ParticleRenderer.cpp" />
-    <ClCompile Include="Baziru3_Engine\Graphics\Sphere\SphereRenderer.cpp" />
-    <ClCompile Include="Baziru3_Engine\Primitive\Cylinder\Cylinder.cpp" />
-    <ClCompile Include="Baziru3_Engine\Particle\Ring.cpp" />
-    <ClCompile Include="Baziru3_Engine\Scene\Factory\AbstractSceneFactory.cpp" />
-    <ClCompile Include="Application\Scene\TitleScene\TitleScene.cpp" />
-    <ClCompile Include="Baziru3_Engine\Audio\AudioManager.cpp" />
-    <ClCompile Include="Baziru3_Engine\Scene\BaseScene.cpp" />
-    <ClCompile Include="Baziru3_Engine\2D\Texture\TextureManager.cpp" />
-    <ClCompile Include="Baziru3_Engine\3D\Object\Object3d.cpp" />
-    <ClCompile Include="Baziru3_Engine\3D\Object\Object3dCom.cpp" />
-    <ClCompile Include="Baziru3_Engine\Audio\Sound.cpp" />
-    <ClCompile Include="Baziru3_Engine\Base\ImGui\ImGuiManager.cpp" />
-    <ClCompile Include="Baziru3_Engine\Base\OffScreenRendering\RenderTexture.cpp" />
-    <ClCompile Include="Baziru3_Engine\Camera\Camera.cpp" />
-    <ClCompile Include="Baziru3_Engine\Camera\DebugCamera\DebugCamera.cpp" />
-    <ClCompile Include="Baziru3_Engine\Base\DirectXCom.cpp" />
-    <ClCompile Include="Baziru3_Engine\Base\KeyInput.cpp" />
-    <ClCompile Include="Baziru3_Engine\Base\Log\Log.cpp" />
-    <ClCompile Include="Baziru3_Engine\Base\Matrix4x4.cpp" />
-    <ClCompile Include="Baziru3_Engine\Base\ResourceLeakCheek.cpp" />
-    <ClCompile Include="Baziru3_Engine\Base\StringUtil.cpp" />
-    <ClCompile Include="Baziru3_Engine\Base\Transform.cpp" />
-    <ClCompile Include="Baziru3_Engine\Base\Windows\WindowsAPI.cpp" />
-    <ClCompile Include="Baziru3_Engine\SkyBox\SkyboxCom.cpp" />
-    <ClCompile Include="Baziru3_Engine\Platform\Windows\CrashDump.cpp" />
-    <ClCompile Include="Baziru3_Engine\Base\DebugUI.cpp" />
-    <ClCompile Include="Application\Framework.cpp" />
-    <ClCompile Include="EngineContext.cpp" />
-    <ClCompile Include="Game.cpp" />
-    <ClCompile Include="Application\Scene\GameScene\GamePlayScene.cpp" />
-    <ClCompile Include="Baziru3_Engine\Light\Light.cpp" />
-    <ClCompile Include="main.cpp" />
-    <ClCompile Include="Baziru3_Engine\2D\Sprite\Sprite.cpp" />
-    <ClCompile Include="Baziru3_Engine\2D\Sprite\SpriteCom.cpp" />
-    <ClCompile Include="Baziru3_Engine\Particle\ParticleManager.cpp" />
-    <ClCompile Include="Baziru3_Engine\Graphics\Material\MaterialManager.cpp" />
-    <ClCompile Include="Baziru3_Engine\Math\Random.cpp" />
-    <ClCompile Include="Baziru3_Engine\3D\Model\Model.cpp" />
-    <ClCompile Include="Baziru3_Engine\3D\Model\ModelCom.cpp" />
-    <ClCompile Include="Baziru3_Engine\3D\Model\ModelManager.cpp" />
-    <ClCompile Include="Baziru3_Engine\Scene\Factory\SceneFactory.cpp" />
-    <ClCompile Include="Baziru3_Engine\Scene\Manager\SceneManager.cpp" />
-    <ClCompile Include="Baziru3_Engine\Scene\Factory\SceneRegistration.cpp" />
-    <ClCompile Include="Baziru3_Engine\SkyBox\SkyBox.cpp" />
-    <ClCompile Include="Baziru3_Engine\Shapes\Sphere\Sphere.cpp" />
-    <ClCompile Include="Baziru3_Engine\2D\Sprite\SpriteManager.cpp" />
-    <ClCompile Include="Baziru3_Engine\Base\Srv\SRVManager.cpp" />
-    <ClCompile Include="Application\Subsystem\SubsystemFactory.cpp" />
+    <FxCompile Include="Resources\shaders\CopyImage.PS.hlsl" />
+    <FxCompile Include="Resources\shaders\CopyImage.VS.hlsl" />
+    <FxCompile Include="Resources\shaders\SkinningObject3d.VS.hlsl" />
+    <FxCompile Include="Resources\CG4\SkinningObject3d.VS.hlsl" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Baziru3_Engine\Animation\NodeAnimation\Node.h" />
@@ -144,6 +276,17 @@
     <ClInclude Include="Baziru3_Engine\Base\Srv\SRVManager.h" />
     <ClInclude Include="Application\Scene\TitleScene\TitleScene.h" />
     <ClInclude Include="Application\Subsystem\SubsystemFactory.h" />
+    <ClInclude Include="Baziru3_Engine\Base\OffScreenRendering\OffScreenRendering.h" />
+    <ClInclude Include="Baziru3_Engine\3D\Model\SkinCluster\SkinCluster.h" />
+    <ClInclude Include="Baziru3_Engine\Animation\NodeAnimation\Node.h" />
+    <ClInclude Include="Baziru3_Engine\Animation\NodeAnimation\NodeStruct.h" />
+    <ClInclude Include="Baziru3_Engine\Animation\Skeleton\Skeleton.h" />
+    <ClInclude Include="Baziru3_Engine\Animation\Joint\Joint.h" />
+    <ClInclude Include="Baziru3_Engine\Animation\Skeleton\SkeletonDebug.h" />
+    <ClInclude Include="Baziru3_Engine\Math\EulerTransform.h" />
+    <ClInclude Include="Baziru3_Engine\3D\Object\SkinningObject3dCom.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="Resources\shaders\CopyImage.hlsli" />

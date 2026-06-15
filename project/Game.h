@@ -15,6 +15,7 @@
 #include"Model.h"
 #include"Object3d.h"
 #include"Object3dCom.h"
+#include"SkinningObject3dCom.h"
 #include"ParticleEmitter.h"
 #include"ParticleManager.h"
 #include"Baziru3_Engine\Base\OffScreenRendering\OffScreenRendering.h"
@@ -134,6 +135,7 @@ private:
 	std::unique_ptr<ModelCom>modelCom_;
 	std::unique_ptr<Object3d> object3d_;
 	std::unique_ptr<Object3dCom> object3dCom;
+	std::unique_ptr<SkinningObject3dCom> skinningObject3dCom;
    std::unique_ptr<OffScreenRendering> offScreenRendering_;
 	std::unique_ptr<ParticleManager> particleManager;
     ParticleRenderer particleRenderer_;

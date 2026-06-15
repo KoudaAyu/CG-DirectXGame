@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|x64">
@@ -16,6 +16,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Baziru3_Engine\3D\Model\SkinCluster\SkinCluster.cpp" />
+    <ClCompile Include="Baziru3_Engine\3D\Object\SkinningObject3dCom.cpp" />
     <ClCompile Include="Baziru3_Engine\Animation\Joint\Joint.cpp" />
     <ClCompile Include="Baziru3_Engine\Animation\NodeAnimation\Node.cpp" />
     <ClCompile Include="Baziru3_Engine\Base\OffScreenRendering\OffScreenRendering.cpp" />
@@ -77,6 +78,26 @@
     <ClCompile Include="Application\Subsystem\SubsystemFactory.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <FxCompile Include="Resources\CG4\SkinningObject3d.VS.hlsl">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </FxCompile>
+    <FxCompile Include="Resources\shaders\SkinningObject3d.VS.hlsl">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </FxCompile>
+    <FxCompile Include="Resources\shaders\CopyImage.PS.hlsl">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </FxCompile>
+    <FxCompile Include="Resources\shaders\CopyImage.VS.hlsl">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </FxCompile>
     <FxCompile Include="Resources\shaders\Skybox.PS.hlsl">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
@@ -112,6 +133,7 @@
     </FxCompile>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Baziru3_Engine\3D\Object\SkinningObject3dCom.h" />
     <ClInclude Include="Baziru3_Engine\Animation\NodeAnimation\Node.h" />
     <ClInclude Include="Baziru3_Engine\Animation\NodeAnimation\NodeStruct.h" />
     <ClInclude Include="Baziru3_Engine\3D\Model\SkinCluster\SkinCluster.h" />
@@ -255,6 +277,9 @@
     <IntDir>$(SolutionDir)..\generated\obj\$(ProjectName)\$(Configuration)\</IntDir>
     <IncludePath>$(SolutionDir)..\externals\imgui;$(SolutionDir)..\externals\DirectXTex;$(SolutionDir)..\externals\assimp\include;$(IncludePath)</IncludePath>
   </PropertyGroup>
+  <PropertyGroup Label="Vcpkg">
+    <VcpkgEnabled>false</VcpkgEnabled>
+  </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
@@ -274,7 +299,7 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <TreatLinkerWarningAsErrors>true</TreatLinkerWarningAsErrors>
       <AdditionalDependencies>imgui.lib;assimp-vc143-mtd.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>$(SolutionDir)..\generated\output\$(Configuration);$(SolutionDir)externals\assimp\lib\$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(SolutionDir)..\generated\output\$(Configuration);$(ProjectDir)externals\assimp\lib\Debug;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -290,7 +315,7 @@
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <Optimization>MinSpace</Optimization>
-      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)\externals\DirectXTex;$(ProjectDir)\externals\imgui;$(ProjectDir)\externals\assimp\include;$(ProjectDir)Application;$(ProjectDir)Application\Scene;$(ProjectDir)Application\Scene\GameScene;$(ProjectDir)Application\Scene\TitleScene;$(ProjectDir)Application\Subsystem;$(ProjectDir)Baziru3_Engine\2D;$(ProjectDir)Baziru3_Engine\2D\Sprite;$(ProjectDir)Baziru3_Engine\2D\Texture;$(ProjectDir)Baziru3_Engine\3D\Model;$(ProjectDir)Baziru3_Engine\3D\Object;$(ProjectDir)Baziru3_Engine\Audio;$(ProjectDir)Baziru3_Engine\Animation;$(ProjectDir)Baziru3_Engine\Animation\Keyframe;$(ProjectDir)Baziru3_Engine\Animation\NodeAnimation;$(ProjectDir)Baziru3_Engine\Base;$(ProjectDir)Baziru3_Engine\Base\ImGui;$(ProjectDir)Baziru3_Engine\Base\Log;$(ProjectDir)Baziru3_Engine\Base\OffScreenRendering;$(ProjectDir)Baziru3_Engine\Base\Scene;$(ProjectDir)Baziru3_Engine\Base\Srv;$(ProjectDir)Baziru3_Engine\Base\Windows;$(ProjectDir)Baziru3_Engine\Camera;$(ProjectDir)Baziru3_Engine\Camera\DebugCamera;$(ProjectDir)Baziru3_Engine\Graphics\Material;$(ProjectDir)Baziru3_Engine\Light;$(ProjectDir)Baziru3_Engine\Math;$(ProjectDir)Baziru3_Engine\Particle;$(ProjectDir)Baziru3_Engine\Platform\Windows;$(ProjectDir)Baziru3_Engine\Primitive\Cylinder;$(ProjectDir)Baziru3_Engine\Scene;$(ProjectDir)Baziru3_Engine\Scene\Factory;$(ProjectDir)Baziru3_Engine\Scene\Manager;$(ProjectDir)Baziru3_Engine\Shapes\Sphere;$(ProjectDir)Baziru3_Engine\SkyBox</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)\externals\DirectXTex;$(ProjectDir)\externals\imgui;$(ProjectDir)\externals\assimp\include;$(ProjectDir)Application;$(ProjectDir)Application\Scene;$(ProjectDir)Application\Scene\GameScene;$(ProjectDir)Application\Scene\TitleScene;$(ProjectDir)Application\Subsystem;$(ProjectDir)Baziru3_Engine\2D;$(ProjectDir)Baziru3_Engine\2D\Sprite;$(ProjectDir)Baziru3_Engine\2D\Texture;$(ProjectDir)Baziru3_Engine\3D\Model;$(ProjectDir)Baziru3_Engine\3D\Object;$(ProjectDir)Baziru3_Engine\Audio;$(ProjectDir)Baziru3_Engine\Animation;$(ProjectDir)Baziru3_Engine\Animation\Joint;$(ProjectDir)Baziru3_Engine\Animation\Keyframe;$(ProjectDir)Baziru3_Engine\Animation\NodeAnimation;$(ProjectDir)Baziru3_Engine\Animation\Skeleton;$(ProjectDir)Baziru3_Engine\Base;$(ProjectDir)Baziru3_Engine\Base\ImGui;$(ProjectDir)Baziru3_Engine\Base\Log;$(ProjectDir)Baziru3_Engine\Base\OffScreenRendering;$(ProjectDir)Baziru3_Engine\Base\Scene;$(ProjectDir)Baziru3_Engine\Base\Srv;$(ProjectDir)Baziru3_Engine\Base\Windows;$(ProjectDir)Baziru3_Engine\Camera;$(ProjectDir)Baziru3_Engine\Camera\DebugCamera;$(ProjectDir)Baziru3_Engine\Graphics\Material;$(ProjectDir)Baziru3_Engine\Light;$(ProjectDir)Baziru3_Engine\Math;$(ProjectDir)Baziru3_Engine\Particle;$(ProjectDir)Baziru3_Engine\Platform\Windows;$(ProjectDir)Baziru3_Engine\Primitive\Cylinder;$(ProjectDir)Baziru3_Engine\Scene;$(ProjectDir)Baziru3_Engine\Scene\Factory;$(ProjectDir)Baziru3_Engine\Scene\Manager;$(ProjectDir)Baziru3_Engine\Shapes\Sphere;$(ProjectDir)Baziru3_Engine\SkyBox</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -298,7 +323,7 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalDependencies>assimp-vc143-mt.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>$(SolutionDir)..\generated\output\$(Configuration);$(SolutionDir)externals\assimp\lib\$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(SolutionDir)..\generated\output\$(Configuration);$(ProjectDir)externals\assimp\lib\Release;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Development|x64'">

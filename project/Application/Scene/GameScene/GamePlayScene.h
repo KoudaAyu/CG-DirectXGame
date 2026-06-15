@@ -23,6 +23,7 @@
 
 class Camera;
 class SpriteCom;
+class SkinningObject3dCom;
 struct SceneRenderRequests;
 
 class GamePlayScene : public BaseScene
@@ -49,6 +50,7 @@ private:
     Light* light = nullptr;
     MaterialManager* materialManager = nullptr;
     Object3dCom* object3dCom = nullptr;
+    SkinningObject3dCom* skinningObject3dCom = nullptr;
     ParticleManager* particleManager = nullptr;
     std::unique_ptr<HitEffect> hitEffect_;
     std::unique_ptr<Object3d> animatedCube_;
@@ -66,6 +68,7 @@ private:
     bool sphereInitialized = false;
     bool hitEffectInitialized = false;
     bool animatedCubeInitialized_ = false;
+    bool showSkeletonDebug_ = true;
 
 	// テクスチャインデックスは TextureManager で管理されるため、ここではインデックスを保持するだけにする
     uint32_t cylinderTextureIndex_ = TextureManager::kInvalidTextureIndex;

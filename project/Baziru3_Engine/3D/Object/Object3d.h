@@ -4,10 +4,14 @@
 #include <vector>
 #include "Camera.h"
 #include "NodeAnimation.h"
-#include"TextureManager.h"
-#include"MaterialManager.h"
+#include "TextureManager.h"
+#include "MaterialManager.h"
 #include "Transform.h"
 #include "Sprite.h"
+#include "Animator.h"
+#include "Skeleton.h"
+#include "SkinCluster.h"
+#include "AnimationData.h"
 
 class Object3dCom;
 
@@ -19,11 +23,10 @@ public:
 
 	struct MaterialData
 	{
-		std::string textureFilePath; // テクスチャファイルのパス
-		uint32_t textureIndex = 0;      // テクスチャのインデックス
+		std::string textureFilePath;
+		uint32_t textureIndex = 0;
 	};
 
-	//objファイル関係
 	struct ModelData
 	{
 		std::vector<Sprite::VertexData> vertices; // 頂点データ
@@ -54,6 +57,10 @@ public:
 
 	void Initialize(Object3dCom* object3dCom, const ModelData& modelData);
 
+	// アニメーション・スケルトン・スキンクラスターをまとめてセットアップする
+	// アプリ側で読み込んだ Animation と Skeleton、Model::ModelData を渡す
+	void SetupAnimation(const Animation* animation, const Skeleton& skeleton, const Model::ModelData& modelData);
+
 	void Update();
 
 	void Draw(ID3D12GraphicsCommandList* commandList);
@@ -82,35 +89,25 @@ public:
 	/// <returns></returns>
 	static ModelData LoadModelFile(const std::string& directoryPath, const std::string& filename);
 
-
-
 	void VertexResource();
-
 	void MaterialResource();
-
 	void TransformationMatrixResource();
-
 	void DirectionalLightResource();
 
-   
     ~Object3d();
 
 public:
-	void SetCamera(Camera* camera)
-	{
-		camera_ = camera;
-	}
-	Camera* GetCamera() const
-	{
-		return camera_;
-	}
-
-	void SetObject3dCom(Object3dCom* object3dCom)
-	{
-		object3dCom_ = object3dCom;
-	}
+	void SetCamera(Camera* camera) { camera_ = camera; }
+	Camera* GetCamera() const { return camera_; }
+	void SetObject3dCom(Object3dCom* object3dCom) { object3dCom_ = object3dCom; }
 
 	const Microsoft::WRL::ComPtr<ID3D12Resource>& GetTransformationMatrixResource() const { return transformationMatrixResource; }
+	const Microsoft::WRL::ComPtr<ID3D12Resource>& GetMaterialResource() const { return materialResource; }
+	const Microsoft::WRL::ComPtr<ID3D12Resource>& GetDirectionalLightResource() const { return directionalLightResource; }
+
+	const D3D12_VERTEX_BUFFER_VIEW& GetVertexBufferView() const { return vertexBufferView_; }
+	const D3D12_INDEX_BUFFER_VIEW& GetIndexBufferView() const { return indexBufferView_; }
+	bool HasIndexBuffer() const { return indexResource != nullptr && !modelData_.indices.empty(); }
 
 	void SetRotate(const Vector3& r) { transform.SetRotate(r); }
 	void SetTranslate(const Vector3& t) { transform.SetTranslate(t); }
@@ -120,8 +117,19 @@ public:
 	Vector3 GetScale() const { return transform.GetScale(); }
 	const ModelData& GetModelData() const { return modelData_; }
 
+	void SetEnableLighting(bool enable);
+	void SetColor(const Vector4& color);
+
+	// デルタタイム設定 (Animator の時間進行に使用)
+	void SetDeltaTime(float dt) { deltaTime_ = dt; }
+	bool HasAnimation() const { return animator_.HasAnimation(); }
+	const Skeleton& GetSkeleton() const { return skeleton_; }
+	Skeleton& GetSkeleton() { return skeleton_; }
+	const SkinCluster& GetSkinCluster() const { return skinCluster_; }
+
 private:
 	Transform transform;
+
 	Transform cameraTransform;
 
 private:
@@ -139,7 +147,6 @@ private:
 	D3D12_VERTEX_BUFFER_VIEW vertexBufferView_{};
 	//インデックスバッファ用のリソース
 	Microsoft::WRL::ComPtr<ID3D12Resource> indexResource = nullptr;
-	//インデックスバッファビュー
 	D3D12_INDEX_BUFFER_VIEW indexBufferView_{};
 
 	//バッファリソース
@@ -156,4 +163,12 @@ private:
 	Microsoft::WRL::ComPtr<ID3D12Resource> directionalLightResource = nullptr;
 	// バッファリソース内のデータを指すポインタ
 	DirectionalLight* directionalLightData_ = nullptr;
+
+	// アニメーション / スケルトン / スキンクラスター
+	Animator animator_;
+	Skeleton skeleton_;
+	SkinCluster skinCluster_;
+	SkinClusterLender skinClusterLender_;
+	bool skinClusterInitialized_ = false;
+	float deltaTime_ = 1.0f / 60.0f;
 };

@@ -135,16 +135,11 @@ void Object3dCom::Draw(Object3d* object, const ::RenderContext& ctx, const Objec
         return;
     }
 
-   
-    if (object)
-    {
-        object->Draw(ctx.commandList);
-    }
 
-    if (drawObject)
-    {
-        ctx.commandList->DrawInstanced(UINT(modelData.vertices.size()), 1, 0, 0);
-    }
+	if (object)
+	{
+		object->Draw(ctx.commandList);
+	}
 }
 
 void Object3dCom::Descriptor()

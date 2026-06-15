@@ -10,6 +10,8 @@
 #include <wrl.h>
 #include <span>
 
+class SRVManager;
+
 const uint32_t kNumMaxInfluences = 4; // 頂点あたりの最大ジョイント影響数
 struct VertexInfluence
 {
@@ -27,6 +29,7 @@ struct SkinCluster
 {
 	std::vector<Matrix4x4> inverseBindPoseMatrices; // 各ジョイントの逆バインド行列
 	Microsoft::WRL::ComPtr<ID3D12Resource> influenceResource; // 頂点ごとのジョイント影響データを格納するGPUリソース
+	D3D12_VERTEX_BUFFER_VIEW influenceBufferView; // 頂点バッファビュー（ジョイント影響データ用）
 	std::span<VertexInfluence> mappedInfluence;
 
 	Microsoft::WRL::ComPtr<ID3D12Resource> paletteResource; // ジョイントのバインド行列を格納するGPUリソース
@@ -39,6 +42,8 @@ class DirectXCom;
 class SkinClusterLender
 {
 public:
-    SkinCluster CreateSkinCluster(const Microsoft::WRL::ComPtr<ID3D12Device>& device, const Skeleton& skeleton,
-		const Model::ModelData& modelData, const Microsoft::WRL::ComPtr<ID3D12DescriptorHeap>& descriptorHeap, uint32_t descriptorSize, DirectXCom& directXCom);
+	SkinCluster CreateSkinCluster(const Microsoft::WRL::ComPtr<ID3D12Device>& device, const Skeleton& skeleton,
+		const Model::ModelData& modelData, const Microsoft::WRL::ComPtr<ID3D12DescriptorHeap>& descriptorHeap, uint32_t descriptorSize, DirectXCom& directXCom, SRVManager& srvManager);
+
+	void Update(SkinCluster& skinCluster, const Skeleton& skeleton);;
 };

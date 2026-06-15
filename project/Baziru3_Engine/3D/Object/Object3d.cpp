@@ -1,7 +1,10 @@
-#include"Object3d.h"
-#include"Object3dCom.h"
-#include"Matrix4x4.h"
+#include "Object3d.h"
+#include "Object3dCom.h"
+#include "Matrix4x4.h"
 #include "RootParam.h"
+#include "TextureManager.h"
+#include "Skeleton.h"
+#include "SkinCluster.h"
 #include <assimp/Importer.hpp>
 #include <assimp/postprocess.h>
 #include <assimp/scene.h>
@@ -113,8 +116,7 @@ namespace
 void Object3d::Initialize(Object3dCom* object3dCom, const ModelData& modelData)
 {
 	object3dCom_ = object3dCom;
-	modelData_ = modelData; // モデルデータを保存
-	// object3dCom_ が未設定の場合は何もしない(デフォルトカメラは取得しない)
+	modelData_ = modelData;
 	if (object3dCom_)
 	{
 		camera_ = object3dCom_->GetDefaultCamera();
@@ -137,12 +139,37 @@ void Object3d::Initialize(Object3dCom* object3dCom, const ModelData& modelData)
 		{
 			OutputDebugStringA(("Texture load failed: " + modelData_.material.textureFilePath + "\n").c_str());
 		}
-
 	}
 
 	//Transform変数の生成
 	transform = { {1.0f,1.0f,1.0f}, {0.0f,0.0f,0.0f}, {0.0f,0.0f,0.0f} };
 	cameraTransform = { {1.0f,1.0f,1.0f}, {0.0f,0.0f,0.0f}, {0.0f,0.0f,-10.0f} };
+}
+
+void Object3d::SetupAnimation(const Animation* animation, const Skeleton& skeleton, const Model::ModelData& modelData)
+{
+	if (!object3dCom_) return;
+	DirectXCom* dx = object3dCom_->GetDirectXCom();
+	if (!dx) return;
+	SRVManager* srvManager = TextureManager::GetInstance()->GetSRVManager();
+	if (!srvManager) return;
+
+	animator_.SetAnimation(animation);
+	skeleton_ = skeleton;
+
+	if (!skeleton_.joints.empty())
+	{
+		skeleton_.Update();
+		skinCluster_ = skinClusterLender_.CreateSkinCluster(
+			dx->GetDevice(),
+			skeleton_,
+			modelData,
+			dx->GetSrvDescriptorHeap(),
+			dx->GetDescriptorSizeSRV(),
+			*dx,
+			*srvManager);
+		skinClusterInitialized_ = true;
+	}
 }
 
 void Object3d::Update()
@@ -153,7 +180,27 @@ void Object3d::Update()
 		camera_ = object3dCom_->GetDefaultCamera();
 	}
 
-	// 優先: Object3dComに設定されたカメラを使う
+	// ステップ1: アニメーション時間を進める
+	// ステップ2: 骨ごとのLocal情報を更新する
+	if (animator_.HasAnimation())
+	{
+		animator_.Update(deltaTime_);
+		// ステップ3: SkeletonSpaceの情報を更新する
+		animator_.ApplyTo(skeleton_);
+	}
+
+	if (!skeleton_.joints.empty())
+	{
+		// ステップ3: 現在の骨ごとのLocal情報を基にSkeletonSpaceの情報を更新する
+		skeleton_.Update();
+	}
+
+	// ステップ4: SkinClusterのMatrixPaletteを更新する
+	if (skinClusterInitialized_)
+	{
+		skinClusterLender_.Update(skinCluster_, skeleton_);
+	}
+
 	Matrix4x4 worldMatrix = MakeAffineMatrix(transform.GetScale(), transform.GetRotate(), transform.GetTranslate());
 
 	Matrix4x4 viewMatrix;
@@ -420,6 +467,32 @@ Object3d::~Object3d()
 		D3D12_RANGE written = { 0, sizeof(DirectionalLight) };
 		directionalLightResource->Unmap(0, &written);
 		directionalLightData_ = nullptr;
+	}
+}
+
+void Object3d::SetEnableLighting(bool enable)
+{
+	if (!materialResource) return;
+	Material* data = nullptr;
+	materialResource->Map(0, nullptr, reinterpret_cast<void**>(&data));
+	if (data)
+	{
+		data->enableLighting = enable ? 1 : 0;
+		D3D12_RANGE written = { 0, sizeof(Material) };
+		materialResource->Unmap(0, &written);
+	}
+}
+
+void Object3d::SetColor(const Vector4& color)
+{
+	if (!materialResource) return;
+	Material* data = nullptr;
+	materialResource->Map(0, nullptr, reinterpret_cast<void**>(&data));
+	if (data)
+	{
+		data->color = color;
+		D3D12_RANGE written = { 0, sizeof(Material) };
+		materialResource->Unmap(0, &written);
 	}
 }
 
