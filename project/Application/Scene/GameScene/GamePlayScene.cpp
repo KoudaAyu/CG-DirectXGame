@@ -320,18 +320,6 @@ void GamePlayScene::Draw(SceneRenderRequests& renderRequests)
 			ctx.textureHandle = {};
 		}
 
-	if (animatedCubeInitialized_ && animatedCube_)
-	{
-		const auto& modelData = animatedCube_->GetModelData();
-		if (modelData.material.textureIndex != TextureManager::kInvalidTextureIndex)
-		{
-			ctx.textureHandle = TextureManager::GetInstance()->GetSrvHandleGPU(modelData.material.textureIndex);
-		}
-		else
-		{
-			ctx.textureHandle = {};
-		}
-
 		// ジョイントがあればスキニングシェーダー、なければ通常シェーダー
 		if (!animatedCube_->GetSkeleton().joints.empty() && skinningObject3dCom)
 		{
@@ -344,4 +332,3 @@ void GamePlayScene::Draw(SceneRenderRequests& renderRequests)
 	}
 
 }
->>>>>>> CG4_Skinning
