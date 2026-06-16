@@ -1,6 +1,7 @@
 #include "Bullet.h"
 #include <cmath>
 #include "TextureManager.h"
+#include "CustomObject3dRenderer.h"
 
 Vector3 Bullet::ComputeSpawnPosition(const Vector3& ownerPosition, const Vector3& forward, const Vector3& spawnOffset)
 {
@@ -99,7 +100,7 @@ void Bullet::Draw(const RenderContext& ctx)
         bulletCtx.textureHandle = TextureManager::GetInstance()->GetSrvHandleGPU(texIdx);
     }
 
-    object3dCom_->Draw(object3d_.get(), bulletCtx, modelData, true);
+    CustomObject3dRenderer::GetInstance()->Draw(object3d_.get(), bulletCtx, modelData, true);
 }
 
 void Bullet::Finalize()

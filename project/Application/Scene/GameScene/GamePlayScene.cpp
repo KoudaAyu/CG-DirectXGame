@@ -16,12 +16,14 @@
 #include <Windows.h>
 
 #include "GamePlayScene.h"
+#include "CustomObject3dRenderer.h"
 
 void GamePlayScene::Initialize(DirectXCom* dxCommon, Camera* camera)
 {
 	camera_ = camera;
 	assert(dxCommon != nullptr);
 	directXCom = dxCommon;
+	CustomObject3dRenderer::GetInstance()->Initialize(dxCommon);
 	lastTime_ = std::chrono::steady_clock::now();
 
 	object3dCom = SceneManager::GetInstance()->GetObject3dCom();
@@ -207,6 +209,7 @@ void GamePlayScene::InitializeAudioAndParticles()
 
 void GamePlayScene::Finalize()
 {
+	CustomObject3dRenderer::GetInstance()->Finalize();
 	if (hitEffect_)
 	{
 		hitEffect_->Finalize();
@@ -618,6 +621,9 @@ RenderContext GamePlayScene::BuildRenderContext() const
 void GamePlayScene::Draw(SceneRenderRequests& renderRequests)
 {
 	const RenderContext ctx = BuildRenderContext();
+
+	// Draw Skybox
+	SceneManager::GetInstance()->DrawSkybox(ctx.commandList);
 
 	if (player_)
 	{

@@ -3,6 +3,7 @@
 #include "Object3dCom.h"
 #include "TextureManager.h"
 #include "RenderContext.h"
+#include "CustomObject3dRenderer.h"
 #include "WindowsAPI.h"
 #include "Sprite.h"
 #include "Bullet.h"
@@ -210,7 +211,7 @@ void Enemy::Draw(const RenderContext& ctx)
         enemyCtx.textureHandle = TextureManager::GetInstance()->GetSrvHandleGPU(texIdx);
     }
 
-    object3dCom_->Draw(object3d_.get(), enemyCtx, modelData, true);
+    CustomObject3dRenderer::GetInstance()->Draw(object3d_.get(), enemyCtx, modelData, true);
 }
 
 void Enemy::OnHit()

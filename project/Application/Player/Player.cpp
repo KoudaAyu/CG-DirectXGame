@@ -3,6 +3,7 @@
 #include "Object3dCom.h"
 #include "TextureManager.h"
 #include "SceneManager.h"
+#include "CustomObject3dRenderer.h"
 #include "RenderContext.h"
 #include "Bullet.h"
 #include <Windows.h>
@@ -341,7 +342,7 @@ void Player::Draw(const RenderContext& ctx)
         playerCtx.textureHandle = TextureManager::GetInstance()->GetSrvHandleGPU(texIdx);
     }
 
-    object3dCom_->Draw(object3d_.get(), playerCtx, modelData, true);
+    CustomObject3dRenderer::GetInstance()->Draw(object3d_.get(), playerCtx, modelData, true);
 }
 
 void Player::Finalize()
