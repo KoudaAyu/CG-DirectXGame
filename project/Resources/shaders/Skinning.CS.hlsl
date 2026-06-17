@@ -47,8 +47,23 @@ void main( uint3 DTid : SV_DispatchThreadID )
         
         //計算の方法はSkinningObject3d.VSと同じ
         //データの取得方法が変わるだけで、原理は同じ
-        skinned.position = float32_t4(0.0f, 0.0f, 0.0f, 1.0f);
-        skinned.normal = float32_t3(0.0f, 0.0f, 0.0f);
+        float32_t4 skinnedPosition = float32_t4(0.0f, 0.0f, 0.0f, 0.0f);
+        float32_t3 skinnedNormal = float32_t3(0.0f, 0.0f, 0.0f);
+        
+        for (int32_t i = 0; i < 4; ++i)
+        {
+            float32_t weight = influence.weight[i];
+            int32_t index = influence.index[i];
+            if (weight > 0.0f)
+            {
+                skinnedPosition += mul(input.position, gMatrixPalette[index].skeletonSpaceMatrix) * weight;
+                skinnedNormal += mul(input.normal, (float32_t3x3)gMatrixPalette[index].skeletonSpaceInverseTransposeMatrix) * weight;
+            }
+        }
+        
+        skinnedPosition.w = 1.0f;
+        skinned.position = skinnedPosition;
+        skinned.normal = normalize(skinnedNormal);
 
         //Skinning後の頂点データを格納、つまり書き込む
         gOutputVertices[vertexIndex] = skinned;

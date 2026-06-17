@@ -73,6 +73,26 @@ void SkinningObject3dCom::Draw(Object3d* object, const ::RenderContext& ctx, con
         return;
     }
 
+    const SkinCluster& skinCluster = object->GetSkinCluster();
+
+    // 1. スキンニング計算用の UAV バリア (COMMON状態からUAV状態へ)
+    D3D12_RESOURCE_BARRIER barrier{};
+    barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+    barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+    barrier.Transition.pResource = skinCluster.uavResource.Get();
+    barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COMMON;
+    barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+    barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+    ctx.commandList->ResourceBarrier(1, &barrier);
+
+    // 2. スキンニング実行
+    Skinning(object, ctx.commandList);
+
+    // 3. 頂点バッファとして読み込むためのバリア
+    barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+    barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER;
+    ctx.commandList->ResourceBarrier(1, &barrier);
+
     if (rootSignature)
     {
         ctx.commandList->SetGraphicsRootSignature(rootSignature.Get());
@@ -138,7 +158,6 @@ void SkinningObject3dCom::Draw(Object3d* object, const ::RenderContext& ctx, con
     }
 
     // CSで計算し終えた変形後バッファ (uavResource) を頂点バッファとして設定する
-    const SkinCluster& skinCluster = object->GetSkinCluster();
     D3D12_VERTEX_BUFFER_VIEW vbv{};
     vbv.BufferLocation = skinCluster.uavResource->GetGPUVirtualAddress();
     vbv.StrideInBytes = sizeof(Object3d::VertexData);
@@ -157,6 +176,16 @@ void SkinningObject3dCom::Draw(Object3d* object, const ::RenderContext& ctx, con
     {
         ctx.commandList->DrawInstanced(static_cast<UINT>(modelData.vertices.size()), 1, 0, 0);
     }
+
+    // 4. 描画終了後にCOMMON状態に戻す
+    D3D12_RESOURCE_BARRIER postDrawBarrier{};
+    postDrawBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+    postDrawBarrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+    postDrawBarrier.Transition.pResource = skinCluster.uavResource.Get();
+    postDrawBarrier.Transition.StateBefore = D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER;
+    postDrawBarrier.Transition.StateAfter = D3D12_RESOURCE_STATE_COMMON;
+    postDrawBarrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+    ctx.commandList->ResourceBarrier(1, &postDrawBarrier);
 }
 
 void SkinningObject3dCom::Descriptor()
@@ -309,7 +338,7 @@ void SkinningObject3dCom::InputLayer()
     inputElementDescs[4].InstanceDataStepRate = 0;
 
     inputLayoutDesc.pInputElementDescs = inputElementDescs;
-    inputLayoutDesc.NumElements = _countof(inputElementDescs);
+    inputLayoutDesc.NumElements = 3;
 }
 
 void SkinningObject3dCom::InitializeBlend()
@@ -332,7 +361,7 @@ void SkinningObject3dCom::RasterizerState()
 
 void SkinningObject3dCom::ShaderCompile()
 {
-    vertexShaderBlob = dxCommon->CompileShader(L"Resources/CG4/SkinningObject3d.VS.hlsl",
+    vertexShaderBlob = dxCommon->CompileShader(L"Resources/shaders/Object3D.VS.hlsl",
         L"vs_6_0", dxCommon->GetDxcUtils().Get(), dxCommon->GetDxcCompiler(), dxCommon->GetIncludeHandler(), logStream);
     assert(vertexShaderBlob != nullptr);
 

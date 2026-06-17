@@ -97,7 +97,28 @@ SkinCluster SkinClusterLender::CreateSkinCluster(const Microsoft::WRL::ComPtr<ID
 	//Skinning結果を書き込むリソース(バッファ)を生成する
 	//Vertexは3D/Object/Object3D.h値腕定義されている構造体
 	size_t vertexCount = modelData.vertices.size();
-	skinCluster.uavResource = directXCom.CreateBufferResource(device,sizeof(Vertex) * vertexCount);
+	
+	D3D12_HEAP_PROPERTIES heapProps{};
+	heapProps.Type = D3D12_HEAP_TYPE_DEFAULT;
+
+	D3D12_RESOURCE_DESC resDesc{};
+	resDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+	resDesc.Width = sizeof(Sprite::VertexData) * vertexCount;
+	resDesc.Height = 1;
+	resDesc.DepthOrArraySize = 1;
+	resDesc.MipLevels = 1;
+	resDesc.SampleDesc.Count = 1;
+	resDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+	resDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+
+	device->CreateCommittedResource(
+		&heapProps,
+		D3D12_HEAP_FLAG_NONE,
+		&resDesc,
+		D3D12_RESOURCE_STATE_COMMON,
+		nullptr,
+		IID_PPV_ARGS(&skinCluster.uavResource)
+	);
 
 	//DescriptorHeapからUAV用のIndexを1つ割り当てる
 	uint32_t uavIndex = srvManager.Allocate();
@@ -105,7 +126,7 @@ SkinCluster SkinClusterLender::CreateSkinCluster(const Microsoft::WRL::ComPtr<ID
 	skinCluster.uavDescriptorHandle.second = directXCom.GetGPUDescriptorHandle(descriptorHeap,descriptorSize,uavIndex);
 
 	//DirectXComに生成したUAVリソースを渡して、Unordered Access View(UAV)を作成する
-	directXCom.CreateUnroaderedAccessView(skinCluster.uavResource,UINT(vertexCount),sizeof(Vertex),skinCluster.uavDescriptorHandle.first);
+	directXCom.CreateUnroaderedAccessView(skinCluster.uavResource,UINT(vertexCount),sizeof(Sprite::VertexData),skinCluster.uavDescriptorHandle.first);
 
 	// 入力頂点用のSRVを作成
 	uint32_t inputVertexSrvIndex = srvManager.Allocate();
