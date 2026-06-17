@@ -94,6 +94,40 @@ SkinCluster SkinClusterLender::CreateSkinCluster(const Microsoft::WRL::ComPtr<ID
 		}
 	}
 
+	//Skinning結果を書き込むリソース(バッファ)を生成する
+	//Vertexは3D/Object/Object3D.h値腕定義されている構造体
+	size_t vertexCount = modelData.vertices.size();
+	skinCluster.uavResource = directXCom.CreateBufferResource(device,sizeof(Vertex) * vertexCount);
+
+	//DescriptorHeapからUAV用のIndexを1つ割り当てる
+	uint32_t uavIndex = srvManager.Allocate();
+	skinCluster.uavDescriptorHandle.first = directXCom.GetCPUDescriptorHandle(descriptorHeap,descriptorSize,uavIndex);
+	skinCluster.uavDescriptorHandle.second = directXCom.GetGPUDescriptorHandle(descriptorHeap,descriptorSize,uavIndex);
+
+	//DirectXComに生成したUAVリソースを渡して、Unordered Access View(UAV)を作成する
+	directXCom.CreateUnroaderedAccessView(skinCluster.uavResource,UINT(vertexCount),sizeof(Vertex),skinCluster.uavDescriptorHandle.first);
+
+	// 入力頂点用のSRVを作成
+	uint32_t inputVertexSrvIndex = srvManager.Allocate();
+	skinCluster.inputVertexSrvHandle.first = directXCom.GetCPUDescriptorHandle(descriptorHeap, descriptorSize, inputVertexSrvIndex);
+	skinCluster.inputVertexSrvHandle.second = directXCom.GetGPUDescriptorHandle(descriptorHeap, descriptorSize, inputVertexSrvIndex);
+	// 入力頂点用のバッファはObject3dが作成するリソースをBindするため、ここではハンドル割り当てのみ行い、バインド時にSRVを生成するか、ここで空で作成します。
+	// ここではSRVManagerの関数を使用してStructuredBuffer用SRVを作成します。
+	// ※Object3dの頂点リソースが生成された後に生成する必要があるため、バインド時に直前で作成するか、あるいはこのSkinCluster作成時点ではObject3dのリソース生成前である可能性があるため、空ハンドルとして扱い呼び出し側で解決できるようにします。
+
+	// インフルエンス用のSRVを作成
+	uint32_t influenceSrvIndex = srvManager.Allocate();
+	skinCluster.influenceSrvHandle.first = directXCom.GetCPUDescriptorHandle(descriptorHeap, descriptorSize, influenceSrvIndex);
+	skinCluster.influenceSrvHandle.second = directXCom.GetGPUDescriptorHandle(descriptorHeap, descriptorSize, influenceSrvIndex);
+	srvManager.CreateSRVForStructuredBuffer(influenceSrvIndex, skinCluster.influenceResource.Get(), UINT(vertexCount), sizeof(VertexInfluence));
+
+	// SkinningInformation用の定数バッファを作成
+	skinCluster.skinningInfoResource = directXCom.CreateBufferResource(device, sizeof(uint32_t) * 4); // 16バイトアライメントのため4つのuint32_t分のサイズにする
+	uint32_t* infoData = nullptr;
+	skinCluster.skinningInfoResource->Map(0, nullptr, reinterpret_cast<void**>(&infoData));
+	infoData[0] = UINT(vertexCount); // numVertices
+	skinCluster.skinningInfoResource->Unmap(0, nullptr);
+
 	return skinCluster;
 }
 

@@ -308,6 +308,21 @@ void DirectXCom::CreateSwapChain()
 	assert(SUCCEEDED(hr));
 }
 
+void DirectXCom::CreateUnroaderedAccessView(const Microsoft::WRL::ComPtr<ID3D12Resource>& resource,
+	UINT NumElements, UINT structureByteStride,D3D12_CPU_DESCRIPTOR_HANDLE uavCpuDescriptorHandle)
+{
+    D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc{};
+    uavDesc.Format = DXGI_FORMAT_UNKNOWN; //Format
+	uavDesc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER; //View Dimension
+	uavDesc.Buffer.FirstElement = 0;
+	uavDesc.Buffer.NumElements = NumElements; //要素数
+	uavDesc.Buffer.CounterOffsetInBytes = 0; //カウンターオフセット
+	uavDesc.Buffer.Flags = D3D12_BUFFER_UAV_FLAG_NONE; //フラグ
+	uavDesc.Buffer.StructureByteStride = structureByteStride; //ストライド
+
+	device->CreateUnorderedAccessView(resource.Get(), nullptr, &uavDesc, uavCpuDescriptorHandle);
+}
+
 Microsoft::WRL::ComPtr<ID3D12Resource> DirectXCom::CreateDepthStencilTextureResource(const Microsoft::WRL::ComPtr<ID3D12Device>& device, int32_t width, int32_t height)
 {
 	//生成するResourceの設定
