@@ -304,9 +304,9 @@ void Game::Draw()
 		Logger::Log(logStream, "Warning: camera GPU resource not available before SceneManager draw.\n");
 	}
 
-	if (skybox_ && skyboxCom_ && textureIndexSkybox_ != TextureManager::kInvalidTextureIndex)
+	if (SceneManager::GetInstance())
 	{
-		skyboxCom_->SetupDraw(ctx.commandList);
+		SceneManager::GetInstance()->DrawSkybox(ctx.commandList);
 	}
 
 	if (SceneManager::GetInstance())

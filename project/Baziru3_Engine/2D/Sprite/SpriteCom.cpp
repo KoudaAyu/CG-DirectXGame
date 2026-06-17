@@ -254,11 +254,11 @@ void SpriteCom::RasterizerState()
 void SpriteCom::ShaderCompile()
 {
 	//Shaderをコンパイルする
-	vertexShaderBlob = dxCommon->CompileShader(L"Resources/shaders/Object3D.VS.hlsl",
+	vertexShaderBlob = dxCommon->CompileShader(L"Resources/shaders/Sprite.VS.hlsl",
 		L"vs_6_0", dxCommon->GetDxcUtils().Get(), dxCommon->GetDxcCompiler(), dxCommon->GetIncludeHandler(), logStream);
 	assert(vertexShaderBlob != nullptr);
 
-	pixelShaderBlob = dxCommon->CompileShader(L"Resources/shaders/Object3D.PS.hlsl",
+	pixelShaderBlob = dxCommon->CompileShader(L"Resources/shaders/Sprite.PS.hlsl",
 		L"ps_6_0", dxCommon->GetDxcUtils().Get(), dxCommon->GetDxcCompiler(), dxCommon->GetIncludeHandler(), logStream);
 	assert(pixelShaderBlob != nullptr);
 }

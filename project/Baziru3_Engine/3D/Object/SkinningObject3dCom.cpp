@@ -1,5 +1,7 @@
 #include"SkinningObject3dCom.h"
 #include "Light.h"
+#include "SceneManager.h"
+#include "TextureManager.h"
 
 // 参照メンバー logStream を初期化するコンストラクタ定義
 SkinningObject3dCom::SkinningObject3dCom(std::ostream& logStream)
@@ -125,6 +127,22 @@ void SkinningObject3dCom::Draw(Object3d* object, const ::RenderContext& ctx, con
         ctx.commandList->SetGraphicsRootDescriptorTable(5, skinCluster.paletteSrvHandle.second);
     }
 
+    // Environment map SRV DescriptorTable (t4, Pixel Shader) -> Index 6
+    uint32_t skyboxIndex = SceneManager::GetInstance()->GetSkyboxTextureIndex();
+    D3D12_GPU_DESCRIPTOR_HANDLE skyboxHandle{};
+    if (skyboxIndex != TextureManager::kInvalidTextureIndex)
+    {
+        skyboxHandle = TextureManager::GetInstance()->GetSrvHandleGPU(skyboxIndex);
+    }
+    else
+    {
+        skyboxHandle = ctx.textureHandle;
+    }
+    if (skyboxHandle.ptr != 0)
+    {
+        ctx.commandList->SetGraphicsRootDescriptorTable(6, skyboxHandle);
+    }
+
     // VBV を複数設定: VertexData (slot 0) と VertexInfluence (slot 1)
     D3D12_VERTEX_BUFFER_VIEW vbvs[2] = {
         object->GetVertexBufferView(),             // slot 0: VertexData (Position, TexCoord, Normal)
@@ -160,6 +178,13 @@ void SkinningObject3dCom::Descriptor()
     descriptorRange[1].BaseShaderRegister = 3;
     descriptorRange[1].RegisterSpace = 0;
     descriptorRange[1].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+
+    // SRV: t4 for Environment map
+    descriptorRange[2].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+    descriptorRange[2].NumDescriptors = 1;
+    descriptorRange[2].BaseShaderRegister = 4;
+    descriptorRange[2].RegisterSpace = 0;
+    descriptorRange[2].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 }
 
 void SkinningObject3dCom::CreateRootParameters()
@@ -195,6 +220,12 @@ void SkinningObject3dCom::CreateRootParameters()
     rootParameters[5].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
     rootParameters[5].DescriptorTable.pDescriptorRanges = &descriptorRange[0];
     rootParameters[5].DescriptorTable.NumDescriptorRanges = 1;
+
+    // Root Parameter 6: Descriptor Table for Environment map (t4, Pixel Shader)
+    rootParameters[6].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+    rootParameters[6].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+    rootParameters[6].DescriptorTable.pDescriptorRanges = &descriptorRange[2];
+    rootParameters[6].DescriptorTable.NumDescriptorRanges = 1;
 
     descriptionRootSignature.pParameters = rootParameters;
     descriptionRootSignature.NumParameters = _countof(rootParameters);

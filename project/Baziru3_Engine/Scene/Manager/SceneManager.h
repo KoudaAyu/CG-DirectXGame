@@ -79,6 +79,9 @@ public:
 	SkyboxCom* GetSkyboxCom() const { return skyboxCom_; }
 	void SetSkyboxTextureIndex(uint32_t v) { skyboxTextureIndex_ = v; }
 	uint32_t GetSkyboxTextureIndex() const { return skyboxTextureIndex_; }
+	void SetShowSkybox(bool show) { showSkybox_ = show; }
+	bool GetShowSkybox() const { return showSkybox_; }
+	bool* GetShowSkyboxPtr() { return &showSkybox_; }
 	void DrawSkybox(ID3D12GraphicsCommandList* commandList) const;
 
 private:
@@ -101,6 +104,7 @@ private:
 	SkyBox* skybox_ = nullptr;
 	SkyboxCom* skyboxCom_ = nullptr;
 	uint32_t skyboxTextureIndex_ = 0;
+	bool showSkybox_ = true;
 	FadeApplication* fadeApplication_ = nullptr;
 	bool isSceneTransitioning_ = false;
 	bool hasSwitchedSceneDuringFade_ = false;

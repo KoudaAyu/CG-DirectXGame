@@ -12,6 +12,8 @@ void  MaterialManager::Initialize(DirectXCom* directXCom)
     hostMaterial_.color = {1.0f, 1.0f, 1.0f, 1.0f};
     hostMaterial_.enableLighting = 0;
     hostMaterial_.specularModel = 0; // Blinn-Phong
+    hostMaterial_.reflectionFactor = 0.5f;
+    hostMaterial_.fresnelF0 = 0.04f;
     hostMaterial_.shininess = 16.0f;
     hostMaterial_.uvTransform = MakeIdentity4x4();
 

@@ -1,12 +1,11 @@
-#include "Object3d.hlsli"
+#include "Sprite.hlsli"
 
 struct Material
 {
     float32_t4 color;
     int32_t enableLighting;
     int32_t specularModel; // 0: Blinn-Phong, 1: Phong
-    float32_t reflectionFactor; // 環境マップ反射強度 (0.0 - 1.0)
-    float32_t fresnelF0;        // 基準反射率 (誘電体は通常0.04)
+    float32_t2 padding;
     float32_t4x4 uvTransform;
     float32_t shininess;
     float32_t3 padding2;
@@ -23,7 +22,6 @@ struct DirectionalLight
 ConstantBuffer<DirectionalLight> gDirectionalLight : register(b1);
 
 Texture2D<float32_t4> gTexture : register(t3);
-TextureCube<float32_t4> gEnvironmentMap : register(t4);
 SamplerState gSample : register(s0);
 
 struct PixelShaderOutput
@@ -80,12 +78,6 @@ PixelShaderOutput main(VertexShaderOutput input)
         float32_t3 specular = gDirectionalLight.color.rgb * gDirectionalLight.intensity * specularPow * saturate(NdotL);
 
         output.color.rgb = diffuse + specular;
-
-        // Environment Mapping with Fresnel (Schlick's approximation)
-        float32_t3 R_env = reflect(-V, N);
-        float32_t3 envColor = gEnvironmentMap.Sample(gSample, R_env).rgb;
-        float32_t fresnel = gMaterial.fresnelF0 + (1.0f - gMaterial.fresnelF0) * pow(1.0f - saturate(dot(N, V)), 5.0f);
-        output.color.rgb = lerp(output.color.rgb, envColor * gMaterial.color.rgb, fresnel * gMaterial.reflectionFactor);
     }
 
     return output;
