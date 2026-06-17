@@ -37,6 +37,10 @@ public:
     float GetMaxStamina() const { return maxStamina_; }
     float GetStaminaRatio() const { return maxStamina_ > 0.0f ? stamina_ / maxStamina_ : 0.0f; }
 
+    float GetCurrentSpread() const { return currentSpread_; }
+    bool IsDodging() const { return isDodging_; }
+    bool IsMoving() const { return isMoving_; }
+
 private:
     std::unique_ptr<Object3d> object3d_;
     Object3dCom* object3dCom_ = nullptr;
@@ -71,5 +75,16 @@ private:
     float maxStamina_ = 100.0f;
     const float dodgeStaminaCost_ = 30.0f;
     const float staminaRegenRate_ = 15.0f;
+
+    // Weapon Recoil & Reticle Spread parameters
+    float currentSpread_ = 0.0f;
+    const float kBaseSpread = 0.01f;
+    const float kMoveSpreadPenalty = 0.06f;
+    const float kShootSpreadPenalty = 0.04f;
+    const float kMaxSpread = 0.25f;
+    const float kSpreadRecoverRate = 0.3f;
+
+    void UpdateSpread(float deltaTime, bool isMoving);
+    bool isMoving_ = false;
 };
 

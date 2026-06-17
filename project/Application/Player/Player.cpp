@@ -118,9 +118,12 @@ void Player::Update(MouseInput* mouseInput)
         }
     }
 
+    bool isMoving = false;
+
     // 回避処理の更新
     if (isDodging_)
     {
+        isMoving = true;
         dodgeTimer_ -= 1.0f / 60.0f;
         
         // 移動処理
@@ -157,6 +160,7 @@ void Player::Update(MouseInput* mouseInput)
         float len = std::sqrt(moveDir.x * moveDir.x + moveDir.z * moveDir.z);
         if (len > 0.0f)
         {
+            isMoving = true;
             moveDir.x /= len;
             moveDir.z /= len;
         }
@@ -164,6 +168,7 @@ void Player::Update(MouseInput* mouseInput)
         if ((GetAsyncKeyState(VK_SPACE) & 0x8000) != 0 && stamina_ >= dodgeStaminaCost_)
         {
             isDodging_ = true;
+            isMoving = true;
             dodgeTimer_ = dodgeDuration_;
             stamina_ -= dodgeStaminaCost_;
 
@@ -194,18 +199,22 @@ void Player::Update(MouseInput* mouseInput)
             if ((GetAsyncKeyState('W') & 0x8000) != 0)
             {
                 pos.z += kSpeed;
+                isMoving = true;
             }
             if ((GetAsyncKeyState('S') & 0x8000) != 0)
             {
                 pos.z -= kSpeed;
+                isMoving = true;
             }
             if ((GetAsyncKeyState('A') & 0x8000) != 0)
             {
                 pos.x -= kSpeed;
+                isMoving = true;
             }
             if ((GetAsyncKeyState('D') & 0x8000) != 0)
             {
                 pos.x += kSpeed;
+                isMoving = true;
             }
             object3d_->SetTranslate(pos);
         }
@@ -280,6 +289,8 @@ void Player::Update(MouseInput* mouseInput)
         camera_->SetTranslate(playerPos + cameraOffset);
     }
 
+    UpdateSpread(1.0f / 60.0f, isMoving);
+    isMoving_ = isMoving;
     object3d_->Update();
 }
 
@@ -311,7 +322,16 @@ std::unique_ptr<Bullet> Player::TryShoot(const MouseInput* mouseInput, float del
     }
 
     const float yaw = GetRotation().y;
-    const Vector3 forward = { std::sin(yaw), 0.0f, std::cos(yaw) };
+    
+    // Add random spread angle to bullet direction
+    float spreadOffset = 0.0f;
+    if (currentSpread_ > 0.001f)
+    {
+        float r = static_cast<float>(rand()) / static_cast<float>(RAND_MAX);
+        spreadOffset = (r * 2.0f - 1.0f) * currentSpread_;
+    }
+    const float finalYaw = yaw + spreadOffset;
+    const Vector3 forward = { std::sin(finalYaw), 0.0f, std::cos(finalYaw) };
     const Vector3 spawnPos = Bullet::ComputeSpawnPosition(GetPosition(), forward, bulletSpawnOffset_);
 
     auto bullet = std::make_unique<Bullet>();
@@ -320,6 +340,13 @@ std::unique_ptr<Bullet> Player::TryShoot(const MouseInput* mouseInput, float del
     
     // 弾薬を減算
     magazineAmmo_--;
+
+    // Apply shooting recoil spread penalty
+    currentSpread_ += kShootSpreadPenalty;
+    if (currentSpread_ > kMaxSpread)
+    {
+        currentSpread_ = kMaxSpread;
+    }
 
     return bullet;
 }
@@ -385,10 +412,43 @@ void Player::Reset()
     dodgeTimer_ = 0.0f;
     dodgeDirection_ = { 0.0f, 0.0f, 1.0f };
     stamina_ = maxStamina_;
+    currentSpread_ = 0.0f;
+    isMoving_ = false;
     if (object3d_)
     {
         object3d_->SetTranslate({ 0.0f, 0.0f, 0.0f });
         object3d_->SetRotate({ 0.0f, 0.0f, 0.0f });
         object3d_->SetColor({ 1.0f, 1.0f, 1.0f, 1.0f });
+    }
+}
+
+void Player::UpdateSpread(float deltaTime, bool isMoving)
+{
+    float targetSpread = kBaseSpread;
+    if (isMoving)
+    {
+        targetSpread += kMoveSpreadPenalty;
+    }
+
+    if (currentSpread_ > targetSpread)
+    {
+        currentSpread_ -= kSpreadRecoverRate * deltaTime;
+        if (currentSpread_ < targetSpread)
+        {
+            currentSpread_ = targetSpread;
+        }
+    }
+    else
+    {
+        currentSpread_ += kSpreadRecoverRate * 2.0f * deltaTime;
+        if (currentSpread_ > targetSpread)
+        {
+            currentSpread_ = targetSpread;
+        }
+    }
+
+    if (currentSpread_ > kMaxSpread)
+    {
+        currentSpread_ = kMaxSpread;
     }
 }

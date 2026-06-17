@@ -140,7 +140,7 @@ void GamePlayScene::InitializeSprites()
 	if (auto cursor = Sprite::Create(sc, defaultTransform, "Resources/CG4/circle2.png"))
 	{
 		cursor->SetSize({ 24.0f, 24.0f });
-		cursor->SetAnchorPoint({ 0.0f, 0.0f });
+		cursor->SetAnchorPoint({ 0.5f, 0.5f });
 		sprites.emplace_back(std::move(cursor));
 		cursorSpriteIndex = static_cast<int>(sprites.size()) - 1;
 	}
@@ -382,6 +382,12 @@ void GamePlayScene::UpdateSprites()
 
 	Vector2 pos = mouseInput.GetScaledPosition();
 
+	if (player_)
+	{
+		float reticleSize = 24.0f + player_->GetCurrentSpread() * 400.0f;
+		cur->SetSize({ reticleSize, reticleSize });
+	}
+
 	cur->SetPosition(pos);
 	cur->UpdateTransformOnly(directXCom ? directXCom->GetWindowAPI() : nullptr);
 	if (mouseInput.PushButton(0))
@@ -434,6 +440,42 @@ void GamePlayScene::UpdateCharacters(float deltaTime)
 	if (player_)
 	{
 		player_->Update(&mouseInput);
+
+		// Spawn dust particles for player movement and dodging
+		if (particleManager && !player_->IsDead())
+		{
+			Vector3 playerPos = player_->GetPosition();
+			if (player_->IsDodging())
+			{
+				// Spawn dense, larger dust during dodge
+				std::list<ParticleManager::Particle> dodgeDust;
+				for (int i = 0; i < 2; ++i)
+				{
+					auto p = particleManager->MakeDustParticle(particleManager->GetRandomEngine(), playerPos, 1.4f);
+					p.textureIndex = particleTextureB;
+					dodgeDust.push_back(p);
+				}
+				particleManager->AddParticles(dodgeDust);
+			}
+			else if (player_->IsMoving())
+			{
+				playerDustTimer_ += deltaTime;
+				if (playerDustTimer_ >= 0.15f)
+				{
+					std::list<ParticleManager::Particle> walkDust;
+					auto p = particleManager->MakeDustParticle(particleManager->GetRandomEngine(), playerPos, 0.8f);
+					p.textureIndex = particleTextureB;
+					walkDust.push_back(p);
+					particleManager->AddParticles(walkDust);
+
+					playerDustTimer_ = 0.0f;
+				}
+			}
+			else
+			{
+				playerDustTimer_ = 0.0f;
+			}
+		}
 	}
 
 	WindowAPI* windowAPI = directXCom ? directXCom->GetWindowAPI() : nullptr;
@@ -465,12 +507,39 @@ void GamePlayScene::UpdateCombat(float deltaTime)
 {
 	if (player_)
 	{
-		AddBullet(player_->TryShoot(&mouseInput, deltaTime));
+		std::unique_ptr<Bullet> bullet = player_->TryShoot(&mouseInput, deltaTime);
+		if (bullet && particleManager)
+		{
+			std::list<ParticleManager::Particle> flashParticles;
+			Vector3 bulletPos = bullet->GetPosition();
+			for (int i = 0; i < 6; ++i)
+			{
+				auto p = particleManager->MakeMuzzleFlashParticle(particleManager->GetRandomEngine(), bulletPos);
+				p.textureIndex = particleTextureB;
+				flashParticles.push_back(p);
+			}
+			particleManager->AddParticles(flashParticles);
+		}
+		AddBullet(std::move(bullet));
 	}
 
 	if (enemy_ && player_ && !enemy_->IsDead() && !player_->IsDead())
 	{
-		AddBullet(enemy_->TryShoot(player_->GetPosition()));
+		std::unique_ptr<Bullet> bullet = enemy_->TryShoot(player_->GetPosition());
+		if (bullet && particleManager)
+		{
+			std::list<ParticleManager::Particle> flashParticles;
+			Vector3 bulletPos = bullet->GetPosition();
+			for (int i = 0; i < 4; ++i)
+			{
+				auto p = particleManager->MakeMuzzleFlashParticle(particleManager->GetRandomEngine(), bulletPos);
+				p.color = { 1.0f, 0.2f, 0.2f, 1.0f }; // Red muzzle flash for enemy
+				p.textureIndex = particleTextureB;
+				flashParticles.push_back(p);
+			}
+			particleManager->AddParticles(flashParticles);
+		}
+		AddBullet(std::move(bullet));
 	}
 
 	UpdateBullets(deltaTime);
@@ -524,6 +593,28 @@ void GamePlayScene::ResolveBulletCollisions()
 			if (IsWithinRadius(bulletPos, enemyPos, bulletHitRadius_ + enemyHitRadius_))
 			{
 				enemy_->OnHit();
+
+				// Spawn feather and spark particles on hit
+				if (particleManager)
+				{
+					std::list<ParticleManager::Particle> hitParticles;
+					// 15 feather particles (white)
+					for (int i = 0; i < 15; ++i)
+					{
+						auto p = particleManager->MakeFeatherParticle(particleManager->GetRandomEngine(), bulletPos);
+						p.textureIndex = particleTextureB;
+						hitParticles.push_back(p);
+					}
+					// 6 spark particles
+					for (int i = 0; i < 6; ++i)
+					{
+						auto p = particleManager->MakeSparkParticle(particleManager->GetRandomEngine(), bulletPos);
+						p.textureIndex = particleTextureB;
+						hitParticles.push_back(p);
+					}
+					particleManager->AddParticles(hitParticles);
+				}
+
 				if (hitEffect_ && enemy_->IsDead())
 				{
 					hitEffect_->SpawnPlaneParticles(enemyPos);
@@ -540,6 +631,28 @@ void GamePlayScene::ResolveBulletCollisions()
 				{
 					hitEffect_->Play(playerPos);
 				}
+
+				// Spawn feather and spark particles on hit
+				if (particleManager)
+				{
+					std::list<ParticleManager::Particle> hitParticles;
+					// 15 feather particles (white)
+					for (int i = 0; i < 15; ++i)
+					{
+						auto p = particleManager->MakeFeatherParticle(particleManager->GetRandomEngine(), bulletPos);
+						p.textureIndex = particleTextureB;
+						hitParticles.push_back(p);
+					}
+					// 6 spark particles
+					for (int i = 0; i < 6; ++i)
+					{
+						auto p = particleManager->MakeSparkParticle(particleManager->GetRandomEngine(), bulletPos);
+						p.textureIndex = particleTextureB;
+						hitParticles.push_back(p);
+					}
+					particleManager->AddParticles(hitParticles);
+				}
+
 				player_->TakeDamage(kEnemyBulletDamage);
 				bullet->Finalize();
 			}

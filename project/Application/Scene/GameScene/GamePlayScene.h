@@ -128,6 +128,7 @@ private:
     bool isGameCleared_ = false;
     float extractionTimer_ = 5.0f;
     std::chrono::steady_clock::time_point lastTime_;
+    float playerDustTimer_ = 0.0f;
 
     // --- ゲームプレイ定数 ---
     static constexpr float kFixedDeltaTime = 1.0f / 60.0f;
