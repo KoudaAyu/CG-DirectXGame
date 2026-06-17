@@ -120,7 +120,7 @@ void SkyBox::UpdateTransformationMatrix()
 	}
 
 	Vector3 cameraPosition = camera_->GetWorldPosition();
-	Matrix4x4 worldMatrix = MakeAffineMatrix(Vector3{ 100.0f, 100.0f, 100.0f }, Vector3{ 0.0f, 0.0f, 0.0f }, cameraPosition);
+	Matrix4x4 worldMatrix = MakeAffineMatrix(Vector3{ 50.0f, 50.0f, 50.0f }, Vector3{ 0.0f, 0.0f, 0.0f }, cameraPosition);
 	Matrix4x4 wvpMatrix = Multiply(worldMatrix, Multiply(camera_->GetViewMatrix(), camera_->GetProjectionMatrix()));
 
 	transformationMatrixData_->World = worldMatrix;

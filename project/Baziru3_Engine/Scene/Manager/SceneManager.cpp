@@ -183,7 +183,7 @@ void SceneManager::Draw(SceneRenderRequests& renderRequests)
 
 void SceneManager::DrawSkybox(ID3D12GraphicsCommandList* commandList) const
 {
-	if (!commandList || !skybox_ || !skyboxCom_ || skyboxTextureIndex_ == TextureManager::kInvalidTextureIndex)
+	if (!showSkybox_ || !commandList || !skybox_ || !skyboxCom_ || skyboxTextureIndex_ == TextureManager::kInvalidTextureIndex)
 	{
 		return;
 	}

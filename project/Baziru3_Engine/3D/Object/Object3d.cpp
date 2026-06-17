@@ -508,6 +508,10 @@ void Object3d::MaterialResource()
 		// 初期値を設定
 		materialData_->color = { 1.0f,1.0f,1.0f,1.0f };
 		materialData_->enableLighting = false;
+		materialData_->specularModel = 0;
+		materialData_->reflectionFactor = 0.5f;
+		materialData_->fresnelF0 = 0.04f;
+		materialData_->shininess = 16.0f;
 		materialData_->uvTransform = MakeIdentity4x4();
 
 		// マテリアルは初期化時に一度だけ書き込む想定のため、MapしたらすぐにUnmapする

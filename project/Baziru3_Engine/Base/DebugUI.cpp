@@ -2,6 +2,7 @@
 #include "MaterialManager.h"
 #include "SpriteManager.h"
 #include "Camera.h"
+#include "SceneManager.h"
 #include <imgui.h>
 
 DebugUI::DebugUI(MaterialManager* materialManager, SpriteManager* spriteManager, Camera* camera,
@@ -87,6 +88,9 @@ void DebugUI::Update()
 
             ImGui::SliderFloat("Shininess", &materialManager_->GetMaterialDataShininess(), 0.1f, 100.0f);
 
+            ImGui::SliderFloat("Reflection Factor", &materialManager_->GetMaterialReflectionFactor(), 0.0f, 1.0f);
+            ImGui::SliderFloat("Fresnel F0", &materialManager_->GetMaterialFresnelF0(), 0.0f, 1.0f);
+
             ImGui::ColorEdit4("Material Color", &materialManager_->GetMaterialDataColor().x);
         }
     }
@@ -157,6 +161,10 @@ void DebugUI::Update()
         }
 
         ImGui::DragFloat("Shininess", &materialManager_->GetMaterialDataShininess(), 0.5f, 0.1f, 100.0f);
+
+        ImGui::SliderFloat("Reflection Factor", &materialManager_->GetMaterialReflectionFactor(), 0.0f, 1.0f);
+        ImGui::SliderFloat("Fresnel F0", &materialManager_->GetMaterialFresnelF0(), 0.0f, 1.0f);
+
         // Specular model selection
         int specModel = materialManager_->GetMaterialSpecularModel();
         const char* items = "Blinn-Phong\0Phong\0";
@@ -173,6 +181,8 @@ void DebugUI::Update()
     if (useMonsterBall_)
         ImGui::Checkbox("Use Monster Ball", useMonsterBall_);
 
+    ImGui::Checkbox("Draw Skybox", SceneManager::GetInstance()->GetShowSkyboxPtr());
+
     ImGui::Separator();
 
     if (ImGui::CollapsingHeader("Material"))
@@ -186,6 +196,9 @@ void DebugUI::Update()
             }
 
             ImGui::SliderFloat("Shininess", &materialManager_->GetMaterialDataShininess(), 0.1f, 100.0f);
+
+            ImGui::SliderFloat("Reflection Factor", &materialManager_->GetMaterialReflectionFactor(), 0.0f, 1.0f);
+            ImGui::SliderFloat("Fresnel F0", &materialManager_->GetMaterialFresnelF0(), 0.0f, 1.0f);
 
             ImGui::ColorEdit4("Color", &materialManager_->GetMaterialDataColor().x);
         }

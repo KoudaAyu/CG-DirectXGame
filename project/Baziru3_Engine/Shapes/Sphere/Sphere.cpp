@@ -3,6 +3,8 @@
 #include"MaterialManager.h"
 #include"Camera.h"
 #include"Light.h"
+#include "SceneManager.h"
+#include "TextureManager.h"
 
 Sphere::Sphere()
 {
@@ -201,6 +203,21 @@ void Sphere::Draw(D3D12_GPU_DESCRIPTOR_HANDLE textureSrvHandle)
 	else
 	{
 		commandList->SetGraphicsRootConstantBufferView(4, 0);
+	}
+
+	uint32_t skyboxIndex = SceneManager::GetInstance()->GetSkyboxTextureIndex();
+	D3D12_GPU_DESCRIPTOR_HANDLE skyboxHandle{};
+	if (skyboxIndex != TextureManager::kInvalidTextureIndex)
+	{
+		skyboxHandle = TextureManager::GetInstance()->GetSrvHandleGPU(skyboxIndex);
+	}
+	else
+	{
+		skyboxHandle = textureSrvHandle;
+	}
+	if (skyboxHandle.ptr != 0)
+	{
+		commandList->SetGraphicsRootDescriptorTable(5, skyboxHandle);
 	}
 
 	commandList->DrawIndexedInstanced(GetIndexCount(), 1, 0, 0, 0);
