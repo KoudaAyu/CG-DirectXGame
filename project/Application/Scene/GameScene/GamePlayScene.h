@@ -56,7 +56,7 @@ private:
 
     void UpdateExtractionGoal(float deltaTime);
     void UpdateEnvironment();
-    void UpdateParticles();
+    void UpdateParticles(float deltaTime);
     void UpdateSprites();
     void UpdateDebugInput();
     void UpdateCharacters(float deltaTime);
@@ -129,6 +129,7 @@ private:
     float extractionTimer_ = 5.0f;
     std::chrono::steady_clock::time_point lastTime_;
     float playerDustTimer_ = 0.0f;
+    float escapeSmokeTimer_ = 0.0f;
 
     // --- ゲームプレイ定数 ---
     static constexpr float kFixedDeltaTime = 1.0f / 60.0f;

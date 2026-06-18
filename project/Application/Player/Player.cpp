@@ -51,7 +51,7 @@ void Player::Initialize(Object3dCom* object3dCom, Camera* camera)
     stamina_ = maxStamina_;
 }
 
-void Player::Update(MouseInput* mouseInput)
+void Player::Update(float deltaTime, MouseInput* mouseInput)
 {
     if (!object3d_) return;
 
@@ -62,10 +62,12 @@ void Player::Update(MouseInput* mouseInput)
         return;
     }
 
+    const float frameScale = deltaTime * 60.0f;
+
     // リロード処理の更新
     if (isReloading_)
     {
-        reloadTimer_ -= 1.0f / 60.0f;
+        reloadTimer_ -= deltaTime;
         if (reloadTimer_ <= 0.0f)
         {
             magazineAmmo_ = maxMagazineAmmo_;
@@ -86,7 +88,7 @@ void Player::Update(MouseInput* mouseInput)
     // 無敵時間タイマーと点滅処理の更新
     if (invincibilityTimer_ > 0.0f)
     {
-        invincibilityTimer_ -= 1.0f / 60.0f;
+        invincibilityTimer_ -= deltaTime;
         if (invincibilityTimer_ <= 0.0f)
         {
             invincibilityTimer_ = 0.0f;
@@ -111,7 +113,7 @@ void Player::Update(MouseInput* mouseInput)
     // スタミナの自動回復
     if (!isDodging_ && !isDead_)
     {
-        stamina_ += staminaRegenRate_ * (1.0f / 60.0f);
+        stamina_ += staminaRegenRate_ * deltaTime;
         if (stamina_ > maxStamina_)
         {
             stamina_ = maxStamina_;
@@ -124,12 +126,12 @@ void Player::Update(MouseInput* mouseInput)
     if (isDodging_)
     {
         isMoving = true;
-        dodgeTimer_ -= 1.0f / 60.0f;
+        dodgeTimer_ -= deltaTime;
         
         // 移動処理
         Vector3 pos = object3d_->GetTranslate();
-        pos.x += dodgeDirection_.x * dodgeSpeed_;
-        pos.z += dodgeDirection_.z * dodgeSpeed_;
+        pos.x += dodgeDirection_.x * dodgeSpeed_ * frameScale;
+        pos.z += dodgeDirection_.z * dodgeSpeed_ * frameScale;
         object3d_->SetTranslate(pos);
 
         // ビジュアル演出：X軸（前転方向）に1回転
@@ -198,22 +200,22 @@ void Player::Update(MouseInput* mouseInput)
 
             if ((GetAsyncKeyState('W') & 0x8000) != 0)
             {
-                pos.z += kSpeed;
+                pos.z += kSpeed * frameScale;
                 isMoving = true;
             }
             if ((GetAsyncKeyState('S') & 0x8000) != 0)
             {
-                pos.z -= kSpeed;
+                pos.z -= kSpeed * frameScale;
                 isMoving = true;
             }
             if ((GetAsyncKeyState('A') & 0x8000) != 0)
             {
-                pos.x -= kSpeed;
+                pos.x -= kSpeed * frameScale;
                 isMoving = true;
             }
             if ((GetAsyncKeyState('D') & 0x8000) != 0)
             {
-                pos.x += kSpeed;
+                pos.x += kSpeed * frameScale;
                 isMoving = true;
             }
             object3d_->SetTranslate(pos);
@@ -289,7 +291,7 @@ void Player::Update(MouseInput* mouseInput)
         camera_->SetTranslate(playerPos + cameraOffset);
     }
 
-    UpdateSpread(1.0f / 60.0f, isMoving);
+    UpdateSpread(deltaTime, isMoving);
     isMoving_ = isMoving;
     object3d_->Update();
 }

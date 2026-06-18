@@ -12,7 +12,7 @@ class Player
 {
 public:
     void Initialize(Object3dCom* object3dCom, Camera* camera);
-    void Update(MouseInput* mouseInput = nullptr);
+    void Update(float deltaTime, MouseInput* mouseInput = nullptr);
     void Draw(const RenderContext& ctx);
     void Finalize();
 

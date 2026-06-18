@@ -340,21 +340,41 @@ void GamePlayScene::UpdateEnvironment()
 	}
 }
 
-void GamePlayScene::UpdateParticles()
+void GamePlayScene::UpdateParticles(float deltaTime)
 {
-	emitter.frequencyTime += kFixedDeltaTime;
-	if (emitter.frequencyTime < emitter.frequency || !particleManager)
+	emitter.frequencyTime += deltaTime;
+	if (emitter.frequencyTime >= emitter.frequency && particleManager)
 	{
-		return;
+		auto newParticles = particleEmitter.Emit(emitter, particleManager->GetRandomEngine(), *particleManager);
+		for (auto& p : newParticles)
+		{
+			p.textureIndex = particleTextureA;
+		}
+		particleManager->AddParticles(newParticles);
+		emitter.frequencyTime -= emitter.frequency;
 	}
 
-	auto newParticles = particleEmitter.Emit(emitter, particleManager->GetRandomEngine(), *particleManager);
-	for (auto& p : newParticles)
+	// 脱出エリアの「もくもく」煙エフェクト (項目2)
+	if (particleManager)
 	{
-		p.textureIndex = particleTextureA;
+		escapeSmokeTimer_ += deltaTime;
+		if (escapeSmokeTimer_ >= 0.08f)
+		{
+			std::list<ParticleManager::Particle> smokeParticles;
+			for (int i = 0; i < 3; ++i)
+			{
+				auto p = particleManager->MakeDustParticle(particleManager->GetRandomEngine(), goalRingTransform_.translate, 1.8f);
+				// エメラルドグリーン
+				p.color = { 0.2f, 0.8f, 0.6f, 0.4f };
+				p.textureIndex = particleTextureB; // 円形
+				p.velocity.y = 1.5f + (static_cast<float>(rand()) / RAND_MAX) * 0.8f;
+				p.lifeTime = 1.3f;
+				smokeParticles.push_back(p);
+			}
+			particleManager->AddParticles(smokeParticles);
+			escapeSmokeTimer_ = 0.0f;
+		}
 	}
-	particleManager->AddParticles(newParticles);
-	emitter.frequencyTime -= emitter.frequency;
 }
 
 void GamePlayScene::UpdateSprites()
@@ -439,7 +459,7 @@ void GamePlayScene::UpdateCharacters(float deltaTime)
 {
 	if (player_)
 	{
-		player_->Update(&mouseInput);
+		player_->Update(deltaTime, &mouseInput);
 
 		// Spawn dust particles for player movement and dodging
 		if (particleManager && !player_->IsDead())
@@ -705,11 +725,11 @@ void GamePlayScene::Update()
 	}
 
 	UpdateEnvironment();
-	UpdateParticles();
+	UpdateParticles(deltaTime);
 	UpdateSprites();
 	UpdateDebugInput();
-	UpdateCharacters(kFixedDeltaTime);
-	UpdateCombat(kFixedDeltaTime);
+	UpdateCharacters(deltaTime);
+	UpdateCombat(deltaTime);
 	UpdatePlayerHpBar();
 	CheckGameOver();
 }
