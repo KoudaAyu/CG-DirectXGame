@@ -574,7 +574,7 @@ void DirectXCom::PostDraw()
 	{
 		Logger::Log(logStream, std::format("DirectXCom::PostDraw - device removed or error after ExecuteCommandLists hr=0x{:08X}\n", static_cast<unsigned int>(deviceRemoved)));
 	}
-	//GUPとOSに画面の交換を要求する
+	//GUPとOSに画面の交換を要求するa
 	swapChain->Present(1, 0);
 
 	//Fenceの値を更新

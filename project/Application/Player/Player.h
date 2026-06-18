@@ -1,5 +1,6 @@
 #pragma once
 #include <memory>
+#include <vector>
 #include "Object3d.h"
 #include "Object3dCom.h"
 #include "Camera.h"
@@ -16,7 +17,7 @@ public:
     void Draw(const RenderContext& ctx);
     void Finalize();
 
-    std::unique_ptr<Bullet> TryShoot(const MouseInput* mouseInput, float deltaTime);
+    std::vector<std::unique_ptr<Bullet>> TryShoot(const MouseInput* mouseInput, float deltaTime);
 
     Vector3 GetPosition() const { return object3d_ ? object3d_->GetTranslate() : Vector3{ 0.0f, 0.0f, 0.0f }; }
     Vector3 GetRotation() const { return object3d_ ? object3d_->GetRotate() : Vector3{ 0.0f, 0.0f, 0.0f }; }
@@ -41,6 +42,8 @@ public:
     float GetCurrentSpread() const { return currentSpread_; }
     bool IsDodging() const { return isDodging_; }
     bool IsMoving() const { return isMoving_; }
+    float GetDodgeTimer() const { return dodgeTimer_; }
+    float GetDodgeDuration() const { return dodgeDuration_; }
 
 private:
     std::unique_ptr<Object3d> object3d_;

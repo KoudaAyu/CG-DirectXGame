@@ -201,8 +201,7 @@ void ParticleManager::Update(float deltaTime)
 				continue;
 			}
 
-			Vector3 rot = it->transform.GetRotate();
-			Matrix4x4 rotZ = MakeRotateZMatrix(rot.z);
+			Matrix4x4 rotZ = MakeRotateZMatrix(it->transform.GetRotate().z);
 			Matrix4x4 finalRotation = Multiply(rotZ, billboardMatrix);
 			Matrix4x4 worldMatrix = MakeAffineMatrix(
 				it->transform.GetScale(), finalRotation, it->transform.GetTranslate());
@@ -220,8 +219,8 @@ void ParticleManager::Update(float deltaTime)
 				++writeIndex;
 			}
 
-			it->transform.SetTranslate(
-				it->transform.GetTranslate() + it->velocity * deltaTime);
+			Vector3 nextTranslate = it->transform.GetTranslate() + it->velocity * deltaTime;
+			it->transform.SetTranslate(nextTranslate);
 
 			++it;
 		}
@@ -406,183 +405,21 @@ void ParticleManager::Draw(ID3D12GraphicsCommandList* commandList, const RenderC
 
 ParticleManager::Particle ParticleManager::MakeNewParticles(std::mt19937& randomEngine, const Vector3& translate)
 {
-	std::uniform_real_distribution<float> distribution(-1.0f, 1.0f);
 	Particle particle;
-	particle.transform.SetScale({ 1.0f,1.0f,1.0f });
-	particle.transform.SetRotate({ 0.0f,0.0f,0.0f });
-	Vector3 randomTranslate{ distribution(randomEngine), distribution(randomEngine), distribution(randomEngine) };
-	particle.transform.SetTranslate({ translate + randomTranslate });
-	particle.velocity = { distribution(randomEngine), distribution(randomEngine), distribution(randomEngine) };
-	std::uniform_real_distribution<float> distColor(0.0f, 1.0f);
+	particle.transform.Initialize();
+	particle.transform.SetTranslate(translate);
+
+	std::uniform_real_distribution<float> distVelocity(-1.0f, 1.0f);
+	particle.velocity = { distVelocity(randomEngine), distVelocity(randomEngine), distVelocity(randomEngine) };
+
+	std::uniform_real_distribution<float> distColor(0.5f, 1.0f);
 	particle.color = { distColor(randomEngine), distColor(randomEngine), distColor(randomEngine), 1.0f };
-	std::uniform_real_distribution<float> distTime(1.0f, 3.0f);
-	particle.lifeTime = distTime(randomEngine);
+
+	std::uniform_real_distribution<float> distLifeTime(1.0f, 3.0f);
+	particle.lifeTime = distLifeTime(randomEngine);
 	particle.currentTime = 0.0f;
+
 	return particle;
-}
-
-ParticleManager::Particle ParticleManager::MakeHieEffect(std::mt19937& randomEngine, const Vector3& translate)
-{
-    Particle particle;
-
-    // ランダム回転
-    std::uniform_real_distribution<float> distRotate(0.0f, std::numbers::pi_v<float> * 2.0f);
-    float rotZ = distRotate(randomEngine);
-    particle.transform.SetRotate({ 0.0f, 0.0f, rotZ });
-
-    // 縦方向にばらつきを持たせた縦長パーティクル
-    std::uniform_real_distribution<float> distScaleX(0.03f, 0.08f); // 横幅
-    std::uniform_real_distribution<float> distScaleY(0.6f, 1.6f);   // 縦幅
-    float sx = distScaleX(randomEngine);
-    float sy = distScaleY(randomEngine);
-    particle.transform.SetScale({ sx, sy, 1.0f }); // Z は 1
-
-    // 発生位置
-    particle.transform.SetTranslate(translate);
-
-    // velocity を 0 に固定
-    particle.velocity = { 0.0f, 0.0f, 0.0f };
-
-    // 色は白
-    particle.color = { 1.0f, 1.0f, 1.0f, 1.0f };
-
-    // 寿命に少しばらつきを持たせる
-    std::uniform_real_distribution<float> distTime(0.7f, 1.3f);
-    particle.lifeTime = distTime(randomEngine);
-    particle.currentTime = 0.0f;
-
-    return particle;
-}
-
-ParticleManager::Particle ParticleManager::MakeFeatherParticle(std::mt19937& randomEngine, const Vector3& translate)
-{
-    Particle particle;
-
-    // Random rotation in Z
-    std::uniform_real_distribution<float> distRotate(0.0f, 6.2831853f);
-    particle.transform.SetRotate({ 0.0f, 0.0f, distRotate(randomEngine) });
-
-    // Non-uniform scale to make the circle look like a feather/oval
-    std::uniform_real_distribution<float> distScaleX(0.05f, 0.12f);
-    std::uniform_real_distribution<float> distScaleY(0.15f, 0.35f);
-    particle.transform.SetScale({ distScaleX(randomEngine), distScaleY(randomEngine), 1.0f });
-
-    // Spawn position with a tiny offset
-    std::uniform_real_distribution<float> distOffset(-0.2f, 0.2f);
-    particle.transform.SetTranslate({
-        translate.x + distOffset(randomEngine),
-        translate.y + distOffset(randomEngine),
-        translate.z + distOffset(randomEngine)
-    });
-
-    // Slow drifting velocity (falling down in Y, slightly moving in X/Z)
-    std::uniform_real_distribution<float> distVelXZ(-0.5f, 0.5f);
-    std::uniform_real_distribution<float> distVelY(-1.2f, -0.6f);
-    particle.velocity = { distVelXZ(randomEngine), distVelY(randomEngine), distVelXZ(randomEngine) };
-
-    // Feather color: Mostly white or very light pastel (アヒルの羽)
-    particle.color = { 1.0f, 1.0f, 1.0f, 1.0f };
-
-    // Longer lifetime for slow drift
-    std::uniform_real_distribution<float> distTime(1.0f, 2.0f);
-    particle.lifeTime = distTime(randomEngine);
-    particle.currentTime = 0.0f;
-
-    return particle;
-}
-
-ParticleManager::Particle ParticleManager::MakeMuzzleFlashParticle(std::mt19937& randomEngine, const Vector3& translate)
-{
-    Particle particle;
-
-    std::uniform_real_distribution<float> distRotate(0.0f, 6.2831853f);
-    particle.transform.SetRotate({ 0.0f, 0.0f, distRotate(randomEngine) });
-
-    // Small scale for sharp sparks
-    std::uniform_real_distribution<float> distScale(0.15f, 0.35f);
-    float s = distScale(randomEngine);
-    particle.transform.SetScale({ s, s, 1.0f });
-
-    particle.transform.SetTranslate(translate);
-
-    // Fast outward velocity
-    std::uniform_real_distribution<float> distVel(-3.0f, 3.0f);
-    particle.velocity = { distVel(randomEngine), distVel(randomEngine), distVel(randomEngine) };
-
-    // Bright yellow/orange color
-    particle.color = { 1.0f, 0.8f, 0.1f, 1.0f };
-
-    // Very short lifetime for instant flash
-    std::uniform_real_distribution<float> distTime(0.05f, 0.15f);
-    particle.lifeTime = distTime(randomEngine);
-    particle.currentTime = 0.0f;
-
-    return particle;
-}
-
-ParticleManager::Particle ParticleManager::MakeSparkParticle(std::mt19937& randomEngine, const Vector3& translate)
-{
-    Particle particle;
-
-    std::uniform_real_distribution<float> distRotate(0.0f, 6.2831853f);
-    particle.transform.SetRotate({ 0.0f, 0.0f, distRotate(randomEngine) });
-
-    // Sharp sparks
-    std::uniform_real_distribution<float> distScaleX(0.02f, 0.06f);
-    std::uniform_real_distribution<float> distScaleY(0.15f, 0.45f);
-    particle.transform.SetScale({ distScaleX(randomEngine), distScaleY(randomEngine), 1.0f });
-
-    particle.transform.SetTranslate(translate);
-
-    // Speed spark velocity (with high speed)
-    std::uniform_real_distribution<float> distVel(-5.0f, 5.0f);
-    particle.velocity = { distVel(randomEngine), distVel(randomEngine), distVel(randomEngine) };
-
-    // Spark color: orange-red
-    particle.color = { 1.0f, 0.4f, 0.0f, 1.0f };
-
-    // Short lifetime
-    std::uniform_real_distribution<float> distTime(0.15f, 0.3f);
-    particle.lifeTime = distTime(randomEngine);
-    particle.currentTime = 0.0f;
-
-    return particle;
-}
-
-ParticleManager::Particle ParticleManager::MakeDustParticle(std::mt19937& randomEngine, const Vector3& translate, float scaleFactor)
-{
-    Particle particle;
-
-    std::uniform_real_distribution<float> distRotate(0.0f, 6.2831853f);
-    particle.transform.SetRotate({ 0.0f, 0.0f, distRotate(randomEngine) });
-
-    // Dust particles start small and puff up
-    std::uniform_real_distribution<float> distScale(0.1f, 0.25f);
-    float s = distScale(randomEngine) * scaleFactor;
-    particle.transform.SetScale({ s, s, 1.0f });
-
-    // Spawn with a tiny random spread around the feet
-    std::uniform_real_distribution<float> distOffset(-0.15f, 0.15f);
-    particle.transform.SetTranslate({
-        translate.x + distOffset(randomEngine),
-        translate.y, // Keep at ground level
-        translate.z + distOffset(randomEngine)
-    });
-
-    // Slow upward and outward velocity
-    std::uniform_real_distribution<float> distVelY(0.2f, 0.6f);
-    std::uniform_real_distribution<float> distVelXZ(-0.3f, 0.3f);
-    particle.velocity = { distVelXZ(randomEngine), distVelY(randomEngine), distVelXZ(randomEngine) };
-
-    // Light brown/tan dust color (semi-transparent)
-    particle.color = { 0.76f, 0.69f, 0.57f, 0.35f };
-
-    // Short-lived dust puff
-    std::uniform_real_distribution<float> distTime(0.3f, 0.55f);
-    particle.lifeTime = distTime(randomEngine);
-    particle.currentTime = 0.0f;
-
-    return particle;
 }
 
 

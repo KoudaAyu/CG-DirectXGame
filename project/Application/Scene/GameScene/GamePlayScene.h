@@ -12,6 +12,7 @@
 #include "Light.h"
 #include "MaterialManager.h"
 #include "ParticleManager.h"
+#include "Application/Particle/AppParticleManager.h"
 #include "Animation.h"
 #include "Animator.h"
 #include "Skeleton.h"
@@ -24,6 +25,7 @@
 #include "Baziru3_Engine/Particle/Ring.h"
 #include "../../Player/Player.h"
 #include "../../Enemy/Enemy.h"
+#include "../../Enemy/MovingEnemy.h"
 #include "../../../Bullet.h"
 #include "../../Obstacle.h"
 
@@ -47,6 +49,11 @@ public:
     Vector3 GetPlayerPosition() const { return player_ ? player_->GetPosition() : Vector3{ 0.0f, 0.0f, 0.0f }; }
     Player* GetPlayer() const { return player_.get(); }
     Vector3 GetGoalPosition() const { return goalRingTransform_.translate; }
+    void TriggerCameraShake(float duration, float intensity) {
+        cameraShakeTime_ = duration;
+        cameraShakeDurationMax_ = duration > 0.0f ? duration : 1.0f;
+        cameraShakeIntensity_ = intensity;
+    }
 
 private:
     float AdvanceDeltaTime();
@@ -85,11 +92,13 @@ private:
     MaterialManager* materialManager = nullptr;
     Object3dCom* object3dCom = nullptr;
     ParticleManager* particleManager = nullptr;
+    std::unique_ptr<AppParticleManager> appParticleManager_;
     SpriteCom* spriteCom = nullptr;
 
     // --- ゲームエンティティ & オブジェクト ---
     std::unique_ptr<Player> player_;
     std::unique_ptr<Enemy> enemy_;
+    std::unique_ptr<MovingEnemy> movingEnemy_;
     std::vector<std::unique_ptr<Bullet>> bullets_;
     std::vector<std::unique_ptr<Obstacle>> obstacles_;
     std::unique_ptr<Sphere> sphere_;
@@ -113,6 +122,8 @@ private:
     Sprite::Transform goalRingTransform_{};
     Sprite* playerHpBarBg_ = nullptr;
     Sprite* playerHpBarFg_ = nullptr;
+    Sprite* playerReloadBarBg_ = nullptr;
+    Sprite* playerReloadBarFg_ = nullptr;
     int cursorSpriteIndex = -1;
 
     // --- インプット ---
@@ -132,10 +143,19 @@ private:
 
     // --- ステート & タイマー ---
     bool isGameCleared_ = false;
+    float clearSlowMoTimer_ = 1.5f;
     float extractionTimer_ = 5.0f;
     std::chrono::steady_clock::time_point lastTime_;
     float playerDustTimer_ = 0.0f;
+    float playerReloadCasingTimer_ = 0.0f;
     float escapeSmokeTimer_ = 0.0f;
+    float lightFlashTimer_ = 0.0f;
+    float clearCelebrateTimer_ = 0.0f;
+
+    // --- カメラシェイク ---
+    float cameraShakeTime_ = 0.0f;
+    float cameraShakeIntensity_ = 0.0f;
+    float cameraShakeDurationMax_ = 1.0f;
 
     // --- ゲームプレイ定数 ---
     static constexpr float kFixedDeltaTime = 1.0f / 60.0f;

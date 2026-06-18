@@ -16,6 +16,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Application\Enemy\Enemy.cpp" />
+    <ClCompile Include="Application\Enemy\MovingEnemy.cpp" />
     <ClCompile Include="Baziru3_Engine\3D\Model\SkinCluster\SkinCluster.cpp" />
     <ClCompile Include="Baziru3_Engine\Animation\Joint\Joint.cpp" />
     <ClCompile Include="Baziru3_Engine\Animation\NodeAnimation\Node.cpp" />
@@ -60,6 +61,7 @@
     <ClCompile Include="EngineContext.cpp" />
     <ClCompile Include="Game.cpp" />
     <ClCompile Include="Application\Scene\GameScene\GamePlayScene.cpp" />
+    <ClCompile Include="Application\Particle\AppParticleManager.cpp" />
     <ClCompile Include="Application\Scene\ClearScene\ClearScene.cpp" />
     <ClCompile Include="Baziru3_Engine\Light\Light.cpp" />
     <ClCompile Include="main.cpp" />
@@ -134,6 +136,7 @@
     <ClInclude Include="Baziru3_Engine\Animation\Skeleton\SkeletonDebug.h" />
     <ClInclude Include="Baziru3_Engine\Effect\HitEffect.h" />
     <ClInclude Include="Application\Fade\FadeApplication.h" />
+    <ClInclude Include="Application\Particle\AppParticleManager.h" />
     <ClInclude Include="Baziru3_Engine\Graphics\Particle\ParticleRenderer.h" />
     <ClInclude Include="Baziru3_Engine\Graphics\SceneRenderRequests.h" />
     <ClInclude Include="Baziru3_Engine\Graphics\Sphere\SphereDrawRequests.h" />
@@ -174,6 +177,7 @@
     <ClInclude Include="Baziru3_Engine\Base\DebugUI.h" />
     <ClInclude Include="Application\Fade\Framework.h" />
     <ClInclude Include="Application\Enemy\Enemy.h" />
+    <ClInclude Include="Application\Enemy\MovingEnemy.h" />
     <ClInclude Include="Bullet.h" />
     <ClInclude Include="EngineContext.h" />
     <ClInclude Include="Game.h" />

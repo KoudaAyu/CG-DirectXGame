@@ -296,8 +296,10 @@ void Player::Update(float deltaTime, MouseInput* mouseInput)
     object3d_->Update();
 }
 
-std::unique_ptr<Bullet> Player::TryShoot(const MouseInput* mouseInput, float deltaTime)
+std::vector<std::unique_ptr<Bullet>> Player::TryShoot(const MouseInput* mouseInput, float deltaTime)
 {
+    std::vector<std::unique_ptr<Bullet>> bullets;
+
     if (shotCooldownTimer_ > 0.0f)
     {
         shotCooldownTimer_ -= deltaTime;
@@ -309,48 +311,98 @@ std::unique_ptr<Bullet> Player::TryShoot(const MouseInput* mouseInput, float del
 
     if (isDead_ || isDodging_ || !object3d_ || !object3dCom_ || !camera_ || !mouseInput)
     {
-        return nullptr;
+        return bullets;
     }
 
     // リロード中、または弾薬切れの場合は射撃不可
     if (isReloading_ || magazineAmmo_ <= 0)
     {
-        return nullptr;
+        return bullets;
     }
 
-    if (!mouseInput->PushButton(0) || shotCooldownTimer_ > 0.0f)
+    bool isLeftClick = mouseInput->PushButton(0);
+    bool isRightClick = mouseInput->PushButton(1);
+
+    if (shotCooldownTimer_ > 0.0f || (!isLeftClick && !isRightClick))
     {
-        return nullptr;
+        return bullets;
     }
 
     const float yaw = GetRotation().y;
     
-    // Add random spread angle to bullet direction
-    float spreadOffset = 0.0f;
-    if (currentSpread_ > 0.001f)
+    if (isRightClick)
     {
-        float r = static_cast<float>(rand()) / static_cast<float>(RAND_MAX);
-        spreadOffset = (r * 2.0f - 1.0f) * currentSpread_;
+        // --- ショットガン (散弾) 射撃 ---
+        int pellets = 5;
+        // マガジン残弾数に応じて発射数を制限
+        if (magazineAmmo_ < pellets)
+        {
+            pellets = magazineAmmo_;
+        }
+
+        float spreadWidth = 0.22f; // 散弾の広がり角度範囲
+        for (int i = 0; i < pellets; ++i)
+        {
+            float offset = 0.0f;
+            if (pellets > 1)
+            {
+                float fraction = static_cast<float>(i) / static_cast<float>(pellets - 1);
+                offset = (fraction - 0.5f) * spreadWidth;
+            }
+            // エイム拡散度も加算
+            if (currentSpread_ > 0.001f)
+            {
+                float r = static_cast<float>(rand()) / static_cast<float>(RAND_MAX);
+                offset += (r * 2.0f - 1.0f) * currentSpread_;
+            }
+
+            const float finalYaw = yaw + offset;
+            const Vector3 forward = { std::sin(finalYaw), 0.0f, std::cos(finalYaw) };
+            const Vector3 spawnPos = Bullet::ComputeSpawnPosition(GetPosition(), forward, bulletSpawnOffset_);
+
+            auto bullet = std::make_unique<Bullet>();
+            bullet->Initialize(object3dCom_, camera_, spawnPos, forward, bulletSpeed_, bulletLifeTime_, BulletOwner::Player);
+            bullets.push_back(std::move(bullet));
+        }
+
+        magazineAmmo_ -= pellets;
+        shotCooldownTimer_ = shotCooldown_ * 3.5f; // ショットガンはクールダウン長め
+
+        // 拡散ペナルティも大きく
+        currentSpread_ += kShootSpreadPenalty * 2.5f;
+        if (currentSpread_ > kMaxSpread)
+        {
+            currentSpread_ = kMaxSpread;
+        }
     }
-    const float finalYaw = yaw + spreadOffset;
-    const Vector3 forward = { std::sin(finalYaw), 0.0f, std::cos(finalYaw) };
-    const Vector3 spawnPos = Bullet::ComputeSpawnPosition(GetPosition(), forward, bulletSpawnOffset_);
-
-    auto bullet = std::make_unique<Bullet>();
-    bullet->Initialize(object3dCom_, camera_, spawnPos, forward, bulletSpeed_, bulletLifeTime_, BulletOwner::Player);
-    shotCooldownTimer_ = shotCooldown_;
-    
-    // 弾薬を減算
-    magazineAmmo_--;
-
-    // Apply shooting recoil spread penalty
-    currentSpread_ += kShootSpreadPenalty;
-    if (currentSpread_ > kMaxSpread)
+    else
     {
-        currentSpread_ = kMaxSpread;
+        // --- 通常射撃 ---
+        float spreadOffset = 0.0f;
+        if (currentSpread_ > 0.001f)
+        {
+            float r = static_cast<float>(rand()) / static_cast<float>(RAND_MAX);
+            spreadOffset = (r * 2.0f - 1.0f) * currentSpread_;
+        }
+        const float finalYaw = yaw + spreadOffset;
+        const Vector3 forward = { std::sin(finalYaw), 0.0f, std::cos(finalYaw) };
+        const Vector3 spawnPos = Bullet::ComputeSpawnPosition(GetPosition(), forward, bulletSpawnOffset_);
+
+        auto bullet = std::make_unique<Bullet>();
+        bullet->Initialize(object3dCom_, camera_, spawnPos, forward, bulletSpeed_, bulletLifeTime_, BulletOwner::Player);
+        bullets.push_back(std::move(bullet));
+
+        magazineAmmo_--;
+        shotCooldownTimer_ = shotCooldown_;
+
+        currentSpread_ += kShootSpreadPenalty;
+        if (currentSpread_ > kMaxSpread)
+        {
+            currentSpread_ = kMaxSpread;
+        }
     }
 
-    return bullet;
+    return bullets;
 }
 
 void Player::Draw(const RenderContext& ctx)

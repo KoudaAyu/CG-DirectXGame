@@ -53,11 +53,6 @@ public:
 	void Draw(ID3D12GraphicsCommandList* commandList, const RenderContext& ctx, UINT vertexCount);
 
 	Particle MakeNewParticles(std::mt19937& randomEngine,const Vector3& translate);
-	Particle MakeHieEffect(std::mt19937& randomEngine, const Vector3& translate);
-	Particle MakeFeatherParticle(std::mt19937& randomEngine, const Vector3& translate);
-	Particle MakeMuzzleFlashParticle(std::mt19937& randomEngine, const Vector3& translate);
-	Particle MakeSparkParticle(std::mt19937& randomEngine, const Vector3& translate);
-	Particle MakeDustParticle(std::mt19937& randomEngine, const Vector3& translate, float scaleFactor = 1.0f);
 
 
 

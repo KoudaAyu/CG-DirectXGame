@@ -1,0 +1,73 @@
+#pragma once
+#include <memory>
+#include "Object3d.h"
+#include "Object3dCom.h"
+#include "Camera.h"
+#include "RenderContext.h"
+
+class Bullet;
+class Sprite;
+class WindowAPI;
+
+class MovingEnemy
+{
+public:
+    enum class AIState
+    {
+        Patrol,
+        Chase
+    };
+
+public:
+    void Initialize(Object3dCom* object3dCom, Camera* camera);
+    void Update(WindowAPI* windowAPI, const Vector3* targetPosition, float deltaTime);
+    void Draw(const RenderContext& ctx);
+    void Finalize();
+    void OnHit();
+
+    std::unique_ptr<Bullet> TryShoot(const Vector3& targetPosition);
+
+    Vector3 GetPosition() const { return object3d_ ? object3d_->GetTranslate() : Vector3{ 0.0f, 0.0f, 0.0f }; }
+    void SetPosition(const Vector3& pos) { if (object3d_) object3d_->SetTranslate(pos); }
+
+    int GetHP() const { return hp_; }
+    int GetMaxHP() const { return maxHp_; }
+    bool IsDead() const { return isDead_; }
+    void SetHPBarSprites(Sprite* bg, Sprite* fg) { hpBarBg_ = bg; hpBarFg_ = fg; }
+    void SetAlertSprites(Sprite* bar, Sprite* dot) { alertBar_ = bar; alertDot_ = dot; }
+
+private:
+    bool FaceTarget(const Vector3& targetPosition);
+
+    std::unique_ptr<Object3d> object3d_;
+    Object3dCom* object3dCom_ = nullptr;
+    Camera* camera_ = nullptr;
+    uint32_t defaultTextureIndex_ = UINT32_MAX;
+    float hitFlashTimer_ = 0.0f;
+    float hitFlashDuration_ = 0.12f;
+
+    int hp_ = 6;
+    int maxHp_ = 6;
+    bool isDead_ = false;
+    float respawnTimer_ = 0.0f;
+    const float respawnDuration_ = 4.0f;
+
+    Sprite* hpBarBg_ = nullptr;
+    Sprite* hpBarFg_ = nullptr;
+    Sprite* alertBar_ = nullptr;
+    Sprite* alertDot_ = nullptr;
+    float alertTimer_ = 0.0f;
+
+    Vector3 bulletSpawnOffset_ = { 0.0f, 0.2f, 0.5f };
+    float bulletSpeed_ = 0.38f; // 少し遅めの弾速
+    float bulletLifeTime_ = 2.0f;
+    float shotCooldown_ = 1.8f; // やや高めの連射
+    float shotCooldownTimer_ = 1.8f;
+
+    // AI Patrol parameters
+    AIState state_ = AIState::Patrol;
+    Vector3 patrolA_ = { -6.0f, 0.0f, 6.0f };
+    Vector3 patrolB_ = { 6.0f, 0.0f, 6.0f };
+    bool movingToB_ = true;
+    float moveSpeed_ = 0.035f; // 歩き速度
+};

@@ -116,7 +116,7 @@ void HitEffect::Play(const Vector3& translate)
         std::list<ParticleManager::Particle> newParticles;
         for (uint32_t i = 0; i < planeParticleCount_; ++i)
         {
-            auto p = particleManager_->MakeHieEffect(particleManager_->GetRandomEngine(), translate);
+            auto p = particleManager_->MakeNewParticles(particleManager_->GetRandomEngine(), translate);
             p.textureIndex = planeParticleTextureIndex_;
             p.lifeTime = effectDuration_;
             newParticles.push_back(p);
@@ -182,7 +182,7 @@ void HitEffect::SpawnPlaneParticles(const Vector3& translate)
     std::list<ParticleManager::Particle> newParticles;
     for (uint32_t i = 0; i < planeParticleCount_; ++i)
     {
-        auto p = particleManager_->MakeHieEffect(particleManager_->GetRandomEngine(), translate);
+        auto p = particleManager_->MakeNewParticles(particleManager_->GetRandomEngine(), translate);
         p.textureIndex = planeParticleTextureIndex_;
         p.lifeTime = effectDuration_;
         newParticles.push_back(p);
