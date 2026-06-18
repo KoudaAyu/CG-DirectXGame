@@ -21,6 +21,7 @@ public:
     std::unique_ptr<Bullet> TryShoot(const Vector3& targetPosition);
 
     Vector3 GetPosition() const { return object3d_ ? object3d_->GetTranslate() : Vector3{ 0.0f, 0.0f, 0.0f }; }
+    void SetPosition(const Vector3& pos) { if (object3d_) object3d_->SetTranslate(pos); }
 
     int GetHP() const { return hp_; }
     int GetMaxHP() const { return maxHp_; }

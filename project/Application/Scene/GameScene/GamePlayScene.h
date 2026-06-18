@@ -25,6 +25,7 @@
 #include "../../Player/Player.h"
 #include "../../Enemy/Enemy.h"
 #include "../../../Bullet.h"
+#include "../../Obstacle.h"
 
 class Camera;
 class SpriteCom;
@@ -53,6 +54,7 @@ private:
     void InitializeCharacters();
     void InitializeSprites();
     void InitializeAudioAndParticles();
+    void InitializeObstacles();
 
     void UpdateExtractionGoal(float deltaTime);
     void UpdateEnvironment();
@@ -63,11 +65,13 @@ private:
     void UpdateCombat(float deltaTime);
     void UpdatePlayerHpBar();
     void CheckGameOver();
+    void UpdateObstacles();
 
     void AddBullet(std::unique_ptr<Bullet> bullet);
     void UpdateBullets(float deltaTime);
     void RemoveDeadBullets();
     void ResolveBulletCollisions();
+    void ResolveObstacleCollisions();
     void ResolveContactDamage();
 
     // ヘルパーメソッド
@@ -87,6 +91,7 @@ private:
     std::unique_ptr<Player> player_;
     std::unique_ptr<Enemy> enemy_;
     std::vector<std::unique_ptr<Bullet>> bullets_;
+    std::vector<std::unique_ptr<Obstacle>> obstacles_;
     std::unique_ptr<Sphere> sphere_;
     std::unique_ptr<Object3d> animatedCube_;
     std::unique_ptr<Ring> goalRing_;
@@ -123,6 +128,7 @@ private:
     uint32_t cylinderTextureIndex_ = TextureManager::kInvalidTextureIndex;
     uint32_t particleTextureA = TextureManager::kInvalidTextureIndex;
     uint32_t particleTextureB = TextureManager::kInvalidTextureIndex;
+    uint32_t fenceTextureIndex_ = TextureManager::kInvalidTextureIndex;
 
     // --- ステート & タイマー ---
     bool isGameCleared_ = false;

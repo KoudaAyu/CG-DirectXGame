@@ -35,6 +35,7 @@ void GamePlayScene::Initialize(DirectXCom* dxCommon, Camera* camera)
 	InitializeCharacters();
 	InitializeSprites();
 	InitializeAudioAndParticles();
+	InitializeObstacles();
 }
 
 void GamePlayScene::InitializeEnvironment()
@@ -198,6 +199,7 @@ void GamePlayScene::InitializeAudioAndParticles()
 	cylinderTextureIndex_ = TextureManager::GetInstance()->Load("Resources/CG4/gradationLine.png");
 	particleTextureA = TextureManager::GetInstance()->Load("Resources/uvChecker.png");
 	particleTextureB = TextureManager::GetInstance()->Load("Resources/CG4/circle2.png");
+	fenceTextureIndex_ = TextureManager::GetInstance()->Load("Resources/fence.png");
 	if (hitEffect_)
 	{
 		hitEffect_->SetPlaneParticleTextureIndex(particleTextureB);
@@ -243,6 +245,15 @@ void GamePlayScene::Finalize()
 		enemy_->Finalize();
 		enemy_.reset();
 	}
+
+	for (auto& obs : obstacles_)
+	{
+		if (obs)
+		{
+			obs->Finalize();
+		}
+	}
+	obstacles_.clear();
 }
 
 float GamePlayScene::AdvanceDeltaTime()
@@ -532,10 +543,22 @@ void GamePlayScene::UpdateCombat(float deltaTime)
 		{
 			std::list<ParticleManager::Particle> flashParticles;
 			Vector3 bulletPos = bullet->GetPosition();
-			for (int i = 0; i < 6; ++i)
+			Vector3 dir = bullet->GetDirection();
+			Vector3 right = { dir.z, 0.0f, -dir.x };
+			Vector3 up = { 0.0f, 1.0f, 0.0f };
+
+			for (int i = 0; i < 8; ++i)
 			{
 				auto p = particleManager->MakeMuzzleFlashParticle(particleManager->GetRandomEngine(), bulletPos);
+				
+				// 前方への強い速度ベクトルに左右・上下のランダムブレを加える（円錐状の広がり）
+				float forwardSpeed = 4.0f + (static_cast<float>(rand()) / RAND_MAX) * 4.0f;
+				float rightSpeed = (static_cast<float>(rand()) / RAND_MAX * 2.0f - 1.0f) * 1.8f;
+				float upSpeed = (static_cast<float>(rand()) / RAND_MAX * 2.0f - 1.0f) * 1.2f;
+
+				p.velocity = dir * forwardSpeed + right * rightSpeed + up * upSpeed;
 				p.textureIndex = particleTextureB;
+				p.lifeTime = 0.05f + (static_cast<float>(rand()) / RAND_MAX) * 0.1f;
 				flashParticles.push_back(p);
 			}
 			particleManager->AddParticles(flashParticles);
@@ -550,11 +573,23 @@ void GamePlayScene::UpdateCombat(float deltaTime)
 		{
 			std::list<ParticleManager::Particle> flashParticles;
 			Vector3 bulletPos = bullet->GetPosition();
-			for (int i = 0; i < 4; ++i)
+			Vector3 dir = bullet->GetDirection();
+			Vector3 right = { dir.z, 0.0f, -dir.x };
+			Vector3 up = { 0.0f, 1.0f, 0.0f };
+
+			for (int i = 0; i < 6; ++i)
 			{
 				auto p = particleManager->MakeMuzzleFlashParticle(particleManager->GetRandomEngine(), bulletPos);
-				p.color = { 1.0f, 0.2f, 0.2f, 1.0f }; // Red muzzle flash for enemy
+				
+				// 敵も同様に円錐状に赤色マズルブラストを前方へ吹き出す
+				float forwardSpeed = 3.5f + (static_cast<float>(rand()) / RAND_MAX) * 3.0f;
+				float rightSpeed = (static_cast<float>(rand()) / RAND_MAX * 2.0f - 1.0f) * 1.5f;
+				float upSpeed = (static_cast<float>(rand()) / RAND_MAX * 2.0f - 1.0f) * 1.0f;
+
+				p.velocity = dir * forwardSpeed + right * rightSpeed + up * upSpeed;
+				p.color = { 1.0f, 0.2f, 0.2f, 1.0f }; // 赤色
 				p.textureIndex = particleTextureB;
+				p.lifeTime = 0.05f + (static_cast<float>(rand()) / RAND_MAX) * 0.1f;
 				flashParticles.push_back(p);
 			}
 			particleManager->AddParticles(flashParticles);
@@ -725,13 +760,174 @@ void GamePlayScene::Update()
 	}
 
 	UpdateEnvironment();
+	UpdateObstacles();
 	UpdateParticles(deltaTime);
 	UpdateSprites();
 	UpdateDebugInput();
 	UpdateCharacters(deltaTime);
 	UpdateCombat(deltaTime);
+	ResolveObstacleCollisions();
 	UpdatePlayerHpBar();
 	CheckGameOver();
+}
+
+void GamePlayScene::InitializeObstacles()
+{
+	obstacles_.clear();
+
+	// 障害物を3つ仮配置 (エディタ作成前の仮置き)
+	auto obs1 = std::make_unique<Obstacle>();
+	obs1->Initialize(object3dCom, camera_, { 0.0f, 0.0f, 4.0f }, 1.0f);
+	obstacles_.push_back(std::move(obs1));
+
+	auto obs2 = std::make_unique<Obstacle>();
+	obs2->Initialize(object3dCom, camera_, { -2.5f, 0.0f, 7.0f }, 1.0f);
+	obstacles_.push_back(std::move(obs2));
+
+	auto obs3 = std::make_unique<Obstacle>();
+	obs3->Initialize(object3dCom, camera_, { 2.5f, 0.0f, 7.0f }, 1.0f);
+	obstacles_.push_back(std::move(obs3));
+}
+
+void GamePlayScene::UpdateObstacles()
+{
+	for (auto& obs : obstacles_)
+	{
+		if (obs)
+		{
+			obs->Update();
+		}
+	}
+}
+
+void GamePlayScene::ResolveObstacleCollisions()
+{
+	// プレイヤーとの衝突判定・押し出し
+	if (player_ && !player_->IsDead())
+	{
+		Vector3 pPos = player_->GetPosition();
+		for (auto& obs : obstacles_)
+		{
+			if (!obs) continue;
+			Vector3 oPos = obs->GetPosition();
+			float dx = pPos.x - oPos.x;
+			float dz = pPos.z - oPos.z;
+			float dist = std::sqrt(dx * dx + dz * dz);
+			float minDist = playerHitRadius_ + obs->GetRadius();
+			if (dist < minDist)
+			{
+				float overlap = minDist - dist;
+				if (dist > 1e-4f)
+				{
+					pPos.x += (dx / dist) * overlap;
+					pPos.z += (dz / dist) * overlap;
+				}
+				else
+				{
+					pPos.x += minDist;
+				}
+				player_->SetPosition(pPos);
+			}
+		}
+	}
+
+	// 敵との衝突判定・押し出し
+	if (enemy_ && !enemy_->IsDead())
+	{
+		Vector3 ePos = enemy_->GetPosition();
+		for (auto& obs : obstacles_)
+		{
+			if (!obs) continue;
+			Vector3 oPos = obs->GetPosition();
+			float dx = ePos.x - oPos.x;
+			float dz = ePos.z - oPos.z;
+			float dist = std::sqrt(dx * dx + dz * dz);
+			float minDist = enemyHitRadius_ + obs->GetRadius();
+			if (dist < minDist)
+			{
+				float overlap = minDist - dist;
+				if (dist > 1e-4f)
+				{
+					ePos.x += (dx / dist) * overlap;
+					ePos.z += (dz / dist) * overlap;
+				}
+				else
+				{
+					ePos.x += minDist;
+				}
+				enemy_->SetPosition(ePos);
+			}
+		}
+	}
+
+	// 弾丸との衝突判定
+	for (auto& bullet : bullets_)
+	{
+		if (!bullet || bullet->IsDead()) continue;
+		Vector3 bPos = bullet->GetPosition();
+		for (auto& obs : obstacles_)
+		{
+			if (!obs) continue;
+			Vector3 oPos = obs->GetPosition();
+			float dx = bPos.x - oPos.x;
+			float dz = bPos.z - oPos.z;
+			float dist = std::sqrt(dx * dx + dz * dz);
+			float minDist = bulletHitRadius_ + obs->GetRadius();
+			if (dist < minDist)
+			{
+				// 衝突時の木片・おがくずエフェクト
+				if (particleManager)
+				{
+					std::list<ParticleManager::Particle> woodDebris;
+					
+					// 1. 木片 (Splinters)
+					for (int i = 0; i < 8; ++i)
+					{
+						auto p = particleManager->MakeSparkParticle(particleManager->GetRandomEngine(), bPos);
+						p.textureIndex = fenceTextureIndex_;
+						// 茶色〜ベージュ系の木片の色に設定
+						std::uniform_real_distribution<float> colorDist(0.0f, 0.15f);
+						float r = 0.5f + colorDist(particleManager->GetRandomEngine());
+						float g = 0.35f + colorDist(particleManager->GetRandomEngine());
+						float b = 0.15f + colorDist(particleManager->GetRandomEngine());
+						p.color = { r, g, b, 1.0f };
+						
+						// スケールを細長い針状から、やや横幅のある木片（チップ）の形状に調整
+						std::uniform_real_distribution<float> chipScaleX(0.08f, 0.16f);
+						std::uniform_real_distribution<float> chipScaleY(0.15f, 0.35f);
+						p.transform.SetScale({ chipScaleX(particleManager->GetRandomEngine()), chipScaleY(particleManager->GetRandomEngine()), 1.0f });
+						
+						woodDebris.push_back(p);
+					}
+					
+					// 2. おがくずの煙 (Sawdust Dust)
+					for (int i = 0; i < 6; ++i)
+					{
+						auto p = particleManager->MakeDustParticle(particleManager->GetRandomEngine(), bPos, 0.6f);
+						p.textureIndex = fenceTextureIndex_;
+						// 明るい茶色（おがくず色）
+						std::uniform_real_distribution<float> colorDist(0.0f, 0.1f);
+						float r = 0.7f + colorDist(particleManager->GetRandomEngine());
+						float g = 0.55f + colorDist(particleManager->GetRandomEngine());
+						float b = 0.35f + colorDist(particleManager->GetRandomEngine());
+						p.color = { r, g, b, 0.8f }; // やや半透明
+						
+						// 速度を少し横/上方向に広げる
+						std::uniform_real_distribution<float> velDist(-2.0f, 2.0f);
+						std::uniform_real_distribution<float> velUp(1.0f, 3.0f);
+						p.velocity = { velDist(particleManager->GetRandomEngine()), velUp(particleManager->GetRandomEngine()), velDist(particleManager->GetRandomEngine()) };
+						
+						woodDebris.push_back(p);
+					}
+					
+					particleManager->AddParticles(woodDebris);
+				}
+
+				bullet->Finalize();
+				break;
+			}
+		}
+	}
 }
 
 RenderContext GamePlayScene::BuildRenderContext() const
@@ -774,6 +970,14 @@ void GamePlayScene::Draw(SceneRenderRequests& renderRequests)
 	if (enemy_)
 	{
 		enemy_->Draw(ctx);
+	}
+
+	for (auto& obs : obstacles_)
+	{
+		if (obs)
+		{
+			obs->Draw(ctx);
+		}
 	}
 
 	if (goalRing_)

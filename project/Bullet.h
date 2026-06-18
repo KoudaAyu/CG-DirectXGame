@@ -25,6 +25,7 @@ public:
     bool IsDead() const { return isDead_; }
     BulletOwner GetOwner() const { return owner_; }
     Vector3 GetPosition() const { return object3d_ ? object3d_->GetTranslate() : Vector3{ 0.0f, 0.0f, 0.0f }; }
+    Vector3 GetDirection() const { return direction_; }
 
 private:
     std::unique_ptr<Object3d> object3d_;

@@ -20,6 +20,7 @@ public:
 
     Vector3 GetPosition() const { return object3d_ ? object3d_->GetTranslate() : Vector3{ 0.0f, 0.0f, 0.0f }; }
     Vector3 GetRotation() const { return object3d_ ? object3d_->GetRotate() : Vector3{ 0.0f, 0.0f, 0.0f }; }
+    void SetPosition(const Vector3& pos) { if (object3d_) object3d_->SetTranslate(pos); }
 
     void TakeDamage(float damage);
     float GetHP() const { return hp_; }
