@@ -2,6 +2,7 @@
 #include <chrono>
 #include <memory>
 #include <vector>
+#include <string>
 
 #include "BaseScene.h"
 #include "Baziru3_Engine\Effect\HitEffect.h"
@@ -160,6 +161,26 @@ private:
     float cameraShakeIntensity_ = 0.0f;
     float cameraShakeDurationMax_ = 1.0f;
 
+    // --- ビネット＆リロード完了 ---
+    Sprite* vignetteSprite_ = nullptr;
+    float vignetteAlpha_ = 0.0f;
+    bool wasPlayerReloading_ = false;
+    bool wasPlayerReloadingPrev_ = false;
+    int remainingAmmoOnReload_ = 0;
+    int droppedCasingsCount_ = 0;
+
+    // --- 浮遊テキスト ---
+    struct FloatingText {
+        Vector3 position;
+        std::string text;
+        Vector4 color;
+        float lifeTime;
+        float maxLifeTime;
+        bool isCritical;
+    };
+    std::vector<FloatingText> floatingTexts_;
+    void AddFloatingText(const Vector3& worldPos, const std::string& text, const Vector4& color, bool isCritical = false);
+
     // --- ゲームプレイ定数 ---
     static constexpr float kFixedDeltaTime = 1.0f / 60.0f;
     static constexpr float kEnemyBulletDamage = 10.0f;
@@ -168,3 +189,4 @@ private:
     static constexpr float playerHitRadius_ = 0.6f;
     static constexpr float enemyHitRadius_ = 0.6f;
 };
+

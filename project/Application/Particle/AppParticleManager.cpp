@@ -8,7 +8,7 @@ void AppParticleManager::Initialize(ParticleManager* enginePM)
 	particles_.clear();
 }
 
-void AppParticleManager::Update(float deltaTime)
+void AppParticleManager::Update(float deltaTime, const Vector3& playerPos)
 {
 	if (!enginePM_) return;
 
@@ -24,20 +24,31 @@ void AppParticleManager::Update(float deltaTime)
 			continue;
 		}
 
-		// Physics update (gravity)
-		it->velocity.y -= it->gravity * deltaTime;
-
-		Vector3 pos = it->transform.GetTranslate();
-		pos += it->velocity * deltaTime;
-
-		// Ground bounce (y = 0.0f)
-		float groundY = 0.0f;
-		if (pos.y < groundY && it->velocity.y < 0.0f)
+		Vector3 pos;
+		if (it->followPlayer)
 		{
-			pos.y = groundY;
-			it->velocity.y = -it->velocity.y * it->bounceElasticity;
-			it->velocity.x *= 0.7f;
-			it->velocity.z *= 0.7f;
+			// Physics update to relative offset
+			it->offsetFromPlayer.y -= it->gravity * deltaTime;
+			it->offsetFromPlayer += it->velocity * deltaTime;
+			pos = playerPos + it->offsetFromPlayer;
+		}
+		else
+		{
+			// Physics update (gravity)
+			it->velocity.y -= it->gravity * deltaTime;
+
+			pos = it->transform.GetTranslate();
+			pos += it->velocity * deltaTime;
+
+			// Ground bounce (y = 0.0f)
+			float groundY = 0.0f;
+			if (pos.y < groundY && it->velocity.y < 0.0f)
+			{
+				pos.y = groundY;
+				it->velocity.y = -it->velocity.y * it->bounceElasticity;
+				it->velocity.x *= 0.7f;
+				it->velocity.z *= 0.7f;
+			}
 		}
 		it->transform.SetTranslate(pos);
 
@@ -54,7 +65,7 @@ void AppParticleManager::Update(float deltaTime)
 		// Set lifetime and current time to achieve target alpha using formula:
 		// alpha = 1.0f - (currentTime / lifeTime)
 		float targetAlpha = 1.0f - (it->currentTime / it->lifeTime);
-		targetAlpha = std::clamp(targetAlpha, 0.0f, 1.0f);
+		targetAlpha = (std::clamp)(targetAlpha, 0.0f, 1.0f);
 
 		// To prevent duplicate trails, we set lifeTime and currentTime such that 
 		// it gets drawn this frame and gets deleted exactly in the next frame.
@@ -62,7 +73,7 @@ void AppParticleManager::Update(float deltaTime)
 		// the engine's ParticleManager is always updated with 1/60s, regardless of slow-mo.
 		float engineDeltaTime = 1.0f / 60.0f;
 		float epsilon = 0.001f;
-		float tAlpha = std::clamp(targetAlpha, epsilon, 1.0f - epsilon);
+		float tAlpha = (std::clamp)(targetAlpha, epsilon, 1.0f - epsilon);
 		p.lifeTime = engineDeltaTime / tAlpha;
 		p.currentTime = p.lifeTime * (1.0f - tAlpha) - engineDeltaTime;
 
@@ -319,3 +330,89 @@ void AppParticleManager::EmitMuzzleFlash(std::mt19937& randomEngine, const Vecto
 
 	particles_.push_back(p);
 }
+
+void AppParticleManager::EmitMuzzleFlare(std::mt19937& randomEngine, const Vector3& position, float scale, const Vector4& color, float lifeTime, uint32_t textureIndex)
+{
+	// Emit particles to form a cross shape + one center glow
+	// Flare 1: Horizontal-ish (rotated 0)
+	{
+		AppParticle p;
+		p.transform.Initialize();
+		p.transform.SetTranslate(position);
+		p.transform.SetRotate({ 0.0f, 0.0f, 0.0f });
+		p.transform.SetScale({ scale * 1.5f, scale * 0.3f, 1.0f });
+		p.velocity = { 0.0f, 0.0f, 0.0f };
+		p.color = color;
+		p.lifeTime = lifeTime;
+		p.currentTime = 0.0f;
+		p.textureIndex = textureIndex;
+		p.gravity = 0.0f;
+		p.bounceElasticity = 0.0f;
+		p.angularVelocity = 0.0f;
+		particles_.push_back(p);
+	}
+	// Flare 2: Vertical-ish (rotated 90 deg / 1.570796f)
+	{
+		AppParticle p;
+		p.transform.Initialize();
+		p.transform.SetTranslate(position);
+		p.transform.SetRotate({ 0.0f, 0.0f, 1.570796f });
+		p.transform.SetScale({ scale * 1.5f, scale * 0.3f, 1.0f });
+		p.velocity = { 0.0f, 0.0f, 0.0f };
+		p.color = color;
+		p.lifeTime = lifeTime;
+		p.currentTime = 0.0f;
+		p.textureIndex = textureIndex;
+		p.gravity = 0.0f;
+		p.bounceElasticity = 0.0f;
+		p.angularVelocity = 0.0f;
+		particles_.push_back(p);
+	}
+	// Flare 3: Center glow (rotated 45 deg, uniform scale)
+	{
+		AppParticle p;
+		p.transform.Initialize();
+		p.transform.SetTranslate(position);
+		p.transform.SetRotate({ 0.0f, 0.0f, 0.785398f });
+		p.transform.SetScale({ scale * 0.7f, scale * 0.7f, 1.0f });
+		p.velocity = { 0.0f, 0.0f, 0.0f };
+		p.color = color;
+		p.lifeTime = lifeTime;
+		p.currentTime = 0.0f;
+		p.textureIndex = textureIndex;
+		p.gravity = 0.0f;
+		p.bounceElasticity = 0.0f;
+		p.angularVelocity = 0.0f;
+		particles_.push_back(p);
+	}
+}
+
+void AppParticleManager::EmitSparkPlayerRelative(std::mt19937& randomEngine, const Vector3& playerPos, const Vector3& offset, const Vector3& velocity, const Vector4& color, float scale, float lifeTime, uint32_t textureIndex)
+{
+	AppParticle p;
+	p.transform.Initialize();
+	p.transform.SetTranslate(playerPos + offset);
+
+	std::uniform_real_distribution<float> distRotate(0.0f, 6.2831853f);
+	p.transform.SetRotate({ 0.0f, 0.0f, distRotate(randomEngine) });
+
+	// Uniform scale for clean energy particles (glow rings)
+	p.transform.SetScale({ scale, scale, 1.0f });
+
+	p.velocity = velocity;
+	p.color = color;
+	p.lifeTime = lifeTime;
+	p.currentTime = 0.0f;
+	p.textureIndex = textureIndex;
+
+	p.gravity = 0.0f; // No gravity for clean energy ring expansion
+	p.bounceElasticity = 0.0f;
+	p.angularVelocity = 0.0f;
+
+	p.followPlayer = true;
+	p.offsetFromPlayer = offset;
+
+	particles_.push_back(p);
+}
+
+

@@ -17,6 +17,7 @@
 
 #include "GamePlayScene.h"
 #include "CustomObject3dRenderer.h"
+#include "imgui.h"
 
 void GamePlayScene::Initialize(DirectXCom* dxCommon, Camera* camera)
 {
@@ -239,6 +240,18 @@ void GamePlayScene::InitializeSprites()
 			sprites.emplace_back(std::move(line));
 			speedLines_.push_back(sprites.back().get());
 		}
+	}
+
+	// ビネット用スプライトの初期化
+	vignetteAlpha_ = 0.0f;
+	if (auto vignette = Sprite::Create(sc, defaultTransform, "Resources/CG4/human/white.png"))
+	{
+		vignette->SetAnchorPoint({ 0.0f, 0.0f });
+		vignette->SetPosition({ 0.0f, 0.0f });
+		vignette->SetSize({ 1280.0f, 720.0f });
+		vignette->SetColor({ 1.0f, 0.0f, 0.0f, 0.0f });
+		sprites.emplace_back(std::move(vignette));
+		vignetteSprite_ = sprites.back().get();
 	}
 }
 
@@ -532,7 +545,7 @@ void GamePlayScene::UpdateParticles(float deltaTime)
 
 	if (appParticleManager_)
 	{
-		appParticleManager_->Update(deltaTime);
+		appParticleManager_->Update(deltaTime, player_ ? player_->GetPosition() : Vector3{ 0.0f, 0.0f, 0.0f });
 	}
 }
 
@@ -646,6 +659,19 @@ void GamePlayScene::UpdateSprites(float deltaTime)
 		// 通常時は白色
 		cur->SetColor({ 1.0f, 1.0f, 1.0f, 1.0f });
 	}
+
+	// ビネット（ダメージ赤フラッシュ）の更新
+	if (vignetteSprite_ && directXCom && directXCom->GetWindowAPI())
+	{
+		WindowAPI* windowAPI = directXCom->GetWindowAPI();
+		if (vignetteAlpha_ > 0.0f)
+		{
+			vignetteAlpha_ -= 2.0f * deltaTime; // 0.5sで完全にフェードアウトする速度
+			if (vignetteAlpha_ < 0.0f) vignetteAlpha_ = 0.0f;
+		}
+		vignetteSprite_->SetColor({ 1.0f, 0.0f, 0.0f, vignetteAlpha_ });
+		vignetteSprite_->UpdateTransformOnly(windowAPI);
+	}
 }
 
 void GamePlayScene::UpdateDebugInput()
@@ -694,8 +720,15 @@ void GamePlayScene::UpdateCharacters(float deltaTime)
 		{
 			Vector3 playerPos = player_->GetPosition();
 
-			// リロード中の物理演出（マガジンの排出 ＆ 薬莢のバラまき）
+			// リロード中の物理演出（マガジンの排出 ＆ 残弾ドロップ）
 			static bool spawnedMagazine = false;
+			if (player_->IsReloading() && !wasPlayerReloadingPrev_)
+			{
+				remainingAmmoOnReload_ = player_->GetMagazineAmmo();
+				droppedCasingsCount_ = 0;
+			}
+			wasPlayerReloadingPrev_ = player_->IsReloading();
+
 			if (player_->IsReloading())
 			{
 				playerReloadCasingTimer_ += deltaTime;
@@ -720,27 +753,32 @@ void GamePlayScene::UpdateCharacters(float deltaTime)
 					spawnedMagazine = true;
 				}
 
-				// 2. 一定間隔（0.2秒ごと）でバラバラと空薬莢を落とす
-				if (playerReloadCasingTimer_ >= 0.2f)
+				// 2. 残弾数に応じた個数の実弾をバラバラと落とす
+				if (remainingAmmoOnReload_ > 0 && droppedCasingsCount_ < remainingAmmoOnReload_)
 				{
-					Vector3 ejectOrigin = playerPos;
-					ejectOrigin.y += 0.5f; // 手元あたりから落とす
-					
-					Vector3 forward = { std::sin(player_->GetRotation().y), 0.0f, std::cos(player_->GetRotation().y) };
-					
-					Vector4 color = (rand() % 2 == 0) ? Vector4{ 1.0f, 0.85f, 0.2f, 1.0f } : Vector4{ 1.0f, 0.05f, 0.05f, 1.0f };
-					Vector3 scale = (rand() % 2 == 0) ? Vector3{ 0.07f, 0.22f, 1.0f } : Vector3{ 0.1f, 0.26f, 1.0f };
+					if (playerReloadCasingTimer_ >= 0.15f)
+					{
+						Vector3 ejectOrigin = playerPos;
+						ejectOrigin.y += 0.5f; // 手元あたりから落とす
+						
+						Vector3 forward = { std::sin(player_->GetRotation().y), 0.0f, std::cos(player_->GetRotation().y) };
+						
+						// 未使用の弾薬なので金色（ゴールド）
+						Vector4 color = { 1.0f, 0.85f, 0.2f, 1.0f };
+						Vector3 scale = { 0.08f, 0.22f, 1.0f };
 
-					appParticleManager_->EmitShellCasing(
-						particleManager->GetRandomEngine(),
-						ejectOrigin,
-						forward,
-						color,
-						scale,
-						particleTextureB
-					);
-					
-					playerReloadCasingTimer_ = 0.0f;
+						appParticleManager_->EmitShellCasing(
+							particleManager->GetRandomEngine(),
+							ejectOrigin,
+							forward,
+							color,
+							scale,
+							particleTextureB
+						);
+						
+						droppedCasingsCount_++;
+						playerReloadCasingTimer_ = 0.0f;
+					}
 				}
 			}
 			else
@@ -748,6 +786,27 @@ void GamePlayScene::UpdateCharacters(float deltaTime)
 				playerReloadCasingTimer_ = 0.0f;
 				spawnedMagazine = false;
 			}
+
+			// リロード完了の検知
+			if (wasPlayerReloading_ && !player_->IsReloading())
+			{
+				for (int i = 0; i < 30; ++i)
+				{
+					float angle = i * (6.2831853f / 30.0f);
+					Vector3 vel = { std::cos(angle) * 4.5f, 0.3f, std::sin(angle) * 4.5f };
+					appParticleManager_->EmitSparkPlayerRelative(
+						particleManager->GetRandomEngine(),
+						playerPos,
+						Vector3{0.0f, 0.1f, 0.0f},
+						vel,
+						{ 0.2f, 1.0f, 0.4f, 1.0f },
+						0.2f,
+						0.6f,
+						particleTextureB
+					);
+				}
+			}
+			wasPlayerReloading_ = player_->IsReloading();
 
 			static bool prevDodge = false;
 			if (player_->IsDodging())
@@ -907,6 +966,17 @@ void GamePlayScene::UpdateCombat(float deltaTime)
 					);
 				}
 
+				// クロス型マズルフレアの生成
+				float flareScale = isShotgun ? 0.9f : 0.45f;
+				appParticleManager_->EmitMuzzleFlare(
+					particleManager->GetRandomEngine(),
+					bulletPos,
+					flareScale,
+					{ 1.0f, 0.9f, 0.3f, 1.0f }, // Gold/Yellow
+					0.08f,
+					particleTextureB
+				);
+
 				// 薬莢の排出 (Shell Ejection)
 				Vector3 ejectOrigin = player_->GetPosition();
 				ejectOrigin.y += 0.5f; // アヒルの胴体高さから排出
@@ -956,9 +1026,19 @@ void GamePlayScene::UpdateCombat(float deltaTime)
 						particleTextureB
 					);
 				}
+
+				// 敵のクロス型マズルフレアの生成 (赤色)
+				appParticleManager_->EmitMuzzleFlare(
+					particleManager->GetRandomEngine(),
+					bulletPos,
+					0.4f,
+					{ 1.0f, 0.3f, 0.3f, 1.0f },
+					0.08f,
+					particleTextureB
+				);
 			}
+			AddBullet(std::move(bullet));
 		}
-		AddBullet(std::move(bullet));
 	}
 
 	if (movingEnemy_ && player_ && !movingEnemy_->IsDead() && !player_->IsDead())
@@ -987,6 +1067,16 @@ void GamePlayScene::UpdateCombat(float deltaTime)
 						particleTextureB
 					);
 				}
+
+				// 動く敵のクロス型マズルフレアの生成 (紫色)
+				appParticleManager_->EmitMuzzleFlare(
+					particleManager->GetRandomEngine(),
+					bulletPos,
+					0.4f,
+					{ 0.9f, 0.4f, 1.0f, 1.0f },
+					0.08f,
+					particleTextureB
+				);
 			}
 			AddBullet(std::move(bullet));
 		}
@@ -1064,7 +1154,17 @@ void GamePlayScene::ResolveBulletCollisions()
 				const Vector3 enemyPos = enemy_->GetPosition();
 				if (IsWithinRadius(bulletPos, enemyPos, bulletHitRadius_ + enemyHitRadius_))
 				{
+					int prevHp = enemy_->GetHP();
 					enemy_->OnHit();
+					int dmg = prevHp - enemy_->GetHP();
+					if (dmg > 0)
+					{
+						bool isCritical = (rand() % 100 < 30);
+						std::string text = std::to_string(dmg);
+						Vector4 color = isCritical ? Vector4{ 1.0f, 0.9f, 0.0f, 1.0f } : Vector4{ 1.0f, 1.0f, 1.0f, 1.0f };
+						if (isCritical) text += "!";
+						AddFloatingText(enemyPos + Vector3{ 0.0f, 1.2f, 0.0f }, text, color, isCritical);
+					}
 
 					if (enemy_->IsDead())
 					{
@@ -1132,7 +1232,17 @@ void GamePlayScene::ResolveBulletCollisions()
 				const Vector3 enemyPos = movingEnemy_->GetPosition();
 				if (IsWithinRadius(bulletPos, enemyPos, bulletHitRadius_ + enemyHitRadius_))
 				{
+					int prevHp = movingEnemy_->GetHP();
 					movingEnemy_->OnHit();
+					int dmg = prevHp - movingEnemy_->GetHP();
+					if (dmg > 0)
+					{
+						bool isCritical = (rand() % 100 < 30);
+						std::string text = std::to_string(dmg);
+						Vector4 color = isCritical ? Vector4{ 1.0f, 0.9f, 0.0f, 1.0f } : Vector4{ 1.0f, 1.0f, 1.0f, 1.0f };
+						if (isCritical) text += "!";
+						AddFloatingText(enemyPos + Vector3{ 0.0f, 1.2f, 0.0f }, text, color, isCritical);
+					}
 
 					if (movingEnemy_->IsDead())
 					{
@@ -1198,19 +1308,26 @@ void GamePlayScene::ResolveBulletCollisions()
 
 				if (particleManager && appParticleManager_)
 				{
-					// プレイヤー被弾：危険を示す赤い羽30枚
-					for (int i = 0; i < 30; ++i)
+					// プレイヤー被弾：アヒル自身の羽である「黄色/金色の羽」が飛び散る
+					for (int i = 0; i < 25; ++i)
 					{
-						appParticleManager_->EmitFeather(particleManager->GetRandomEngine(), bulletPos, { 1.0f, 0.2f, 0.2f, 1.0f }, particleTextureB);
+						appParticleManager_->EmitFeather(particleManager->GetRandomEngine(), bulletPos, { 1.0f, 0.9f, 0.2f, 1.0f }, particleTextureB);
 					}
-					// 赤い火花15発
+					// プレイヤーのシールド・エネルギー色である「鮮やかな水色/シアンの火花」を散布
 					for (int i = 0; i < 15; ++i)
 					{
-						appParticleManager_->EmitSpark(particleManager->GetRandomEngine(), bulletPos, {0,0,0}, { 1.0f, 0.3f, 0.3f, 1.0f }, 0.12f, 1.0f, particleTextureB);
+						appParticleManager_->EmitSpark(particleManager->GetRandomEngine(), bulletPos, {0,0,0}, { 0.0f, 1.0f, 1.0f, 1.0f }, 0.12f, 1.0f, particleTextureB);
 					}
 				}
 
+				float prevHp = player_->GetHP();
 				player_->TakeDamage(kEnemyBulletDamage);
+				if (player_->GetHP() < prevHp)
+				{
+					vignetteAlpha_ = 0.6f; // Vignette gets slightly stronger red flash
+					// クリティカル扱いの警告テキストにすることで、振動かつ太赤文字にする
+					AddFloatingText(playerPos + Vector3{ 0.0f, 1.0f, 0.0f }, "WARNING -10", { 1.0f, 0.1f, 0.1f, 1.0f }, true);
+				}
 				bullet->Finalize();
 			}
 		}
@@ -1226,14 +1343,26 @@ void GamePlayScene::ResolveContactDamage()
 
 	if (IsWithinRadius(player_->GetPosition(), enemy_->GetPosition(), playerHitRadius_ + enemyHitRadius_))
 	{
+		float prevHp = player_->GetHP();
 		player_->TakeDamage(kContactDamage);
+		if (player_->GetHP() < prevHp)
+		{
+			vignetteAlpha_ = 0.6f;
+			AddFloatingText(player_->GetPosition() + Vector3{0.0f, 1.0f, 0.0f}, "WARNING -20", {1.0f, 0.1f, 0.1f, 1.0f}, true);
+		}
 	}
 
 	if (movingEnemy_ && !movingEnemy_->IsDead())
 	{
 		if (IsWithinRadius(player_->GetPosition(), movingEnemy_->GetPosition(), playerHitRadius_ + enemyHitRadius_))
 		{
+			float prevHp = player_->GetHP();
 			player_->TakeDamage(kContactDamage);
+			if (player_->GetHP() < prevHp)
+			{
+				vignetteAlpha_ = 0.6f;
+				AddFloatingText(player_->GetPosition() + Vector3{0.0f, 1.0f, 0.0f}, "WARNING -20", {1.0f, 0.1f, 0.1f, 1.0f}, true);
+			}
 		}
 	}
 }
@@ -1405,6 +1534,83 @@ void GamePlayScene::Update()
 		currentTranslate.z += (targetTranslate.z - currentTranslate.z) * 0.08f;
 		camera_->SetTranslate(currentTranslate);
 	}
+
+	// 浮遊テキストの更新
+	auto it = floatingTexts_.begin();
+	while (it != floatingTexts_.end())
+	{
+		it->lifeTime -= deltaTime;
+		it->position.y += 1.5f * deltaTime; // 上昇させる
+		if (it->isCritical)
+		{
+			it->position.x += std::sin(it->lifeTime * 20.0f) * 0.15f * deltaTime; // クリティカルはゆらゆら揺らす
+		}
+
+		if (it->lifeTime <= 0.0f)
+		{
+			it = floatingTexts_.erase(it);
+		}
+		else
+		{
+			++it;
+		}
+	}
+
+#ifdef USE_IMGUI
+	// 浮遊テキストのImGui描画
+	if (camera_ && !floatingTexts_.empty())
+	{
+		ImGuiIO& io = ImGui::GetIO();
+		float screenW = io.DisplaySize.x;
+		float screenH = io.DisplaySize.y;
+
+		if (screenW > 0.0f && screenH > 0.0f)
+		{
+			Matrix4x4 viewProj = camera_->GetViewProjectionMatrix();
+			ImDrawList* drawList = ImGui::GetForegroundDrawList();
+
+			for (const auto& ft : floatingTexts_)
+			{
+				// 3D座標をスクリーン座標に変換
+				float x = ft.position.x * viewProj.m[0][0] + ft.position.y * viewProj.m[1][0] + ft.position.z * viewProj.m[2][0] + viewProj.m[3][0];
+				float y = ft.position.x * viewProj.m[0][1] + ft.position.y * viewProj.m[1][1] + ft.position.z * viewProj.m[2][1] + viewProj.m[3][1];
+				float z = ft.position.x * viewProj.m[0][2] + ft.position.y * viewProj.m[1][2] + ft.position.z * viewProj.m[2][2] + viewProj.m[3][2];
+				float w = ft.position.x * viewProj.m[0][3] + ft.position.y * viewProj.m[1][3] + ft.position.z * viewProj.m[2][3] + viewProj.m[3][3];
+
+				if (w <= 0.0f) continue;
+
+				float ndcX = x / w;
+				float ndcY = y / w;
+
+				if (ndcX < -1.1f || ndcX > 1.1f || ndcY < -1.1f || ndcY > 1.1f) continue;
+
+				float screenX = (ndcX + 1.0f) * 0.5f * screenW;
+				float screenY = (1.0f - ndcY) * 0.5f * screenH;
+
+				float alpha = ft.lifeTime / ft.maxLifeTime;
+				alpha = (std::clamp)(alpha, 0.0f, 1.0f);
+				
+				ImU32 textColor = ImGui::ColorConvertFloat4ToU32({ ft.color.x, ft.color.y, ft.color.z, ft.color.w * alpha });
+				ImU32 shadowColor = ImGui::ColorConvertFloat4ToU32({ 0.0f, 0.0f, 0.0f, 0.8f * alpha });
+
+				if (ft.isCritical)
+				{
+					// クリティカルテキストは太く見せるために3方向シャドウ＋2重メイン描画
+					drawList->AddText(ImVec2(screenX + 2.0f, screenY + 2.0f), shadowColor, ft.text.c_str());
+					drawList->AddText(ImVec2(screenX + 1.0f, screenY + 2.0f), shadowColor, ft.text.c_str());
+					drawList->AddText(ImVec2(screenX + 2.0f, screenY + 1.0f), shadowColor, ft.text.c_str());
+					drawList->AddText(ImVec2(screenX, screenY), textColor, ft.text.c_str());
+					drawList->AddText(ImVec2(screenX + 1.0f, screenY), textColor, ft.text.c_str());
+				}
+				else
+				{
+					drawList->AddText(ImVec2(screenX + 1.0f, screenY + 1.0f), shadowColor, ft.text.c_str());
+					drawList->AddText(ImVec2(screenX, screenY), textColor, ft.text.c_str());
+				}
+			}
+		}
+	}
+#endif
 }
 
 void GamePlayScene::InitializeObstacles()
@@ -1669,3 +1875,19 @@ void GamePlayScene::Draw(SceneRenderRequests& renderRequests)
 
 	renderRequests.sceneDrawn = true;
 }
+
+void GamePlayScene::AddFloatingText(const Vector3& worldPos, const std::string& text, const Vector4& color, bool isCritical)
+{
+	FloatingText ft;
+	ft.position = worldPos;
+	// 敵などの位置から少しランダムにずらして被りを防ぐ
+	ft.position.x += ((float)rand() / RAND_MAX * 2.0f - 1.0f) * 0.3f;
+	ft.position.z += ((float)rand() / RAND_MAX * 2.0f - 1.0f) * 0.3f;
+	ft.text = text;
+	ft.color = color;
+	ft.maxLifeTime = isCritical ? 1.0f : 0.75f;
+	ft.lifeTime = ft.maxLifeTime;
+	ft.isCritical = isCritical;
+	floatingTexts_.push_back(ft);
+}
+
