@@ -7,7 +7,9 @@
 #include "WindowsAPI.h"
 #include "Sprite.h"
 #include "Bullet.h"
+#include "Obstacle.h"
 #include <cmath>
+#include <random>
 
 void Enemy::Initialize(Object3dCom* object3dCom, Camera* camera)
 {
@@ -33,7 +35,7 @@ void Enemy::Initialize(Object3dCom* object3dCom, Camera* camera)
     shotCooldownTimer_ = shotCooldown_;
 }
 
-bool Enemy::FaceTarget(const Vector3& targetPosition)
+bool Enemy::FaceTarget(const Vector3& targetPosition, float deltaTime)
 {
     if (!object3d_)
     {
@@ -49,12 +51,40 @@ bool Enemy::FaceTarget(const Vector3& targetPosition)
     }
 
     const float invLen = 1.0f / std::sqrt(lenSq);
-    const float yaw = std::atan2(toTarget.x * invLen, toTarget.z * invLen);
-    object3d_->SetRotate({ 0.0f, yaw, 0.0f });
+    const float targetYaw = std::atan2(toTarget.x * invLen, toTarget.z * invLen);
+
+    // Smooth rotation towards target yaw (max turn speed ~200 deg/sec)
+    float currentYaw = object3d_->GetRotate().y;
+
+    // Normalize currentYaw to [-PI, PI] to prevent precision issues
+    while (currentYaw < -3.14159265f) currentYaw += 6.2831853f;
+    while (currentYaw > 3.14159265f) currentYaw -= 6.2831853f;
+
+    float diff = targetYaw - currentYaw;
+    while (diff < -3.14159265f) diff += 6.2831853f;
+    while (diff > 3.14159265f) diff -= 6.2831853f;
+
+    // Tie-breaker for 180 degree turns to prevent visual jittering/oscillation
+    if (std::abs(diff) > 3.14f)
+    {
+        diff = 3.14f; // Force clockwise rotation
+    }
+
+    float maxRotate = 3.5f * deltaTime;
+    if (std::abs(diff) > maxRotate)
+    {
+        diff = (diff > 0.0f) ? maxRotate : -maxRotate;
+    }
+
+    float newYaw = currentYaw + diff;
+    while (newYaw < -3.14159265f) newYaw += 6.2831853f;
+    while (newYaw > 3.14159265f) newYaw -= 6.2831853f;
+
+    object3d_->SetRotate({ 0.0f, newYaw, 0.0f });
     return true;
 }
 
-void Enemy::Update(WindowAPI* windowAPI, const Vector3* targetPosition, float deltaTime)
+void Enemy::Update(WindowAPI* windowAPI, const Vector3* targetPosition, const std::vector<std::unique_ptr<Obstacle>>& obstacles, float deltaTime)
 {
     if (isDead_)
     {
@@ -63,6 +93,9 @@ void Enemy::Update(WindowAPI* windowAPI, const Vector3* targetPosition, float de
         {
             isDead_ = false;
             hp_ = maxHp_;
+            state_ = AIState::Patrol;
+            detectionMeter_ = 0.0f;
+            alertTimer_ = 0.0f;
             if (object3d_)
             {
                 object3d_->SetTranslate({ 3.0f, 0.0f, 3.0f });
@@ -90,11 +123,109 @@ void Enemy::Update(WindowAPI* windowAPI, const Vector3* targetPosition, float de
 
     if (!object3d_) return;
 
+    // --- 索敵 ＆ 視界チェック ---
+    bool canSeePlayer = false;
     if (targetPosition)
     {
-        FaceTarget(*targetPosition);
+        const Vector3 enemyPos = GetPosition();
+        Vector3 toPlayer = { targetPosition->x - enemyPos.x, 0.0f, targetPosition->z - enemyPos.z };
+        float dist = std::sqrt(toPlayer.x * toPlayer.x + toPlayer.z * toPlayer.z);
+
+        if (dist <= maxSightRange_)
+        {
+            // 視線の向きを計算（回転角度 object3d_->GetRotate().y から前方方向）
+            float yaw = object3d_->GetRotate().y;
+            Vector3 forward = { std::sin(yaw), 0.0f, std::cos(yaw) };
+            
+            // プレイヤー方向ベクトルの正規化
+            Vector3 toPlayerNorm = { toPlayer.x / dist, 0.0f, toPlayer.z / dist };
+            
+            // 内積を計算
+            float dot = forward.x * toPlayerNorm.x + forward.z * toPlayerNorm.z;
+            float angle = std::acos((std::max)(-1.0f, (std::min)(1.0f, dot)));
+            
+            // 視界角の半分（fovAngle_ / 2.0f）の範囲内かチェック
+            if (angle <= fovAngle_ * 0.5f)
+            {
+                // 壁の遮蔽判定
+                if (HasLineOfSight(*targetPosition, obstacles))
+                {
+                    canSeePlayer = true;
+                }
+            }
+        }
     }
 
+    // 索敵メーターの更新
+    if (canSeePlayer)
+    {
+        detectionMeter_ += 1.5f * deltaTime; // 約0.6秒で発見状態へ
+        if (detectionMeter_ >= 1.0f)
+        {
+            detectionMeter_ = 1.0f;
+            if (state_ != AIState::Chase)
+            {
+                state_ = AIState::Chase;
+                alertTimer_ = 1.0f; // 「！」マーク表示タイマー開始
+            }
+        }
+
+        if (state_ == AIState::Chase && targetPosition)
+        {
+            lastSeenPlayerPosition_ = *targetPosition;
+        }
+    }
+    else
+    {
+        if (state_ == AIState::Chase)
+        {
+            state_ = AIState::Investigate;
+            investigateTarget_ = lastSeenPlayerPosition_;
+            searchTimer_ = 3.0f; // 3秒間捜索
+            alertTimer_ = 1.0f;  // 「？」マーク
+            detectionMeter_ = 0.5f;
+        }
+        else
+        {
+            detectionMeter_ -= 0.6f * deltaTime; // 緩やかに見失う
+            if (detectionMeter_ < 0.0f)
+            {
+                detectionMeter_ = 0.0f;
+            }
+        }
+    }
+
+    // --- AI状態ごとの行動ロジック ---
+    if (state_ == AIState::Patrol)
+    {
+        // 巡回中（定点）: ゆっくり左右に首を振る（視野スキャン）
+        static float scanTime = 0.0f;
+        scanTime += deltaTime;
+        // 定点座標の向きから左右にスイング
+        float targetYaw = std::sin(scanTime * 1.5f) * 0.6f;
+        object3d_->SetRotate({ 0.0f, targetYaw, 0.0f });
+    }
+    else if (state_ == AIState::Investigate)
+    {
+        // 音源の捜索: 音がした方向を向いて留まる
+        FaceTarget(investigateTarget_, deltaTime);
+        
+        searchTimer_ -= deltaTime;
+        if (searchTimer_ <= 0.0f)
+        {
+            state_ = AIState::Patrol; // 捜索終了、通常パトロールへ戻る
+        }
+    }
+    else if (state_ == AIState::Chase)
+    {
+        // 戦闘状態: プレイヤーをロックオンして撃つ
+        if (targetPosition)
+        {
+            FaceTarget(*targetPosition, deltaTime);
+        }
+    }
+
+    // タイマーデクリメント
     if (shotCooldownTimer_ > 0.0f)
     {
         shotCooldownTimer_ -= deltaTime;
@@ -114,6 +245,12 @@ void Enemy::Update(WindowAPI* windowAPI, const Vector3* targetPosition, float de
         }
     }
 
+    if (alertTimer_ > 0.0f)
+    {
+        alertTimer_ -= deltaTime;
+        if (alertTimer_ < 0.0f) alertTimer_ = 0.0f;
+    }
+
     object3d_->Update();
 
     // HPバーの座標・サイズ更新
@@ -121,7 +258,7 @@ void Enemy::Update(WindowAPI* windowAPI, const Vector3* targetPosition, float de
     {
         Vector3 enemyPos = GetPosition();
         Vector3 barPos3D = enemyPos;
-        barPos3D.y += 1.5f; // 頭上
+        barPos3D.y += 1.5f;
 
         const Matrix4x4& vp = camera_->GetViewProjectionMatrix();
         float x = barPos3D.x * vp.m[0][0] + barPos3D.y * vp.m[1][0] + barPos3D.z * vp.m[2][0] + vp.m[3][0];
@@ -169,9 +306,66 @@ void Enemy::Update(WindowAPI* windowAPI, const Vector3* targetPosition, float de
     }
 }
 
+bool Enemy::HasLineOfSight(const Vector3& playerPos, const std::vector<std::unique_ptr<Obstacle>>& obstacles)
+{
+    Vector3 enemyPos = GetPosition();
+    Vector3 toPlayer = { playerPos.x - enemyPos.x, playerPos.y - enemyPos.y, playerPos.z - enemyPos.z };
+    float distToPlayer = std::sqrt(toPlayer.x * toPlayer.x + toPlayer.y * toPlayer.y + toPlayer.z * toPlayer.z);
+    if (distToPlayer < 1e-4f) return true;
+
+    Vector3 rayDir = { toPlayer.x / distToPlayer, toPlayer.y / distToPlayer, toPlayer.z / distToPlayer };
+
+    for (const auto& obs : obstacles)
+    {
+        if (!obs) continue;
+        Vector3 obsPos = obs->GetPosition();
+        float obsRadius = obs->GetRadius();
+
+        // 敵（光線始点）から障害物中心へのベクトル
+        Vector3 v = { obsPos.x - enemyPos.x, obsPos.y - enemyPos.y, obsPos.z - enemyPos.z };
+
+        // 射影を計算
+        float t = v.x * rayDir.x + v.y * rayDir.y + v.z * rayDir.z;
+
+        // 線分上の最も近い点をクランプ
+        float tClosest = t;
+        if (tClosest < 0.0f) tClosest = 0.0f;
+        else if (tClosest > distToPlayer) tClosest = distToPlayer;
+
+        Vector3 closestPt = {
+            enemyPos.x + rayDir.x * tClosest,
+            enemyPos.y + rayDir.y * tClosest,
+            enemyPos.z + rayDir.z * tClosest
+        };
+
+        // 障害物中心との距離の平方が半径の平方より小さいか判定
+        float dx = closestPt.x - obsPos.x;
+        float dy = closestPt.y - obsPos.y;
+        float dz = closestPt.z - obsPos.z;
+        float distSq = dx * dx + dy * dy + dz * dz;
+
+        float blockRadius = obsRadius * 1.5f; // 見た目のフェンス幅に合わせるため遮蔽判定半径を少し拡大 (1.5倍)
+        if (distSq < blockRadius * blockRadius)
+        {
+            return false; // 障害物に遮蔽されている
+        }
+    }
+    return true; // 視線が通っている
+}
+
+void Enemy::HearNoise(const Vector3& noisePosition)
+{
+    if (isDead_ || state_ == AIState::Chase) return;
+
+    state_ = AIState::Investigate;
+    investigateTarget_ = noisePosition;
+    searchTimer_ = 3.0f; // 3秒間捜索
+    alertTimer_ = 1.0f;  // 「？」マーク表示タイマー
+}
+
 std::unique_ptr<Bullet> Enemy::TryShoot(const Vector3& targetPosition)
 {
-    if (isDead_ || !object3d_ || !object3dCom_ || !camera_ || shotCooldownTimer_ > 0.0f)
+    if (isDead_ || !object3d_ || !object3dCom_ || !camera_ || shotCooldownTimer_ > 0.0f || state_ != AIState::Chase || alertTimer_ > 0.0f)
     {
         return nullptr;
     }
@@ -211,10 +405,28 @@ void Enemy::Draw(const RenderContext& ctx)
         enemyCtx.textureHandle = TextureManager::GetInstance()->GetSrvHandleGPU(texIdx);
     }
 
+    // 被弾時のノックバック・震動シェイク演出の適用
+    Vector3 originalPos = object3d_->GetTranslate();
+    if (hitFlashTimer_ > 0.0f)
+    {
+        float shakeIntensity = 0.35f * (hitFlashTimer_ / hitFlashDuration_);
+        float rx = ((float)rand() / RAND_MAX * 2.0f - 1.0f) * shakeIntensity;
+        float rz = ((float)rand() / RAND_MAX * 2.0f - 1.0f) * shakeIntensity;
+        object3d_->SetTranslate(originalPos + Vector3{ rx, 0.0f, rz });
+        object3d_->Update(); // WVP行列を再計算してGPUに送るためUpdate
+    }
+
     CustomObject3dRenderer::GetInstance()->Draw(object3d_.get(), enemyCtx, modelData, true);
+
+    // 描画後は論理座標を元に戻して座標ドリフトを防ぐ
+    if (hitFlashTimer_ > 0.0f)
+    {
+        object3d_->SetTranslate(originalPos);
+        object3d_->Update();
+    }
 }
 
-void Enemy::OnHit()
+void Enemy::OnHit(const Vector3& attackerPos)
 {
     if (isDead_ || !object3d_)
     {
@@ -235,6 +447,16 @@ void Enemy::OnHit()
 
     hitFlashTimer_ = hitFlashDuration_;
     object3d_->SetColor({ 6.0f, 6.0f, 6.0f, 1.0f });
+
+    // Attack reaction: turn around to search attacker's direction
+    if (state_ != AIState::Chase)
+    {
+        state_ = AIState::Investigate;
+        investigateTarget_ = attackerPos;
+        searchTimer_ = 3.5f;
+        alertTimer_ = 0.8f;
+        detectionMeter_ = 0.8f; // Set alert to 80%
+    }
 }
 
 void Enemy::Finalize()

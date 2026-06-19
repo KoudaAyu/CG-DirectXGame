@@ -471,8 +471,28 @@ void GamePlayScene::UpdateEnvironment()
 	if (sphereInitialized && sphere_)
 	{
 		Sprite::Transform transformSphere = sphere_->GetTransform();
-		transformSphere.rotate.y += 0.01f;
-		transformSphere.translate.x = -2.0f;
+		transformSphere.rotate.y += 0.05f; // バリア感を出すために少し速めに回転
+		
+		if (player_ && player_->IsDodging())
+		{
+			// プレイヤーアヒルの位置にスナップ（頭部に合わせるためY軸方向に少しオフセット）
+			transformSphere.translate = player_->GetPosition();
+			transformSphere.translate.y += 0.4f;
+			transformSphere.scale = { 1.3f, 1.3f, 1.3f }; // アヒルを覆うサイズ
+			
+			// ドッジタイマーに基づいてシールドサイズを少し脈動させる
+			float pulse = 1.0f + 0.08f * std::sin(player_->GetDodgeTimer() * 35.0f);
+			transformSphere.scale.x *= pulse;
+			transformSphere.scale.y *= pulse;
+			transformSphere.scale.z *= pulse;
+		}
+		else
+		{
+			// 非回避時は従来通りの初期静的配置
+			transformSphere.translate = { -2.0f, 0.0f, 0.0f };
+			transformSphere.scale = { 1.0f, 1.0f, 1.0f };
+		}
+		
 		sphere_->SetTransform(transformSphere);
 		sphere_->Update();
 	}
@@ -511,6 +531,8 @@ void GamePlayScene::UpdateEnvironment()
 
 void GamePlayScene::UpdateParticles(float deltaTime)
 {
+	// 初期状態からテスト用エミッターが連続でパーティクルを出し続けるのを停止
+	/*
 	emitter.frequencyTime += deltaTime;
 	if (emitter.frequencyTime >= emitter.frequency && particleManager)
 	{
@@ -522,6 +544,7 @@ void GamePlayScene::UpdateParticles(float deltaTime)
 		particleManager->AddParticles(newParticles);
 		emitter.frequencyTime -= emitter.frequency;
 	}
+	*/
 
 	// 脱出エリアの「もくもく」煙エフェクト (項目2)
 	if (particleManager && appParticleManager_)
@@ -540,6 +563,104 @@ void GamePlayScene::UpdateParticles(float deltaTime)
 				);
 			}
 			escapeSmokeTimer_ = 0.0f;
+		}
+	}
+
+	// 敵の視野コーンの3Dパーティクルエフェクト描画 (F1デバッグ表示が有効な場合)
+	if (showDebugGizmos_ && particleManager && appParticleManager_)
+	{
+		auto emitVisionCone3D = [&](const Vector3& pos, float yaw, float fov, float maxRange, const Vector4& color) {
+			float halfFov = fov * 0.5f;
+			float startAngle = yaw - halfFov;
+			float endAngle = yaw + halfFov;
+
+			// Left boundary (densely sampled, slowly rising)
+			for (int i = 1; i <= 10; ++i)
+			{
+				float dist = maxRange * (i / 10.0f);
+				Vector3 p = {
+					pos.x + std::sin(startAngle) * dist,
+					pos.y + 0.05f,
+					pos.z + std::cos(startAngle) * dist
+				};
+				appParticleManager_->EmitSparkWithVelocity(
+					particleManager->GetRandomEngine(),
+					p,
+					{ 0.0f, 1.0f, 0.0f }, // Slowly rise up to define a 3D wall of light
+					color,
+					0.22f, // Larger size
+					0.45f, // Longer lifetime
+					particleTextureB
+				);
+			}
+
+			// Right boundary
+			for (int i = 1; i <= 10; ++i)
+			{
+				float dist = maxRange * (i / 10.0f);
+				Vector3 p = {
+					pos.x + std::sin(endAngle) * dist,
+					pos.y + 0.05f,
+					pos.z + std::cos(endAngle) * dist
+				};
+				appParticleManager_->EmitSparkWithVelocity(
+					particleManager->GetRandomEngine(),
+					p,
+					{ 0.0f, 1.0f, 0.0f },
+					color,
+					0.22f,
+					0.45f,
+					particleTextureB
+				);
+			}
+
+			// Outer arc (densely sampled)
+			for (int i = 0; i <= 16; ++i)
+			{
+				float angle = startAngle + i * (fov / 16.0f);
+				Vector3 p = {
+					pos.x + std::sin(angle) * maxRange,
+					pos.y + 0.05f,
+					pos.z + std::cos(angle) * maxRange
+				};
+				appParticleManager_->EmitSparkWithVelocity(
+					particleManager->GetRandomEngine(),
+					p,
+					{ 0.0f, 1.0f, 0.0f },
+					color,
+					0.22f,
+					0.45f,
+					particleTextureB
+				);
+			}
+		};
+
+		if (enemy_ && !enemy_->IsDead())
+		{
+			Vector4 color = { 0.1f, 0.9f, 0.2f, 0.7f }; // Green
+			if (enemy_->GetAIState() == Enemy::AIState::Investigate)
+			{
+				color = { 1.0f, 0.6f, 0.1f, 0.7f }; // Orange
+			}
+			else if (enemy_->GetAIState() == Enemy::AIState::Chase)
+			{
+				color = { 1.0f, 0.1f, 0.1f, 0.7f }; // Red
+			}
+			emitVisionCone3D(enemy_->GetPosition(), enemy_->GetYaw(), enemy_->GetFieldOfView(), enemy_->GetMaxSightRange(), color);
+		}
+
+		if (movingEnemy_ && !movingEnemy_->IsDead())
+		{
+			Vector4 color = { 0.1f, 0.9f, 0.2f, 0.7f }; // Green
+			if (movingEnemy_->GetAIState() == MovingEnemy::AIState::Investigate)
+			{
+				color = { 1.0f, 0.6f, 0.1f, 0.7f }; // Orange
+			}
+			else if (movingEnemy_->GetAIState() == MovingEnemy::AIState::Chase)
+			{
+				color = { 1.0f, 0.1f, 0.1f, 0.7f }; // Red
+			}
+			emitVisionCone3D(movingEnemy_->GetPosition(), movingEnemy_->GetYaw(), movingEnemy_->GetFieldOfView(), movingEnemy_->GetMaxSightRange(), color);
 		}
 	}
 
@@ -660,16 +781,43 @@ void GamePlayScene::UpdateSprites(float deltaTime)
 		cur->SetColor({ 1.0f, 1.0f, 1.0f, 1.0f });
 	}
 
-	// ビネット（ダメージ赤フラッシュ）の更新
+	// ビネット（ダメージ赤フラッシュ ＆ 瀕死時赤鼓動ビネット）の更新
 	if (vignetteSprite_ && directXCom && directXCom->GetWindowAPI())
 	{
 		WindowAPI* windowAPI = directXCom->GetWindowAPI();
+		
+		// 瀕死の赤鼓動の計算
+		float lowHpVignette = 0.0f;
+		if (player_ && !player_->IsDead())
+		{
+			float hpRatio = player_->GetHPRatio();
+			if (hpRatio <= 0.3f)
+			{
+				// 心拍数の周期（HPが低ければ低いほど鼓動が速くなるようにする）
+				static float heartTimer = 0.0f;
+				// HP 30% -> スピード速め。1秒間に約1.5回〜3回のパルス
+				float pulseSpeed = 6.0f + (1.0f - hpRatio / 0.3f) * 6.0f; 
+				heartTimer += pulseSpeed * deltaTime;
+
+				// 鼓動のようなドクン、ドクンという2拍子の波を作る
+				float sinVal = std::sin(heartTimer);
+				float pulse = sinVal > 0.0f ? std::pow(sinVal, 2.0f) : 0.0f; // 収縮期を強調
+				
+				// 最大の強さは残りHPに応じて0.2〜0.5の間で変化
+				float maxIntensity = 0.2f + (1.0f - hpRatio / 0.3f) * 0.3f;
+				lowHpVignette = pulse * maxIntensity;
+			}
+		}
+
 		if (vignetteAlpha_ > 0.0f)
 		{
 			vignetteAlpha_ -= 2.0f * deltaTime; // 0.5sで完全にフェードアウトする速度
 			if (vignetteAlpha_ < 0.0f) vignetteAlpha_ = 0.0f;
 		}
-		vignetteSprite_->SetColor({ 1.0f, 0.0f, 0.0f, vignetteAlpha_ });
+
+		// 被弾赤フラッシュ（一時）と瀕死赤鼓動（持続）の強い方を適用
+		float finalAlpha = (std::max)(vignetteAlpha_, lowHpVignette);
+		vignetteSprite_->SetColor({ 1.0f, 0.0f, 0.0f, finalAlpha });
 		vignetteSprite_->UpdateTransformOnly(windowAPI);
 	}
 }
@@ -706,6 +854,16 @@ void GamePlayScene::UpdateDebugInput()
 			particleManager->AddParticles(newParticles);
 		}
 		prevKey8 = curKey8;
+	}
+
+	{
+		static bool prevF1 = false;
+		const bool curF1 = (GetAsyncKeyState(VK_F1) & 0x8000) != 0;
+		if (curF1 && !prevF1)
+		{
+			showDebugGizmos_ = !showDebugGizmos_;
+		}
+		prevF1 = curF1;
 	}
 }
 
@@ -814,6 +972,34 @@ void GamePlayScene::UpdateCharacters(float deltaTime)
 				if (!prevDodge)
 				{
 					TriggerCameraShake(0.12f, 0.22f); // 回避開始のカメラブレ
+					
+					float maxRad = 10.0f;
+					playerSoundMaxRadius_ = maxRad;
+					playerSoundRadius_ = 0.0f;
+					playerSoundTimer_ = 0.4f; // Ring lasts for 0.4s
+					
+					Vector3 playerPos = player_->GetPosition();
+					if (enemy_ && !enemy_->IsDead())
+					{
+						float dx = enemy_->GetPosition().x - playerPos.x;
+						float dz = enemy_->GetPosition().z - playerPos.z;
+						float dist = std::sqrt(dx * dx + dz * dz);
+						if (dist <= maxRad)
+						{
+							// enemy_->HearNoise(playerPos); // 将来音に反応する敵用に残す
+						}
+					}
+					if (movingEnemy_ && !movingEnemy_->IsDead())
+					{
+						float dx = movingEnemy_->GetPosition().x - playerPos.x;
+						float dz = movingEnemy_->GetPosition().z - playerPos.z;
+						float dist = std::sqrt(dx * dx + dz * dz);
+						if (dist <= maxRad)
+						{
+							// movingEnemy_->HearNoise(playerPos); // 将来音に反応する敵用に残す
+						}
+					}
+					
 					// 足元から全方位（8方向）に勢いよく広がる土煙の輪（キックオフ演出）
 					for (int i = 0; i < 8; ++i)
 					{
@@ -881,6 +1067,40 @@ void GamePlayScene::UpdateCharacters(float deltaTime)
 
 						playerDustTimer_ = 0.0f;
 					}
+
+					// Footstep sound simulation
+					static float stepNoiseAccumulator = 0.0f;
+					stepNoiseAccumulator += deltaTime;
+					if (stepNoiseAccumulator >= 0.35f)
+					{
+						stepNoiseAccumulator = 0.0f;
+						float maxRad = 6.0f;
+						playerSoundMaxRadius_ = maxRad;
+						playerSoundRadius_ = 0.0f;
+						playerSoundTimer_ = 0.25f; // Ring lasts for 0.25s
+						
+						Vector3 playerPos = player_->GetPosition();
+						if (enemy_ && !enemy_->IsDead())
+						{
+							float dx = enemy_->GetPosition().x - playerPos.x;
+							float dz = enemy_->GetPosition().z - playerPos.z;
+							float dist = std::sqrt(dx * dx + dz * dz);
+							if (dist <= maxRad)
+							{
+								// enemy_->HearNoise(playerPos); // 将来音に反応する敵用に残す
+							}
+						}
+						if (movingEnemy_ && !movingEnemy_->IsDead())
+						{
+							float dx = movingEnemy_->GetPosition().x - playerPos.x;
+							float dz = movingEnemy_->GetPosition().z - playerPos.z;
+							float dist = std::sqrt(dx * dx + dz * dz);
+							if (dist <= maxRad)
+							{
+								// movingEnemy_->HearNoise(playerPos); // 将来音に反応する敵用に残す
+							}
+						}
+					}
 				}
 				else
 				{
@@ -897,18 +1117,34 @@ void GamePlayScene::UpdateCharacters(float deltaTime)
 	}
 
 	const Vector3* target = nullptr;
-	Vector3 playerPos{};
+	Vector3 playerPosTarget{};
 	if (player_ && !player_->IsDead())
 	{
-		playerPos = player_->GetPosition();
-		target = &playerPos;
+		playerPosTarget = player_->GetPosition();
+		target = &playerPosTarget;
 	}
 
-	enemy_->Update(windowAPI, target, deltaTime);
+	enemy_->Update(windowAPI, target, obstacles_, deltaTime);
 
 	if (movingEnemy_)
 	{
-		movingEnemy_->Update(windowAPI, target, deltaTime);
+		movingEnemy_->Update(windowAPI, target, obstacles_, deltaTime);
+	}
+
+	// Update sound radius propagation
+	if (playerSoundTimer_ > 0.0f)
+	{
+		playerSoundTimer_ -= deltaTime;
+		playerSoundRadius_ += 30.0f * deltaTime;
+		if (playerSoundRadius_ > playerSoundMaxRadius_)
+		{
+			playerSoundRadius_ = playerSoundMaxRadius_;
+		}
+		if (playerSoundTimer_ <= 0.0f)
+		{
+			playerSoundRadius_ = 0.0f;
+			playerSoundMaxRadius_ = 0.0f;
+		}
 	}
 }
 
@@ -928,6 +1164,32 @@ void GamePlayScene::UpdateCombat(float deltaTime)
 		if (!fired.empty())
 		{
 			bool isShotgun = (fired.size() > 1);
+			float maxRad = isShotgun ? 18.0f : 14.0f;
+			playerSoundMaxRadius_ = maxRad;
+			playerSoundRadius_ = 0.0f;
+			playerSoundTimer_ = 0.6f; // Ring lasts for 0.6s
+			
+			Vector3 playerPos = player_->GetPosition();
+			if (enemy_ && !enemy_->IsDead())
+			{
+				float dx = enemy_->GetPosition().x - playerPos.x;
+				float dz = enemy_->GetPosition().z - playerPos.z;
+				float dist = std::sqrt(dx * dx + dz * dz);
+				if (dist <= maxRad)
+				{
+					// enemy_->HearNoise(playerPos); // 将来音に反応する敵用に残す
+				}
+			}
+			if (movingEnemy_ && !movingEnemy_->IsDead())
+			{
+				float dx = movingEnemy_->GetPosition().x - playerPos.x;
+				float dz = movingEnemy_->GetPosition().z - playerPos.z;
+				float dist = std::sqrt(dx * dx + dz * dz);
+				if (dist <= maxRad)
+				{
+					// movingEnemy_->HearNoise(playerPos); // 将来音に反応する敵用に残す
+				}
+			}
 
 			// ライト点滅タイマーをセット
 			lightFlashTimer_ = isShotgun ? 0.08f : 0.04f;
@@ -1155,7 +1417,7 @@ void GamePlayScene::ResolveBulletCollisions()
 				if (IsWithinRadius(bulletPos, enemyPos, bulletHitRadius_ + enemyHitRadius_))
 				{
 					int prevHp = enemy_->GetHP();
-					enemy_->OnHit();
+					enemy_->OnHit(player_ ? player_->GetPosition() : Vector3{0.0f,0.0f,0.0f});
 					int dmg = prevHp - enemy_->GetHP();
 					if (dmg > 0)
 					{
@@ -1233,7 +1495,7 @@ void GamePlayScene::ResolveBulletCollisions()
 				if (IsWithinRadius(bulletPos, enemyPos, bulletHitRadius_ + enemyHitRadius_))
 				{
 					int prevHp = movingEnemy_->GetHP();
-					movingEnemy_->OnHit();
+					movingEnemy_->OnHit(player_ ? player_->GetPosition() : Vector3{0.0f,0.0f,0.0f});
 					int dmg = prevHp - movingEnemy_->GetHP();
 					if (dmg > 0)
 					{
@@ -1308,15 +1570,15 @@ void GamePlayScene::ResolveBulletCollisions()
 
 				if (particleManager && appParticleManager_)
 				{
-					// プレイヤー被弾：アヒル自身の羽である「黄色/金色の羽」が飛び散る
+					// プレイヤー被弾：アヒルの下羽を模した「白・シルバーの羽」が飛び散る
 					for (int i = 0; i < 25; ++i)
 					{
-						appParticleManager_->EmitFeather(particleManager->GetRandomEngine(), bulletPos, { 1.0f, 0.9f, 0.2f, 1.0f }, particleTextureB);
+						appParticleManager_->EmitFeather(particleManager->GetRandomEngine(), bulletPos, { 0.95f, 0.95f, 1.0f, 1.0f }, particleTextureB);
 					}
-					// プレイヤーのシールド・エネルギー色である「鮮やかな水色/シアンの火花」を散布
+					// 危険を表す「鮮やかな赤色の警告スパーク」を散布
 					for (int i = 0; i < 15; ++i)
 					{
-						appParticleManager_->EmitSpark(particleManager->GetRandomEngine(), bulletPos, {0,0,0}, { 0.0f, 1.0f, 1.0f, 1.0f }, 0.12f, 1.0f, particleTextureB);
+						appParticleManager_->EmitSpark(particleManager->GetRandomEngine(), bulletPos, {0,0,0}, { 1.0f, 0.1f, 0.1f, 1.0f }, 0.12f, 1.0f, particleTextureB);
 					}
 				}
 
@@ -1868,10 +2130,181 @@ void GamePlayScene::Draw(SceneRenderRequests& renderRequests)
 		hitEffect_->Draw();
 	}
 
+	if (sphere_ && sphereInitialized)
+	{
+		if (player_ && player_->IsDodging())
+		{
+			// 回避中は青く半透明に光るシールドとしてオーバーレイ描画
+			sphere_->SetOverlayDraw(true);
+			D3D12_GPU_DESCRIPTOR_HANDLE handle = TextureManager::GetInstance()->GetSrvHandleGPU(particleTextureB); // 円形のテクスチャ
+			if (handle.ptr != 0)
+			{
+				sphere_->Draw(handle);
+			}
+		}
+	}
+
 	if (spriteManager_)
 	{
 		spriteManager_->DrawAll(ctx, &debugCamera_, &sprites, false);
 	}
+
+#ifdef USE_IMGUI
+	if (showDebugGizmos_ && camera_ && cameraShakeTime_ <= 0.0f)
+	{
+		ImGuiIO& io = ImGui::GetIO();
+		float width = io.DisplaySize.x;
+		float height = io.DisplaySize.y;
+
+		if (width > 0.0f && height > 0.0f)
+		{
+			const Matrix4x4& vp = camera_->GetViewProjectionMatrix();
+			ImDrawList* drawList = ImGui::GetForegroundDrawList();
+
+			auto project3DTo2D = [&](const Vector3& pos3D, ImVec2& outPos) -> bool {
+				float w = pos3D.x * vp.m[0][3] + pos3D.y * vp.m[1][3] + pos3D.z * vp.m[2][3] + vp.m[3][3];
+				if (w <= 0.0f) return false;
+				float x = (pos3D.x * vp.m[0][0] + pos3D.y * vp.m[1][0] + pos3D.z * vp.m[2][0] + vp.m[3][0]) / w;
+				float y = (pos3D.x * vp.m[0][1] + pos3D.y * vp.m[1][1] + pos3D.z * vp.m[2][1] + vp.m[3][1]) / w;
+				outPos.x = (x + 1.0f) * 0.5f * width;
+				outPos.y = (1.0f - y) * 0.5f * height;
+				return true;
+			};
+
+			// 1. Draw Player Noise Ring
+			if (playerSoundRadius_ > 0.0f && player_)
+			{
+				Vector3 playerPos = player_->GetPosition();
+				const int numSegments = 32;
+				std::vector<ImVec2> points2D;
+				for (int i = 0; i <= numSegments; ++i)
+				{
+					float angle = i * (6.2831853f / numSegments);
+					Vector3 p3D = {
+						playerPos.x + std::cos(angle) * playerSoundRadius_,
+						playerPos.y,
+						playerPos.z + std::sin(angle) * playerSoundRadius_
+					};
+					ImVec2 p2D;
+					if (project3DTo2D(p3D, p2D))
+					{
+						points2D.push_back(p2D);
+					}
+				}
+				if (points2D.size() > 1)
+				{
+					float alpha = 1.0f - (playerSoundRadius_ / playerSoundMaxRadius_);
+					ImU32 color = ImGui::ColorConvertFloat4ToU32({ 0.0f, 0.8f, 1.0f, alpha * 0.5f });
+					drawList->AddPolyline(points2D.data(), (int)points2D.size(), color, false, 2.5f);
+				}
+			}
+
+			// Helper to draw vision cone
+			auto drawVisionCone = [&](const Vector3& enemyPos, float yaw, float fov, float maxRange, ImU32 color) {
+				const int numSegments = 16;
+				std::vector<ImVec2> points2D;
+				ImVec2 center2D;
+				if (project3DTo2D(enemyPos, center2D))
+				{
+					points2D.push_back(center2D);
+				}
+				else
+				{
+					return;
+				}
+
+				float halfFov = fov * 0.5f;
+				float startAngle = yaw - halfFov;
+
+				for (int i = 0; i <= numSegments; ++i)
+				{
+					float angle = startAngle + i * (fov / numSegments);
+					Vector3 p3D = {
+						enemyPos.x + std::sin(angle) * maxRange,
+						enemyPos.y,
+						enemyPos.z + std::cos(angle) * maxRange
+					};
+					ImVec2 p2D;
+					if (project3DTo2D(p3D, p2D))
+					{
+						points2D.push_back(p2D);
+					}
+				}
+
+				if (points2D.size() > 2)
+				{
+					drawList->AddPolyline(points2D.data(), (int)points2D.size(), color, true, 2.0f);
+					ImU32 fillColor = (color & 0x00FFFFFF) | 0x15000000;
+					drawList->AddConvexPolyFilled(points2D.data(), (int)points2D.size(), fillColor);
+				}
+			};
+
+			// 2. Draw Enemy Vision Cone & Stats
+			if (enemy_ && !enemy_->IsDead())
+			{
+				Vector3 pos = enemy_->GetPosition();
+				float yaw = enemy_->GetYaw();
+				float fov = enemy_->GetFieldOfView();
+				float range = enemy_->GetMaxSightRange();
+				
+				ImU32 color = ImGui::ColorConvertFloat4ToU32({ 0.0f, 1.0f, 0.0f, 0.8f });
+				std::string stateName = "PATROL";
+				if (enemy_->GetAIState() == Enemy::AIState::Investigate)
+				{
+					color = ImGui::ColorConvertFloat4ToU32({ 1.0f, 0.6f, 0.0f, 0.8f });
+					stateName = "INVESTIGATE";
+				}
+				else if (enemy_->GetAIState() == Enemy::AIState::Chase)
+				{
+					color = ImGui::ColorConvertFloat4ToU32({ 1.0f, 0.1f, 0.1f, 0.8f });
+					stateName = "CHASE";
+				}
+
+				drawVisionCone(pos, yaw, fov, range, color);
+
+				ImVec2 head2D;
+				if (project3DTo2D(pos + Vector3{ 0.0f, 1.8f, 0.0f }, head2D))
+				{
+					char buf[128];
+					sprintf_s(buf, "%s (Alert: %.0f%%)", stateName.c_str(), enemy_->GetDetectionMeter() * 100.0f);
+					drawList->AddText(ImVec2(head2D.x - 50.0f, head2D.y), color, buf);
+				}
+			}
+
+			// 3. Draw MovingEnemy Vision Cone & Stats
+			if (movingEnemy_ && !movingEnemy_->IsDead())
+			{
+				Vector3 pos = movingEnemy_->GetPosition();
+				float yaw = movingEnemy_->GetYaw();
+				float fov = movingEnemy_->GetFieldOfView();
+				float range = movingEnemy_->GetMaxSightRange();
+				
+				ImU32 color = ImGui::ColorConvertFloat4ToU32({ 0.0f, 1.0f, 0.0f, 0.8f });
+				std::string stateName = "PATROL";
+				if (movingEnemy_->GetAIState() == MovingEnemy::AIState::Investigate)
+				{
+					color = ImGui::ColorConvertFloat4ToU32({ 1.0f, 0.6f, 0.0f, 0.8f });
+					stateName = "INVESTIGATE";
+				}
+				else if (movingEnemy_->GetAIState() == MovingEnemy::AIState::Chase)
+				{
+					color = ImGui::ColorConvertFloat4ToU32({ 1.0f, 0.1f, 0.1f, 0.8f });
+					stateName = "CHASE";
+				}
+
+				drawVisionCone(pos, yaw, fov, range, color);
+
+				ImVec2 head2D;
+				if (project3DTo2D(pos + Vector3{ 0.0f, 1.8f, 0.0f }, head2D))
+				{
+					char buf[128];
+					sprintf_s(buf, "%s (Alert: %.0f%%)", stateName.c_str(), movingEnemy_->GetDetectionMeter() * 100.0f);
+					drawList->AddText(ImVec2(head2D.x - 50.0f, head2D.y), color, buf);
+				}
+			}
+		}
+	}
+#endif
 
 	renderRequests.sceneDrawn = true;
 }

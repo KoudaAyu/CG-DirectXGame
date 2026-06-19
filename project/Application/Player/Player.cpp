@@ -438,7 +438,25 @@ void Player::Draw(const RenderContext& ctx)
         playerCtx.textureHandle = TextureManager::GetInstance()->GetSrvHandleGPU(texIdx);
     }
 
+    // 被弾時のノックバック・震動シェイク演出の適用
+    Vector3 originalPos = object3d_->GetTranslate();
+    if (hitFlashTimer_ > 0.0f)
+    {
+        float shakeIntensity = 0.35f * (hitFlashTimer_ / hitFlashDuration_);
+        float rx = ((float)rand() / RAND_MAX * 2.0f - 1.0f) * shakeIntensity;
+        float rz = ((float)rand() / RAND_MAX * 2.0f - 1.0f) * shakeIntensity;
+        object3d_->SetTranslate(originalPos + Vector3{ rx, 0.0f, rz });
+        object3d_->Update(); // WVP行列を再計算してGPUに送るためUpdate
+    }
+
     CustomObject3dRenderer::GetInstance()->Draw(object3d_.get(), playerCtx, modelData, true);
+
+    // 描画後は論理座標を元に戻して座標ドリフトを防ぐ
+    if (hitFlashTimer_ > 0.0f)
+    {
+        object3d_->SetTranslate(originalPos);
+        object3d_->Update();
+    }
 }
 
 void Player::Finalize()

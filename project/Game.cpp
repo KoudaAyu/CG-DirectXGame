@@ -262,10 +262,7 @@ void Game::Update()
 	}
 #endif
 
-	//ImGui内部コマンドを生成する
-#ifdef USE_IMGUI
-	if (imguiManager) imguiManager->Render();
-#endif
+
 
 	inputManager.Update();
 
@@ -378,6 +375,7 @@ void Game::Draw()
 
 	//実際のcommandListのImGuiの描画コマンドを積む
 #ifdef USE_IMGUI
+	if (imguiManager) imguiManager->Render();
 	if (dx) ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), dx->GetCommandList().Get());
 #endif
 

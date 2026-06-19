@@ -188,5 +188,11 @@ private:
     static constexpr float bulletHitRadius_ = 0.25f;
     static constexpr float playerHitRadius_ = 0.6f;
     static constexpr float enemyHitRadius_ = 0.6f;
+
+    // --- タクティカル音響 ＆ デバッグ表示 ---
+    float playerSoundRadius_ = 0.0f;
+    float playerSoundMaxRadius_ = 0.0f;
+    float playerSoundTimer_ = 0.0f;
+    bool showDebugGizmos_ = true; // デバッグコーンと音波リングの表示フラグ (F1でトグル)
 };
 
