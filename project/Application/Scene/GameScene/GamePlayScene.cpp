@@ -225,6 +225,21 @@ void GamePlayScene::InitializeSprites()
 		playerReloadBarBg_ = sprites[sprites.size() - 2].get();
 		playerReloadBarFg_ = sprites[sprites.size() - 1].get();
 	}
+
+	// 速度線のスプライトを初期化 (8本)
+	speedLines_.clear();
+	speedLineAlpha_ = 0.0f;
+	for (int i = 0; i < 8; ++i)
+	{
+		auto line = Sprite::Create(sc, defaultTransform, "Resources/CG4/gradationLine.png");
+		if (line)
+		{
+			line->SetAnchorPoint({ 0.5f, 0.0f });
+			line->SetColor({ 1.0f, 1.0f, 1.0f, 0.0f });
+			sprites.emplace_back(std::move(line));
+			speedLines_.push_back(sprites.back().get());
+		}
+	}
 }
 
 void GamePlayScene::InitializeAudioAndParticles()
@@ -521,7 +536,7 @@ void GamePlayScene::UpdateParticles(float deltaTime)
 	}
 }
 
-void GamePlayScene::UpdateSprites()
+void GamePlayScene::UpdateSprites(float deltaTime)
 {
 	if (spriteManager_ && directXCom)
 	{
@@ -529,6 +544,72 @@ void GamePlayScene::UpdateSprites()
 		if (windowAPI)
 		{
 			spriteManager_->Update(windowAPI, &debugCamera_);
+		}
+	}
+
+	// 速度線の更新
+	if (directXCom && directXCom->GetWindowAPI())
+	{
+		WindowAPI* windowAPI = directXCom->GetWindowAPI();
+		float width = static_cast<float>(windowAPI->GetClientWidth());
+		float height = static_cast<float>(windowAPI->GetClientHeight());
+		Vector2 center = { width * 0.5f, height * 0.5f };
+
+		// 回避中ならアルファ値を上げ、そうでなければ下げる
+		if (player_ && player_->IsDodging())
+		{
+			speedLineAlpha_ += 10.0f * deltaTime; // 高速でフェードイン
+			if (speedLineAlpha_ > 0.6f) speedLineAlpha_ = 0.6f;
+		}
+		else
+		{
+			speedLineAlpha_ -= 4.0f * deltaTime; // フェードアウト
+			if (speedLineAlpha_ < 0.0f) speedLineAlpha_ = 0.0f;
+		}
+
+		// 回避タイマー割合を基準にスケールアニメーション
+		float dodgeProgress = 1.0f;
+		if (player_ && player_->IsDodging())
+		{
+			dodgeProgress = player_->GetDodgeTimer() / player_->GetDodgeDuration();
+		}
+
+		for (size_t i = 0; i < speedLines_.size(); ++i)
+		{
+			auto* line = speedLines_[i];
+			if (!line) continue;
+
+			if (speedLineAlpha_ <= 0.0f)
+			{
+				line->SetSize({ 0.0f, 0.0f });
+				line->UpdateTransformOnly(windowAPI);
+				continue;
+			}
+
+			// 放射状の角度
+			float angle = i * (6.2831853f / speedLines_.size());
+			
+			// 中心から外側に向かうベクトル
+			Vector2 dir = { std::cos(angle), std::sin(angle) };
+
+			// 画面端から少し中心側にオフセット
+			float maxDist = (std::max)(width, height) * 0.5f;
+			// 回避進行度に合わせて、中央に向けて伸縮アニメーション
+			float dist = maxDist * (0.8f + 0.2f * std::sin(dodgeProgress * 3.14159f));
+
+			Vector2 pos = { center.x + dir.x * dist, center.y + dir.y * dist };
+
+			line->SetPosition(pos);
+			// 速度線の向きを中心に合わせる
+			line->SetRotation(angle - 1.570796f); // gradationLineは縦方向なので90度ずらす
+			
+			// スピード感のあるサイズ (幅と長さ)
+			float lineWidth = 8.0f + 4.0f * std::sin(static_cast<float>(i + dodgeProgress * 10.0f));
+			float lineHeight = maxDist * 0.7f;
+			line->SetSize({ lineWidth, lineHeight });
+			
+			line->SetColor({ 1.0f, 1.0f, 1.0f, speedLineAlpha_ });
+			line->UpdateTransformOnly(windowAPI);
 		}
 	}
 
@@ -706,6 +787,25 @@ void GamePlayScene::UpdateCharacters(float deltaTime)
 			}
 			else
 			{
+				if (prevDodge)
+				{
+					// 回避終了時の着地衝撃波（土煙の放射状バースト ＆ カメラブレ）
+					TriggerCameraShake(0.15f, 0.35f);
+					for (int i = 0; i < 12; ++i)
+					{
+						float angle = i * (6.2831853f / 12.0f);
+						Vector3 vel = { std::cos(angle) * 3.2f, 0.5f, std::sin(angle) * 3.2f };
+						appParticleManager_->EmitDustWithVelocity(
+							particleManager->GetRandomEngine(),
+							playerPos,
+							2.0f,
+							{ 1.0f, 1.0f, 1.0f, 0.8f },
+							vel,
+							0.45f,
+							particleTextureB
+						);
+					}
+				}
 				prevDodge = false;
 				if (player_->IsMoving())
 				{
@@ -801,7 +901,7 @@ void GamePlayScene::UpdateCombat(float deltaTime)
 						dir,
 						right,
 						up,
-						{ 1.0f, 1.0f, 1.0f, 1.0f }, // Default white/orange flash
+						{ 1.0f, 0.85f, 0.2f, 1.0f }, // Gold/Yellow flash for Player
 						speedMultiplier,
 						particleTextureB
 					);
@@ -902,9 +1002,28 @@ void GamePlayScene::UpdateBullets(float deltaTime)
 {
 	for (auto& bullet : bullets_)
 	{
-		if (bullet)
+		if (bullet && !bullet->IsDead())
 		{
 			bullet->Update(deltaTime);
+
+			// 弾道スモークトレイルの生成
+			if (particleManager && appParticleManager_)
+			{
+				Vector3 pos = bullet->GetPosition();
+				Vector4 color = { 0.7f, 0.9f, 1.0f, 0.35f }; // Player bullet has a light cyan/blue smoke trail
+				if (bullet->GetOwner() == BulletOwner::Enemy)
+				{
+					color = { 1.0f, 0.2f, 0.2f, 0.35f }; // Enemy bullet has a pure red smoke trail
+				}
+
+				appParticleManager_->EmitDust(
+					particleManager->GetRandomEngine(),
+					pos,
+					0.5f,
+					color,
+					particleTextureB
+				);
+			}
 		}
 	}
 }
@@ -958,15 +1077,30 @@ void GamePlayScene::ResolveBulletCollisions()
 						}
 						if (particleManager && appParticleManager_)
 						{
-							// 羽70枚の大爆発
-							for (int i = 0; i < 70; ++i)
+							// 羽90枚の大爆発 (通常アヒルなので黄色い羽)
+							for (int i = 0; i < 90; ++i)
 							{
-								appParticleManager_->EmitFeather(particleManager->GetRandomEngine(), enemyPos, { 1.0f, 1.0f, 1.0f, 1.0f }, particleTextureB);
+								appParticleManager_->EmitFeather(particleManager->GetRandomEngine(), enemyPos, { 1.0f, 0.9f, 0.2f, 1.0f }, particleTextureB);
 							}
-							// 火花30発
+							// オレンジの火花30発
 							for (int i = 0; i < 30; ++i)
 							{
-								appParticleManager_->EmitSpark(particleManager->GetRandomEngine(), enemyPos, {0,0,0}, { 1.0f, 0.9f, 0.4f, 1.0f }, 0.15f, 1.5f, particleTextureB);
+								appParticleManager_->EmitSpark(particleManager->GetRandomEngine(), enemyPos, {0,0,0}, { 1.0f, 0.6f, 0.0f, 1.0f }, 0.15f, 1.5f, particleTextureB);
+							}
+							// ドーナツ状に広がる白い煙のリング
+							for (int i = 0; i < 40; ++i)
+							{
+								float angle = i * (6.2831853f / 40.0f);
+								Vector3 vel = { std::cos(angle) * 3.5f, 0.2f, std::sin(angle) * 3.5f };
+								appParticleManager_->EmitDustWithVelocity(
+									particleManager->GetRandomEngine(),
+									enemyPos,
+									2.0f,
+									{ 1.0f, 1.0f, 1.0f, 0.6f },
+									vel,
+									0.6f,
+									particleTextureB
+								);
 							}
 						}
 					}
@@ -976,15 +1110,15 @@ void GamePlayScene::ResolveBulletCollisions()
 						TriggerCameraShake(0.12f, 0.35f);
 						if (particleManager && appParticleManager_)
 						{
-							// 羽30枚
+							// 黄色い羽30枚
 							for (int i = 0; i < 30; ++i)
 							{
-								appParticleManager_->EmitFeather(particleManager->GetRandomEngine(), bulletPos, { 1.0f, 1.0f, 1.0f, 1.0f }, particleTextureB);
+								appParticleManager_->EmitFeather(particleManager->GetRandomEngine(), bulletPos, { 1.0f, 0.9f, 0.2f, 1.0f }, particleTextureB);
 							}
-							// 火花15発
+							// オレンジの火花15発
 							for (int i = 0; i < 15; ++i)
 							{
-								appParticleManager_->EmitSpark(particleManager->GetRandomEngine(), bulletPos, {0,0,0}, { 1.0f, 0.9f, 0.4f, 1.0f }, 0.12f, 1.0f, particleTextureB);
+								appParticleManager_->EmitSpark(particleManager->GetRandomEngine(), bulletPos, {0,0,0}, { 1.0f, 0.6f, 0.0f, 1.0f }, 0.12f, 1.0f, particleTextureB);
 							}
 						}
 					}
@@ -1006,15 +1140,30 @@ void GamePlayScene::ResolveBulletCollisions()
 						TriggerCameraShake(0.45f, 0.9f);
 						if (particleManager && appParticleManager_)
 						{
-							// 羽70枚の大爆発 (青アヒルなので青白の羽)
-							for (int i = 0; i < 70; ++i)
+							// 羽90枚の大爆発 (青アヒルなので青の羽)
+							for (int i = 0; i < 90; ++i)
 							{
-								appParticleManager_->EmitFeather(particleManager->GetRandomEngine(), enemyPos, { 0.85f, 0.95f, 1.0f, 1.0f }, particleTextureB);
+								appParticleManager_->EmitFeather(particleManager->GetRandomEngine(), enemyPos, { 0.2f, 0.7f, 1.0f, 1.0f }, particleTextureB);
 							}
 							// 紫色の火花30発
 							for (int i = 0; i < 30; ++i)
 							{
-								appParticleManager_->EmitSpark(particleManager->GetRandomEngine(), enemyPos, {0,0,0}, { 0.9f, 0.5f, 1.0f, 1.0f }, 0.15f, 1.5f, particleTextureB);
+								appParticleManager_->EmitSpark(particleManager->GetRandomEngine(), enemyPos, {0,0,0}, { 0.8f, 0.3f, 1.0f, 1.0f }, 0.15f, 1.5f, particleTextureB);
+							}
+							// 青紫がかった煙のリング
+							for (int i = 0; i < 40; ++i)
+							{
+								float angle = i * (6.2831853f / 40.0f);
+								Vector3 vel = { std::cos(angle) * 3.5f, 0.2f, std::sin(angle) * 3.5f };
+								appParticleManager_->EmitDustWithVelocity(
+									particleManager->GetRandomEngine(),
+									enemyPos,
+									2.0f,
+									{ 0.85f, 0.9f, 1.0f, 0.6f },
+									vel,
+									0.6f,
+									particleTextureB
+								);
 							}
 						}
 					}
@@ -1024,15 +1173,15 @@ void GamePlayScene::ResolveBulletCollisions()
 						TriggerCameraShake(0.12f, 0.35f);
 						if (particleManager && appParticleManager_)
 						{
-							// 青白い羽30枚
+							// 青い羽30枚
 							for (int i = 0; i < 30; ++i)
 							{
-								appParticleManager_->EmitFeather(particleManager->GetRandomEngine(), bulletPos, { 0.85f, 0.95f, 1.0f, 1.0f }, particleTextureB);
+								appParticleManager_->EmitFeather(particleManager->GetRandomEngine(), bulletPos, { 0.2f, 0.7f, 1.0f, 1.0f }, particleTextureB);
 							}
 							// 紫色の火花15発
 							for (int i = 0; i < 15; ++i)
 							{
-								appParticleManager_->EmitSpark(particleManager->GetRandomEngine(), bulletPos, {0,0,0}, { 0.9f, 0.5f, 1.0f, 1.0f }, 0.12f, 1.0f, particleTextureB);
+								appParticleManager_->EmitSpark(particleManager->GetRandomEngine(), bulletPos, {0,0,0}, { 0.8f, 0.3f, 1.0f, 1.0f }, 0.12f, 1.0f, particleTextureB);
 							}
 						}
 					}
@@ -1049,15 +1198,15 @@ void GamePlayScene::ResolveBulletCollisions()
 
 				if (particleManager && appParticleManager_)
 				{
-					// プレイヤー被弾：羽30枚
+					// プレイヤー被弾：危険を示す赤い羽30枚
 					for (int i = 0; i < 30; ++i)
 					{
-						appParticleManager_->EmitFeather(particleManager->GetRandomEngine(), bulletPos, { 1.0f, 1.0f, 1.0f, 1.0f }, particleTextureB);
+						appParticleManager_->EmitFeather(particleManager->GetRandomEngine(), bulletPos, { 1.0f, 0.2f, 0.2f, 1.0f }, particleTextureB);
 					}
-					// 火花15発
+					// 赤い火花15発
 					for (int i = 0; i < 15; ++i)
 					{
-						appParticleManager_->EmitSpark(particleManager->GetRandomEngine(), bulletPos, {0,0,0}, { 1.0f, 0.9f, 0.4f, 1.0f }, 0.12f, 1.0f, particleTextureB);
+						appParticleManager_->EmitSpark(particleManager->GetRandomEngine(), bulletPos, {0,0,0}, { 1.0f, 0.3f, 0.3f, 1.0f }, 0.12f, 1.0f, particleTextureB);
 					}
 				}
 
@@ -1195,7 +1344,7 @@ void GamePlayScene::Update()
 	UpdateEnvironment();
 	UpdateObstacles();
 	UpdateParticles(deltaTime);
-	UpdateSprites();
+	UpdateSprites(deltaTime);
 	UpdateDebugInput();
 	UpdateCharacters(deltaTime);
 	UpdateCombat(deltaTime);

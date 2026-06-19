@@ -56,6 +56,8 @@ private:
     bool isDead_ = false;
     float invincibilityTimer_ = 0.0f;
     const float invincibilityDuration_ = 1.0f;
+    float hitFlashTimer_ = 0.0f;
+    const float hitFlashDuration_ = 0.12f;
 
     Vector3 bulletSpawnOffset_ = { 0.0f, 0.2f, 0.5f };
     float bulletSpeed_ = 0.45f;

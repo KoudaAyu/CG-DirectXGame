@@ -255,16 +255,12 @@ void Game::Update()
 
 
 
-#ifdef _DEBUG
-
-
+#ifdef USE_IMGUI
 	if (debugUI)
 	{
 		debugUI->Update();
 	}
-
-
-#endif // DEBUG
+#endif
 
 	//ImGui内部コマンドを生成する
 #ifdef USE_IMGUI

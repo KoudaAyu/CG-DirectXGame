@@ -66,7 +66,7 @@ private:
     void UpdateExtractionGoal(float deltaTime);
     void UpdateEnvironment();
     void UpdateParticles(float deltaTime);
-    void UpdateSprites();
+    void UpdateSprites(float deltaTime);
     void UpdateDebugInput();
     void UpdateCharacters(float deltaTime);
     void UpdateCombat(float deltaTime);
@@ -151,6 +151,9 @@ private:
     float escapeSmokeTimer_ = 0.0f;
     float lightFlashTimer_ = 0.0f;
     float clearCelebrateTimer_ = 0.0f;
+    bool wasPlayerDodging_ = false;
+    std::vector<Sprite*> speedLines_;
+    float speedLineAlpha_ = 0.0f;
 
     // --- カメラシェイク ---
     float cameraShakeTime_ = 0.0f;

@@ -394,7 +394,7 @@ void MovingEnemy::OnHit()
     }
 
     hitFlashTimer_ = hitFlashDuration_;
-    object3d_->SetColor({ 1.0f, 0.2f, 0.2f, 1.0f });
+    object3d_->SetColor({ 6.0f, 6.0f, 6.0f, 1.0f });
 }
 
 void MovingEnemy::Finalize()

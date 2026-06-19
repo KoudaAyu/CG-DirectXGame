@@ -36,6 +36,7 @@ void Player::Initialize(Object3dCom* object3dCom, Camera* camera)
     hp_ = maxHp_ = 100.0f;
     isDead_ = false;
     invincibilityTimer_ = 0.0f;
+    hitFlashTimer_ = 0.0f;
 
     // 弾薬の初期化
     magazineAmmo_ = maxMagazineAmmo_;
@@ -85,8 +86,22 @@ void Player::Update(float deltaTime, MouseInput* mouseInput)
         }
     }
 
+    // 被弾フラッシュタイマーの更新
+    if (hitFlashTimer_ > 0.0f)
+    {
+        hitFlashTimer_ -= deltaTime;
+        if (hitFlashTimer_ <= 0.0f)
+        {
+            hitFlashTimer_ = 0.0f;
+            object3d_->SetColor({ 1.0f, 1.0f, 1.0f, 1.0f });
+        }
+        else
+        {
+            object3d_->SetColor({ 5.0f, 5.0f, 5.0f, 1.0f });
+        }
+    }
     // 無敵時間タイマーと点滅処理の更新
-    if (invincibilityTimer_ > 0.0f)
+    else if (invincibilityTimer_ > 0.0f)
     {
         invincibilityTimer_ -= deltaTime;
         if (invincibilityTimer_ <= 0.0f)
@@ -451,6 +466,8 @@ void Player::TakeDamage(float damage)
     else
     {
         invincibilityTimer_ = invincibilityDuration_;
+        hitFlashTimer_ = hitFlashDuration_;
+        object3d_->SetColor({ 5.0f, 5.0f, 5.0f, 1.0f });
     }
 }
 
@@ -459,6 +476,7 @@ void Player::Reset()
     hp_ = maxHp_;
     isDead_ = false;
     invincibilityTimer_ = 0.0f;
+    hitFlashTimer_ = 0.0f;
     magazineAmmo_ = maxMagazineAmmo_;
     isReloading_ = false;
     reloadTimer_ = 0.0f;
