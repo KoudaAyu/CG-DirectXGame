@@ -70,7 +70,12 @@ bool Enemy::FaceTarget(const Vector3& targetPosition, float deltaTime)
         diff = 3.14f; // Force clockwise rotation
     }
 
-    float maxRotate = 3.5f * deltaTime;
+    float turnSpeed = 3.5f;
+    if (state_ == AIState::Investigate || state_ == AIState::Chase)
+    {
+        turnSpeed = 12.0f; // 警戒時・追跡時はより高速に振り向く
+    }
+    float maxRotate = turnSpeed * deltaTime;
     if (std::abs(diff) > maxRotate)
     {
         diff = (diff > 0.0f) ? maxRotate : -maxRotate;

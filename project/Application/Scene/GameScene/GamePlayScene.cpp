@@ -586,10 +586,10 @@ void GamePlayScene::UpdateParticles(float deltaTime)
 				appParticleManager_->EmitSparkWithVelocity(
 					particleManager->GetRandomEngine(),
 					p,
-					{ 0.0f, 1.0f, 0.0f }, // Slowly rise up to define a 3D wall of light
+					{ 0.0f, 0.0f, 0.0f }, // No rise, stay flat on the ground
 					color,
 					0.22f, // Larger size
-					0.45f, // Longer lifetime
+					0.02f, // 1-frame lifetime to prevent lag
 					particleTextureB
 				);
 			}
@@ -606,10 +606,10 @@ void GamePlayScene::UpdateParticles(float deltaTime)
 				appParticleManager_->EmitSparkWithVelocity(
 					particleManager->GetRandomEngine(),
 					p,
-					{ 0.0f, 1.0f, 0.0f },
+					{ 0.0f, 0.0f, 0.0f },
 					color,
 					0.22f,
-					0.45f,
+					0.02f,
 					particleTextureB
 				);
 			}
@@ -626,10 +626,10 @@ void GamePlayScene::UpdateParticles(float deltaTime)
 				appParticleManager_->EmitSparkWithVelocity(
 					particleManager->GetRandomEngine(),
 					p,
-					{ 0.0f, 1.0f, 0.0f },
+					{ 0.0f, 0.0f, 0.0f },
 					color,
 					0.22f,
-					0.45f,
+					0.02f,
 					particleTextureB
 				);
 			}
@@ -1734,11 +1734,11 @@ void GamePlayScene::Update()
 
 	UpdateEnvironment();
 	UpdateObstacles();
-	UpdateParticles(deltaTime);
 	UpdateSprites(deltaTime);
 	UpdateDebugInput();
 	UpdateCharacters(deltaTime);
 	UpdateCombat(deltaTime);
+	UpdateParticles(deltaTime);
 	ResolveObstacleCollisions();
 	UpdatePlayerHpBar();
 	CheckGameOver();
@@ -2150,7 +2150,7 @@ void GamePlayScene::Draw(SceneRenderRequests& renderRequests)
 	}
 
 #ifdef USE_IMGUI
-	if (showDebugGizmos_ && camera_ && cameraShakeTime_ <= 0.0f)
+	if (showDebugGizmos_ && camera_)
 	{
 		ImGuiIO& io = ImGui::GetIO();
 		float width = io.DisplaySize.x;
