@@ -35,6 +35,8 @@ public:
     int GetHP() const { return hp_; }
     int GetMaxHP() const { return maxHp_; }
     bool IsDead() const { return isDead_; }
+    bool GetJustRespawned() const { return justRespawned_; }
+    void ClearJustRespawned() { justRespawned_ = false; }
     void SetHPBarSprites(Sprite* bg, Sprite* fg) { hpBarBg_ = bg; hpBarFg_ = fg; }
 
     // AI索敵ゲッター
@@ -64,6 +66,7 @@ private:
     int hp_ = 5;
     int maxHp_ = 5;
     bool isDead_ = false;
+    bool justRespawned_ = false;
     float respawnTimer_ = 0.0f;
     const float respawnDuration_ = 3.0f;
 

@@ -32,6 +32,7 @@ void MovingEnemy::Initialize(Object3dCom* object3dCom, Camera* camera)
 
     hp_ = maxHp_;
     isDead_ = false;
+    justRespawned_ = false;
     respawnTimer_ = 0.0f;
     shotCooldownTimer_ = shotCooldown_;
     state_ = AIState::Patrol;
@@ -100,6 +101,7 @@ void MovingEnemy::Update(WindowAPI* windowAPI, const Vector3* targetPosition, co
         if (respawnTimer_ <= 0.0f)
         {
             isDead_ = false;
+            justRespawned_ = true;
             hp_ = maxHp_;
             state_ = AIState::Patrol;
             movingToB_ = true;
@@ -517,6 +519,7 @@ void MovingEnemy::OnHit(const Vector3& attackerPos)
     {
         hp_ = 0;
         isDead_ = true;
+        justRespawned_ = false;
         respawnTimer_ = respawnDuration_;
 
         if (hpBarBg_) hpBarBg_->SetSize({ 0.0f, 0.0f });

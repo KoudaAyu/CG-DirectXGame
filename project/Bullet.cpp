@@ -22,6 +22,7 @@ void Bullet::Initialize(Object3dCom* object3dCom, Camera* camera, const Vector3&
     elapsed_ = 0.0f;
     isDead_ = false;
     owner_ = owner;
+    nearMissTriggered_ = false;
 
     const float len = std::sqrt(direction.x * direction.x + direction.y * direction.y + direction.z * direction.z);
     if (len > 1e-6f)

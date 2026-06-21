@@ -415,4 +415,65 @@ void AppParticleManager::EmitSparkPlayerRelative(std::mt19937& randomEngine, con
 	particles_.push_back(p);
 }
 
+void AppParticleManager::EmitDeathFlash(std::mt19937& randomEngine, const Vector3& position, float scale, const Vector4& color, float lifeTime, uint32_t textureIndex)
+{
+	// 敵死亡時の超強力なレンズフレア・スターバースト型閃光エフェクト
+	// 異なる角度とサイズで3枚のスターバースト画像を重ねることで、動きと立体感を出す
+	
+	// 1枚目：中心の主ビーム（大）
+	{
+		AppParticle p;
+		p.transform.Initialize();
+		p.transform.SetTranslate(position);
+		p.transform.SetRotate({ 0.0f, 0.0f, 0.0f });
+		p.transform.SetScale({ scale * 1.5f, scale * 1.5f, 1.0f });
+		p.velocity = { 0.0f, 0.0f, 0.0f };
+		p.color = color;
+		p.lifeTime = lifeTime;
+		p.currentTime = 0.0f;
+		p.textureIndex = textureIndex;
+		p.gravity = 0.0f;
+		p.bounceElasticity = 0.0f;
+		p.angularVelocity = 0.5f; // 少し回転させる
+		particles_.push_back(p);
+	}
+	
+	// 2枚目：斜め45度回転（中）
+	{
+		AppParticle p;
+		p.transform.Initialize();
+		p.transform.SetTranslate(position);
+		p.transform.SetRotate({ 0.0f, 0.0f, 0.785398f }); // 45 deg
+		p.transform.SetScale({ scale * 1.1f, scale * 1.1f, 1.0f });
+		p.velocity = { 0.0f, 0.0f, 0.0f };
+		p.color = color;
+		p.lifeTime = lifeTime * 0.8f; // 少し早く消す
+		p.currentTime = 0.0f;
+		p.textureIndex = textureIndex;
+		p.gravity = 0.0f;
+		p.bounceElasticity = 0.0f;
+		p.angularVelocity = -0.8f; // 逆方向に回転
+		particles_.push_back(p);
+	}
+
+	// 3枚目：コアの超高輝度フラッシュ（小、白め）
+	{
+		AppParticle p;
+		p.transform.Initialize();
+		p.transform.SetTranslate(position);
+		std::uniform_real_distribution<float> angleDist(0.0f, 6.2831853f);
+		p.transform.SetRotate({ 0.0f, 0.0f, angleDist(randomEngine) });
+		p.transform.SetScale({ scale * 0.7f, scale * 0.7f, 1.0f });
+		p.velocity = { 0.0f, 0.0f, 0.0f };
+		p.color = { 1.0f, 1.0f, 1.0f, 1.0f }; // コアは白
+		p.lifeTime = lifeTime * 0.6f;
+		p.currentTime = 0.0f;
+		p.textureIndex = textureIndex;
+		p.gravity = 0.0f;
+		p.bounceElasticity = 0.0f;
+		p.angularVelocity = 1.2f;
+		particles_.push_back(p);
+	}
+}
+
 

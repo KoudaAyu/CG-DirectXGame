@@ -26,6 +26,8 @@ public:
     BulletOwner GetOwner() const { return owner_; }
     Vector3 GetPosition() const { return object3d_ ? object3d_->GetTranslate() : Vector3{ 0.0f, 0.0f, 0.0f }; }
     Vector3 GetDirection() const { return direction_; }
+    bool IsNearMissTriggered() const { return nearMissTriggered_; }
+    void TriggerNearMiss() { nearMissTriggered_ = true; }
 
 private:
     std::unique_ptr<Object3d> object3d_;
@@ -38,6 +40,7 @@ private:
     float elapsed_ = 0.0f;
     bool isDead_ = false;
     BulletOwner owner_ = BulletOwner::Player;
+    bool nearMissTriggered_ = false;
 
     uint32_t defaultTextureIndex_ = UINT32_MAX;
 };

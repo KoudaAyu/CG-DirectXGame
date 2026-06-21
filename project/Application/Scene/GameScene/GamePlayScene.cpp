@@ -276,6 +276,7 @@ void GamePlayScene::InitializeAudioAndParticles()
 	particleTextureA = TextureManager::GetInstance()->Load("Resources/uvChecker.png");
 	particleTextureB = TextureManager::GetInstance()->Load("Resources/CG4/circle2.png");
 	fenceTextureIndex_ = TextureManager::GetInstance()->Load("Resources/fence.png");
+	starburstTextureIndex_ = TextureManager::GetInstance()->Load("Resources/starburst.png");
 	if (hitEffect_)
 	{
 		hitEffect_->SetPlaneParticleTextureIndex(particleTextureB);
@@ -664,6 +665,47 @@ void GamePlayScene::UpdateParticles(float deltaTime)
 		}
 	}
 
+	// 敵の警戒予兆エフェクト (Suspicion Aura)
+	if (particleManager && appParticleManager_)
+	{
+		auto emitSuspicionAura = [&](const Vector3& pos, float meter) {
+			// 警戒度に応じて発生頻度を高める (15% 〜 45%)
+			int chance = static_cast<int>(15.0f + meter * 30.0f);
+			if (rand() % 100 < chance)
+			{
+				std::uniform_real_distribution<float> offsetDist(-0.35f, 0.35f);
+				Vector3 spawnPos = pos + Vector3{ offsetDist(particleManager->GetRandomEngine()), 1.3f, offsetDist(particleManager->GetRandomEngine()) };
+				
+				std::uniform_real_distribution<float> velY(0.5f, 1.3f);
+				std::uniform_real_distribution<float> velXZ(-0.2f, 0.2f);
+				Vector3 vel = { velXZ(particleManager->GetRandomEngine()), velY(particleManager->GetRandomEngine()), velXZ(particleManager->GetRandomEngine()) };
+
+				// 警戒度に応じた色（黄色〜オレンジ）
+				Vector4 color = { 1.0f, 0.9f - (meter * 0.3f), 0.15f, 0.75f };
+
+				appParticleManager_->EmitDustWithVelocity(
+					particleManager->GetRandomEngine(),
+					spawnPos,
+					0.85f, // はっきり見えるサイズに拡大
+					color,
+					vel,
+					1.15f, // 寿命を長くして頭上へ立ち上らせる
+					particleTextureB
+				);
+			}
+		};
+
+		if (enemy_ && !enemy_->IsDead() && enemy_->GetDetectionMeter() > 0.0f && enemy_->GetAIState() != Enemy::AIState::Chase)
+		{
+			emitSuspicionAura(enemy_->GetPosition(), enemy_->GetDetectionMeter());
+		}
+
+		if (movingEnemy_ && !movingEnemy_->IsDead() && movingEnemy_->GetDetectionMeter() > 0.0f && movingEnemy_->GetAIState() != MovingEnemy::AIState::Chase)
+		{
+			emitSuspicionAura(movingEnemy_->GetPosition(), movingEnemy_->GetDetectionMeter());
+		}
+	}
+
 	if (appParticleManager_)
 	{
 		appParticleManager_->Update(deltaTime, player_ ? player_->GetPosition() : Vector3{ 0.0f, 0.0f, 0.0f });
@@ -948,20 +990,33 @@ void GamePlayScene::UpdateCharacters(float deltaTime)
 			// リロード完了の検知
 			if (wasPlayerReloading_ && !player_->IsReloading())
 			{
-				for (int i = 0; i < 30; ++i)
+				// 巨大な緑のマズルフレアを発生させて完了の瞬間を目立たせる
+				if (particleManager && appParticleManager_)
 				{
-					float angle = i * (6.2831853f / 30.0f);
-					Vector3 vel = { std::cos(angle) * 4.5f, 0.3f, std::sin(angle) * 4.5f };
-					appParticleManager_->EmitSparkPlayerRelative(
+					appParticleManager_->EmitMuzzleFlare(
 						particleManager->GetRandomEngine(),
-						playerPos,
-						Vector3{0.0f, 0.1f, 0.0f},
-						vel,
-						{ 0.2f, 1.0f, 0.4f, 1.0f },
-						0.2f,
-						0.6f,
+						playerPos + Vector3{ 0.0f, 0.4f, 0.0f },
+						0.75f,
+						{ 0.3f, 1.0f, 0.5f, 1.0f }, // 鮮やかな緑色
+						0.08f,
 						particleTextureB
 					);
+
+					for (int i = 0; i < 60; ++i)
+					{
+						float angle = i * (6.2831853f / 60.0f);
+						Vector3 vel = { std::cos(angle) * 6.5f, 0.3f, std::sin(angle) * 6.5f };
+						appParticleManager_->EmitSparkPlayerRelative(
+							particleManager->GetRandomEngine(),
+							playerPos,
+							Vector3{0.0f, 0.1f, 0.0f},
+							vel,
+							{ 0.2f, 1.0f, 0.4f, 1.0f },
+							0.45f, // はっきり見えるサイズ
+							0.6f,
+							particleTextureB
+						);
+					}
 				}
 			}
 			wasPlayerReloading_ = player_->IsReloading();
@@ -1131,6 +1186,78 @@ void GamePlayScene::UpdateCharacters(float deltaTime)
 		movingEnemy_->Update(windowAPI, target, obstacles_, deltaTime);
 	}
 
+	// 敵の復活時演出 (Enemy Respawn Effects - 光の召喚ピラー)
+	if (particleManager && appParticleManager_)
+	{
+		auto emitRespawnPortal = [&](const Vector3& spawnPos, const Vector4& portalColor, float scaleMult = 1.0f) {
+			// 二重同心円状に配置した粒子を垂直上方向に打ち上げて光の柱を形成する
+			
+			// 外円 (半径 0.7f, 24個 of particles)
+			for (int i = 0; i < 24; ++i)
+			{
+				float angle = i * (6.2831853f / 24.0f);
+				Vector3 offset = { std::sin(angle) * 0.7f, 0.0f, std::cos(angle) * 0.7f };
+				appParticleManager_->EmitDustWithVelocity(
+					particleManager->GetRandomEngine(),
+					spawnPos + offset,
+					0.65f * scaleMult, // サイズスケーリング
+					portalColor,
+					{ 0.0f, 2.2f, 0.0f }, // 垂直方向のみに高速上昇
+					0.8f, // 少し長めの寿命で高くまで届かせる
+					particleTextureB
+				);
+			}
+
+			// 内円 (半径 0.4f, 16個 of particles)
+			for (int i = 0; i < 16; ++i)
+			{
+				float angle = i * (6.2831853f / 16.0f);
+				Vector3 offset = { std::sin(angle) * 0.4f, 0.0f, std::cos(angle) * 0.4f };
+				appParticleManager_->EmitDustWithVelocity(
+					particleManager->GetRandomEngine(),
+					spawnPos + offset,
+					0.55f * scaleMult,
+					portalColor,
+					{ 0.0f, 2.8f, 0.0f }, // さらに速く上昇
+					0.7f,
+					particleTextureB
+				);
+			}
+
+			// 中心ビームコア (中心から数粒子を立ち上らせる)
+			for (int i = 0; i < 8; ++i)
+			{
+				std::uniform_real_distribution<float> offsetH(-0.1f, 0.1f);
+				std::uniform_real_distribution<float> offsetV(0.0f, 0.4f);
+				Vector3 spawnOffset = { offsetH(particleManager->GetRandomEngine()), offsetV(particleManager->GetRandomEngine()), offsetH(particleManager->GetRandomEngine()) };
+				
+				appParticleManager_->EmitDustWithVelocity(
+					particleManager->GetRandomEngine(),
+					spawnPos + spawnOffset,
+					0.75f * scaleMult,
+					{ 1.0f, 1.0f, 1.0f, 0.95f }, // 中心コアは高輝度な白光
+					{ 0.0f, 3.2f, 0.0f },
+					0.6f,
+					particleTextureB
+				);
+			}
+		};
+
+		if (enemy_ && enemy_->GetJustRespawned())
+		{
+			// 通常の敵：視認性の高い「鮮やかなネオンゴールド（オレンジ黄）」のフューチャーゲートでサイズを1.35倍に拡大
+			emitRespawnPortal(enemy_->GetPosition(), { 1.0f, 0.7f, 0.0f, 0.95f }, 1.35f);
+			enemy_->ClearJustRespawned();
+		}
+
+		if (movingEnemy_ && movingEnemy_->GetJustRespawned())
+		{
+			// 動く敵：ホットマゼンタ（ピンク）のマジックポータル
+			emitRespawnPortal(movingEnemy_->GetPosition(), { 1.0f, 0.1f, 0.75f, 0.85f }, 1.0f);
+			movingEnemy_->ClearJustRespawned();
+		}
+	}
+
 	// Update sound radius propagation
 	if (playerSoundTimer_ > 0.0f)
 	{
@@ -1253,6 +1380,26 @@ void GamePlayScene::UpdateCombat(float deltaTime)
 					shellScale,
 					particleTextureB
 				);
+
+				// 銃撃時の硝煙 (Muzzle Smoke)
+				int smokeCount = isShotgun ? 12 : 3;
+				for (int i = 0; i < smokeCount; ++i)
+				{
+					std::uniform_real_distribution<float> velXZ(-0.5f, 0.5f);
+					std::uniform_real_distribution<float> velY(0.1f, 0.4f);
+					std::uniform_real_distribution<float> forwardMult(1.0f, 2.5f);
+					Vector3 smokeVel = dir * forwardMult(particleManager->GetRandomEngine()) + right * velXZ(particleManager->GetRandomEngine()) + up * velY(particleManager->GetRandomEngine());
+					
+					appParticleManager_->EmitDustWithVelocity(
+						particleManager->GetRandomEngine(),
+						bulletPos,
+						isShotgun ? 0.9f : 0.5f,
+						{ 0.8f, 0.8f, 0.8f, 0.35f }, // 半透明グレーの煙
+						smokeVel,
+						0.45f,
+						particleTextureB
+					);
+				}
 			}
 
 			for (auto& b : fired)
@@ -1298,6 +1445,25 @@ void GamePlayScene::UpdateCombat(float deltaTime)
 					0.08f,
 					particleTextureB
 				);
+
+				// 敵の硝煙 (Muzzle Smoke)
+				for (int i = 0; i < 3; ++i)
+				{
+					std::uniform_real_distribution<float> velXZ(-0.4f, 0.4f);
+					std::uniform_real_distribution<float> velY(0.1f, 0.3f);
+					std::uniform_real_distribution<float> forwardMult(0.8f, 2.0f);
+					Vector3 smokeVel = dir * forwardMult(particleManager->GetRandomEngine()) + right * velXZ(particleManager->GetRandomEngine()) + up * velY(particleManager->GetRandomEngine());
+					
+					appParticleManager_->EmitDustWithVelocity(
+						particleManager->GetRandomEngine(),
+						bulletPos,
+						0.45f,
+						{ 0.85f, 0.75f, 0.75f, 0.3f }, // 赤みがかった薄いグレー煙
+						smokeVel,
+						0.4f,
+						particleTextureB
+					);
+				}
 			}
 			AddBullet(std::move(bullet));
 		}
@@ -1339,6 +1505,25 @@ void GamePlayScene::UpdateCombat(float deltaTime)
 					0.08f,
 					particleTextureB
 				);
+
+				// 動く敵の硝煙 (Muzzle Smoke)
+				for (int i = 0; i < 3; ++i)
+				{
+					std::uniform_real_distribution<float> velXZ(-0.4f, 0.4f);
+					std::uniform_real_distribution<float> velY(0.1f, 0.3f);
+					std::uniform_real_distribution<float> forwardMult(0.8f, 2.0f);
+					Vector3 smokeVel = dir * forwardMult(particleManager->GetRandomEngine()) + right * velXZ(particleManager->GetRandomEngine()) + up * velY(particleManager->GetRandomEngine());
+					
+					appParticleManager_->EmitDustWithVelocity(
+						particleManager->GetRandomEngine(),
+						bulletPos,
+						0.45f,
+						{ 0.8f, 0.75f, 0.85f, 0.3f }, // 紫みがかった薄いグレー煙
+						smokeVel,
+						0.4f,
+						particleTextureB
+					);
+				}
 			}
 			AddBullet(std::move(bullet));
 		}
@@ -1357,6 +1542,47 @@ void GamePlayScene::UpdateBullets(float deltaTime)
 		if (bullet && !bullet->IsDead())
 		{
 			bullet->Update(deltaTime);
+
+			// かすり（ニアミス）判定
+			if (bullet->GetOwner() == BulletOwner::Enemy && player_ && !player_->IsDead() && !bullet->IsNearMissTriggered())
+			{
+				Vector3 bPos = bullet->GetPosition();
+				Vector3 pPos = player_->GetPosition();
+				float dx = bPos.x - pPos.x;
+				float dz = bPos.z - pPos.z;
+				float dist = std::sqrt(dx * dx + dz * dz);
+				
+				float minHitDist = playerHitRadius_ + bulletHitRadius_; // 0.85f
+				float nearMissDist = minHitDist + 1.20f; // 2.05f
+
+				if (dist > minHitDist && dist <= nearMissDist)
+				{
+					bullet->TriggerNearMiss();
+
+					// かすり風エフェクト粒子 (進行方向に沿って風のラインを生成)
+					if (particleManager && appParticleManager_)
+					{
+						Vector3 dir = bullet->GetDirection();
+						for (int i = 0; i < 4; ++i)
+						{
+							float offset = (i - 1.5f) * 0.15f;
+							Vector3 spawnPos = bPos + dir * offset;
+							appParticleManager_->EmitDustWithVelocity(
+								particleManager->GetRandomEngine(),
+								spawnPos,
+								0.25f,
+								{ 1.0f, 1.0f, 1.0f, 0.6f }, // 薄い白い空気の弾き
+								dir * 1.8f,
+								0.12f,
+								particleTextureB
+							);
+						}
+					}
+
+					// 画面上に青白い文字で "GRAZE" フローティングテキスト表示
+					AddFloatingText(pPos + Vector3{ 0.0f, 1.3f, 0.0f }, "GRAZE", { 0.5f, 0.9f, 1.0f, 1.0f }, false);
+				}
+			}
 
 			// 弾道スモークトレイルの生成
 			if (particleManager && appParticleManager_)
@@ -1439,6 +1665,9 @@ void GamePlayScene::ResolveBulletCollisions()
 						}
 						if (particleManager && appParticleManager_)
 						{
+							// レンズフレア・スターバースト閃光エフェクト (黄・オレンジ)
+							appParticleManager_->EmitDeathFlash(particleManager->GetRandomEngine(), enemyPos, 6.0f, { 1.0f, 0.8f, 0.2f, 1.0f }, 0.45f, starburstTextureIndex_);
+
 							// 羽90枚の大爆発 (通常アヒルなので黄色い羽)
 							for (int i = 0; i < 90; ++i)
 							{
@@ -1482,6 +1711,15 @@ void GamePlayScene::ResolveBulletCollisions()
 							{
 								appParticleManager_->EmitSpark(particleManager->GetRandomEngine(), bulletPos, {0,0,0}, { 1.0f, 0.6f, 0.0f, 1.0f }, 0.12f, 1.0f, particleTextureB);
 							}
+							// 着弾フラッシュ (黄色/オレンジ)
+							appParticleManager_->EmitMuzzleFlare(
+								particleManager->GetRandomEngine(),
+								bulletPos,
+								0.4f,
+								{ 1.0f, 0.85f, 0.3f, 1.0f },
+								0.05f,
+								particleTextureB
+							);
 						}
 					}
 					bullet->Finalize();
@@ -1512,6 +1750,9 @@ void GamePlayScene::ResolveBulletCollisions()
 						TriggerCameraShake(0.45f, 0.9f);
 						if (particleManager && appParticleManager_)
 						{
+							// レンズフレア・スターバースト閃光エフェクト (マゼンタ・紫)
+							appParticleManager_->EmitDeathFlash(particleManager->GetRandomEngine(), enemyPos, 6.0f, { 1.0f, 0.2f, 0.8f, 1.0f }, 0.45f, starburstTextureIndex_);
+
 							// 羽90枚の大爆発 (青アヒルなので青の羽)
 							for (int i = 0; i < 90; ++i)
 							{
@@ -1555,6 +1796,15 @@ void GamePlayScene::ResolveBulletCollisions()
 							{
 								appParticleManager_->EmitSpark(particleManager->GetRandomEngine(), bulletPos, {0,0,0}, { 0.8f, 0.3f, 1.0f, 1.0f }, 0.12f, 1.0f, particleTextureB);
 							}
+							// 着弾フラッシュ (青/紫)
+							appParticleManager_->EmitMuzzleFlare(
+								particleManager->GetRandomEngine(),
+								bulletPos,
+								0.4f,
+								{ 0.8f, 0.4f, 1.0f, 1.0f },
+								0.05f,
+								particleTextureB
+							);
 						}
 					}
 					bullet->Finalize();
@@ -1580,6 +1830,15 @@ void GamePlayScene::ResolveBulletCollisions()
 					{
 						appParticleManager_->EmitSpark(particleManager->GetRandomEngine(), bulletPos, {0,0,0}, { 1.0f, 0.1f, 0.1f, 1.0f }, 0.12f, 1.0f, particleTextureB);
 					}
+					// 着弾フラッシュ (警告赤色)
+					appParticleManager_->EmitMuzzleFlare(
+						particleManager->GetRandomEngine(),
+						bulletPos,
+						0.5f,
+						{ 1.0f, 0.2f, 0.2f, 1.0f },
+						0.06f,
+						particleTextureB
+					);
 				}
 
 				float prevHp = player_->GetHP();
@@ -1879,18 +2138,34 @@ void GamePlayScene::InitializeObstacles()
 {
 	obstacles_.clear();
 
-	// 障害物を3つ仮配置 (エディタ作成前の仮置き)
+	// 障害物を6つ配置 (左部グループ、右部グループ、奥ゴール前グループの3つの束に分けて配置)
+	
+	// --- 左側グループ (X = -4.5f 〜 -5.5f 付近の束) ---
 	auto obs1 = std::make_unique<Obstacle>();
-	obs1->Initialize(object3dCom, camera_, { 0.0f, 0.0f, 4.0f }, 1.0f);
+	obs1->Initialize(object3dCom, camera_, { -4.5f, 0.0f, 3.5f }, 1.0f);
 	obstacles_.push_back(std::move(obs1));
 
 	auto obs2 = std::make_unique<Obstacle>();
-	obs2->Initialize(object3dCom, camera_, { -2.5f, 0.0f, 7.0f }, 1.0f);
+	obs2->Initialize(object3dCom, camera_, { -5.5f, 0.0f, 5.5f }, 1.0f);
 	obstacles_.push_back(std::move(obs2));
 
+	// --- 右側グループ (X = 4.5f 〜 5.5f 付近の束) ---
 	auto obs3 = std::make_unique<Obstacle>();
-	obs3->Initialize(object3dCom, camera_, { 2.5f, 0.0f, 7.0f }, 1.0f);
+	obs3->Initialize(object3dCom, camera_, { 4.5f, 0.0f, 3.5f }, 1.0f);
 	obstacles_.push_back(std::move(obs3));
+
+	auto obs4 = std::make_unique<Obstacle>();
+	obs4->Initialize(object3dCom, camera_, { 5.5f, 0.0f, 5.5f }, 1.0f);
+	obstacles_.push_back(std::move(obs4));
+
+	// --- 奥・ゴール前グループ (脱出リング手前のカバー用の束) ---
+	auto obs5 = std::make_unique<Obstacle>();
+	obs5->Initialize(object3dCom, camera_, { -1.2f, 0.0f, 8.5f }, 1.0f);
+	obstacles_.push_back(std::move(obs5));
+
+	auto obs6 = std::make_unique<Obstacle>();
+	obs6->Initialize(object3dCom, camera_, { 1.2f, 0.0f, 8.5f }, 1.0f);
+	obstacles_.push_back(std::move(obs6));
 }
 
 void GamePlayScene::UpdateObstacles()
@@ -1931,6 +2206,25 @@ void GamePlayScene::ResolveObstacleCollisions()
 					pPos.x += minDist;
 				}
 				player_->SetPosition(pPos);
+
+				// 障害物擦り火花演出 (砂煙から火花へ強化)
+				if (player_->IsMoving() && particleManager && appParticleManager_)
+				{
+					if (rand() % 100 < 25) // 発生頻度を25%にアップ
+					{
+						// 接触点近くに火花を生成
+						Vector3 contactPos = oPos + Vector3{ (dx / (dist > 1e-4f ? dist : 1.0f)) * obs->GetRadius(), 0.1f, (dz / (dist > 1e-4f ? dist : 1.0f)) * obs->GetRadius() };
+						appParticleManager_->EmitSpark(
+							particleManager->GetRandomEngine(),
+							contactPos,
+							Vector3{ 0.0f, 2.0f, 0.0f },
+							{ 1.0f, 0.65f, 0.15f, 1.0f }, // 鮮やかなオレンジ火花
+							0.12f,
+							0.8f,
+							particleTextureB
+						);
+					}
+				}
 			}
 		}
 	}
@@ -1960,6 +2254,24 @@ void GamePlayScene::ResolveObstacleCollisions()
 					ePos.x += minDist;
 				}
 				enemy_->SetPosition(ePos);
+
+				// 敵の障害物擦り火花演出
+				if (overlap > 0.005f && particleManager && appParticleManager_)
+				{
+					if (rand() % 100 < 15) // 発生頻度を15%にアップ
+					{
+						Vector3 contactPos = oPos + Vector3{ (dx / (dist > 1e-4f ? dist : 1.0f)) * obs->GetRadius(), 0.1f, (dz / (dist > 1e-4f ? dist : 1.0f)) * obs->GetRadius() };
+						appParticleManager_->EmitSpark(
+							particleManager->GetRandomEngine(),
+							contactPos,
+							Vector3{ 0.0f, 1.8f, 0.0f },
+							{ 1.0f, 0.6f, 0.1f, 1.0f },
+							0.1f,
+							0.7f,
+							particleTextureB
+						);
+					}
+				}
 			}
 		}
 	}
@@ -1989,6 +2301,24 @@ void GamePlayScene::ResolveObstacleCollisions()
 					ePos.x += minDist;
 				}
 				movingEnemy_->SetPosition(ePos);
+
+				// 動く敵の障害物擦り火花演出
+				if (overlap > 0.005f && particleManager && appParticleManager_)
+				{
+					if (rand() % 100 < 15) // 発生頻度を15%にアップ
+					{
+						Vector3 contactPos = oPos + Vector3{ (dx / (dist > 1e-4f ? dist : 1.0f)) * obs->GetRadius(), 0.1f, (dz / (dist > 1e-4f ? dist : 1.0f)) * obs->GetRadius() };
+						appParticleManager_->EmitSpark(
+							particleManager->GetRandomEngine(),
+							contactPos,
+							Vector3{ 0.0f, 1.8f, 0.0f },
+							{ 1.0f, 0.6f, 0.1f, 1.0f },
+							0.1f,
+							0.7f,
+							particleTextureB
+						);
+					}
+				}
 			}
 		}
 	}
@@ -2010,6 +2340,16 @@ void GamePlayScene::ResolveObstacleCollisions()
 			{
 				if (particleManager && appParticleManager_)
 				{
+					// 着弾フラッシュの生成 (Impact Flare)
+					appParticleManager_->EmitMuzzleFlare(
+						particleManager->GetRandomEngine(),
+						bPos,
+						0.32f,
+						{ 1.0f, 0.9f, 0.6f, 0.9f }, // 白熱色
+						0.06f,
+						particleTextureB
+					);
+
 					// 1. 木片 (Splinters)
 					for (int i = 0; i < 8; ++i)
 					{

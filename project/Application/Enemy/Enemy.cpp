@@ -31,6 +31,7 @@ void Enemy::Initialize(Object3dCom* object3dCom, Camera* camera)
 
     hp_ = maxHp_;
     isDead_ = false;
+    justRespawned_ = false;
     respawnTimer_ = 0.0f;
     shotCooldownTimer_ = shotCooldown_;
 }
@@ -97,6 +98,7 @@ void Enemy::Update(WindowAPI* windowAPI, const Vector3* targetPosition, const st
         if (respawnTimer_ <= 0.0f)
         {
             isDead_ = false;
+            justRespawned_ = true;
             hp_ = maxHp_;
             state_ = AIState::Patrol;
             detectionMeter_ = 0.0f;
@@ -208,7 +210,26 @@ void Enemy::Update(WindowAPI* windowAPI, const Vector3* targetPosition, const st
         scanTime += deltaTime;
         // 定点座標の向きから左右にスイング
         float targetYaw = std::sin(scanTime * 1.5f) * 0.6f;
-        object3d_->SetRotate({ 0.0f, targetYaw, 0.0f });
+
+        // スナップ（急激な角度変化）を防ぐため、スムーズに回転させる
+        float currentYaw = object3d_->GetRotate().y;
+        while (currentYaw < -3.14159265f) currentYaw += 6.2831853f;
+        while (currentYaw > 3.14159265f) currentYaw -= 6.2831853f;
+
+        float diff = targetYaw - currentYaw;
+        while (diff < -3.14159265f) diff += 6.2831853f;
+        while (diff > 3.14159265f) diff -= 6.2831853f;
+
+        // 巡回中はゆっくり（速度3.0f）振り向かせる
+        float turnSpeed = 3.0f;
+        float maxRotate = turnSpeed * deltaTime;
+        if (std::abs(diff) > maxRotate)
+        {
+            diff = (diff > 0.0f) ? maxRotate : -maxRotate;
+        }
+
+        float newYaw = currentYaw + diff;
+        object3d_->SetRotate({ 0.0f, newYaw, 0.0f });
     }
     else if (state_ == AIState::Investigate)
     {
@@ -443,6 +464,7 @@ void Enemy::OnHit(const Vector3& attackerPos)
     {
         hp_ = 0;
         isDead_ = true;
+        justRespawned_ = false;
         respawnTimer_ = respawnDuration_;
 
         if (hpBarBg_) hpBarBg_->SetSize({ 0.0f, 0.0f });
