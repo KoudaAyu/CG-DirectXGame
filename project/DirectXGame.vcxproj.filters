@@ -7,6 +7,8 @@
     <FxCompile Include="Resources\shaders\Particle.PS.hlsl" />
     <FxCompile Include="Resources\shaders\Particle.VS.hlsl" />
     <FxCompile Include="Resources\shaders\Object3d.VS.hlsl" />
+    <FxCompile Include="Resources\shaders\SkinningObject3d.VS.hlsl" />
+    <FxCompile Include="Resources\CG4\SkinningObject3d.VS.hlsl" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Baziru3_Engine\3D\Model\SkinCluster\SkinCluster.cpp" />
@@ -79,6 +81,9 @@
     <ClCompile Include="Bullet.cpp" />
     <ClCompile Include="Application\Subsystem\CustomObject3dRenderer.cpp">
       <Filter>Application\Subsystem</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\3D\Object\SkinningObject3dCom.cpp">
+      <Filter>ソース ファイル</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -165,6 +170,9 @@
     <ClInclude Include="Bullet.h" />
     <ClInclude Include="Application\Subsystem\CustomObject3dRenderer.h">
       <Filter>Application\Subsystem</Filter>
+    </ClInclude>
+    <ClInclude Include="Baziru3_Engine\3D\Object\SkinningObject3dCom.h">
+      <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

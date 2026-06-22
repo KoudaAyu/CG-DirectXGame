@@ -8,9 +8,8 @@
 class GameOverScene : public BaseScene
 {
 public:
-	void Initialize(DirectXCom* dxCommon, Camera* /*camera*/) override
+	void InitializeScene() override
 	{
-		dxCommon_ = dxCommon;
 		if (dxCommon_)
 		{
 			input_ = new KeyInput();
@@ -43,6 +42,5 @@ public:
 	const char* GetSceneType() const override { return "GAMEOVER"; }
 
 private:
-	DirectXCom* dxCommon_ = nullptr;
 	KeyInput* input_ = nullptr;
 };

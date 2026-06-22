@@ -1,10 +1,10 @@
 #include "Cylinder.h"
-#include "Cylinder.h"
-
 #include "Camera.h"
 #include "Light.h"
 #include "MaterialManager.h"
 #include "Object3dCom.h"
+#include "SceneManager.h"
+#include "TextureManager.h"
 
 #include <cmath>
 #include <cstring>
@@ -130,6 +130,21 @@ void Cylinder::Draw(D3D12_GPU_DESCRIPTOR_HANDLE textureSrvHandle)
     commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandle);
     commandList->SetGraphicsRootConstantBufferView(3, light_->GetDirectionalLightResource()->GetGPUVirtualAddress());
     commandList->SetGraphicsRootConstantBufferView(4, camera_->GetCameraResource()->GetGPUVirtualAddress());
+
+    uint32_t skyboxIndex = SceneManager::GetInstance()->GetSkyboxTextureIndex();
+    D3D12_GPU_DESCRIPTOR_HANDLE skyboxHandle{};
+    if (skyboxIndex != TextureManager::kInvalidTextureIndex)
+    {
+        skyboxHandle = TextureManager::GetInstance()->GetSrvHandleGPU(skyboxIndex);
+    }
+    else
+    {
+        skyboxHandle = textureSrvHandle;
+    }
+    if (skyboxHandle.ptr != 0)
+    {
+        commandList->SetGraphicsRootDescriptorTable(5, skyboxHandle);
+    }
 
     commandList->DrawInstanced(vertexCount_, 1, 0, 0);
 }

@@ -9,6 +9,7 @@
 class DirectXCom;
 class Camera;
 class Object3dCom;
+class SkinningObject3dCom;
 class MaterialManager;
 class Light;
 class ParticleManager;
@@ -45,7 +46,9 @@ public:
     void ApplyPendingSceneChange();
 
 	void SetDirectXCom(DirectXCom* dxCommon) { dxCommon_ = dxCommon; }
+	DirectXCom* GetDirectXCom() const { return dxCommon_; }
 	void SetCamera(Camera* camera) { camera_ = camera; }
+	Camera* GetCamera() const { return camera_; }
 
 	void SetSceneFactory(std::unique_ptr<AbstractSceneFactory> sceneFactory) { sceneFactory_ = std::move(sceneFactory); }
 	BaseScene* GetCurrentScene() const { return scene_.get(); }
@@ -56,6 +59,8 @@ public:
 
 	void SetObject3dCom(Object3dCom* v) { object3dCom_ = v; }
 	Object3dCom* GetObject3dCom() const { return object3dCom_; }
+	void SetSkinningObject3dCom(SkinningObject3dCom* v) { skinningObject3dCom_ = v; }
+	SkinningObject3dCom* GetSkinningObject3dCom() const { return skinningObject3dCom_; }
 	void SetMaterialManager(MaterialManager* v) { materialManager_ = v; }
 	MaterialManager* GetMaterialManager() const { return materialManager_; }
 	void SetLight(Light* v) { light_ = v; }
@@ -76,6 +81,9 @@ public:
 	SkyboxCom* GetSkyboxCom() const { return skyboxCom_; }
 	void SetSkyboxTextureIndex(uint32_t v) { skyboxTextureIndex_ = v; }
 	uint32_t GetSkyboxTextureIndex() const { return skyboxTextureIndex_; }
+	void SetShowSkybox(bool show) { showSkybox_ = show; }
+	bool GetShowSkybox() const { return showSkybox_; }
+	bool* GetShowSkyboxPtr() { return &showSkybox_; }
 	void DrawSkybox(ID3D12GraphicsCommandList* commandList) const;
 
 private:
@@ -87,6 +95,7 @@ private:
 
 	
 	Object3dCom* object3dCom_ = nullptr;
+	SkinningObject3dCom* skinningObject3dCom_ = nullptr;
 	MaterialManager* materialManager_ = nullptr;
 	Light* light_ = nullptr;
 	ParticleManager* particleManager_ = nullptr;
@@ -97,6 +106,7 @@ private:
 	SkyBox* skybox_ = nullptr;
 	SkyboxCom* skyboxCom_ = nullptr;
 	uint32_t skyboxTextureIndex_ = 0;
+	bool showSkybox_ = true;
 	FadeApplication* fadeApplication_ = nullptr;
 	bool isSceneTransitioning_ = false;
 	bool hasSwitchedSceneDuringFade_ = false;

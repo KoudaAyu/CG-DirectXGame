@@ -33,7 +33,7 @@ public:
 	~Sprite();
 
 	void Initialize(SpriteCom* spriteCom,std::string textureFilePath);
-	void Update(WindowAPI* windowAPI, DebugCamera* debugCamera_);
+	void Update(WindowAPI* windowAPI = nullptr, DebugCamera* debugCamera_ = nullptr);
     // テクスチャ/UV の重い処理を行わずに変換行列のみを更新する軽量メソッド
 	void UpdateTransformOnly(WindowAPI* windowAPI);
 	void Draw();

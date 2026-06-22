@@ -1,7 +1,12 @@
-#include"Object3d.h"
-#include"Object3dCom.h"
-#include"Matrix4x4.h"
+#include "Object3d.h"
+#include "Object3dCom.h"
+#include "Matrix4x4.h"
 #include "RootParam.h"
+#include "TextureManager.h"
+#include "Skeleton.h"
+#include "SkinCluster.h"
+#include "SkinningObject3dCom.h"
+#include "SceneManager.h"
 #include <assimp/Importer.hpp>
 #include <assimp/postprocess.h>
 #include <assimp/scene.h>
@@ -113,8 +118,7 @@ namespace
 void Object3d::Initialize(Object3dCom* object3dCom, const ModelData& modelData)
 {
 	object3dCom_ = object3dCom;
-	modelData_ = modelData; // モデルデータを保存
-	// object3dCom_ が未設定の場合は何もしない(デフォルトカメラは取得しない)
+	modelData_ = modelData;
 	if (object3dCom_)
 	{
 		camera_ = object3dCom_->GetDefaultCamera();
@@ -137,12 +141,37 @@ void Object3d::Initialize(Object3dCom* object3dCom, const ModelData& modelData)
 		{
 			OutputDebugStringA(("Texture load failed: " + modelData_.material.textureFilePath + "\n").c_str());
 		}
-
 	}
 
 	//Transform変数の生成
 	transform = { {1.0f,1.0f,1.0f}, {0.0f,0.0f,0.0f}, {0.0f,0.0f,0.0f} };
 	cameraTransform = { {1.0f,1.0f,1.0f}, {0.0f,0.0f,0.0f}, {0.0f,0.0f,-10.0f} };
+}
+
+void Object3d::SetupAnimation(const Animation* animation, const Skeleton& skeleton, const Model::ModelData& modelData)
+{
+	if (!object3dCom_) return;
+	DirectXCom* dx = object3dCom_->GetDirectXCom();
+	if (!dx) return;
+	SRVManager* srvManager = TextureManager::GetInstance()->GetSRVManager();
+	if (!srvManager) return;
+
+	animator_.SetAnimation(animation);
+	skeleton_ = skeleton;
+
+	if (!skeleton_.joints.empty())
+	{
+		skeleton_.Update();
+		skinCluster_ = skinClusterLender_.CreateSkinCluster(
+			dx->GetDevice(),
+			skeleton_,
+			modelData,
+			dx->GetSrvDescriptorHeap(),
+			dx->GetDescriptorSizeSRV(),
+			*dx,
+			*srvManager);
+		skinClusterInitialized_ = true;
+	}
 }
 
 void Object3d::Update()
@@ -153,7 +182,27 @@ void Object3d::Update()
 		camera_ = object3dCom_->GetDefaultCamera();
 	}
 
-	// 優先: Object3dComに設定されたカメラを使う
+	// ステップ1: アニメーション時間を進める
+	// ステップ2: 骨ごとのLocal情報を更新する
+	if (animator_.HasAnimation())
+	{
+		animator_.Update(deltaTime_);
+		// ステップ3: SkeletonSpaceの情報を更新する
+		animator_.ApplyTo(skeleton_);
+	}
+
+	if (!skeleton_.joints.empty())
+	{
+		// ステップ3: 現在の骨ごとのLocal情報を基にSkeletonSpaceの情報を更新する
+		skeleton_.Update();
+	}
+
+	// ステップ4: SkinClusterのMatrixPaletteを更新する
+	if (skinClusterInitialized_)
+	{
+		skinClusterLender_.Update(skinCluster_, skeleton_);
+	}
+
 	Matrix4x4 worldMatrix = MakeAffineMatrix(transform.GetScale(), transform.GetRotate(), transform.GetTranslate());
 
 	Matrix4x4 viewMatrix;
@@ -198,6 +247,43 @@ void Object3d::Draw(ID3D12GraphicsCommandList* commandList)
 	else
 	{
 		commandList->DrawInstanced(static_cast<UINT>(modelData_.vertices.size()), 1, 0, 0);
+	}
+}
+
+void Object3d::Draw(Object3dCom* object3dCom, SkinningObject3dCom* skinningObject3dCom)
+{
+	Object3dCom* com = object3dCom ? object3dCom : object3dCom_;
+	if (!com) return;
+	DirectXCom* dx = com->GetDirectXCom();
+	if (!dx) return;
+
+	// RenderContext を内部で解決・構築
+	RenderContext ctx{};
+	ctx.commandList = dx->GetCommandList().Get();
+	ctx.windowAPI = dx->GetWindowAPI();
+	ctx.camera = camera_ ? camera_ : com->GetDefaultCamera();
+	ctx.light = SceneManager::GetInstance()->GetLight();
+	ctx.materialGPUAddress = 0;
+
+	// テクスチャ解決
+	const auto& modelData = GetModelData();
+	if (modelData.material.textureIndex != TextureManager::kInvalidTextureIndex)
+	{
+		ctx.textureHandle = TextureManager::GetInstance()->GetSrvHandleGPU(modelData.material.textureIndex);
+	}
+	else
+	{
+		ctx.textureHandle = {};
+	}
+
+	// ジョイント（ボーン）があればスキニングシェーダー、なければ通常シェーダーで描画
+	if (!skeleton_.joints.empty() && skinningObject3dCom)
+	{
+		skinningObject3dCom->Draw(this, ctx, modelData, true);
+	}
+	else if (object3dCom)
+	{
+		object3dCom->Draw(this, ctx, modelData, true);
 	}
 }
 
@@ -423,6 +509,20 @@ Object3d::~Object3d()
 	}
 }
 
+void Object3d::SetEnableLighting(bool enable)
+{
+	if (!materialResource) return;
+	Material* data = nullptr;
+	materialResource->Map(0, nullptr, reinterpret_cast<void**>(&data));
+	if (data)
+	{
+		data->enableLighting = enable ? 1 : 0;
+		D3D12_RANGE written = { 0, sizeof(Material) };
+		materialResource->Unmap(0, &written);
+	}
+}
+
+
 void Object3d::MaterialResource()
 {
 	if (object3dCom_ && object3dCom_->GetDirectXCom())
@@ -435,6 +535,10 @@ void Object3d::MaterialResource()
 		// 初期値を設定
 		materialData_->color = color_;
 		materialData_->enableLighting = false;
+		materialData_->specularModel = 0;
+		materialData_->reflectionFactor = 0.5f;
+		materialData_->fresnelF0 = 0.04f;
+		materialData_->shininess = 16.0f;
 		materialData_->uvTransform = MakeIdentity4x4();
 
 		// マテリアルは初期化時に一度だけ書き込む想定のため、MapしたらすぐにUnmapする

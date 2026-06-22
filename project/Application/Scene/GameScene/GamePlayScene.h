@@ -32,12 +32,13 @@
 
 class Camera;
 class SpriteCom;
+class SkinningObject3dCom;
 struct SceneRenderRequests;
 
 class GamePlayScene : public BaseScene
 {
 public:
-    void Initialize(DirectXCom* dxCommon, Camera* camera) override;
+    void InitializeScene() override;
     void Finalize() override;
     void Update() override;
     void Draw(SceneRenderRequests& renderRequests) override;
@@ -92,6 +93,7 @@ private:
     Light* light = nullptr;
     MaterialManager* materialManager = nullptr;
     Object3dCom* object3dCom = nullptr;
+    SkinningObject3dCom* skinningObject3dCom = nullptr;
     ParticleManager* particleManager = nullptr;
     std::unique_ptr<AppParticleManager> appParticleManager_;
     SpriteCom* spriteCom = nullptr;
@@ -135,6 +137,7 @@ private:
     bool sphereInitialized = false;
     bool hitEffectInitialized = false;
     bool animatedCubeInitialized_ = false;
+    bool showSkeletonDebug_ = true;
 
     // --- テクスチャ ---
     uint32_t cylinderTextureIndex_ = TextureManager::kInvalidTextureIndex;

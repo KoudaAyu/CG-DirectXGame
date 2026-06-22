@@ -1,5 +1,7 @@
 #include"Object3dCom.h"
 #include "Light.h"
+#include "SceneManager.h"
+#include "TextureManager.h"
 
 
 // 参照メンバー logStream を初期化するコンストラクタ定義
@@ -125,6 +127,21 @@ void Object3dCom::Draw(Object3d* object, const ::RenderContext& ctx, const Objec
 		ctx.commandList->SetGraphicsRootDescriptorTable(2, srvHandle);
 	}
 
+    uint32_t skyboxIndex = SceneManager::GetInstance()->GetSkyboxTextureIndex();
+    D3D12_GPU_DESCRIPTOR_HANDLE skyboxHandle{};
+    if (skyboxIndex != TextureManager::kInvalidTextureIndex)
+    {
+        skyboxHandle = TextureManager::GetInstance()->GetSrvHandleGPU(skyboxIndex);
+    }
+    else
+    {
+        skyboxHandle = ctx.textureHandle;
+    }
+    if (skyboxHandle.ptr != 0)
+    {
+        ctx.commandList->SetGraphicsRootDescriptorTable(5, skyboxHandle);
+    }
+
    
     if (ctx.light)
     {
@@ -147,27 +164,28 @@ void Object3dCom::Draw(Object3d* object, const ::RenderContext& ctx, const Objec
         return;
     }
 
-   
-    if (object)
-    {
-        object->Draw(ctx.commandList);
-    }
 
-    if (drawObject)
-    {
-        ctx.commandList->DrawInstanced(UINT(modelData.vertices.size()), 1, 0, 0);
-    }
+	if (object)
+	{
+		object->Draw(ctx.commandList);
+	}
 }
 
 void Object3dCom::Descriptor()
 {
-
-	// SRV: t3, t4
+	// SRV: t3 (2D texture)
 	descriptorRange[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
 	descriptorRange[0].NumDescriptors = 1;
 	descriptorRange[0].BaseShaderRegister = 3;
 	descriptorRange[0].RegisterSpace = 0;
 	descriptorRange[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+
+	// SRV: t4 (Cube texture)
+	descriptorRange[1].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+	descriptorRange[1].NumDescriptors = 1;
+	descriptorRange[1].BaseShaderRegister = 4;
+	descriptorRange[1].RegisterSpace = 0;
+	descriptorRange[1].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 }
 
 void Object3dCom::CreateRootParameters()
@@ -182,8 +200,8 @@ void Object3dCom::CreateRootParameters()
 
 	rootParameters[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;//DescriptorTableを使う
 	rootParameters[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;//PixelShaderで使う
-	rootParameters[2].DescriptorTable.pDescriptorRanges = descriptorRange;//Tableの中身の配列を指定
-	rootParameters[2].DescriptorTable.NumDescriptorRanges = _countof(descriptorRange);//Tableで管理する数
+	rootParameters[2].DescriptorTable.pDescriptorRanges = &descriptorRange[0];//Tableの中身の配列を指定
+	rootParameters[2].DescriptorTable.NumDescriptorRanges = 1;//Tableで管理する数
 
 	rootParameters[3].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
 	rootParameters[3].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
@@ -192,6 +210,11 @@ void Object3dCom::CreateRootParameters()
 	rootParameters[4].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
 	rootParameters[4].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL; // PixelShaderで使う 
 	rootParameters[4].Descriptor.ShaderRegister = 2; // b2 とバインド
+
+	rootParameters[5].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;//DescriptorTableを使う
+	rootParameters[5].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;//PixelShaderで使う
+	rootParameters[5].DescriptorTable.pDescriptorRanges = &descriptorRange[1];//Tableの中身の配列を指定
+	rootParameters[5].DescriptorTable.NumDescriptorRanges = 1;//Tableで管理する数
 
 	descriptionRootSignature.pParameters = rootParameters; //ルートパラメーター配列へのポインタ
 	descriptionRootSignature.NumParameters = _countof(rootParameters);//配列の長さ

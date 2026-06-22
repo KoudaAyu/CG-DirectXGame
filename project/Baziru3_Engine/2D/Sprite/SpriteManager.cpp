@@ -3,6 +3,7 @@
 #include "SpriteCom.h"
 #include "WindowsAPI.h"
 #include "Light.h"
+#include "SceneManager.h"
 #include <iostream>
 
 void SpriteManager::Initialize(SpriteCom* spriteCom, const std::string& texturePath, size_t count)
@@ -62,7 +63,7 @@ void SpriteManager::DrawAll(const RenderContext& ctx, DebugCamera* debugCamera, 
     for (auto& sp : sprites_)
     {
         if (!sp) continue;
-        sp->Update(ctx.windowAPI, debugCamera);
+        sp->Update();
         if (ctx.light) sp->SetDirectionalLightResource(ctx.light->GetDirectionalLightResource());
         sp->Draw();
     }
@@ -82,6 +83,22 @@ void SpriteManager::DrawAll(const RenderContext& ctx, DebugCamera* debugCamera, 
             sp->Draw();
         }
     }
+}
+
+void SpriteManager::DrawAll(DebugCamera* debugCamera, const std::vector<std::unique_ptr<Sprite>>* externalSprites)
+{
+    if (!spriteCom_) return;
+    DirectXCom* dx = spriteCom_->GetDxCommon();
+    if (!dx) return;
+
+    RenderContext ctx{};
+    ctx.commandList = dx->GetCommandList().Get();
+    ctx.windowAPI = dx->GetWindowAPI();
+    ctx.camera = SceneManager::GetInstance()->GetCamera();
+    ctx.light = SceneManager::GetInstance()->GetLight();
+    ctx.materialGPUAddress = 0;
+
+    DrawAll(ctx, debugCamera, externalSprites);
 }
 
 std::vector<std::unique_ptr<Sprite>>& SpriteManager::GetSprites()

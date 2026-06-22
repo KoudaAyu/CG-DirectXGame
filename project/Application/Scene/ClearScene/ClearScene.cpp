@@ -3,10 +3,8 @@
 #include "DirectXCom.h"
 #include "SceneManager.h"
 
-void ClearScene::Initialize(DirectXCom* dxCommon, Camera* /*camera*/)
+void ClearScene::InitializeScene()
 {
-	dxCommon_ = dxCommon;
-
 	if (dxCommon_)
 	{
 		input_ = new KeyInput();

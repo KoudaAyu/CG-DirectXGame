@@ -261,21 +261,6 @@ void Model::VertexResource()
         if (vertexCount == 0) { vertexCount = 1; }
         size_t bufferSize = sizeof(Sprite::VertexData) * vertexCount;
 
-
-        //頂点リソースを作る
-        vertexResourceModel = dxCommon->CreateBufferResource(dxCommon->GetDevice().Get(), sizeof(Sprite::VertexData) * modelData_.vertices.size());
-
-        //頂点リソースにデータを書き込む
-        Sprite::VertexData* vertexDataModel = nullptr;
-        vertexResourceModel->Map(0, nullptr, reinterpret_cast<void**>(&vertexDataModel));
-        std::memcpy(vertexDataModel, modelData_.vertices.data(), sizeof(Sprite::VertexData) * modelData_.vertices.size());//頂点データをリソースにコピー
-
-
-        //頂点バッファービューを作成末う
-        vertexBufferView.BufferLocation = vertexResourceModel->GetGPUVirtualAddress();//リソースの先頭のアドレスから使う
-        vertexBufferView.SizeInBytes = UINT(sizeof(Sprite::VertexData) * modelData_.vertices.size()); //使用するリソースのサイズは頂点のサイズ
-        vertexBufferView.StrideInBytes = sizeof(Sprite::VertexData); //1頂点当たりのサイズ
-
         vertexResource = dxCommon->CreateBufferResource(dxCommon->GetDevice().Get(), bufferSize);
 
         // VertexBufferView を設定（値の設定のみ）
@@ -293,6 +278,8 @@ void Model::VertexResource()
         }
 
         vertexResource->Unmap(0, nullptr);
+        vertexData_ = nullptr;
+
         // --- インデックスバッファの作成とアップロード ---
         if (!modelData_.indices.empty())
         {
@@ -326,4 +313,127 @@ void Model::MaterialResource()
         materialData_->uvTransform = MakeIdentity4x4();
 
     }
+}
+
+Model::ModelData Model::LoadModelFile(const std::string& directoryPath, const std::string& filename)
+{
+	Model::ModelData modelData;
+	Assimp::Importer importer;
+
+	const std::string fullPath = directoryPath + "/" + filename;
+	const aiScene* scene = importer.ReadFile(fullPath, aiProcess_Triangulate | aiProcess_FlipUVs | aiProcess_GenNormals);
+	assert(scene != nullptr);
+	assert(scene->mRootNode != nullptr);
+
+	// メッシュごとの頂点ベースオフセットを記録
+	std::vector<uint32_t> meshBaseIndices(scene->mNumMeshes, 0);
+
+	// ノードを再帰的にたどってメッシュを結合
+	auto AppendNodeMeshes = [&](auto& self, const aiNode* node) -> void {
+		if (!node) return;
+		for (uint32_t i = 0; i < node->mNumMeshes; ++i)
+		{
+			uint32_t meshIndex = node->mMeshes[i];
+			const aiMesh* mesh = scene->mMeshes[meshIndex];
+			if (!mesh) continue;
+
+			uint32_t baseIndex = static_cast<uint32_t>(modelData.vertices.size());
+			meshBaseIndices[meshIndex] = baseIndex;
+			modelData.vertices.resize(baseIndex + mesh->mNumVertices);
+
+			for (uint32_t v = 0; v < mesh->mNumVertices; ++v)
+			{
+				Sprite::VertexData vertex{};
+				if (mesh->HasPositions())
+				{
+					const aiVector3D& pos = mesh->mVertices[v];
+					vertex.position = { pos.x, pos.y, pos.z, 1.0f };
+				}
+				if (mesh->HasTextureCoords(0))
+				{
+					const aiVector3D& uv = mesh->mTextureCoords[0][v];
+					vertex.texcoord = { uv.x, uv.y };
+				}
+				if (mesh->HasNormals())
+				{
+					const aiVector3D& n = mesh->mNormals[v];
+					vertex.normal = { n.x, n.y, n.z };
+				}
+				modelData.vertices[baseIndex + v] = vertex;
+			}
+
+			for (uint32_t fi = 0; fi < mesh->mNumFaces; ++fi)
+			{
+				const aiFace& face = mesh->mFaces[fi];
+				if (face.mNumIndices == 3)
+				{
+					modelData.indices.push_back(baseIndex + face.mIndices[0]);
+					modelData.indices.push_back(baseIndex + face.mIndices[1]);
+					modelData.indices.push_back(baseIndex + face.mIndices[2]);
+				}
+				else
+				{
+					for (uint32_t k = 0; k < face.mNumIndices; ++k)
+						modelData.indices.push_back(baseIndex + face.mIndices[k]);
+				}
+			}
+		}
+		for (uint32_t i = 0; i < node->mNumChildren; ++i)
+			self(self, node->mChildren[i]);
+	};
+
+	AppendNodeMeshes(AppendNodeMeshes, scene->mRootNode);
+
+	// マテリアル（テクスチャパス）読み込み
+	if (scene->mNumMaterials > 0)
+	{
+		const aiMaterial* material = scene->mMaterials[0];
+		aiString texturePath;
+		if (material->GetTexture(aiTextureType_BASE_COLOR, 0, &texturePath) == aiReturn_SUCCESS ||
+			material->GetTexture(aiTextureType_DIFFUSE, 0, &texturePath) == aiReturn_SUCCESS)
+		{
+			modelData.material.textureFilePath = directoryPath + "/" + texturePath.C_Str();
+		}
+	}
+
+	// ボーン（スキン）ウェイト読み込み
+	for (unsigned int meshIndex = 0; meshIndex < scene->mNumMeshes; ++meshIndex)
+	{
+		const aiMesh* mesh = scene->mMeshes[meshIndex];
+		if (!mesh || !mesh->HasBones()) continue;
+
+		uint32_t baseIndex = meshBaseIndices[meshIndex];
+
+		for (uint32_t boneIndex = 0; boneIndex < mesh->mNumBones; ++boneIndex)
+		{
+			const aiBone* bone = mesh->mBones[boneIndex];
+			if (!bone) continue;
+
+			std::string jointName = bone->mName.C_Str();
+			Model::JointWeightData& jwd = modelData.skinClusterData[jointName];
+
+			// InverseBindPoseMatrix
+			aiMatrix4x4 bindPoseMatrixAssimp = bone->mOffsetMatrix;
+			bindPoseMatrixAssimp.Inverse();
+			aiVector3D scale, translate;
+			aiQuaternion rotate;
+			bindPoseMatrixAssimp.Decompose(scale, rotate, translate);
+			Matrix4x4 bindPoseMatrix = MakeAffineMatrix(
+				{ scale.x, scale.y, scale.z },
+				{ rotate.x, rotate.y, rotate.z, rotate.w },
+				{ translate.x, translate.y, translate.z });
+			jwd.inverseBindPoseMatrix = Inverse(bindPoseMatrix);
+
+			// 頂点ウェイト
+			for (uint32_t wi = 0; wi < bone->mNumWeights; ++wi)
+			{
+				jwd.vertexWeights.push_back({
+					bone->mWeights[wi].mWeight,
+					bone->mWeights[wi].mVertexId + baseIndex
+				});
+			}
+		}
+	}
+
+	return modelData;
 }

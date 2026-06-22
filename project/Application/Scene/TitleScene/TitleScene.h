@@ -10,7 +10,7 @@ struct SceneRenderRequests;
 class TitleScene : public BaseScene
 {
 public:
-	void Initialize(DirectXCom* dxCommon, Camera* camera) override;
+	void InitializeScene() override;
 	void Finalize() override;
 	void Update() override;
    void Draw(SceneRenderRequests& renderRequests) override;
@@ -18,7 +18,6 @@ public:
 	const char* GetSceneType() const override { return "TITLE"; }
 
 private:
-	DirectXCom* dxCommon_ = nullptr;
 	KeyInput* input_ = nullptr;
 };
 

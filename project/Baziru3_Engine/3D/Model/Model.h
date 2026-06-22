@@ -101,6 +101,11 @@ public:
 	/// <returns></returns>
 	static ModelData LoadObjFile(const std::string& directoryPath, const std::string& filename);
 
+	/// <summary>
+	/// GLTFなどAssimpによるモデル読み込み（スキンウェイト対応）
+	/// </summary>
+	static ModelData LoadModelFile(const std::string& directoryPath, const std::string& filename);
+
 	void VertexResource();
 
 	void MaterialResource();
@@ -128,10 +133,6 @@ private:
 	// マテリアル用リソース
 	Microsoft::WRL::ComPtr<ID3D12Resource> materialResource = nullptr;
 	Material* materialData_ = nullptr;
-
-	Microsoft::WRL::ComPtr<ID3D12Resource> vertexResourceModel;
-
-	D3D12_VERTEX_BUFFER_VIEW vertexBufferView{};
 
 	// インデックスバッファ用リソース
 	Microsoft::WRL::ComPtr<ID3D12Resource> indexResource = nullptr;

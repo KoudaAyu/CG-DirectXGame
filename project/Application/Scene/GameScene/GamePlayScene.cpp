@@ -1,3 +1,4 @@
+
 #include "SceneManager.h"
 #include "MaterialManager.h"
 #include "Light.h"
@@ -19,18 +20,19 @@
 #include "CustomObject3dRenderer.h"
 #include "imgui.h"
 
-void GamePlayScene::Initialize(DirectXCom* dxCommon, Camera* camera)
+void GamePlayScene::InitializeScene()
 {
-	camera_ = camera;
-	assert(dxCommon != nullptr);
-	directXCom = dxCommon;
-	CustomObject3dRenderer::GetInstance()->Initialize(dxCommon);
+	directXCom = dxCommon_;
+	camera_ = BaseScene::camera_;
+	assert(directXCom != nullptr);
+	CustomObject3dRenderer::GetInstance()->Initialize(directXCom);
 	lastTime_ = std::chrono::steady_clock::now();
 
-	object3dCom = SceneManager::GetInstance()->GetObject3dCom();
-	materialManager = SceneManager::GetInstance()->GetMaterialManager();
-	light = SceneManager::GetInstance()->GetLight();
-	particleManager = SceneManager::GetInstance()->GetParticleManager();
+	object3dCom = GetObject3dCom();
+	skinningObject3dCom = GetSkinningObject3dCom();
+	materialManager = GetMaterialManager();
+	light = GetLight();
+	particleManager = GetParticleManager();
 	appParticleManager_ = std::make_unique<AppParticleManager>();
 	appParticleManager_->Initialize(particleManager);
 
@@ -503,7 +505,7 @@ void GamePlayScene::UpdateEnvironment()
 		Vector3 rotate = animatedCube_->GetRotate();
 		rotate.y += 0.01f;
 		animatedCube_->SetRotate(rotate);
-		animatedCube_->Update();
+		animatedCube_->Update(); // ステップ1〜4はエンジン層で実行される
 	}
 
 	if (skeletonDebug_.IsInitialized() && animatedCube_)
@@ -515,12 +517,11 @@ void GamePlayScene::UpdateEnvironment()
 		}
 
 		skeleton_.Update();
-
 		const Matrix4x4 modelWorldMatrix = MakeAffineMatrix(
 			animatedCube_->GetScale(),
 			animatedCube_->GetRotate(),
 			animatedCube_->GetTranslate());
-		skeletonDebug_.Sync(skeleton_, modelWorldMatrix);
+		skeletonDebug_.Sync(animatedCube_->GetSkeleton(), modelWorldMatrix);
 	}
 
 	if (hitEffectInitialized && hitEffect_)
@@ -709,6 +710,11 @@ void GamePlayScene::UpdateParticles(float deltaTime)
 	if (appParticleManager_)
 	{
 		appParticleManager_->Update(deltaTime, player_ ? player_->GetPosition() : Vector3{ 0.0f, 0.0f, 0.0f });
+	}
+
+	if (particleManager)
+	{
+		particleManager->Update(deltaTime);
 	}
 }
 
@@ -2496,6 +2502,21 @@ void GamePlayScene::Draw(SceneRenderRequests& renderRequests)
 		float width = io.DisplaySize.x;
 		float height = io.DisplaySize.y;
 
+		if (skeletonDebug_.IsInitialized() && showSkeletonDebug_)
+		{
+			D3D12_GPU_DESCRIPTOR_HANDLE skeletonTexHandle = {};
+			if (cylinderTextureIndex_ != TextureManager::kInvalidTextureIndex)
+			{
+				skeletonTexHandle = TextureManager::GetInstance()->GetSrvHandleGPU(cylinderTextureIndex_);
+			}
+			skeletonDebug_.Draw(renderRequests, skeletonTexHandle);
+		}
+
+		if (animatedCubeInitialized_ && animatedCube_)
+		{
+			animatedCube_->Draw(object3dCom, skinningObject3dCom);
+		}
+
 		if (width > 0.0f && height > 0.0f)
 		{
 			const Matrix4x4& vp = camera_->GetViewProjectionMatrix();
@@ -2663,4 +2684,5 @@ void GamePlayScene::AddFloatingText(const Vector3& worldPos, const std::string& 
 	ft.isCritical = isCritical;
 	floatingTexts_.push_back(ft);
 }
+
 
