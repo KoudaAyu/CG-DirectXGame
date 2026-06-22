@@ -209,7 +209,6 @@
     <FxCompile Include="Resources\shaders\CopyImage.PS.hlsl" />
     <FxCompile Include="Resources\shaders\CopyImage.VS.hlsl" />
     <FxCompile Include="Resources\shaders\SkinningObject3d.VS.hlsl" />
-    <FxCompile Include="Resources\shaders\SkinningObject3d.VS.hlsl" />
     <FxCompile Include="Resources\shaders\Skinning.CS.hlsl" />
     <FxCompile Include="Resources\shaders\InitializeParticle.CS.hlsl" />
   </ItemGroup>
