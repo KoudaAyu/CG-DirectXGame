@@ -30,7 +30,7 @@ class GamePlayScene : public BaseScene
 {
 public:
     
-    void Initialize(DirectXCom* dxCommon, Camera* camera) override;
+    void InitializeScene() override;
 
     void Finalize() override;
 

@@ -134,10 +134,6 @@ private:
 	Microsoft::WRL::ComPtr<ID3D12Resource> materialResource = nullptr;
 	Material* materialData_ = nullptr;
 
-	Microsoft::WRL::ComPtr<ID3D12Resource> vertexResourceModel;
-
-	D3D12_VERTEX_BUFFER_VIEW vertexBufferView{};
-
 	// インデックスバッファ用リソース
 	Microsoft::WRL::ComPtr<ID3D12Resource> indexResource = nullptr;
 	// インデックスバッファービュー

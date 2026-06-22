@@ -16,18 +16,16 @@
 #include <cassert>
 #include <Windows.h>
 
-void GamePlayScene::Initialize(DirectXCom* dxCommon, Camera* camera)
+void GamePlayScene::InitializeScene()
 {
-	camera_ = camera;
-	assert(dxCommon != nullptr);
-	this->directXCom = dxCommon;
+	directXCom = dxCommon_;
+	camera_ = BaseScene::camera_;
 
-
-	object3dCom = SceneManager::GetInstance()->GetObject3dCom();
-	skinningObject3dCom = SceneManager::GetInstance()->GetSkinningObject3dCom();
-	materialManager = SceneManager::GetInstance()->GetMaterialManager();
-	light = SceneManager::GetInstance()->GetLight();
-	particleManager = SceneManager::GetInstance()->GetParticleManager();
+	object3dCom = GetObject3dCom();
+	skinningObject3dCom = GetSkinningObject3dCom();
+	materialManager = GetMaterialManager();
+	light = GetLight();
+	particleManager = GetParticleManager();
 
 
 	if (object3dCom && materialManager && light && particleManager)
@@ -203,15 +201,10 @@ void GamePlayScene::Update()
 		emitter.frequencyTime -= emitter.frequency;
 	}
 
-	// スプライトの毎フレーム更新はここで行う（必要な依存を持っている場合）
-	if (spriteManager_ && directXCom)
+	// スプライトの毎フレーム更新
+	if (spriteManager_)
 	{
-		WindowAPI* windowAPI = directXCom->GetWindowAPI();
-		DebugCamera* debugCamera = &debugCamera_;
-		if (windowAPI && debugCamera)
-		{
-			spriteManager_->Update(windowAPI, debugCamera);
-		}
+		spriteManager_->Update();
 	}
 
 	// 9キーで Ring を発生させる
@@ -259,20 +252,9 @@ void GamePlayScene::Update()
 
 void GamePlayScene::Draw(SceneRenderRequests& renderRequests)
 {
-	RenderContext ctx{};
-	if (directXCom)
-	{
-		ctx.commandList = directXCom->GetCommandList().Get();
-		ctx.windowAPI = directXCom->GetWindowAPI();
-		ctx.camera = camera_;
-		ctx.light = SceneManager::GetInstance()->GetLight();
-		ctx.materialGPUAddress = (materialManager && materialManager->GetMaterialResource()) ?
-			materialManager->GetMaterialResource()->GetGPUVirtualAddress() : 0;
-	}
-
 	if (spriteManager_)
 	{
-		spriteManager_->DrawAll(ctx, &debugCamera_, &sprites);
+		spriteManager_->DrawAll(&debugCamera_, &sprites);
 	}
 	else
 	{
@@ -281,7 +263,7 @@ void GamePlayScene::Draw(SceneRenderRequests& renderRequests)
 		{
 			if (sprite)
 			{
-				sprite->Update(ctx.windowAPI, &debugCamera_);
+				sprite->Update();
 				sprite->Draw();
 			}
 		}
@@ -310,25 +292,7 @@ void GamePlayScene::Draw(SceneRenderRequests& renderRequests)
 
 	if (animatedCubeInitialized_ && animatedCube_)
 	{
-		const auto& modelData = animatedCube_->GetModelData();
-		if (modelData.material.textureIndex != TextureManager::kInvalidTextureIndex)
-		{
-			ctx.textureHandle = TextureManager::GetInstance()->GetSrvHandleGPU(modelData.material.textureIndex);
-		}
-		else
-		{
-			ctx.textureHandle = {};
-		}
-
-		// ジョイントがあればスキニングシェーダー、なければ通常シェーダー
-		if (!animatedCube_->GetSkeleton().joints.empty() && skinningObject3dCom)
-		{
-			skinningObject3dCom->Draw(animatedCube_.get(), ctx, modelData, true);
-		}
-		else if (object3dCom)
-		{
-			object3dCom->Draw(animatedCube_.get(), ctx, modelData, true);
-		}
+		animatedCube_->Draw(object3dCom, skinningObject3dCom);
 	}
 
 }
