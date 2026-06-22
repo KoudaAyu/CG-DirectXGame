@@ -85,6 +85,9 @@ void Game::Initialize()
 	// OffScreenRendering の初期化
 	offScreenRendering_ = std::make_unique<OffScreenRendering>(logStream, dx);
 	offScreenRendering_->Initialize(0, 0, DXGI_FORMAT_R8G8B8A8_UNORM_SRGB, { 1.0f, 0.0f, 0.0f, 1.0f });
+
+	// 遅延していたアップロードバッファの解放とGPU同期待ちを一括実行
+	TextureManager::GetInstance()->ReleaseUploadBuffers();
 }
 
 

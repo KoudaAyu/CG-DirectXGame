@@ -95,7 +95,7 @@ void FadeApplication::Draw()
     }
 
     spriteCom_->SetupDraw(dxCommon->GetCommandList().Get());
-    fadeSprite_->Update(windowAPI_, nullptr);
+    fadeSprite_->Update();
     fadeSprite_->Draw();
 }
 

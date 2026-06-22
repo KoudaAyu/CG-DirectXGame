@@ -229,10 +229,7 @@ public:
 	MSG& GetMsg() { return msg; }
 
 
-	static const uint32_t GetKMaXSRVCount()
-	{
-		return kMacSRVCount;
-	}
+
 
 	size_t GetSwapChainResourcesNum() const
 	{
@@ -284,10 +281,7 @@ private:
 	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> srvDescriptorHeap = nullptr;
 	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> dsvDescriptorHeap = nullptr;
 
-	Microsoft::WRL::ComPtr<ID3D12Device> device_ = nullptr;
 
-	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> descriptorHeap_;
-	uint32_t descriptorSize_;
 
 	std::ostream& logStream;
 
@@ -298,8 +292,7 @@ public:
     WindowAPI* GetWindowAPI() const { return windowAPI; }
 
 
-	//最大SRV数(Texture枚数)
-	static const uint32_t kMacSRVCount = 512;
+
 
 	std::chrono::steady_clock::time_point refrence_;
 

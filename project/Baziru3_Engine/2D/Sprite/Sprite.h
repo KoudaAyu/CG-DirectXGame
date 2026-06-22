@@ -33,7 +33,7 @@ public:
 	~Sprite();
 
 	void Initialize(SpriteCom* spriteCom,std::string textureFilePath);
-	void Update(WindowAPI* windowAPI, DebugCamera* debugCamera_);
+	void Update();
 	void Draw();
 
 	void Finalize();

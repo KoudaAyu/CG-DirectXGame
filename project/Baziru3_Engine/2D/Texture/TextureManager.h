@@ -5,6 +5,7 @@
 
 #include<unordered_map>
 #include <memory>
+#include <vector>
 
 class TextureManager
 {
@@ -19,6 +20,9 @@ public:
 
 
 	void Initialize();
+
+	// アップロード用中間バッファの一括解放と同期
+	void ReleaseUploadBuffers();
 
 	void LoadTexture(const std::string& filePath);
 
@@ -90,6 +94,9 @@ private:
 
 	//SRVインデックスの開始番号
 	uint32_t kSRVIndexTop = 1;
+
+	// コピー用中間リソースの一時保持リスト
+	std::vector<Microsoft::WRL::ComPtr<ID3D12Resource>> uploadBuffers_;
 
 	
 };

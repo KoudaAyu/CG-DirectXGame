@@ -5,6 +5,8 @@
 #include "TextureManager.h"
 #include "Skeleton.h"
 #include "SkinCluster.h"
+#include "SkinningObject3dCom.h"
+#include "SceneManager.h"
 #include <assimp/Importer.hpp>
 #include <assimp/postprocess.h>
 #include <assimp/scene.h>
@@ -245,6 +247,43 @@ void Object3d::Draw(ID3D12GraphicsCommandList* commandList)
 	else
 	{
 		commandList->DrawInstanced(static_cast<UINT>(modelData_.vertices.size()), 1, 0, 0);
+	}
+}
+
+void Object3d::Draw(Object3dCom* object3dCom, SkinningObject3dCom* skinningObject3dCom)
+{
+	Object3dCom* com = object3dCom ? object3dCom : object3dCom_;
+	if (!com) return;
+	DirectXCom* dx = com->GetDirectXCom();
+	if (!dx) return;
+
+	// RenderContext を内部で解決・構築
+	RenderContext ctx{};
+	ctx.commandList = dx->GetCommandList().Get();
+	ctx.windowAPI = dx->GetWindowAPI();
+	ctx.camera = camera_ ? camera_ : com->GetDefaultCamera();
+	ctx.light = SceneManager::GetInstance()->GetLight();
+	ctx.materialGPUAddress = 0;
+
+	// テクスチャ解決
+	const auto& modelData = GetModelData();
+	if (modelData.material.textureIndex != TextureManager::kInvalidTextureIndex)
+	{
+		ctx.textureHandle = TextureManager::GetInstance()->GetSrvHandleGPU(modelData.material.textureIndex);
+	}
+	else
+	{
+		ctx.textureHandle = {};
+	}
+
+	// ジョイント（ボーン）があればスキニングシェーダー、なければ通常シェーダーで描画
+	if (!skeleton_.joints.empty() && skinningObject3dCom)
+	{
+		skinningObject3dCom->Draw(this, ctx, modelData, true);
+	}
+	else if (object3dCom)
+	{
+		object3dCom->Draw(this, ctx, modelData, true);
 	}
 }
 

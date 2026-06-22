@@ -261,21 +261,6 @@ void Model::VertexResource()
         if (vertexCount == 0) { vertexCount = 1; }
         size_t bufferSize = sizeof(Sprite::VertexData) * vertexCount;
 
-
-        //頂点リソースを作る
-        vertexResourceModel = dxCommon->CreateBufferResource(dxCommon->GetDevice().Get(), sizeof(Sprite::VertexData) * modelData_.vertices.size());
-
-        //頂点リソースにデータを書き込む
-        Sprite::VertexData* vertexDataModel = nullptr;
-        vertexResourceModel->Map(0, nullptr, reinterpret_cast<void**>(&vertexDataModel));
-        std::memcpy(vertexDataModel, modelData_.vertices.data(), sizeof(Sprite::VertexData) * modelData_.vertices.size());//頂点データをリソースにコピー
-
-
-        //頂点バッファービューを作成末う
-        vertexBufferView.BufferLocation = vertexResourceModel->GetGPUVirtualAddress();//リソースの先頭のアドレスから使う
-        vertexBufferView.SizeInBytes = UINT(sizeof(Sprite::VertexData) * modelData_.vertices.size()); //使用するリソースのサイズは頂点のサイズ
-        vertexBufferView.StrideInBytes = sizeof(Sprite::VertexData); //1頂点当たりのサイズ
-
         vertexResource = dxCommon->CreateBufferResource(dxCommon->GetDevice().Get(), bufferSize);
 
         // VertexBufferView を設定（値の設定のみ）
@@ -293,6 +278,8 @@ void Model::VertexResource()
         }
 
         vertexResource->Unmap(0, nullptr);
+        vertexData_ = nullptr;
+
         // --- インデックスバッファの作成とアップロード ---
         if (!modelData_.indices.empty())
         {

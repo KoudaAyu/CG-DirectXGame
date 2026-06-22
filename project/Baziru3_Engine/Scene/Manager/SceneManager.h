@@ -46,7 +46,9 @@ public:
     void ApplyPendingSceneChange();
 
 	void SetDirectXCom(DirectXCom* dxCommon) { dxCommon_ = dxCommon; }
+	DirectXCom* GetDirectXCom() const { return dxCommon_; }
 	void SetCamera(Camera* camera) { camera_ = camera; }
+	Camera* GetCamera() const { return camera_; }
 
 	void SetSceneFactory(std::unique_ptr<AbstractSceneFactory> sceneFactory) { sceneFactory_ = std::move(sceneFactory); }
 	BaseScene* GetCurrentScene() const { return scene_.get(); }
