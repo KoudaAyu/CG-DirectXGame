@@ -64,31 +64,6 @@ void GamePlayScene::InitializeEnvironment()
 	sphere_->Initialize(directXCom, object3dCom, materialManager, light, camera_);
 	sphereInitialized = true;
 
-	Object3d::ModelData animatedCubeModelData = Object3d::LoadModelFile("Resources/CG4/human", "walk.gltf");
-	if (!animatedCubeModelData.material.textureFilePath.empty())
-	{
-		animatedCubeModelData.material.textureIndex = TextureManager::GetInstance()->Load(animatedCubeModelData.material.textureFilePath);
-	}
-
-	animatedCube_ = std::make_unique<Object3d>();
-	animatedCube_->Initialize(object3dCom, animatedCubeModelData);
-	animatedCube_->SetTranslate({ 2.0f, 0.0f, 0.0f });
-	animatedCube_->SetScale({ 1.0f, 1.0f, 1.0f });
-	animatedCubeInitialized_ = true;
-
-	animation_ = LoadAnimationFile("Resources/CG4/human", "walk.gltf");
-	if (animation_.duration > 0.0f && !animation_.nodeAnimations.empty())
-	{
-		animator_.SetAnimation(&animation_);
-	}
-
-	skeleton_ = SkeletonLoader{}.LoadSkeletonFile("Resources/CG4/human", "walk.gltf");
-	if (!skeleton_.joints.empty())
-	{
-		skeleton_.Update();
-		skeletonDebug_.Initialize(directXCom, object3dCom, materialManager, light, camera_, skeleton_);
-	}
-
 	goalRing_ = std::make_unique<Ring>();
 	goalRing_->Initialize(directXCom, object3dCom, materialManager, light, camera_, 64, 1.5f, 1.2f);
 	goalRingTransform_.rotate = { 1.570796f, 0.0f, 0.0f };
@@ -500,29 +475,7 @@ void GamePlayScene::UpdateEnvironment()
 		sphere_->Update();
 	}
 
-	if (animatedCubeInitialized_ && animatedCube_)
-	{
-		Vector3 rotate = animatedCube_->GetRotate();
-		rotate.y += 0.01f;
-		animatedCube_->SetRotate(rotate);
-		animatedCube_->Update(); // ステップ1〜4はエンジン層で実行される
-	}
 
-	if (skeletonDebug_.IsInitialized() && animatedCube_)
-	{
-		if (animator_.HasAnimation())
-		{
-			animator_.Update(kFixedDeltaTime);
-			animator_.ApplyTo(skeleton_);
-		}
-
-		skeleton_.Update();
-		const Matrix4x4 modelWorldMatrix = MakeAffineMatrix(
-			animatedCube_->GetScale(),
-			animatedCube_->GetRotate(),
-			animatedCube_->GetTranslate());
-		skeletonDebug_.Sync(animatedCube_->GetSkeleton(), modelWorldMatrix);
-	}
 
 	if (hitEffectInitialized && hitEffect_)
 	{
@@ -2501,21 +2454,6 @@ void GamePlayScene::Draw(SceneRenderRequests& renderRequests)
 		ImGuiIO& io = ImGui::GetIO();
 		float width = io.DisplaySize.x;
 		float height = io.DisplaySize.y;
-
-		if (skeletonDebug_.IsInitialized() && showSkeletonDebug_)
-		{
-			D3D12_GPU_DESCRIPTOR_HANDLE skeletonTexHandle = {};
-			if (cylinderTextureIndex_ != TextureManager::kInvalidTextureIndex)
-			{
-				skeletonTexHandle = TextureManager::GetInstance()->GetSrvHandleGPU(cylinderTextureIndex_);
-			}
-			skeletonDebug_.Draw(renderRequests, skeletonTexHandle);
-		}
-
-		if (animatedCubeInitialized_ && animatedCube_)
-		{
-			animatedCube_->Draw(object3dCom, skinningObject3dCom);
-		}
 
 		if (width > 0.0f && height > 0.0f)
 		{

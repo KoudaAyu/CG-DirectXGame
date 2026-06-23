@@ -105,15 +105,8 @@ private:
     std::vector<std::unique_ptr<Bullet>> bullets_;
     std::vector<std::unique_ptr<Obstacle>> obstacles_;
     std::unique_ptr<Sphere> sphere_;
-    std::unique_ptr<Object3d> animatedCube_;
     std::unique_ptr<Ring> goalRing_;
     std::unique_ptr<HitEffect> hitEffect_;
-
-    // --- アニメーション & スケルトン ---
-    Skeleton skeleton_{};
-    Animation animation_{};
-    Animator animator_{};
-    SkeletonDebug skeletonDebug_{};
 
     // --- パーティクルエミッター ---
     Emitter emitter;
@@ -136,8 +129,6 @@ private:
     // --- 初期化フラグ ---
     bool sphereInitialized = false;
     bool hitEffectInitialized = false;
-    bool animatedCubeInitialized_ = false;
-    bool showSkeletonDebug_ = true;
 
     // --- テクスチャ ---
     uint32_t cylinderTextureIndex_ = TextureManager::kInvalidTextureIndex;
