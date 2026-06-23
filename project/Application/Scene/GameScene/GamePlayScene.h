@@ -33,24 +33,70 @@
 class Camera;
 class SpriteCom;
 class SkinningObject3dCom;
+class CombatSystem;
+class CollisionSystem;
 struct SceneRenderRequests;
 
+/// <summary>
+/// メインのゲームプレイシーンクラス
+/// キャラクター、ステージ環境、サブシステムの初期化・更新・描画の統括を行います。
+/// </summary>
 class GamePlayScene : public BaseScene
 {
+	friend class CombatSystem;
+	friend class CollisionSystem;
+
 public:
+	/// <summary>
+	/// コンストラクタ
+	/// </summary>
+	GamePlayScene();
+
+	/// <summary>
+	/// シーンの初期化処理
+	/// エンジンの各コンポーネント取得、キャラ・背景・サブシステムの初期設定を行います。
+	/// </summary>
     void InitializeScene() override;
+
+	/// <summary>
+	/// シーンの終了処理（メモリ解放）
+	/// 各種オブジェクト・サブシステムのクリーンアップを行います。
+	/// </summary>
     void Finalize() override;
+
+	/// <summary>
+	/// デストラクタ
+	/// </summary>
+    ~GamePlayScene() override;
+
+	/// <summary>
+	/// シーンの更新処理
+	/// サブシステム、演出タイマー、カメラ演出、UIの毎フレーム更新を行います。
+	/// </summary>
     void Update() override;
+
+	/// <summary>
+	/// シーンの描画処理
+	/// プレイヤー、敵、障害物、エフェクト、UIスプライトの描画を要求します。
+	/// </summary>
+	/// <param name="renderRequests">レンダリングリクエストマネージャー</param>
     void Draw(SceneRenderRequests& renderRequests) override;
 
     void SetSpriteCom(SpriteCom* spriteCom) { this->spriteCom = spriteCom; }
 
+	// --- ゲッター & ユーティリティ ---
     bool IsGameCleared() const { return isGameCleared_; }
     float GetExtractionTimer() const { return extractionTimer_; }
     const char* GetSceneType() const override { return "GAMEPLAY"; }
     Vector3 GetPlayerPosition() const { return player_ ? player_->GetPosition() : Vector3{ 0.0f, 0.0f, 0.0f }; }
     Player* GetPlayer() const { return player_.get(); }
     Vector3 GetGoalPosition() const { return goalRingTransform_.translate; }
+
+	/// <summary>
+	/// カメラシェイク（揺れ）エフェクトを誘発します
+	/// </summary>
+	/// <param name="duration">効果時間(秒)</param>
+	/// <param name="intensity">揺れの強さ</param>
     void TriggerCameraShake(float duration, float intensity) {
         cameraShakeTime_ = duration;
         cameraShakeDurationMax_ = duration > 0.0f ? duration : 1.0f;
@@ -71,17 +117,9 @@ private:
     void UpdateSprites(float deltaTime);
     void UpdateDebugInput();
     void UpdateCharacters(float deltaTime);
-    void UpdateCombat(float deltaTime);
     void UpdatePlayerHpBar();
     void CheckGameOver();
     void UpdateObstacles();
-
-    void AddBullet(std::unique_ptr<Bullet> bullet);
-    void UpdateBullets(float deltaTime);
-    void RemoveDeadBullets();
-    void ResolveBulletCollisions();
-    void ResolveObstacleCollisions();
-    void ResolveContactDamage();
 
     // ヘルパーメソッド
     RenderContext BuildRenderContext() const;
@@ -102,11 +140,14 @@ private:
     std::unique_ptr<Player> player_;
     std::unique_ptr<Enemy> enemy_;
     std::unique_ptr<MovingEnemy> movingEnemy_;
-    std::vector<std::unique_ptr<Bullet>> bullets_;
     std::vector<std::unique_ptr<Obstacle>> obstacles_;
     std::unique_ptr<Sphere> sphere_;
     std::unique_ptr<Ring> goalRing_;
     std::unique_ptr<HitEffect> hitEffect_;
+
+    // --- 分割されたサブシステム ---
+    std::unique_ptr<CombatSystem> combatSystem_;
+    std::unique_ptr<CollisionSystem> collisionSystem_;
 
     // --- パーティクルエミッター ---
     Emitter emitter;
@@ -130,7 +171,7 @@ private:
     bool sphereInitialized = false;
     bool hitEffectInitialized = false;
 
-    // --- テクスチャ ---
+    // --- テクスチャインデックス ---
     uint32_t cylinderTextureIndex_ = TextureManager::kInvalidTextureIndex;
     uint32_t particleTextureA = TextureManager::kInvalidTextureIndex;
     uint32_t particleTextureB = TextureManager::kInvalidTextureIndex;
@@ -151,12 +192,12 @@ private:
     std::vector<Sprite*> speedLines_;
     float speedLineAlpha_ = 0.0f;
 
-    // --- カメラシェイク ---
+    // --- カメラシェイク用パラメータ ---
     float cameraShakeTime_ = 0.0f;
     float cameraShakeIntensity_ = 0.0f;
     float cameraShakeDurationMax_ = 1.0f;
 
-    // --- ビネット＆リロード完了 ---
+    // --- ビネット＆リロード完了時の演出パラメータ ---
     Sprite* vignetteSprite_ = nullptr;
     float vignetteAlpha_ = 0.0f;
     bool wasPlayerReloading_ = false;
@@ -164,7 +205,7 @@ private:
     int remainingAmmoOnReload_ = 0;
     int droppedCasingsCount_ = 0;
 
-    // --- 浮遊テキスト ---
+    // --- 浮遊ダメージテキスト構造体 ---
     struct FloatingText {
         Vector3 position;
         std::string text;

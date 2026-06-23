@@ -53,6 +53,8 @@
     <ClCompile Include="EngineContext.cpp" />
     <ClCompile Include="Game.cpp" />
     <ClCompile Include="Application\Scene\GameScene\GamePlayScene.cpp" />
+    <ClCompile Include="Application\Scene\GameScene\CollisionSystem.cpp" />
+    <ClCompile Include="Application\Scene\GameScene\CombatSystem.cpp" />
     <ClCompile Include="Application\Particle\AppParticleManager.cpp" />
     <ClCompile Include="Application\Scene\ClearScene\ClearScene.cpp" />
     <ClCompile Include="Baziru3_Engine\Light\Light.cpp" />
@@ -143,6 +145,8 @@
     <ClInclude Include="EngineContext.h" />
     <ClInclude Include="Game.h" />
     <ClInclude Include="Application\Scene\GameScene\GamePlayScene.h" />
+    <ClInclude Include="Application\Scene\GameScene\CollisionSystem.h" />
+    <ClInclude Include="Application\Scene\GameScene\CombatSystem.h" />
     <ClInclude Include="Application\Particle\AppParticleManager.h" />
     <ClInclude Include="Application\Scene\ClearScene\ClearScene.h" />
     <ClInclude Include="Baziru3_Engine\Particle\ParticleEmitter.h" />
