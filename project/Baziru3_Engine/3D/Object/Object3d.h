@@ -114,9 +114,9 @@ public:
 	void SetRotate(const Vector3& r) { transform.SetRotate(r); }
 	void SetTranslate(const Vector3& t) { transform.SetTranslate(t); }
 	void SetScale(const Vector3& s) { transform.SetScale(s); }
-	Vector3 GetRotate() const { return transform.GetRotate(); }
-	Vector3 GetTranslate() const { return transform.GetTranslate(); }
-	Vector3 GetScale() const { return transform.GetScale(); }
+	const Vector3& GetRotate() const { return transform.GetRotate(); }
+	const Vector3& GetTranslate() const { return transform.GetTranslate(); }
+	const Vector3& GetScale() const { return transform.GetScale(); }
 	const ModelData& GetModelData() const { return modelData_; }
 
 	void SetEnableLighting(bool enable);
