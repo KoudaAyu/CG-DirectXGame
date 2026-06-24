@@ -16,6 +16,7 @@
 #include <imgui_impl_win32.h>
 #include <imgui_impl_dx12.h>
 #endif
+#include "Baziru3_Engine/Graphics/GpuProfiler.h"
 
 void Game::Initialize()
 {
@@ -307,6 +308,9 @@ void Game::Draw()
 		Logger::Log(logStream, "Warning: camera GPU resource not available before SceneManager draw.\n");
 	}
 
+	// 1. Scene Drawの計測
+	GpuProfiler::GetInstance()->BeginProfile(dx->GetCommandList().Get(), "Scene Draw");
+
 	if (SceneManager::GetInstance())
 	{
 		SceneManager::GetInstance()->DrawSkybox(ctx.commandList);
@@ -319,8 +323,6 @@ void Game::Draw()
 
 	sphereRenderer_.Draw(ctx, renderRequests);
 
-
-
 	if (drawObject)
 	{
 		if (object3dCom && object3d_)
@@ -331,13 +333,21 @@ void Game::Draw()
 			object3dCom->Draw(object3d_.get(), ctx, modelData, drawObject);
 		}
 	}
+	GpuProfiler::GetInstance()->EndProfile(dx->GetCommandList().Get(), "Scene Draw");
+
+	// 2. Sprite Drawの計測
+	GpuProfiler::GetInstance()->BeginProfile(dx->GetCommandList().Get(), "Sprite Draw");
     DrawSprites(ctx);
+	GpuProfiler::GetInstance()->EndProfile(dx->GetCommandList().Get(), "Sprite Draw");
 
-
+	// 3. Particle Drawの計測 (通常のパーティクル描画)
+	GpuProfiler::GetInstance()->BeginProfile(dx->GetCommandList().Get(), "Particle Draw");
 	if (renderRequests.sceneDrawn)
 	{
 		DrawParticles(ctx);
 	}
+	GpuProfiler::GetInstance()->EndProfile(dx->GetCommandList().Get(), "Particle Draw");
+
 	if (fadeApplication_)
 	{
 		fadeApplication_->Draw();
@@ -369,7 +379,11 @@ void Game::Draw()
 	{
 		offScreenRendering_->End(dx->GetCommandList().Get());
 		offScreenRendering_->SetMainRenderTarget(dx->GetCommandList().Get());
+
+		// 4. PostProcess (OffScreen Rendering) Drawの計測
+		GpuProfiler::GetInstance()->BeginProfile(dx->GetCommandList().Get(), "PostProcess Draw");
 		offScreenRendering_->DrawToBackBuffer(dx->GetCommandList().Get());
+		GpuProfiler::GetInstance()->EndProfile(dx->GetCommandList().Get(), "PostProcess Draw");
 	}
 
 	if (dx) ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), dx->GetCommandList().Get());

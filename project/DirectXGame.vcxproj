@@ -77,6 +77,7 @@
     <ClCompile Include="Baziru3_Engine\Base\Srv\SRVManager.cpp" />
     <ClCompile Include="Application\Subsystem\SubsystemFactory.cpp" />
     <ClCompile Include="Baziru3_Engine\Collision\CollisionManager.cpp" />
+    <ClCompile Include="Baziru3_Engine\Graphics\GpuProfiler.cpp" />
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="Resources\CG4\SkinningObject3d.VS.hlsl">
@@ -213,6 +214,7 @@
     <ClInclude Include="Baziru3_Engine\Collision\BoxCollider.h" />
     <ClInclude Include="Baziru3_Engine\Collision\CapsuleCollider.h" />
     <ClInclude Include="Baziru3_Engine\Collision\CollisionManager.h" />
+    <ClInclude Include="Baziru3_Engine\Graphics\GpuProfiler.h" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="externals\DirectXTex\DirectXTex_Desktop_2022_Win10.vcxproj">
@@ -236,20 +238,20 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v143</PlatformToolset>
+    <PlatformToolset>v145</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v143</PlatformToolset>
+    <PlatformToolset>v145</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Development|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v143</PlatformToolset>
+    <PlatformToolset>v145</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
