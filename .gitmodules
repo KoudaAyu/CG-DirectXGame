@@ -1,0 +1,4 @@
+[submodule "project/Baziru3_Engine"]
+	path = project/Baziru3_Engine
+	url = https://github.com/KoudaAyu/Baziru3_Engine.git
+	branch = master
