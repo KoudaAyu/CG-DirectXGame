@@ -3,8 +3,6 @@
 #include "AbstractSceneFactory.h"
 #include "BaseScene.h"
 #include <memory>
-#include <cstdint>
-// RenderContext is not required by SceneManager Draw; keep scene-only draw signature
 
 class DirectXCom;
 class Camera;
@@ -15,10 +13,6 @@ class Light;
 class ParticleManager;
 class SpriteCom;
 class AudioManager;
-class SkyBox;
-class SkyboxCom;
-class FadeApplication;
-struct ID3D12GraphicsCommandList;
 struct SceneRenderRequests;
 
 class SceneManager
@@ -31,10 +25,10 @@ public:
 
 	void Initialize(DirectXCom* dxCommon);
 
-    // Update the scene manager and engine-level subsystems. deltaTime is in seconds.
-	void Update(float deltaTime);
+	void Update();
 
     void Draw(SceneRenderRequests& renderRequests);
+	void DrawImGui();
 
 	/// <summary>
 	/// 次のシーン予約
@@ -46,9 +40,7 @@ public:
     void ApplyPendingSceneChange();
 
 	void SetDirectXCom(DirectXCom* dxCommon) { dxCommon_ = dxCommon; }
-	DirectXCom* GetDirectXCom() const { return dxCommon_; }
 	void SetCamera(Camera* camera) { camera_ = camera; }
-	Camera* GetCamera() const { return camera_; }
 
 	void SetSceneFactory(std::unique_ptr<AbstractSceneFactory> sceneFactory) { sceneFactory_ = std::move(sceneFactory); }
 	BaseScene* GetCurrentScene() const { return scene_.get(); }
@@ -69,22 +61,10 @@ public:
 	ParticleManager* GetParticleManager() const { return particleManager_; }
 	void SetSpriteCom(SpriteCom* v) { spriteCom_ = v; }
 	SpriteCom* GetSpriteCom() const { return spriteCom_; }
-	void SetFadeApplication(FadeApplication* v) { fadeApplication_ = v; }
-	FadeApplication* GetFadeApplication() const { return fadeApplication_; }
 
 	
 	void SetAudioManager(AudioManager* v) { audioManager_ = v; }
 	AudioManager* GetAudioManager() const { return audioManager_; }
-	void SetSkyBox(SkyBox* v) { skybox_ = v; }
-	SkyBox* GetSkyBox() const { return skybox_; }
-	void SetSkyboxCom(SkyboxCom* v) { skyboxCom_ = v; }
-	SkyboxCom* GetSkyboxCom() const { return skyboxCom_; }
-	void SetSkyboxTextureIndex(uint32_t v) { skyboxTextureIndex_ = v; }
-	uint32_t GetSkyboxTextureIndex() const { return skyboxTextureIndex_; }
-	void SetShowSkybox(bool show) { showSkybox_ = show; }
-	bool GetShowSkybox() const { return showSkybox_; }
-	bool* GetShowSkyboxPtr() { return &showSkybox_; }
-	void DrawSkybox(ID3D12GraphicsCommandList* commandList) const;
 
 private:
 	std::unique_ptr<AbstractSceneFactory> sceneFactory_;
@@ -103,17 +83,8 @@ private:
 
 
 	AudioManager* audioManager_ = nullptr;
-	SkyBox* skybox_ = nullptr;
-	SkyboxCom* skyboxCom_ = nullptr;
-	uint32_t skyboxTextureIndex_ = 0;
-	bool showSkybox_ = true;
-	FadeApplication* fadeApplication_ = nullptr;
-	bool isSceneTransitioning_ = false;
-	bool hasSwitchedSceneDuringFade_ = false;
 
     std::ostream& logStream_ = std::cerr;
-
-	void CommitPendingSceneChange();
 
 };
 
