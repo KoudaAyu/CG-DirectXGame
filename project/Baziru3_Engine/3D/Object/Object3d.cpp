@@ -146,6 +146,16 @@ void Object3d::Initialize(Object3dCom* object3dCom, const ModelData& modelData)
 	cameraTransform = { {1.0f,1.0f,1.0f}, {0.0f,0.0f,0.0f}, {0.0f,0.0f,-10.0f} };
 }
 
+void Object3d::UpdateModelData(const ModelData& modelData)
+{
+	modelData_ = modelData;
+	// 既存のリソースを安全に破棄
+	vertexResource.Reset();
+	indexResource.Reset();
+	// 再生成とアップロード
+	VertexResource();
+}
+
 void Object3d::SetupAnimation(const Animation* animation, const Skeleton& skeleton, const Model::ModelData& modelData)
 {
 	if (!object3dCom_) return;

@@ -67,7 +67,7 @@ void Game::Initialize()
 
 
 	SpriteManager* uiSpriteManager = engine_ ? engine_->GetSpriteManager() : nullptr;
-	debugUI = std::make_unique<DebugUI>(materialManager_.get(), uiSpriteManager, camera_.get(), &transformObject, &useMonsterBall, &drawObject, &drawSprite);
+	debugUI = std::make_unique<DebugUI>(materialManager_.get(), uiSpriteManager, camera_.get(), &transformObject, &useMonsterBall, &drawObject, &drawSprite, object3d_.get());
 	debugUI->Initialize();
 
 	SceneRegistration::RegisterScenes();

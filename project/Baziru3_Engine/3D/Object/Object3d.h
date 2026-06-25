@@ -56,6 +56,7 @@ public:
 	};
 
 	void Initialize(Object3dCom* object3dCom, const ModelData& modelData);
+	void UpdateModelData(const ModelData& modelData);
 
 	// アニメーション・スケルトン・スキンクラスターをまとめてセットアップする
 	// アプリ側で読み込んだ Animation と Skeleton、Model::ModelData を渡す

@@ -76,6 +76,7 @@
     <ClCompile Include="Baziru3_Engine\2D\Sprite\SpriteManager.cpp" />
     <ClCompile Include="Baziru3_Engine\Base\Srv\SRVManager.cpp" />
     <ClCompile Include="Application\Subsystem\SubsystemFactory.cpp" />
+    <ClCompile Include="Baziru3_Engine\3D\Procedural\ProceduralGenerator.cpp" />
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="Resources\CG4\SkinningObject3d.VS.hlsl">
@@ -207,6 +208,7 @@
     <ClInclude Include="Baziru3_Engine\Base\Srv\SRVManager.h" />
     <ClInclude Include="Application\Scene\TitleScene\TitleScene.h" />
     <ClInclude Include="Application\Subsystem\SubsystemFactory.h" />
+    <ClInclude Include="Baziru3_Engine\3D\Procedural\ProceduralGenerator.h" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="externals\DirectXTex\DirectXTex_Desktop_2022_Win10.vcxproj">

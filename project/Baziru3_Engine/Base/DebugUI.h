@@ -1,5 +1,7 @@
 #pragma once
 #include "Sprite.h"
+#include "Object3d.h"
+#include "../3D/Procedural/ProceduralGenerator.h"
 #include <memory>
 #include <vector>
 
@@ -12,7 +14,8 @@ class DebugUI
 {
 public:
     DebugUI(MaterialManager* materialManager, SpriteManager* spriteManager, Camera* camera,
-            Sprite::Transform* transformObject, bool* useMonsterBall, bool* drawObject, bool* drawSprite);
+            Sprite::Transform* transformObject, bool* useMonsterBall, bool* drawObject, bool* drawSprite,
+            Object3d* object3d);
 
     void Initialize();
     void Update();
@@ -24,6 +27,16 @@ private:
     bool* drawSphere_ = nullptr;
     bool* drawObject_ = nullptr;
     bool* drawSprite_ = nullptr;
+    Object3d* targetObject3d_ = nullptr;
+
+    // --- プロシージャル生成用パラメータ ---
+    int proceduralMode = 0; // 0: 通常モデル, 1: 岩石 (Rock), 2: 樹木 (Tree)
+    ProceduralGenerator::RockParameters rockParams;
+    ProceduralGenerator::TreeParameters treeParams;
+    
+    // 元のOBJモデルデータを退避するバッファ
+    Object3d::ModelData originalModelData;
+    bool isOriginalModelDataSaved = false;
 
 private:
     Camera* camera_ = nullptr;

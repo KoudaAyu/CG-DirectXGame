@@ -192,6 +192,9 @@
     <ClCompile Include="Baziru3_Engine\3D\Object\SkinningObject3dCom.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
+    <ClCompile Include="Baziru3_Engine\3D\Procedural\ProceduralGenerator.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="Resources\shaders\Skybox.PS.hlsl" />
@@ -338,6 +341,9 @@
     <ClInclude Include="Baziru3_Engine\Animation\Skeleton\SkeletonDebug.h" />
     <ClInclude Include="Baziru3_Engine\Math\EulerTransform.h" />
     <ClInclude Include="Baziru3_Engine\3D\Object\SkinningObject3dCom.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="Baziru3_Engine\3D\Procedural\ProceduralGenerator.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
   </ItemGroup>

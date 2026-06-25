@@ -2,22 +2,30 @@
 #include "MaterialManager.h"
 #include "SpriteManager.h"
 #include "Camera.h"
+#include "../3D/Procedural/ProceduralGenerator.h"
 #include <imgui.h>
 
 DebugUI::DebugUI(MaterialManager* materialManager, SpriteManager* spriteManager, Camera* camera,
-    Sprite::Transform* transformObject, bool* useMonsterBall, bool* drawObject, bool* drawSprite)
-    : materialManager_(materialManager), spriteManager_(spriteManager), camera_(camera), transformObject_(transformObject), useMonsterBall_(useMonsterBall), drawObject_(drawObject), drawSprite_(drawSprite)
+    Sprite::Transform* transformObject, bool* useMonsterBall, bool* drawObject, bool* drawSprite,
+    Object3d* object3d)
+    : materialManager_(materialManager), spriteManager_(spriteManager), camera_(camera), transformObject_(transformObject), useMonsterBall_(useMonsterBall), drawObject_(drawObject), drawSprite_(drawSprite), targetObject3d_(object3d)
 {
 }
 
 void DebugUI::Initialize()
 {
+    // 初回に元のオブジェクトデータを保存して退避しておく
+    if (targetObject3d_)
+    {
+        originalModelData = targetObject3d_->GetModelData();
+        isOriginalModelDataSaved = true;
+    }
 }
 
 void DebugUI::Update()
 {
 #ifdef USE_IMGUI
-    ImGui::ShowDemoWindow();
+    // ImGui::ShowDemoWindow(); // 画面が散らかるためデフォルトでは非表示にします
 
     ImGui::Begin("Windows");
 
@@ -188,6 +196,86 @@ void DebugUI::Update()
             ImGui::SliderFloat("Shininess", &materialManager_->GetMaterialDataShininess(), 0.1f, 100.0f);
 
             ImGui::ColorEdit4("Color", &materialManager_->GetMaterialDataColor().x);
+        }
+    }
+
+    ImGui::End();
+
+    // --- プロシージャル生成エディタウィンドウ ---
+    ImGui::Begin("Procedural Generator (BIO-AUTHORING STUDIO)");
+
+    const char* modes[] = { "Normal (OBJ)", "Rock (Noise & Voronoi)", "Tree (L-System)" };
+    int prevMode = proceduralMode;
+    if (ImGui::Combo("Generation Mode", &proceduralMode, modes, IM_ARRAYSIZE(modes)))
+    {
+        if (proceduralMode == 0 && prevMode != 0 && isOriginalModelDataSaved && targetObject3d_)
+        {
+            // 通常モデル（元のデータ）に戻す
+            targetObject3d_->UpdateModelData(originalModelData);
+        }
+        else if (proceduralMode != prevMode)
+        {
+            // モードが切り替わったら初期生成トリガーを引く
+            prevMode = -1; 
+        }
+    }
+
+    bool needRegen = false;
+
+    if (proceduralMode == 1) // Rock
+    {
+        ImGui::Separator();
+        ImGui::Text("Rock Parameters");
+        if (ImGui::DragFloat("Scale", &rockParams.scale, 0.05f, 0.1f, 5.0f)) needRegen = true;
+        if (ImGui::SliderInt("Subdivisions", &rockParams.subdivisions, 1, 6)) needRegen = true;
+        if (ImGui::SliderFloat("Noise Strength", &rockParams.noiseStrength, 0.0f, 2.0f)) needRegen = true;
+        if (ImGui::SliderFloat("Noise Frequency", &rockParams.noiseFrequency, 0.1f, 10.0f)) needRegen = true;
+        if (ImGui::SliderInt("Noise Octaves", &rockParams.octaves, 1, 6)) needRegen = true;
+        if (ImGui::SliderFloat("Voronoi Strength", &rockParams.voronoiStrength, 0.0f, 2.0f)) needRegen = true;
+        if (ImGui::SliderInt("Voronoi Cells", &rockParams.voronoiCells, 2, 50)) needRegen = true;
+        
+        int seedVal = (int)rockParams.seed;
+        if (ImGui::DragInt("Seed", &seedVal, 1, 0, 999999))
+        {
+            rockParams.seed = (unsigned int)seedVal;
+            needRegen = true;
+        }
+    }
+    else if (proceduralMode == 2) // Tree
+    {
+        ImGui::Separator();
+        ImGui::Text("L-System Tree Parameters");
+        if (ImGui::SliderInt("Iterations (Depth)", &treeParams.iterations, 1, 4)) needRegen = true;
+        if (ImGui::SliderFloat("Branch Length", &treeParams.branchLength, 0.1f, 5.0f)) needRegen = true;
+        if (ImGui::SliderFloat("Branch Radius", &treeParams.branchRadius, 0.01f, 0.5f)) needRegen = true;
+        if (ImGui::SliderFloat("Taper Rate", &treeParams.taperRate, 0.5f, 0.95f)) needRegen = true;
+        if (ImGui::SliderFloat("Branch Angle", &treeParams.angle, 5.0f, 90.0f)) needRegen = true;
+        
+        int seedVal = (int)treeParams.seed;
+        if (ImGui::DragInt("Seed", &seedVal, 1, 0, 999999))
+        {
+            treeParams.seed = (unsigned int)seedVal;
+            needRegen = true;
+        }
+    }
+
+    if (needRegen || (proceduralMode != 0 && prevMode == -1))
+    {
+        if (targetObject3d_)
+        {
+            Object3d::ModelData newModelData;
+            if (proceduralMode == 1)
+            {
+                newModelData = ProceduralGenerator::GenerateRock(rockParams);
+            }
+            else if (proceduralMode == 2)
+            {
+                newModelData = ProceduralGenerator::GenerateTree(treeParams);
+            }
+            // ランタイムで描画切り替え用にテクスチャパス等は引き継ぐ
+            newModelData.material = originalModelData.material;
+            
+            targetObject3d_->UpdateModelData(newModelData);
         }
     }
 
