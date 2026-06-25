@@ -1,23 +1,38 @@
 #include"TitleScene.h"
 #include"KeyInput.h"
+#include"DirectXCom.h"
 #include"SceneManager.h"
 
-void TitleScene::Initialize(DirectXCom* dxCommon, Camera* /*camera*/)
+void TitleScene::InitializeScene()
 {
-	dxCommon_ = dxCommon;
-
-	SceneManager::GetInstance()->ChangeScene("GAMEPLAY");
+	if (dxCommon_)
+	{
+		input_ = new KeyInput();
+		input_->Initialize(dxCommon_->GetWindowAPI());
+	}
 }
 
 void TitleScene::Finalize()
 {
+   delete input_;
+	input_ = nullptr;
 }
 
 void TitleScene::Update()
 {
+	if (!input_)
+	{
+		return;
+	}
 
+	input_->Update();
+
+	if (input_->TriggerKey(DIK_SPACE))
+	{
+		SceneManager::GetInstance()->ChangeScene("GAMEPLAY");
+	}
 }
 
-void TitleScene::Draw()
+void TitleScene::Draw(SceneRenderRequests& /*renderRequests*/)
 {
 }

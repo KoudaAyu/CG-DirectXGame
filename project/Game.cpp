@@ -6,6 +6,7 @@
 #include <sstream>
 #include <iomanip>
 
+#include "Baziru3_Engine\Graphics\SceneRenderRequests.h"
 #include"RenderContext.h"
 #include"RootParam.h"
 #include"SubsystemFactory.h"
@@ -15,91 +16,29 @@
 #include <imgui_impl_win32.h>
 #include <imgui_impl_dx12.h>
 #endif
+#include "Baziru3_Engine/Graphics/GpuProfiler.h"
 
 void Game::Initialize()
 {
-	
+
 	Framework::Initialize();
 	crashDump.Install();
 	log.Initialize();
 
-	engine_ = std::make_unique<EngineContext>();
-
-	if (!engine_->Initialize(logStream, InitConfig{}))
-	{
-		Logger::Log(logStream, "EngineContext initialization failed. Check previous logs for details.\n");
-		return;
-	}
-	
-	if (!engine_->GetDirectXCom())
-	{
-		Logger::Log(logStream, "Error: EngineContext initialized but DirectXCom is null.\n");
-		return;
-	}
+	InitializeEngine();
 
 	auto* dx = engine_->GetDirectXCom();
 	auto* window = engine_->GetWindowAPI();
 	auto* spriteCom = engine_->GetSpriteCom();
 
 
-	{
-		std::ostringstream oss;
-		oss << "Diagnostics: DirectXCom=" << std::hex << (uintptr_t)dx;
-		oss << " device=" << (uintptr_t)(dx ? dx->GetDevice().Get() : nullptr);
-		oss << " commandList=" << (uintptr_t)(dx ? dx->GetCommandList().Get() : nullptr) << std::dec << "\n";
-		Logger::Log(logStream, oss.str());
-	}
+	LogEngineDiagnostics();
 
+	InitializeSceneCore();
 
-	SceneManager::GetInstance()->Initialize(engine_->GetDirectXCom());
+	InitializeModelResources();
 
-
-	// 既存の手動テクスチャ読み込みはそのまま利用（Sphere用）
-
-	object3dCom = std::make_unique<Object3dCom>(logStream);
-	object3dCom->Initialize(dx);
-
-
-	SceneManager::GetInstance()->SetObject3dCom(object3dCom.get());
-
-#pragma region 最初のシーンの初期化
-	object3d_ = std::make_unique<Object3d>();
-	object3d_->Initialize(object3dCom.get(), object3d_->LoadObjFile("Resources", "plane.obj"));
-#pragma endregion 最初のシーン終了
-	//パイプラインステートの生成に失敗した場合はエラー
-	assert(SUCCEEDED(dx->GetHr()));
-
-	//モデル読み込み
-	modelData = object3d_->LoadObjFile("Resources", "plane.obj");
-
-	// Model を作成して初期化（Model が自分で頂点リソースを作る）
-	modelCom_ = std::make_unique<ModelCom>();
-	modelCom_->Initialize(dx);
-	model_ = std::make_unique<Model>();
-	model_->Initialize(modelCom_.get(), "Resources", "plane.obj");
-
-
-
-	materialManager_ = std::make_unique<MaterialManager>();
-	materialManager_->Initialize(dx);
-	SceneManager::GetInstance()->SetMaterialManager(materialManager_.get());
-
-	light = std::make_unique<Light>();
-	light->Initialize(dx);
-	SceneManager::GetInstance()->SetLight(light.get());
-
-	camera_ = std::make_unique<Camera>();
-	camera_->Initialize(dx);
-	SceneManager::GetInstance()->SetCamera(camera_.get());
-
-	skyboxCom_ = std::make_unique<SkyboxCom>(logStream, dx);
-	skyboxCom_->Initialize();
-	skybox_ = std::make_unique<SkyBox>();
-	skybox_->Initialize(dx, camera_.get());
-
-	particleManager = std::make_unique<ParticleManager>(logStream, dx);
-	particleManager->Initialize(camera_.get());
-	SceneManager::GetInstance()->SetParticleManager(particleManager.get());
+	InitializeSceneResources();
 
 	//Transform変数を作る
 	Sprite::Transform transform = { {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };
@@ -107,27 +46,20 @@ void Game::Initialize()
 	//Sphere用
 	transformObject = { {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };
 
-	// ユーザー指定の API 形式でのテクスチャ読み込み＆スプライト生成例
 	{
-		uint32_t textureHandle = TextureManager::GetInstance()->Load("Resources/uvChecker.png");
-
-		auto sp = std::make_unique<Sprite>();
-		sp->Initialize(spriteCom, "Resources/uvChecker.png");
-
-		sprites.emplace_back(std::move(sp));
+		Sprite::Transform t = { {1.0f,1.0f,1.0f}, {0.0f,0.0f,0.0f}, {0.0f,0.0f,0.0f} };
+		if (auto sp = Sprite::Create(spriteCom, t, "Resources/uvChecker.png"))
+		{
+			sprites.emplace_back(std::move(sp));
+		}
+		else
+		{
+			Logger::Log(logStream, "Failed to create sprite: Resources/uvChecker.png\n");
+		}
 	}
 
+	InitializeAudioAndInput();
 
-	//音声読み込み
-	audioManager_ = std::make_unique<AudioManager>(logStream);
-	audioManager_->Initialize();
-	SceneManager::GetInstance()->SetAudioManager(audioManager_.get());
-
-
-	inputManager.Initialize(window);
-
-
-	debugCamera_.Initialize(window);
 
 	object3dCom->SetDefaultCamera(camera_.get());
 
@@ -139,78 +71,147 @@ void Game::Initialize()
 	debugUI = std::make_unique<DebugUI>(materialManager_.get(), uiSpriteManager, camera_.get(), &transformObject, &useMonsterBall, &drawObject, &drawSprite);
 	debugUI->Initialize();
 
+	fadeApplication_ = std::make_unique<FadeApplication>();
+	fadeApplication_->Initialize(spriteCom, window);
+	SceneManager::GetInstance()->SetFadeApplication(fadeApplication_.get());
+
 	SceneRegistration::RegisterScenes();
 	SceneManager::GetInstance()->ChangeScene("TITLE");
 
 	textureIndexUvChecker = TextureManager::GetInstance()->Load("Resources/uvChecker.png"); // Load UV Checker texture
 	textureIndexModelTex = TextureManager::GetInstance()->Load(modelData.material.textureFilePath); // Load model texture
 	textureIndexSkybox_ = TextureManager::GetInstance()->Load("Resources/CG4/dds/CG4_test.dds"); // Load skybox texture
+   SceneManager::GetInstance()->SetSkyboxTextureIndex(textureIndexSkybox_);
+
+	// OffScreenRendering の初期化
+	offScreenRendering_ = std::make_unique<OffScreenRendering>(logStream, dx);
+	offScreenRendering_->Initialize(0, 0, DXGI_FORMAT_R8G8B8A8_UNORM_SRGB, { 1.0f, 0.0f, 0.0f, 1.0f });
+
+	// 遅延していたアップロードバッファの解放とGPU同期待ちを一括実行
+	TextureManager::GetInstance()->ReleaseUploadBuffers();
 }
 
 
 void Game::Finalize()
 {
-	SceneManager::Destroy();
-
-
+	// ImGuiの終了処理
 #ifdef USE_IMGUI
-	if (imguiManager) { imguiManager->Finalize(); imguiManager.reset(); }
+	if (imguiManager)
+	{
+		try { imguiManager->Finalize(); }
+		catch (...) { Logger::Log(logStream, "imgui finalize failed\n"); }
+		imguiManager.reset();
+	}
 #endif
 
+	// DebugUIの終了処理
+	if (debugUI)
+	{
+		debugUI.reset();
+	}
 
-	debugUI.reset();
+	if (SceneManager::GetInstance())
+	{
+		SceneManager::GetInstance()->SetFadeApplication(nullptr);
+	}
 
+	if (fadeApplication_)
+	{
+		fadeApplication_->Finalize();
+		fadeApplication_.reset();
+	}
 
+	// AudioManagerの終了処理
 	if (audioManager_)
 	{
-		SceneManager::GetInstance()->SetAudioManager(nullptr);
-		audioManager_->Finalize();
+		if (SceneManager::GetInstance()) SceneManager::GetInstance()->SetAudioManager(nullptr);
+		try { audioManager_->Finalize(); }
+		catch (...) { Logger::Log(logStream, "audio finalize failed\n"); }
 		audioManager_.reset();
 	}
 
-	SceneManager::GetInstance()->SetParticleManager(nullptr);
-	particleManager.reset();
+	// 3) Unregister SceneManager references (ensure SceneManager still exists)
+	if (SceneManager::GetInstance())
+	{
+		SceneManager::GetInstance()->SetParticleManager(nullptr);
+		SceneManager::GetInstance()->SetSpriteCom(nullptr); // owned by EngineContext but unregister anyway
+		SceneManager::GetInstance()->SetMaterialManager(nullptr);
+		SceneManager::GetInstance()->SetCamera(nullptr);
+		SceneManager::GetInstance()->SetLight(nullptr);
+		SceneManager::GetInstance()->SetObject3dCom(nullptr);
+       SceneManager::GetInstance()->SetSkyboxCom(nullptr);
+		SceneManager::GetInstance()->SetSkyBox(nullptr);
+		SceneManager::GetInstance()->SetSkyboxTextureIndex(TextureManager::kInvalidTextureIndex);
+		SceneManager::GetInstance()->SetSkinningObject3dCom(nullptr);
+	}
 
-	SceneManager::GetInstance()->SetSpriteCom(nullptr);
-	// SpriteCom/SpriteManager are owned by EngineContext now; do not reset here.
+	// 4) Particle manager
+	if (particleManager)
+	{
+		try { particleManager->Finalize(); }
+		catch (...) { Logger::Log(logStream, "particle finalize failed\n"); }
+		particleManager.reset();
+	}
 
-	// Finalize and release any game-owned sprites that reference GPU resources
-	for (auto &sp : sprites)
+	// 5) Game-owned sprites
+	for (auto& sp : sprites)
 	{
 		if (sp)
 		{
-			sp->Finalize();
+			try { sp->Finalize(); }
+			catch (...) { Logger::Log(logStream, "sprite finalize failed\n"); }
 		}
 	}
 	sprites.clear();
 
-	// Ensure TextureManager releases its GPU resources before engine teardown
-	TextureManager::GetInstance()->Finalize();
+	// 6) Material / Models / Skybox / Object3d / Camera / Light
+	if (materialManager_)
+	{
+		try { materialManager_->Finalize(); }
+		catch (...) { Logger::Log(logStream, "material finalize failed\n"); }
+		materialManager_.reset();
+	}
 
-	SceneManager::GetInstance()->SetMaterialManager(nullptr);
-	materialManager_.reset();
+	if (model_) { model_.reset(); }
+	if (modelCom_) { modelCom_.reset(); }
 
-	model_.reset();
-	modelCom_.reset();
+	if (skybox_) { skybox_.reset(); }
+	if (skyboxCom_) { skyboxCom_.reset(); }
 
-	skybox_.reset();
-	skyboxCom_.reset();
+	if (object3d_) { object3d_.reset(); }
+	if (object3dCom) { object3dCom.reset(); }
+	if (skinningObject3dCom) { skinningObject3dCom.reset(); }
 
-	object3d_.reset();
-	object3dCom.reset();
+	if (camera_)
+	{
+		try { camera_->Finalize(); }
+		catch (...) { Logger::Log(logStream, "camera finalize failed\n"); }
+		camera_.reset();
+	}
 
-	SceneManager::GetInstance()->SetCamera(nullptr);
-	camera_->Finalize();
-	camera_.reset();
+	if (light) { light.reset(); }
 
-	SceneManager::GetInstance()->SetLight(nullptr);
-	light.reset();
+	// OffScreenRendering の終了処理
+	if (offScreenRendering_)
+	{
+		offScreenRendering_->Finalize();
+		offScreenRendering_.reset();
+	}
 
-    if (engine_)
-    {
-        engine_->Finalize();
-        engine_.reset();
-    }
+	// 7) Ensure TextureManager releases GPU resources before engine teardown
+	try { TextureManager::GetInstance()->Finalize(); }
+	catch (...) { Logger::Log(logStream, "TextureManager finalize failed\n"); }
+
+	// 8) Engine teardown
+	if (engine_)
+	{
+		try { engine_->Finalize(); }
+		catch (...) { Logger::Log(logStream, "engine finalize failed\n"); }
+		engine_.reset();
+	}
+
+	// 9) Finally destroy SceneManager and framework
+	SceneManager::Destroy();
 
 	Framework::Finalize();
 }
@@ -224,8 +225,14 @@ void Game::Update()
 		audioManager_->Update();
 	}
 
+	if (fadeApplication_)
+	{
+		fadeApplication_->Update();
+	}
 
-	SceneManager::GetInstance()->Update();
+
+    // Update scenes and engine subsystems. Use fixed timestep here (same as scenes expect).
+	SceneManager::GetInstance()->Update(1.0f / 60.0f);
 
 	//if (windowAPI->ProcessMassage())
 	//{
@@ -263,7 +270,7 @@ void Game::Update()
 
 	//ImGui内部コマンドを生成する
 #ifdef USE_IMGUI
-	ImGui::Render();
+	if (imguiManager) imguiManager->Render();
 #endif
 
 	inputManager.Update();
@@ -282,24 +289,15 @@ void Game::Draw()
 
 	if (dx) dx->PreDraw();
 
+	if (offScreenRendering_)
+	{
+		offScreenRendering_->Begin(dx->GetCommandList().Get());
+	}
+
 	if (object3dCom) object3dCom->PreDraw();
 
-	RenderContext ctx{};
-	ctx.commandList = dx ? dx->GetCommandList().Get() : nullptr;
-	ctx.windowAPI = window;
-	ctx.camera = camera_.get();
-	ctx.light = light.get();
-	uint32_t chosenIndex = useMonsterBall ? textureIndexModelTex : textureIndexUvChecker;
-	if (chosenIndex != TextureManager::kInvalidTextureIndex)
-	{
-		ctx.textureHandle = TextureManager::GetInstance()->GetSrvHandleGPU(chosenIndex);
-	}
-	else
-	{
-		Logger::Log(logStream, "Warning: invalid texture index when preparing render context for drawing.\n");
-		ctx.textureHandle = {};
-	}
-	ctx.materialGPUAddress = materialManager_->GetMaterialResource() ? materialManager_->GetMaterialResource()->GetGPUVirtualAddress() : 0;
+	RenderContext ctx = PrepareRenderContext();
+    SceneRenderRequests renderRequests{};
 
 	if (camera_ && camera_->GetCameraResource() && dx)
 	{
@@ -310,30 +308,50 @@ void Game::Draw()
 		Logger::Log(logStream, "Warning: camera GPU resource not available before SceneManager draw.\n");
 	}
 
-	if (skybox_ && skyboxCom_ && textureIndexSkybox_ != TextureManager::kInvalidTextureIndex)
-	{
-		skyboxCom_->SetupDraw(ctx.commandList);
-		skybox_->Draw(ctx.commandList, TextureManager::GetInstance()->GetSrvHandleGPU(textureIndexSkybox_));
-	}
-
-	if (object3dCom) object3dCom->PreDraw();
+	// 1. Scene Drawの計測
+	GpuProfiler::GetInstance()->BeginProfile(dx->GetCommandList().Get(), "Scene Draw");
 
 	if (SceneManager::GetInstance())
 	{
-		SceneManager::GetInstance()->Draw();
+		SceneManager::GetInstance()->DrawSkybox(ctx.commandList);
 	}
 
+	if (SceneManager::GetInstance())
+	{
+        SceneManager::GetInstance()->Draw(renderRequests);
+	}
 
+	sphereRenderer_.Draw(ctx, renderRequests);
 
 	if (drawObject)
 	{
 		if (object3dCom && object3d_)
 		{
+			// スキニング対応かどうかを判定（今後拡張）
+			// 現在は通常の object3dCom を使用
+			object3dCom->PreDraw();
 			object3dCom->Draw(object3d_.get(), ctx, modelData, drawObject);
 		}
 	}
-	DrawSprites(ctx);
-	DrawParticles(ctx);
+	GpuProfiler::GetInstance()->EndProfile(dx->GetCommandList().Get(), "Scene Draw");
+
+	// 2. Sprite Drawの計測
+	GpuProfiler::GetInstance()->BeginProfile(dx->GetCommandList().Get(), "Sprite Draw");
+    DrawSprites(ctx);
+	GpuProfiler::GetInstance()->EndProfile(dx->GetCommandList().Get(), "Sprite Draw");
+
+	// 3. Particle Drawの計測 (通常のパーティクル描画)
+	GpuProfiler::GetInstance()->BeginProfile(dx->GetCommandList().Get(), "Particle Draw");
+	if (renderRequests.sceneDrawn)
+	{
+		DrawParticles(ctx);
+	}
+	GpuProfiler::GetInstance()->EndProfile(dx->GetCommandList().Get(), "Particle Draw");
+
+	if (fadeApplication_)
+	{
+		fadeApplication_->Draw();
+	}
 
 	//Objectの描画
 
@@ -357,6 +375,17 @@ void Game::Draw()
 
 	//実際のcommandListのImGuiの描画コマンドを積む
 #ifdef USE_IMGUI
+	if (offScreenRendering_)
+	{
+		offScreenRendering_->End(dx->GetCommandList().Get());
+		offScreenRendering_->SetMainRenderTarget(dx->GetCommandList().Get());
+
+		// 4. PostProcess (OffScreen Rendering) Drawの計測
+		GpuProfiler::GetInstance()->BeginProfile(dx->GetCommandList().Get(), "PostProcess Draw");
+		offScreenRendering_->DrawToBackBuffer(dx->GetCommandList().Get());
+		GpuProfiler::GetInstance()->EndProfile(dx->GetCommandList().Get(), "PostProcess Draw");
+	}
+
 	if (dx) ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), dx->GetCommandList().Get());
 #endif
 
@@ -371,6 +400,129 @@ bool Game::IsQuitRequested()
 		return (dx->GetMsg().message == WM_QUIT);
 	}
 	return false;
+}
+
+bool Game::InitializeEngine()
+{
+	engine_ = std::make_unique<EngineContext>();
+
+	if (!engine_->Initialize(logStream, InitConfig{}))
+	{
+		Logger::Log(logStream, "EngineContext initialization failed. Check previous logs for details.\n");
+		return false;
+	}
+
+	if (!engine_->GetDirectXCom())
+	{
+		Logger::Log(logStream, "Error: EngineContext initialized but DirectXCom is null.\n");
+		return false;
+	}
+
+	return true;
+}
+
+void Game::LogEngineDiagnostics()
+{
+	auto* dx = engine_->GetDirectXCom();
+
+	{
+		std::ostringstream oss;
+		oss << "Diagnostics: DirectXCom=" << std::hex << (uintptr_t)dx;
+		oss << " device=" << (uintptr_t)(dx ? dx->GetDevice().Get() : nullptr);
+		oss << " commandList=" << (uintptr_t)(dx ? dx->GetCommandList().Get() : nullptr) << std::dec << "\n";
+		Logger::Log(logStream, oss.str());
+	}
+}
+
+void Game::InitializeSceneCore()
+{
+	auto* dx = engine_->GetDirectXCom();
+
+	SceneManager::GetInstance()->Initialize(engine_->GetDirectXCom());
+
+	// 既存の手動テクスチャ読み込みはそのまま利用（Sphere用）
+
+	object3dCom = std::make_unique<Object3dCom>(logStream);
+	object3dCom->Initialize(dx);
+
+	// Skinning対応の Object3dCom も初期化
+	skinningObject3dCom = std::make_unique<SkinningObject3dCom>(logStream);
+	skinningObject3dCom->Initialize(dx);
+
+	SceneManager::GetInstance()->SetObject3dCom(object3dCom.get());
+	SceneManager::GetInstance()->SetSkinningObject3dCom(skinningObject3dCom.get());
+}
+
+
+void Game::InitializeModelResources()
+{
+	auto* dx = engine_->GetDirectXCom();
+
+	object3d_ = std::make_unique<Object3d>();
+	object3d_->Initialize(object3dCom.get(), object3d_->LoadObjFile("Resources", "plane.obj"));
+
+	//パイプラインステートの生成に失敗した場合はエラー
+	assert(SUCCEEDED(dx->GetHr()));
+
+	//モデル読み込み
+	modelData = object3d_->LoadObjFile("Resources", "plane.obj");
+
+	// Model を作成して初期化（Model が自分で頂点リソースを作る）
+	modelCom_ = std::make_unique<ModelCom>();
+	modelCom_->Initialize(dx);
+	model_ = std::make_unique<Model>();
+	model_->Initialize(modelCom_.get(), "Resources", "plane.obj");
+}
+
+void Game::InitializeSceneResources()
+{
+	auto* dx = engine_->GetDirectXCom();
+
+	materialManager_ = std::make_unique<MaterialManager>();
+	materialManager_->Initialize(dx);
+	SceneManager::GetInstance()->SetMaterialManager(materialManager_.get());
+
+	light = std::make_unique<Light>();
+	light->Initialize(dx);
+	SceneManager::GetInstance()->SetLight(light.get());
+
+	camera_ = std::make_unique<Camera>();
+	camera_->Initialize(dx);
+	SceneManager::GetInstance()->SetCamera(camera_.get());
+
+	skyboxCom_ = std::make_unique<SkyboxCom>(logStream, dx);
+	skyboxCom_->Initialize();
+	skybox_ = std::make_unique<SkyBox>();
+	skybox_->Initialize(dx, camera_.get());
+	SceneManager::GetInstance()->SetSkyboxCom(skyboxCom_.get());
+	SceneManager::GetInstance()->SetSkyBox(skybox_.get());
+
+	particleManager = std::make_unique<ParticleManager>(logStream, dx);
+	particleManager->Initialize(camera_.get());
+	SceneManager::GetInstance()->SetParticleManager(particleManager.get());
+
+	// Load example particle textures so they are available early
+	TextureManager::GetInstance()->Load("Resources/uvChecker.png");
+	// Load circle texture used by GamePlayScene for alternate particle appearance
+	TextureManager::GetInstance()->Load("Resources/CG4/circle2.png");
+
+}
+
+void Game::InitializeAudioAndInput()
+{
+	auto* window = engine_ ? engine_->GetWindowAPI() : nullptr;
+
+
+	//音声読み込み
+	audioManager_ = std::make_unique<AudioManager>(logStream);
+	audioManager_->Initialize();
+	SceneManager::GetInstance()->SetAudioManager(audioManager_.get());
+
+
+	inputManager.Initialize(window);
+
+
+	debugCamera_.Initialize(window);
 }
 
 void Game::DrawObjects(const RenderContext& ctx)
@@ -411,7 +563,7 @@ void Game::DrawSprites(const RenderContext& ctx)
 {
 	if (!drawSprite) return;
 
-	
+
 	SpriteManager* sm = engine_ ? engine_->GetSpriteManager() : nullptr;
 	if (sm)
 	{
@@ -421,34 +573,43 @@ void Game::DrawSprites(const RenderContext& ctx)
 
 void Game::DrawParticles(const RenderContext& ctx)
 {
+	particleRenderer_.Draw(ctx, particleManager.get(), model_.get(), UINT(modelData.vertices.size()));
+}
 
-	particleManager->SetupDraw(ctx.commandList);
+RenderContext Game::PrepareRenderContext()
+{
+	RenderContext ctx{};
+	auto* dx = engine_ ? engine_->GetDirectXCom() : nullptr;
+	auto* window = engine_ ? engine_->GetWindowAPI() : nullptr;
 
+	ctx.commandList = dx ? dx->GetCommandList().Get() : nullptr;
+	ctx.windowAPI = window;
+	ctx.camera = camera_.get();
+	ctx.light = light.get();
 
-	model_->Bind(ctx.commandList);
-
-	particleManager->BindResources(ctx.commandList, ctx.materialGPUAddress);
-
-
-	if (ctx.textureHandle.ptr != 0)
+	uint32_t chosenIndex = useMonsterBall ? textureIndexModelTex : textureIndexUvChecker;
+	if (chosenIndex != TextureManager::kInvalidTextureIndex)
 	{
-		ctx.commandList->SetGraphicsRootDescriptorTable(RootParam::Particle::kTextureTable, ctx.textureHandle);
-	}
-
-
-	if (ctx.light)
-	{
-		ctx.commandList->SetGraphicsRootConstantBufferView(RootParam::Particle::kLight, ctx.light->GetDirectionalLightResource()->GetGPUVirtualAddress());
+		ctx.textureHandle = TextureManager::GetInstance()->GetSrvHandleGPU(chosenIndex);
 	}
 	else
 	{
-		ctx.commandList->SetGraphicsRootConstantBufferView(RootParam::Particle::kLight, 0);
+		Logger::Log(logStream, "Warning: invalid texture index when preparing render context for drawing.\n");
+		ctx.textureHandle = {};
 	}
-	ctx.commandList->SetGraphicsRootConstantBufferView(RootParam::Particle::kCamera,
-		ctx.camera && ctx.camera->GetCameraResource() ? ctx.camera->GetCameraResource()->GetGPUVirtualAddress() : 0);
 
-	if (particleManager->GetNumInstance() > 0)
-	{
-		ctx.commandList->DrawInstanced(UINT(modelData.vertices.size()), particleManager->GetNumInstance(), 0, 0);
-	}
+	ctx.materialGPUAddress = (materialManager_ && materialManager_->GetMaterialResource())
+		? materialManager_->GetMaterialResource()->GetGPUVirtualAddress()
+		: 0;
+
+	return ctx;
 }
+
+
+
+
+
+
+
+
+
