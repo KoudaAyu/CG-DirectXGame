@@ -40,6 +40,9 @@ void Game::Initialize()
 
 	InitializeSceneResources();
 
+	offScreenRendering_ = std::make_unique<OffScreenRendering>(logStream, dx);
+	offScreenRendering_->Initialize();
+
 	//Transform変数を作る
 	Sprite::Transform transform = { {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };
 
@@ -119,6 +122,12 @@ void Game::Finalize()
 	{
 		fadeApplication_->Finalize();
 		fadeApplication_.reset();
+	}
+
+	if (offScreenRendering_)
+	{
+		offScreenRendering_->Finalize();
+		offScreenRendering_.reset();
 	}
 
 	// AudioManagerの終了処理
@@ -287,7 +296,16 @@ void Game::Draw()
 	auto* dx = engine_ ? engine_->GetDirectXCom() : nullptr;
 	auto* window = engine_ ? engine_->GetWindowAPI() : nullptr;
 
-	if (dx) dx->PreDraw();
+	if (!dx) return;
+
+	// PreDraw backbuffer transition and clear
+	dx->PreDraw();
+
+	// Begin rendering to off-screen buffer
+	if (offScreenRendering_)
+	{
+		offScreenRendering_->Begin(dx->GetCommandList().Get());
+	}
 
 	if (offScreenRendering_)
 	{
@@ -297,9 +315,9 @@ void Game::Draw()
 	if (object3dCom) object3dCom->PreDraw();
 
 	RenderContext ctx = PrepareRenderContext();
-    SceneRenderRequests renderRequests{};
+	SceneRenderRequests renderRequests{};
 
-	if (camera_ && camera_->GetCameraResource() && dx)
+	if (camera_ && camera_->GetCameraResource())
 	{
 		dx->GetCommandList()->SetGraphicsRootConstantBufferView(4, camera_->GetCameraResource()->GetGPUVirtualAddress());
 	}
@@ -318,7 +336,7 @@ void Game::Draw()
 
 	if (SceneManager::GetInstance())
 	{
-        SceneManager::GetInstance()->Draw(renderRequests);
+		SceneManager::GetInstance()->Draw(renderRequests);
 	}
 
 	sphereRenderer_.Draw(ctx, renderRequests);
@@ -337,7 +355,7 @@ void Game::Draw()
 
 	// 2. Sprite Drawの計測
 	GpuProfiler::GetInstance()->BeginProfile(dx->GetCommandList().Get(), "Sprite Draw");
-    DrawSprites(ctx);
+	DrawSprites(ctx);
 	GpuProfiler::GetInstance()->EndProfile(dx->GetCommandList().Get(), "Sprite Draw");
 
 	// 3. Particle Drawの計測 (通常のパーティクル描画)
@@ -353,8 +371,27 @@ void Game::Draw()
 		fadeApplication_->Draw();
 	}
 
-	//Objectの描画
+	// End off-screen rendering
+	if (offScreenRendering_)
+	{
+		offScreenRendering_->End(dx->GetCommandList().Get());
 
+		// Restore main render target (backbuffer)
+		offScreenRendering_->SetMainRenderTarget(dx->GetCommandList().Get());
+
+		// Set camera's inverse projection matrix
+		if (camera_)
+		{
+			offScreenRendering_->SetProjectionInverse(Inverse(camera_->GetProjectionMatrix()));
+		}
+
+		// 4. PostProcess (OffScreen Rendering) Drawの計測
+		GpuProfiler::GetInstance()->BeginProfile(dx->GetCommandList().Get(), "PostProcess Draw");
+		offScreenRendering_->DrawToBackBuffer(dx->GetCommandList().Get());
+		GpuProfiler::GetInstance()->EndProfile(dx->GetCommandList().Get(), "PostProcess Draw");
+	}
+
+	// Draw object debug logs if necessary
 	{
 		uint32_t chosenIndex = useMonsterBall ? textureIndexModelTex : textureIndexUvChecker;
 		D3D12_GPU_DESCRIPTOR_HANDLE chosenHandle{};
@@ -373,23 +410,11 @@ void Game::Draw()
 		OutputDebugStringA(oss.str().c_str());
 	}
 
-	//実際のcommandListのImGuiの描画コマンドを積む
 #ifdef USE_IMGUI
-	if (offScreenRendering_)
-	{
-		offScreenRendering_->End(dx->GetCommandList().Get());
-		offScreenRendering_->SetMainRenderTarget(dx->GetCommandList().Get());
-
-		// 4. PostProcess (OffScreen Rendering) Drawの計測
-		GpuProfiler::GetInstance()->BeginProfile(dx->GetCommandList().Get(), "PostProcess Draw");
-		offScreenRendering_->DrawToBackBuffer(dx->GetCommandList().Get());
-		GpuProfiler::GetInstance()->EndProfile(dx->GetCommandList().Get(), "PostProcess Draw");
-	}
-
 	if (dx) ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), dx->GetCommandList().Get());
 #endif
 
-	if (dx) dx->PostDraw();
+	dx->PostDraw();
 }
 
 bool Game::IsQuitRequested()

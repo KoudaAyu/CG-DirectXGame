@@ -207,6 +207,11 @@
     <FxCompile Include="Resources\shaders\CopyImage.VS.hlsl" />
     <FxCompile Include="Resources\shaders\SkinningObject3d.VS.hlsl" />
     <FxCompile Include="Resources\CG4\SkinningObject3d.VS.hlsl" />
+    <FxCompile Include="Resources\shaders\RadialBlur.PS.hlsl" />
+    <FxCompile Include="Resources\shaders\BoxFilter.PS.hlsl" />
+    <FxCompile Include="Resources\shaders\GaussianFilter.PS.hlsl" />
+    <FxCompile Include="Resources\shaders\LuminanceBaseOutline.PS.hlsl" />
+    <FxCompile Include="Resources\shaders\DepthBasedOutline.PS.hlsl" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Baziru3_Engine\Animation\NodeAnimation\Node.h" />
