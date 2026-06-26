@@ -13,7 +13,7 @@ public:
     /// <param name="radius">球の半径</param>
     /// <param name="refPos">追従する対象の座標ポインタ</param>
     /// <param name="attribute">衝突属性タグ</param>
-    SphereCollider(float radius, const Vector3* refPos, CollisionAttribute attribute)
+    SphereCollider(float radius, Vector3* refPos, CollisionAttribute attribute)
         : Collider(ColliderType::Sphere, attribute)
         , radius_(radius)
         , referencePosition_(refPos)
@@ -38,7 +38,18 @@ public:
         return GetPositionOffset();
     }
 
+    /// <summary>
+    /// コライダーの現在の世界座標を設定（親オブジェクトの座標を補正）
+    /// </summary>
+    virtual void SetWorldPosition(const Vector3& pos) override
+    {
+        if (referencePosition_)
+        {
+            *referencePosition_ = pos - GetPositionOffset();
+        }
+    }
+
 private:
     float radius_;                  // 球の半径
-    const Vector3* referencePosition_; // 基準となる位置ポインタ (PlayerやEnemy等の座標ポインタを指定)
+    Vector3* referencePosition_; // 基準となる位置ポインタ (PlayerやEnemy等の座標ポインタを指定)
 };

@@ -62,6 +62,11 @@ public:
     virtual Vector3 GetWorldPosition() const = 0;
 
     /// <summary>
+    /// コライダーの現在の世界座標を設定（親オブジェクトの座標を補正）
+    /// </summary>
+    virtual void SetWorldPosition(const Vector3& pos) = 0;
+
+    /// <summary>
     /// 物理的衝突（押し出し）を行わず、接触イベント検知のみを行うかどうか
     /// </summary>
     void SetIsTrigger(bool isTrigger) { isTrigger_ = isTrigger; }

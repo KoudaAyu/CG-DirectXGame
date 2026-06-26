@@ -10,14 +10,7 @@
 // エンジン標準のVector3クラスに対して、衝突判定に必要な基本演算を提供します。
 // =========================================================================
 
-/// <summary>
-/// ベクトルの減算演算子 (-)
-/// 2つの3次元ベクトル間の差分ベクトル（AからBへの方向ベクトルなど）を計算します。
-/// </summary>
-inline Vector3 operator-(const Vector3& lhs, const Vector3& rhs)
-{
-    return { lhs.x - rhs.x, lhs.y - rhs.y, lhs.z - rhs.z };
-}
+
 
 /// <summary>
 /// ベクトルの内積 (ドット積)
@@ -196,17 +189,24 @@ void CollisionManager::Update()
                     {
                         // Aが固定オブジェクトで、Bが移動オブジェクトの場合:
                         // Bのみを「Aから離れる方向(pushDir)」へ「めり込み量(pushLen)」分だけ移動させて解決します。
-                        // ※ 将来的には B の座標ポインタを介して書き戻すか、Bの保持するオブジェクト側で座標修正を行います。
+                        Vector3 newPos = colB->GetWorldPosition() + pushDir * pushLen;
+                        colB->SetWorldPosition(newPos);
                     }
                     else if (!isAFixed && isBFixed)
                     {
                         // Aが移動オブジェクトで、Bが固定オブジェクトの場合:
                         // Aのみを「Bから離れる方向(-pushDir)」へ「めり込み量(pushLen)」分だけ移動させて解決します。
+                        Vector3 newPos = colA->GetWorldPosition() - pushDir * pushLen;
+                        colA->SetWorldPosition(newPos);
                     }
                     else if (!isAFixed && !isBFixed)
                     {
                         // 両者とも移動可能な動的オブジェクト同士の場合:
                         // 公平に半々 (pushLen * 0.5f) ずつ逆方向に押し出して干渉を解決します。
+                        Vector3 newPosA = colA->GetWorldPosition() - pushDir * (pushLen * 0.5f);
+                        Vector3 newPosB = colB->GetWorldPosition() + pushDir * (pushLen * 0.5f);
+                        colA->SetWorldPosition(newPosA);
+                        colB->SetWorldPosition(newPosB);
                     }
                 }
             }

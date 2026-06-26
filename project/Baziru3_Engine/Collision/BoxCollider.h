@@ -14,7 +14,7 @@ public:
     /// <param name="refPos">追従する対象の座標ポインタ</param>
     /// <param name="refRot">追従する対象の回転ポインタ (NULLの場合はAABBとして扱います)</param>
     /// <param name="attribute">衝突属性タグ</param>
-    BoxCollider(const Vector3& size, const Vector3* refPos, const Vector3* refRot, CollisionAttribute attribute)
+    BoxCollider(const Vector3& size, Vector3* refPos, const Vector3* refRot, CollisionAttribute attribute)
         : Collider(ColliderType::Box, attribute)
         , size_(size)
         , referencePosition_(refPos)
@@ -60,8 +60,19 @@ public:
         return GetPositionOffset();
     }
 
+    /// <summary>
+    /// コライダーの現在の世界座標を設定（親オブジェクトの座標を補正）
+    /// </summary>
+    virtual void SetWorldPosition(const Vector3& pos) override
+    {
+        if (referencePosition_)
+        {
+            *referencePosition_ = pos - GetPositionOffset();
+        }
+    }
+
 private:
     Vector3 size_;                    // 直方体のサイズ (幅, 高さ, 奥行き)
-    const Vector3* referencePosition_; // 基準となる位置ポインタ
+    Vector3* referencePosition_; // 基準となる位置ポインタ
     const Vector3* referenceRotation_; // 基準となる回転ポインタ (オイラー角)
 };
