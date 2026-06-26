@@ -43,6 +43,25 @@ void OffScreenRendering::Finalize()
         srvIndex_ = TextureManager::kInvalidTextureIndex;
     }
 
+    if (depthSrvIndex_ != TextureManager::kInvalidTextureIndex)
+    {
+        if (auto* textureManager = TextureManager::GetInstance())
+        {
+            if (auto* srvManager = textureManager->GetSRVManager())
+            {
+                srvManager->Free(depthSrvIndex_);
+            }
+        }
+        depthSrvIndex_ = TextureManager::kInvalidTextureIndex;
+    }
+
+    if (inverseProjectionBuffer_)
+    {
+        inverseProjectionBuffer_->Unmap(0, nullptr);
+        inverseProjectionMap_ = nullptr;
+        inverseProjectionBuffer_.Reset();
+    }
+
     pipelineState_.Reset();
     rootSignature_.Reset();
     signatureBlob_.Reset();
@@ -54,6 +73,7 @@ void OffScreenRendering::Finalize()
     rtvDescriptorHeap_.Reset();
     dsvDescriptorHeap_.Reset();
     srvHandleGPU_ = {};
+    depthSrvHandleGPU_ = {};
     currentState_ = D3D12_RESOURCE_STATE_RENDER_TARGET;
 }
 
@@ -95,6 +115,17 @@ void OffScreenRendering::DrawToBackBuffer(ID3D12GraphicsCommandList* commandList
 {
     assert(commandList);
     assert(srvHandleGPU_.ptr != 0);
+    assert(depthSrvHandleGPU_.ptr != 0);
+
+    // Transition depth buffer resource barrier: WRITE -> PIXEL_SHADER_RESOURCE
+    D3D12_RESOURCE_BARRIER barrier{};
+    barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+    barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+    barrier.Transition.pResource = depthStencilResource_.Get();
+    barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_DEPTH_WRITE;
+    barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+    barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+    commandList->ResourceBarrier(1, &barrier);
 
     ID3D12DescriptorHeap* descriptorHeaps[] = { dxCommon_->GetSrvDescriptorHeap().Get() };
     commandList->SetDescriptorHeaps(1, descriptorHeaps);
@@ -102,7 +133,17 @@ void OffScreenRendering::DrawToBackBuffer(ID3D12GraphicsCommandList* commandList
     commandList->SetPipelineState(pipelineState_.Get());
     commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
     commandList->SetGraphicsRootDescriptorTable(0, srvHandleGPU_);
+    commandList->SetGraphicsRootDescriptorTable(1, depthSrvHandleGPU_);
+    if (inverseProjectionBuffer_)
+    {
+        commandList->SetGraphicsRootConstantBufferView(2, inverseProjectionBuffer_->GetGPUVirtualAddress());
+    }
     commandList->DrawInstanced(3, 1, 0, 0);
+
+    // Transition depth buffer resource barrier back: PIXEL_SHADER_RESOURCE -> WRITE
+    barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+    barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_DEPTH_WRITE;
+    commandList->ResourceBarrier(1, &barrier);
 }
 
 D3D12_GPU_DESCRIPTOR_HANDLE OffScreenRendering::GetSrvHandleGPU() const
@@ -117,6 +158,7 @@ ID3D12Resource* OffScreenRendering::GetTextureResource() const
 
 void OffScreenRendering::CreateRootSignature()
 {
+    // Color Texture (t0)
     descriptorRange_[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
     descriptorRange_[0].NumDescriptors = 1;
     descriptorRange_[0].BaseShaderRegister = 0;
@@ -125,9 +167,28 @@ void OffScreenRendering::CreateRootSignature()
 
     rootParameters_[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
     rootParameters_[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
-    rootParameters_[0].DescriptorTable.pDescriptorRanges = descriptorRange_;
-    rootParameters_[0].DescriptorTable.NumDescriptorRanges = _countof(descriptorRange_);
+    rootParameters_[0].DescriptorTable.pDescriptorRanges = &descriptorRange_[0];
+    rootParameters_[0].DescriptorTable.NumDescriptorRanges = 1;
 
+    // Depth Texture (t1)
+    descriptorRange_[1].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+    descriptorRange_[1].NumDescriptors = 1;
+    descriptorRange_[1].BaseShaderRegister = 1;
+    descriptorRange_[1].RegisterSpace = 0;
+    descriptorRange_[1].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+
+    rootParameters_[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+    rootParameters_[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+    rootParameters_[1].DescriptorTable.pDescriptorRanges = &descriptorRange_[1];
+    rootParameters_[1].DescriptorTable.NumDescriptorRanges = 1;
+
+    // Constant Buffer (b1)
+    rootParameters_[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+    rootParameters_[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+    rootParameters_[2].Descriptor.ShaderRegister = 1;
+    rootParameters_[2].Descriptor.RegisterSpace = 0;
+
+    // Sampler (s0) - Linear
     staticSamplers_[0].Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
     staticSamplers_[0].AddressU = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
     staticSamplers_[0].AddressV = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
@@ -136,6 +197,16 @@ void OffScreenRendering::CreateRootSignature()
     staticSamplers_[0].MaxLOD = D3D12_FLOAT32_MAX;
     staticSamplers_[0].ShaderRegister = 0;
     staticSamplers_[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+
+    // Sampler (s1) - Point
+    staticSamplers_[1].Filter = D3D12_FILTER_MIN_MAG_MIP_POINT;
+    staticSamplers_[1].AddressU = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+    staticSamplers_[1].AddressV = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+    staticSamplers_[1].AddressW = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+    staticSamplers_[1].ComparisonFunc = D3D12_COMPARISON_FUNC_NEVER;
+    staticSamplers_[1].MaxLOD = D3D12_FLOAT32_MAX;
+    staticSamplers_[1].ShaderRegister = 1;
+    staticSamplers_[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 
     D3D12_ROOT_SIGNATURE_DESC rootSignatureDesc{};
     rootSignatureDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
@@ -179,7 +250,7 @@ void OffScreenRendering::ShaderCompile()
     assert(vertexShaderBlob_ != nullptr);
 
     pixelShaderBlob_ = dxCommon_->CompileShader(
-        L"Resources/shaders/CopyImage.PS.hlsl",
+        L"Resources/shaders/DepthBasedOutline.PS.hlsl",
         L"ps_6_0",
         dxCommon_->GetDxcUtils().Get(),
         dxCommon_->GetDxcCompiler(),
@@ -292,6 +363,47 @@ void OffScreenRendering::CreateRenderTargets()
     srvIndex_ = srvManager->Allocate();
     srvManager->CreateSRVForTexture2D(srvIndex_, offScreenTexture_.Get(), format_, 1);
     srvHandleGPU_ = srvManager->GetGPUDescriptorHandle(srvIndex_);
+
+    // Create Depth SRV (Format: DXGI_FORMAT_R24_UNORM_X8_TYPELESS)
+    depthSrvIndex_ = srvManager->Allocate();
+    D3D12_SHADER_RESOURCE_VIEW_DESC depthTextureSrvDesc{};
+    depthTextureSrvDesc.Format = DXGI_FORMAT_R24_UNORM_X8_TYPELESS;
+    depthTextureSrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    depthTextureSrvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+    depthTextureSrvDesc.Texture2D.MipLevels = 1;
+    dxCommon_->GetDevice()->CreateShaderResourceView(
+        depthStencilResource_.Get(),
+        &depthTextureSrvDesc,
+        srvManager->GetCPUDescriptorHandle(depthSrvIndex_));
+    depthSrvHandleGPU_ = srvManager->GetGPUDescriptorHandle(depthSrvIndex_);
+
+    // Create Constant Buffer for inverseProjection matrix
+    D3D12_HEAP_PROPERTIES uploadHeapProperties{};
+    uploadHeapProperties.Type = D3D12_HEAP_TYPE_UPLOAD;
+    
+    D3D12_RESOURCE_DESC bufferDesc{};
+    bufferDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+    bufferDesc.Width = (sizeof(Matrix4x4) + 255) & ~255;
+    bufferDesc.Height = 1;
+    bufferDesc.DepthOrArraySize = 1;
+    bufferDesc.MipLevels = 1;
+    bufferDesc.Format = DXGI_FORMAT_UNKNOWN;
+    bufferDesc.SampleDesc.Count = 1;
+    bufferDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+    bufferDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
+
+    dxCommon_->SetHr(dxCommon_->GetDevice()->CreateCommittedResource(
+        &uploadHeapProperties,
+        D3D12_HEAP_FLAG_NONE,
+        &bufferDesc,
+        D3D12_RESOURCE_STATE_GENERIC_READ,
+        nullptr,
+        IID_PPV_ARGS(&inverseProjectionBuffer_)));
+    assert(SUCCEEDED(dxCommon_->GetHr()));
+
+    dxCommon_->SetHr(inverseProjectionBuffer_->Map(0, nullptr, &inverseProjectionMap_));
+    assert(SUCCEEDED(dxCommon_->GetHr()));
+
     currentState_ = D3D12_RESOURCE_STATE_RENDER_TARGET;
 }
 
@@ -321,4 +433,12 @@ void OffScreenRendering::TransitionResource(ID3D12GraphicsCommandList* commandLi
     barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
     commandList->ResourceBarrier(1, &barrier);
     currentState_ = nextState;
+}
+
+void OffScreenRendering::SetProjectionInverse(const Matrix4x4& projectionInverse)
+{
+    if (inverseProjectionMap_)
+    {
+        std::memcpy(inverseProjectionMap_, &projectionInverse, sizeof(Matrix4x4));
+    }
 }

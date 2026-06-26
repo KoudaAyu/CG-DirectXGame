@@ -1,4 +1,3 @@
-#include "Resources/shaders/CopyImage.hlsli"
 #include "CopyImage.hlsli"
 
 static const uint32_t kNumVertex = 3;

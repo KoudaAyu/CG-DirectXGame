@@ -11,6 +11,7 @@
 #include "DirectXCom.h"
 #include "RenderTexture.h"
 #include "TextureManager.h"
+#include "Matrix4x4.h"
 
 class OffScreenRendering
 {
@@ -29,6 +30,9 @@ public:
     void End(ID3D12GraphicsCommandList* commandList);
     void SetMainRenderTarget(ID3D12GraphicsCommandList* commandList) const;
     void DrawToBackBuffer(ID3D12GraphicsCommandList* commandList);
+
+    // 逆プロジェクション行列を設定する関数を追加
+    void SetProjectionInverse(const Matrix4x4& projectionInverse);
 
     D3D12_GPU_DESCRIPTOR_HANDLE GetSrvHandleGPU() const;
     ID3D12Resource* GetTextureResource() const;
@@ -51,6 +55,7 @@ private:
     DXGI_FORMAT format_ = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
     Vector4 clearColor_ = { 0.1f, 0.25f, 0.5f, 1.0f };
     uint32_t srvIndex_ = TextureManager::kInvalidTextureIndex;
+    uint32_t depthSrvIndex_ = TextureManager::kInvalidTextureIndex; // 深度用SRVのインデックスを追加
     D3D12_RESOURCE_STATES currentState_ = D3D12_RESOURCE_STATE_RENDER_TARGET;
 
     RenderTexture renderTexture_;
@@ -61,10 +66,15 @@ private:
     D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle_{};
     D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle_{};
     D3D12_GPU_DESCRIPTOR_HANDLE srvHandleGPU_{};
+    D3D12_GPU_DESCRIPTOR_HANDLE depthSrvHandleGPU_{}; // 深度用SRVのGPUハンドルを追加
 
-    D3D12_DESCRIPTOR_RANGE descriptorRange_[1] = {};
-    D3D12_ROOT_PARAMETER rootParameters_[1] = {};
-    D3D12_STATIC_SAMPLER_DESC staticSamplers_[1] = {};
+    // 逆プロジェクション行列送信用定数バッファ
+    Microsoft::WRL::ComPtr<ID3D12Resource> inverseProjectionBuffer_ = nullptr;
+    void* inverseProjectionMap_ = nullptr;
+
+    D3D12_DESCRIPTOR_RANGE descriptorRange_[2] = {}; // 範囲を2つに増やす（Color, Depth）
+    D3D12_ROOT_PARAMETER rootParameters_[3] = {};    // パラメータを3つに増やす（Color, Depth, CBuffer）
+    D3D12_STATIC_SAMPLER_DESC staticSamplers_[2] = {}; // サンプラーを2つに増やす（Linear, Point）
     Microsoft::WRL::ComPtr<ID3DBlob> signatureBlob_ = nullptr;
     Microsoft::WRL::ComPtr<ID3DBlob> errorBlob_ = nullptr;
     Microsoft::WRL::ComPtr<ID3D12RootSignature> rootSignature_ = nullptr;
