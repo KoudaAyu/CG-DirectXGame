@@ -46,7 +46,8 @@
     <ClCompile Include="Baziru3_Engine\Camera\Camera.cpp" />
     <ClCompile Include="Baziru3_Engine\Camera\DebugCamera\DebugCamera.cpp" />
     <ClCompile Include="Baziru3_Engine\Base\DirectXCom.cpp" />
-    <ClCompile Include="Baziru3_Engine\Base\KeyInput.cpp" />
+    <ClCompile Include="Baziru3_Engine\Collision\CollisionManager.cpp" />
+    <ClCompile Include="Baziru3_Engine\IO\Key\KeyInput.cpp" />
     <ClCompile Include="Baziru3_Engine\Base\Log\Log.cpp" />
     <ClCompile Include="Baziru3_Engine\Math\Matrix4x4.cpp" />
     <ClCompile Include="Baziru3_Engine\Base\ResourceLeakCheek.cpp" />
@@ -199,6 +200,11 @@
     <ClInclude Include="Baziru3_Engine\Scene\BaseScene.h" />
     <ClInclude Include="Baziru3_Engine\3D\Object\Object3d.h" />
     <ClInclude Include="Baziru3_Engine\3D\Object\Object3dCom.h" />
+    <ClInclude Include="Baziru3_Engine\Collision\BoxCollider.h" />
+    <ClInclude Include="Baziru3_Engine\Collision\CapsuleCollider.h" />
+    <ClInclude Include="Baziru3_Engine\Collision\Collider.h" />
+    <ClInclude Include="Baziru3_Engine\Collision\CollisionManager.h" />
+    <ClInclude Include="Baziru3_Engine\Collision\SphereCollider.h" />
     <ClInclude Include="Baziru3_Engine\Audio\Sound.h" />
     <ClInclude Include="Baziru3_Engine\Base\MappedResource.h" />
     <ClInclude Include="Baziru3_Engine\Base\OffScreenRendering\RenderTexture.h" />
@@ -207,7 +213,7 @@
     <ClInclude Include="Baziru3_Engine\Camera\DebugCamera\DebugCamera.h" />
     <ClInclude Include="Baziru3_Engine\Base\DirectXCom.h" />
     <ClInclude Include="Baziru3_Engine\Base\ImGui\ImGuiManager.h" />
-    <ClInclude Include="Baziru3_Engine\Base\KeyInput.h" />
+    <ClInclude Include="Baziru3_Engine\IO\Key\KeyInput.h" />
     <ClInclude Include="Baziru3_Engine\Base\Log\Log.h" />
     <ClInclude Include="Baziru3_Engine\Math\Matrix4x4.h" />
     <ClInclude Include="Baziru3_Engine\Base\ResourceLeakCheek.h" />

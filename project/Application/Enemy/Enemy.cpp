@@ -20,9 +20,14 @@ void Enemy::Initialize(Object3dCom* object3dCom, Camera* camera)
     object3d_ = std::make_unique<Object3d>();
     object3d_->Initialize(object3dCom_, model);
 
-    object3d_->SetTranslate({ 3.0f, 0.0f, 3.0f });
+    position_ = { 3.0f, 0.0f, 3.0f };
+    object3d_->SetTranslate(position_);
     object3d_->SetScale({ 1.0f, 1.0f, 1.0f });
     object3d_->SetColor({ 1.0f, 1.0f, 1.0f, 1.0f });
+
+    // コライダーの初期化と登録
+    collider_ = std::make_unique<SphereCollider>(0.6f, &position_, CollisionAttribute::Enemy);
+    CollisionManager::GetInstance()->RegisterCollider(collider_.get());
 
     if (model.material.textureFilePath.empty())
     {
@@ -105,7 +110,8 @@ void Enemy::Update(WindowAPI* windowAPI, const Vector3* targetPosition, const st
             alertTimer_ = 0.0f;
             if (object3d_)
             {
-                object3d_->SetTranslate({ 3.0f, 0.0f, 3.0f });
+                position_ = { 3.0f, 0.0f, 3.0f };
+                object3d_->SetTranslate(position_);
                 object3d_->SetColor({ 1.0f, 1.0f, 1.0f, 1.0f });
             }
         }
@@ -277,6 +283,7 @@ void Enemy::Update(WindowAPI* windowAPI, const Vector3* targetPosition, const st
         if (alertTimer_ < 0.0f) alertTimer_ = 0.0f;
     }
 
+    object3d_->SetTranslate(position_);
     object3d_->Update();
 
     // HPバーの座標・サイズ更新
@@ -488,6 +495,11 @@ void Enemy::OnHit(const Vector3& attackerPos)
 
 void Enemy::Finalize()
 {
+    if (collider_)
+    {
+        CollisionManager::GetInstance()->UnregisterCollider(collider_.get());
+        collider_.reset();
+    }
     if (object3d_)
     {
         object3d_.reset();

@@ -22,8 +22,13 @@ void Player::Initialize(Object3dCom* object3dCom, Camera* camera)
     object3d_->Initialize(object3dCom_, model);
 
     // デフォルトのトランスフォーム
-    object3d_->SetTranslate({ 0.0f, 0.0f, 0.0f });
+    position_ = { 0.0f, 0.0f, 0.0f };
+    object3d_->SetTranslate(position_);
     object3d_->SetScale({ 1.0f, 1.0f, 1.0f });
+
+    // コライダーの初期化と登録
+    collider_ = std::make_unique<SphereCollider>(0.6f, &position_, CollisionAttribute::Player);
+    CollisionManager::GetInstance()->RegisterCollider(collider_.get());
 
     // テクスチャがない OBJ の場合、デフォルトテクスチャをバインドしておく
     // GPU-based validation でディスクリプタ未初期化エラーが出ないようにするため
@@ -144,10 +149,9 @@ void Player::Update(float deltaTime, MouseInput* mouseInput)
         dodgeTimer_ -= deltaTime;
         
         // 移動処理
-        Vector3 pos = object3d_->GetTranslate();
-        pos.x += dodgeDirection_.x * dodgeSpeed_ * frameScale;
-        pos.z += dodgeDirection_.z * dodgeSpeed_ * frameScale;
-        object3d_->SetTranslate(pos);
+        position_.x += dodgeDirection_.x * dodgeSpeed_ * frameScale;
+        position_.z += dodgeDirection_.z * dodgeSpeed_ * frameScale;
+        object3d_->SetTranslate(position_);
 
         // ビジュアル演出：X軸（前転方向）に1回転
         float ratio = dodgeTimer_ / dodgeDuration_;
@@ -211,29 +215,28 @@ void Player::Update(float deltaTime, MouseInput* mouseInput)
         {
             // 通常のWASD移動処理
             const float kSpeed = 0.05f;
-            Vector3 pos = object3d_->GetTranslate();
 
             if ((GetAsyncKeyState('W') & 0x8000) != 0)
             {
-                pos.z += kSpeed * frameScale;
+                position_.z += kSpeed * frameScale;
                 isMoving = true;
             }
             if ((GetAsyncKeyState('S') & 0x8000) != 0)
             {
-                pos.z -= kSpeed * frameScale;
+                position_.z -= kSpeed * frameScale;
                 isMoving = true;
             }
             if ((GetAsyncKeyState('A') & 0x8000) != 0)
             {
-                pos.x -= kSpeed * frameScale;
+                position_.x -= kSpeed * frameScale;
                 isMoving = true;
             }
             if ((GetAsyncKeyState('D') & 0x8000) != 0)
             {
-                pos.x += kSpeed * frameScale;
+                position_.x += kSpeed * frameScale;
                 isMoving = true;
             }
-            object3d_->SetTranslate(pos);
+            object3d_->SetTranslate(position_);
         }
     }
 
@@ -286,7 +289,7 @@ void Player::Update(float deltaTime, MouseInput* mouseInput)
                     if (t > 0.0f)
                     {
                         Vector3 hit = { worldNear.x + dir.x * t, 0.0f, worldNear.z + dir.z * t };
-                        Vector3 ppos = object3d_->GetTranslate();
+                        Vector3 ppos = position_;
                         Vector3 to = { hit.x - ppos.x, 0.0f, hit.z - ppos.z };
                         // ヨーの計算。前方が +Z なので atan2(x, z) を使用
                         float yaw = std::atan2(to.x, to.z);
@@ -301,13 +304,14 @@ void Player::Update(float deltaTime, MouseInput* mouseInput)
 
     if (camera_)
     {
-        Vector3 playerPos = object3d_->GetTranslate();
+        Vector3 playerPos = position_;
         Vector3 cameraOffset = { 0.0f, 20.0f, -20.0f };
         camera_->SetTranslate(playerPos + cameraOffset);
     }
 
     UpdateSpread(deltaTime, isMoving);
     isMoving_ = isMoving;
+    object3d_->SetTranslate(position_);
     object3d_->Update();
 }
 
@@ -461,6 +465,11 @@ void Player::Draw(const RenderContext& ctx)
 
 void Player::Finalize()
 {
+    if (collider_)
+    {
+        CollisionManager::GetInstance()->UnregisterCollider(collider_.get());
+        collider_.reset();
+    }
     if (object3d_)
     {
         object3d_.reset();
@@ -504,9 +513,10 @@ void Player::Reset()
     stamina_ = maxStamina_;
     currentSpread_ = 0.0f;
     isMoving_ = false;
+    position_ = { 0.0f, 0.0f, 0.0f };
     if (object3d_)
     {
-        object3d_->SetTranslate({ 0.0f, 0.0f, 0.0f });
+        object3d_->SetTranslate(position_);
         object3d_->SetRotate({ 0.0f, 0.0f, 0.0f });
         object3d_->SetColor({ 1.0f, 1.0f, 1.0f, 1.0f });
     }

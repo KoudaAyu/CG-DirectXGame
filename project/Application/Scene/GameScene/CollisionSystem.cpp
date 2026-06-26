@@ -7,6 +7,7 @@
 #include "Application/Particle/AppParticleManager.h"
 #include "ParticleManager.h"
 #include "Baziru3_Engine/Effect/HitEffect.h"
+#include "Baziru3_Engine/Collision/CollisionManager.h"
 #include "CombatSystem.h"
 #include <cmath>
 #include <algorithm>
@@ -20,6 +21,7 @@ CollisionSystem::CollisionSystem(GamePlayScene* scene)
 // 衝突判定とキャラクターの位置補正を毎フレーム実行
 void CollisionSystem::Update()
 {
+	CollisionManager::GetInstance()->Update(); // エンジンの衝突判定更新
 	ResolveBulletCollisions();      // 弾丸とキャラクターの衝突
 	ResolveObstacleCollisions();    // キャラクター・弾丸と障害物の衝突
 	ResolveContactDamage();        // プレイヤーと敵の直接接触によるダメージ
@@ -197,146 +199,7 @@ void CollisionSystem::ResolveBulletCollisions()
 // キャラクターおよび弾丸と障害物（Obstacle）の衝突判定とめり込み補正
 void CollisionSystem::ResolveObstacleCollisions()
 {
-	// --- 1. プレイヤーと障害物の衝突判定・押し出し ---
-	if (scene_->player_ && !scene_->player_->IsDead())
-	{
-		Vector3 pPos = scene_->player_->GetPosition();
-		for (auto& obs : scene_->obstacles_)
-		{
-			if (!obs) continue;
-			Vector3 oPos = obs->GetPosition();
-			float dx = pPos.x - oPos.x;
-			float dz = pPos.z - oPos.z;
-			float dist = std::sqrt(dx * dx + dz * dz);
-			float minDist = scene_->playerHitRadius_ + obs->GetRadius();
-			if (dist < minDist)
-			{
-				float overlap = minDist - dist;
-				if (dist > 1e-4f)
-				{
-					pPos.x += (dx / dist) * overlap;
-					pPos.z += (dz / dist) * overlap;
-				}
-				else
-				{
-					pPos.x += minDist;
-				}
-				scene_->player_->SetPosition(pPos); // めり込み位置を補正
-
-				// 壁擦り時の火花パーティクル演出
-				if (scene_->player_->IsMoving() && scene_->particleManager && scene_->appParticleManager_)
-				{
-					if (rand() % 100 < 25)
-					{
-						Vector3 contactPos = oPos + Vector3{ (dx / (dist > 1e-4f ? dist : 1.0f)) * obs->GetRadius(), 0.1f, (dz / (dist > 1e-4f ? dist : 1.0f)) * obs->GetRadius() };
-						scene_->appParticleManager_->EmitSpark(
-							scene_->particleManager->GetRandomEngine(),
-							contactPos,
-							Vector3{ 0.0f, 2.0f, 0.0f },
-							{ 1.0f, 0.65f, 0.15f, 1.0f },
-							0.12f,
-							0.8f,
-							scene_->particleTextureB
-						);
-					}
-				}
-			}
-		}
-	}
-
-	// --- 2. 固定敵と障害物の衝突判定・押し出し ---
-	if (scene_->enemy_ && !scene_->enemy_->IsDead())
-	{
-		Vector3 ePos = scene_->enemy_->GetPosition();
-		for (auto& obs : scene_->obstacles_)
-		{
-			if (!obs) continue;
-			Vector3 oPos = obs->GetPosition();
-			float dx = ePos.x - oPos.x;
-			float dz = ePos.z - oPos.z;
-			float dist = std::sqrt(dx * dx + dz * dz);
-			float minDist = scene_->enemyHitRadius_ + obs->GetRadius();
-			if (dist < minDist)
-			{
-				float overlap = minDist - dist;
-				if (dist > 1e-4f)
-				{
-					ePos.x += (dx / dist) * overlap;
-					ePos.z += (dz / dist) * overlap;
-				}
-				else
-				{
-					ePos.x += minDist;
-				}
-				scene_->enemy_->SetPosition(ePos);
-
-				if (overlap > 0.005f && scene_->particleManager && scene_->appParticleManager_)
-				{
-					if (rand() % 100 < 15)
-					{
-						Vector3 contactPos = oPos + Vector3{ (dx / (dist > 1e-4f ? dist : 1.0f)) * obs->GetRadius(), 0.1f, (dz / (dist > 1e-4f ? dist : 1.0f)) * obs->GetRadius() };
-						scene_->appParticleManager_->EmitSpark(
-							scene_->particleManager->GetRandomEngine(),
-							contactPos,
-							Vector3{ 0.0f, 1.8f, 0.0f },
-							{ 1.0f, 0.6f, 0.1f, 1.0f },
-							0.1f,
-							0.7f,
-							scene_->particleTextureB
-						);
-					}
-				}
-			}
-		}
-	}
-
-	// --- 3. 移動敵と障害物の衝突判定・押し出し ---
-	if (scene_->movingEnemy_ && !scene_->movingEnemy_->IsDead())
-	{
-		Vector3 ePos = scene_->movingEnemy_->GetPosition();
-		for (auto& obs : scene_->obstacles_)
-		{
-			if (!obs) continue;
-			Vector3 oPos = obs->GetPosition();
-			float dx = ePos.x - oPos.x;
-			float dz = ePos.z - oPos.z;
-			float dist = std::sqrt(dx * dx + dz * dz);
-			float minDist = scene_->enemyHitRadius_ + obs->GetRadius();
-			if (dist < minDist)
-			{
-				float overlap = minDist - dist;
-				if (dist > 1e-4f)
-				{
-					ePos.x += (dx / dist) * overlap;
-					ePos.z += (dz / dist) * overlap;
-				}
-				else
-				{
-					ePos.x += minDist;
-				}
-				scene_->movingEnemy_->SetPosition(ePos);
-
-				if (overlap > 0.005f && scene_->particleManager && scene_->appParticleManager_)
-				{
-					if (rand() % 100 < 15)
-					{
-						Vector3 contactPos = oPos + Vector3{ (dx / (dist > 1e-4f ? dist : 1.0f)) * obs->GetRadius(), 0.1f, (dz / (dist > 1e-4f ? dist : 1.0f)) * obs->GetRadius() };
-						scene_->appParticleManager_->EmitSpark(
-							scene_->particleManager->GetRandomEngine(),
-							contactPos,
-							Vector3{ 0.0f, 1.8f, 0.0f },
-							{ 1.0f, 0.6f, 0.1f, 1.0f },
-							0.1f,
-							0.7f,
-							scene_->particleTextureB
-						);
-					}
-				}
-			}
-		}
-	}
-
-	// --- 4. 弾丸と障害物の衝突判定 ---
+	// --- 弾丸と障害物の衝突判定 ---
 	if (!scene_->combatSystem_) return;
 	auto& bullets = scene_->combatSystem_->GetBullets();
 

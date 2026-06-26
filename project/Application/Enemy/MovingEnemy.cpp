@@ -21,9 +21,14 @@ void MovingEnemy::Initialize(Object3dCom* object3dCom, Camera* camera)
     object3d_->Initialize(object3dCom_, model);
 
     // 初期配置 (パトロールA地点)
-    object3d_->SetTranslate(patrolA_);
+    position_ = patrolA_;
+    object3d_->SetTranslate(position_);
     object3d_->SetScale({ 1.0f, 1.0f, 1.0f });
     object3d_->SetColor({ 0.8f, 0.9f, 1.0f, 1.0f }); // わずかに青みがかったアヒルにして差別化
+
+    // コライダーの初期化と登録
+    collider_ = std::make_unique<SphereCollider>(0.6f, &position_, CollisionAttribute::Enemy);
+    CollisionManager::GetInstance()->RegisterCollider(collider_.get());
 
     if (model.material.textureFilePath.empty())
     {
@@ -109,7 +114,8 @@ void MovingEnemy::Update(WindowAPI* windowAPI, const Vector3* targetPosition, co
             alertTimer_ = 0.0f;
             if (object3d_)
             {
-                object3d_->SetTranslate(patrolA_);
+                position_ = patrolA_;
+                object3d_->SetTranslate(position_);
                 object3d_->SetColor({ 0.8f, 0.9f, 1.0f, 1.0f });
             }
         }
@@ -145,7 +151,7 @@ void MovingEnemy::Update(WindowAPI* windowAPI, const Vector3* targetPosition, co
     if (!object3d_) return;
 
     // AI 意思決定 & 移動処理
-    Vector3 currentPos = GetPosition();
+    const Vector3& currentPos = position_;
     const float frameScale = deltaTime * 60.0f;
 
     // --- 索敵 ＆ 視界チェック ---
@@ -239,9 +245,9 @@ void MovingEnemy::Update(WindowAPI* windowAPI, const Vector3* targetPosition, co
         {
             float vx = (dx / distToDest) * moveSpeed_ * frameScale;
             float vz = (dz / distToDest) * moveSpeed_ * frameScale;
-            currentPos.x += vx;
-            currentPos.z += vz;
-            object3d_->SetTranslate(currentPos);
+            position_.x += vx;
+            position_.z += vz;
+            object3d_->SetTranslate(position_);
         }
     }
     else if (state_ == AIState::Investigate)
@@ -257,9 +263,9 @@ void MovingEnemy::Update(WindowAPI* windowAPI, const Vector3* targetPosition, co
         {
             float vx = (dx / distToDest) * moveSpeed_ * 1.1f * frameScale; // 捜索はパトロールより少し早歩き
             float vz = (dz / distToDest) * moveSpeed_ * 1.1f * frameScale;
-            currentPos.x += vx;
-            currentPos.z += vz;
-            object3d_->SetTranslate(currentPos);
+            position_.x += vx;
+            position_.z += vz;
+            object3d_->SetTranslate(position_);
         }
 
         searchTimer_ -= deltaTime;
@@ -287,9 +293,9 @@ void MovingEnemy::Update(WindowAPI* windowAPI, const Vector3* targetPosition, co
                 {
                     float vx = (dx / distToPlayer) * moveSpeed_ * 0.9f * frameScale; // プレイヤーが逃げ切れるように追跡速度を少し落とす (0.9f)
                     float vz = (dz / distToPlayer) * moveSpeed_ * 0.9f * frameScale;
-                    currentPos.x += vx;
-                    currentPos.z += vz;
-                    object3d_->SetTranslate(currentPos);
+                    position_.x += vx;
+                    position_.z += vz;
+                    object3d_->SetTranslate(position_);
                 }
             }
         }
@@ -333,6 +339,7 @@ void MovingEnemy::Update(WindowAPI* windowAPI, const Vector3* targetPosition, co
         }
     }
 
+    object3d_->SetTranslate(position_);
     object3d_->Update();
 
     // HPバーの座標・サイズ更新
@@ -544,6 +551,11 @@ void MovingEnemy::OnHit(const Vector3& attackerPos)
 
 void MovingEnemy::Finalize()
 {
+    if (collider_)
+    {
+        CollisionManager::GetInstance()->UnregisterCollider(collider_.get());
+        collider_.reset();
+    }
     if (object3d_)
     {
         object3d_.reset();

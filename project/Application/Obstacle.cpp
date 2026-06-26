@@ -1,6 +1,7 @@
 #include "Obstacle.h"
 #include "TextureManager.h"
 #include "CustomObject3dRenderer.h"
+#include "Baziru3_Engine/Collision/CollisionManager.h"
 
 void Obstacle::Initialize(Object3dCom* object3dCom, Camera* camera, const Vector3& position, float radius)
 {
@@ -15,6 +16,10 @@ void Obstacle::Initialize(Object3dCom* object3dCom, Camera* camera, const Vector
 
     object3d_->SetTranslate(position_);
     object3d_->SetScale({ radius_, radius_, radius_ });
+
+    // コライダーの初期化と登録
+    collider_ = std::make_unique<SphereCollider>(radius_, &position_, CollisionAttribute::Obstacle);
+    CollisionManager::GetInstance()->RegisterCollider(collider_.get());
 
     // テクスチャ設定
     if (model.material.textureFilePath.empty())
@@ -54,8 +59,14 @@ void Obstacle::Draw(const RenderContext& ctx)
 
 void Obstacle::Finalize()
 {
+    if (collider_)
+    {
+        CollisionManager::GetInstance()->UnregisterCollider(collider_.get());
+        collider_.reset();
+    }
     if (object3d_)
     {
         object3d_.reset();
     }
 }
+

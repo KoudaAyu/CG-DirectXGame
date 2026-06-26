@@ -4,6 +4,8 @@
 #include "Object3dCom.h"
 #include "Camera.h"
 #include "RenderContext.h"
+#include "Baziru3_Engine/Collision/SphereCollider.h"
+#include "Baziru3_Engine/Collision/CollisionManager.h"
 
 class Bullet;
 class Sprite;
@@ -57,6 +59,8 @@ private:
     bool HasLineOfSight(const Vector3& playerPos, const std::vector<std::unique_ptr<Obstacle>>& obstacles);
 
     std::unique_ptr<Object3d> object3d_;
+    Vector3 position_ = { 0.0f, 0.0f, 0.0f };
+    std::unique_ptr<SphereCollider> collider_;
     Object3dCom* object3dCom_ = nullptr;
     Camera* camera_ = nullptr;
     uint32_t defaultTextureIndex_ = UINT32_MAX;
