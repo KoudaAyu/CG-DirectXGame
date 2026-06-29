@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include "Collider.h"
 #include <vector>
 #include <memory>
@@ -51,6 +51,21 @@ public:
     static bool CheckBoxCapsule(const Collider* box, const Collider* capsule, Vector3& outPushDir, float& outPushLen);
 
     static bool CheckCapsuleCapsule(const Collider* a, const Collider* b, Vector3& outPushDir, float& outPushLen);
+
+    // --- レイキャスト (Raycast) 判定機能 ---
+    
+    /// <summary>
+    /// レイ（光線）とすべてのコライダーとの交差判定を行い、最も近い衝突情報を取得します。
+    /// </summary>
+    bool Raycast(const Vector3& rayStart, const Vector3& rayDir, float maxDist, Collider*& outHitCollider, float& outHitDist);
+
+    /// <summary>
+    /// レイと個別コライダーの交差判定ブリッジ
+    /// </summary>
+    static bool CheckRayCollider(const Vector3& rayStart, const Vector3& rayDir, float maxDist, const Collider* collider, float& outDist);
+
+    static bool CheckRaySphere(const Vector3& rayStart, const Vector3& rayDir, float maxDist, const Collider* sphere, float& outDist);
+    static bool CheckRayBox(const Vector3& rayStart, const Vector3& rayDir, float maxDist, const Collider* box, float& outDist);
 
 private:
     CollisionManager() = default;
