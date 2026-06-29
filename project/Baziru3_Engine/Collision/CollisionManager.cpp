@@ -1,21 +1,22 @@
-#include "CollisionManager.h"
+﻿#include "CollisionManager.h"
 #include "SphereCollider.h"
 #include "BoxCollider.h"
 #include "CapsuleCollider.h"
+#include "Matrix4x4.h"
 #include <cmath>
 #include <algorithm>
 
 // =========================================================================
-// ベクトル数学のインラインヘルパー関数
-// エンジン標準のVector3クラスに対して、衝突判定に必要な基本演算を提供します。
+// 繝吶け繝医Ν謨ｰ蟄ｦ縺ｮ繧､繝ｳ繝ｩ繧､繝ｳ繝倥Ν繝代ｼ髢｢謨ｰ
+// 繧ｨ繝ｳ繧ｸ繝ｳ讓呎ｺ悶ｮVector3繧ｯ繝ｩ繧ｹ縺ｫ蟇ｾ縺励※縲∬｡晉ｪ∝愛螳壹↓蠢隕√↑蝓ｺ譛ｬ貍皮ｮ励ｒ謠蝉ｾ帙＠縺ｾ縺吶
 // =========================================================================
 
 
 
 /// <summary>
-/// ベクトルの内積 (ドット積)
-/// 2つのベクトルの類似度（同じ方向を向いているか）や、ベクトル投影の計算に使用します。
-/// 式: a.x * b.x + a.y * b.y + a.z * b.z
+/// 繝吶け繝医Ν縺ｮ蜀遨 (繝峨ャ繝育ｩ)
+/// 2縺､縺ｮ繝吶け繝医Ν縺ｮ鬘樔ｼｼ蠎ｦｼ亥酔縺俶婿蜷代ｒ蜷代＞縺ｦ縺繧九°ｼ峨ｄ縲√吶け繝医Ν謚募ｽｱ縺ｮ險育ｮ励↓菴ｿ逕ｨ縺励∪縺吶
+/// 蠑: a.x * b.x + a.y * b.y + a.z * b.z
 /// </summary>
 inline float Dot(const Vector3& a, const Vector3& b)
 {
@@ -23,8 +24,8 @@ inline float Dot(const Vector3& a, const Vector3& b)
 }
 
 /// <summary>
-/// ベクトルの長さの二乗 (Length Squared)
-/// 平方根(sqrt)の計算は処理負荷が高いため、距離の比較のみを行う場合は二乗のまま比較します。
+/// 繝吶け繝医Ν縺ｮ髟ｷ縺輔ｮ莠御ｹ (Length Squared)
+/// 蟷ｳ譁ｹ譬ｹ(sqrt)縺ｮ險育ｮ励ｯ蜃ｦ逅雋闕ｷ縺碁ｫ倥＞縺溘ａ縲∬ｷ晞屬縺ｮ豈碑ｼ縺ｮ縺ｿ繧定｡後≧蝣ｴ蜷医ｯ莠御ｹ励ｮ縺ｾ縺ｾ豈碑ｼ縺励∪縺吶
 /// </summary>
 inline float LengthSq(const Vector3& v)
 {
@@ -32,8 +33,8 @@ inline float LengthSq(const Vector3& v)
 }
 
 /// <summary>
-/// ベクトルの長さ (距離)
-/// 実際にオブジェクトを移動・補正するための正確な距離を算出します。
+/// 繝吶け繝医Ν縺ｮ髟ｷ縺 (霍晞屬)
+/// 螳滄圀縺ｫ繧ｪ繝悶ず繧ｧ繧ｯ繝医ｒ遘ｻ蜍輔ｻ陬懈ｭ｣縺吶ｋ縺溘ａ縺ｮ豁｣遒ｺ縺ｪ霍晞屬繧堤ｮ怜ｺ縺励∪縺吶
 /// </summary>
 inline float Length(const Vector3& v)
 {
@@ -41,9 +42,9 @@ inline float Length(const Vector3& v)
 }
 
 /// <summary>
-/// ベクトルの正規化 (単位ベクトル化)
-/// ベクトルの長さを1に変換し、純粋な「方向」情報のみを取り出します。
-/// ゼロ除算を防止するため、長さが極めてゼロに近い(1e-5f以下)場合はゼロベクトルを返します。
+/// 繝吶け繝医Ν縺ｮ豁｣隕丞喧 (蜊倅ｽ阪吶け繝医Ν蛹)
+/// 繝吶け繝医Ν縺ｮ髟ｷ縺輔ｒ1縺ｫ螟画鋤縺励∫ｴ皮ｲ九↑縲梧婿蜷代肴ュ蝣ｱ縺ｮ縺ｿ繧貞叙繧雁ｺ縺励∪縺吶
+/// 繧ｼ繝ｭ髯､邂励ｒ髦ｲ豁｢縺吶ｋ縺溘ａ縲髟ｷ縺輔′讌ｵ繧√※繧ｼ繝ｭ縺ｫ霑代＞(1e-5f莉･荳)蝣ｴ蜷医ｯ繧ｼ繝ｭ繝吶け繝医Ν繧定ｿ斐＠縺ｾ縺吶
 /// </summary>
 inline Vector3 Normalize(const Vector3& v)
 {
@@ -56,9 +57,9 @@ inline Vector3 Normalize(const Vector3& v)
 }
 
 /// <summary>
-/// クランプ関数
-/// 指定した値を最小値(min)と最大値(max)の範囲内に制限します。
-/// ボックスコライダー上の最寄点を探索する際などに重宝します。
+/// 繧ｯ繝ｩ繝ｳ繝鈴未謨ｰ
+/// 謖螳壹＠縺溷､繧呈怙蟆丞､(min)縺ｨ譛螟ｧ蛟､(max)縺ｮ遽蝗ｲ蜀縺ｫ蛻ｶ髯舌＠縺ｾ縺吶
+/// 繝懊ャ繧ｯ繧ｹ繧ｳ繝ｩ繧､繝繝ｼ荳翫ｮ譛蟇轤ｹ繧呈爾邏｢縺吶ｋ髫帙↑縺ｩ縺ｫ驥榊ｮ昴＠縺ｾ縺吶
 /// </summary>
 inline float Clamp(float value, float min, float max)
 {
@@ -66,12 +67,12 @@ inline float Clamp(float value, float min, float max)
 }
 
 // =========================================================================
-// CollisionManager メンバー関数実装
+// CollisionManager 繝｡繝ｳ繝舌ｼ髢｢謨ｰ螳溯｣
 // =========================================================================
 
 /// <summary>
-/// シングルトンインスタンスの取得
-/// プログラム全体で唯一の衝突判定マネージャインスタンスを返します。
+/// 繧ｷ繝ｳ繧ｰ繝ｫ繝医Φ繧､繝ｳ繧ｹ繧ｿ繝ｳ繧ｹ縺ｮ蜿門ｾ
+/// 繝励Ο繧ｰ繝ｩ繝蜈ｨ菴薙〒蜚ｯ荳縺ｮ陦晉ｪ∝愛螳壹槭ロ繝ｼ繧ｸ繝｣繧､繝ｳ繧ｹ繧ｿ繝ｳ繧ｹ繧定ｿ斐＠縺ｾ縺吶
 /// </summary>
 CollisionManager* CollisionManager::GetInstance()
 {
@@ -80,8 +81,8 @@ CollisionManager* CollisionManager::GetInstance()
 }
 
 /// <summary>
-/// マネージャの初期化
-/// 登録されているコライダーのリストをクリアします。
+/// 繝槭ロ繝ｼ繧ｸ繝｣縺ｮ蛻晄悄蛹
+/// 逋ｻ骭ｲ縺輔ｌ縺ｦ縺繧九さ繝ｩ繧､繝繝ｼ縺ｮ繝ｪ繧ｹ繝医ｒ繧ｯ繝ｪ繧｢縺励∪縺吶
 /// </summary>
 void CollisionManager::Initialize()
 {
@@ -89,8 +90,8 @@ void CollisionManager::Initialize()
 }
 
 /// <summary>
-/// マネージャの終了処理
-/// リソースのクリアを行います。
+/// 繝槭ロ繝ｼ繧ｸ繝｣縺ｮ邨ゆｺ蜃ｦ逅
+/// 繝ｪ繧ｽ繝ｼ繧ｹ縺ｮ繧ｯ繝ｪ繧｢繧定｡後＞縺ｾ縺吶
 /// </summary>
 void CollisionManager::Finalize()
 {
@@ -98,8 +99,8 @@ void CollisionManager::Finalize()
 }
 
 /// <summary>
-/// コライダーの登録
-/// 重複登録を防ぎつつ、判定対象となるアクティブなコライダーをリストに追加します。
+/// 繧ｳ繝ｩ繧､繝繝ｼ縺ｮ逋ｻ骭ｲ
+/// 驥崎､逋ｻ骭ｲ繧帝亟縺弱▽縺､縲∝愛螳壼ｯｾ雎｡縺ｨ縺ｪ繧九い繧ｯ繝繧｣繝悶↑繧ｳ繝ｩ繧､繝繝ｼ繧偵Μ繧ｹ繝医↓霑ｽ蜉縺励∪縺吶
 /// </summary>
 void CollisionManager::RegisterCollider(Collider* collider)
 {
@@ -110,8 +111,8 @@ void CollisionManager::RegisterCollider(Collider* collider)
 }
 
 /// <summary>
-/// コライダーの登録解除
-/// オブジェクトが破棄される際などに呼び出され、判定対象リストから削除します。
+/// 繧ｳ繝ｩ繧､繝繝ｼ縺ｮ逋ｻ骭ｲ隗｣髯､
+/// 繧ｪ繝悶ず繧ｧ繧ｯ繝医′遐ｴ譽縺輔ｌ繧矩圀縺ｪ縺ｩ縺ｫ蜻ｼ縺ｳ蜃ｺ縺輔ｌ縲∝愛螳壼ｯｾ雎｡繝ｪ繧ｹ繝医°繧牙炎髯､縺励∪縺吶
 /// </summary>
 void CollisionManager::UnregisterCollider(Collider* collider)
 {
@@ -123,17 +124,17 @@ void CollisionManager::UnregisterCollider(Collider* collider)
 }
 
 /// <summary>
-/// 衝突フィルタリングルール
-/// 特定のオブジェクトタイプ同士（例：敵の弾同士、背景の遮蔽物同士）の不要な判定をスキップします。
+/// 陦晉ｪ√ヵ繧｣繝ｫ繧ｿ繝ｪ繝ｳ繧ｰ繝ｫ繝ｼ繝ｫ
+/// 迚ｹ螳壹ｮ繧ｪ繝悶ず繧ｧ繧ｯ繝医ち繧､繝怜酔螢ｫｼ井ｾ具ｼ壽雰縺ｮ蠑ｾ蜷悟｣ｫ縲∬レ譎ｯ縺ｮ驕ｮ阡ｽ迚ｩ蜷悟｣ｫｼ峨ｮ荳崎ｦ√↑蛻､螳壹ｒ繧ｹ繧ｭ繝繝励＠縺ｾ縺吶
 /// </summary>
 bool CollisionManager::ShouldCollide(CollisionAttribute a, CollisionAttribute b) const
 {
-    // 弾丸同士は衝突しない
+    // 蠑ｾ荳ｸ蜷悟｣ｫ縺ｯ陦晉ｪ√＠縺ｪ縺
     if (a == CollisionAttribute::Bullet && b == CollisionAttribute::Bullet)
     {
         return false;
     }
-    // 障害物（静的遮蔽物）同士も衝突しない
+    // 髫懷ｮｳ迚ｩｼ磯撕逧驕ｮ阡ｽ迚ｩｼ牙酔螢ｫ繧り｡晉ｪ√＠縺ｪ縺
     if (a == CollisionAttribute::Obstacle && b == CollisionAttribute::Obstacle)
     {
         return false;
@@ -142,15 +143,15 @@ bool CollisionManager::ShouldCollide(CollisionAttribute a, CollisionAttribute b)
 }
 
 /// <summary>
-/// 衝突判定および解決処理のメインループ
-/// 登録された全コライダーに対して総当たり(O(N^2))で交差確認を行い、
-/// 衝突検知イベントコールバックの発火、および物理的な押し戻し（めり込み補正）を実行します。
+/// 陦晉ｪ∝愛螳壹♀繧医ｳ隗｣豎ｺ蜃ｦ逅縺ｮ繝｡繧､繝ｳ繝ｫ繝ｼ繝
+/// 逋ｻ骭ｲ縺輔ｌ縺溷ｨ繧ｳ繝ｩ繧､繝繝ｼ縺ｫ蟇ｾ縺励※邱丞ｽ薙◆繧(O(N^2))縺ｧ莠､蟾ｮ遒ｺ隱阪ｒ陦後＞縲
+/// 陦晉ｪ∵､懃衍繧､繝吶Φ繝医さ繝ｼ繝ｫ繝舌ャ繧ｯ縺ｮ逋ｺ轣ｫ縲√♀繧医ｳ迚ｩ逅逧縺ｪ謚ｼ縺玲綾縺暦ｼ医ａ繧願ｾｼ縺ｿ陬懈ｭ｣ｼ峨ｒ螳溯｡後＠縺ｾ縺吶
 /// </summary>
 void CollisionManager::Update()
 {
     if (colliders_.size() < 2) return;
 
-    // 二重ループによる総当たり組み合わせ判定
+    // 莠碁阪Ν繝ｼ繝励↓繧医ｋ邱丞ｽ薙◆繧顔ｵ縺ｿ蜷医ｏ縺帛愛螳
     for (size_t i = 0; i < colliders_.size(); ++i)
     {
         Collider* colA = colliders_[i];
@@ -161,48 +162,48 @@ void CollisionManager::Update()
             Collider* colB = colliders_[j];
             if (!colB || !colB->IsEnabled()) continue;
 
-            // 衝突属性フィルタリングを適用して不要な組み合わせを除外
+            // 陦晉ｪ∝ｱ樊ｧ繝輔ぅ繝ｫ繧ｿ繝ｪ繝ｳ繧ｰ繧帝←逕ｨ縺励※荳崎ｦ√↑邨縺ｿ蜷医ｏ縺帙ｒ髯､螟
             if (!ShouldCollide(colA->GetAttribute(), colB->GetAttribute()))
             {
                 continue;
             }
 
-            Vector3 pushDir = { 0.0f, 0.0f, 0.0f }; // 衝突時の押し出し方向 (AからBを押し出すベクトル)
-            float pushLen = 0.0f;                   // 衝突時のめり込み量 (押し出しに必要な距離)
+            Vector3 pushDir = { 0.0f, 0.0f, 0.0f }; // 陦晉ｪ∵凾縺ｮ謚ｼ縺怜ｺ縺玲婿蜷 (A縺九ｉB繧呈款縺怜ｺ縺吶吶け繝医Ν)
+            float pushLen = 0.0f;                   // 陦晉ｪ∵凾縺ｮ繧√ｊ霎ｼ縺ｿ驥 (謚ｼ縺怜ｺ縺励↓蠢隕√↑霍晞屬)
 
-            // 2つのコライダー間で詳細な交差判定を実行
+            // 2縺､縺ｮ繧ｳ繝ｩ繧､繝繝ｼ髢薙〒隧ｳ邏ｰ縺ｪ莠､蟾ｮ蛻､螳壹ｒ螳溯｡
             if (CheckCollision(colA, colB, pushDir, pushLen))
             {
-                // 衝突コールバック関数を相互にトリガー
+                // 陦晉ｪ√さ繝ｼ繝ｫ繝舌ャ繧ｯ髢｢謨ｰ繧堤嶌莠偵↓繝医Μ繧ｬ繝ｼ
                 colA->OnCollision(colB);
                 colB->OnCollision(colA);
 
-                // 物理衝突（押し出し）の解決
-                // 両者ともに「トリガー判定専用(検知のみ)」ではない場合のみ、押し出し補正を適用します。
+                // 迚ｩ逅陦晉ｪｼ域款縺怜ｺ縺暦ｼ峨ｮ隗｣豎ｺ
+                // 荳｡閠縺ｨ繧ゅ↓縲後ヨ繝ｪ繧ｬ繝ｼ蛻､螳壼ｰら畑(讀懃衍縺ｮ縺ｿ)縲阪〒縺ｯ縺ｪ縺蝣ｴ蜷医ｮ縺ｿ縲∵款縺怜ｺ縺苓｣懈ｭ｣繧帝←逕ｨ縺励∪縺吶
                 if (!colA->IsTrigger() && !colB->IsTrigger())
                 {
-                    // 障害物(Obstacle)は固定壁や地形として扱い、位置補正によって動かないものとします。
+                    // 髫懷ｮｳ迚ｩ(Obstacle)縺ｯ蝗ｺ螳壼｣√ｄ蝨ｰ蠖｢縺ｨ縺励※謇ｱ縺縲∽ｽ咲ｽｮ陬懈ｭ｣縺ｫ繧医▲縺ｦ蜍輔°縺ｪ縺繧ゅｮ縺ｨ縺励∪縺吶
                     bool isAFixed = (colA->GetAttribute() == CollisionAttribute::Obstacle);
                     bool isBFixed = (colB->GetAttribute() == CollisionAttribute::Obstacle);
 
                     if (isAFixed && !isBFixed)
                     {
-                        // Aが固定オブジェクトで、Bが移動オブジェクトの場合:
-                        // Bのみを「Aから離れる方向(pushDir)」へ「めり込み量(pushLen)」分だけ移動させて解決します。
+                        // A縺悟崋螳壹が繝悶ず繧ｧ繧ｯ繝医〒縲。縺檎ｧｻ蜍輔が繝悶ず繧ｧ繧ｯ繝医ｮ蝣ｴ蜷:
+                        // B縺ｮ縺ｿ繧偵窟縺九ｉ髮｢繧後ｋ譁ｹ蜷(pushDir)縲阪∈縲後ａ繧願ｾｼ縺ｿ驥(pushLen)縲榊縺縺醍ｧｻ蜍輔＆縺帙※隗｣豎ｺ縺励∪縺吶
                         Vector3 newPos = colB->GetWorldPosition() + pushDir * pushLen;
                         colB->SetWorldPosition(newPos);
                     }
                     else if (!isAFixed && isBFixed)
                     {
-                        // Aが移動オブジェクトで、Bが固定オブジェクトの場合:
-                        // Aのみを「Bから離れる方向(-pushDir)」へ「めり込み量(pushLen)」分だけ移動させて解決します。
+                        // A縺檎ｧｻ蜍輔が繝悶ず繧ｧ繧ｯ繝医〒縲。縺悟崋螳壹が繝悶ず繧ｧ繧ｯ繝医ｮ蝣ｴ蜷:
+                        // A縺ｮ縺ｿ繧偵沓縺九ｉ髮｢繧後ｋ譁ｹ蜷(-pushDir)縲阪∈縲後ａ繧願ｾｼ縺ｿ驥(pushLen)縲榊縺縺醍ｧｻ蜍輔＆縺帙※隗｣豎ｺ縺励∪縺吶
                         Vector3 newPos = colA->GetWorldPosition() - pushDir * pushLen;
                         colA->SetWorldPosition(newPos);
                     }
                     else if (!isAFixed && !isBFixed)
                     {
-                        // 両者とも移動可能な動的オブジェクト同士の場合:
-                        // 公平に半々 (pushLen * 0.5f) ずつ逆方向に押し出して干渉を解決します。
+                        // 荳｡閠縺ｨ繧らｧｻ蜍募庄閭ｽ縺ｪ蜍慕噪繧ｪ繝悶ず繧ｧ繧ｯ繝亥酔螢ｫ縺ｮ蝣ｴ蜷:
+                        // 蜈ｬ蟷ｳ縺ｫ蜊翫 (pushLen * 0.5f) 縺壹▽騾譁ｹ蜷代↓謚ｼ縺怜ｺ縺励※蟷ｲ貂峨ｒ隗｣豎ｺ縺励∪縺吶
                         Vector3 newPosA = colA->GetWorldPosition() - pushDir * (pushLen * 0.5f);
                         Vector3 newPosB = colB->GetWorldPosition() + pushDir * (pushLen * 0.5f);
                         colA->SetWorldPosition(newPosA);
@@ -215,58 +216,58 @@ void CollisionManager::Update()
 }
 
 /// <summary>
-/// 2つのコライダー間の形状別判定振り分け
-/// コライダーの形状タイプ(Sphere, Box, Capsule)の組み合わせに応じて適切な数学判定関数へブリッジします。
+/// 2縺､縺ｮ繧ｳ繝ｩ繧､繝繝ｼ髢薙ｮ蠖｢迥ｶ蛻･蛻､螳壽険繧雁縺
+/// 繧ｳ繝ｩ繧､繝繝ｼ縺ｮ蠖｢迥ｶ繧ｿ繧､繝(Sphere, Box, Capsule)縺ｮ邨縺ｿ蜷医ｏ縺帙↓蠢懊§縺ｦ驕ｩ蛻縺ｪ謨ｰ蟄ｦ蛻､螳夐未謨ｰ縺ｸ繝悶Μ繝繧ｸ縺励∪縺吶
 /// </summary>
 bool CollisionManager::CheckCollision(const Collider* a, const Collider* b, Vector3& outPushDir, float& outPushLen)
 {
     ColliderType typeA = a->GetType();
     ColliderType typeB = b->GetType();
 
-    // 1. 球 vs 球 (Sphere - Sphere)
+    // 1. 逅 vs 逅 (Sphere - Sphere)
     if (typeA == ColliderType::Sphere && typeB == ColliderType::Sphere)
     {
         return CheckSphereSphere(a, b, outPushDir, outPushLen);
     }
-    // 2. 球 vs ボックス (Sphere - Box)
+    // 2. 逅 vs 繝懊ャ繧ｯ繧ｹ (Sphere - Box)
     if (typeA == ColliderType::Sphere && typeB == ColliderType::Box)
     {
         return CheckSphereBox(a, b, outPushDir, outPushLen);
     }
     if (typeA == ColliderType::Box && typeB == ColliderType::Sphere)
     {
-        // 引数の順序を入れ替えて判定を行います。
-        // 押し出し方向ベクトル(outPushDir)は「AからBへの方向」として算出されるため、
-        // 判定後に結果の方向を反転 (-1.0f) させます。
+        // 蠑墓焚縺ｮ鬆蠎上ｒ蜈･繧梧崛縺医※蛻､螳壹ｒ陦後＞縺ｾ縺吶
+        // 謚ｼ縺怜ｺ縺玲婿蜷代吶け繝医Ν(outPushDir)縺ｯ縲窟縺九ｉB縺ｸ縺ｮ譁ｹ蜷代阪→縺励※邂怜ｺ縺輔ｌ繧九◆繧√
+        // 蛻､螳壼ｾ後↓邨先棡縺ｮ譁ｹ蜷代ｒ蜿崎ｻ｢ (-1.0f) 縺輔○縺ｾ縺吶
         bool hit = CheckSphereBox(b, a, outPushDir, outPushLen);
         outPushDir = outPushDir * -1.0f;
         return hit;
     }
-    // 3. 球 vs カプセル (Sphere - Capsule)
+    // 3. 逅 vs 繧ｫ繝励そ繝ｫ (Sphere - Capsule)
     if (typeA == ColliderType::Sphere && typeB == ColliderType::Capsule)
     {
         return CheckSphereCapsule(a, b, outPushDir, outPushLen);
     }
     if (typeA == ColliderType::Capsule && typeB == ColliderType::Sphere)
     {
-        // 球 vs カプセルと同様に、順序を入れ替えて判定し、押し出し方向を反転します。
+        // 逅 vs 繧ｫ繝励そ繝ｫ縺ｨ蜷梧ｧ倥↓縲鬆蠎上ｒ蜈･繧梧崛縺医※蛻､螳壹＠縲∵款縺怜ｺ縺玲婿蜷代ｒ蜿崎ｻ｢縺励∪縺吶
         bool hit = CheckSphereCapsule(b, a, outPushDir, outPushLen);
         outPushDir = outPushDir * -1.0f;
         return hit;
     }
 
-    // 将来的に Box-Box, Box-Capsule などの判定ロジックが追加されたらここに分岐を追加します。
+    // 蟆譚･逧縺ｫ Box-Box, Box-Capsule 縺ｪ縺ｩ縺ｮ蛻､螳壹Ο繧ｸ繝繧ｯ縺瑚ｿｽ蜉縺輔ｌ縺溘ｉ縺薙％縺ｫ蛻蟯舌ｒ霑ｽ蜉縺励∪縺吶
     return false;
 }
 
 // =========================================================================
-// 各コライダー組み合わせに対する詳細な交差判定アルゴリズム
+// 蜷繧ｳ繝ｩ繧､繝繝ｼ邨縺ｿ蜷医ｏ縺帙↓蟇ｾ縺吶ｋ隧ｳ邏ｰ縺ｪ莠､蟾ｮ蛻､螳壹い繝ｫ繧ｴ繝ｪ繧ｺ繝
 // =========================================================================
 
 /// <summary>
-/// 【球 vs 球】の衝突判定
-/// 原理: 2つの球の中心点間の距離が、それぞれの半径の和未満であれば衝突していると判定します。
-/// 計算式: |posB - posA| < radiusA + radiusB
+/// 縲千帥 vs 逅縲代ｮ陦晉ｪ∝愛螳
+/// 蜴溽炊: 2縺､縺ｮ逅縺ｮ荳ｭ蠢轤ｹ髢薙ｮ霍晞屬縺後√◎繧後◇繧後ｮ蜊雁ｾ縺ｮ蜥梧悴貅縺ｧ縺ゅｌ縺ｰ陦晉ｪ√＠縺ｦ縺繧九→蛻､螳壹＠縺ｾ縺吶
+/// 險育ｮ怜ｼ: |posB - posA| < radiusA + radiusB
 /// </summary>
 bool CollisionManager::CheckSphereSphere(const Collider* a, const Collider* b, Vector3& outPushDir, float& outPushLen)
 {
@@ -277,23 +278,23 @@ bool CollisionManager::CheckSphereSphere(const Collider* a, const Collider* b, V
     Vector3 posA = sA->GetWorldPosition();
     Vector3 posB = sB->GetWorldPosition();
 
-    // 2点間の相対ベクトルを算出
+    // 2轤ｹ髢薙ｮ逶ｸ蟇ｾ繝吶け繝医Ν繧堤ｮ怜ｺ
     Vector3 dir = posB - posA;
-    float dist = Length(dir); // 中心点間の距離
-    float minDist = sA->GetRadius() + sB->GetRadius(); // 衝突限界距離（半径の和）
+    float dist = Length(dir); // 荳ｭ蠢轤ｹ髢薙ｮ霍晞屬
+    float minDist = sA->GetRadius() + sB->GetRadius(); // 陦晉ｪ髯千阜霍晞屬ｼ亥濠蠕縺ｮ蜥鯉ｼ
 
     if (dist < minDist)
     {
-        // めり込み量 = 限界距離 - 実際の距離
+        // 繧√ｊ霎ｼ縺ｿ驥 = 髯千阜霍晞屬 - 螳滄圀縺ｮ霍晞屬
         outPushLen = minDist - dist;
         if (dist > 1e-4f)
         {
-            // 押し出し方向はAからBへの方向ベクトル
+            // 謚ｼ縺怜ｺ縺玲婿蜷代ｯA縺九ｉB縺ｸ縺ｮ譁ｹ蜷代吶け繝医Ν
             outPushDir = Normalize(dir);
         }
         else
         {
-            // 中心座標が完全に一致してしまっている場合のフォールバック（デフォルトでZ軸方向に押し出す）
+            // 荳ｭ蠢蠎ｧ讓吶′螳悟ｨ縺ｫ荳閾ｴ縺励※縺励∪縺｣縺ｦ縺繧句ｴ蜷医ｮ繝輔か繝ｼ繝ｫ繝舌ャ繧ｯｼ医ョ繝輔か繝ｫ繝医〒Z霆ｸ譁ｹ蜷代↓謚ｼ縺怜ｺ縺呻ｼ
             outPushDir = { 0.0f, 0.0f, 1.0f };
         }
         return true;
@@ -302,9 +303,9 @@ bool CollisionManager::CheckSphereSphere(const Collider* a, const Collider* b, V
 }
 
 /// <summary>
-/// 【球 vs ボックス (AABB想定)】の衝突判定
-/// 原理: ボックスのローカル空間（中心を原点とする空間）において、球の中心に最も近いボックス上の点（最寄点）を求め、
-///       その最寄点と球の中心との距離が球の半径未満であるかを判定します。
+/// 縲千帥 vs 繝懊ャ繧ｯ繧ｹ (AABB諠ｳ螳)縲代ｮ陦晉ｪ∝愛螳
+/// 蜴溽炊: 繝懊ャ繧ｯ繧ｹ縺ｮ繝ｭ繝ｼ繧ｫ繝ｫ遨ｺ髢難ｼ井ｸｭ蠢繧貞次轤ｹ縺ｨ縺吶ｋ遨ｺ髢難ｼ峨↓縺翫＞縺ｦ縲∫帥縺ｮ荳ｭ蠢縺ｫ譛繧りｿ代＞繝懊ャ繧ｯ繧ｹ荳翫ｮ轤ｹｼ域怙蟇轤ｹｼ峨ｒ豎ゅａ縲
+///       縺昴ｮ譛蟇轤ｹ縺ｨ逅縺ｮ荳ｭ蠢縺ｨ縺ｮ霍晞屬縺檎帥縺ｮ蜊雁ｾ譛ｪ貅縺ｧ縺ゅｋ縺九ｒ蛻､螳壹＠縺ｾ縺吶
 /// </summary>
 bool CollisionManager::CheckSphereBox(const Collider* sphere, const Collider* box, Vector3& outPushDir, float& outPushLen)
 {
@@ -314,34 +315,49 @@ bool CollisionManager::CheckSphereBox(const Collider* sphere, const Collider* bo
 
     Vector3 sPos = s->GetWorldPosition();
     Vector3 bPos = b->GetWorldPosition();
-    Vector3 extents = b->GetExtents(); // ボックスの各軸の半サイズ
+    Vector3 extents = b->GetExtents(); // ボックスの各辺の半サイズ
 
-    // ボックスの中心を原点とした空間における球の相対座標
-    Vector3 localSphPos = sPos - bPos;
+    // 1. ボックスの回転行列 R を計算する
+    Vector3 bRot = b->GetWorldRotation();
+    Matrix4x4 R = Multiply(MakeRotateXMatrix(bRot.x), Multiply(MakeRotateYMatrix(bRot.y), MakeRotateZMatrix(bRot.z)));
 
-    // ボックスの境界（[-Extents, Extents]の範囲）に球の座標をクランプし、
-    // ボックス表面または内部で「球に最も近い点」を求めます。
+    // ボックスのワールド空間でのローカル軸（X, Y, Z）を行列 R の行から取得する
+    Vector3 axisX = { R.m[0][0], R.m[0][1], R.m[0][2] };
+    Vector3 axisY = { R.m[1][0], R.m[1][1], R.m[1][2] };
+    Vector3 axisZ = { R.m[2][0], R.m[2][1], R.m[2][2] };
+
+    // 2. 球体のワールド座標系オフセットを、ボックスのローカル空間に変換する
+    Vector3 offset = sPos - bPos;
+    Vector3 localSphPos = {
+        Dot(offset, axisX),
+        Dot(offset, axisY),
+        Dot(offset, axisZ)
+    };
+
+    // 3. ローカル空間上で、ボックスに最も近い点をクランプして求める
     Vector3 closestPointOnBox;
     closestPointOnBox.x = Clamp(localSphPos.x, -extents.x, extents.x);
     closestPointOnBox.y = Clamp(localSphPos.y, -extents.y, extents.y);
     closestPointOnBox.z = Clamp(localSphPos.z, -extents.z, extents.z);
 
-    // ボックス上の最寄点から球の中心へ向かうベクトル
-    Vector3 dir = localSphPos - closestPointOnBox;
-    float dist = Length(dir); // その距離
+    // 4. ローカル空間での押し出し方向と距離を計算する
+    Vector3 localDir = localSphPos - closestPointOnBox;
+    float dist = Length(localDir); // 距離
 
     if (dist < s->GetRadius())
     {
-        // めり込み量 = 球の半径 - 最寄点との距離
+        // 押し込み量 = 半径 - 最も近い点との距離
         outPushLen = s->GetRadius() - dist;
         if (dist > 1e-4f)
         {
-            outPushDir = Normalize(dir);
+            Vector3 localPushDir = Normalize(localDir);
+            // ローカル空間の押し出し方向をワールド空間に変換する
+            outPushDir = axisX * localPushDir.x + axisY * localPushDir.y + axisZ * localPushDir.z;
         }
         else
         {
-            // 球の中心がボックスの重心と完全に一致している場合の避難方向
-            outPushDir = { 0.0f, 0.0f, 1.0f };
+            // 球体の中心が完全にボックスの中心と重なっている場合のフォールバック
+            outPushDir = axisZ;
         }
         return true;
     }
@@ -350,10 +366,10 @@ bool CollisionManager::CheckSphereBox(const Collider* sphere, const Collider* bo
 }
 
 /// <summary>
-/// 【球 vs カプセル】の衝突判定
-/// 原理: カプセルを「中心を通る線分（シリンダー部の芯）」と「半径」として定義します。
-///       カプセルの線分上で、球の中心に最も近い点（最寄点）をベクトル投影を用いて割り出し、
-///       その点と球の中心との距離が「球の半径 ＋ カプセルの半径」未満であるかを判定します。
+/// 縲千帥 vs 繧ｫ繝励そ繝ｫ縲代ｮ陦晉ｪ∝愛螳
+/// 蜴溽炊: 繧ｫ繝励そ繝ｫ繧偵御ｸｭ蠢繧帝壹ｋ邱壼ｼ医す繝ｪ繝ｳ繝繝ｼ驛ｨ縺ｮ闃ｯｼ峨阪→縲悟濠蠕縲阪→縺励※螳夂ｾｩ縺励∪縺吶
+///       繧ｫ繝励そ繝ｫ縺ｮ邱壼荳翫〒縲∫帥縺ｮ荳ｭ蠢縺ｫ譛繧りｿ代＞轤ｹｼ域怙蟇轤ｹｼ峨ｒ繝吶け繝医Ν謚募ｽｱ繧堤畑縺縺ｦ蜑ｲ繧雁ｺ縺励
+///       縺昴ｮ轤ｹ縺ｨ逅縺ｮ荳ｭ蠢縺ｨ縺ｮ霍晞屬縺後檎帥縺ｮ蜊雁ｾ ｼ 繧ｫ繝励そ繝ｫ縺ｮ蜊雁ｾ縲肴悴貅縺ｧ縺ゅｋ縺九ｒ蛻､螳壹＠縺ｾ縺吶
 /// </summary>
 bool CollisionManager::CheckSphereCapsule(const Collider* sphere, const Collider* capsule, Vector3& outPushDir, float& outPushLen)
 {
@@ -364,20 +380,20 @@ bool CollisionManager::CheckSphereCapsule(const Collider* sphere, const Collider
     Vector3 sPos = s->GetWorldPosition();
     Vector3 cPos = c->GetWorldPosition();
 
-    // カプセルの中心軸となる線分の両端点（下端segA, 上端segB）を算出
-    // ※ここでは簡易的にY軸方向（上方向）をカプセルの高さ方向として扱います。
+    // 繧ｫ繝励そ繝ｫ縺ｮ荳ｭ蠢霆ｸ縺ｨ縺ｪ繧狗ｷ壼縺ｮ荳｡遶ｯ轤ｹｼ井ｸ狗ｫｯsegA, 荳顔ｫｯsegBｼ峨ｒ邂怜ｺ
+    // 窶ｻ縺薙％縺ｧ縺ｯ邁｡譏鍋噪縺ｫY霆ｸ譁ｹ蜷托ｼ井ｸ頑婿蜷托ｼ峨ｒ繧ｫ繝励そ繝ｫ縺ｮ鬮倥＆譁ｹ蜷代→縺励※謇ｱ縺縺ｾ縺吶
     float halfH = c->GetHeight() * 0.5f;
     Vector3 segA = cPos - Vector3{ 0.0f, halfH, 0.0f };
     Vector3 segB = cPos + Vector3{ 0.0f, halfH, 0.0f };
 
-    // 線分ABのベクトル
+    // 邱壼AB縺ｮ繝吶け繝医Ν
     Vector3 ab = segB - segA;
-    // 線分の始点から球の中心へのベクトル
+    // 邱壼縺ｮ蟋狗せ縺九ｉ逅縺ｮ荳ｭ蠢縺ｸ縺ｮ繝吶け繝医Ν
     Vector3 as = sPos - segA;
 
-    // 射影比率 t の計算 (内積を利用して、点Sを直線ABへ下ろした垂線の足を求める)
-    // t = (as・ab) / |ab|^2
-    // 分母がゼロになることを防ぐ安全策を追加しています
+    // 蟆蠖ｱ豈皮紫 t 縺ｮ險育ｮ (蜀遨阪ｒ蛻ｩ逕ｨ縺励※縲∫せS繧堤峩邱哂B縺ｸ荳九ｍ縺励◆蝙らｷ壹ｮ雜ｳ繧呈ｱゅａ繧)
+    // t = (as繝ｻab) / |ab|^2
+    // 蛻豈阪′繧ｼ繝ｭ縺ｫ縺ｪ繧九％縺ｨ繧帝亟縺仙ｮ牙ｨ遲悶ｒ霑ｽ蜉縺励※縺縺ｾ縺
     float abLenSq = Dot(ab, ab);
     float t = 0.0f;
     if (abLenSq > 1e-5f)
@@ -385,21 +401,21 @@ bool CollisionManager::CheckSphereCapsule(const Collider* sphere, const Collider
         t = Dot(as, ab) / abLenSq;
     }
     
-    // 線分の内側に収めるため、tを 0.0 から 1.0 の範囲にクランプします。
-    // t = 0.0 の場合は下端点、t = 1.0 の場合は上端点、その間は線分上の点となります。
+    // 邱壼縺ｮ蜀蛛ｴ縺ｫ蜿弱ａ繧九◆繧√》繧 0.0 縺九ｉ 1.0 縺ｮ遽蝗ｲ縺ｫ繧ｯ繝ｩ繝ｳ繝励＠縺ｾ縺吶
+    // t = 0.0 縺ｮ蝣ｴ蜷医ｯ荳狗ｫｯ轤ｹ縲》 = 1.0 縺ｮ蝣ｴ蜷医ｯ荳顔ｫｯ轤ｹ縲√◎縺ｮ髢薙ｯ邱壼荳翫ｮ轤ｹ縺ｨ縺ｪ繧翫∪縺吶
     t = Clamp(t, 0.0f, 1.0f);
     
-    // カプセル芯の線分上の最寄点
+    // 繧ｫ繝励そ繝ｫ闃ｯ縺ｮ邱壼荳翫ｮ譛蟇轤ｹ
     Vector3 closestPointOnSegment = segA + ab * t;
 
-    // カプセル芯上の最寄点から、球の中心へ向かうベクトル
+    // 繧ｫ繝励そ繝ｫ闃ｯ荳翫ｮ譛蟇轤ｹ縺九ｉ縲∫帥縺ｮ荳ｭ蠢縺ｸ蜷代°縺繝吶け繝医Ν
     Vector3 dir = sPos - closestPointOnSegment;
-    float dist = Length(dir); // 実際の距離
-    float minDist = s->GetRadius() + c->GetRadius(); // 衝突限界距離 (両形状の半径の合計)
+    float dist = Length(dir); // 螳滄圀縺ｮ霍晞屬
+    float minDist = s->GetRadius() + c->GetRadius(); // 陦晉ｪ髯千阜霍晞屬 (荳｡蠖｢迥ｶ縺ｮ蜊雁ｾ縺ｮ蜷郁ｨ)
 
     if (dist < minDist)
     {
-        // めり込み量 = 衝突限界距離 - 実際の距離
+        // 繧√ｊ霎ｼ縺ｿ驥 = 陦晉ｪ髯千阜霍晞屬 - 螳滄圀縺ｮ霍晞屬
         outPushLen = minDist - dist;
         if (dist > 1e-4f)
         {
@@ -407,7 +423,7 @@ bool CollisionManager::CheckSphereCapsule(const Collider* sphere, const Collider
         }
         else
         {
-            // 球がカプセルの中心線と完全に重なっている場合のフォールバック方向
+            // 逅縺後き繝励そ繝ｫ縺ｮ荳ｭ蠢邱壹→螳悟ｨ縺ｫ驥阪↑縺｣縺ｦ縺繧句ｴ蜷医ｮ繝輔か繝ｼ繝ｫ繝舌ャ繧ｯ譁ｹ蜷
             outPushDir = { 0.0f, 0.0f, 1.0f };
         }
         return true;
@@ -417,8 +433,8 @@ bool CollisionManager::CheckSphereCapsule(const Collider* sphere, const Collider
 }
 
 // =========================================================================
-// 以下、将来拡張のための判定スタブ関数群（Box-Box, Box-Capsule, Capsule-Capsule）
-// アプリケーション側の要求に応じて、今後アルゴリズムを追加・実装可能です。
+// 莉･荳九∝ｰ譚･諡｡蠑ｵ縺ｮ縺溘ａ縺ｮ蛻､螳壹せ繧ｿ繝夜未謨ｰ鄒､ｼBox-Box, Box-Capsule, Capsule-Capsuleｼ
+// 繧｢繝励Μ繧ｱ繝ｼ繧ｷ繝ｧ繝ｳ蛛ｴ縺ｮ隕∵ｱゅ↓蠢懊§縺ｦ縲∽ｻ雁ｾ後い繝ｫ繧ｴ繝ｪ繧ｺ繝繧定ｿｽ蜉繝ｻ螳溯｣蜿ｯ閭ｽ縺ｧ縺吶
 // =========================================================================
 
 bool CollisionManager::CheckBoxBox(const Collider* a, const Collider* b, Vector3& outPushDir, float& outPushLen)

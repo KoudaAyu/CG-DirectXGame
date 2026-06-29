@@ -62,12 +62,22 @@ void OffScreenRendering::Finalize()
         inverseProjectionBuffer_.Reset();
     }
 
-    pipelineState_.Reset();
+    if (radialBlurBuffer_)
+    {
+        radialBlurBuffer_->Unmap(0, nullptr);
+        radialBlurMap_ = nullptr;
+        radialBlurBuffer_.Reset();
+    }
+
+    for (size_t i = 0; i < static_cast<size_t>(PostEffect::Count); ++i)
+    {
+        pipelineStates_[i].Reset();
+        pixelShaderBlobs_[i].Reset();
+    }
     rootSignature_.Reset();
     signatureBlob_.Reset();
     errorBlob_.Reset();
     vertexShaderBlob_.Reset();
-    pixelShaderBlob_.Reset();
     offScreenTexture_.Reset();
     depthStencilResource_.Reset();
     rtvDescriptorHeap_.Reset();
@@ -130,13 +140,17 @@ void OffScreenRendering::DrawToBackBuffer(ID3D12GraphicsCommandList* commandList
     ID3D12DescriptorHeap* descriptorHeaps[] = { dxCommon_->GetSrvDescriptorHeap().Get() };
     commandList->SetDescriptorHeaps(1, descriptorHeaps);
     commandList->SetGraphicsRootSignature(rootSignature_.Get());
-    commandList->SetPipelineState(pipelineState_.Get());
+    commandList->SetPipelineState(pipelineStates_[static_cast<size_t>(currentEffect_)].Get());
     commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
     commandList->SetGraphicsRootDescriptorTable(0, srvHandleGPU_);
     commandList->SetGraphicsRootDescriptorTable(1, depthSrvHandleGPU_);
+    if (radialBlurBuffer_)
+    {
+        commandList->SetGraphicsRootConstantBufferView(2, radialBlurBuffer_->GetGPUVirtualAddress());
+    }
     if (inverseProjectionBuffer_)
     {
-        commandList->SetGraphicsRootConstantBufferView(2, inverseProjectionBuffer_->GetGPUVirtualAddress());
+        commandList->SetGraphicsRootConstantBufferView(3, inverseProjectionBuffer_->GetGPUVirtualAddress());
     }
     commandList->DrawInstanced(3, 1, 0, 0);
 
@@ -182,11 +196,17 @@ void OffScreenRendering::CreateRootSignature()
     rootParameters_[1].DescriptorTable.pDescriptorRanges = &descriptorRange_[1];
     rootParameters_[1].DescriptorTable.NumDescriptorRanges = 1;
 
-    // Constant Buffer (b1)
+    // Constant Buffer (b0) - RadialBlur
     rootParameters_[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
     rootParameters_[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
-    rootParameters_[2].Descriptor.ShaderRegister = 1;
+    rootParameters_[2].Descriptor.ShaderRegister = 0;
     rootParameters_[2].Descriptor.RegisterSpace = 0;
+
+    // Constant Buffer (b1) - ProjectionMatrix
+    rootParameters_[3].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+    rootParameters_[3].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+    rootParameters_[3].Descriptor.ShaderRegister = 1;
+    rootParameters_[3].Descriptor.RegisterSpace = 0;
 
     // Sampler (s0) - Linear
     staticSamplers_[0].Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
@@ -249,14 +269,26 @@ void OffScreenRendering::ShaderCompile()
         logStream_);
     assert(vertexShaderBlob_ != nullptr);
 
-    pixelShaderBlob_ = dxCommon_->CompileShader(
+    const wchar_t* shaderPaths[static_cast<size_t>(PostEffect::Count)] = {
+        L"Resources/shaders/CopyImage.PS.hlsl",
         L"Resources/shaders/DepthBasedOutline.PS.hlsl",
-        L"ps_6_0",
-        dxCommon_->GetDxcUtils().Get(),
-        dxCommon_->GetDxcCompiler(),
-        dxCommon_->GetIncludeHandler(),
-        logStream_);
-    assert(pixelShaderBlob_ != nullptr);
+        L"Resources/shaders/LuminanceBaseOutline.PS.hlsl",
+        L"Resources/shaders/RadialBlur.PS.hlsl",
+        L"Resources/shaders/GaussianFilter.PS.hlsl",
+        L"Resources/shaders/BoxFilter.PS.hlsl"
+    };
+
+    for (size_t i = 0; i < static_cast<size_t>(PostEffect::Count); ++i)
+    {
+        pixelShaderBlobs_[i] = dxCommon_->CompileShader(
+            shaderPaths[i],
+            L"ps_6_0",
+            dxCommon_->GetDxcUtils().Get(),
+            dxCommon_->GetDxcCompiler(),
+            dxCommon_->GetIncludeHandler(),
+            logStream_);
+        assert(pixelShaderBlobs_[i] != nullptr);
+    }
 }
 
 void OffScreenRendering::InitializePipelineState()
@@ -266,7 +298,6 @@ void OffScreenRendering::InitializePipelineState()
     desc.InputLayout.pInputElementDescs = nullptr;
     desc.InputLayout.NumElements = 0;
     desc.VS = { vertexShaderBlob_->GetBufferPointer(), vertexShaderBlob_->GetBufferSize() };
-    desc.PS = { pixelShaderBlob_->GetBufferPointer(), pixelShaderBlob_->GetBufferSize() };
 
     D3D12_BLEND_DESC blendDesc{};
     blendDesc.AlphaToCoverageEnable = FALSE;
@@ -319,13 +350,17 @@ void OffScreenRendering::InitializePipelineState()
     desc.SampleDesc.Quality = 0;
     desc.SampleMask = D3D12_DEFAULT_SAMPLE_MASK;
 
-    dxCommon_->SetHr(dxCommon_->GetDevice()->CreateGraphicsPipelineState(&desc, IID_PPV_ARGS(&pipelineState_)));
-    if (FAILED(dxCommon_->GetHr()))
+    for (size_t i = 0; i < static_cast<size_t>(PostEffect::Count); ++i)
     {
-        Logger::Log(logStream_, std::format(
-            "OffScreenRendering::InitializePipelineState - CreateGraphicsPipelineState failed hr=0x{:08X}\n",
-            static_cast<unsigned int>(dxCommon_->GetHr())));
-        assert(false);
+        desc.PS = { pixelShaderBlobs_[i]->GetBufferPointer(), pixelShaderBlobs_[i]->GetBufferSize() };
+        dxCommon_->SetHr(dxCommon_->GetDevice()->CreateGraphicsPipelineState(&desc, IID_PPV_ARGS(&pipelineStates_[i])));
+        if (FAILED(dxCommon_->GetHr()))
+        {
+            Logger::Log(logStream_, std::format(
+                "OffScreenRendering::InitializePipelineState - CreateGraphicsPipelineState failed index={} hr=0x{:08X}\n",
+                i, static_cast<unsigned int>(dxCommon_->GetHr())));
+            assert(false);
+        }
     }
 }
 
@@ -404,6 +439,31 @@ void OffScreenRendering::CreateRenderTargets()
     dxCommon_->SetHr(inverseProjectionBuffer_->Map(0, nullptr, &inverseProjectionMap_));
     assert(SUCCEEDED(dxCommon_->GetHr()));
 
+    // Create Constant Buffer for RadialBlur parameters
+    D3D12_RESOURCE_DESC radialBlurBufferDesc{};
+    radialBlurBufferDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+    radialBlurBufferDesc.Width = (sizeof(RadialBlurData) + 255) & ~255;
+    radialBlurBufferDesc.Height = 1;
+    radialBlurBufferDesc.DepthOrArraySize = 1;
+    radialBlurBufferDesc.MipLevels = 1;
+    radialBlurBufferDesc.Format = DXGI_FORMAT_UNKNOWN;
+    radialBlurBufferDesc.SampleDesc.Count = 1;
+    radialBlurBufferDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+    radialBlurBufferDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
+
+    dxCommon_->SetHr(dxCommon_->GetDevice()->CreateCommittedResource(
+        &uploadHeapProperties,
+        D3D12_HEAP_FLAG_NONE,
+        &radialBlurBufferDesc,
+        D3D12_RESOURCE_STATE_GENERIC_READ,
+        nullptr,
+        IID_PPV_ARGS(&radialBlurBuffer_)));
+    assert(SUCCEEDED(dxCommon_->GetHr()));
+
+    dxCommon_->SetHr(radialBlurBuffer_->Map(0, nullptr, &radialBlurMap_));
+    assert(SUCCEEDED(dxCommon_->GetHr()));
+    std::memcpy(radialBlurMap_, &radialBlurData_, sizeof(RadialBlurData));
+
     currentState_ = D3D12_RESOURCE_STATE_RENDER_TARGET;
 }
 
@@ -440,5 +500,23 @@ void OffScreenRendering::SetProjectionInverse(const Matrix4x4& projectionInverse
     if (inverseProjectionMap_)
     {
         std::memcpy(inverseProjectionMap_, &projectionInverse, sizeof(Matrix4x4));
+    }
+}
+
+void OffScreenRendering::SetRadialBlurCenter(const Vector2& center)
+{
+    radialBlurData_.center = center;
+    if (radialBlurMap_)
+    {
+        std::memcpy(radialBlurMap_, &radialBlurData_, sizeof(RadialBlurData));
+    }
+}
+
+void OffScreenRendering::SetRadialBlurWidth(float width)
+{
+    radialBlurData_.blurWidth = width;
+    if (radialBlurMap_)
+    {
+        std::memcpy(radialBlurMap_, &radialBlurData_, sizeof(RadialBlurData));
     }
 }
