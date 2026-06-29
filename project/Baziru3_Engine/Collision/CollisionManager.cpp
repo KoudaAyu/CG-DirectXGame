@@ -340,6 +340,33 @@ bool CollisionManager::CheckSphereBox(const Collider* sphere, const Collider* bo
     closestPointOnBox.y = Clamp(localSphPos.y, -extents.y, extents.y);
     closestPointOnBox.z = Clamp(localSphPos.z, -extents.z, extents.z);
 
+    // 3.5. 球体の中心が完全にボックスの内部にある場合の処理
+    if (std::abs(localSphPos.x) <= extents.x &&
+        std::abs(localSphPos.y) <= extents.y &&
+        std::abs(localSphPos.z) <= extents.z)
+    {
+        // 6つの面（左右・上下・前後）のうち、最も近い面を見つけてその方向に押し出す
+        float distL = extents.x + localSphPos.x; // -X面への距離
+        float distR = extents.x - localSphPos.x; // +X面への距離
+        float distB = extents.y + localSphPos.y; // -Y面への距離
+        float distT = extents.y - localSphPos.y; // +Y面への距離
+        float distF = extents.z + localSphPos.z; // -Z面への距離
+        float distN = extents.z - localSphPos.z; // +Z面への距離
+
+        float minDist = distL;
+        Vector3 localPushDir = { -1.0f, 0.0f, 0.0f };
+
+        if (distR < minDist) { minDist = distR; localPushDir = { 1.0f, 0.0f, 0.0f }; }
+        if (distB < minDist) { minDist = distB; localPushDir = { 0.0f, -1.0f, 0.0f }; }
+        if (distT < minDist) { minDist = distT; localPushDir = { 0.0f, 1.0f, 0.0f }; }
+        if (distF < minDist) { minDist = distF; localPushDir = { 0.0f, 0.0f, -1.0f }; }
+        if (distN < minDist) { minDist = distN; localPushDir = { 0.0f, 0.0f, 1.0f }; }
+
+        outPushLen = s->GetRadius() + minDist;
+        outPushDir = axisX * localPushDir.x + axisY * localPushDir.y + axisZ * localPushDir.z;
+        return true;
+    }
+
     // 4. ローカル空間での押し出し方向と距離を計算する
     Vector3 localDir = localSphPos - closestPointOnBox;
     float dist = Length(localDir); // 距離
