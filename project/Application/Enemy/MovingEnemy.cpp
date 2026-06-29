@@ -8,6 +8,7 @@
 #include "Sprite.h"
 #include "Bullet.h"
 #include "Obstacle.h"
+#include "Baziru3_Engine/Collision/CollisionManager.h"
 #include <cmath>
 #include <random>
 
@@ -573,36 +574,14 @@ bool MovingEnemy::HasLineOfSight(const Vector3& playerPos, const std::vector<std
 
     for (const auto& obs : obstacles)
     {
-        if (!obs) continue;
-        Vector3 obsPos = obs->GetPosition();
-        float obsRadius = obs->GetRadius();
-
-        Vector3 v = { obsPos.x - enemyPos.x, obsPos.y - enemyPos.y, obsPos.z - enemyPos.z };
-
-        float t = v.x * rayDir.x + v.y * rayDir.y + v.z * rayDir.z;
-
-        float tClosest = t;
-        if (tClosest < 0.0f) tClosest = 0.0f;
-        else if (tClosest > distToPlayer) tClosest = distToPlayer;
-
-        Vector3 closestPt = {
-            enemyPos.x + rayDir.x * tClosest,
-            enemyPos.y + rayDir.y * tClosest,
-            enemyPos.z + rayDir.z * tClosest
-        };
-
-        float dx = closestPt.x - obsPos.x;
-        float dy = closestPt.y - obsPos.y;
-        float dz = closestPt.z - obsPos.z;
-        float distSq = dx * dx + dy * dy + dz * dz;
-
-        float blockRadius = obsRadius * 1.5f; // 見た目のフェンス幅に合わせるため遮蔽判定半径を少し拡大 (1.5倍)
-        if (distSq < blockRadius * blockRadius)
+        if (!obs || !obs->GetCollider()) continue;
+        float hitDist = 0.0f;
+        if (CollisionManager::CheckRayCollider(enemyPos, rayDir, distToPlayer, obs->GetCollider(), hitDist))
         {
-            return false;
+            return false; // 障害物に遮蔽されている
         }
     }
-    return true;
+    return true; // 視線が通っている
 }
 
 void MovingEnemy::HearNoise(const Vector3& noisePosition)

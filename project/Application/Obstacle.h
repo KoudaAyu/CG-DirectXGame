@@ -16,6 +16,7 @@ public:
 
     Vector3 GetPosition() const { return position_; }
     float GetRadius() const { return radius_; }
+    BoxCollider* GetCollider() const { return collider_.get(); }
 
 private:
     std::unique_ptr<Object3d> object3d_;
