@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include "Sprite.h"
 #include <memory>
 #include <vector>
@@ -6,19 +6,19 @@
 class Camera;
 class DebugCamera;
 class MaterialManager;
-class SpriteManager;
 class OffScreenRendering;
+class SpriteManager;
 
 class DebugUI
 {
 public:
     DebugUI(MaterialManager* materialManager, SpriteManager* spriteManager, Camera* camera,
-            Sprite::Transform* transformObject, bool* useMonsterBall, bool* drawObject, bool* drawSprite);
+            Sprite::Transform* transformObject, bool* useMonsterBall, bool* drawObject, bool* drawSprite,
+            DebugCamera* debugCamera = nullptr);
 
     void Initialize();
     void Update();
     void Finalize();
-
     void SetOffScreenRendering(OffScreenRendering* offScreenRendering) { offScreenRendering_ = offScreenRendering; }
 
 private:
@@ -31,6 +31,7 @@ private:
 private:
     Camera* camera_ = nullptr;
     DebugCamera* debugCamera_ = nullptr;
+    bool cameraMode_ = false;
     SpriteManager* spriteManager_ = nullptr;
     MaterialManager* materialManager_ = nullptr;
     OffScreenRendering* offScreenRendering_ = nullptr;
