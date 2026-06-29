@@ -4,7 +4,7 @@
 #include "Object3dCom.h"
 #include "Camera.h"
 #include "RenderContext.h"
-#include "Baziru3_Engine/Collision/SphereCollider.h"
+#include "Baziru3_Engine/Collision/BoxCollider.h"
 
 class Obstacle
 {
@@ -21,7 +21,7 @@ private:
     std::unique_ptr<Object3d> object3d_;
     Vector3 position_;
     float radius_;
-    std::unique_ptr<SphereCollider> collider_;
+    std::unique_ptr<BoxCollider> collider_;
     uint32_t defaultTextureIndex_ = UINT32_MAX;
 };
 

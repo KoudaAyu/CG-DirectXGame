@@ -18,7 +18,8 @@ void Obstacle::Initialize(Object3dCom* object3dCom, Camera* camera, const Vector
     object3d_->SetScale({ radius_, radius_, radius_ });
 
     // コライダーの初期化と登録
-    collider_ = std::make_unique<SphereCollider>(radius_, &position_, CollisionAttribute::Obstacle);
+    Vector3 boxSize = { 4.24f * radius_, 2.0f * radius_, 2.45f * radius_ };
+    collider_ = std::make_unique<BoxCollider>(boxSize, &position_, nullptr, CollisionAttribute::Obstacle);
     CollisionManager::GetInstance()->RegisterCollider(collider_.get());
 
     // テクスチャ設定
