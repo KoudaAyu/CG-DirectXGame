@@ -3,6 +3,7 @@
 #include "SpriteManager.h"
 #include "Camera.h"
 #include <imgui.h>
+#include "Baziru3_Engine/Graphics/GpuProfiler.h"
 
 DebugUI::DebugUI(MaterialManager* materialManager, SpriteManager* spriteManager, Camera* camera,
     Sprite::Transform* transformObject, bool* useMonsterBall, bool* drawObject, bool* drawSprite)
@@ -191,6 +192,37 @@ void DebugUI::Update()
         }
     }
 
+    ImGui::End();
+
+    // GPU Profiler の結果を可視化するウィンドウを追加
+    ImGui::Begin("GPU Profiler");
+    {
+        const auto& results = GpuProfiler::GetInstance()->GetResults();
+        float totalTime = 0.0f;
+        
+        ImGui::TextColored(ImVec4(0.0f, 1.0f, 1.0f, 1.0f), "GPU Render Passes:");
+        ImGui::Separator();
+        
+        std::vector<float> timeValues;
+        timeValues.reserve(results.size());
+        
+        for (const auto& res : results)
+        {
+            ImGui::Text("%-20s: %6.3f ms", res.name.c_str(), res.timeMs);
+            totalTime += res.timeMs;
+            timeValues.push_back(res.timeMs);
+        }
+        
+        ImGui::Separator();
+        ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.0f, 1.0f), "%-20s: %6.3f ms", "Total GPU Draw Time", totalTime);
+
+        if (!timeValues.empty())
+        {
+            ImGui::Spacing();
+            // 60FPS基準の 16.67ms を上限の目安として棒グラフを表示
+            ImGui::PlotHistogram("Pass Durations (ms)", timeValues.data(), static_cast<int>(timeValues.size()), 0, nullptr, 0.0f, 16.67f, ImVec2(0, 80.0f));
+        }
+    }
     ImGui::End();
 #endif
 }

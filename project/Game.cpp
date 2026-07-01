@@ -3,6 +3,7 @@
 
 #include <combaseapi.h>
 
+
 #include <sstream>
 #include <iomanip>
 
@@ -16,6 +17,7 @@
 #include <imgui_impl_win32.h>
 #include <imgui_impl_dx12.h>
 #endif
+#include "Baziru3_Engine/Graphics/GpuProfiler.h"
 
 void Game::Initialize()
 {
@@ -88,6 +90,11 @@ void Game::Initialize()
 	// OffScreenRendering の初期化
 	offScreenRendering_ = std::make_unique<OffScreenRendering>(logStream, dx);
 	offScreenRendering_->Initialize(0, 0, DXGI_FORMAT_R8G8B8A8_UNORM_SRGB, { 1.0f, 0.0f, 0.0f, 1.0f });
+
+	if (debugUI)
+	{
+		debugUI->SetOffScreenRendering(offScreenRendering_.get());
+	}
 
 	// 遅延していたアップロードバッファの解放とGPU同期待ちを一括実行
 	TextureManager::GetInstance()->ReleaseUploadBuffers();
@@ -265,7 +272,7 @@ void Game::Update()
 
 
 
-#ifdef _DEBUG
+#ifdef USE_IMGUI
 
 
 	if (debugUI)
@@ -274,7 +281,7 @@ void Game::Update()
 	}
 
 
-#endif // DEBUG
+#endif // USE_IMGUI
 
 	//ImGui内部コマンドを生成する
 #ifdef USE_IMGUI
@@ -325,6 +332,9 @@ void Game::Draw()
 		Logger::Log(logStream, "Warning: camera GPU resource not available before SceneManager draw.\n");
 	}
 
+	// 1. Scene Drawの計測
+	GpuProfiler::GetInstance()->BeginProfile(dx->GetCommandList().Get(), "Scene Draw");
+
 	if (SceneManager::GetInstance())
 	{
 		SceneManager::GetInstance()->DrawSkybox(ctx.commandList);
@@ -347,12 +357,21 @@ void Game::Draw()
 			object3dCom->Draw(object3d_.get(), ctx, modelData, drawObject);
 		}
 	}
-	DrawSprites(ctx);
+	GpuProfiler::GetInstance()->EndProfile(dx->GetCommandList().Get(), "Scene Draw");
 
+	// 2. Sprite Drawの計測
+	GpuProfiler::GetInstance()->BeginProfile(dx->GetCommandList().Get(), "Sprite Draw");
+	DrawSprites(ctx);
+	GpuProfiler::GetInstance()->EndProfile(dx->GetCommandList().Get(), "Sprite Draw");
+
+	// 3. Particle Drawの計測 (通常のパーティクル描画)
+	GpuProfiler::GetInstance()->BeginProfile(dx->GetCommandList().Get(), "Particle Draw");
 	if (renderRequests.sceneDrawn)
 	{
 		DrawParticles(ctx);
 	}
+	GpuProfiler::GetInstance()->EndProfile(dx->GetCommandList().Get(), "Particle Draw");
+
 	if (fadeApplication_)
 	{
 		fadeApplication_->Draw();
@@ -372,8 +391,10 @@ void Game::Draw()
 			offScreenRendering_->SetProjectionInverse(Inverse(camera_->GetProjectionMatrix()));
 		}
 
-		// Draw off-screen texture (with post-effect) to backbuffer
+		// 4. PostProcess (OffScreen Rendering) Drawの計測
+		GpuProfiler::GetInstance()->BeginProfile(dx->GetCommandList().Get(), "PostProcess Draw");
 		offScreenRendering_->DrawToBackBuffer(dx->GetCommandList().Get());
+		GpuProfiler::GetInstance()->EndProfile(dx->GetCommandList().Get(), "PostProcess Draw");
 	}
 
 	// Draw object debug logs if necessary
@@ -396,7 +417,7 @@ void Game::Draw()
 	}
 
 #ifdef USE_IMGUI
-	ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), dx->GetCommandList().Get());
+	if (dx) ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), dx->GetCommandList().Get());
 #endif
 
 	dx->PostDraw();
