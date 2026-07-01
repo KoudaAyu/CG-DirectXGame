@@ -283,6 +283,31 @@ void DebugUI::Update()
     }
 
     ImGui::End();
+
+    ImGui::Begin("Performance Tracker");
+    {
+        float currentFps = ImGui::GetIO().Framerate;
+        ImGui::Text("Current FPS: %.1f", currentFps);
+        ImGui::Text("Frame Time: %.3f ms/frame", 1000.0f / currentFps);
+
+        static float fpsHistory[120] = {};
+        static int fpsHistoryOffset = 0;
+        fpsHistory[fpsHistoryOffset] = currentFps;
+        fpsHistoryOffset = (fpsHistoryOffset + 1) % 120;
+
+        float minFps = fpsHistory[0];
+        float maxFps = fpsHistory[0];
+        for (int i = 1; i < 120; ++i)
+        {
+            if (fpsHistory[i] < minFps) minFps = fpsHistory[i];
+            if (fpsHistory[i] > maxFps) maxFps = fpsHistory[i];
+        }
+
+        char label[64];
+        std::snprintf(label, sizeof(label), "Min: %.1f | Max: %.1f", minFps, maxFps);
+        ImGui::PlotLines("##FPSGraph", fpsHistory, 120, fpsHistoryOffset, label, 0.0f, 120.0f, ImVec2(0, 80.0f));
+    }
+    ImGui::End();
 #endif
 }
 
