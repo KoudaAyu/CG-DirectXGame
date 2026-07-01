@@ -81,34 +81,7 @@ public:
 	std::ostream& logStream = log.GetLogStream();
 	DirectXCom* GetDirectXCom() { return engine_ ? engine_->GetDirectXCom() : nullptr; }
 	const DirectXCom* GetDirectXCom() const { return engine_ ? engine_->GetDirectXCom() : nullptr; }
-	Sprite* GetSprites(size_t index)
-	{
-		if (index < sprites.size())
-		{
-			return sprites[index].get();
-		}
-		return nullptr;
-	}
-	const Sprite* GetSprites(size_t index) const
-	{
-		if (index < sprites.size())
-		{
-			return sprites[index].get();
-		}
-		return nullptr;
-	}
-	std::vector<std::unique_ptr<Sprite>>& GetSprites()
-	{
-		if (engine_ && engine_->GetSpriteManager()) return engine_->GetSpriteManager()->GetSprites();
-		static std::vector<std::unique_ptr<Sprite>> empty;
-		return empty;
-	}
-	const std::vector<std::unique_ptr<Sprite>>& GetSprites() const
-	{
-		if (engine_ && engine_->GetSpriteManager()) return engine_->GetSpriteManager()->GetSprites();
-		static const std::vector<std::unique_ptr<Sprite>> empty;
-		return empty;
-	}
+
 	Object3d* GetObject3d() { return object3d_.get(); }
 	const Object3d* GetObject3d() const { return object3d_.get(); }
 	Object3dCom* GetObject3dCom() { return object3dCom.get(); }
@@ -145,9 +118,6 @@ private:
 	
 	DebugCamera debugCamera_;
 	
-	SRVManager srvManager;
-	std::list<ParticleManager::Particle> particles;
-	ParticleEmitter particleEmitter;
 	KeyInput inputManager;
 	std::unique_ptr<AudioManager> audioManager_;
 	std::unique_ptr<MaterialManager> materialManager_;
@@ -156,7 +126,6 @@ private:
 private:
 	std::vector<std::unique_ptr<Sprite>>sprites;
 	Sprite::Transform transformObject;
-	Sprite::Transform cameraTransform;
 
 	Object3d::ModelData modelData;
 

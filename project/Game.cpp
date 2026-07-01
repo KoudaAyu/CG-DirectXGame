@@ -249,11 +249,7 @@ void Game::Update()
     // Update scenes and engine subsystems. Use fixed timestep here (same as scenes expect).
 	SceneManager::GetInstance()->Update(1.0f / 60.0f);
 
-	//if (windowAPI->ProcessMassage())
-	//{
-	//	//ゲームループ抜ける
-	//	break;
-	//}
+
 
 
 	//ImGuiにここからフレームが始まる趣旨をつたえる
@@ -290,11 +286,7 @@ void Game::Update()
 
 	inputManager.Update();
 
-	//// ImGuiを使わずにSpaceキーでパーティクルを追加
-	//if (inputManager.TriggerKey(DIK_SPACE))
-	//{
-	//	particles.splice(particles.end(), ParticleEmitter{}.Emit(emitter, particleManager->GetRandomEngine(), *particleManager));
-	//}
+
 }
 
 void Game::Draw()
