@@ -7,7 +7,7 @@ on:
 env:
  # リポジトリのルートディレクトリを基点としたソリューションファイルのパス
   SOLUTION_FILE_PATH: project/DirectXGame.sln
-  # VisualStdioの構成
+  # VisualStudioの構成
   CONFIGURATION: Development
 
 jobs:
@@ -15,7 +15,7 @@ jobs:
     runs-on: windows-2022
 
     steps:
-    - name: Cheakout
+    - name: Checkout
       uses: actions/checkout@v4 
 
     - name: Add MSBuild to PATH
@@ -25,4 +25,4 @@ jobs:
 
     - name: Build
       run:
-        msbuild ${{env.SOLUTION_FILE_PATH}} /p:Platfrom=x64,Configuration=${{env.CONFIGURATION}}
+        msbuild ${{env.SOLUTION_FILE_PATH}} /p:Platform=x64,Configuration=${{env.CONFIGURATION}}

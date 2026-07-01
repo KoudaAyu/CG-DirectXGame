@@ -54,7 +54,7 @@
     <ClCompile Include="main.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
-    <ClCompile Include="Baziru3_Engine\Base\ResourceLeakCheek.cpp">
+    <ClCompile Include="Baziru3_Engine\Base\ResourceLeakCheck.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
     <ClCompile Include="Baziru3_Engine\Audio\Sound.cpp">
@@ -263,7 +263,7 @@
     <ClInclude Include="Baziru3_Engine\Base\KeyInput.h" />
     <ClInclude Include="Baziru3_Engine\Base\Log\Log.h" />
     <ClInclude Include="Baziru3_Engine\Base\Matrix4x4.h" />
-    <ClInclude Include="Baziru3_Engine\Base\ResourceLeakCheek.h" />
+    <ClInclude Include="Baziru3_Engine\Base\ResourceLeakCheck.h" />
     <ClInclude Include="Baziru3_Engine\Base\StringUtil.h" />
     <ClInclude Include="Baziru3_Engine\Base\Transform.h" />
     <ClInclude Include="Baziru3_Engine\Base\Vector.h" />

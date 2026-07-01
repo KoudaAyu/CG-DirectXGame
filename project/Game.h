@@ -30,7 +30,7 @@
 #include"Sprite.h"
 #include"SpriteCom.h"
 #include"SpriteManager.h"
-#include"ResourceLeakCheek.h"
+#include"ResourceLeakCheck.h"
 #include"TextureManager.h"
 #include"WindowsAPI.h"
 #include "DebugUI.h"
@@ -123,7 +123,7 @@ private:
     void DrawParticles(const RenderContext& ctx);
 
 private:
-	ResourceLeakCheek leakChecker; //リソースリークチェック用のオブジェクト
+	ResourceLeakCheck leakChecker; //リソースリークチェック用のオブジェクト
 	CrashDump crashDump; //クラッシュダンプ生成用のオブジェクト
 	Log log;
 	
