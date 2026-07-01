@@ -1,9 +1,10 @@
 struct Particle {
     float32_t3 translate;
-    float32_t3 scale;
     float32_t lifeTime;
-    float32_t3 velocity;
+    float32_t3 scale;
     float32_t currentTime;
+    float32_t3 velocity;
+    float32_t padding;
     float32_t4 color;
 };
 
@@ -12,10 +13,9 @@ struct PerView {
     float32_t4x4 billboardMatrix;
     float32_t deltaTime;
     float32_t time;
-    float32_t2 padding;
+    uint32_t maxParticles;
+    float32_t padding;
 };
-
-static const uint32_t kMaxParticles = 1024;
 
 ConstantBuffer<PerView> gPerView : register(b0);
 RWStructuredBuffer<Particle> gParticles : register(u0);
@@ -28,7 +28,7 @@ float rand(float3 co) {
 void main(uint3 DTid : SV_DispatchThreadID)
 {
     uint32_t particleIndex = DTid.x;
-    if(particleIndex < kMaxParticles)
+    if(particleIndex < gPerView.maxParticles)
     {
         Particle p = gParticles[particleIndex];
         

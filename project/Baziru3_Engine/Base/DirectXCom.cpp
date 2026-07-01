@@ -14,7 +14,6 @@
 #include"StringUtil.h"
 
 #include"ImGuiManager.h"
-#include "Baziru3_Engine/Graphics/GpuProfiler.h"
 
 using namespace Microsoft::WRL;
 
@@ -81,9 +80,6 @@ void DirectXCom::Initialize()
 	CerateScissorRect();
 	CreateDxcCompiler();
 	InitializeImGui();
-
-	// GpuProfilerの初期化
-	GpuProfiler::GetInstance()->Initialize(device.Get(), commandQueue.Get());
 }
 
 void DirectXCom::Finalize()
@@ -107,9 +103,6 @@ void DirectXCom::Finalize()
 			}
 		}
 	}
-
-	// GpuProfilerの終了処理
-	GpuProfiler::GetInstance()->Finalize();
 
 	// スワップチェーンのリソースを解放する前に、コマンドリストとコマンドアロケーターをリセットしておく
 	for (auto& res : swapChainResources) res.Reset();
@@ -239,7 +232,7 @@ void DirectXCom::SetupD3D12InfoQueue()
 		infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_ERROR, true);
 
 		//警告時に止まる
-		infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_WARNING, false);
+		infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_WARNING, true);
 
 
 
@@ -315,6 +308,21 @@ void DirectXCom::CreateSwapChain()
 	assert(SUCCEEDED(hr));
 }
 
+void DirectXCom::CreateUnroaderedAccessView(const Microsoft::WRL::ComPtr<ID3D12Resource>& resource,
+	UINT NumElements, UINT structureByteStride,D3D12_CPU_DESCRIPTOR_HANDLE uavCpuDescriptorHandle)
+{
+    D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc{};
+    uavDesc.Format = DXGI_FORMAT_UNKNOWN; //Format
+	uavDesc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER; //View Dimension
+	uavDesc.Buffer.FirstElement = 0;
+	uavDesc.Buffer.NumElements = NumElements; //要素数
+	uavDesc.Buffer.CounterOffsetInBytes = 0; //カウンターオフセット
+	uavDesc.Buffer.Flags = D3D12_BUFFER_UAV_FLAG_NONE; //フラグ
+	uavDesc.Buffer.StructureByteStride = structureByteStride; //ストライド
+
+	device->CreateUnorderedAccessView(resource.Get(), nullptr, &uavDesc, uavCpuDescriptorHandle);
+}
+
 Microsoft::WRL::ComPtr<ID3D12Resource> DirectXCom::CreateDepthStencilTextureResource(const Microsoft::WRL::ComPtr<ID3D12Device>& device, int32_t width, int32_t height)
 {
 	//生成するResourceの設定
@@ -373,7 +381,7 @@ void DirectXCom::CreateDescriptorHeaps()
 	//RTV用のヒープでディスクリプタの数は2。RTVはShader内でふれるものではないため、ShaderVisibleはfalse
 	rtvDescriptorHeap = CreateDescriptorHeap(device.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_RTV, 2, false);
 
-	srvDescriptorHeap = CreateDescriptorHeap(device.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, kMaxSRVCount, true);
+	srvDescriptorHeap = CreateDescriptorHeap(device.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, kMacSRVCount, true);
 
 	//DSV用のヒープでディスクリプタの数は1。DSVはShader内で触れるものではないため、ShaderVisibleはfalse
 	dsvDescriptorHeap = CreateDescriptorHeap(device.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_DSV, 1, false);
@@ -490,9 +498,6 @@ void DirectXCom::InitializeImGui()
 
 void DirectXCom::PreDraw()
 {
-	// GpuProfilerのフレーム開始処理
-	GpuProfiler::GetInstance()->BeginFrame(commandList.Get());
-
 	//これから書き込むバックバッファのインデックスを取得する
 	backBufferIndex = swapChain->GetCurrentBackBufferIndex();
 
@@ -544,9 +549,6 @@ void DirectXCom::PostDraw()
 	//TransitionBarrierを張る
 	commandList->ResourceBarrier(1, &barrier);
 
-	// GpuProfilerのフレーム終了・クエリ解決処理
-	GpuProfiler::GetInstance()->EndFrame(commandList.Get());
-
 	//コマンドリストの内容を下記率させる。すべてのコマンドを積んでからCloseする
 	hr = (commandList->Close());
 	if (FAILED(hr))
@@ -591,9 +593,6 @@ void DirectXCom::PostDraw()
 		//イベントを待つ
 		WaitForSingleObject(fenceEvent, INFINITE);
 	}
-
-	// GPUの同期が完了した直後に、タイムスタンプ計測結果をCPU側へ回収する
-	GpuProfiler::GetInstance()->ResolveResults();
 
 
 	//次フレーム用のコマンドリストを用意

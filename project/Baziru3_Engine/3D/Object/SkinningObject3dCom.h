@@ -29,6 +29,10 @@ public:
     void ShaderCompile();
     void InitializeGraphicPipeline();
     void CreateGraphicsPipelineState();
+    void CreateComputePipelineState();
+
+    void Skinning(Object3d* object, ID3D12GraphicsCommandList* commandList);
+
 
     void PreDraw();
 
@@ -77,6 +81,11 @@ private:
     Microsoft::WRL::ComPtr<IDxcBlob> pixelShaderBlob;
     D3D12_GRAPHICS_PIPELINE_STATE_DESC graphicPipelineStateDesc{};
     Microsoft::WRL::ComPtr<ID3D12PipelineState> pipelineState = nullptr;
+
+    // Compute Shader variables
+    Microsoft::WRL::ComPtr<IDxcBlob> computeShaderBlob = nullptr;
+    Microsoft::WRL::ComPtr<ID3D12RootSignature> computeRootSignature = nullptr;
+    Microsoft::WRL::ComPtr<ID3D12PipelineState> computePipelineState = nullptr;
 
     std::ostream& logStream;
 };
