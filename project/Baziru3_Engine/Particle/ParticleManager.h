@@ -21,6 +21,9 @@ class Ring;
 class ParticleManager
 {
 public:
+	static ParticleManager* GetInstance() { return instance_; }
+
+public:
 	struct ParticleCS
 	{
 		Vector3 translate;
@@ -245,4 +248,6 @@ private:
 		Ring,
 		External
 	};
+private:
+	static ParticleManager* instance_;
 };

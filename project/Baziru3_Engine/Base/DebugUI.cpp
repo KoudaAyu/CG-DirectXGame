@@ -4,6 +4,7 @@
 #include "Camera.h"
 #include "SceneManager.h"
 #include "OffScreenRendering.h"
+#include "ParticleManager.h"
 #include <imgui.h>
 
 DebugUI::DebugUI(MaterialManager* materialManager, SpriteManager* spriteManager, Camera* camera,
@@ -219,6 +220,23 @@ void DebugUI::Update()
         ImGui::Checkbox("Use Monster Ball", useMonsterBall_);
 
     ImGui::Checkbox("Draw Skybox", SceneManager::GetInstance()->GetShowSkyboxPtr());
+
+    if (ImGui::CollapsingHeader("GPU Particle System"))
+    {
+        ParticleManager* pm = ParticleManager::GetInstance();
+        if (pm)
+        {
+            ImGui::Text("Shader Layer: GPU Compute Shader");
+            ImGui::Text("Max Capacity: %u particles", 10240);
+            uint32_t activeCount = pm->GetNumInstance();
+            ImGui::Text("Active Count: %u particles", activeCount);
+            ImGui::ProgressBar(static_cast<float>(activeCount) / 10240.0f, ImVec2(0.0f, 0.0f), "Spawn Load");
+        }
+        else
+        {
+            ImGui::Text("GPU Particle System not initialized.");
+        }
+    }
 
     ImGui::Separator();
 

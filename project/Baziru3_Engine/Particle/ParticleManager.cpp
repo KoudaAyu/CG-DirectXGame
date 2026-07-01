@@ -9,15 +9,22 @@
 #include "Camera.h"
 #include "Light.h"
 
+ParticleManager* ParticleManager::instance_ = nullptr;
+
 ParticleManager::ParticleManager(std::ostream& logStream, DirectXCom* dxCommon)
 	: logStream(logStream), dxCommon(dxCommon)
 {
+	instance_ = this;
 }
 
 
 
 ParticleManager::~ParticleManager()
 {
+	if (instance_ == this)
+	{
+		instance_ = nullptr;
+	}
 }
 
 void ParticleManager::Initialize(Camera* camera)
@@ -424,15 +431,6 @@ void ParticleManager::Update(float deltaTime)
 	barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
 	barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
 	commandList->ResourceBarrier(1, &barrier);
-
-#ifdef USE_IMGUI
-	ImGui::Begin("GPU Particle System");
-	ImGui::Text("Shader Type: GPU Compute Shader (Initialize/Update)");
-	ImGui::Text("GPU Buffer Capacity: %u particles", kMaxGPUParticles);
-	ImGui::Text("Active Spawns (CPU track): %u", numInstance);
-	ImGui::ProgressBar(static_cast<float>(numInstance) / kMaxGPUParticles, ImVec2(0.0f, 0.0f), "Spawn Load");
-	ImGui::End();
-#endif
 }
 
 void ParticleManager::Draw(ID3D12GraphicsCommandList* commandList, const RenderContext& ctx, UINT vertexCount)
