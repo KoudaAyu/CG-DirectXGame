@@ -266,6 +266,10 @@ void Game::Update()
 		fadeApplication_->Update();
 	}
 
+	if (offScreenRendering_)
+	{
+		offScreenRendering_->Update(kDeltaTime);
+	}
 
     // Update scenes and engine subsystems. Use fixed timestep here (same as scenes expect).
 	SceneManager::GetInstance()->Update(1.0f / 60.0f);
