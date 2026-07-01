@@ -35,17 +35,6 @@ struct SkinCluster
 	Microsoft::WRL::ComPtr<ID3D12Resource> paletteResource; // ジョイントのバインド行列を格納するGPUリソース
 	std::span<WellForGPU> mappedPalette;
 	std::pair<D3D12_CPU_DESCRIPTOR_HANDLE, D3D12_GPU_DESCRIPTOR_HANDLE> paletteSrvHandle; // ジョイントのバインド行列をシェーダーで参照するためのSRVハンドル
-
-	// Compute Shader用頂点バッファとUAVハンドル
-	Microsoft::WRL::ComPtr<ID3D12Resource> uavResource;
-	std::pair<D3D12_CPU_DESCRIPTOR_HANDLE, D3D12_GPU_DESCRIPTOR_HANDLE> uavDescriptorHandle;
-
-	// Compute Shader用SRVハンドル
-	std::pair<D3D12_CPU_DESCRIPTOR_HANDLE, D3D12_GPU_DESCRIPTOR_HANDLE> inputVertexSrvHandle;
-	std::pair<D3D12_CPU_DESCRIPTOR_HANDLE, D3D12_GPU_DESCRIPTOR_HANDLE> influenceSrvHandle;
-
-	// SkinningInformation用の定数バッファ
-	Microsoft::WRL::ComPtr<ID3D12Resource> skinningInfoResource;
 };
 
 class DirectXCom;

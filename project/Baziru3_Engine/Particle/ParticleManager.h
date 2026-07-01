@@ -21,25 +21,6 @@ class Ring;
 class ParticleManager
 {
 public:
-	struct ParticleCS
-	{
-		Vector3 translate;
-		Vector3 scale;
-		float lifeTime;
-		Vector3 velocity;
-		float currentTime;
-		Vector4 color;
-	};
-
-	struct PerView
-	{
-		Matrix4x4 viewProjection;
-		Matrix4x4 billboardMatrix;
-		float deltaTime;
-		float time;
-		float padding[2]; // 16バイトアライメントのためのパディング
-	};
-
 	struct Particle
 	{
 		Transform transform;
@@ -92,7 +73,6 @@ public:
 	void RasterizerState();
 	void ShaderCompile();
 	void InitializeGraphicPipeline();
-	void CreateComputePipelineState();
 
 	void SetupDraw(ID3D12GraphicsCommandList* commandList);
 	void BindResources(ID3D12GraphicsCommandList* commandList, D3D12_GPU_VIRTUAL_ADDRESS materialCBV);
@@ -183,7 +163,7 @@ private:
 
 	D3D12_ROOT_SIGNATURE_DESC descriptionRootSignature{};
 	D3D12_DESCRIPTOR_RANGE descriptorRangeForInstancing[2] = {};
-	D3D12_ROOT_PARAMETER rootParameters[7] = {};
+	D3D12_ROOT_PARAMETER rootParameters[6] = {};
 	D3D12_STATIC_SAMPLER_DESC staticSamplers[1] = {};
 	Microsoft::WRL::ComPtr<ID3DBlob> signatureBlob = nullptr;
 	Microsoft::WRL::ComPtr<ID3DBlob> errorBlob = nullptr;
@@ -201,26 +181,6 @@ private:
 	D3D12_GPU_DESCRIPTOR_HANDLE instancingSrvHandleGPU;
 	Microsoft::WRL::ComPtr<ID3D12Resource> instancingResource;
 	std::unique_ptr<Ring> ring_;
-
-	// GPU Particle リソースとディスクリプタ用インデックス
-	Microsoft::WRL::ComPtr<ID3D12Resource> gpuParticleResource_ = nullptr;
-	uint32_t gpuParticleUavIndex_ = 0;
-	uint32_t gpuParticleSrvIndex_ = 0;
-	std::pair<D3D12_CPU_DESCRIPTOR_HANDLE, D3D12_GPU_DESCRIPTOR_HANDLE> gpuParticleUavHandle_;
-	std::pair<D3D12_CPU_DESCRIPTOR_HANDLE, D3D12_GPU_DESCRIPTOR_HANDLE> gpuParticleSrvHandle_;
-
-	// PerView 用のバッファ
-	Microsoft::WRL::ComPtr<ID3D12Resource> perViewResource_ = nullptr;
-	PerView* perViewData_ = nullptr;
-
-	// Compute Pipeline
-	Microsoft::WRL::ComPtr<ID3D12RootSignature> computeRootSignature_ = nullptr;
-	Microsoft::WRL::ComPtr<ID3D12PipelineState> computePipelineState_ = nullptr;
-	Microsoft::WRL::ComPtr<IDxcBlob> computeShaderBlob_;
-
-	Microsoft::WRL::ComPtr<ID3D12RootSignature> updateRootSignature_ = nullptr;
-	Microsoft::WRL::ComPtr<ID3D12PipelineState> updatePipelineState_ = nullptr;
-	Microsoft::WRL::ComPtr<IDxcBlob> updateShaderBlob_;
 
 	std::mt19937 randomEngine{ std::random_device{}() };
 	std::list<ParticleManager::Particle> particles;
