@@ -8,7 +8,7 @@ struct Particle {
     float32_t4 color;
 };
 
-static const uint32_t kMaxParticles = 1024;
+static const uint32_t kMaxParticles = 10240;
 
 RWStructuredBuffer<Particle> gParticles : register(u0);
 

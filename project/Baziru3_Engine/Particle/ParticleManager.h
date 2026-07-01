@@ -173,7 +173,7 @@ public:
 
 private:
 	const uint32_t kNumMaxInstances = 256;
-	static const uint32_t kMaxGPUParticles = 1024;
+	static const uint32_t kMaxGPUParticles = 10240;
 	uint32_t numInstance = 0;
 	uint32_t writeIndex = 0;
 	uint32_t normalInstanceCount_ = 0;
