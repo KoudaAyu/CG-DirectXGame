@@ -73,6 +73,7 @@ namespace BioProcedural
         int radialSegments = 8;      // 枝の円柱分割数 (LOD制御用)
         int maxSegments = 2000;      // 枝の最大生成数 (クランプ用)
         int maxLeaves = 1000;        // 葉の最大生成数 (クランプ用)
+        float minBranchRadiusLimit = 0.0f; // この半径未満の枝・葉の生成をスキップする制限値 (LOD用)
     };
 
     // GPUで並列展開するための樹木の骨格セグメント定義

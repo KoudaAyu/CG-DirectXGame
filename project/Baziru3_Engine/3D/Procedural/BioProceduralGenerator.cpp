@@ -578,13 +578,16 @@ namespace BioProcedural
                 if (minRadius < 0.002f) minRadius = 0.002f;
                 float nextRadius = std::max(minRadius, turtle.radius * 0.96f); // 前進時はわずかに細く（ステップテーパー）
 
-                BuildCylinder(turtle.position, nextPos, turtle.radius, nextRadius, turtle);
+                if (turtle.radius >= params.minBranchRadiusLimit)
+                {
+                    BuildCylinder(turtle.position, nextPos, turtle.radius, nextRadius, turtle);
+                }
 
                 turtle.position = nextPos;
                 turtle.radius = nextRadius;
                 turtle.distanceToRoot += params.branchLength;
 
-                if (turtle.radius < params.branchRadius * 0.6f)
+                if (turtle.radius < params.branchRadius * 0.6f && turtle.radius >= params.minBranchRadiusLimit)
                 {
                     if (leafCount < (size_t)params.maxLeaves)
                     {
@@ -595,10 +598,13 @@ namespace BioProcedural
             }
             else if (c == 'X')
             {
-                if (leafCount < (size_t)params.maxLeaves)
+                if (turtle.radius >= params.minBranchRadiusLimit)
                 {
-                    BuildLeaf(turtle.position, params.branchLength * 0.4f, turtle, rand);
-                    leafCount++;
+                    if (leafCount < (size_t)params.maxLeaves)
+                    {
+                        BuildLeaf(turtle.position, params.branchLength * 0.4f, turtle, rand);
+                        leafCount++;
+                    }
                 }
             }
             else if (c == '+')
@@ -959,6 +965,7 @@ namespace BioProcedural
             params1.radialSegments = std::max(4, treeParams.radialSegments - 2);
             params1.maxSegments = std::max(100, treeParams.maxSegments / 2);
             params1.maxLeaves = std::max(50, treeParams.maxLeaves / 2);
+            params1.minBranchRadiusLimit = treeParams.branchRadius * 0.35f;
             lod1Mesh = GenerateTree(params1);
 
             // LOD2
@@ -967,6 +974,7 @@ namespace BioProcedural
             params2.radialSegments = std::max(4, treeParams.radialSegments - 4);
             params2.maxSegments = std::max(50, treeParams.maxSegments / 4);
             params2.maxLeaves = std::max(20, treeParams.maxLeaves / 5);
+            params2.minBranchRadiusLimit = treeParams.branchRadius * 0.55f;
             lod2Mesh = GenerateTree(params2);
         }
         else // Rock

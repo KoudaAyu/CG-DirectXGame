@@ -38,6 +38,7 @@ public:
         int radialSegments = 8;      // 枝の円柱分割数 (LOD制御用)
         int maxSegments = 2000;      // 枝の最大生成数
         int maxLeaves = 1000;        // 葉の最大生成数
+        float minBranchRadiusLimit = 0.0f; // この半径未満の枝・葉の生成をスキップする制限値
     };
 
     /// <summary>
