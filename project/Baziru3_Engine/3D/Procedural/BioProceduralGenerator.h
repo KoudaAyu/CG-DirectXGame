@@ -124,6 +124,9 @@ namespace BioProcedural
         );
 
     private:
+        static bool SaveTextureAtlasTga(const std::string& path, int mode);
+        static MeshData GenerateCollisionMesh(const MeshData& baseMesh, int mode);
+
         // 内部ユーティリティ数学関数
         static float Noise3D(float x, float y, float z);
         static float FractalNoise3D(float x, float y, float z, int octaves, float frequency);

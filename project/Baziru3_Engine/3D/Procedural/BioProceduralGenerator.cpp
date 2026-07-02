@@ -837,14 +837,293 @@ namespace BioProcedural
         return segments;
     }
 
-    // --- OBJ形式でエクスポートする機能の実装 (統計結果を返す) ---
+    // TGAアトラス画像を合成して保存する関数
+    bool BioProceduralGenerator::SaveTextureAtlasTga(const std::string& path, int mode)
+    {
+        const int width = 1024;
+        const int height = 1024;
+        std::vector<uint32_t> pixels(width * height, 0); // 32bpp (BGRA)
+
+        if (mode == 0) // Tree
+        {
+            for (int y = 0; y < height; ++y)
+            {
+                for (int x = 0; x < width; ++x)
+                {
+                    uint8_t r = 0, g = 0, b = 0, a = 255;
+                    if (x < width / 2) // 幹 (Bark)
+                    {
+                        float noise = Noise3D((float)x * 0.05f, (float)y * 0.01f, 0.0f);
+                        float ratio = 0.7f + 0.3f * noise;
+                        r = (uint8_t)(100.0f * ratio);
+                        g = (uint8_t)(65.0f * ratio);
+                        b = (uint8_t)(40.0f * ratio);
+                    }
+                    else // 葉 (Leaf)
+                    {
+                        float cx = 768.0f;
+                        float cy = 512.0f;
+                        float dx = ((float)x - cx) / 200.0f;
+                        float dy = ((float)y - cy) / 400.0f;
+                        
+                        float dist = dx * dx + dy * dy;
+                        if (dist < 1.0f && std::abs(dx) < (1.0f - dy * 0.5f) * 0.8f && dy > -0.8f && dy < 0.9f)
+                        {
+                            float leafVein = 1.0f;
+                            if (std::abs(dx) < 0.02f) leafVein = 0.6f;
+                            else if (std::abs(dy - std::abs(dx) * 0.5f) < 0.02f) leafVein = 0.7f;
+
+                            r = (uint8_t)(40.0f * leafVein);
+                            g = (uint8_t)(150.0f * leafVein);
+                            b = (uint8_t)(30.0f * leafVein);
+                            a = 255;
+                        }
+                        else
+                        {
+                            r = 0; g = 0; b = 0; a = 0;
+                        }
+                    }
+                    pixels[y * width + x] = (a << 24) | (r << 16) | (g << 8) | b;
+                }
+            }
+        }
+        else // Rock
+        {
+            for (int y = 0; y < height; ++y)
+            {
+                for (int x = 0; x < width; ++x)
+                {
+                    uint8_t r = 0, g = 0, b = 0, a = 255;
+                    if (x < width / 2) // 岩肌 (Rock Base)
+                    {
+                        float noise = Noise3D((float)x * 0.08f, (float)y * 0.08f, 0.0f);
+                        float ratio = 0.6f + 0.4f * noise;
+                        r = g = b = (uint8_t)(140.0f * ratio);
+                    }
+                    else // 苔 & 亀裂 (Moss & Crack)
+                    {
+                        float noise = Noise3D((float)x * 0.05f, (float)y * 0.05f, 0.0f);
+                        r = (uint8_t)(45.0f * (0.8f + 0.2f * noise));
+                        g = (uint8_t)(110.0f * (0.7f + 0.3f * noise));
+                        b = (uint8_t)(35.0f * (0.8f + 0.2f * noise));
+                    }
+                    pixels[y * width + x] = (a << 24) | (r << 16) | (g << 8) | b;
+                }
+            }
+        }
+
+#pragma pack(push, 1)
+        struct TgaHeader {
+            uint8_t  idLength = 0;
+            uint8_t  colorMapType = 0;
+            uint8_t  imageType = 2; // Uncompressed true-color
+            uint16_t colorMapStart = 0;
+            uint16_t colorMapLength = 0;
+            uint8_t  colorMapDepth = 0;
+            uint16_t xOffset = 0;
+            uint16_t yOffset = 0;
+            uint16_t width = 1024;
+            uint16_t height = 1024;
+            uint8_t  pixelDepth = 32;
+            uint8_t  imageDescriptor = 8; // Top-down
+        } header;
+#pragma pack(pop)
+
+        std::ofstream file(path, std::ios::out | std::ios::binary);
+        if (!file.is_open()) return false;
+
+        file.write(reinterpret_cast<const char*>(&header), sizeof(header));
+        file.write(reinterpret_cast<const char*>(pixels.data()), pixels.size() * sizeof(uint32_t));
+        file.close();
+
+        return true;
+    }
+
+    // コリジョン簡易メッシュを自動生成する関数
+    MeshData BioProceduralGenerator::GenerateCollisionMesh(const MeshData& baseMesh, int mode)
+    {
+        MeshData colMesh;
+        if (baseMesh.vertices.empty()) return colMesh;
+
+        if (mode == 0) // Tree
+        {
+            float minY = 999999.0f;
+            float maxY = -999999.0f;
+            float maxRadiusSq = 0.0f;
+
+            for (const auto& v : baseMesh.vertices)
+            {
+                if (v.position.y < minY) minY = v.position.y;
+                if (v.position.y > maxY) maxY = v.position.y;
+                
+                if (v.color.g < 0.8f)
+                {
+                    float radSq = v.position.x * v.position.x + v.position.z * v.position.z;
+                    if (radSq > maxRadiusSq) maxRadiusSq = radSq;
+                }
+            }
+
+            float height = maxY - minY;
+            float radius = std::sqrt(maxRadiusSq);
+            if (radius < 0.05f) radius = 0.15f;
+            
+            const int segments = 12;
+            for (int i = 0; i < segments; ++i)
+            {
+                float angle = (float)i * 2.0f * (float)M_PI / (float)segments;
+                float cosA = std::cos(angle);
+                float sinA = std::sin(angle);
+
+                Vertex vBottom{}, vTop{};
+                vBottom.position = { cosA * radius, minY, sinA * radius };
+                vBottom.normal = { cosA, 0.0f, sinA };
+                vBottom.texcoord = { (float)i / (float)segments, 0.0f };
+                vBottom.color = { 0.0f, 0.0f, 0.0f, 1.0f };
+
+                vTop.position = { cosA * radius, maxY, sinA * radius };
+                vTop.normal = { cosA, 0.0f, sinA };
+                vTop.texcoord = { (float)i / (float)segments, 1.0f };
+                vTop.color = { 0.0f, 0.0f, 0.0f, 1.0f };
+
+                colMesh.vertices.push_back(vBottom);
+                colMesh.vertices.push_back(vTop);
+            }
+
+            for (int i = 0; i < segments; ++i)
+            {
+                uint32_t i0 = i * 2;
+                uint32_t i1 = i0 + 1;
+                uint32_t i2 = ((i + 1) % segments) * 2;
+                uint32_t i3 = i2 + 1;
+
+                colMesh.indices.push_back(i0);
+                colMesh.indices.push_back(i1);
+                colMesh.indices.push_back(i2);
+
+                colMesh.indices.push_back(i2);
+                colMesh.indices.push_back(i1);
+                colMesh.indices.push_back(i3);
+            }
+        }
+        else // Rock
+        {
+            std::vector<Vec3> directions = {
+                { 1.0f, 0.0f, 0.0f }, { -1.0f, 0.0f, 0.0f },
+                { 0.0f, 1.0f, 0.0f }, { 0.0f, -1.0f, 0.0f },
+                { 0.0f, 0.0f, 1.0f }, { 0.0f, 0.0f, -1.0f },
+                { 1.0f, 1.0f, 1.0f }, { -1.0f, -1.0f, -1.0f },
+                { 1.0f, -1.0f, 1.0f }, { -1.0f, 1.0f, -1.0f },
+                { -1.0f, 1.0f, 1.0f }, { 1.0f, -1.0f, -1.0f },
+                { 1.0f, 1.0f, -1.0f }, { -1.0f, -1.0f, 1.0f }
+            };
+
+            std::vector<Vertex> sampledVertices;
+            for (const auto& dir : directions)
+            {
+                float maxDot = -999999.0f;
+                Vertex bestVert{};
+                for (const auto& v : baseMesh.vertices)
+                {
+                    float d = v.position.x * dir.x + v.position.y * dir.y + v.position.z * dir.z;
+                    if (d > maxDot)
+                    {
+                        maxDot = d;
+                        bestVert = v;
+                    }
+                }
+                
+                bool duplicate = false;
+                for (const auto& sv : sampledVertices)
+                {
+                    float distSq = (sv.position.x - bestVert.position.x) * (sv.position.x - bestVert.position.x) +
+                                   (sv.position.y - bestVert.position.y) * (sv.position.y - bestVert.position.y) +
+                                   (sv.position.z - bestVert.position.z) * (sv.position.z - bestVert.position.z);
+                    if (distSq < 0.001f)
+                    {
+                        duplicate = true;
+                        break;
+                    }
+                }
+                if (!duplicate)
+                {
+                    sampledVertices.push_back(bestVert);
+                }
+            }
+
+            colMesh.vertices = sampledVertices;
+            
+            if (colMesh.vertices.size() >= 4)
+            {
+                float minX = 99999.f, maxX = -99999.f;
+                float minY = 99999.f, maxY = -99999.f;
+                float minZ = 99999.f, maxZ = -99999.f;
+                for (const auto& v : colMesh.vertices)
+                {
+                    if (v.position.x < minX) minX = v.position.x;
+                    if (v.position.x > maxX) maxX = v.position.x;
+                    if (v.position.y < minY) minY = v.position.y;
+                    if (v.position.y > maxY) maxY = v.position.y;
+                    if (v.position.z < minZ) minZ = v.position.z;
+                    if (v.position.z > maxZ) maxZ = v.position.z;
+                }
+
+                colMesh.vertices.clear();
+                
+                Vec3 box[8] = {
+                    { minX, minY, minZ }, { maxX, minY, minZ },
+                    { maxX, maxY, minZ }, { minX, maxY, minZ },
+                    { minX, minY, maxZ }, { maxX, minY, maxZ },
+                    { maxX, maxY, maxZ }, { minX, maxY, maxZ }
+                };
+
+                for (int i = 0; i < 8; ++i)
+                {
+                    Vertex v{};
+                    Vec3 closest = box[i];
+                    float minDist = 99999.f;
+                    for (const auto& sv : sampledVertices)
+                    {
+                        float d = (sv.position.x - box[i].x)*(sv.position.x - box[i].x) +
+                                  (sv.position.y - box[i].y)*(sv.position.y - box[i].y) +
+                                  (sv.position.z - box[i].z)*(sv.position.z - box[i].z);
+                        if (d < minDist)
+                        {
+                            minDist = d;
+                            closest = sv.position;
+                        }
+                    }
+
+                    v.position = closest;
+                    v.normal = NormalizeVec3(closest);
+                    v.texcoord = { (i % 2 == 0) ? 0.f : 1.f, (i / 4 == 0) ? 0.f : 1.f };
+                    v.color = { 0.f, 0.f, 0.f, 1.f };
+                    colMesh.vertices.push_back(v);
+                }
+
+                uint32_t indices[36] = {
+                    0, 2, 1,   0, 3, 2,
+                    4, 5, 6,   4, 6, 7,
+                    0, 1, 5,   0, 5, 4,
+                    2, 3, 7,   2, 7, 6,
+                    0, 4, 7,   0, 7, 3,
+                    1, 2, 6,   1, 6, 5
+                };
+                for (int i = 0; i < 36; ++i)
+                {
+                    colMesh.indices.push_back(indices[i]);
+                }
+            }
+        }
+
+        return colMesh;
+    }
+
     ExportResult BioProceduralGenerator::ExportToObj(const std::string& directoryPath, const std::string& fileName, const MeshData& meshData)
     {
         ExportResult result;
         result.totalVertices = (uint32_t)meshData.vertices.size();
         result.totalIndices = (uint32_t)meshData.indices.size();
 
-        // 統計情報の計算
         for (const auto& v : meshData.vertices)
         {
             if (v.color.r > 0.1f) result.mossVertices++;
@@ -857,7 +1136,6 @@ namespace BioProcedural
             result.windRatio = (float)result.windVertices / (float)result.totalVertices;
         }
 
-        // 1. ディレクトリの作成
         try
         {
             if (!std::filesystem::exists(directoryPath))
@@ -872,10 +1150,29 @@ namespace BioProcedural
             return result;
         }
 
-        std::string objPath = (std::filesystem::path(directoryPath) / (fileName + ".obj")).string();
-        std::string mtlPath = (std::filesystem::path(directoryPath) / (fileName + ".mtl")).string();
+        std::string cleanDir = directoryPath;
+        if (!cleanDir.empty() && cleanDir.back() != '/' && cleanDir.back() != '\\')
+        {
+            cleanDir += "/";
+        }
+        std::string objPath = cleanDir + fileName + ".obj";
+        std::string mtlPath = cleanDir + fileName + ".mtl";
+        std::string materialName = "ProceduralMaterial";
 
-        // 2. MTLファイルの書き出し
+        int mode = 1; // 1: Rock
+        for (const auto& v : meshData.vertices)
+        {
+            if (v.color.g > 0.5f)
+            {
+                mode = 0; // Tree
+                break;
+            }
+        }
+
+        std::string atlasName = fileName + "_atlas.tga";
+        std::string atlasPath = cleanDir + atlasName;
+        SaveTextureAtlasTga(atlasPath, mode);
+
         std::ofstream mtlFile(mtlPath);
         if (!mtlFile.is_open())
         {
@@ -884,7 +1181,6 @@ namespace BioProcedural
             return result;
         }
 
-        std::string materialName = fileName + "_Material";
         mtlFile << "# Bio-Authoring Studio Material\n";
         mtlFile << "newmtl " << materialName << "\n";
         mtlFile << "Ka 1.0 1.0 1.0\n";
@@ -892,16 +1188,9 @@ namespace BioProcedural
         mtlFile << "Ks 0.2 0.2 0.2\n";
         mtlFile << "Ns 20.0\n";
         mtlFile << "Illum 2\n";
-        
-        if (!meshData.texturePath.empty())
-        {
-            std::string texPath = meshData.texturePath;
-            std::replace(texPath.begin(), texPath.end(), '\\', '/');
-            mtlFile << "map_Kd " << texPath << "\n";
-        }
+        mtlFile << "map_Kd " << atlasName << "\n";
         mtlFile.close();
 
-        // 3. OBJファイルの書き出し (メモリバッファを用いた超高速一括書き出し)
         std::string buffer;
         size_t estimatedSize = meshData.vertices.size() * 150 + (meshData.indices.size() / 3) * 50 + 1024;
         buffer.reserve(estimatedSize);
@@ -909,52 +1198,60 @@ namespace BioProcedural
         buffer += "# Bio-Authoring Studio Procedural Mesh with Vertex Color\n";
         buffer += "mtllib " + fileName + ".mtl\n\n";
 
+        char temp[256];
         for (const auto& v : meshData.vertices)
         {
-            buffer += "v ";
-            char temp[128];
-            char* ptr = temp;
-            ptr = WriteFloatToBuf(ptr, v.position.x);
-            *ptr++ = ' ';
-            ptr = WriteFloatToBuf(ptr, v.position.y);
-            *ptr++ = ' ';
-            ptr = WriteFloatToBuf(ptr, v.position.z);
-            *ptr++ = ' ';
-            ptr = WriteFloatToBuf(ptr, v.color.r);
-            *ptr++ = ' ';
-            ptr = WriteFloatToBuf(ptr, v.color.g);
-            *ptr++ = ' ';
-            ptr = WriteFloatToBuf(ptr, v.color.b);
-            *ptr++ = '\n';
-            buffer.append(temp, ptr - temp);
+            int len = std::snprintf(temp, sizeof(temp), "v %.6f %.6f %.6f %.4f %.4f %.4f\n",
+                v.position.x, v.position.y, v.position.z,
+                v.color.r, v.color.g, v.color.b);
+            buffer.append(temp, len);
         }
         buffer += "\n";
 
         for (const auto& v : meshData.vertices)
         {
+            float u = v.texcoord.u;
+            float v_coord = v.texcoord.v;
+
+            if (mode == 0) // Tree
+            {
+                if (v.color.g > 0.5f) // 葉
+                {
+                    u = u * 0.5f + 0.5f;
+                }
+                else // 幹
+                {
+                    u = u * 0.5f;
+                }
+            }
+            else // Rock
+            {
+                u = u * 0.5f;
+            }
+
             buffer += "vt ";
-            char temp[64];
-            char* ptr = temp;
-            ptr = WriteFloatToBuf(ptr, v.texcoord.u);
+            char temp_vt[64];
+            char* ptr = temp_vt;
+            ptr = WriteFloatToBuf(ptr, u);
             *ptr++ = ' ';
-            ptr = WriteFloatToBuf(ptr, v.texcoord.v);
+            ptr = WriteFloatToBuf(ptr, v_coord);
             *ptr++ = '\n';
-            buffer.append(temp, ptr - temp);
+            buffer.append(temp_vt, ptr - temp_vt);
         }
         buffer += "\n";
 
         for (const auto& v : meshData.vertices)
         {
             buffer += "vn ";
-            char temp[96];
-            char* ptr = temp;
+            char temp_vn[96];
+            char* ptr = temp_vn;
             ptr = WriteFloatToBuf(ptr, v.normal.x);
             *ptr++ = ' ';
             ptr = WriteFloatToBuf(ptr, v.normal.y);
             *ptr++ = ' ';
             ptr = WriteFloatToBuf(ptr, v.normal.z);
             *ptr++ = '\n';
-            buffer.append(temp, ptr - temp);
+            buffer.append(temp_vn, ptr - temp_vn);
         }
         buffer += "\n";
 
@@ -967,8 +1264,8 @@ namespace BioProcedural
             uint32_t idx2 = meshData.indices[i + 2] + 1;
 
             buffer += "f ";
-            char temp[128];
-            char* ptr = temp;
+            char temp_f[128];
+            char* ptr = temp_f;
             
             auto r = std::to_chars(ptr, ptr + 16, idx0); ptr = r.ptr;
             *ptr++ = '/';

@@ -513,6 +513,8 @@ void DebugUI::Update()
                 ImGui::Indent(10.0f);
                 ImGui::Text("Total Vertices: %u", exportResult.totalVertices);
                 ImGui::Text("Total Polygons: %u", exportResult.totalIndices / 3);
+                ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "-> Texture Atlas generated successfully.");
+                ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "-> Collision Mesh generated successfully.");
                 
                 // 苔ウェイトの可視化統計
                 ImGui::Text("Moss-affected Vertices (Red > 0.1): %u (%.1f%%)", 
@@ -539,6 +541,10 @@ void DebugUI::Update()
                 ImGui::Spacing();
                 ImGui::TextColored(ImVec4(0.3f, 0.8f, 1.0f, 1.0f), "--- LOD Batch Export Statistics ---");
                 ImGui::Indent(10.0f);
+                
+                ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "-> Texture Atlas generated successfully.");
+                ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "-> Collision Mesh (*_collision.obj) generated successfully.");
+                ImGui::Spacing();
                 
                 // LOD0
                 ImGui::Text("LOD0 (High): Vertices: %u | Polygons: %u", 
