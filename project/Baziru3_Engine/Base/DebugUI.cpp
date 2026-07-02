@@ -57,7 +57,15 @@ void DebugUI::Update()
 
     if (materialManager_)
     {
-        ImGui::ColorEdit4("Material Color", &materialManager_->GetMaterialDataColor().x);
+        Vector4 col = materialManager_->GetMaterialDataColor();
+        if (ImGui::ColorEdit4("Material Color", &col.x))
+        {
+            materialManager_->GetMaterialDataColor() = col;
+            if (targetObject3d_)
+            {
+                targetObject3d_->SetColor(col);
+            }
+        }
     }
 
     // Sprite position window: size (500,100), sliders (x,y) with initial (100,100) and format integer 4 digits, decimal 1
@@ -361,12 +369,20 @@ void DebugUI::Update()
                 {
                     materialManager_->GetMaterialDataColor() = { 0.6f, 0.6f, 0.6f, 1.0f };
                 }
+                if (targetObject3d_)
+                {
+                    targetObject3d_->SetColor({ 0.6f, 0.6f, 0.6f, 1.0f });
+                }
             }
             else if (proceduralMode == 2) // Tree
             {
                 if (materialManager_)
                 {
                     materialManager_->GetMaterialDataColor() = { 0.55f, 0.35f, 0.17f, 1.0f };
+                }
+                if (targetObject3d_)
+                {
+                    targetObject3d_->SetColor({ 0.55f, 0.35f, 0.17f, 1.0f });
                 }
             }
         }
@@ -682,7 +698,9 @@ void DebugUI::Update()
                             }
                             
                             dummyMesh.material = originalModelData.material;
+                            dummyMesh.material.textureFilePath = "Resources/checkerBoard.png";
                             targetObject3d_->UpdateModelData(dummyMesh);
+                            targetObject3d_->SetColor({ 0.55f, 0.35f, 0.17f, 1.0f });
                             isTreeDummyMeshCreated = true;
                         }
                         
