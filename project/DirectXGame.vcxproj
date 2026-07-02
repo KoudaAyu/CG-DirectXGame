@@ -77,6 +77,8 @@
     <ClCompile Include="Baziru3_Engine\Base\Srv\SRVManager.cpp" />
     <ClCompile Include="Application\Subsystem\SubsystemFactory.cpp" />
     <ClCompile Include="Baziru3_Engine\3D\Procedural\ProceduralGenerator.cpp" />
+    <ClCompile Include="Baziru3_Engine\3D\Procedural\BioProceduralGenerator.cpp" />
+    <ClCompile Include="Baziru3_Engine\3D\Procedural\ProceduralGPUGenerator.cpp" />
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="Resources\CG4\SkinningObject3d.VS.hlsl">
@@ -209,6 +211,8 @@
     <ClInclude Include="Application\Scene\TitleScene\TitleScene.h" />
     <ClInclude Include="Application\Subsystem\SubsystemFactory.h" />
     <ClInclude Include="Baziru3_Engine\3D\Procedural\ProceduralGenerator.h" />
+    <ClInclude Include="Baziru3_Engine\3D\Procedural\BioProceduralGenerator.h" />
+    <ClInclude Include="Baziru3_Engine\3D\Procedural\ProceduralGPUGenerator.h" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="externals\DirectXTex\DirectXTex_Desktop_2022_Win10.vcxproj">

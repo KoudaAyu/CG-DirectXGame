@@ -3,6 +3,7 @@
 #include "SpriteManager.h"
 #include "Camera.h"
 #include "../3D/Procedural/ProceduralGenerator.h"
+#include "../3D/Object/Object3dCom.h"
 #include <imgui.h>
 
 DebugUI::DebugUI(MaterialManager* materialManager, SpriteManager* spriteManager, Camera* camera,
@@ -227,12 +228,14 @@ void DebugUI::Update()
         ImGui::Separator();
         ImGui::Text("Rock Parameters");
         if (ImGui::DragFloat("Scale", &rockParams.scale, 0.05f, 0.1f, 5.0f)) needRegen = true;
-        if (ImGui::SliderInt("Subdivisions", &rockParams.subdivisions, 1, 6)) needRegen = true;
+        if (ImGui::SliderInt("Subdivisions", &rockParams.subdivisions, 1, 12)) needRegen = true;
         if (ImGui::SliderFloat("Noise Strength", &rockParams.noiseStrength, 0.0f, 2.0f)) needRegen = true;
         if (ImGui::SliderFloat("Noise Frequency", &rockParams.noiseFrequency, 0.1f, 10.0f)) needRegen = true;
         if (ImGui::SliderInt("Noise Octaves", &rockParams.octaves, 1, 6)) needRegen = true;
         if (ImGui::SliderFloat("Voronoi Strength", &rockParams.voronoiStrength, 0.0f, 2.0f)) needRegen = true;
         if (ImGui::SliderInt("Voronoi Cells", &rockParams.voronoiCells, 2, 50)) needRegen = true;
+        if (ImGui::SliderFloat("Crack Strength", &rockParams.crackStrength, 0.0f, 2.0f)) needRegen = true;
+        if (ImGui::SliderFloat("Crack Frequency", &rockParams.crackFrequency, 0.5f, 10.0f)) needRegen = true;
         
         int seedVal = (int)rockParams.seed;
         if (ImGui::DragInt("Seed", &seedVal, 1, 0, 999999))
@@ -245,37 +248,170 @@ void DebugUI::Update()
     {
         ImGui::Separator();
         ImGui::Text("L-System Tree Parameters");
-        if (ImGui::SliderInt("Iterations (Depth)", &treeParams.iterations, 1, 4)) needRegen = true;
-        if (ImGui::SliderFloat("Branch Length", &treeParams.branchLength, 0.1f, 5.0f)) needRegen = true;
-        if (ImGui::SliderFloat("Branch Radius", &treeParams.branchRadius, 0.01f, 0.5f)) needRegen = true;
-        if (ImGui::SliderFloat("Taper Rate", &treeParams.taperRate, 0.5f, 0.95f)) needRegen = true;
-        if (ImGui::SliderFloat("Branch Angle", &treeParams.angle, 5.0f, 90.0f)) needRegen = true;
+        
+        // 樹木はCPUでポリゴン構造ごと再構成されるため、操作の快適性を最優先し、ドラッグを終えて「手を離した瞬間」に再生成する設計にします
+        ImGui::SliderInt("Iterations (Depth)", &treeParams.iterations, 1, 5);
+        if (ImGui::IsItemDeactivatedAfterEdit()) needRegen = true;
+
+        ImGui::SliderFloat("Branch Length", &treeParams.branchLength, 0.1f, 5.0f);
+        if (ImGui::IsItemDeactivatedAfterEdit()) needRegen = true;
+
+        ImGui::SliderFloat("Branch Radius", &treeParams.branchRadius, 0.01f, 0.5f);
+        if (ImGui::IsItemDeactivatedAfterEdit()) needRegen = true;
+
+        ImGui::SliderFloat("Taper Rate", &treeParams.taperRate, 0.5f, 0.95f);
+        if (ImGui::IsItemDeactivatedAfterEdit()) needRegen = true;
+
+        ImGui::SliderFloat("Branch Angle", &treeParams.angle, 5.0f, 90.0f);
+        if (ImGui::IsItemDeactivatedAfterEdit()) needRegen = true;
         
         int seedVal = (int)treeParams.seed;
-        if (ImGui::DragInt("Seed", &seedVal, 1, 0, 999999))
+        ImGui::DragInt("Seed", &seedVal, 1, 0, 999999);
+        if (ImGui::IsItemDeactivatedAfterEdit())
         {
             treeParams.seed = (unsigned int)seedVal;
             needRegen = true;
         }
     }
 
+    if (proceduralMode != 0)
+    {
+        ImGui::Separator();
+        ImGui::Text("Export Asset (Standalone OBJ)");
+        ImGui::InputText("Export Name", exportFileName, IM_ARRAYSIZE(exportFileName));
+        
+        if (ImGui::Button("Export to OBJ"))
+        {
+            if (targetObject3d_)
+            {
+                exportResult = ProceduralGenerator::ExportToObj("Resources/Outputs", exportFileName, targetObject3d_->GetModelData());
+                hasExported = true;
+            }
+            else
+            {
+                exportResult.success = false;
+                exportResult.outputMessage = "Error: No target model data.";
+                hasExported = true;
+            }
+        }
+
+        if (hasExported)
+        {
+            if (exportResult.success)
+            {
+                ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "%s", exportResult.outputMessage.c_str());
+                
+                // 統計情報 (就活ポートフォリオ用アピール) の描画
+                ImGui::Spacing();
+                ImGui::TextColored(ImVec4(0.3f, 0.8f, 1.0f, 1.0f), "--- Geometry & Vertex Color Stats ---");
+                ImGui::Indent(10.0f);
+                ImGui::Text("Total Vertices: %u", exportResult.totalVertices);
+                ImGui::Text("Total Polygons: %u", exportResult.totalIndices / 3);
+                
+                // 苔ウェイトの可視化統計
+                ImGui::Text("Moss-affected Vertices (Red > 0.1): %u (%.1f%%)", 
+                            exportResult.mossVertices, exportResult.mossRatio * 100.0f);
+                ImGui::ProgressBar(exportResult.mossRatio, ImVec2(250.0f, 15.0f), "Moss Blending Area");
+                
+                // 風ウェイトの可視化統計
+                ImGui::Text("Wind-sway Vertices (Green > 0.1): %u (%.1f%%)", 
+                            exportResult.windVertices, exportResult.windRatio * 100.0f);
+                ImGui::ProgressBar(exportResult.windRatio, ImVec2(250.0f, 15.0f), "Wind Animation Area");
+                ImGui::Unindent(10.0f);
+            }
+            else
+            {
+                ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "%s", exportResult.outputMessage.c_str());
+            }
+        }
+    }
+
+    // GPUジェネレーターの初期化
+    if (!isGpuGeneratorInitialized && targetObject3d_ && targetObject3d_->GetObject3dCom())
+    {
+        DirectXCom* dxCom = targetObject3d_->GetObject3dCom()->GetDirectXCom();
+        if (dxCom)
+        {
+            if (gpuGenerator.Initialize(dxCom))
+            {
+                isGpuGeneratorInitialized = true;
+            }
+        }
+    }
+
+    static int prevSubdivisions = -1;
+
     if (needRegen || (proceduralMode != 0 && prevMode == -1))
     {
         if (targetObject3d_)
         {
             Object3d::ModelData newModelData;
-            if (proceduralMode == 1)
+            if (proceduralMode == 1) // Rock
             {
-                newModelData = ProceduralGenerator::GenerateRock(rockParams);
+                if (isGpuGeneratorInitialized)
+                {
+                    // 分割数(Subdivisions)が変わった、または初回のみベースメッシュを再転送する
+                    if (rockParams.subdivisions != prevSubdivisions || prevMode == -1)
+                    {
+                        // 綺麗な球体（変形パラメータ 0.0）を生成
+                        ProceduralGenerator::RockParameters baseParams = rockParams;
+                        baseParams.noiseStrength = 0.0f;
+                        baseParams.voronoiStrength = 0.0f;
+                        baseParams.crackStrength = 0.0f;
+                        
+                        Object3d::ModelData baseMesh = ProceduralGenerator::GenerateRock(baseParams);
+                        
+                        // BioProcedural::Vertex構造体に詰め替え
+                        std::vector<BioProcedural::Vertex> bVertices(baseMesh.vertices.size());
+                        for (size_t i = 0; i < baseMesh.vertices.size(); ++i)
+                        {
+                            bVertices[i].position = { baseMesh.vertices[i].position.x, baseMesh.vertices[i].position.y, baseMesh.vertices[i].position.z };
+                            bVertices[i].normal = { baseMesh.vertices[i].normal.x, baseMesh.vertices[i].normal.y, baseMesh.vertices[i].normal.z };
+                            bVertices[i].texcoord = { baseMesh.vertices[i].texcoord.x, baseMesh.vertices[i].texcoord.y };
+                            bVertices[i].color = { 0.0f, 0.0f, 0.0f, 1.0f };
+                        }
+                        
+                        gpuGenerator.SetBaseMesh(bVertices);
+                        
+                        // インデックスや基本情報を更新 (頂点バッファのアロケーションもここで行う)
+                        baseMesh.material = originalModelData.material;
+                        targetObject3d_->UpdateModelData(baseMesh);
+                        
+                        prevSubdivisions = rockParams.subdivisions;
+                    }
+                    
+                    // GPU側で変形計算を実行
+                    BioProcedural::RockParameters bParams;
+                    bParams.scale = rockParams.scale;
+                    bParams.subdivisions = rockParams.subdivisions;
+                    bParams.noiseStrength = rockParams.noiseStrength;
+                    bParams.noiseFrequency = rockParams.noiseFrequency;
+                    bParams.octaves = rockParams.octaves;
+                    bParams.voronoiStrength = rockParams.voronoiStrength;
+                    bParams.voronoiCells = rockParams.voronoiCells;
+                    bParams.crackStrength = rockParams.crackStrength;
+                    bParams.crackFrequency = rockParams.crackFrequency;
+                    bParams.seed = rockParams.seed;
+                    
+                    gpuGenerator.Dispatch(bParams, (uint32_t)targetObject3d_->GetModelData().vertices.size());
+                    
+                    // 描画用の頂点バッファビューをオーバーライド
+                    targetObject3d_->OverrideVertexBufferView(gpuGenerator.GetVertexBufferView());
+                }
+                else
+                {
+                    // フォールバック (CPU版)
+                    newModelData = ProceduralGenerator::GenerateRock(rockParams);
+                    newModelData.material = originalModelData.material;
+                    targetObject3d_->UpdateModelData(newModelData);
+                }
             }
-            else if (proceduralMode == 2)
+            else if (proceduralMode == 2) // Tree
             {
                 newModelData = ProceduralGenerator::GenerateTree(treeParams);
+                newModelData.material = originalModelData.material;
+                targetObject3d_->UpdateModelData(newModelData);
             }
-            // ランタイムで描画切り替え用にテクスチャパス等は引き継ぐ
-            newModelData.material = originalModelData.material;
-            
-            targetObject3d_->UpdateModelData(newModelData);
         }
     }
 

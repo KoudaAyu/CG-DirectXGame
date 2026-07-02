@@ -101,6 +101,7 @@ public:
 	void SetCamera(Camera* camera) { camera_ = camera; }
 	Camera* GetCamera() const { return camera_; }
 	void SetObject3dCom(Object3dCom* object3dCom) { object3dCom_ = object3dCom; }
+	Object3dCom* GetObject3dCom() const { return object3dCom_; }
 
 	const Microsoft::WRL::ComPtr<ID3D12Resource>& GetTransformationMatrixResource() const { return transformationMatrixResource; }
 	const Microsoft::WRL::ComPtr<ID3D12Resource>& GetMaterialResource() const { return materialResource; }
@@ -109,6 +110,9 @@ public:
 	const D3D12_VERTEX_BUFFER_VIEW& GetVertexBufferView() const { return vertexBufferView_; }
 	const D3D12_INDEX_BUFFER_VIEW& GetIndexBufferView() const { return indexBufferView_; }
 	bool HasIndexBuffer() const { return indexResource != nullptr && !modelData_.indices.empty(); }
+	
+	// GPUプロシージャル頂点バッファをバインドするためのビューオーバーライド
+	void OverrideVertexBufferView(const D3D12_VERTEX_BUFFER_VIEW& vbv) { vertexBufferView_ = vbv; }
 
 	void SetRotate(const Vector3& r) { transform.SetRotate(r); }
 	void SetTranslate(const Vector3& t) { transform.SetTranslate(t); }

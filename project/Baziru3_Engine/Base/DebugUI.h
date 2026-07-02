@@ -2,8 +2,10 @@
 #include "Sprite.h"
 #include "Object3d.h"
 #include "../3D/Procedural/ProceduralGenerator.h"
+#include "../3D/Procedural/ProceduralGPUGenerator.h"
 #include <memory>
 #include <vector>
+#include <string>
 
 class Camera;
 class DebugCamera;
@@ -33,6 +35,13 @@ private:
     int proceduralMode = 0; // 0: 通常モデル, 1: 岩石 (Rock), 2: 樹木 (Tree)
     ProceduralGenerator::RockParameters rockParams;
     ProceduralGenerator::TreeParameters treeParams;
+    char exportFileName[64] = "ProceduralAsset";
+    BioProcedural::ExportResult exportResult;
+    bool hasExported = false; // エクスポートを行ったかどうかのフラグ
+    
+    // GPUプロシージャル岩石生成
+    ProceduralGPUGenerator gpuGenerator;
+    bool isGpuGeneratorInitialized = false;
     
     // 元のOBJモデルデータを退避するバッファ
     Object3d::ModelData originalModelData;

@@ -2,11 +2,11 @@
 
 #include "Vector.h"
 #include "Object3d.h"
+#include "BioProceduralGenerator.h"
 #include <vector>
 #include <string>
-#include <map>
 
-// プロシージャルなアセット生成を司るクラス
+// プロシージャルなアセット生成を司るクラス (BioProceduralGeneratorへのアダプター)
 class ProceduralGenerator
 {
 public:
@@ -20,6 +20,8 @@ public:
         int octaves = 3;             // ノイズのオクターブ数 (細かさ)
         float voronoiStrength = 0.2f; // ボロノイ断層の強さ
         int voronoiCells = 10;       // ボロノイセルの中心数
+        float crackStrength = 0.4f;   // 岩の亀裂（クラック）の強さ
+        float crackFrequency = 3.0f;  // 亀裂の周波数
         unsigned int seed = 12345;   // ランダムシード値
     };
 
@@ -36,24 +38,17 @@ public:
     };
 
     /// <summary>
-    /// プロシージャルな岩石メッシュを生成する
+    /// プロシージャルな岩石メッシュを生成する (アダプター経由)
     /// </summary>
-    /// <param name="params">生成パラメータ</param>
-    /// <returns>生成されたモデルデータ</returns>
     static Object3d::ModelData GenerateRock(const RockParameters& params);
 
     /// <summary>
-    /// プロシージャルな樹木メッシュを生成する (L-System)
+    /// プロシージャルな樹木メッシュを生成する (L-System, アダプター経由)
     /// </summary>
-    /// <param name="params">生成パラメータ</param>
-    /// <returns>生成されたモデルデータ</returns>
     static Object3d::ModelData GenerateTree(const TreeParameters& params);
 
-private:
-    // 3Dノイズ (Perlin/Simplexノイズの簡易実装)
-    static float Noise3D(float x, float y, float z);
-    static float FractalNoise3D(float x, float y, float z, int octaves, float frequency);
-    
-    // 簡易ボロノイノイズ
-    static float Voronoi3D(float x, float y, float z, int cellCount, unsigned int seed);
+    /// <summary>
+    /// 現在のモデルデータをOBJ形式でエクスポートする
+    /// </summary>
+    static BioProcedural::ExportResult ExportToObj(const std::string& directoryPath, const std::string& fileName, const Object3d::ModelData& modelData);
 };

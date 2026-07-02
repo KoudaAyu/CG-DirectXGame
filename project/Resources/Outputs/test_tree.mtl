@@ -1,0 +1,8 @@
+# Bio-Authoring Studio Material
+newmtl test_tree_Material
+Ka 1.0 1.0 1.0
+Kd 1.0 1.0 1.0
+Ks 0.2 0.2 0.2
+Ns 20.0
+Illum 2
+map_Kd Resources/uvChecker.png
