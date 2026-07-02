@@ -71,8 +71,13 @@ void main(uint3 DTid : SV_DispatchThreadID)
     end += endWind;
 
     float3 dir = normalize(end - start);
+    
+    // 変形後の dir に基づいて right と up を再算出（法線のねじれとしなりを完全に同期）
     float3 right = normalize(seg.right);
     float3 up = normalize(seg.up);
+    // Gram-Schmidt で dir に直交する面を構築
+    float3 deformRight = normalize(right - dir * dot(right, dir));
+    float3 deformUp = normalize(cross(dir, deformRight));
 
     // 8角形円柱の頂点を生成
     const uint radialSegments = 8;
@@ -82,7 +87,8 @@ void main(uint3 DTid : SV_DispatchThreadID)
         float c = cos(angle);
         float s = sin(angle);
 
-        float3 ringDir = right * c + up * s;
+        // 変形後の直交座標系から法線と周囲頂点を計算
+        float3 ringDir = deformRight * c + deformUp * s;
 
         // startPos側 (頂点 0〜8)
         uint vIndexStart = branchVertexOffset + i;
@@ -126,7 +132,7 @@ void main(uint3 DTid : SV_DispatchThreadID)
     {
         float3 norm = leafNormals[leafIdx];
         float angleOffset = (float)leafIdx * 3.14159265f / 4.0f;
-        float3 leafRight = right * cos(angleOffset) + up * sin(angleOffset);
+        float3 leafRight = deformRight * cos(angleOffset) + deformUp * sin(angleOffset);
         float3 leafUp = dir; // 枝の伸びる方向
 
         uint baseV = leafVertexOffset + leafIdx * 8;

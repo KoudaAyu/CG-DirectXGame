@@ -19,6 +19,27 @@ DebugUI::DebugUI(MaterialManager* materialManager, SpriteManager* spriteManager,
 
 void DebugUI::Initialize()
 {
+    // 樹木パラメータの木らしい初期値
+    treeParams.iterations = 4;
+    treeParams.branchLength = 1.0f;
+    treeParams.branchRadius = 0.05f;
+    treeParams.taperRate = 0.8f;
+    treeParams.angle = 25.0f;
+    treeParams.axiom = "F";
+    treeParams.seed = 12345;
+
+    // 岩石パラメータの初期値
+    rockParams.scale = 1.0f;
+    rockParams.subdivisions = 4;
+    rockParams.noiseStrength = 0.3f;
+    rockParams.noiseFrequency = 2.0f;
+    rockParams.octaves = 3;
+    rockParams.voronoiStrength = 0.2f;
+    rockParams.voronoiCells = 10;
+    rockParams.crackStrength = 0.1f;
+    rockParams.crackFrequency = 4.0f;
+    rockParams.seed = 42;
+
     // 初回に元のオブジェクトデータを保存して退避しておく
     if (targetObject3d_)
     {
@@ -334,6 +355,20 @@ void DebugUI::Update()
         {
             // モードが切り替わったら初期生成トリガーを引く
             prevMode = -1; 
+            if (proceduralMode == 1) // Rock
+            {
+                if (materialManager_)
+                {
+                    materialManager_->GetMaterialDataColor() = { 0.6f, 0.6f, 0.6f, 1.0f };
+                }
+            }
+            else if (proceduralMode == 2) // Tree
+            {
+                if (materialManager_)
+                {
+                    materialManager_->GetMaterialDataColor() = { 0.55f, 0.35f, 0.17f, 1.0f };
+                }
+            }
         }
     }
 
