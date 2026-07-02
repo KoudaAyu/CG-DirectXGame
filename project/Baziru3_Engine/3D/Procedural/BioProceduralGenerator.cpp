@@ -540,7 +540,9 @@ namespace BioProcedural
                     turtle.position.z + turtle.direction.z * params.branchLength
                 };
 
-                float nextRadius = turtle.radius * params.taperRate;
+                float minRadius = params.branchRadius * 0.15f;
+                if (minRadius < 0.002f) minRadius = 0.002f;
+                float nextRadius = std::max(minRadius, turtle.radius * params.taperRate);
 
                 BuildCylinder(turtle.position, nextPos, turtle.radius, nextRadius, turtle);
 
@@ -689,7 +691,9 @@ namespace BioProcedural
                     turtle.position.z + turtle.direction.z * params.branchLength
                 };
 
-                float nextRadius = turtle.radius * params.taperRate;
+                float minRadius = params.branchRadius * 0.15f;
+                if (minRadius < 0.002f) minRadius = 0.002f;
+                float nextRadius = std::max(minRadius, turtle.radius * params.taperRate);
 
                 GPUBranchesSegment seg{};
                 seg.startPos = turtle.position;
