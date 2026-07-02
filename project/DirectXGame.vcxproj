@@ -80,6 +80,7 @@
     <ClCompile Include="Baziru3_Engine\3D\Procedural\ProceduralGenerator.cpp" />
     <ClCompile Include="Baziru3_Engine\3D\Procedural\BioProceduralGenerator.cpp" />
     <ClCompile Include="Baziru3_Engine\3D\Procedural\ProceduralGPUGenerator.cpp" />
+    <ClCompile Include="Baziru3_Engine\3D\Procedural\ProceduralTreeGPUGenerator.cpp" />
     <ClCompile Include="Baziru3_Engine\Collision\CollisionManager.cpp" />
     <ClCompile Include="Baziru3_Engine\Graphics\GpuProfiler.cpp" />
   </ItemGroup>
@@ -173,6 +174,11 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</ExcludedFromBuild>
     </FxCompile>
+    <FxCompile Include="Resources\shaders\ProceduralTree.CS.hlsl">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </FxCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Baziru3_Engine\3D\Object\SkinningObject3dCom.h" />
@@ -253,6 +259,7 @@
     <ClInclude Include="Baziru3_Engine\3D\Procedural\ProceduralGenerator.h" />
     <ClInclude Include="Baziru3_Engine\3D\Procedural\BioProceduralGenerator.h" />
     <ClInclude Include="Baziru3_Engine\3D\Procedural\ProceduralGPUGenerator.h" />
+    <ClInclude Include="Baziru3_Engine\3D\Procedural\ProceduralTreeGPUGenerator.h" />
     <ClInclude Include="Baziru3_Engine\Collision\Collider.h" />
     <ClInclude Include="Baziru3_Engine\Collision\SphereCollider.h" />
     <ClInclude Include="Baziru3_Engine\Collision\BoxCollider.h" />

@@ -365,25 +365,15 @@ void DebugUI::Update()
         ImGui::Separator();
         ImGui::Text("L-System Tree Parameters");
         
-        // 樹木はCPUでポリゴン構造ごと再構成されるため、操作の快適性を最優先し、ドラッグを終えて「手を離した瞬間」に再生成する設計にします
-        ImGui::SliderInt("Iterations (Depth)", &treeParams.iterations, 1, 5);
-        if (ImGui::IsItemDeactivatedAfterEdit()) needRegen = true;
-
-        ImGui::SliderFloat("Branch Length", &treeParams.branchLength, 0.1f, 5.0f);
-        if (ImGui::IsItemDeactivatedAfterEdit()) needRegen = true;
-
-        ImGui::SliderFloat("Branch Radius", &treeParams.branchRadius, 0.01f, 0.5f);
-        if (ImGui::IsItemDeactivatedAfterEdit()) needRegen = true;
-
-        ImGui::SliderFloat("Taper Rate", &treeParams.taperRate, 0.5f, 0.95f);
-        if (ImGui::IsItemDeactivatedAfterEdit()) needRegen = true;
-
-        ImGui::SliderFloat("Branch Angle", &treeParams.angle, 5.0f, 90.0f);
-        if (ImGui::IsItemDeactivatedAfterEdit()) needRegen = true;
+        // GPU化により、ドラッグ中もリアルタイムに超高速変形できるようになりました！
+        if (ImGui::SliderInt("Iterations (Depth)", &treeParams.iterations, 1, 5)) needRegen = true;
+        if (ImGui::SliderFloat("Branch Length", &treeParams.branchLength, 0.1f, 5.0f)) needRegen = true;
+        if (ImGui::SliderFloat("Branch Radius", &treeParams.branchRadius, 0.01f, 0.5f)) needRegen = true;
+        if (ImGui::SliderFloat("Taper Rate", &treeParams.taperRate, 0.5f, 0.95f)) needRegen = true;
+        if (ImGui::SliderFloat("Branch Angle", &treeParams.angle, 5.0f, 90.0f)) needRegen = true;
         
         int seedVal = (int)treeParams.seed;
-        ImGui::DragInt("Seed", &seedVal, 1, 0, 999999);
-        if (ImGui::IsItemDeactivatedAfterEdit())
+        if (ImGui::DragInt("Seed", &seedVal, 1, 0, 999999))
         {
             treeParams.seed = (unsigned int)seedVal;
             needRegen = true;
@@ -455,9 +445,23 @@ void DebugUI::Update()
         }
     }
 
+    // GPU樹木ジェネレーターの初期化
+    if (!isGpuTreeGeneratorInitialized && targetObject3d_ && targetObject3d_->GetObject3dCom())
+    {
+        DirectXCom* dxCom = targetObject3d_->GetObject3dCom()->GetDirectXCom();
+        if (dxCom)
+        {
+            if (gpuTreeGenerator.Initialize(dxCom))
+            {
+                isGpuTreeGeneratorInitialized = true;
+            }
+        }
+    }
+
     static int prevSubdivisions = -1;
 
-    if (needRegen || (proceduralMode != 0 && prevMode == -1))
+    bool shouldDispatchTree = (proceduralMode == 2 && isGpuTreeGeneratorInitialized);
+    if (needRegen || shouldDispatchTree || (proceduralMode != 0 && prevMode == -1))
     {
         if (targetObject3d_)
         {
@@ -524,9 +528,152 @@ void DebugUI::Update()
             }
             else if (proceduralMode == 2) // Tree
             {
-                newModelData = ProceduralGenerator::GenerateTree(treeParams);
-                newModelData.material = originalModelData.material;
-                targetObject3d_->UpdateModelData(newModelData);
+                if (isGpuTreeGeneratorInitialized)
+                {
+                    static int prevTreeIterations = -1;
+                    static float prevTreeLength = -1.0f;
+                    static float prevTreeRadius = -1.0f;
+                    static float prevTreeTaper = -1.0f;
+                    static float prevTreeAngle = -1.0f;
+                    static unsigned int prevTreeSeed = 0;
+
+                    bool skeletonChanged = (treeParams.iterations != prevTreeIterations ||
+                                            treeParams.branchLength != prevTreeLength ||
+                                            treeParams.branchRadius != prevTreeRadius ||
+                                            treeParams.taperRate != prevTreeTaper ||
+                                            treeParams.angle != prevTreeAngle ||
+                                            treeParams.seed != prevTreeSeed ||
+                                            prevMode == -1 ||
+                                            needRegen);
+
+                    static uint32_t currentSegments = 0;
+
+                    if (skeletonChanged)
+                    {
+                        BioProcedural::TreeParameters bTreeParams;
+                        bTreeParams.iterations = treeParams.iterations;
+                        bTreeParams.branchLength = treeParams.branchLength;
+                        bTreeParams.branchRadius = treeParams.branchRadius;
+                        bTreeParams.taperRate = treeParams.taperRate;
+                        bTreeParams.angle = treeParams.angle;
+                        bTreeParams.axiom = treeParams.axiom;
+                        bTreeParams.seed = treeParams.seed;
+
+                        // 骨格のみ生成（極めて軽量）
+                        std::vector<BioProcedural::GPUBranchesSegment> skeleton = BioProcedural::BioProceduralGenerator::GenerateTreeSkeleton(bTreeParams);
+                        currentSegments = (uint32_t)skeleton.size();
+                        
+                        // GPUの構造化バッファへ転送
+                        gpuTreeGenerator.SetSkeletonData(skeleton);
+
+                        // 描画用のダミーメッシュ構造（最大サイズ）を設定する (初回のみ)
+                        static bool isTreeDummyMeshCreated = false;
+                        if (!isTreeDummyMeshCreated || prevMode == -1)
+                        {
+                            Object3d::ModelData dummyMesh;
+                            
+                            // 頂点領域を最大サイズでアロケート
+                            dummyMesh.vertices.resize(ProceduralTreeGPUGenerator::kMaxVertices);
+                            
+                            // インデックスバッファの構築 (枝用と葉用)
+                            uint32_t maxSegments = ProceduralTreeGPUGenerator::kMaxSegments;
+                            dummyMesh.indices.reserve(maxSegments * 48 + maxSegments * 96);
+                            
+                            // 枝のインデックス
+                            for (uint32_t segIdx = 0; segIdx < maxSegments; ++segIdx)
+                            {
+                                uint32_t baseV = segIdx * 18;
+                                int radialSegments = 8;
+                                for (int i = 0; i < radialSegments; ++i)
+                                {
+                                    uint32_t i0 = baseV + i * 2;
+                                    uint32_t i1 = i0 + 1;
+                                    uint32_t i2 = baseV + (i + 1) * 2;
+                                    uint32_t i3 = i2 + 1;
+
+                                    dummyMesh.indices.push_back(i0);
+                                    dummyMesh.indices.push_back(i1);
+                                    dummyMesh.indices.push_back(i2);
+
+                                    dummyMesh.indices.push_back(i2);
+                                    dummyMesh.indices.push_back(i1);
+                                    dummyMesh.indices.push_back(i3);
+                                }
+                            }
+                            
+                            // 葉のインデックス
+                            uint32_t leafVertexStart = maxSegments * 18;
+                            for (uint32_t segIdx = 0; segIdx < maxSegments; ++segIdx)
+                            {
+                                uint32_t baseV = leafVertexStart + segIdx * 32;
+                                for (uint32_t leafIdx = 0; leafIdx < 4; ++leafIdx)
+                                {
+                                    uint32_t baseLeafV = baseV + leafIdx * 8;
+                                    
+                                    // Crossed Quad 1 (表裏)
+                                    dummyMesh.indices.push_back(baseLeafV + 0);
+                                    dummyMesh.indices.push_back(baseLeafV + 1);
+                                    dummyMesh.indices.push_back(baseLeafV + 2);
+                                    dummyMesh.indices.push_back(baseLeafV + 0);
+                                    dummyMesh.indices.push_back(baseLeafV + 2);
+                                    dummyMesh.indices.push_back(baseLeafV + 3);
+                                    
+                                    dummyMesh.indices.push_back(baseLeafV + 0);
+                                    dummyMesh.indices.push_back(baseLeafV + 2);
+                                    dummyMesh.indices.push_back(baseLeafV + 1);
+                                    dummyMesh.indices.push_back(baseLeafV + 0);
+                                    dummyMesh.indices.push_back(baseLeafV + 3);
+                                    dummyMesh.indices.push_back(baseLeafV + 2);
+
+                                    // Crossed Quad 2 (表裏)
+                                    dummyMesh.indices.push_back(baseLeafV + 4);
+                                    dummyMesh.indices.push_back(baseLeafV + 5);
+                                    dummyMesh.indices.push_back(baseLeafV + 6);
+                                    dummyMesh.indices.push_back(baseLeafV + 4);
+                                    dummyMesh.indices.push_back(baseLeafV + 6);
+                                    dummyMesh.indices.push_back(baseLeafV + 7);
+                                    
+                                    dummyMesh.indices.push_back(baseLeafV + 4);
+                                    dummyMesh.indices.push_back(baseLeafV + 6);
+                                    dummyMesh.indices.push_back(baseLeafV + 5);
+                                    dummyMesh.indices.push_back(baseLeafV + 4);
+                                    dummyMesh.indices.push_back(baseLeafV + 7);
+                                    dummyMesh.indices.push_back(baseLeafV + 6);
+                                }
+                            }
+                            
+                            dummyMesh.material = originalModelData.material;
+                            targetObject3d_->UpdateModelData(dummyMesh);
+                            isTreeDummyMeshCreated = true;
+                        }
+                        
+                        prevTreeIterations = treeParams.iterations;
+                        prevTreeLength = treeParams.branchLength;
+                        prevTreeRadius = treeParams.branchRadius;
+                        prevTreeTaper = treeParams.taperRate;
+                        prevTreeAngle = treeParams.angle;
+                        prevTreeSeed = treeParams.seed;
+                    }
+
+                    // 2. GPUで円柱展開・葉ポリゴン並列構築と揺れアニメーションを実行
+                    static float treeTime = 0.0f;
+                    treeTime += 0.016f;
+                    
+                    Vector3 windDir = { 1.0f, 0.0f, 0.3f };
+                    float windStrength = 0.6f;
+
+                    gpuTreeGenerator.Dispatch(windDir, windStrength, treeTime, currentSegments);
+
+                    // 3. 描画用バッファビューのオーバーライド
+                    targetObject3d_->OverrideVertexBufferView(gpuTreeGenerator.GetVertexBufferView());
+                }
+                else
+                {
+                    // フォールバック (CPU版)
+                    newModelData = ProceduralGenerator::GenerateTree(treeParams);
+                    newModelData.material = originalModelData.material;
+                    targetObject3d_->UpdateModelData(newModelData);
+                }
             }
         }
     }

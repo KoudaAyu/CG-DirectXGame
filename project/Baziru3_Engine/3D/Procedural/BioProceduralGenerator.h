@@ -62,6 +62,18 @@ namespace BioProcedural
         unsigned int seed = 54321;   // ランダムシード値
     };
 
+    // GPUで並列展開するための樹木の骨格セグメント定義
+    struct GPUBranchesSegment {
+        Vec3 startPos;
+        float startRadius;
+        Vec3 endPos;
+        float endRadius;
+        Vec3 right;
+        uint32_t isLeafEmitter;
+        Vec3 up;
+        float padding[3];
+    };
+
     class BioProceduralGenerator
     {
     public:
@@ -74,6 +86,11 @@ namespace BioProcedural
         /// プロシージャルな樹木メッシュを生成する (L-System)
         /// </summary>
         static MeshData GenerateTree(const TreeParameters& params);
+
+        /// <summary>
+        /// GPU並列生成用の樹木骨格データを生成する
+        /// </summary>
+        static std::vector<GPUBranchesSegment> GenerateTreeSkeleton(const TreeParameters& params);
 
         /// <summary>
         /// メッシュデータを標準的なOBJ形式で書き出す (詳細統計結果を返す)

@@ -612,6 +612,162 @@ namespace BioProcedural
         return data;
     }
 
+    std::vector<GPUBranchesSegment> BioProceduralGenerator::GenerateTreeSkeleton(const TreeParameters& params)
+    {
+        std::vector<GPUBranchesSegment> segments;
+        segments.reserve(1000);
+
+        std::string currentString = params.axiom;
+        for (int i = 0; i < params.iterations; ++i)
+        {
+            std::string nextString = "";
+            nextString.reserve(currentString.length() * 4);
+            for (char c : currentString)
+            {
+                if (c == 'X')
+                {
+                    nextString += "F-[[X]+X]+F[&[X]/[X]]&F[/[X]&X]/X";
+                }
+                else if (c == 'F')
+                {
+                    nextString += "FF";
+                }
+                else
+                {
+                    nextString += c;
+                }
+            }
+            currentString = nextString;
+        }
+
+        struct TurtleState
+        {
+            Vec3 position;
+            Vec3 direction;
+            Vec3 up;
+            Vec3 right;
+            float radius;
+            float distanceToRoot;
+        };
+
+        std::stack<TurtleState> stateStack;
+        
+        TurtleState turtle = {
+            { 0.0f, 0.0f, 0.0f },
+            { 0.0f, 1.0f, 0.0f },
+            { 0.0f, 0.0f, -1.0f },
+            { 1.0f, 0.0f, 0.0f },
+            params.branchRadius,
+            0.0f
+        };
+
+        float radAngle = params.angle * (float)M_PI / 180.0f;
+        std::mt19937 rand(params.seed);
+        std::uniform_real_distribution<float> angleDist(-0.15f, 0.15f);
+
+        for (char c : currentString)
+        {
+            if (c == 'F')
+            {
+                float nx = Noise3D(turtle.position.x * 2.0f, turtle.position.y * 2.0f, turtle.position.z * 2.0f) - 0.5f;
+                float ny = Noise3D(turtle.position.y * 2.0f, turtle.position.z * 2.0f, turtle.position.x * 2.0f) - 0.5f;
+                float nz = Noise3D(turtle.position.z * 2.0f, turtle.position.x * 2.0f, turtle.position.y * 2.0f) - 0.5f;
+
+                Vec3 noiseVec = { nx * 0.25f, ny * 0.25f, nz * 0.25f };
+                turtle.direction = NormalizeVec3({
+                    turtle.direction.x + noiseVec.x,
+                    turtle.direction.y + noiseVec.y,
+                    turtle.direction.z + noiseVec.z
+                });
+
+                turtle.right = NormalizeVec3(CrossVec3(turtle.up, turtle.direction));
+                turtle.up = NormalizeVec3(CrossVec3(turtle.direction, turtle.right));
+
+                Vec3 nextPos = {
+                    turtle.position.x + turtle.direction.x * params.branchLength,
+                    turtle.position.y + turtle.direction.y * params.branchLength,
+                    turtle.position.z + turtle.direction.z * params.branchLength
+                };
+
+                float nextRadius = turtle.radius * params.taperRate;
+
+                GPUBranchesSegment seg{};
+                seg.startPos = turtle.position;
+                seg.startRadius = turtle.radius;
+                seg.endPos = nextPos;
+                seg.endRadius = nextRadius;
+                seg.right = turtle.right;
+                seg.up = turtle.up;
+                seg.isLeafEmitter = (turtle.radius < params.branchRadius * 0.6f) ? 1 : 0;
+
+                segments.push_back(seg);
+
+                turtle.position = nextPos;
+                turtle.radius = nextRadius;
+                turtle.distanceToRoot += params.branchLength;
+            }
+            else if (c == 'X')
+            {
+                if (!segments.empty())
+                {
+                    segments.back().isLeafEmitter = 1;
+                }
+            }
+            else if (c == '+')
+            {
+                float variation = angleDist(rand);
+                float rot = radAngle + variation;
+                turtle.direction = RotateVectorVec3(turtle.direction, turtle.up, rot);
+                turtle.right = RotateVectorVec3(turtle.right, turtle.up, rot);
+            }
+            else if (c == '-')
+            {
+                float variation = angleDist(rand);
+                float rot = -radAngle + variation;
+                turtle.direction = RotateVectorVec3(turtle.direction, turtle.up, rot);
+                turtle.right = RotateVectorVec3(turtle.right, turtle.up, rot);
+            }
+            else if (c == '&')
+            {
+                float variation = angleDist(rand);
+                float rot = radAngle + variation;
+                turtle.direction = RotateVectorVec3(turtle.direction, turtle.right, rot);
+                turtle.up = RotateVectorVec3(turtle.up, turtle.right, rot);
+            }
+            else if (c == '^')
+            {
+                float variation = angleDist(rand);
+                float rot = -radAngle + variation;
+                turtle.direction = RotateVectorVec3(turtle.direction, turtle.right, rot);
+                turtle.up = RotateVectorVec3(turtle.up, turtle.right, rot);
+            }
+            else if (c == '/')
+            {
+                turtle.up = RotateVectorVec3(turtle.up, turtle.direction, radAngle);
+                turtle.right = RotateVectorVec3(turtle.right, turtle.direction, radAngle);
+            }
+            else if (c == '\\')
+            {
+                turtle.up = RotateVectorVec3(turtle.up, turtle.direction, -radAngle);
+                turtle.right = RotateVectorVec3(turtle.right, turtle.direction, -radAngle);
+            }
+            else if (c == '[')
+            {
+                stateStack.push(turtle);
+            }
+            else if (c == ']')
+            {
+                if (!stateStack.empty())
+                {
+                    turtle = stateStack.top();
+                    stateStack.pop();
+                }
+            }
+        }
+
+        return segments;
+    }
+
     // --- OBJ形式でエクスポートする機能の実装 (統計結果を返す) ---
     ExportResult BioProceduralGenerator::ExportToObj(const std::string& directoryPath, const std::string& fileName, const MeshData& meshData)
     {

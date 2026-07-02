@@ -63,7 +63,8 @@ void LevelEditor::Initialize(DirectXCom* dxCommon, Object3dCom* object3dCom)
             data->specularModel = 0;
             data->shininess = 0.0f;
             data->uvTransform = MakeIdentity4x4();
-            std::memset(data->padding, 0, sizeof(data->padding));
+            data->reflectionFactor = 0.0f;
+            data->fresnelF0 = 0.00f;
             std::memset(data->padding2, 0, sizeof(data->padding2));
             axisMaterialResources_[i]->Unmap(0, nullptr);
         }

@@ -3,6 +3,7 @@
 #include "Object3d.h"
 #include "../3D/Procedural/ProceduralGenerator.h"
 #include "../3D/Procedural/ProceduralGPUGenerator.h"
+#include "../3D/Procedural/ProceduralTreeGPUGenerator.h"
 #include <memory>
 #include <vector>
 #include <string>
@@ -45,6 +46,10 @@ private:
     // GPUプロシージャル岩石生成
     ProceduralGPUGenerator gpuGenerator;
     bool isGpuGeneratorInitialized = false;
+
+    // GPUプロシージャル樹木生成
+    ProceduralTreeGPUGenerator gpuTreeGenerator;
+    bool isGpuTreeGeneratorInitialized = false;
     
     // 元のOBJモデルデータを退避するバッファ
     Object3d::ModelData originalModelData;

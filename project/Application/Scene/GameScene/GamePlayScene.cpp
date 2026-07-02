@@ -299,7 +299,7 @@ void GamePlayScene::Draw(SceneRenderRequests& renderRequests)
 		{
 			if (sprite)
 			{
-				sprite->Update(ctx.windowAPI, &debugCamera_);
+				sprite->Update();
 				sprite->Draw();
 			}
 		}
