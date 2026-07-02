@@ -513,10 +513,18 @@ namespace BioProcedural
             }
         };
 
+        size_t segmentCount = 0;
+        const size_t kMaxSegments = 2000;
+
         for (char c : currentString)
         {
             if (c == 'F')
             {
+                if (segmentCount >= kMaxSegments)
+                {
+                    break;
+                }
+                segmentCount++;
                 // 【就活強化点: 枝のノイズによる有機的うねり(曲がり)】
                 // 3Dバリューノイズにより、枝の成長方向にわずかにゆらぎを与えてクネクネと曲がらせる
                 float nx = Noise3D(turtle.position.x * 2.0f, turtle.position.y * 2.0f, turtle.position.z * 2.0f) - 0.5f;
