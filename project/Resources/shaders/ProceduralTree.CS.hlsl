@@ -60,11 +60,15 @@ void main(uint3 DTid : SV_DispatchThreadID)
     float3 start = seg.startPos;
     float3 end = seg.endPos;
 
-    // 風の揺れアニメーション
-    float swayFactor = max(0.0f, end.y * 0.15f);
-    float3 windOffset = gTreeCB.windDirection * sin(gTreeCB.time * 2.5f + end.y * 0.5f) * gTreeCB.windStrength * swayFactor;
-    end += windOffset;
-    start += windOffset * 0.7f;
+    // 風の揺れアニメーションを start / end それぞれ元の座標の高さから計算（ちぎれを防止）
+    float startSway = max(0.0f, seg.startPos.y * 0.15f);
+    float3 startWind = gTreeCB.windDirection * sin(gTreeCB.time * 2.5f + seg.startPos.y * 0.5f) * gTreeCB.windStrength * startSway;
+
+    float endSway = max(0.0f, seg.endPos.y * 0.15f);
+    float3 endWind = gTreeCB.windDirection * sin(gTreeCB.time * 2.5f + seg.endPos.y * 0.5f) * gTreeCB.windStrength * endSway;
+
+    start += startWind;
+    end += endWind;
 
     float3 dir = normalize(end - start);
     float3 right = normalize(seg.right);
