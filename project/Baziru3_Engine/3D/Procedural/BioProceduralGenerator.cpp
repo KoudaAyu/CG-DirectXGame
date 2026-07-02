@@ -542,7 +542,7 @@ namespace BioProcedural
 
                 float minRadius = params.branchRadius * 0.15f;
                 if (minRadius < 0.002f) minRadius = 0.002f;
-                float nextRadius = std::max(minRadius, turtle.radius * params.taperRate);
+                float nextRadius = std::max(minRadius, turtle.radius * 0.96f); // 前進時はわずかに細く（ステップテーパー）
 
                 BuildCylinder(turtle.position, nextPos, turtle.radius, nextRadius, turtle);
 
@@ -599,7 +599,9 @@ namespace BioProcedural
             }
             else if (c == '[')
             {
-                stateStack.push(turtle);
+                TurtleState pushState = turtle;
+                pushState.radius = std::max(params.branchRadius * 0.15f, turtle.radius * params.taperRate); // 分岐時にテーパー率を適用
+                stateStack.push(pushState);
             }
             else if (c == ']')
             {
@@ -693,7 +695,7 @@ namespace BioProcedural
 
                 float minRadius = params.branchRadius * 0.15f;
                 if (minRadius < 0.002f) minRadius = 0.002f;
-                float nextRadius = std::max(minRadius, turtle.radius * params.taperRate);
+                float nextRadius = std::max(minRadius, turtle.radius * 0.96f); // 前進時はわずかに細く（ステップテーパー）
 
                 GPUBranchesSegment seg{};
                 seg.startPos = turtle.position;
@@ -757,7 +759,9 @@ namespace BioProcedural
             }
             else if (c == '[')
             {
-                stateStack.push(turtle);
+                TurtleState pushState = turtle;
+                pushState.radius = std::max(params.branchRadius * 0.15f, turtle.radius * params.taperRate); // 分岐時にテーパー率を適用
+                stateStack.push(pushState);
             }
             else if (c == ']')
             {
