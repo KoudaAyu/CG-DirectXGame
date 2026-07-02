@@ -3,6 +3,7 @@
 #include <wrl.h>
 #include <vector>
 #include <string>
+#include "Sprite.h"
 #include "BioProceduralGenerator.h"
 
 class DirectXCom;
@@ -24,7 +25,7 @@ public:
     /// <summary>
     /// ベースとなる綺麗な球体メッシュを設定・転送する (初回のみ)
     /// </summary>
-    bool SetBaseMesh(const std::vector<BioProcedural::Vertex>& vertices);
+    bool SetBaseMesh(const std::vector<Sprite::VertexData>& vertices);
 
     /// <summary>
     /// GPU側で変形Compute Shaderを実行する (Dispatch)

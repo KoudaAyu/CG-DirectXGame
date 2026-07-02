@@ -3,10 +3,9 @@
 
 struct Vertex
 {
-    float3 position;
-    float3 normal;
-    float2 texcoord;
-    float4 color;
+    float4 position; // 16 bytes
+    float2 texcoord; // 8 bytes
+    float3 normal;   // 12 bytes
 };
 
 struct RockParameters
@@ -128,7 +127,7 @@ void main(uint3 DTid : SV_DispatchThreadID)
     }
 
     Vertex base = gBaseVertices[DTid.x];
-    float3 basePos = base.position;
+    float3 basePos = base.position.xyz;
 
     // 1. ボロノイ断崖 (崖を作る平滑化)
     float v = Voronoi3D(basePos, gParams.voronoiCells);
@@ -171,10 +170,9 @@ void main(uint3 DTid : SV_DispatchThreadID)
 
     // 頂点データの出力
     Vertex output;
-    output.position = deformedPos;
-    output.normal = calculatedNormal; // 初期法線をひとまず設定 (頂点シェーダーでのトランスフォームに対応)
+    output.position = float4(deformedPos, 1.0f);
     output.texcoord = base.texcoord;
-    output.color = float4(mossWeight, 0.0f, 0.0f, 1.0f);
+    output.normal = calculatedNormal;
 
     gOutputVertices[DTid.x] = output;
 }

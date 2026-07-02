@@ -532,17 +532,7 @@ void DebugUI::Update()
                         
                         Object3d::ModelData baseMesh = ProceduralGenerator::GenerateRock(baseParams);
                         
-                        // BioProcedural::Vertex構造体に詰め替え
-                        std::vector<BioProcedural::Vertex> bVertices(baseMesh.vertices.size());
-                        for (size_t i = 0; i < baseMesh.vertices.size(); ++i)
-                        {
-                            bVertices[i].position = { baseMesh.vertices[i].position.x, baseMesh.vertices[i].position.y, baseMesh.vertices[i].position.z };
-                            bVertices[i].normal = { baseMesh.vertices[i].normal.x, baseMesh.vertices[i].normal.y, baseMesh.vertices[i].normal.z };
-                            bVertices[i].texcoord = { baseMesh.vertices[i].texcoord.x, baseMesh.vertices[i].texcoord.y };
-                            bVertices[i].color = { 0.0f, 0.0f, 0.0f, 1.0f };
-                        }
-                        
-                        gpuGenerator.SetBaseMesh(bVertices);
+                        gpuGenerator.SetBaseMesh(baseMesh.vertices);
                         
                         // インデックスや基本情報を更新 (頂点バッファのアロケーションもここで行う)
                         baseMesh.material = originalModelData.material;

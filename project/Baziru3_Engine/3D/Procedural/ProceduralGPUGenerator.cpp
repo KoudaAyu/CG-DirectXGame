@@ -190,7 +190,7 @@ bool ProceduralGPUGenerator::CreateBuffers(uint32_t maxVertices)
 
     D3D12_RESOURCE_DESC resDesc{};
     resDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-    resDesc.Width = maxVertices * sizeof(BioProcedural::Vertex);
+    resDesc.Width = maxVertices * sizeof(Sprite::VertexData);
     resDesc.Height = 1;
     resDesc.DepthOrArraySize = 1;
     resDesc.MipLevels = 1;
@@ -211,8 +211,8 @@ bool ProceduralGPUGenerator::CreateBuffers(uint32_t maxVertices)
 
     // VBV（VertexBufferView）のセットアップ
     vertexBufferView_.BufferLocation = outputBuffer_->GetGPUVirtualAddress();
-    vertexBufferView_.SizeInBytes = maxVertices * sizeof(BioProcedural::Vertex);
-    vertexBufferView_.StrideInBytes = sizeof(BioProcedural::Vertex);
+    vertexBufferView_.SizeInBytes = maxVertices * sizeof(Sprite::VertexData);
+    vertexBufferView_.StrideInBytes = sizeof(Sprite::VertexData);
 
     // UAV の作成 (構造化バッファとして)
     D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc{};
@@ -220,7 +220,7 @@ bool ProceduralGPUGenerator::CreateBuffers(uint32_t maxVertices)
     uavDesc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
     uavDesc.Buffer.FirstElement = 0;
     uavDesc.Buffer.NumElements = maxVertices;
-    uavDesc.Buffer.StructureByteStride = sizeof(BioProcedural::Vertex);
+    uavDesc.Buffer.StructureByteStride = sizeof(Sprite::VertexData);
     uavDesc.Buffer.Flags = D3D12_BUFFER_UAV_FLAG_NONE;
     device->CreateUnorderedAccessView(outputBuffer_.Get(), nullptr, &uavDesc, uavCpuHandle);
 
@@ -244,14 +244,14 @@ bool ProceduralGPUGenerator::CreateBuffers(uint32_t maxVertices)
     srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
     srvDesc.Buffer.FirstElement = 0;
     srvDesc.Buffer.NumElements = maxVertices;
-    srvDesc.Buffer.StructureByteStride = sizeof(BioProcedural::Vertex);
+    srvDesc.Buffer.StructureByteStride = sizeof(Sprite::VertexData);
     srvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
     device->CreateShaderResourceView(baseMeshSRV_.Get(), &srvDesc, srvCpuHandle);
 
     return true;
 }
 
-bool ProceduralGPUGenerator::SetBaseMesh(const std::vector<BioProcedural::Vertex>& vertices)
+bool ProceduralGPUGenerator::SetBaseMesh(const std::vector<Sprite::VertexData>& vertices)
 {
     if (vertices.empty()) return false;
     assert(vertices.size() <= currentMaxVertices_);
@@ -260,13 +260,13 @@ bool ProceduralGPUGenerator::SetBaseMesh(const std::vector<BioProcedural::Vertex
     auto commandList = dxCom_->GetCommandList();
 
     // 1. アップロードヒープ（中間リソース）の作成
-    Microsoft::WRL::ComPtr<ID3D12Resource> uploadBuffer = dxCom_->CreateBufferResource(device, vertices.size() * sizeof(BioProcedural::Vertex));
+    Microsoft::WRL::ComPtr<ID3D12Resource> uploadBuffer = dxCom_->CreateBufferResource(device, vertices.size() * sizeof(Sprite::VertexData));
 
     // 2. アップロードバッファへ頂点データを書き込む
     void* mapPtr = nullptr;
     HRESULT hr = uploadBuffer->Map(0, nullptr, &mapPtr);
     if (FAILED(hr)) return false;
-    std::memcpy(mapPtr, vertices.data(), vertices.size() * sizeof(BioProcedural::Vertex));
+    std::memcpy(mapPtr, vertices.data(), vertices.size() * sizeof(Sprite::VertexData));
     uploadBuffer->Unmap(0, nullptr);
 
     // 3. コマンドリストでデフォルトヒープへコピー
@@ -278,7 +278,7 @@ bool ProceduralGPUGenerator::SetBaseMesh(const std::vector<BioProcedural::Vertex
     barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_COPY_DEST;
     commandList->ResourceBarrier(1, &barrier);
 
-    commandList->CopyBufferRegion(baseMeshSRV_.Get(), 0, uploadBuffer.Get(), 0, vertices.size() * sizeof(BioProcedural::Vertex));
+    commandList->CopyBufferRegion(baseMeshSRV_.Get(), 0, uploadBuffer.Get(), 0, vertices.size() * sizeof(Sprite::VertexData));
 
     // 状態を NON_PIXEL_SHADER_RESOURCE (CS読み込み用) に遷移
     barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
