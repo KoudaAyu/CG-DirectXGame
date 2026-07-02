@@ -229,19 +229,25 @@ bool ProceduralTreeGPUGenerator::CreateBuffers()
 bool ProceduralTreeGPUGenerator::SetSkeletonData(const std::vector<BioProcedural::GPUBranchesSegment>& segments)
 {
     if (segments.empty()) return false;
-    assert(segments.size() <= kMaxSegments);
+    
+    // 安全クリッピング（最大セグメント数を超えた場合は切り捨ててクラッシュを防ぐ）
+    uint32_t transferSize = (uint32_t)segments.size();
+    if (transferSize > kMaxSegments)
+    {
+        transferSize = kMaxSegments;
+    }
 
     auto device = dxCom_->GetDevice();
     auto commandList = dxCom_->GetCommandList();
 
     // 1. アップロードヒープ（一時バッファ）の作成
-    Microsoft::WRL::ComPtr<ID3D12Resource> uploadBuffer = dxCom_->CreateBufferResource(device, segments.size() * sizeof(BioProcedural::GPUBranchesSegment));
+    Microsoft::WRL::ComPtr<ID3D12Resource> uploadBuffer = dxCom_->CreateBufferResource(device, transferSize * sizeof(BioProcedural::GPUBranchesSegment));
 
     // 2. アップロードヒープへのデータ転送
     void* mapPtr = nullptr;
     HRESULT hr = uploadBuffer->Map(0, nullptr, &mapPtr);
     if (FAILED(hr)) return false;
-    std::memcpy(mapPtr, segments.data(), segments.size() * sizeof(BioProcedural::GPUBranchesSegment));
+    std::memcpy(mapPtr, segments.data(), transferSize * sizeof(BioProcedural::GPUBranchesSegment));
     uploadBuffer->Unmap(0, nullptr);
 
     // 3. コマンドリストを用いたコピー
@@ -252,7 +258,7 @@ bool ProceduralTreeGPUGenerator::SetSkeletonData(const std::vector<BioProcedural
     barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_COPY_DEST;
     commandList->ResourceBarrier(1, &barrier);
 
-    commandList->CopyBufferRegion(skeletonSRV_.Get(), 0, uploadBuffer.Get(), 0, segments.size() * sizeof(BioProcedural::GPUBranchesSegment));
+    commandList->CopyBufferRegion(skeletonSRV_.Get(), 0, uploadBuffer.Get(), 0, transferSize * sizeof(BioProcedural::GPUBranchesSegment));
 
     // CS読み込み用に状態を遷移
     barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
@@ -269,7 +275,9 @@ bool ProceduralTreeGPUGenerator::SetSkeletonData(const std::vector<BioProcedural
 bool ProceduralTreeGPUGenerator::Dispatch(const Vector3& windDirection, float windStrength, float timeValue, uint32_t currentSegments)
 {
     if (!isSkeletonDataTransferred_) return false;
-    assert(currentSegments <= kMaxSegments);
+    
+    // 安全クリップ
+    uint32_t activeSegments = (currentSegments > kMaxSegments) ? kMaxSegments : currentSegments;
 
     auto commandList = dxCom_->GetCommandList();
 
@@ -279,7 +287,7 @@ bool ProceduralTreeGPUGenerator::Dispatch(const Vector3& windDirection, float wi
     cbData.windStrength = windStrength;
     cbData.time = timeValue;
     cbData.maxSegments = kMaxSegments;
-    cbData.currentSegments = currentSegments;
+    cbData.currentSegments = activeSegments;
 
     void* mapPtr = nullptr;
     HRESULT hr = constantBuffer_->Map(0, nullptr, &mapPtr);
