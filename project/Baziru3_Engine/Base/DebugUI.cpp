@@ -456,7 +456,8 @@ void DebugUI::Update()
                     }
                 }
 
-                exportResult = ProceduralGenerator::ExportToObj(exportDirectory, exportFileName, modelData);
+                int mode = (proceduralMode == 2) ? 0 : 1;
+                exportResult = ProceduralGenerator::ExportToObj(exportDirectory, exportFileName, modelData, mode);
                 hasExported = true;
                 hasLODExported = false;
             }

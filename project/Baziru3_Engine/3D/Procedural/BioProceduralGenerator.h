@@ -109,7 +109,7 @@ namespace BioProcedural
         /// <summary>
         /// メッシュデータを標準的なOBJ形式で書き出す (詳細統計結果を返す)
         /// </summary>
-        static ExportResult ExportToObj(const std::string& directoryPath, const std::string& fileName, const MeshData& meshData);
+        static ExportResult ExportToObj(const std::string& directoryPath, const std::string& fileName, const MeshData& meshData, int mode = 1);
 
         /// <summary>
         /// LOD0〜LOD2のメッシュを自動段階削減して一括でエクスポートする

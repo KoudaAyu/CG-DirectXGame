@@ -1118,7 +1118,7 @@ namespace BioProcedural
         return colMesh;
     }
 
-    ExportResult BioProceduralGenerator::ExportToObj(const std::string& directoryPath, const std::string& fileName, const MeshData& meshData)
+    ExportResult BioProceduralGenerator::ExportToObj(const std::string& directoryPath, const std::string& fileName, const MeshData& meshData, int mode)
     {
         ExportResult result;
         result.totalVertices = (uint32_t)meshData.vertices.size();
@@ -1158,16 +1158,6 @@ namespace BioProcedural
         std::string objPath = cleanDir + fileName + ".obj";
         std::string mtlPath = cleanDir + fileName + ".mtl";
         std::string materialName = "ProceduralMaterial";
-
-        int mode = 1; // 1: Rock
-        for (const auto& v : meshData.vertices)
-        {
-            if (v.color.g > 0.5f)
-            {
-                mode = 0; // Tree
-                break;
-            }
-        }
 
         std::string atlasName = fileName + "_atlas.tga";
         std::string atlasPath = cleanDir + atlasName;
@@ -1367,19 +1357,19 @@ namespace BioProcedural
         result.lod2Indices = (uint32_t)lod2Mesh.indices.size();
 
         // 各LODファイルを書き出し
-        ExportResult res0 = ExportToObj(directoryPath, fileName + "_LOD0", lod0Mesh);
+        ExportResult res0 = ExportToObj(directoryPath, fileName + "_LOD0", lod0Mesh, mode);
         if (!res0.success) {
             result.outputMessage = "Failed to export LOD0: " + res0.outputMessage;
             return result;
         }
 
-        ExportResult res1 = ExportToObj(directoryPath, fileName + "_LOD1", lod1Mesh);
+        ExportResult res1 = ExportToObj(directoryPath, fileName + "_LOD1", lod1Mesh, mode);
         if (!res1.success) {
             result.outputMessage = "Failed to export LOD1: " + res1.outputMessage;
             return result;
         }
 
-        ExportResult res2 = ExportToObj(directoryPath, fileName + "_LOD2", lod2Mesh);
+        ExportResult res2 = ExportToObj(directoryPath, fileName + "_LOD2", lod2Mesh, mode);
         if (!res2.success) {
             result.outputMessage = "Failed to export LOD2: " + res2.outputMessage;
             return result;

@@ -84,10 +84,10 @@ Object3d::ModelData ProceduralGenerator::GenerateTree(const TreeParameters& para
 }
 
 // --- エクスポート機能のアダプター ---
-BioProcedural::ExportResult ProceduralGenerator::ExportToObj(const std::string& directoryPath, const std::string& fileName, const Object3d::ModelData& modelData)
+BioProcedural::ExportResult ProceduralGenerator::ExportToObj(const std::string& directoryPath, const std::string& fileName, const Object3d::ModelData& modelData, int mode)
 {
     BioProcedural::MeshData bMeshData = ConvertToMeshData(modelData);
-    return BioProcedural::BioProceduralGenerator::ExportToObj(directoryPath, fileName, bMeshData);
+    return BioProcedural::BioProceduralGenerator::ExportToObj(directoryPath, fileName, bMeshData, mode);
 }
 
 // --- LOD一括エクスポート機能のアダプター ---

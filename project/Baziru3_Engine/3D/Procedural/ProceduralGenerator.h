@@ -54,7 +54,7 @@ public:
     /// <summary>
     /// 現在のモデルデータをOBJ形式でエクスポートする
     /// </summary>
-    static BioProcedural::ExportResult ExportToObj(const std::string& directoryPath, const std::string& fileName, const Object3d::ModelData& modelData);
+    static BioProcedural::ExportResult ExportToObj(const std::string& directoryPath, const std::string& fileName, const Object3d::ModelData& modelData, int mode = 1);
 
     /// <summary>
     /// LOD0〜LOD2のメッシュを自動段階削減して一括でエクスポートする
