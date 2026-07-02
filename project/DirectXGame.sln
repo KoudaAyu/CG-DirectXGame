@@ -1,4 +1,4 @@
-﻿
+
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.13.35931.197
@@ -40,8 +40,8 @@ Global
 		{371B9FA9-4C90-4AC6-A123-ACED756D6C77}.Release|x64.Build.0 = Release|x64
 		{24C0D8C4-F20F-401F-9504-CFAC18C13858}.Debug|x64.ActiveCfg = Debug|x64
 		{24C0D8C4-F20F-401F-9504-CFAC18C13858}.Debug|x64.Build.0 = Debug|x64
-		{24C0D8C4-F20F-401F-9504-CFAC18C13858}.Development|x64.ActiveCfg = Release|x64
-		{24C0D8C4-F20F-401F-9504-CFAC18C13858}.Development|x64.Build.0 = Release|x64
+		{24C0D8C4-F20F-401F-9504-CFAC18C13858}.Development|x64.ActiveCfg = Debug|x64
+		{24C0D8C4-F20F-401F-9504-CFAC18C13858}.Development|x64.Build.0 = Debug|x64
 		{24C0D8C4-F20F-401F-9504-CFAC18C13858}.Release|x64.ActiveCfg = Release|x64
 		{24C0D8C4-F20F-401F-9504-CFAC18C13858}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
