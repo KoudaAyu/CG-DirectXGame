@@ -2,7 +2,6 @@ struct Vertex {
     float4 position; // Offset 0
     float2 texcoord; // Offset 16
     float3 normal;   // Offset 24
-    float padding;   // Offset 36 (Total 40 bytes)
 };
 
 struct BranchSegment {
@@ -86,14 +85,12 @@ void main(uint3 DTid : SV_DispatchThreadID)
         gOutVertices[vIndexStart].position = float4(start + ringDir * seg.startRadius, 1.0f);
         gOutVertices[vIndexStart].normal = ringDir;
         gOutVertices[vIndexStart].texcoord = float2((float)i / (float)radialSegments, 0.0f);
-        gOutVertices[vIndexStart].padding = 0.0f;
 
         // endPos側 (頂点 9〜17)
         uint vIndexEnd = branchVertexOffset + radialSegments + 1 + i;
         gOutVertices[vIndexEnd].position = float4(end + ringDir * seg.endRadius, 1.0f);
         gOutVertices[vIndexEnd].normal = ringDir;
         gOutVertices[vIndexEnd].texcoord = float2((float)i / (float)radialSegments, 1.0f);
-        gOutVertices[vIndexEnd].padding = 0.0f;
     }
 
     // --- 2. 葉（Crossed Quad）の頂点生成 ---
@@ -161,7 +158,6 @@ void main(uint3 DTid : SV_DispatchThreadID)
         for (uint k = 0; k < 8; ++k)
         {
             gOutVertices[baseV + k].normal = norm;
-            gOutVertices[baseV + k].padding = 0.0f;
         }
     }
 }
