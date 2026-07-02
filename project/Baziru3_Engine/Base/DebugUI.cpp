@@ -24,7 +24,7 @@ void DebugUI::Initialize()
     treeParams.branchLength = 1.0f;
     treeParams.branchRadius = 0.05f;
     treeParams.taperRate = 0.8f;
-    treeParams.angle = 25.0f;
+    treeParams.angle = 35.0f;
     treeParams.axiom = "X";
     treeParams.seed = 12345;
 
@@ -381,7 +381,7 @@ void DebugUI::Update()
                 treeParams.branchLength = 1.0f;
                 treeParams.branchRadius = 0.05f;
                 treeParams.taperRate = 0.8f;
-                treeParams.angle = 25.0f;
+                treeParams.angle = 35.0f;
                 treeParams.axiom = "X";
                 treeParams.seed = 12345;
             }
