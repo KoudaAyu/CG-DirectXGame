@@ -153,8 +153,9 @@ namespace BioProcedural
         std::mt19937 rand(seed);
         std::uniform_real_distribution<float> dist(-1.0f, 1.0f);
 
-        std::vector<Vec3> centers(cellCount);
-        for (int i = 0; i < cellCount; ++i)
+        int actualCells = std::min(50, cellCount);
+        Vec3 centers[50];
+        for (int i = 0; i < actualCells; ++i)
         {
             centers[i] = { dist(rand), dist(rand), dist(rand) };
         }
@@ -162,7 +163,7 @@ namespace BioProcedural
         Vec3 pos = { x, y, z };
         float minDist = 1e10f;
 
-        for (int i = 0; i < cellCount; ++i)
+        for (int i = 0; i < actualCells; ++i)
         {
             float dx = pos.x - centers[i].x;
             float dy = pos.y - centers[i].y;
@@ -518,12 +519,13 @@ namespace BioProcedural
 
         for (char c : currentString)
         {
+            if (segmentCount >= kMaxSegments)
+            {
+                break;
+            }
+
             if (c == 'F')
             {
-                if (segmentCount >= kMaxSegments)
-                {
-                    break;
-                }
                 segmentCount++;
                 // 【就活強化点: 枝のノイズによる有機的うねり(曲がり)】
                 // 3Dバリューノイズにより、枝の成長方向にわずかにゆらぎを与えてクネクネと曲がらせる
