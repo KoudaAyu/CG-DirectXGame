@@ -590,10 +590,10 @@ void DebugUI::Update()
                                 int radialSegments = 8;
                                 for (int i = 0; i < radialSegments; ++i)
                                 {
-                                    uint32_t i0 = baseV + i * 2;
-                                    uint32_t i1 = i0 + 1;
-                                    uint32_t i2 = baseV + (i + 1) * 2;
-                                    uint32_t i3 = i2 + 1;
+                                    uint32_t i0 = baseV + i;
+                                    uint32_t i1 = baseV + 9 + i;
+                                    uint32_t i2 = baseV + i + 1;
+                                    uint32_t i3 = baseV + 9 + i + 1;
 
                                     dummyMesh.indices.push_back(i0);
                                     dummyMesh.indices.push_back(i1);

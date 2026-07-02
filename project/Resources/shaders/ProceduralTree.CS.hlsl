@@ -108,7 +108,8 @@ void main(uint3 DTid : SV_DispatchThreadID)
 
     // 葉を4枚配置（4枚の Crossed Quad = 4枚 * 2Quad (8頂点) = 32頂点）
     float3 leafCenter = end;
-    float leafSize = 0.5f;
+    float branchLen = length(seg.endPos - seg.startPos);
+    float leafSize = branchLen * 0.35f;
 
     float3 leafNormals[4] = {
         float3(1, 0, 0),
