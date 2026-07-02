@@ -120,7 +120,7 @@ namespace BioProcedural
             int mode, // 0: Tree, 1: Rock
             const TreeParameters& treeParams,
             const RockParameters& rockParams,
-            const std::vector<Vertex>& lod0GpuVertices = {}
+            const MeshData& lod0BaseMesh
         );
 
     private:

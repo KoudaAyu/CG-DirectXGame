@@ -97,7 +97,7 @@ BioProcedural::LODExportResult ProceduralGenerator::ExportLODsToObj(
     int mode, 
     const TreeParameters& treeParams,
     const RockParameters& rockParams,
-    const std::vector<Sprite::VertexData>& lod0GpuVertices
+    const Object3d::ModelData& lod0ModelData
 )
 {
     BioProcedural::TreeParameters bTreeParams;
@@ -125,17 +125,7 @@ BioProcedural::LODExportResult ProceduralGenerator::ExportLODsToObj(
     bRockParams.crackFrequency = rockParams.crackFrequency;
     bRockParams.seed = rockParams.seed;
 
-    std::vector<BioProcedural::Vertex> bGpuVertices;
-    bGpuVertices.reserve(lod0GpuVertices.size());
-    for (const auto& sVert : lod0GpuVertices)
-    {
-        BioProcedural::Vertex dVert{};
-        dVert.position = { sVert.position.x, sVert.position.y, sVert.position.z };
-        dVert.normal = { sVert.normal.x, sVert.normal.y, sVert.normal.z };
-        dVert.texcoord = { sVert.texcoord.x, sVert.texcoord.y };
-        dVert.color = { 0.0f, 0.0f, 0.0f, 1.0f };
-        bGpuVertices.push_back(dVert);
-    }
+    BioProcedural::MeshData bLod0Mesh = ConvertToMeshData(lod0ModelData);
 
-    return BioProcedural::BioProceduralGenerator::ExportLODsToObj(directoryPath, fileName, mode, bTreeParams, bRockParams, bGpuVertices);
+    return BioProcedural::BioProceduralGenerator::ExportLODsToObj(directoryPath, fileName, mode, bTreeParams, bRockParams, bLod0Mesh);
 }

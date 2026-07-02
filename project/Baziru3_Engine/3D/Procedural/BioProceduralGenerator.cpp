@@ -945,28 +945,18 @@ namespace BioProcedural
         int mode, 
         const TreeParameters& treeParams,
         const RockParameters& rockParams,
-        const std::vector<Vertex>& lod0GpuVertices
+        const MeshData& lod0BaseMesh
     )
     {
         LODExportResult result;
         result.success = false;
 
-        MeshData lod0Mesh;
+        MeshData lod0Mesh = lod0BaseMesh;
         MeshData lod1Mesh;
         MeshData lod2Mesh;
 
         if (mode == 0) // Tree
         {
-            // LOD0
-            lod0Mesh = GenerateTree(treeParams);
-            
-            if (!lod0GpuVertices.empty())
-            {
-                for (size_t i = 0; i < lod0Mesh.vertices.size() && i < lod0GpuVertices.size(); ++i)
-                {
-                    lod0Mesh.vertices[i] = lod0GpuVertices[i];
-                }
-            }
             
             // LOD1
             TreeParameters params1 = treeParams;

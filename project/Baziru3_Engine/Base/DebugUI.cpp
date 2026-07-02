@@ -471,17 +471,34 @@ void DebugUI::Update()
         ImGui::SameLine();
         if (ImGui::Button("Export LODs (Batch)"))
         {
-            int mode = (proceduralMode == 2) ? 0 : 1;
-            
-            std::vector<Sprite::VertexData> gpuVertices;
-            if (proceduralMode == 2 && isGpuTreeGeneratorInitialized)
+            if (targetObject3d_)
             {
-                gpuTreeGenerator.ReadbackVertices(gpuVertices);
-            }
+                int mode = (proceduralMode == 2) ? 0 : 1;
+                Object3d::ModelData modelData = targetObject3d_->GetModelData();
+                
+                if (proceduralMode == 2 && isGpuTreeGeneratorInitialized)
+                {
+                    std::vector<Sprite::VertexData> gpuVertices;
+                    if (gpuTreeGenerator.ReadbackVertices(gpuVertices))
+                    {
+                        for (size_t i = 0; i < modelData.vertices.size() && i < gpuVertices.size(); ++i)
+                        {
+                            modelData.vertices[i] = gpuVertices[i];
+                        }
+                    }
+                }
 
-            lodExportResult = ProceduralGenerator::ExportLODsToObj(exportDirectory, exportFileName, mode, treeParams, rockParams, gpuVertices);
-            hasLODExported = true;
-            hasExported = false;
+                lodExportResult = ProceduralGenerator::ExportLODsToObj(exportDirectory, exportFileName, mode, treeParams, rockParams, modelData);
+                hasLODExported = true;
+                hasExported = false;
+            }
+            else
+            {
+                lodExportResult.success = false;
+                lodExportResult.outputMessage = "Error: No target model data.";
+                hasLODExported = true;
+                hasExported = false;
+            }
         }
         
         if (hasExported)

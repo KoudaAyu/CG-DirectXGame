@@ -60,11 +60,11 @@ public:
     /// LOD0〜LOD2のメッシュを自動段階削減して一括でエクスポートする
     /// </summary>
     static BioProcedural::LODExportResult ExportLODsToObj(
-        const std::string& directoryPath, 
-        const std::string& fileName, 
-        int mode, // 0: Tree, 1: Rock
-        const TreeParameters& treeParams,
-        const RockParameters& rockParams,
-        const std::vector<Sprite::VertexData>& lod0GpuVertices = {}
-    );
+         const std::string& directoryPath, 
+         const std::string& fileName, 
+         int mode, // 0: Tree, 1: Rock
+         const TreeParameters& treeParams,
+         const RockParameters& rockParams,
+         const Object3d::ModelData& lod0ModelData
+     );
 };
