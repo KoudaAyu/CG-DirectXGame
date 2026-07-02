@@ -25,7 +25,7 @@ void DebugUI::Initialize()
     treeParams.branchRadius = 0.05f;
     treeParams.taperRate = 0.8f;
     treeParams.angle = 25.0f;
-    treeParams.axiom = "F";
+    treeParams.axiom = "X";
     treeParams.seed = 12345;
 
     // 岩石パラメータの初期値
@@ -384,6 +384,14 @@ void DebugUI::Update()
                 {
                     targetObject3d_->SetColor({ 0.55f, 0.35f, 0.17f, 1.0f });
                 }
+                // 木らしい比率と分岐に自動リセット
+                treeParams.iterations = 4;
+                treeParams.branchLength = 1.0f;
+                treeParams.branchRadius = 0.05f;
+                treeParams.taperRate = 0.8f;
+                treeParams.angle = 25.0f;
+                treeParams.axiom = "X";
+                treeParams.seed = 12345;
             }
         }
     }
