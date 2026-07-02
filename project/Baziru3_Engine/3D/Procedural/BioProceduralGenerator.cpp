@@ -539,11 +539,11 @@ namespace BioProcedural
         };
 
         size_t segmentCount = 0;
-        const size_t kMaxSegments = 2000;
+        size_t leafCount = 0;
 
         for (char c : currentString)
         {
-            if (segmentCount >= kMaxSegments)
+            if (segmentCount >= (size_t)params.maxSegments)
             {
                 break;
             }
@@ -586,12 +586,20 @@ namespace BioProcedural
 
                 if (turtle.radius < params.branchRadius * 0.6f)
                 {
-                    BuildLeaf(turtle.position, params.branchLength * 0.35f, turtle, rand);
+                    if (leafCount < (size_t)params.maxLeaves)
+                    {
+                        BuildLeaf(turtle.position, params.branchLength * 0.35f, turtle, rand);
+                        leafCount++;
+                    }
                 }
             }
             else if (c == 'X')
             {
-                BuildLeaf(turtle.position, params.branchLength * 0.4f, turtle, rand);
+                if (leafCount < (size_t)params.maxLeaves)
+                {
+                    BuildLeaf(turtle.position, params.branchLength * 0.4f, turtle, rand);
+                    leafCount++;
+                }
             }
             else if (c == '+')
             {
@@ -949,12 +957,16 @@ namespace BioProcedural
             TreeParameters params1 = treeParams;
             params1.iterations = std::max(1, treeParams.iterations - 1);
             params1.radialSegments = std::max(4, treeParams.radialSegments - 2);
+            params1.maxSegments = std::max(100, treeParams.maxSegments / 2);
+            params1.maxLeaves = std::max(50, treeParams.maxLeaves / 2);
             lod1Mesh = GenerateTree(params1);
 
             // LOD2
             TreeParameters params2 = treeParams;
             params2.iterations = std::max(1, treeParams.iterations - 2);
             params2.radialSegments = std::max(4, treeParams.radialSegments - 4);
+            params2.maxSegments = std::max(50, treeParams.maxSegments / 4);
+            params2.maxLeaves = std::max(20, treeParams.maxLeaves / 5);
             lod2Mesh = GenerateTree(params2);
         }
         else // Rock

@@ -75,6 +75,8 @@ Object3d::ModelData ProceduralGenerator::GenerateTree(const TreeParameters& para
     bParams.axiom = params.axiom;
     bParams.seed = params.seed;
     bParams.radialSegments = params.radialSegments;
+    bParams.maxSegments = params.maxSegments;
+    bParams.maxLeaves = params.maxLeaves;
 
     BioProcedural::MeshData bMeshData = BioProcedural::BioProceduralGenerator::GenerateTree(bParams);
     return ConvertToModelData(bMeshData);
@@ -105,6 +107,8 @@ BioProcedural::LODExportResult ProceduralGenerator::ExportLODsToObj(
     bTreeParams.axiom = treeParams.axiom;
     bTreeParams.seed = treeParams.seed;
     bTreeParams.radialSegments = treeParams.radialSegments;
+    bTreeParams.maxSegments = treeParams.maxSegments;
+    bTreeParams.maxLeaves = treeParams.maxLeaves;
 
     BioProcedural::RockParameters bRockParams;
     bRockParams.scale = rockParams.scale;

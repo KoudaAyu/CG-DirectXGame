@@ -36,6 +36,8 @@ public:
         std::string axiom = "X";     // 初期記号 (Axiom)
         unsigned int seed = 54321;   // ランダムシード値
         int radialSegments = 8;      // 枝の円柱分割数 (LOD制御用)
+        int maxSegments = 2000;      // 枝の最大生成数
+        int maxLeaves = 1000;        // 葉の最大生成数
     };
 
     /// <summary>
