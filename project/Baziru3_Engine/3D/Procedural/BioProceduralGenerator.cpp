@@ -6,6 +6,7 @@
 #include <fstream>
 #include <filesystem>
 #include <sstream>
+#include <charconv>
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846f
@@ -16,6 +17,18 @@ namespace BioProcedural
     // --- ユーティリティ数学関数 ---
     namespace
     {
+        // floatを小数点以下4桁固定で高速書き出し
+        inline char* WriteFloatToBuf(char* ptr, float val)
+        {
+            auto res = std::to_chars(ptr, ptr + 32, val, std::chars_format::fixed, 4);
+            if (res.ec == std::errc())
+            {
+                return res.ptr;
+            }
+            int len = sprintf_s(ptr, 32, "%.4f", val);
+            return ptr + len;
+        }
+
         // ベクトルの正規化
         Vec3 NormalizeVec3(const Vec3& v)
         {
@@ -896,27 +909,52 @@ namespace BioProcedural
         buffer += "# Bio-Authoring Studio Procedural Mesh with Vertex Color\n";
         buffer += "mtllib " + fileName + ".mtl\n\n";
 
-        char temp[256];
         for (const auto& v : meshData.vertices)
         {
-            int len = std::snprintf(temp, sizeof(temp), "v %.6f %.6f %.6f %.4f %.4f %.4f\n",
-                v.position.x, v.position.y, v.position.z,
-                v.color.r, v.color.g, v.color.b);
-            buffer.append(temp, len);
+            buffer += "v ";
+            char temp[128];
+            char* ptr = temp;
+            ptr = WriteFloatToBuf(ptr, v.position.x);
+            *ptr++ = ' ';
+            ptr = WriteFloatToBuf(ptr, v.position.y);
+            *ptr++ = ' ';
+            ptr = WriteFloatToBuf(ptr, v.position.z);
+            *ptr++ = ' ';
+            ptr = WriteFloatToBuf(ptr, v.color.r);
+            *ptr++ = ' ';
+            ptr = WriteFloatToBuf(ptr, v.color.g);
+            *ptr++ = ' ';
+            ptr = WriteFloatToBuf(ptr, v.color.b);
+            *ptr++ = '\n';
+            buffer.append(temp, ptr - temp);
         }
         buffer += "\n";
 
         for (const auto& v : meshData.vertices)
         {
-            int len = std::snprintf(temp, sizeof(temp), "vt %.6f %.6f\n", v.texcoord.u, v.texcoord.v);
-            buffer.append(temp, len);
+            buffer += "vt ";
+            char temp[64];
+            char* ptr = temp;
+            ptr = WriteFloatToBuf(ptr, v.texcoord.u);
+            *ptr++ = ' ';
+            ptr = WriteFloatToBuf(ptr, v.texcoord.v);
+            *ptr++ = '\n';
+            buffer.append(temp, ptr - temp);
         }
         buffer += "\n";
 
         for (const auto& v : meshData.vertices)
         {
-            int len = std::snprintf(temp, sizeof(temp), "vn %.6f %.6f %.6f\n", v.normal.x, v.normal.y, v.normal.z);
-            buffer.append(temp, len);
+            buffer += "vn ";
+            char temp[96];
+            char* ptr = temp;
+            ptr = WriteFloatToBuf(ptr, v.normal.x);
+            *ptr++ = ' ';
+            ptr = WriteFloatToBuf(ptr, v.normal.y);
+            *ptr++ = ' ';
+            ptr = WriteFloatToBuf(ptr, v.normal.z);
+            *ptr++ = '\n';
+            buffer.append(temp, ptr - temp);
         }
         buffer += "\n";
 
@@ -928,11 +966,32 @@ namespace BioProcedural
             uint32_t idx1 = meshData.indices[i + 1] + 1;
             uint32_t idx2 = meshData.indices[i + 2] + 1;
 
-            int len = std::snprintf(temp, sizeof(temp), "f %u/%u/%u %u/%u/%u %u/%u/%u\n",
-                idx0, idx0, idx0,
-                idx1, idx1, idx1,
-                idx2, idx2, idx2);
-            buffer.append(temp, len);
+            buffer += "f ";
+            char temp[128];
+            char* ptr = temp;
+            
+            auto r = std::to_chars(ptr, ptr + 16, idx0); ptr = r.ptr;
+            *ptr++ = '/';
+            r = std::to_chars(ptr, ptr + 16, idx0); ptr = r.ptr;
+            *ptr++ = '/';
+            r = std::to_chars(ptr, ptr + 16, idx0); ptr = r.ptr;
+            *ptr++ = ' ';
+
+            r = std::to_chars(ptr, ptr + 16, idx1); ptr = r.ptr;
+            *ptr++ = '/';
+            r = std::to_chars(ptr, ptr + 16, idx1); ptr = r.ptr;
+            *ptr++ = '/';
+            r = std::to_chars(ptr, ptr + 16, idx1); ptr = r.ptr;
+            *ptr++ = ' ';
+
+            r = std::to_chars(ptr, ptr + 16, idx2); ptr = r.ptr;
+            *ptr++ = '/';
+            r = std::to_chars(ptr, ptr + 16, idx2); ptr = r.ptr;
+            *ptr++ = '/';
+            r = std::to_chars(ptr, ptr + 16, idx2); ptr = r.ptr;
+            *ptr++ = '\n';
+
+            buffer.append(temp, ptr - temp);
         }
 
         std::ofstream objFile(objPath, std::ios::out | std::ios::binary);
