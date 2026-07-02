@@ -5,6 +5,7 @@
 #include <string>
 #include "BioProceduralGenerator.h"
 #include "Vector.h"
+#include "Sprite.h"
 
 class DirectXCom;
 
@@ -47,6 +48,11 @@ public:
     /// </summary>
     D3D12_VERTEX_BUFFER_VIEW GetVertexBufferView() const { return vertexBufferView_; }
     
+    /// <summary>
+    /// GPUで生成された頂点データをCPU側バッファに読み戻す (Readback)
+    /// </summary>
+    bool ReadbackVertices(std::vector<Sprite::VertexData>& outVertices);
+
     /// <summary>
     /// 出力バッファリソース自体のポインタを取得
     /// </summary>

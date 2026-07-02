@@ -338,3 +338,63 @@ bool ProceduralTreeGPUGenerator::Dispatch(const Vector3& windDirection, float wi
 
     return true;
 }
+
+bool ProceduralTreeGPUGenerator::ReadbackVertices(std::vector<Sprite::VertexData>& outVertices)
+{
+    if (!outputBuffer_) return false;
+
+    UINT64 bufferSize = kMaxVertices * sizeof(Sprite::VertexData);
+    
+    Microsoft::WRL::ComPtr<ID3D12Resource> readbackBuffer;
+    
+    D3D12_HEAP_PROPERTIES heapProps{};
+    heapProps.Type = D3D12_HEAP_TYPE_READBACK;
+    
+    D3D12_RESOURCE_DESC desc{};
+    desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+    desc.Width = bufferSize;
+    desc.Height = 1;
+    desc.DepthOrArraySize = 1;
+    desc.MipLevels = 1;
+    desc.Format = DXGI_FORMAT_UNKNOWN;
+    desc.SampleDesc.Count = 1;
+    desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+    
+    HRESULT hr = dxCom_->GetDevice()->CreateCommittedResource(
+        &heapProps,
+        D3D12_HEAP_FLAG_NONE,
+        &desc,
+        D3D12_RESOURCE_STATE_COPY_DEST,
+        nullptr,
+        IID_PPV_ARGS(&readbackBuffer)
+    );
+    if (FAILED(hr)) return false;
+
+    auto commandList = dxCom_->GetCommandList();
+
+    D3D12_RESOURCE_BARRIER barrier{};
+    barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+    barrier.Transition.pResource = outputBuffer_.Get();
+    barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER;
+    barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_COPY_SOURCE;
+    barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+    commandList->ResourceBarrier(1, &barrier);
+
+    commandList->CopyResource(readbackBuffer.Get(), outputBuffer_.Get());
+
+    barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_SOURCE;
+    barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER;
+    commandList->ResourceBarrier(1, &barrier);
+
+    dxCom_->ExecuteAndWaitForGPU();
+
+    void* mapPtr = nullptr;
+    hr = readbackBuffer->Map(0, nullptr, &mapPtr);
+    if (FAILED(hr)) return false;
+
+    outVertices.resize(kMaxVertices);
+    std::memcpy(outVertices.data(), mapPtr, bufferSize);
+    readbackBuffer->Unmap(0, nullptr);
+
+    return true;
+}

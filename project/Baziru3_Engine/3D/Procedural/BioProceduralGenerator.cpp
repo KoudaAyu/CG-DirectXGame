@@ -944,7 +944,8 @@ namespace BioProcedural
         const std::string& fileName, 
         int mode, 
         const TreeParameters& treeParams,
-        const RockParameters& rockParams
+        const RockParameters& rockParams,
+        const std::vector<Vertex>& lod0GpuVertices
     )
     {
         LODExportResult result;
@@ -958,6 +959,14 @@ namespace BioProcedural
         {
             // LOD0
             lod0Mesh = GenerateTree(treeParams);
+            
+            if (!lod0GpuVertices.empty())
+            {
+                for (size_t i = 0; i < lod0Mesh.vertices.size() && i < lod0GpuVertices.size(); ++i)
+                {
+                    lod0Mesh.vertices[i] = lod0GpuVertices[i];
+                }
+            }
             
             // LOD1
             TreeParameters params1 = treeParams;

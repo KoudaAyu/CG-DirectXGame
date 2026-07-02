@@ -64,6 +64,7 @@ public:
         const std::string& fileName, 
         int mode, // 0: Tree, 1: Rock
         const TreeParameters& treeParams,
-        const RockParameters& rockParams
+        const RockParameters& rockParams,
+        const std::vector<Sprite::VertexData>& lod0GpuVertices = {}
     );
 };

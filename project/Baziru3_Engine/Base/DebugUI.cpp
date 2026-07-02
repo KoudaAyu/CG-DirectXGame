@@ -442,7 +442,21 @@ void DebugUI::Update()
         {
             if (targetObject3d_)
             {
-                exportResult = ProceduralGenerator::ExportToObj(exportDirectory, exportFileName, targetObject3d_->GetModelData());
+                Object3d::ModelData modelData = targetObject3d_->GetModelData();
+                
+                if (proceduralMode == 2 && isGpuTreeGeneratorInitialized)
+                {
+                    std::vector<Sprite::VertexData> gpuVertices;
+                    if (gpuTreeGenerator.ReadbackVertices(gpuVertices))
+                    {
+                        for (size_t i = 0; i < modelData.vertices.size() && i < gpuVertices.size(); ++i)
+                        {
+                            modelData.vertices[i] = gpuVertices[i];
+                        }
+                    }
+                }
+
+                exportResult = ProceduralGenerator::ExportToObj(exportDirectory, exportFileName, modelData);
                 hasExported = true;
                 hasLODExported = false;
             }
@@ -458,7 +472,14 @@ void DebugUI::Update()
         if (ImGui::Button("Export LODs (Batch)"))
         {
             int mode = (proceduralMode == 2) ? 0 : 1;
-            lodExportResult = ProceduralGenerator::ExportLODsToObj(exportDirectory, exportFileName, mode, treeParams, rockParams);
+            
+            std::vector<Sprite::VertexData> gpuVertices;
+            if (proceduralMode == 2 && isGpuTreeGeneratorInitialized)
+            {
+                gpuTreeGenerator.ReadbackVertices(gpuVertices);
+            }
+
+            lodExportResult = ProceduralGenerator::ExportLODsToObj(exportDirectory, exportFileName, mode, treeParams, rockParams, gpuVertices);
             hasLODExported = true;
             hasExported = false;
         }
