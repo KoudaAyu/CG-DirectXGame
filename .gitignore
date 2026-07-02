@@ -339,7 +339,6 @@ imgui.ini
 !/project/externals/assimp/lib/Debug/
 !/project/externals/assimp/lib/Debug/assimp-vc143-mtd.lib
 !/project/externals/assimp/lib/Debug/assimp-vc143-mdd.lib
-!/project/externals/assimp/lib/Debug/assimp-vc143-mtd.pdb
 !/project/externals/assimp/lib/Release/
 !/project/externals/assimp/lib/Release/assimp-vc143-mt.lib
 !/project/externals/assimp/lib/Release/assimp-vc143-md.lib
