@@ -121,54 +121,53 @@ void main(uint3 DTid : SV_DispatchThreadID)
     float branchLen = length(seg.endPos - seg.startPos);
     float leafSize = branchLen * 0.35f;
 
-    float3 leafNormals[4] = {
-        float3(1, 0, 0),
-        float3(0, 0, 1),
-        float3(0.707, 0, 0.707),
-        float3(-0.707, 0, 0.707)
-    };
-
     for (uint leafIdx = 0; leafIdx < 4; ++leafIdx)
     {
-        float3 norm = leafNormals[leafIdx];
-        float angleOffset = (float)leafIdx * 3.14159265f / 4.0f;
-        float3 leafRight = deformRight * cos(angleOffset) + deformUp * sin(angleOffset);
-        float3 leafUp = dir; // 枝の伸びる方向
+        float rollAngleRad = (float)leafIdx * 3.14159265f / 4.0f;
+        float3 rightVec = normalize(deformRight);
+        float3 upVec = normalize(deformUp);
+
+        // Rodrigues' rotation formula to rotate right/up vectors around dir axis
+        float cRoll = cos(rollAngleRad);
+        float sRoll = sin(rollAngleRad);
+        float3 rotRight = rightVec * cRoll + cross(dir, rightVec) * sRoll + dir * dot(dir, rightVec) * (1.0f - cRoll);
+        float3 rotUp = upVec * cRoll + cross(dir, upVec) * sRoll + dir * dot(dir, upVec) * (1.0f - cRoll);
 
         uint baseV = leafVertexOffset + leafIdx * 8;
-        
-        // Crossed Quad 1 (4頂点)
-        gOutVertices[baseV + 0].position = float4(leafCenter + (-leafRight - leafUp) * leafSize * 0.5f, 1.0f);
-        gOutVertices[baseV + 0].texcoord = float2(0.0f, 1.0f);
-        
-        gOutVertices[baseV + 1].position = float4(leafCenter + (-leafRight + leafUp) * leafSize * 0.5f, 1.0f);
-        gOutVertices[baseV + 1].texcoord = float2(0.0f, 0.0f);
-        
-        gOutVertices[baseV + 2].position = float4(leafCenter + (leafRight - leafUp) * leafSize * 0.5f, 1.0f);
-        gOutVertices[baseV + 2].texcoord = float2(1.0f, 1.0f);
-        
-        gOutVertices[baseV + 3].position = float4(leafCenter + (leafRight + leafUp) * leafSize * 0.5f, 1.0f);
-        gOutVertices[baseV + 3].texcoord = float2(1.0f, 0.0f);
 
-        // Crossed Quad 2 (直交、4頂点)
-        float3 leafRightOrtho = cross(leafRight, leafUp);
-        
-        gOutVertices[baseV + 4].position = float4(leafCenter + (-leafRightOrtho - leafUp) * leafSize * 0.5f, 1.0f);
-        gOutVertices[baseV + 4].texcoord = float2(0.0f, 1.0f);
-        
-        gOutVertices[baseV + 5].position = float4(leafCenter + (-leafRightOrtho + leafUp) * leafSize * 0.5f, 1.0f);
-        gOutVertices[baseV + 5].texcoord = float2(0.0f, 0.0f);
-        
-        gOutVertices[baseV + 6].position = float4(leafCenter + (leafRightOrtho - leafUp) * leafSize * 0.5f, 1.0f);
-        gOutVertices[baseV + 6].texcoord = float2(1.0f, 1.0f);
-        
-        gOutVertices[baseV + 7].position = float4(leafCenter + (leafRightOrtho + leafUp) * leafSize * 0.5f, 1.0f);
-        gOutVertices[baseV + 7].texcoord = float2(1.0f, 0.0f);
-
-        // 共通設定
-        for (uint k = 0; k < 8; ++k)
+        for (uint quadIdx = 0; quadIdx < 2; ++quadIdx)
         {
-            gOutVertices[baseV + k].normal = norm;
+            float rotAngleRad = (float)quadIdx * 3.14159265f / 2.0f;
+            float cQ = cos(rotAngleRad);
+            float sQ = sin(rotAngleRad);
+            float3 qRight = rotRight * cQ + cross(dir, rotRight) * sQ + dir * dot(dir, rotRight) * (1.0f - cQ);
+            float3 qUp = rotUp * cQ + cross(dir, rotUp) * sQ + dir * dot(dir, rotUp) * (1.0f - cQ);
+
+            // Compute precise quad vertices matching CPU layout (left-bottom, right-bottom, right-top, left-top)
+            float3 p0 = leafCenter - qRight * leafSize - qUp * leafSize;
+            float3 p1 = leafCenter + qRight * leafSize - qUp * leafSize;
+            float3 p2 = leafCenter + qRight * leafSize + qUp * leafSize;
+            float3 p3 = leafCenter - qRight * leafSize + qUp * leafSize;
+
+            float3 normal = normalize(cross(qRight, qUp));
+
+            uint qOffset = baseV + quadIdx * 4;
+
+            gOutVertices[qOffset + 0].position = float4(p0, 1.0f);
+            gOutVertices[qOffset + 0].texcoord = float2(0.0f, 0.0f);
+            gOutVertices[qOffset + 0].normal = normal;
+
+            gOutVertices[qOffset + 1].position = float4(p1, 1.0f);
+            gOutVertices[qOffset + 1].texcoord = float2(0.1f, 0.0f);
+            gOutVertices[qOffset + 1].normal = normal;
+
+            gOutVertices[qOffset + 2].position = float4(p2, 1.0f);
+            gOutVertices[qOffset + 2].texcoord = float2(0.1f, 0.1f);
+            gOutVertices[qOffset + 2].normal = normal;
+
+            gOutVertices[qOffset + 3].position = float4(p3, 1.0f);
+            gOutVertices[qOffset + 3].texcoord = float2(0.0f, 0.1f);
+            gOutVertices[qOffset + 3].normal = normal;
         }
     }
 }

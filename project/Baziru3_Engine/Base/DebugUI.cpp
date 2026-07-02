@@ -376,14 +376,6 @@ void DebugUI::Update()
             }
             else if (proceduralMode == 2) // Tree
             {
-                if (materialManager_)
-                {
-                    materialManager_->GetMaterialDataColor() = { 0.55f, 0.35f, 0.17f, 1.0f };
-                }
-                if (targetObject3d_)
-                {
-                    targetObject3d_->SetColor({ 0.55f, 0.35f, 0.17f, 1.0f });
-                }
                 // 木らしい比率と分岐に自動リセット
                 treeParams.iterations = 4;
                 treeParams.branchLength = 1.0f;
@@ -706,9 +698,7 @@ void DebugUI::Update()
                             }
                             
                             dummyMesh.material = originalModelData.material;
-                            dummyMesh.material.textureFilePath = "Resources/checkerBoard.png";
                             targetObject3d_->UpdateModelData(dummyMesh);
-                            targetObject3d_->SetColor({ 0.55f, 0.35f, 0.17f, 1.0f });
                             isTreeDummyMeshCreated = true;
                         }
                         
