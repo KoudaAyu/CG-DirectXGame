@@ -341,10 +341,10 @@ namespace BioProcedural
             else if (c == 'X') numX++;
         }
 
-        // 1つのF（枝シリンダー）＝18頂点、48インデックス
+        // 1つのF（枝シリンダー）＝(radialSegments+1)*2 頂点、radialSegments*6 インデックス
         // 1つのXまたは細い枝先（葉クラスター4個）＝32頂点、96インデックス
-        size_t estimatedVertices = numF * 18 + (numX + numF) * 32;
-        size_t estimatedIndices = numF * 48 + (numX + numF) * 96;
+        size_t estimatedVertices = numF * (params.radialSegments + 1) * 2 + (numX + numF) * 32;
+        size_t estimatedIndices = numF * params.radialSegments * 6 + (numX + numF) * 96;
 
         data.vertices.reserve(estimatedVertices);
         data.indices.reserve(estimatedIndices);
@@ -378,7 +378,7 @@ namespace BioProcedural
         if (maxExpectedLen <= 0.0f) maxExpectedLen = 1.0f;
 
         auto BuildCylinder = [&](const Vec3& start, const Vec3& end, float startRad, float endRad, const TurtleState& t) {
-            int radialSegments = 8;
+            int radialSegments = params.radialSegments;
             uint32_t baseIdx = (uint32_t)data.vertices.size();
 
             float windWeightStart = std::min(1.0f, t.distanceToRoot / maxExpectedLen);
@@ -888,6 +888,85 @@ namespace BioProcedural
         
         result.success = true;
         result.outputMessage = "Export Succeeded: " + objPath;
+        return result;
+    }
+
+    LODExportResult BioProceduralGenerator::ExportLODsToObj(
+        const std::string& directoryPath, 
+        const std::string& fileName, 
+        int mode, 
+        const TreeParameters& treeParams,
+        const RockParameters& rockParams
+    )
+    {
+        LODExportResult result;
+        result.success = false;
+
+        MeshData lod0Mesh;
+        MeshData lod1Mesh;
+        MeshData lod2Mesh;
+
+        if (mode == 0) // Tree
+        {
+            // LOD0
+            lod0Mesh = GenerateTree(treeParams);
+            
+            // LOD1
+            TreeParameters params1 = treeParams;
+            params1.iterations = std::max(1, treeParams.iterations - 1);
+            params1.radialSegments = std::max(4, treeParams.radialSegments - 2);
+            lod1Mesh = GenerateTree(params1);
+
+            // LOD2
+            TreeParameters params2 = treeParams;
+            params2.iterations = std::max(1, treeParams.iterations - 2);
+            params2.radialSegments = std::max(4, treeParams.radialSegments - 4);
+            lod2Mesh = GenerateTree(params2);
+        }
+        else // Rock
+        {
+            // LOD0
+            lod0Mesh = GenerateRock(rockParams);
+
+            // LOD1
+            RockParameters params1 = rockParams;
+            params1.subdivisions = std::max(1, rockParams.subdivisions - 1);
+            lod1Mesh = GenerateRock(params1);
+
+            // LOD2
+            RockParameters params2 = rockParams;
+            params2.subdivisions = std::max(1, rockParams.subdivisions - 2);
+            lod2Mesh = GenerateRock(params2);
+        }
+
+        result.lod0Vertices = (uint32_t)lod0Mesh.vertices.size();
+        result.lod0Indices = (uint32_t)lod0Mesh.indices.size();
+        result.lod1Vertices = (uint32_t)lod1Mesh.vertices.size();
+        result.lod1Indices = (uint32_t)lod1Mesh.indices.size();
+        result.lod2Vertices = (uint32_t)lod2Mesh.vertices.size();
+        result.lod2Indices = (uint32_t)lod2Mesh.indices.size();
+
+        // 各LODファイルを書き出し
+        ExportResult res0 = ExportToObj(directoryPath, fileName + "_LOD0", lod0Mesh);
+        if (!res0.success) {
+            result.outputMessage = "Failed to export LOD0: " + res0.outputMessage;
+            return result;
+        }
+
+        ExportResult res1 = ExportToObj(directoryPath, fileName + "_LOD1", lod1Mesh);
+        if (!res1.success) {
+            result.outputMessage = "Failed to export LOD1: " + res1.outputMessage;
+            return result;
+        }
+
+        ExportResult res2 = ExportToObj(directoryPath, fileName + "_LOD2", lod2Mesh);
+        if (!res2.success) {
+            result.outputMessage = "Failed to export LOD2: " + res2.outputMessage;
+            return result;
+        }
+
+        result.success = true;
+        result.outputMessage = "LOD Batch Export Succeeded to: " + directoryPath;
         return result;
     }
 }

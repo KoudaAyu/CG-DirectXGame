@@ -35,6 +35,7 @@ public:
         float angle = 25.0f;         // 分岐する角度 (度数法)
         std::string axiom = "X";     // 初期記号 (Axiom)
         unsigned int seed = 54321;   // ランダムシード値
+        int radialSegments = 8;      // 枝の円柱分割数 (LOD制御用)
     };
 
     /// <summary>
@@ -51,4 +52,15 @@ public:
     /// 現在のモデルデータをOBJ形式でエクスポートする
     /// </summary>
     static BioProcedural::ExportResult ExportToObj(const std::string& directoryPath, const std::string& fileName, const Object3d::ModelData& modelData);
+
+    /// <summary>
+    /// LOD0〜LOD2のメッシュを自動段階削減して一括でエクスポートする
+    /// </summary>
+    static BioProcedural::LODExportResult ExportLODsToObj(
+        const std::string& directoryPath, 
+        const std::string& fileName, 
+        int mode, // 0: Tree, 1: Rock
+        const TreeParameters& treeParams,
+        const RockParameters& rockParams
+    );
 };

@@ -35,6 +35,16 @@ namespace BioProcedural
         std::string outputMessage = "";
     };
 
+    // --- LOD一括エクスポート結果構造体 ---
+    struct LODExportResult
+    {
+        bool success = false;
+        uint32_t lod0Vertices = 0, lod0Indices = 0;
+        uint32_t lod1Vertices = 0, lod1Indices = 0;
+        uint32_t lod2Vertices = 0, lod2Indices = 0;
+        std::string outputMessage = "";
+    };
+
     // --- 岩石生成用パラメータ構造体 ---
     struct RockParameters
     {
@@ -60,6 +70,7 @@ namespace BioProcedural
         float angle = 25.0f;         // 分岐する角度 (度数法)
         std::string axiom = "X";     // 初期記号 (Axiom)
         unsigned int seed = 54321;   // ランダムシード値
+        int radialSegments = 8;      // 枝の円柱分割数 (LOD制御用)
     };
 
     // GPUで並列展開するための樹木の骨格セグメント定義
@@ -96,6 +107,17 @@ namespace BioProcedural
         /// メッシュデータを標準的なOBJ形式で書き出す (詳細統計結果を返す)
         /// </summary>
         static ExportResult ExportToObj(const std::string& directoryPath, const std::string& fileName, const MeshData& meshData);
+
+        /// <summary>
+        /// LOD0〜LOD2のメッシュを自動段階削減して一括でエクスポートする
+        /// </summary>
+        static LODExportResult ExportLODsToObj(
+            const std::string& directoryPath, 
+            const std::string& fileName, 
+            int mode, // 0: Tree, 1: Rock
+            const TreeParameters& treeParams,
+            const RockParameters& rockParams
+        );
 
     private:
         // 内部ユーティリティ数学関数

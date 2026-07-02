@@ -435,23 +435,34 @@ void DebugUI::Update()
     {
         ImGui::Separator();
         ImGui::Text("Export Asset (Standalone OBJ)");
+        ImGui::InputText("Export Folder", exportDirectory, IM_ARRAYSIZE(exportDirectory));
         ImGui::InputText("Export Name", exportFileName, IM_ARRAYSIZE(exportFileName));
         
-        if (ImGui::Button("Export to OBJ"))
+        if (ImGui::Button("Export Single (LOD0)"))
         {
             if (targetObject3d_)
             {
-                exportResult = ProceduralGenerator::ExportToObj("Resources/Outputs", exportFileName, targetObject3d_->GetModelData());
+                exportResult = ProceduralGenerator::ExportToObj(exportDirectory, exportFileName, targetObject3d_->GetModelData());
                 hasExported = true;
+                hasLODExported = false;
             }
             else
             {
                 exportResult.success = false;
                 exportResult.outputMessage = "Error: No target model data.";
                 hasExported = true;
+                hasLODExported = false;
             }
         }
-
+        ImGui::SameLine();
+        if (ImGui::Button("Export LODs (Batch)"))
+        {
+            int mode = (proceduralMode == 2) ? 0 : 1;
+            lodExportResult = ProceduralGenerator::ExportLODsToObj(exportDirectory, exportFileName, mode, treeParams, rockParams);
+            hasLODExported = true;
+            hasExported = false;
+        }
+        
         if (hasExported)
         {
             if (exportResult.success)
@@ -479,6 +490,44 @@ void DebugUI::Update()
             else
             {
                 ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "%s", exportResult.outputMessage.c_str());
+            }
+        }
+
+        if (hasLODExported)
+        {
+            if (lodExportResult.success)
+            {
+                ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "%s", lodExportResult.outputMessage.c_str());
+                ImGui::Spacing();
+                ImGui::TextColored(ImVec4(0.3f, 0.8f, 1.0f, 1.0f), "--- LOD Batch Export Statistics ---");
+                ImGui::Indent(10.0f);
+                
+                // LOD0
+                ImGui::Text("LOD0 (High): Vertices: %u | Polygons: %u", 
+                    lodExportResult.lod0Vertices, lodExportResult.lod0Indices / 3);
+                
+                // LOD1
+                float lod1Red = 0.0f;
+                if (lodExportResult.lod0Vertices > 0)
+                {
+                    lod1Red = (1.0f - (float)lodExportResult.lod1Vertices / (float)lodExportResult.lod0Vertices) * 100.0f;
+                }
+                ImGui::Text("LOD1 (Medium): Vertices: %u | Polygons: %u (Reduced: %.1f%%)", 
+                    lodExportResult.lod1Vertices, lodExportResult.lod1Indices / 3, lod1Red);
+                
+                // LOD2
+                float lod2Red = 0.0f;
+                if (lodExportResult.lod0Vertices > 0)
+                {
+                    lod2Red = (1.0f - (float)lodExportResult.lod2Vertices / (float)lodExportResult.lod0Vertices) * 100.0f;
+                }
+                ImGui::Text("LOD2 (Low): Vertices: %u | Polygons: %u (Reduced: %.1f%%)", 
+                    lodExportResult.lod2Vertices, lodExportResult.lod2Indices / 3, lod2Red);
+                ImGui::Unindent(10.0f);
+            }
+            else
+            {
+                ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "%s", lodExportResult.outputMessage.c_str());
             }
         }
     }

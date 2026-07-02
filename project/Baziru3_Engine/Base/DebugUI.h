@@ -40,8 +40,11 @@ private:
     ProceduralGenerator::RockParameters rockParams;
     ProceduralGenerator::TreeParameters treeParams;
     char exportFileName[64] = "ProceduralAsset";
+    char exportDirectory[128] = "Resources/Outputs";
     BioProcedural::ExportResult exportResult;
+    BioProcedural::LODExportResult lodExportResult;
     bool hasExported = false; // エクスポートを行ったかどうかのフラグ
+    bool hasLODExported = false;
     
     // GPUプロシージャル岩石生成
     ProceduralGPUGenerator gpuGenerator;

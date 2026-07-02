@@ -74,6 +74,7 @@ Object3d::ModelData ProceduralGenerator::GenerateTree(const TreeParameters& para
     bParams.angle = params.angle;
     bParams.axiom = params.axiom;
     bParams.seed = params.seed;
+    bParams.radialSegments = params.radialSegments;
 
     BioProcedural::MeshData bMeshData = BioProcedural::BioProceduralGenerator::GenerateTree(bParams);
     return ConvertToModelData(bMeshData);
@@ -84,4 +85,38 @@ BioProcedural::ExportResult ProceduralGenerator::ExportToObj(const std::string& 
 {
     BioProcedural::MeshData bMeshData = ConvertToMeshData(modelData);
     return BioProcedural::BioProceduralGenerator::ExportToObj(directoryPath, fileName, bMeshData);
+}
+
+// --- LOD一括エクスポート機能のアダプター ---
+BioProcedural::LODExportResult ProceduralGenerator::ExportLODsToObj(
+    const std::string& directoryPath, 
+    const std::string& fileName, 
+    int mode, 
+    const TreeParameters& treeParams,
+    const RockParameters& rockParams
+)
+{
+    BioProcedural::TreeParameters bTreeParams;
+    bTreeParams.iterations = treeParams.iterations;
+    bTreeParams.branchLength = treeParams.branchLength;
+    bTreeParams.branchRadius = treeParams.branchRadius;
+    bTreeParams.taperRate = treeParams.taperRate;
+    bTreeParams.angle = treeParams.angle;
+    bTreeParams.axiom = treeParams.axiom;
+    bTreeParams.seed = treeParams.seed;
+    bTreeParams.radialSegments = treeParams.radialSegments;
+
+    BioProcedural::RockParameters bRockParams;
+    bRockParams.scale = rockParams.scale;
+    bRockParams.subdivisions = rockParams.subdivisions;
+    bRockParams.noiseStrength = rockParams.noiseStrength;
+    bRockParams.noiseFrequency = rockParams.noiseFrequency;
+    bRockParams.octaves = rockParams.octaves;
+    bRockParams.voronoiStrength = rockParams.voronoiStrength;
+    bRockParams.voronoiCells = rockParams.voronoiCells;
+    bRockParams.crackStrength = rockParams.crackStrength;
+    bRockParams.crackFrequency = rockParams.crackFrequency;
+    bRockParams.seed = rockParams.seed;
+
+    return BioProcedural::BioProceduralGenerator::ExportLODsToObj(directoryPath, fileName, mode, bTreeParams, bRockParams);
 }
