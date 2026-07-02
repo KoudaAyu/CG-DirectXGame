@@ -169,6 +169,11 @@ void GamePlayScene::Update()
 		Vector3 rotate = animatedCube_->GetRotate();
 		rotate.y += 0.01f;
 		animatedCube_->SetRotate(rotate);
+		if (materialManager)
+		{
+			animatedCube_->SetReflectionFactor(materialManager->GetMaterialReflectionFactor());
+			animatedCube_->SetFresnelF0(materialManager->GetMaterialFresnelF0());
+		}
 		animatedCube_->Update(); // ステップ1〜4はエンジン層で実行される
 	}
 

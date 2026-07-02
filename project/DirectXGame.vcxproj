@@ -47,7 +47,7 @@
     <ClCompile Include="Baziru3_Engine\Base\KeyInput.cpp" />
     <ClCompile Include="Baziru3_Engine\Base\Log\Log.cpp" />
     <ClCompile Include="Baziru3_Engine\Base\Matrix4x4.cpp" />
-    <ClCompile Include="Baziru3_Engine\Base\ResourceLeakCheek.cpp" />
+    <ClCompile Include="Baziru3_Engine\Base\ResourceLeakCheck.cpp" />
     <ClCompile Include="Baziru3_Engine\Base\StringUtil.cpp" />
     <ClCompile Include="Baziru3_Engine\Base\Transform.cpp" />
     <ClCompile Include="Baziru3_Engine\Base\Windows\WindowsAPI.cpp" />
@@ -80,7 +80,7 @@
     <ClCompile Include="Baziru3_Engine\Graphics\GpuProfiler.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <FxCompile Include="Resources\CG4\SkinningObject3d.VS.hlsl">
+    <FxCompile Include="Resources\shaders\InitializeParticle.CS.hlsl">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
@@ -90,7 +90,43 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
     </FxCompile>
+    <FxCompile Include="Resources\shaders\DepthBasedOutline.PS.hlsl">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </FxCompile>
+    <FxCompile Include="Resources\shaders\LuminanceBaseOutline.PS.hlsl">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </FxCompile>
+    <FxCompile Include="Resources\shaders\GaussianFilter.PS.hlsl">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </FxCompile>
+    <FxCompile Include="Resources\shaders\BoxFilter.PS.hlsl">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </FxCompile>
+    <FxCompile Include="Resources\shaders\Skinning.CS.hlsl">
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Compute</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">4.0</ShaderModel>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Compute</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4.0</ShaderModel>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Development|x64'">Compute</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Development|x64'">4.0</ShaderModel>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </FxCompile>
     <FxCompile Include="Resources\shaders\CopyImage.PS.hlsl">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </FxCompile>
+    <FxCompile Include="Resources\shaders\RadialBlur.PS.hlsl">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
@@ -175,7 +211,7 @@
     <ClInclude Include="Baziru3_Engine\Base\KeyInput.h" />
     <ClInclude Include="Baziru3_Engine\Base\Log\Log.h" />
     <ClInclude Include="Baziru3_Engine\Base\Matrix4x4.h" />
-    <ClInclude Include="Baziru3_Engine\Base\ResourceLeakCheek.h" />
+    <ClInclude Include="Baziru3_Engine\Base\ResourceLeakCheck.h" />
     <ClInclude Include="Baziru3_Engine\Base\StringUtil.h" />
     <ClInclude Include="Baziru3_Engine\Base\Transform.h" />
     <ClInclude Include="Baziru3_Engine\Base\Vector.h" />
@@ -376,13 +412,3 @@
     <Copy SourceFiles="$(WindowsSdkDir)Redist\D3D\x64\dxil.dll" DestinationFiles="$(OutDir)dxil.dll" Condition="Exists('$(WindowsSdkDir)Redist\D3D\x64\dxil.dll')" />
   </Target>
 </Project>
-
-
-
-
-
-
-
-
-
-

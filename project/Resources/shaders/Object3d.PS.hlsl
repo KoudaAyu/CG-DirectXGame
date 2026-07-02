@@ -25,6 +25,7 @@ ConstantBuffer<DirectionalLight> gDirectionalLight : register(b1);
 Texture2D<float32_t4> gTexture : register(t3);
 TextureCube<float32_t4> gEnvironmentMap : register(t4);
 SamplerState gSample : register(s0);
+SamplerState gEnvironmentSampler : register(s1);
 
 struct PixelShaderOutput
 {
@@ -83,7 +84,7 @@ PixelShaderOutput main(VertexShaderOutput input)
 
         // Environment Mapping with Fresnel (Schlick's approximation)
         float32_t3 R_env = reflect(-V, N);
-        float32_t3 envColor = gEnvironmentMap.Sample(gSample, R_env).rgb;
+        float32_t3 envColor = gEnvironmentMap.Sample(gEnvironmentSampler, R_env).rgb;
         float32_t fresnel = gMaterial.fresnelF0 + (1.0f - gMaterial.fresnelF0) * pow(1.0f - saturate(dot(N, V)), 5.0f);
         output.color.rgb = lerp(output.color.rgb, envColor * gMaterial.color.rgb, fresnel * gMaterial.reflectionFactor);
     }
