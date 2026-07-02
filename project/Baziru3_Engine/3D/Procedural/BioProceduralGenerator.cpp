@@ -888,38 +888,39 @@ namespace BioProcedural
         }
         mtlFile.close();
 
-        // 3. OBJファイルの書き出し (頂点カラー拡張に対応)
-        std::ofstream objFile(objPath);
-        if (!objFile.is_open())
-        {
-            result.success = false;
-            result.outputMessage = "Failed to write OBJ file: " + objPath;
-            return result;
-        }
+        // 3. OBJファイルの書き出し (メモリバッファを用いた超高速一括書き出し)
+        std::string buffer;
+        size_t estimatedSize = meshData.vertices.size() * 150 + (meshData.indices.size() / 3) * 50 + 1024;
+        buffer.reserve(estimatedSize);
 
-        objFile << "# Bio-Authoring Studio Procedural Mesh with Vertex Color\n";
-        objFile << "mtllib " << fileName << ".mtl\n\n";
+        buffer += "# Bio-Authoring Studio Procedural Mesh with Vertex Color\n";
+        buffer += "mtllib " + fileName + ".mtl\n\n";
+
+        char temp[256];
+        for (const auto& v : meshData.vertices)
+        {
+            int len = std::snprintf(temp, sizeof(temp), "v %.6f %.6f %.6f %.4f %.4f %.4f\n",
+                v.position.x, v.position.y, v.position.z,
+                v.color.r, v.color.g, v.color.b);
+            buffer.append(temp, len);
+        }
+        buffer += "\n";
 
         for (const auto& v : meshData.vertices)
         {
-            objFile << "v " << v.position.x << " " << v.position.y << " " << v.position.z 
-                    << " " << v.color.r << " " << v.color.g << " " << v.color.b << "\n";
+            int len = std::snprintf(temp, sizeof(temp), "vt %.6f %.6f\n", v.texcoord.u, v.texcoord.v);
+            buffer.append(temp, len);
         }
-        objFile << "\n";
+        buffer += "\n";
 
         for (const auto& v : meshData.vertices)
         {
-            objFile << "vt " << v.texcoord.u << " " << v.texcoord.v << "\n";
+            int len = std::snprintf(temp, sizeof(temp), "vn %.6f %.6f %.6f\n", v.normal.x, v.normal.y, v.normal.z);
+            buffer.append(temp, len);
         }
-        objFile << "\n";
+        buffer += "\n";
 
-        for (const auto& v : meshData.vertices)
-        {
-            objFile << "vn " << v.normal.x << " " << v.normal.y << " " << v.normal.z << "\n";
-        }
-        objFile << "\n";
-
-        objFile << "usemtl " << materialName << "\n";
+        buffer += "usemtl " + materialName + "\n";
 
         for (size_t i = 0; i < meshData.indices.size(); i += 3)
         {
@@ -927,11 +928,21 @@ namespace BioProcedural
             uint32_t idx1 = meshData.indices[i + 1] + 1;
             uint32_t idx2 = meshData.indices[i + 2] + 1;
 
-            objFile << "f " << idx0 << "/" << idx0 << "/" << idx0 << " " 
-                            << idx1 << "/" << idx1 << "/" << idx1 << " " 
-                            << idx2 << "/" << idx2 << "/" << idx2 << "\n";
+            int len = std::snprintf(temp, sizeof(temp), "f %u/%u/%u %u/%u/%u %u/%u/%u\n",
+                idx0, idx0, idx0,
+                idx1, idx1, idx1,
+                idx2, idx2, idx2);
+            buffer.append(temp, len);
         }
 
+        std::ofstream objFile(objPath, std::ios::out | std::ios::binary);
+        if (!objFile.is_open())
+        {
+            result.success = false;
+            result.outputMessage = "Failed to write OBJ file: " + objPath;
+            return result;
+        }
+        objFile.write(buffer.data(), buffer.size());
         objFile.close();
         
         result.success = true;
@@ -962,8 +973,8 @@ namespace BioProcedural
             TreeParameters params1 = treeParams;
             params1.iterations = std::max(1, treeParams.iterations - 1);
             params1.radialSegments = std::max(4, treeParams.radialSegments - 2);
-            params1.maxSegments = std::max(100, treeParams.maxSegments / 2);
-            params1.maxLeaves = std::max(50, treeParams.maxLeaves / 2);
+            params1.maxSegments = std::max(60, treeParams.maxSegments / 4);
+            params1.maxLeaves = std::max(30, treeParams.maxLeaves / 4);
             params1.minBranchRadiusLimit = treeParams.branchRadius * 0.35f;
             lod1Mesh = GenerateTree(params1);
 
@@ -971,8 +982,8 @@ namespace BioProcedural
             TreeParameters params2 = treeParams;
             params2.iterations = std::max(1, treeParams.iterations - 2);
             params2.radialSegments = std::max(4, treeParams.radialSegments - 4);
-            params2.maxSegments = std::max(50, treeParams.maxSegments / 4);
-            params2.maxLeaves = std::max(20, treeParams.maxLeaves / 5);
+            params2.maxSegments = std::max(30, treeParams.maxSegments / 10);
+            params2.maxLeaves = std::max(10, treeParams.maxLeaves / 10);
             params2.minBranchRadiusLimit = treeParams.branchRadius * 0.55f;
             lod2Mesh = GenerateTree(params2);
         }
