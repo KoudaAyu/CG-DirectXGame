@@ -956,7 +956,18 @@ namespace BioProcedural
                 if (v.position.y < minY) minY = v.position.y;
                 if (v.position.y > maxY) maxY = v.position.y;
                 
+                // 幹の部分（風揺れウェイトが小さい部分）で半径を測定
                 if (v.color.g < 0.8f)
+                {
+                    float radSq = v.position.x * v.position.x + v.position.z * v.position.z;
+                    if (radSq > maxRadiusSq) maxRadiusSq = radSq;
+                }
+            }
+
+            // フォールバック：もしウェイト判定で半径が取れなかった場合は全頂点から計算
+            if (maxRadiusSq == 0.0f)
+            {
+                for (const auto& v : baseMesh.vertices)
                 {
                     float radSq = v.position.x * v.position.x + v.position.z * v.position.z;
                     if (radSq > maxRadiusSq) maxRadiusSq = radSq;
@@ -965,8 +976,10 @@ namespace BioProcedural
 
             float height = maxY - minY;
             float radius = std::sqrt(maxRadiusSq);
+            // 樹木のスケール感に合わせる（半径が大きすぎる場合はクランプ）
             if (radius < 0.05f) radius = 0.15f;
-            
+            if (radius > 1.5f) radius = 0.5f; // 葉を含んでしまい半径が巨大化した時の調整
+
             const int segments = 12;
             for (int i = 0; i < segments; ++i)
             {
@@ -1007,111 +1020,49 @@ namespace BioProcedural
         }
         else // Rock
         {
-            std::vector<Vec3> directions = {
-                { 1.0f, 0.0f, 0.0f }, { -1.0f, 0.0f, 0.0f },
-                { 0.0f, 1.0f, 0.0f }, { 0.0f, -1.0f, 0.0f },
-                { 0.0f, 0.0f, 1.0f }, { 0.0f, 0.0f, -1.0f },
-                { 1.0f, 1.0f, 1.0f }, { -1.0f, -1.0f, -1.0f },
-                { 1.0f, -1.0f, 1.0f }, { -1.0f, 1.0f, -1.0f },
-                { -1.0f, 1.0f, 1.0f }, { 1.0f, -1.0f, -1.0f },
-                { 1.0f, 1.0f, -1.0f }, { -1.0f, -1.0f, 1.0f }
-            };
+            // 全頂点から単純で安全なAABBバウンディングボックスを生成
+            float minX = 999999.0f, maxX = -999999.0f;
+            float minY = 999999.0f, maxY = -999999.0f;
+            float minZ = 999999.0f, maxZ = -999999.0f;
 
-            std::vector<Vertex> sampledVertices;
-            for (const auto& dir : directions)
+            for (const auto& v : baseMesh.vertices)
             {
-                float maxDot = -999999.0f;
-                Vertex bestVert{};
-                for (const auto& v : baseMesh.vertices)
-                {
-                    float d = v.position.x * dir.x + v.position.y * dir.y + v.position.z * dir.z;
-                    if (d > maxDot)
-                    {
-                        maxDot = d;
-                        bestVert = v;
-                    }
-                }
-                
-                bool duplicate = false;
-                for (const auto& sv : sampledVertices)
-                {
-                    float distSq = (sv.position.x - bestVert.position.x) * (sv.position.x - bestVert.position.x) +
-                                   (sv.position.y - bestVert.position.y) * (sv.position.y - bestVert.position.y) +
-                                   (sv.position.z - bestVert.position.z) * (sv.position.z - bestVert.position.z);
-                    if (distSq < 0.001f)
-                    {
-                        duplicate = true;
-                        break;
-                    }
-                }
-                if (!duplicate)
-                {
-                    sampledVertices.push_back(bestVert);
-                }
+                if (v.position.x < minX) minX = v.position.x;
+                if (v.position.x > maxX) maxX = v.position.x;
+                if (v.position.y < minY) minY = v.position.y;
+                if (v.position.y > maxY) maxY = v.position.y;
+                if (v.position.z < minZ) minZ = v.position.z;
+                if (v.position.z > maxZ) maxZ = v.position.z;
             }
 
-            colMesh.vertices = sampledVertices;
-            
-            if (colMesh.vertices.size() >= 4)
+            Vec3 box[8] = {
+                { minX, minY, minZ }, { maxX, minY, minZ },
+                { maxX, maxY, minZ }, { minX, maxY, minZ },
+                { minX, minY, maxZ }, { maxX, minY, maxZ },
+                { maxX, maxY, maxZ }, { minX, maxY, maxZ }
+            };
+
+            for (int i = 0; i < 8; ++i)
             {
-                float minX = 99999.f, maxX = -99999.f;
-                float minY = 99999.f, maxY = -99999.f;
-                float minZ = 99999.f, maxZ = -99999.f;
-                for (const auto& v : colMesh.vertices)
-                {
-                    if (v.position.x < minX) minX = v.position.x;
-                    if (v.position.x > maxX) maxX = v.position.x;
-                    if (v.position.y < minY) minY = v.position.y;
-                    if (v.position.y > maxY) maxY = v.position.y;
-                    if (v.position.z < minZ) minZ = v.position.z;
-                    if (v.position.z > maxZ) maxZ = v.position.z;
-                }
+                Vertex v{};
+                v.position = box[i];
+                v.normal = NormalizeVec3(box[i]);
+                v.texcoord = { (i % 2 == 0) ? 0.f : 1.f, (i / 4 == 0) ? 0.f : 1.f };
+                v.color = { 0.f, 0.f, 0.f, 1.f };
+                colMesh.vertices.push_back(v);
+            }
 
-                colMesh.vertices.clear();
-                
-                Vec3 box[8] = {
-                    { minX, minY, minZ }, { maxX, minY, minZ },
-                    { maxX, maxY, minZ }, { minX, maxY, minZ },
-                    { minX, minY, maxZ }, { maxX, minY, maxZ },
-                    { maxX, maxY, maxZ }, { minX, maxY, maxZ }
-                };
-
-                for (int i = 0; i < 8; ++i)
-                {
-                    Vertex v{};
-                    Vec3 closest = box[i];
-                    float minDist = 99999.f;
-                    for (const auto& sv : sampledVertices)
-                    {
-                        float d = (sv.position.x - box[i].x)*(sv.position.x - box[i].x) +
-                                  (sv.position.y - box[i].y)*(sv.position.y - box[i].y) +
-                                  (sv.position.z - box[i].z)*(sv.position.z - box[i].z);
-                        if (d < minDist)
-                        {
-                            minDist = d;
-                            closest = sv.position;
-                        }
-                    }
-
-                    v.position = closest;
-                    v.normal = NormalizeVec3(closest);
-                    v.texcoord = { (i % 2 == 0) ? 0.f : 1.f, (i / 4 == 0) ? 0.f : 1.f };
-                    v.color = { 0.f, 0.f, 0.f, 1.f };
-                    colMesh.vertices.push_back(v);
-                }
-
-                uint32_t indices[36] = {
-                    0, 2, 1,   0, 3, 2,
-                    4, 5, 6,   4, 6, 7,
-                    0, 1, 5,   0, 5, 4,
-                    2, 3, 7,   2, 7, 6,
-                    0, 4, 7,   0, 7, 3,
-                    1, 2, 6,   1, 6, 5
-                };
-                for (int i = 0; i < 36; ++i)
-                {
-                    colMesh.indices.push_back(indices[i]);
-                }
+            uint32_t indices[36] = {
+                0, 2, 1,   0, 3, 2,
+                4, 5, 6,   4, 6, 7,
+                0, 1, 5,   0, 5, 4,
+                2, 3, 7,   2, 7, 6,
+                0, 4, 7,   0, 7, 3,
+                1, 2, 6,   1, 6, 5
+            };
+            for (int i = 0; i < 36; ++i)
+            {
+                colMesh.indices.push_back(indices[i]);
             }
         }
 
