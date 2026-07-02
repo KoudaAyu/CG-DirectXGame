@@ -1,5 +1,6 @@
 #include "ProceduralTreeGPUGenerator.h"
 #include "DirectXCom.h"
+#include "Sprite.h"
 #include <d3dcompiler.h>
 #include <iostream>
 #include <cassert>
@@ -165,7 +166,7 @@ bool ProceduralTreeGPUGenerator::CreateBuffers()
 
     D3D12_RESOURCE_DESC resDesc{};
     resDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-    resDesc.Width = kMaxVertices * sizeof(BioProcedural::Vertex);
+    resDesc.Width = kMaxVertices * sizeof(Sprite::VertexData);
     resDesc.Height = 1;
     resDesc.DepthOrArraySize = 1;
     resDesc.MipLevels = 1;
@@ -186,8 +187,8 @@ bool ProceduralTreeGPUGenerator::CreateBuffers()
 
     // Vertex Buffer Viewのセットアップ
     vertexBufferView_.BufferLocation = outputBuffer_->GetGPUVirtualAddress();
-    vertexBufferView_.SizeInBytes = kMaxVertices * sizeof(BioProcedural::Vertex);
-    vertexBufferView_.StrideInBytes = sizeof(BioProcedural::Vertex);
+    vertexBufferView_.SizeInBytes = kMaxVertices * sizeof(Sprite::VertexData);
+    vertexBufferView_.StrideInBytes = sizeof(Sprite::VertexData);
 
     // UAVの作成
     D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc{};
@@ -195,7 +196,7 @@ bool ProceduralTreeGPUGenerator::CreateBuffers()
     uavDesc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
     uavDesc.Buffer.FirstElement = 0;
     uavDesc.Buffer.NumElements = kMaxVertices;
-    uavDesc.Buffer.StructureByteStride = sizeof(BioProcedural::Vertex);
+    uavDesc.Buffer.StructureByteStride = sizeof(Sprite::VertexData);
     uavDesc.Buffer.Flags = D3D12_BUFFER_UAV_FLAG_NONE;
     device->CreateUnorderedAccessView(outputBuffer_.Get(), nullptr, &uavDesc, uavCpuHandle);
 

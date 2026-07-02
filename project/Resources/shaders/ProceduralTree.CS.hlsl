@@ -1,8 +1,8 @@
 struct Vertex {
-    float3 position : POSITION;
-    float3 normal : NORMAL;
-    float2 texcoord : TEXCOORD;
-    float4 color : COLOR;
+    float4 position; // Offset 0
+    float2 texcoord; // Offset 16
+    float3 normal;   // Offset 24
+    float padding;   // Offset 36 (Total 40 bytes)
 };
 
 struct BranchSegment {
@@ -37,18 +37,18 @@ void main(uint3 DTid : SV_DispatchThreadID)
 
     if (segmentIndex >= gTreeCB.currentSegments || segmentIndex >= maxSegments)
     {
-        // 描画されない未使用領域の頂点はスケールを0にして見えなくする
+        // 未使用頂点を0に潰す
         if (segmentIndex < maxSegments)
         {
             uint branchVertexOffset = segmentIndex * 18;
             for (uint i = 0; i < 18; ++i)
             {
-                gOutVertices[branchVertexOffset + i].position = float3(0, 0, 0);
+                gOutVertices[branchVertexOffset + i].position = float4(0, 0, 0, 1.0f);
             }
             uint leafVertexOffset = maxSegments * 18 + segmentIndex * 32;
             for (uint j = 0; j < 32; ++j)
             {
-                gOutVertices[leafVertexOffset + j].position = float3(0, 0, 0);
+                gOutVertices[leafVertexOffset + j].position = float4(0, 0, 0, 1.0f);
             }
         }
         return;
@@ -61,7 +61,7 @@ void main(uint3 DTid : SV_DispatchThreadID)
     float3 start = seg.startPos;
     float3 end = seg.endPos;
 
-    // 簡単な風の揺れ（Wind Sway）を計算（高さに応じて揺らす）
+    // 風の揺れアニメーション
     float swayFactor = max(0.0f, end.y * 0.15f);
     float3 windOffset = gTreeCB.windDirection * sin(gTreeCB.time * 2.5f + end.y * 0.5f) * gTreeCB.windStrength * swayFactor;
     end += windOffset;
@@ -83,17 +83,17 @@ void main(uint3 DTid : SV_DispatchThreadID)
 
         // startPos側 (頂点 0〜8)
         uint vIndexStart = branchVertexOffset + i;
-        gOutVertices[vIndexStart].position = start + ringDir * seg.startRadius;
+        gOutVertices[vIndexStart].position = float4(start + ringDir * seg.startRadius, 1.0f);
         gOutVertices[vIndexStart].normal = ringDir;
         gOutVertices[vIndexStart].texcoord = float2((float)i / (float)radialSegments, 0.0f);
-        gOutVertices[vIndexStart].color = float4(0.0f, 0.0f, 0.0f, 1.0f); // 苔/風なし
+        gOutVertices[vIndexStart].padding = 0.0f;
 
         // endPos側 (頂点 9〜17)
         uint vIndexEnd = branchVertexOffset + radialSegments + 1 + i;
-        gOutVertices[vIndexEnd].position = end + ringDir * seg.endRadius;
+        gOutVertices[vIndexEnd].position = float4(end + ringDir * seg.endRadius, 1.0f);
         gOutVertices[vIndexEnd].normal = ringDir;
         gOutVertices[vIndexEnd].texcoord = float2((float)i / (float)radialSegments, 1.0f);
-        gOutVertices[vIndexEnd].color = float4(0.0f, 0.0f, 0.0f, 1.0f); // 苔/風なし
+        gOutVertices[vIndexEnd].padding = 0.0f;
     }
 
     // --- 2. 葉（Crossed Quad）の頂点生成 ---
@@ -104,7 +104,7 @@ void main(uint3 DTid : SV_DispatchThreadID)
         // 葉がないセグメントはスケール0で潰す
         for (uint j = 0; j < 32; ++j)
         {
-            gOutVertices[leafVertexOffset + j].position = float3(0, 0, 0);
+            gOutVertices[leafVertexOffset + j].position = float4(0, 0, 0, 1.0f);
         }
         return;
     }
@@ -130,38 +130,38 @@ void main(uint3 DTid : SV_DispatchThreadID)
         uint baseV = leafVertexOffset + leafIdx * 8;
         
         // Crossed Quad 1 (4頂点)
-        gOutVertices[baseV + 0].position = leafCenter + (-leafRight - leafUp) * leafSize * 0.5f;
+        gOutVertices[baseV + 0].position = float4(leafCenter + (-leafRight - leafUp) * leafSize * 0.5f, 1.0f);
         gOutVertices[baseV + 0].texcoord = float2(0.0f, 1.0f);
         
-        gOutVertices[baseV + 1].position = leafCenter + (-leafRight + leafUp) * leafSize * 0.5f;
+        gOutVertices[baseV + 1].position = float4(leafCenter + (-leafRight + leafUp) * leafSize * 0.5f, 1.0f);
         gOutVertices[baseV + 1].texcoord = float2(0.0f, 0.0f);
         
-        gOutVertices[baseV + 2].position = leafCenter + (leafRight - leafUp) * leafSize * 0.5f;
+        gOutVertices[baseV + 2].position = float4(leafCenter + (leafRight - leafUp) * leafSize * 0.5f, 1.0f);
         gOutVertices[baseV + 2].texcoord = float2(1.0f, 1.0f);
         
-        gOutVertices[baseV + 3].position = leafCenter + (leafRight + leafUp) * leafSize * 0.5f;
+        gOutVertices[baseV + 3].position = float4(leafCenter + (leafRight + leafUp) * leafSize * 0.5f, 1.0f);
         gOutVertices[baseV + 3].texcoord = float2(1.0f, 0.0f);
 
         // Crossed Quad 2 (直交、4頂点)
         float3 leafRightOrtho = cross(leafRight, leafUp);
         
-        gOutVertices[baseV + 4].position = leafCenter + (-leafRightOrtho - leafUp) * leafSize * 0.5f;
+        gOutVertices[baseV + 4].position = float4(leafCenter + (-leafRightOrtho - leafUp) * leafSize * 0.5f, 1.0f);
         gOutVertices[baseV + 4].texcoord = float2(0.0f, 1.0f);
         
-        gOutVertices[baseV + 5].position = leafCenter + (-leafRightOrtho + leafUp) * leafSize * 0.5f;
+        gOutVertices[baseV + 5].position = float4(leafCenter + (-leafRightOrtho + leafUp) * leafSize * 0.5f, 1.0f);
         gOutVertices[baseV + 5].texcoord = float2(0.0f, 0.0f);
         
-        gOutVertices[baseV + 6].position = leafCenter + (leafRightOrtho - leafUp) * leafSize * 0.5f;
+        gOutVertices[baseV + 6].position = float4(leafCenter + (leafRightOrtho - leafUp) * leafSize * 0.5f, 1.0f);
         gOutVertices[baseV + 6].texcoord = float2(1.0f, 1.0f);
         
-        gOutVertices[baseV + 7].position = leafCenter + (leafRightOrtho + leafUp) * leafSize * 0.5f;
+        gOutVertices[baseV + 7].position = float4(leafCenter + (leafRightOrtho + leafUp) * leafSize * 0.5f, 1.0f);
         gOutVertices[baseV + 7].texcoord = float2(1.0f, 0.0f);
 
-        // 共通設定 (法線・緑色の風揺れウェイトを設定)
+        // 共通設定
         for (uint k = 0; k < 8; ++k)
         {
             gOutVertices[baseV + k].normal = norm;
-            gOutVertices[baseV + k].color = float4(0.0f, 1.0f, 0.0f, 1.0f); // 風ウェイト緑 = 1.0f
+            gOutVertices[baseV + k].padding = 0.0f;
         }
     }
 }

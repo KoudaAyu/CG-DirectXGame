@@ -574,6 +574,10 @@ void DebugUI::Update()
                             
                             // 頂点領域を最大サイズでアロケート
                             dummyMesh.vertices.resize(ProceduralTreeGPUGenerator::kMaxVertices);
+                            for (auto& v : dummyMesh.vertices)
+                            {
+                                v.position.w = 1.0f;
+                            }
                             
                             // インデックスバッファの構築 (枝用と葉用)
                             uint32_t maxSegments = ProceduralTreeGPUGenerator::kMaxSegments;
