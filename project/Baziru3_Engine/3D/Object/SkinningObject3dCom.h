@@ -29,6 +29,10 @@ public:
     void ShaderCompile();
     void InitializeGraphicPipeline();
     void CreateGraphicsPipelineState();
+    void CreateComputePipelineState();
+
+    void Skinning(Object3d* object, ID3D12GraphicsCommandList* commandList);
+
 
     void PreDraw();
 
@@ -62,9 +66,9 @@ private:
 
 private:
     D3D12_ROOT_SIGNATURE_DESC descriptionRootSignature{};
-    D3D12_DESCRIPTOR_RANGE descriptorRange[2] = {};
-    D3D12_ROOT_PARAMETER rootParameters[6] = {};
-    D3D12_STATIC_SAMPLER_DESC staticSamplers[1] = {};
+    D3D12_DESCRIPTOR_RANGE descriptorRange[3] = {};
+    D3D12_ROOT_PARAMETER rootParameters[7] = {};
+    D3D12_STATIC_SAMPLER_DESC staticSamplers[2] = {};
     Microsoft::WRL::ComPtr<ID3DBlob> signatureBlob = nullptr;
     Microsoft::WRL::ComPtr<ID3DBlob> errorBlob = nullptr;
     Microsoft::WRL::ComPtr<ID3D12RootSignature> rootSignature = nullptr;
@@ -77,6 +81,11 @@ private:
     Microsoft::WRL::ComPtr<IDxcBlob> pixelShaderBlob;
     D3D12_GRAPHICS_PIPELINE_STATE_DESC graphicPipelineStateDesc{};
     Microsoft::WRL::ComPtr<ID3D12PipelineState> pipelineState = nullptr;
+
+    // Compute Shader variables
+    Microsoft::WRL::ComPtr<IDxcBlob> computeShaderBlob = nullptr;
+    Microsoft::WRL::ComPtr<ID3D12RootSignature> computeRootSignature = nullptr;
+    Microsoft::WRL::ComPtr<ID3D12PipelineState> computePipelineState = nullptr;
 
     std::ostream& logStream;
 };

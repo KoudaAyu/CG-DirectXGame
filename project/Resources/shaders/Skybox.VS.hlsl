@@ -1,4 +1,4 @@
-#include "Resources/shaders/Skybox.hlsli"
+#include "Skybox.hlsli"
 
 struct TransformationMatrix
 {
@@ -10,18 +10,17 @@ ConstantBuffer<TransformationMatrix> gTransformationMatrix : register(b0);
 
 struct VertexShaderInput
 {
-    float4 position : POSITION0;
-    float2 texcoord : TEXCOORD0;
-    float3 normal : NORMAL0;
+    float32_t4 position : POSITION0;
+    float32_t2 texcoord : TEXCOORD0;
+    float32_t3 normal : NORMAL0;
 };
 
 VertexShaderOutput main(VertexShaderInput input)
 {
     VertexShaderOutput output;
-    output.potision = mul(input.position, gTransformationMatrix.WVP).xyww;
+    output.position = mul(input.position, gTransformationMatrix.WVP).xyww;
 
-    
-    float3 worldPos = mul(input.position, gTransformationMatrix.World).xyz;
+    float32_t3 worldPos = mul(input.position, gTransformationMatrix.World).xyz;
     output.texcoord = normalize(worldPos);
 
     return output;

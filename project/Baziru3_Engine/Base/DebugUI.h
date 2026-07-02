@@ -11,6 +11,7 @@ class Camera;
 class DebugCamera;
 class MaterialManager;
 class SpriteManager;
+class OffScreenRendering;
 
 class DebugUI
 {
@@ -22,6 +23,8 @@ public:
     void Initialize();
     void Update();
     void Finalize();
+
+    void SetOffScreenRendering(OffScreenRendering* offScreenRendering) { offScreenRendering_ = offScreenRendering; }
 
 private:
     Sprite::Transform* transformObject_ = nullptr;
@@ -52,6 +55,7 @@ private:
     DebugCamera* debugCamera_ = nullptr;
     SpriteManager* spriteManager_ = nullptr;
     MaterialManager* materialManager_ = nullptr;
+    OffScreenRendering* offScreenRendering_ = nullptr;
 
     std::vector<std::unique_ptr<Sprite>> sprites;
 

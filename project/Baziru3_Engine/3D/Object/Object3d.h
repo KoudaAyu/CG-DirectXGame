@@ -14,6 +14,7 @@
 #include "AnimationData.h"
 
 class Object3dCom;
+class SkinningObject3dCom;
 
 class Object3d
 {
@@ -65,6 +66,7 @@ public:
 	void Update();
 
 	void Draw(ID3D12GraphicsCommandList* commandList);
+	void Draw(Object3dCom* object3dCom, SkinningObject3dCom* skinningObject3dCom);
 
 	/// <summary>
 	/// .mtlファイルの読み込み
@@ -106,6 +108,7 @@ public:
 	const Microsoft::WRL::ComPtr<ID3D12Resource>& GetTransformationMatrixResource() const { return transformationMatrixResource; }
 	const Microsoft::WRL::ComPtr<ID3D12Resource>& GetMaterialResource() const { return materialResource; }
 	const Microsoft::WRL::ComPtr<ID3D12Resource>& GetDirectionalLightResource() const { return directionalLightResource; }
+	const Microsoft::WRL::ComPtr<ID3D12Resource>& GetVertexResource() const { return vertexResource; }
 
 	const D3D12_VERTEX_BUFFER_VIEW& GetVertexBufferView() const { return vertexBufferView_; }
 	const D3D12_INDEX_BUFFER_VIEW& GetIndexBufferView() const { return indexBufferView_; }
@@ -117,13 +120,15 @@ public:
 	void SetRotate(const Vector3& r) { transform.SetRotate(r); }
 	void SetTranslate(const Vector3& t) { transform.SetTranslate(t); }
 	void SetScale(const Vector3& s) { transform.SetScale(s); }
-	Vector3 GetRotate() const { return transform.GetRotate(); }
-	Vector3 GetTranslate() const { return transform.GetTranslate(); }
-	Vector3 GetScale() const { return transform.GetScale(); }
+	const Vector3& GetRotate() const { return transform.GetRotate(); }
+	const Vector3& GetTranslate() const { return transform.GetTranslate(); }
+	const Vector3& GetScale() const { return transform.GetScale(); }
 	const ModelData& GetModelData() const { return modelData_; }
 
 	void SetEnableLighting(bool enable);
 	void SetColor(const Vector4& color);
+	void SetReflectionFactor(float factor);
+	void SetFresnelF0(float f0);
 
 	// デルタタイム設定 (Animator の時間進行に使用)
 	void SetDeltaTime(float dt) { deltaTime_ = dt; }

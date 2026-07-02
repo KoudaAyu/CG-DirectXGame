@@ -21,6 +21,7 @@ namespace RootParam
             kLight = 3,
             kCamera = 4,
             kInstanceOffset = 5,
+            kPerView = 6,
         };
     }
 }

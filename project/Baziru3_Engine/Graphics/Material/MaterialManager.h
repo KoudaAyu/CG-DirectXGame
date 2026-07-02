@@ -13,7 +13,8 @@ struct Material
 	Vector4 color;
 	int32_t enableLighting;
     int32_t specularModel; // 0: Blinn-Phong, 1: Phong
-    float padding[2]; // パディングを追加して16バイト境界に揃える
+    float reflectionFactor; // 環境マップ反射強度 (0.0 - 1.0)
+    float fresnelF0;        // 基準反射率 (誘電体は通常0.04)
 	Matrix4x4 uvTransform; // UV変換行列
 	float shininess;
 	float padding2[3];
@@ -41,7 +42,12 @@ public:
 
 	int32_t& GetMaterialSpecularModel() { return materialData->specularModel; }
 
+	float& GetMaterialReflectionFactor() { return materialData->reflectionFactor; }
+	float& GetMaterialFresnelF0() { return materialData->fresnelF0; }
+
 	Microsoft::WRL::ComPtr<ID3D12Resource> GetMaterialResource() { return materialResource; }
+
+	void Update();
 
 private:
 	Microsoft::WRL::ComPtr<ID3D12Resource> materialResource;

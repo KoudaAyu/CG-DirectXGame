@@ -66,6 +66,9 @@ public:
 		int32_t width,
 		int32_t height);
 
+	void CreateUnroaderedAccessView(const Microsoft::WRL::ComPtr<ID3D12Resource>& resource,
+		UINT NumElements, UINT structureByteStride, D3D12_CPU_DESCRIPTOR_HANDLE uavCpuDescriptorHandle);
+
 	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap>  CreateDescriptorHeap(
 		const Microsoft::WRL::ComPtr<ID3D12Device>& device, D3D12_DESCRIPTOR_HEAP_TYPE heapType, UINT numDescriptors, bool shaderVisible);
 

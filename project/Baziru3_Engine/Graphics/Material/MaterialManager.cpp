@@ -12,10 +12,24 @@ void  MaterialManager::Initialize(DirectXCom* directXCom)
     hostMaterial_.color = {1.0f, 1.0f, 1.0f, 1.0f};
     hostMaterial_.enableLighting = 0;
     hostMaterial_.specularModel = 0; // Blinn-Phong
+    hostMaterial_.reflectionFactor = 0.5f;
+    hostMaterial_.fresnelF0 = 0.04f;
     hostMaterial_.shininess = 16.0f;
     hostMaterial_.uvTransform = MakeIdentity4x4();
 
     // Mapしたら書き込みして Unmap -> 生ポインタを残さない
+    Material* gpuPtr = nullptr;
+    materialResource->Map(0, nullptr, reinterpret_cast<void**>(&gpuPtr));
+    if (gpuPtr)
+    {
+        *gpuPtr = hostMaterial_;
+        materialResource->Unmap(0, nullptr);
+    }
+}
+
+void MaterialManager::Update()
+{
+    if (!materialResource) return;
     Material* gpuPtr = nullptr;
     materialResource->Map(0, nullptr, reinterpret_cast<void**>(&gpuPtr));
     if (gpuPtr)

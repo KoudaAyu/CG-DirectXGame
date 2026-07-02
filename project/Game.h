@@ -30,10 +30,11 @@
 #include"Sprite.h"
 #include"SpriteCom.h"
 #include"SpriteManager.h"
-#include"ResourceLeakCheek.h"
+#include"ResourceLeakCheck.h"
 #include"TextureManager.h"
 #include"WindowsAPI.h"
 #include "DebugUI.h"
+#include "FadeApplication.h"
 
 #include <vector>
 #include <random>
@@ -122,7 +123,7 @@ private:
     void DrawParticles(const RenderContext& ctx);
 
 private:
-	ResourceLeakCheek leakChecker; //リソースリークチェック用のオブジェクト
+	ResourceLeakCheck leakChecker; //リソースリークチェック用のオブジェクト
 	CrashDump crashDump; //クラッシュダンプ生成用のオブジェクト
 	Log log;
 	
@@ -151,6 +152,7 @@ private:
 	std::unique_ptr<AudioManager> audioManager_;
 	std::unique_ptr<MaterialManager> materialManager_;
 	std::unique_ptr<DebugUI> debugUI; // debug UI
+    std::unique_ptr<FadeApplication> fadeApplication_;
 private:
 	std::vector<std::unique_ptr<Sprite>>sprites;
 	Sprite::Transform transformObject;

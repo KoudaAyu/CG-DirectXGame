@@ -4,6 +4,10 @@
 #include "Camera.h"
 #include "../3D/Procedural/ProceduralGenerator.h"
 #include "../3D/Object/Object3dCom.h"
+#include "SceneManager.h"
+#include "OffScreenRendering.h"
+#include "ParticleManager.h"
+#include "Application/Scene/GameScene/GamePlayScene.h"
 #include <imgui.h>
 
 DebugUI::DebugUI(MaterialManager* materialManager, SpriteManager* spriteManager, Camera* camera,
@@ -96,6 +100,9 @@ void DebugUI::Update()
 
             ImGui::SliderFloat("Shininess", &materialManager_->GetMaterialDataShininess(), 0.1f, 100.0f);
 
+            ImGui::SliderFloat("Reflection Factor", &materialManager_->GetMaterialReflectionFactor(), 0.0f, 1.0f);
+            ImGui::SliderFloat("Fresnel F0", &materialManager_->GetMaterialFresnelF0(), 0.0f, 1.0f);
+
             ImGui::ColorEdit4("Material Color", &materialManager_->GetMaterialDataColor().x);
         }
     }
@@ -166,6 +173,10 @@ void DebugUI::Update()
         }
 
         ImGui::DragFloat("Shininess", &materialManager_->GetMaterialDataShininess(), 0.5f, 0.1f, 100.0f);
+
+        ImGui::SliderFloat("Reflection Factor", &materialManager_->GetMaterialReflectionFactor(), 0.0f, 1.0f);
+        ImGui::SliderFloat("Fresnel F0", &materialManager_->GetMaterialFresnelF0(), 0.0f, 1.0f);
+
         // Specular model selection
         int specModel = materialManager_->GetMaterialSpecularModel();
         const char* items = "Blinn-Phong\0Phong\0";
@@ -179,8 +190,80 @@ void DebugUI::Update()
 
     ImGui::Begin("Settings");
 
+    if (offScreenRendering_)
+    {
+        if (ImGui::CollapsingHeader("Post Effect"))
+        {
+            int currentEffect = static_cast<int>(offScreenRendering_->GetPostEffect());
+            const char* effectNames[] = {
+                "Normal",
+                "DepthBasedOutline",
+                "LuminanceBaseOutline",
+                "RadialBlur",
+                "GaussianFilter",
+                "BoxFilter"
+            };
+            if (ImGui::Combo("Effect Type", &currentEffect, effectNames, IM_ARRAYSIZE(effectNames)))
+            {
+                offScreenRendering_->SetPostEffect(static_cast<OffScreenRendering::PostEffect>(currentEffect));
+            }
+
+            if (offScreenRendering_->GetPostEffect() == OffScreenRendering::PostEffect::RadialBlur)
+            {
+                Vector2 center = offScreenRendering_->GetRadialBlurCenter();
+                float centerArr[2] = { center.x, center.y };
+                if (ImGui::SliderFloat2("Blur Center", centerArr, 0.0f, 1.0f))
+                {
+                    offScreenRendering_->SetRadialBlurCenter({ centerArr[0], centerArr[1] });
+                }
+
+                float blurWidth = offScreenRendering_->GetRadialBlurWidth();
+                if (ImGui::SliderFloat("Blur Width", &blurWidth, 0.0f, 0.1f, "%.4f"))
+                {
+                    offScreenRendering_->SetRadialBlurWidth(blurWidth);
+                }
+            }
+        }
+    }
+
     if (useMonsterBall_)
         ImGui::Checkbox("Use Monster Ball", useMonsterBall_);
+
+    ImGui::Checkbox("Draw Skybox", SceneManager::GetInstance()->GetShowSkyboxPtr());
+
+    if (ImGui::CollapsingHeader("GPU Particle System"))
+    {
+        ParticleManager* pm = ParticleManager::GetInstance();
+        if (pm)
+        {
+            ImGui::Text("Shader Layer: GPU Compute Shader");
+            ImGui::Text("Max Capacity: %u particles", 10240);
+            uint32_t activeCount = pm->GetNumInstance();
+            ImGui::Text("Active Count: %u particles", activeCount);
+            ImGui::ProgressBar(static_cast<float>(activeCount) / 10240.0f, ImVec2(0.0f, 0.0f), "Spawn Load");
+
+            BaseScene* currentScene = SceneManager::GetInstance()->GetCurrentScene();
+            GamePlayScene* gps = dynamic_cast<GamePlayScene*>(currentScene);
+            if (gps)
+            {
+                ImGui::Separator();
+                ImGui::Text("Emitter Settings:");
+                Emitter& emitter = gps->GetEmitter();
+
+                int countVal = static_cast<int>(emitter.count);
+                if (ImGui::SliderInt("Spawn Count", &countVal, 1, 1000))
+                {
+                    emitter.count = static_cast<uint32_t>(countVal);
+                }
+
+                ImGui::SliderFloat("Spawn Frequency (sec)", &emitter.frequency, 0.01f, 2.0f, "%.2fs");
+            }
+        }
+        else
+        {
+            ImGui::Text("GPU Particle System not initialized.");
+        }
+    }
 
     ImGui::Separator();
 
@@ -196,10 +279,43 @@ void DebugUI::Update()
 
             ImGui::SliderFloat("Shininess", &materialManager_->GetMaterialDataShininess(), 0.1f, 100.0f);
 
+            ImGui::SliderFloat("Reflection Factor", &materialManager_->GetMaterialReflectionFactor(), 0.0f, 1.0f);
+            ImGui::SliderFloat("Fresnel F0", &materialManager_->GetMaterialFresnelF0(), 0.0f, 1.0f);
+
             ImGui::ColorEdit4("Color", &materialManager_->GetMaterialDataColor().x);
         }
     }
 
+    if (materialManager_)
+    {
+        materialManager_->Update();
+    }
+
+    ImGui::End();
+
+    ImGui::Begin("Performance Tracker");
+    {
+        float currentFps = ImGui::GetIO().Framerate;
+        ImGui::Text("Current FPS: %.1f", currentFps);
+        ImGui::Text("Frame Time: %.3f ms/frame", 1000.0f / currentFps);
+
+        static float fpsHistory[120] = {};
+        static int fpsHistoryOffset = 0;
+        fpsHistory[fpsHistoryOffset] = currentFps;
+        fpsHistoryOffset = (fpsHistoryOffset + 1) % 120;
+
+        float minFps = fpsHistory[0];
+        float maxFps = fpsHistory[0];
+        for (int i = 1; i < 120; ++i)
+        {
+            if (fpsHistory[i] < minFps) minFps = fpsHistory[i];
+            if (fpsHistory[i] > maxFps) maxFps = fpsHistory[i];
+        }
+
+        char label[64];
+        std::snprintf(label, sizeof(label), "Min: %.1f | Max: %.1f", minFps, maxFps);
+        ImGui::PlotLines("##FPSGraph", fpsHistory, 120, fpsHistoryOffset, label, 0.0f, 120.0f, ImVec2(0, 80.0f));
+    }
     ImGui::End();
 
     // --- プロシージャル生成エディタウィンドウ ---

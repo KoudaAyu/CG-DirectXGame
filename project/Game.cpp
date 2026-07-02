@@ -3,6 +3,7 @@
 
 #include <combaseapi.h>
 
+
 #include <sstream>
 #include <iomanip>
 
@@ -16,6 +17,7 @@
 #include <imgui_impl_win32.h>
 #include <imgui_impl_dx12.h>
 #endif
+#include "Baziru3_Engine/Graphics/GpuProfiler.h"
 
 void Game::Initialize()
 {
@@ -38,6 +40,9 @@ void Game::Initialize()
 	InitializeModelResources();
 
 	InitializeSceneResources();
+
+	offScreenRendering_ = std::make_unique<OffScreenRendering>(logStream, dx);
+	offScreenRendering_->Initialize();
 
 	//Transform変数を作る
 	Sprite::Transform transform = { {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };
@@ -70,16 +75,29 @@ void Game::Initialize()
 	debugUI = std::make_unique<DebugUI>(materialManager_.get(), uiSpriteManager, camera_.get(), &transformObject, &useMonsterBall, &drawObject, &drawSprite, object3d_.get());
 	debugUI->Initialize();
 
+	fadeApplication_ = std::make_unique<FadeApplication>();
+	fadeApplication_->Initialize(spriteCom, window);
+	SceneManager::GetInstance()->SetFadeApplication(fadeApplication_.get());
+
 	SceneRegistration::RegisterScenes();
 	SceneManager::GetInstance()->ChangeScene("TITLE");
 
 	textureIndexUvChecker = TextureManager::GetInstance()->Load("Resources/uvChecker.png"); // Load UV Checker texture
 	textureIndexModelTex = TextureManager::GetInstance()->Load(modelData.material.textureFilePath); // Load model texture
 	textureIndexSkybox_ = TextureManager::GetInstance()->Load("Resources/CG4/dds/CG4_test.dds"); // Load skybox texture
+   SceneManager::GetInstance()->SetSkyboxTextureIndex(textureIndexSkybox_);
 
 	// OffScreenRendering の初期化
 	offScreenRendering_ = std::make_unique<OffScreenRendering>(logStream, dx);
 	offScreenRendering_->Initialize(0, 0, DXGI_FORMAT_R8G8B8A8_UNORM_SRGB, { 1.0f, 0.0f, 0.0f, 1.0f });
+
+	if (debugUI)
+	{
+		debugUI->SetOffScreenRendering(offScreenRendering_.get());
+	}
+
+	// 遅延していたアップロードバッファの解放とGPU同期待ちを一括実行
+	TextureManager::GetInstance()->ReleaseUploadBuffers();
 }
 
 
@@ -101,6 +119,23 @@ void Game::Finalize()
 		debugUI.reset();
 	}
 
+	if (SceneManager::GetInstance())
+	{
+		SceneManager::GetInstance()->SetFadeApplication(nullptr);
+	}
+
+	if (fadeApplication_)
+	{
+		fadeApplication_->Finalize();
+		fadeApplication_.reset();
+	}
+
+	if (offScreenRendering_)
+	{
+		offScreenRendering_->Finalize();
+		offScreenRendering_.reset();
+	}
+
 	// AudioManagerの終了処理
 	if (audioManager_)
 	{
@@ -119,6 +154,9 @@ void Game::Finalize()
 		SceneManager::GetInstance()->SetCamera(nullptr);
 		SceneManager::GetInstance()->SetLight(nullptr);
 		SceneManager::GetInstance()->SetObject3dCom(nullptr);
+       SceneManager::GetInstance()->SetSkyboxCom(nullptr);
+		SceneManager::GetInstance()->SetSkyBox(nullptr);
+		SceneManager::GetInstance()->SetSkyboxTextureIndex(TextureManager::kInvalidTextureIndex);
 		SceneManager::GetInstance()->SetSkinningObject3dCom(nullptr);
 	}
 
@@ -202,8 +240,14 @@ void Game::Update()
 		audioManager_->Update();
 	}
 
+	if (fadeApplication_)
+	{
+		fadeApplication_->Update();
+	}
 
-	SceneManager::GetInstance()->Update();
+
+    // Update scenes and engine subsystems. Use fixed timestep here (same as scenes expect).
+	SceneManager::GetInstance()->Update(1.0f / 60.0f);
 
 	//if (windowAPI->ProcessMassage())
 	//{
@@ -232,7 +276,7 @@ void Game::Update()
 
 
 
-#ifdef _DEBUG
+#ifdef USE_IMGUI
 
 
 	if (debugUI)
@@ -241,7 +285,7 @@ void Game::Update()
 	}
 
 
-#endif // DEBUG
+#endif // USE_IMGUI
 
 	//ImGui内部コマンドを生成する
 #ifdef USE_IMGUI
@@ -262,7 +306,16 @@ void Game::Draw()
 	auto* dx = engine_ ? engine_->GetDirectXCom() : nullptr;
 	auto* window = engine_ ? engine_->GetWindowAPI() : nullptr;
 
-	if (dx) dx->PreDraw();
+	if (!dx) return;
+
+	// PreDraw backbuffer transition and clear
+	dx->PreDraw();
+
+	// Begin rendering to off-screen buffer
+	if (offScreenRendering_)
+	{
+		offScreenRendering_->Begin(dx->GetCommandList().Get());
+	}
 
 	if (offScreenRendering_)
 	{
@@ -272,9 +325,9 @@ void Game::Draw()
 	if (object3dCom) object3dCom->PreDraw();
 
 	RenderContext ctx = PrepareRenderContext();
-    SceneRenderRequests renderRequests{};
+	SceneRenderRequests renderRequests{};
 
-	if (camera_ && camera_->GetCameraResource() && dx)
+	if (camera_ && camera_->GetCameraResource())
 	{
 		dx->GetCommandList()->SetGraphicsRootConstantBufferView(4, camera_->GetCameraResource()->GetGPUVirtualAddress());
 	}
@@ -283,21 +336,20 @@ void Game::Draw()
 		Logger::Log(logStream, "Warning: camera GPU resource not available before SceneManager draw.\n");
 	}
 
-	if (skybox_ && skyboxCom_ && textureIndexSkybox_ != TextureManager::kInvalidTextureIndex)
-	{
-		skyboxCom_->SetupDraw(ctx.commandList);
-		//skybox_->Draw(ctx.commandList, TextureManager::GetInstance()->GetSrvHandleGPU(textureIndexSkybox_));
-	}
-
-	if (object3dCom) object3dCom->PreDraw();
+	// 1. Scene Drawの計測
+	GpuProfiler::GetInstance()->BeginProfile(dx->GetCommandList().Get(), "Scene Draw");
 
 	if (SceneManager::GetInstance())
 	{
-        SceneManager::GetInstance()->Draw(renderRequests);
+		SceneManager::GetInstance()->DrawSkybox(ctx.commandList);
 	}
-  sphereRenderer_.Draw(ctx, renderRequests);
 
+	if (SceneManager::GetInstance())
+	{
+		SceneManager::GetInstance()->Draw(renderRequests);
+	}
 
+	sphereRenderer_.Draw(ctx, renderRequests);
 
 	if (drawObject)
 	{
@@ -309,11 +361,47 @@ void Game::Draw()
 			object3dCom->Draw(object3d_.get(), ctx, modelData, drawObject);
 		}
 	}
-	//DrawSprites(ctx);
-	//DrawParticles(ctx);
+	GpuProfiler::GetInstance()->EndProfile(dx->GetCommandList().Get(), "Scene Draw");
 
-	//Objectの描画
+	// 2. Sprite Drawの計測
+	GpuProfiler::GetInstance()->BeginProfile(dx->GetCommandList().Get(), "Sprite Draw");
+	DrawSprites(ctx);
+	GpuProfiler::GetInstance()->EndProfile(dx->GetCommandList().Get(), "Sprite Draw");
 
+	// 3. Particle Drawの計測 (通常のパーティクル描画)
+	GpuProfiler::GetInstance()->BeginProfile(dx->GetCommandList().Get(), "Particle Draw");
+	if (renderRequests.sceneDrawn)
+	{
+		DrawParticles(ctx);
+	}
+	GpuProfiler::GetInstance()->EndProfile(dx->GetCommandList().Get(), "Particle Draw");
+
+	if (fadeApplication_)
+	{
+		fadeApplication_->Draw();
+	}
+
+	// End off-screen rendering
+	if (offScreenRendering_)
+	{
+		offScreenRendering_->End(dx->GetCommandList().Get());
+
+		// Restore main render target (backbuffer)
+		offScreenRendering_->SetMainRenderTarget(dx->GetCommandList().Get());
+
+		// Set camera's inverse projection matrix
+		if (camera_)
+		{
+			offScreenRendering_->SetProjectionInverse(Inverse(camera_->GetProjectionMatrix()));
+		}
+
+		// 4. PostProcess (OffScreen Rendering) Drawの計測
+		GpuProfiler::GetInstance()->BeginProfile(dx->GetCommandList().Get(), "PostProcess Draw");
+		offScreenRendering_->DrawToBackBuffer(dx->GetCommandList().Get());
+		GpuProfiler::GetInstance()->EndProfile(dx->GetCommandList().Get(), "PostProcess Draw");
+	}
+
+	// Draw object debug logs if necessary
 	{
 		uint32_t chosenIndex = useMonsterBall ? textureIndexModelTex : textureIndexUvChecker;
 		D3D12_GPU_DESCRIPTOR_HANDLE chosenHandle{};
@@ -332,19 +420,11 @@ void Game::Draw()
 		OutputDebugStringA(oss.str().c_str());
 	}
 
-	//実際のcommandListのImGuiの描画コマンドを積む
 #ifdef USE_IMGUI
-	if (offScreenRendering_)
-	{
-		offScreenRendering_->End(dx->GetCommandList().Get());
-		offScreenRendering_->SetMainRenderTarget(dx->GetCommandList().Get());
-		offScreenRendering_->DrawToBackBuffer(dx->GetCommandList().Get());
-	}
-
 	if (dx) ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), dx->GetCommandList().Get());
 #endif
 
-	if (dx) dx->PostDraw();
+	dx->PostDraw();
 }
 
 bool Game::IsQuitRequested()
@@ -449,6 +529,8 @@ void Game::InitializeSceneResources()
 	skyboxCom_->Initialize();
 	skybox_ = std::make_unique<SkyBox>();
 	skybox_->Initialize(dx, camera_.get());
+	SceneManager::GetInstance()->SetSkyboxCom(skyboxCom_.get());
+	SceneManager::GetInstance()->SetSkyBox(skybox_.get());
 
 	particleManager = std::make_unique<ParticleManager>(logStream, dx);
 	particleManager->Initialize(camera_.get());

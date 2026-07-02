@@ -5,6 +5,8 @@
 #include "TextureManager.h"
 #include "Skeleton.h"
 #include "SkinCluster.h"
+#include "SkinningObject3dCom.h"
+#include "SceneManager.h"
 #include <assimp/Importer.hpp>
 #include <assimp/postprocess.h>
 #include <assimp/scene.h>
@@ -255,6 +257,43 @@ void Object3d::Draw(ID3D12GraphicsCommandList* commandList)
 	else
 	{
 		commandList->DrawInstanced(static_cast<UINT>(modelData_.vertices.size()), 1, 0, 0);
+	}
+}
+
+void Object3d::Draw(Object3dCom* object3dCom, SkinningObject3dCom* skinningObject3dCom)
+{
+	Object3dCom* com = object3dCom ? object3dCom : object3dCom_;
+	if (!com) return;
+	DirectXCom* dx = com->GetDirectXCom();
+	if (!dx) return;
+
+	// RenderContext を内部で解決・構築
+	RenderContext ctx{};
+	ctx.commandList = dx->GetCommandList().Get();
+	ctx.windowAPI = dx->GetWindowAPI();
+	ctx.camera = camera_ ? camera_ : com->GetDefaultCamera();
+	ctx.light = SceneManager::GetInstance()->GetLight();
+	ctx.materialGPUAddress = 0;
+
+	// テクスチャ解決
+	const auto& modelData = GetModelData();
+	if (modelData.material.textureIndex != TextureManager::kInvalidTextureIndex)
+	{
+		ctx.textureHandle = TextureManager::GetInstance()->GetSrvHandleGPU(modelData.material.textureIndex);
+	}
+	else
+	{
+		ctx.textureHandle = {};
+	}
+
+	// ジョイント（ボーン）があればスキニングシェーダー、なければ通常シェーダーで描画
+	if (!skeleton_.joints.empty() && skinningObject3dCom)
+	{
+		skinningObject3dCom->Draw(this, ctx, modelData, true);
+	}
+	else if (object3dCom)
+	{
+		object3dCom->Draw(this, ctx, modelData, true);
 	}
 }
 
@@ -517,6 +556,32 @@ void Object3d::SetColor(const Vector4& color)
 	}
 }
 
+void Object3d::SetReflectionFactor(float factor)
+{
+	if (!materialResource) return;
+	Material* data = nullptr;
+	materialResource->Map(0, nullptr, reinterpret_cast<void**>(&data));
+	if (data)
+	{
+		data->reflectionFactor = factor;
+		D3D12_RANGE written = { 0, sizeof(Material) };
+		materialResource->Unmap(0, &written);
+	}
+}
+
+void Object3d::SetFresnelF0(float f0)
+{
+	if (!materialResource) return;
+	Material* data = nullptr;
+	materialResource->Map(0, nullptr, reinterpret_cast<void**>(&data));
+	if (data)
+	{
+		data->fresnelF0 = f0;
+		D3D12_RANGE written = { 0, sizeof(Material) };
+		materialResource->Unmap(0, &written);
+	}
+}
+
 void Object3d::MaterialResource()
 {
 	if (object3dCom_ && object3dCom_->GetDirectXCom())
@@ -529,10 +594,10 @@ void Object3d::MaterialResource()
 		// 初期値を設定
 		materialData_->color = { 1.0f,1.0f,1.0f,1.0f };
 		materialData_->enableLighting = false;
-		materialData_->specularModel = 0; // 0: Blinn-Phong
-		materialData_->shininess = 70.0f; // デフォルトの光沢度を設定
-		std::memset(materialData_->padding, 0, sizeof(materialData_->padding));
-		std::memset(materialData_->padding2, 0, sizeof(materialData_->padding2));
+		materialData_->specularModel = 0;
+		materialData_->reflectionFactor = 0.5f;
+		materialData_->fresnelF0 = 0.04f;
+		materialData_->shininess = 16.0f;
 		materialData_->uvTransform = MakeIdentity4x4();
 
 		// マテリアルは初期化時に一度だけ書き込む想定のため、MapしたらすぐにUnmapする

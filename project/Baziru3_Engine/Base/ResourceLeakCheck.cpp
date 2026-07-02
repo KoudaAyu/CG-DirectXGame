@@ -1,11 +1,17 @@
-#include "ResourceLeakCheek.h"
+#include "ResourceLeakCheck.h"
 #include<dxgidebug.h>
 #include<d3d12.h>
 #include<dxgi1_6.h>
 #include<wrl.h>
 
-ResourceLeakCheek::~ResourceLeakCheek()
+ResourceLeakCheck::~ResourceLeakCheck()
 {
+	Microsoft::WRL::ComPtr<IDXGIInfoQueue> dxgiInfoQueue;
+	if (SUCCEEDED(DXGIGetDebugInterface1(0, IID_PPV_ARGS(&dxgiInfoQueue))))
+	{
+		dxgiInfoQueue->SetBreakOnSeverity(DXGI_DEBUG_ALL, DXGI_INFO_QUEUE_MESSAGE_SEVERITY_WARNING, FALSE);
+	}
+
 	Microsoft::WRL::ComPtr<IDXGIDebug1> debug;
 	if (SUCCEEDED(DXGIGetDebugInterface1(0, IID_PPV_ARGS(&debug))))
 	{

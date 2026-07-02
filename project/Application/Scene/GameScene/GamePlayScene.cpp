@@ -16,18 +16,16 @@
 #include <cassert>
 #include <Windows.h>
 
-void GamePlayScene::Initialize(DirectXCom* dxCommon, Camera* camera)
+void GamePlayScene::InitializeScene()
 {
-	camera_ = camera;
-	assert(dxCommon != nullptr);
-	this->directXCom = dxCommon;
+	directXCom = dxCommon_;
+	camera_ = BaseScene::camera_;
 
-
-	object3dCom = SceneManager::GetInstance()->GetObject3dCom();
-	skinningObject3dCom = SceneManager::GetInstance()->GetSkinningObject3dCom();
-	materialManager = SceneManager::GetInstance()->GetMaterialManager();
-	light = SceneManager::GetInstance()->GetLight();
-	particleManager = SceneManager::GetInstance()->GetParticleManager();
+	object3dCom = GetObject3dCom();
+	skinningObject3dCom = GetSkinningObject3dCom();
+	materialManager = GetMaterialManager();
+	light = GetLight();
+	particleManager = GetParticleManager();
 
 
 	if (object3dCom && materialManager && light && particleManager)
@@ -87,7 +85,6 @@ void GamePlayScene::Initialize(DirectXCom* dxCommon, Camera* camera)
 		{
 			skeletonDebug_.Initialize(directXCom, object3dCom, materialManager, light, camera_, skeleton_);
 		}
-
 		levelEditor_ = std::make_unique<LevelEditor>();
 		levelEditor_->Initialize(directXCom, object3dCom);
 	}
@@ -154,7 +151,6 @@ void GamePlayScene::Finalize()
 		hitEffect_.reset();
 	}
     hitEffectInitialized = false;
-
     if (levelEditor_)
     {
         levelEditor_.reset();
@@ -179,6 +175,11 @@ void GamePlayScene::Update()
 		Vector3 rotate = animatedCube_->GetRotate();
 		rotate.y += 0.01f;
 		animatedCube_->SetRotate(rotate);
+		if (materialManager)
+		{
+			animatedCube_->SetReflectionFactor(materialManager->GetMaterialReflectionFactor());
+			animatedCube_->SetFresnelF0(materialManager->GetMaterialFresnelF0());
+		}
 		animatedCube_->Update(); // ステップ1〜4はエンジン層で実行される
 	}
 
@@ -211,15 +212,10 @@ void GamePlayScene::Update()
 		emitter.frequencyTime -= emitter.frequency;
 	}
 
-	// スプライトの毎フレーム更新はここで行う（必要な依存を持っている場合）
-	if (spriteManager_ && directXCom)
+	// スプライトの毎フレーム更新
+	if (spriteManager_)
 	{
-		WindowAPI* windowAPI = directXCom->GetWindowAPI();
-		DebugCamera* debugCamera = &debugCamera_;
-		if (windowAPI && debugCamera)
-		{
-			spriteManager_->Update(windowAPI, debugCamera);
-		}
+		spriteManager_->Update();
 	}
 
 	// 9キーで Ring を発生させる
@@ -263,7 +259,6 @@ void GamePlayScene::Update()
 	}
 
 	particleManager->Update(kDeltaTime);
-
 	if (levelEditor_)
 	{
 		levelEditor_->Update(kDeltaTime);

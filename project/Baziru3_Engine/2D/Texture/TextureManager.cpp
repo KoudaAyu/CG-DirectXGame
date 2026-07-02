@@ -35,7 +35,7 @@ void TextureManager::Destroy()
 
 void TextureManager::Finalize()
 {
-
+	uploadBuffers_.clear();
 	srvManager_.reset();
 	TextureManagerStorage().reset();
 }
@@ -165,9 +165,7 @@ uint32_t TextureManager::Load(const std::string& filePath)
 		auto intermediate = directXCom_->UploadTextureData(
 			textureData.resource_, mipImages, directXCom_->GetDevice(), directXCom_->GetCommandList()
 		);
-
-		
-		directXCom_->ExecuteAndWaitForGPU();
+		uploadBuffers_.push_back(intermediate);
 	}
 
 	//SRVの割り当てと先性
@@ -206,5 +204,14 @@ void TextureManager::SetDirectXCom(DirectXCom* directXCom)
 	
 	srvManager_ = std::make_unique<SRVManager>();
 	srvManager_->Initialize(directXCom_);
+}
+
+void TextureManager::ReleaseUploadBuffers()
+{
+	if (directXCom_ && !uploadBuffers_.empty())
+	{
+		directXCom_->ExecuteAndWaitForGPU();
+		uploadBuffers_.clear();
+	}
 }
 
