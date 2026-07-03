@@ -122,7 +122,7 @@ bool Sound::LoadFileToSoundData(const std::string& filename, SoundData& out)
 		}
 	}
 
-	return false;
+	return true;
 }
 
 void Sound::SoundUnload()
