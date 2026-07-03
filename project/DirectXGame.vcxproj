@@ -46,6 +46,7 @@
     <ClCompile Include="Baziru3_Engine\Camera\DebugCamera\DebugCamera.cpp" />
     <ClCompile Include="Baziru3_Engine\Base\DirectXCom.cpp" />
     <ClCompile Include="Baziru3_Engine\Base\Allocator\ConstantBufferAllocator.cpp" />
+    <ClCompile Include="Baziru3_Engine\Base\Allocator\StackAllocator.cpp" />
     <ClCompile Include="Baziru3_Engine\Base\KeyInput.cpp" />
     <ClCompile Include="Baziru3_Engine\Base\Log\Log.cpp" />
     <ClCompile Include="Baziru3_Engine\Base\Matrix4x4.cpp" />

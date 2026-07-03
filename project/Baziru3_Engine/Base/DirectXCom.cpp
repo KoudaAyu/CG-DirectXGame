@@ -15,6 +15,7 @@
 
 #include"ImGuiManager.h"
 #include "Baziru3_Engine/Base/Allocator/ConstantBufferAllocator.h"
+#include "Baziru3_Engine/Base/Allocator/StackAllocator.h"
 
 using namespace Microsoft::WRL;
 
@@ -85,6 +86,10 @@ void DirectXCom::Initialize()
 	// 定数バッファアロケーターの生成・初期化
 	cbAllocator_ = std::make_unique<ConstantBufferAllocator>(this);
 	cbAllocator_->Initialize();
+
+	// スタックアロケーターの生成・初期化
+	stackAllocator_ = std::make_unique<StackAllocator>();
+	stackAllocator_->Initialize(16 * 1024 * 1024); // 16MB
 }
 
 void DirectXCom::Finalize()
@@ -144,6 +149,11 @@ void DirectXCom::Finalize()
 	{
 		cbAllocator_->Finalize();
 		cbAllocator_.reset();
+	}
+
+	if (stackAllocator_)
+	{
+		stackAllocator_.reset();
 	}
 }
 
@@ -512,6 +522,11 @@ void DirectXCom::PreDraw()
 	if (cbAllocator_)
 	{
 		cbAllocator_->BeginFrame();
+	}
+
+	if (stackAllocator_)
+	{
+		stackAllocator_->Reset();
 	}
 
 	//これから書き込むバックバッファのインデックスを取得する

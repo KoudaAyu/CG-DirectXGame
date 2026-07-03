@@ -13,6 +13,7 @@
 #include "DirectXTex.h"
 
 class ConstantBufferAllocator;
+class StackAllocator;
 
 
 #include"WindowsAPI.h"
@@ -334,6 +335,7 @@ private:
 
 	WindowAPI* windowAPI = nullptr;
 	std::unique_ptr<ConstantBufferAllocator> cbAllocator_ = nullptr;
+	std::unique_ptr<StackAllocator> stackAllocator_ = nullptr;
 
 public:
     // Provide access to WindowAPI for callers that need window information
@@ -341,6 +343,7 @@ public:
 	D3D12_CPU_DESCRIPTOR_HANDLE GetRtvHandle(UINT index) const { return rtvHandles[index]; }
 	void PrintDebugMessages();
 	ConstantBufferAllocator* GetCBAllocator() const { return cbAllocator_.get(); }
+	StackAllocator* GetStackAllocator() const { return stackAllocator_.get(); }
 
 
 	//最大SRV数(Texture枚数)
