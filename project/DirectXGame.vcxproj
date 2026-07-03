@@ -36,6 +36,7 @@
     <ClCompile Include="Baziru3_Engine\Audio\AudioManager.cpp" />
     <ClCompile Include="Baziru3_Engine\Scene\BaseScene.cpp" />
     <ClCompile Include="Baziru3_Engine\2D\Texture\TextureManager.cpp" />
+    <ClCompile Include="Baziru3_Engine\Base\Srv\DescriptorHeap.cpp" />
     <ClCompile Include="Baziru3_Engine\3D\Object\Object3d.cpp" />
     <ClCompile Include="Baziru3_Engine\3D\Object\Object3dCom.cpp" />
     <ClCompile Include="Baziru3_Engine\Audio\Sound.cpp" />
@@ -44,6 +45,7 @@
     <ClCompile Include="Baziru3_Engine\Camera\Camera.cpp" />
     <ClCompile Include="Baziru3_Engine\Camera\DebugCamera\DebugCamera.cpp" />
     <ClCompile Include="Baziru3_Engine\Base\DirectXCom.cpp" />
+    <ClCompile Include="Baziru3_Engine\Base\Allocator\ConstantBufferAllocator.cpp" />
     <ClCompile Include="Baziru3_Engine\Base\KeyInput.cpp" />
     <ClCompile Include="Baziru3_Engine\Base\Log\Log.cpp" />
     <ClCompile Include="Baziru3_Engine\Base\Matrix4x4.cpp" />
@@ -51,6 +53,7 @@
     <ClCompile Include="Baziru3_Engine\Base\StringUtil.cpp" />
     <ClCompile Include="Baziru3_Engine\Base\Transform.cpp" />
     <ClCompile Include="Baziru3_Engine\Base\Windows\WindowsAPI.cpp" />
+    <ClCompile Include="Baziru3_Engine\Base\Pipeline\PipelineStateManager.cpp" />
     <ClCompile Include="Baziru3_Engine\SkyBox\SkyboxCom.cpp" />
     <ClCompile Include="Baziru3_Engine\Platform\Windows\CrashDump.cpp" />
     <ClCompile Include="Baziru3_Engine\Base\DebugUI.cpp" />
@@ -207,6 +210,7 @@
     <ClInclude Include="Baziru3_Engine\Base\RootParam.h" />
     <ClInclude Include="Baziru3_Engine\Camera\DebugCamera\DebugCamera.h" />
     <ClInclude Include="Baziru3_Engine\Base\DirectXCom.h" />
+    <ClInclude Include="Baziru3_Engine\Base\Allocator\ConstantBufferAllocator.h" />
     <ClInclude Include="Baziru3_Engine\Base\ImGui\ImGuiManager.h" />
     <ClInclude Include="Baziru3_Engine\Base\KeyInput.h" />
     <ClInclude Include="Baziru3_Engine\Base\Log\Log.h" />
@@ -220,7 +224,9 @@
     <ClInclude Include="Baziru3_Engine\2D\Sprite\Sprite.h" />
     <ClInclude Include="Baziru3_Engine\2D\Sprite\SpriteCom.h" />
     <ClInclude Include="Baziru3_Engine\Base\Operator.h" />
+    <ClInclude Include="Baziru3_Engine\Base\Pipeline\PipelineStateManager.h" />
     <ClInclude Include="Baziru3_Engine\2D\Texture\TextureManager.h" />
+    <ClInclude Include="Baziru3_Engine\Base\Srv\DescriptorHeap.h" />
     <ClInclude Include="Baziru3_Engine\SkyBox\SkyboxCom.h" />
     <ClInclude Include="Baziru3_Engine\Platform\Windows\CrashDump.h" />
     <ClInclude Include="Baziru3_Engine\Base\DebugUI.h" />
@@ -331,7 +337,7 @@
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;USE_IMGUI;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/utf-8 /FS %(AdditionalOptions)</AdditionalOptions>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <TreatWarningAsError>true</TreatWarningAsError>
@@ -355,7 +361,7 @@
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/utf-8 /FS %(AdditionalOptions)</AdditionalOptions>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <Optimization>MinSpace</Optimization>
@@ -379,7 +385,7 @@
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/utf-8 /FS %(AdditionalOptions)</AdditionalOptions>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <Optimization>Disabled</Optimization>

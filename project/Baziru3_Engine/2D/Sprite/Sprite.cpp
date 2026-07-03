@@ -2,6 +2,7 @@
 #include"SpriteCom.h"
 #include"TextureManager.h"
 #include"Log.h"
+#include "Baziru3_Engine/Base/Allocator/ConstantBufferAllocator.h"
 #include<cassert>
 #include <iostream>
 
@@ -11,11 +12,12 @@ Sprite::Sprite()
 {
 }
 
-std::unique_ptr<Sprite> Sprite::Create(SpriteCom* spriteCom, const Sprite::Transform& transform, const std::string& texturePath)
+std::unique_ptr<Sprite> Sprite::Create(SpriteCom* spriteCom, const Sprite::Transform& transform, const std::string& texturePath, TextureManager* textureManager)
 {
     if (!spriteCom) return nullptr;
 
-    uint32_t texIndex = TextureManager::GetInstance()->Load(texturePath);
+    TextureManager* tm = textureManager ? textureManager : TextureManager::GetInstance();
+    uint32_t texIndex = tm->Load(texturePath);
     if (texIndex == TextureManager::kInvalidTextureIndex)
     {
         Logger::Log(std::string("Sprite::Create - failed to load texture: ") + texturePath);
@@ -23,7 +25,7 @@ std::unique_ptr<Sprite> Sprite::Create(SpriteCom* spriteCom, const Sprite::Trans
     }
 
     Vector2 pos{ transform.translate.x, transform.translate.y };
-    auto sp = Sprite::Create(spriteCom, texIndex, pos);
+    auto sp = Sprite::Create(spriteCom, texIndex, pos, tm);
     if (!sp) return nullptr;
 
     Vector2 baseSize = sp->GetSize();
@@ -41,13 +43,14 @@ Sprite::~Sprite()
 
 
 
-void Sprite::Initialize(SpriteCom* spriteCom, const std::string& textureFilePath)
+void Sprite::Initialize(SpriteCom* spriteCom, const std::string& textureFilePath, TextureManager* textureManager)
 {
 	spriteCom_ = spriteCom;
 	assert(spriteCom);
 	dxCommon_ = spriteCom->GetDxCommon();
 	assert(dxCommon_);
 
+	textureManager_ = textureManager ? textureManager : TextureManager::GetInstance();
 
 	CreateVertexBufferView();
 	CreateIndexBufferView();
@@ -56,37 +59,28 @@ void Sprite::Initialize(SpriteCom* spriteCom, const std::string& textureFilePath
 	ReflectionProcessing();
 	CreateIndexData();
 
-    materialResourceSprite_ = dxCommon_->CreateBufferResource(dxCommon_->GetDevice().Get(), sizeof(Material));
-    // Persistent map so materialData remains valid for the Sprite lifetime
-    materialMap_.reset(materialResourceSprite_);
-    materialData_ = materialMap_.get();
-    materialData_->color = { 1.0f, 1.0f, 1.0f, 1.0f }; // 白（テクスチャ色をそのまま出す用）
-    materialData_->enableLighting = false;
-    materialData_->specularModel = 0; // Blinn-Phong default
-    materialData_->shininess = 16.0f;
-    materialData_->uvTransform = MakeIdentity4x4();
+    materialData_.color = { 1.0f, 1.0f, 1.0f, 1.0f }; // 白
+    materialData_.enableLighting = false;
+    materialData_.specularModel = 0;
+    materialData_.shininess = 16.0f;
+    materialData_.uvTransform = MakeIdentity4x4();
 	
-	//Sprite用のTransformationMatrix用のリソースを作る
-    transformationMatrixResourceSprite_ = dxCommon_->CreateBufferResource(dxCommon_->GetDevice().Get(), sizeof(TransformationMatrix));
-    // Persistent map for per-frame updated transformation matrix
-    transformationMatrixMap_.reset(transformationMatrixResourceSprite_);
-    transformationMatrixDataSprite_ = transformationMatrixMap_.get();
 	// 単位行列を書き込んでおく
-	transformationMatrixDataSprite_->WVP = MakeIdentity4x4();
-	transformationMatrixDataSprite_->World = MakeIdentity4x4();
+	transformationMatrixDataSprite_.WVP = MakeIdentity4x4();
+	transformationMatrixDataSprite_.World = MakeIdentity4x4();
 	
-	uint32_t index = TextureManager::GetInstance()->Load(textureFilePath);
+	uint32_t index = textureManager_->Load(textureFilePath);
 
 	assert(index != TextureManager::kInvalidTextureIndex);
 
 	textureIndex_ = index;
 
-	textureHandleGPU_ = TextureManager::GetInstance()->GetSrvHandleGPU(textureIndex_);
+	textureHandleGPU_ = textureManager_->GetSrvHandleGPU(textureIndex_);
 	
 	AdjustTextureSize();
 }
 
-std::unique_ptr<Sprite> Sprite::Create(SpriteCom* spriteCom, uint32_t textureHandle, const Vector2& position)
+std::unique_ptr<Sprite> Sprite::Create(SpriteCom* spriteCom, uint32_t textureHandle, const Vector2& position, TextureManager* textureManager)
 {
     if (!spriteCom) return nullptr;
 
@@ -108,26 +102,21 @@ std::unique_ptr<Sprite> Sprite::Create(SpriteCom* spriteCom, uint32_t textureHan
     sp->ReflectionProcessing();
     sp->CreateIndexData();
 
-    // マテリアルリソース
-    sp->materialResourceSprite_ = sp->dxCommon_->CreateBufferResource(sp->dxCommon_->GetDevice().Get(), sizeof(Material));
-    sp->materialMap_.reset(sp->materialResourceSprite_);
-    sp->materialData_ = sp->materialMap_.get();
-    sp->materialData_->color = { 1.0f,1.0f,1.0f,1.0f };
-    sp->materialData_->enableLighting = false;
-    sp->materialData_->specularModel = 0;
-    sp->materialData_->shininess = 16.0f;
-    sp->materialData_->uvTransform = MakeIdentity4x4();
+    // マテリアルリソース初期化
+    sp->materialData_.color = { 1.0f,1.0f,1.0f,1.0f };
+    sp->materialData_.enableLighting = false;
+    sp->materialData_.specularModel = 0;
+    sp->materialData_.shininess = 16.0f;
+    sp->materialData_.uvTransform = MakeIdentity4x4();
 
-	// TransformationMatrixリソース
-    sp->transformationMatrixResourceSprite_ = sp->dxCommon_->CreateBufferResource(sp->dxCommon_->GetDevice().Get(), sizeof(TransformationMatrix));
-    sp->transformationMatrixMap_.reset(sp->transformationMatrixResourceSprite_);
-    sp->transformationMatrixDataSprite_ = sp->transformationMatrixMap_.get();
-    sp->transformationMatrixDataSprite_->WVP = MakeIdentity4x4();
-    sp->transformationMatrixDataSprite_->World = MakeIdentity4x4();
+	// TransformationMatrix初期化
+    sp->transformationMatrixDataSprite_.WVP = MakeIdentity4x4();
+    sp->transformationMatrixDataSprite_.World = MakeIdentity4x4();
 
 	// Textureのセット
+	sp->textureManager_ = textureManager ? textureManager : TextureManager::GetInstance();
     sp->textureIndex_ = textureHandle;
-    sp->textureHandleGPU_ = TextureManager::GetInstance()->GetSrvHandleGPU(sp->textureIndex_);
+    sp->textureHandleGPU_ = sp->textureManager_->GetSrvHandleGPU(sp->textureIndex_);
 
 	// positionのセット
     sp->SetPosition(position);
@@ -143,7 +132,7 @@ void Sprite::Update()
 	WindowAPI* windowAPI = dxCommon_ ? dxCommon_->GetWindowAPI() : nullptr;
 	assert(windowAPI);
 
-	const DirectX::TexMetadata& metadata = TextureManager::GetInstance()->GetMetadata(textureIndex_);
+	const DirectX::TexMetadata& metadata = textureManager_->GetMetadata(textureIndex_);
 
 	float tex_left = textureLeftTop_.x / static_cast<float>(metadata.width);
 	float tex_right = (textureLeftTop_.x + textureSize_.x) / static_cast<float>(metadata.width);
@@ -175,8 +164,8 @@ void Sprite::Update()
 	Matrix4x4 viewMatrixSprite = MakeIdentity4x4();
 	Matrix4x4 projectionMatrixSprite = MakeOrthographicMatrix(0.0f, 0.0f, float(windowAPI->GetClientWidth()), float(windowAPI->GetClientHeight()), 0.0f, 100.0f);
 	Matrix4x4 worldViewProjectionmatrixSprite = Multiply(worldMatrixSprite, Multiply(viewMatrixSprite, projectionMatrixSprite));
-	transformationMatrixDataSprite_->WVP = worldViewProjectionmatrixSprite; 
-	transformationMatrixDataSprite_->World = worldMatrixSprite;
+	transformationMatrixDataSprite_.WVP = worldViewProjectionmatrixSprite; 
+	transformationMatrixDataSprite_.World = worldMatrixSprite;
 
 	if (uvDirty_)
 	{
@@ -185,28 +174,39 @@ void Sprite::Update()
 	}
 }
 
-void Sprite::Draw()
+void Sprite::Draw(ID3D12GraphicsCommandList* commandList)
 {
+	ID3D12GraphicsCommandList* cmdList = commandList ? commandList : dxCommon_->GetCommandList().Get();
 	
-	dxCommon_->GetCommandList()->IASetVertexBuffers(0, 1, &vertexBufferViewSprite_);
-	dxCommon_->GetCommandList()->IASetIndexBuffer(&indexBufferViewSprite_);
-	dxCommon_->GetCommandList()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+	cmdList->IASetVertexBuffers(0, 1, &vertexBufferViewSprite_);
+	cmdList->IASetIndexBuffer(&indexBufferViewSprite_);
+	cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-	dxCommon_->GetCommandList()->SetGraphicsRootConstantBufferView(0, materialResourceSprite_->GetGPUVirtualAddress());
-	dxCommon_->GetCommandList()->SetGraphicsRootConstantBufferView(1, transformationMatrixResourceSprite_->GetGPUVirtualAddress());
+	// 定数バッファアロケーターから領域を切り出す
+	auto* cbAllocator = dxCommon_->GetCBAllocator();
+	assert(cbAllocator);
+
+	auto matAlloc = cbAllocator->Allocate(sizeof(Material));
+	std::memcpy(matAlloc.cpuAddress, &materialData_, sizeof(Material));
+
+	auto transAlloc = cbAllocator->Allocate(sizeof(TransformationMatrix));
+	std::memcpy(transAlloc.cpuAddress, &transformationMatrixDataSprite_, sizeof(TransformationMatrix));
+
+	cmdList->SetGraphicsRootConstantBufferView(0, matAlloc.gpuAddress);
+	cmdList->SetGraphicsRootConstantBufferView(1, transAlloc.gpuAddress);
 	if (textureHandleGPU_.ptr != 0) {
-		dxCommon_->GetCommandList()->SetGraphicsRootDescriptorTable(2, textureHandleGPU_);
+		cmdList->SetGraphicsRootDescriptorTable(2, textureHandleGPU_);
 	}
 	if (directionalLightResource_) {
-		dxCommon_->GetCommandList()->SetGraphicsRootConstantBufferView(3, directionalLightResource_->GetGPUVirtualAddress());
+		cmdList->SetGraphicsRootConstantBufferView(3, directionalLightResource_->GetGPUVirtualAddress());
 	}
 	else {
-		dxCommon_->GetCommandList()->SetGraphicsRootConstantBufferView(3, transformationMatrixResourceSprite_->GetGPUVirtualAddress());
+		cmdList->SetGraphicsRootConstantBufferView(3, transAlloc.gpuAddress);
 	}
-	dxCommon_->GetCommandList()->SetGraphicsRootConstantBufferView(4, transformationMatrixResourceSprite_->GetGPUVirtualAddress());
+	cmdList->SetGraphicsRootConstantBufferView(4, transAlloc.gpuAddress);
 
 	// draw quad
-	dxCommon_->GetCommandList()->DrawIndexedInstanced(6, 1, 0, 0, 0);
+	cmdList->DrawIndexedInstanced(6, 1, 0, 0, 0);
 }
 
 void Sprite::Finalize()
@@ -215,14 +215,6 @@ void Sprite::Finalize()
     if (vertexMap_) {
         vertexMap_.releaseWithWrittenRange(sizeof(VertexData) * 6);
         vertexData_ = nullptr;
-    }
-    if (materialMap_) {
-        materialMap_.releaseWithWrittenRange(sizeof(Material));
-        materialData_ = nullptr;
-    }
-    if (transformationMatrixMap_) {
-        transformationMatrixMap_.releaseWithWrittenRange(sizeof(TransformationMatrix));
-        transformationMatrixDataSprite_ = nullptr;
     }
 	// indexResourceSprite_ は既に Unmap 済み
 }
@@ -307,7 +299,7 @@ void Sprite::ReflectionProcessing()
 
 void Sprite::AdjustTextureSize()
 {
-	const DirectX::TexMetadata& metadata = TextureManager::GetInstance()->GetMetadata(textureIndex_);
+	const DirectX::TexMetadata& metadata = textureManager_->GetMetadata(textureIndex_);
 	
 	textureSize_.x = static_cast<float>(metadata.width);
 	textureSize_.y = static_cast<float>(metadata.height);
@@ -327,11 +319,9 @@ void Sprite::SetUVParams(const Vector3& scale, float rotZ, const Vector3& transl
 
 void Sprite::RecalculateUVMatrix()
 {
-	if (!materialData_) return;
-
 	Matrix4x4 uvTransformMatrix = MakeScaleMatrix(uvParams_.scale);
 	uvTransformMatrix = Multiply(uvTransformMatrix, MakeRotateZMatrix(uvParams_.rotate.z));
 	uvTransformMatrix = Multiply(uvTransformMatrix, MakeTranslateMatrix(uvParams_.translate));
 
-	materialData_->uvTransform = uvTransformMatrix;
+	materialData_.uvTransform = uvTransformMatrix;
 }

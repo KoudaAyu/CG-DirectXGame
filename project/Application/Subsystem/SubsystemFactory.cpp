@@ -1,6 +1,7 @@
 #include "SubsystemFactory.h"
 
 #include "DirectXCom.h"
+#include "Baziru3_Engine/Base/Pipeline/PipelineStateManager.h"
 #include "Log.h"
 #include "SceneManager.h"
 #include "SpriteCom.h"
@@ -31,10 +32,11 @@ SubsystemResult SubsystemFactory::InitializeAll(std::ostream& logStream, const I
         TextureManager::GetInstance()->SetDirectXCom(res.directXCom.get());
         Logger::Log(logStream, "TextureManager initialized and bound to DirectXCom\n");
 
+        PipelineStateManager::GetInstance()->Initialize(res.directXCom.get());
+
         res.spriteCom = std::make_unique<SpriteCom>(logStream, res.directXCom.get());
         res.spriteCom->Initialize();
-        res.spriteCom->CreateGraphicsPipeline();
-        Logger::Log(logStream, "SpriteCom initialized and pipeline created\n");
+        Logger::Log(logStream, "SpriteCom initialized\n");
 
         SceneManager::GetInstance()->SetSpriteCom(res.spriteCom.get());
 
@@ -76,6 +78,7 @@ void SubsystemFactory::FinalizeAll(SubsystemResult& r, std::ostream& logStream)
         r.spriteCom.reset();
         Logger::Log(logStream, "SpriteCom finalized\n");
     }
+    PipelineStateManager::GetInstance()->Finalize();
     try { TextureManager::GetInstance()->Finalize(); Logger::Log(logStream, "TextureManager finalized\n"); }
     catch (...) {}
     if (r.directXCom)

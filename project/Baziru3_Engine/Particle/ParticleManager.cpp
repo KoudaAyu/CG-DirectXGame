@@ -27,9 +27,10 @@ ParticleManager::~ParticleManager()
 	}
 }
 
-void ParticleManager::Initialize(Camera* camera)
+void ParticleManager::Initialize(Camera* camera, TextureManager* textureManager)
 {
 	camera_ = camera;
+	textureManager_ = textureManager ? textureManager : TextureManager::GetInstance();
 	SetupDraw(dxCommon->GetCommandList().Get());
 
     Random::SeedEngine();
@@ -67,7 +68,7 @@ void ParticleManager::Initialize(Camera* camera)
 	}
 
 	// インスタンシング用 StructuredBuffer の SRV を SRVManager 経由で作成する
-	SRVManager* srvManager = TextureManager::GetInstance()->GetSRVManager();
+	SRVManager* srvManager = textureManager_->GetSRVManager();
 	assert(srvManager);
 
 	instancingSrvIndex_ = srvManager->Allocate();
@@ -175,7 +176,7 @@ void ParticleManager::Finalize()
     
     try
     {
-        SRVManager* srvManager = TextureManager::GetInstance()->GetSRVManager();
+        SRVManager* srvManager = textureManager_->GetSRVManager();
         if (srvManager)
         {
             if (instancingSrvIndex_ >= 3 && instancingSrvIndex_ < SRVManager::kMaxSRVCount)
@@ -373,7 +374,7 @@ void ParticleManager::Update(float deltaTime)
 				}
 				else
 				{
-					g.srvHandle = TextureManager::GetInstance()->GetSrvHandleGPU(curTex);
+					g.srvHandle = textureManager_->GetSrvHandleGPU(curTex);
 				}
 				outGroups.push_back(g);
 
@@ -392,7 +393,7 @@ void ParticleManager::Update(float deltaTime)
 		}
 		else
 		{
-			g.srvHandle = TextureManager::GetInstance()->GetSrvHandleGPU(curTex);
+			g.srvHandle = textureManager_->GetSrvHandleGPU(curTex);
 		}
 		outGroups.push_back(g);
 	};
@@ -415,7 +416,7 @@ void ParticleManager::Update(float deltaTime)
 	barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
 	commandList->ResourceBarrier(1, &barrier);
 
-	SRVManager* srvManager = TextureManager::GetInstance()->GetSRVManager();
+	SRVManager* srvManager = textureManager_->GetSRVManager();
 	if (srvManager)
 	{
 		srvManager->PreDraw();

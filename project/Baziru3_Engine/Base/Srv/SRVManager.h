@@ -38,19 +38,7 @@ public:
 	D3D12_GPU_DESCRIPTOR_HANDLE GetGPUDescriptorHandle(uint32_t index);
 
 private:
-
 	SRVManager(const SRVManager&) = delete;
 	SRVManager& operator=(const SRVManager&) = delete;
 	DirectXCom* directXCom_ = nullptr;
-
-	//SRV用のデスクリプタサイズ
-	uint32_t descriptorSize_;
-	//SRV用のデスクリプタヒープ
-	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> descriptorHeap;
-
-	//次に使用するSRVインデックス
-	uint32_t useIndex = 2;
-
-	std::vector<uint32_t> freeIndices_;
-	std::vector<char> allocatedFlags_; // インデックスの使用状況を管理するマップ
 };

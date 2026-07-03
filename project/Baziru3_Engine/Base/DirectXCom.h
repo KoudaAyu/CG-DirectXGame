@@ -8,12 +8,15 @@
 #include <ostream>
 
 #include <array>
+#include <memory>
 #include <chrono>
-
 #include "DirectXTex.h"
+
+class ConstantBufferAllocator;
 
 
 #include"WindowsAPI.h"
+#include "Baziru3_Engine/Base/Srv/DescriptorHeap.h"
 
 /**
  * @brief DirectX12の共通処理を管理するクラス
@@ -169,6 +172,14 @@ public:
 	{
 		return commandList;
 	}
+	Microsoft::WRL::ComPtr<ID3D12CommandAllocator>& GetWorkerCommandAllocator()
+	{
+		return workerCommandAllocator_;
+	}
+	Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList>& GetWorkerCommandList()
+	{
+		return workerCommandList_;
+	}
 
 	Microsoft::WRL::ComPtr<ID3D12CommandQueue>& GetCommandQueue()
 	{
@@ -182,18 +193,21 @@ public:
 	{
 		return swapChainDesc;
 	}
-	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap>& GetRtvDescriptorHeap()
+	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> GetRtvDescriptorHeap() const
 	{
-		return rtvDescriptorHeap;
+		return rtvDescriptorHeap_.GetHeap();
 	}
-	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap>& GetSrvDescriptorHeap()
+	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> GetSrvDescriptorHeap() const
 	{
-		return srvDescriptorHeap;
+		return srvDescriptorHeap_.GetHeap();
 	}
-	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap>& GetDsvDescriptorHeap()
+	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> GetDsvDescriptorHeap() const
 	{
-		return dsvDescriptorHeap;
+		return dsvDescriptorHeap_.GetHeap();
 	}
+	DescriptorHeap& GetSrvHeap() { return srvDescriptorHeap_; }
+	DescriptorHeap& GetRtvHeap() { return rtvDescriptorHeap_; }
+	DescriptorHeap& GetDsvHeap() { return dsvDescriptorHeap_; }
 	uint32_t GetDescriptorSizeSRV() const
 	{
 		return device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
@@ -303,11 +317,15 @@ private:
 	D3D12_RESOURCE_BARRIER barrier{};
 	UINT backBufferIndex;
 
+	// ワーカー用（並列コマンド記録用）
+	Microsoft::WRL::ComPtr<ID3D12CommandAllocator> workerCommandAllocator_ = nullptr;
+	Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> workerCommandList_ = nullptr;
+
 	//DescriptorSizeを取得しておく
 	
-	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> rtvDescriptorHeap = nullptr;
-	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> srvDescriptorHeap = nullptr;
-	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> dsvDescriptorHeap = nullptr;
+	DescriptorHeap rtvDescriptorHeap_;
+	DescriptorHeap srvDescriptorHeap_;
+	DescriptorHeap dsvDescriptorHeap_;
 
 
 	uint32_t descriptorSize_;
@@ -315,10 +333,14 @@ private:
 	std::ostream& logStream;
 
 	WindowAPI* windowAPI = nullptr;
+	std::unique_ptr<ConstantBufferAllocator> cbAllocator_ = nullptr;
 
 public:
     // Provide access to WindowAPI for callers that need window information
     WindowAPI* GetWindowAPI() const { return windowAPI; }
+	D3D12_CPU_DESCRIPTOR_HANDLE GetRtvHandle(UINT index) const { return rtvHandles[index]; }
+	void PrintDebugMessages();
+	ConstantBufferAllocator* GetCBAllocator() const { return cbAllocator_.get(); }
 
 
 	//最大SRV数(Texture枚数)

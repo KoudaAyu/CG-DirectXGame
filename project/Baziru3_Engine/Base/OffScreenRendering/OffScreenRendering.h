@@ -55,6 +55,9 @@ public:
     PostEffect GetPostEffect() const { return currentEffect_; }
     void SetPostEffect(PostEffect effect) { currentEffect_ = effect; }
 
+    D3D12_CPU_DESCRIPTOR_HANDLE GetRtvHandle() const { return rtvHandle_; }
+    D3D12_CPU_DESCRIPTOR_HANDLE GetDsvHandle() const { return dsvHandle_; }
+
 private:
     void CreateRootSignature();
     void ShaderCompile();

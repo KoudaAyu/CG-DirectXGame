@@ -17,6 +17,7 @@ class ParticleEmitter;
 
 class Camera;
 class Ring;
+class TextureManager;
 
 class ParticleManager
 {
@@ -70,7 +71,7 @@ public:
 	ParticleManager(std::ostream& logStream, DirectXCom* dxCommon);
 	~ParticleManager();
 
-	void Initialize(Camera* camera);
+	void Initialize(Camera* camera, TextureManager* textureManager = nullptr);
 	void Finalize();
 	void ClearParticles();
 	void Update(float deltaTime);
@@ -242,6 +243,7 @@ private:
 
 	uint32_t instancingSrvIndex_ = 0;
     bool finalized_ = false;
+	TextureManager* textureManager_ = nullptr;
     enum class DrawMode
 	{
 		None,

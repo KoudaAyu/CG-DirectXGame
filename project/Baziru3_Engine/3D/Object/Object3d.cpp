@@ -7,6 +7,7 @@
 #include "SkinCluster.h"
 #include "SkinningObject3dCom.h"
 #include "SceneManager.h"
+#include "Baziru3_Engine/Base/Allocator/ConstantBufferAllocator.h"
 #include <assimp/Importer.hpp>
 #include <assimp/postprocess.h>
 #include <assimp/scene.h>
@@ -115,7 +116,7 @@ namespace
 
 
 
-void Object3d::Initialize(Object3dCom* object3dCom, const ModelData& modelData)
+void Object3d::Initialize(Object3dCom* object3dCom, const ModelData& modelData, TextureManager* textureManager)
 {
 	object3dCom_ = object3dCom;
 	modelData_ = modelData;
@@ -123,6 +124,8 @@ void Object3d::Initialize(Object3dCom* object3dCom, const ModelData& modelData)
 	{
 		camera_ = object3dCom_->GetDefaultCamera();
 	}
+
+	textureManager_ = textureManager ? textureManager : TextureManager::GetInstance();
 
 	VertexResource();
 	MaterialResource();
@@ -132,7 +135,7 @@ void Object3d::Initialize(Object3dCom* object3dCom, const ModelData& modelData)
 	// テクスチャロードはパスが有効なときのみ実行
 	if (!modelData_.material.textureFilePath.empty())
 	{
-		uint32_t index = TextureManager::GetInstance()->Load(modelData_.material.textureFilePath);
+		uint32_t index = textureManager_->Load(modelData_.material.textureFilePath);
 		if (index != TextureManager::kInvalidTextureIndex)
 		{
 			modelData_.material.textureIndex = index;
@@ -153,7 +156,13 @@ void Object3d::SetupAnimation(const Animation* animation, const Skeleton& skelet
 	if (!object3dCom_) return;
 	DirectXCom* dx = object3dCom_->GetDirectXCom();
 	if (!dx) return;
-	SRVManager* srvManager = TextureManager::GetInstance()->GetSRVManager();
+
+	if (!textureManager_)
+	{
+		textureManager_ = TextureManager::GetInstance();
+	}
+
+	SRVManager* srvManager = textureManager_->GetSRVManager();
 	if (!srvManager) return;
 
 	animator_.SetAnimation(animation);
@@ -223,23 +232,29 @@ void Object3d::Update()
 	}
 
 	// WVP を更新
-	transformationMatrixData_->WVP = Multiply(worldMatrix, Multiply(viewMatrix, projectionMatrix));
-	transformationMatrixData_->World = worldMatrix;
+	transformationMatrixData_.WVP = Multiply(worldMatrix, Multiply(viewMatrix, projectionMatrix));
+	transformationMatrixData_.World = worldMatrix;
 	// WorldInverseTranspose を計算して格納（法線変換用）
-	transformationMatrixData_->WorldInverseTranspose = Transpose(Inverse(worldMatrix));
+	transformationMatrixData_.WorldInverseTranspose = Transpose(Inverse(worldMatrix));
 }
 
 void Object3d::Draw(ID3D12GraphicsCommandList* commandList)
 {
+	DirectXCom* dx = object3dCom_ ? object3dCom_->GetDirectXCom() : nullptr;
+	if (dx)
+	{
+		PrepareConstantBuffers(dx);
+	}
+
 	commandList->IASetVertexBuffers(0, 1, &vertexBufferView_);
 	commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
    if (indexResource && !modelData_.indices.empty())
 	{
 		commandList->IASetIndexBuffer(&indexBufferView_);
 	}
-	commandList->SetGraphicsRootConstantBufferView(RootParam::Object3D::kMaterial, materialResource->GetGPUVirtualAddress());
-	commandList->SetGraphicsRootConstantBufferView(RootParam::Object3D::kTransform, transformationMatrixResource->GetGPUVirtualAddress());
-	commandList->SetGraphicsRootConstantBufferView(RootParam::Object3D::kLight, directionalLightResource->GetGPUVirtualAddress());
+	commandList->SetGraphicsRootConstantBufferView(RootParam::Object3D::kMaterial, materialGpuAddress_);
+	commandList->SetGraphicsRootConstantBufferView(RootParam::Object3D::kTransform, transformationMatrixGpuAddress_);
+	commandList->SetGraphicsRootConstantBufferView(RootParam::Object3D::kLight, directionalLightGpuAddress_);
    if (indexResource && !modelData_.indices.empty())
 	{
 		commandList->DrawIndexedInstanced(static_cast<UINT>(modelData_.indices.size()), 1, 0, 0, 0);
@@ -269,7 +284,11 @@ void Object3d::Draw(Object3dCom* object3dCom, SkinningObject3dCom* skinningObjec
 	const auto& modelData = GetModelData();
 	if (modelData.material.textureIndex != TextureManager::kInvalidTextureIndex)
 	{
-		ctx.textureHandle = TextureManager::GetInstance()->GetSrvHandleGPU(modelData.material.textureIndex);
+		if (!textureManager_)
+		{
+			textureManager_ = TextureManager::GetInstance();
+		}
+		ctx.textureHandle = textureManager_->GetSrvHandleGPU(modelData.material.textureIndex);
 	}
 	else
 	{
@@ -480,147 +499,78 @@ Object3d::~Object3d()
 {
 	// 持続的にマップされたリソースがある場合は安全にアンマップする
 	// 二重アンマップを避けるため、CPU側のポインタが nullptr でない場合のみ Unmap する
-	if (transformationMatrixResource && transformationMatrixData_ != nullptr)
-	{
-		D3D12_RANGE written = { 0, sizeof(TransformationMatrix) };
-		transformationMatrixResource->Unmap(0, &written);
-		transformationMatrixData_ = nullptr;
-	}
-
 	if (vertexResource && vertexData_ != nullptr)
 	{
 		D3D12_RANGE written = { 0, static_cast<SIZE_T>(vertexBufferView_.SizeInBytes) };
 		vertexResource->Unmap(0, &written);
 		vertexData_ = nullptr;
 	}
-
-	if (materialResource && materialData_ != nullptr)
-	{
-		D3D12_RANGE written = { 0, sizeof(Material) };
-		materialResource->Unmap(0, &written);
-		materialData_ = nullptr;
-	}
-
-	if (directionalLightResource && directionalLightData_ != nullptr)
-	{
-		D3D12_RANGE written = { 0, sizeof(DirectionalLight) };
-		directionalLightResource->Unmap(0, &written);
-		directionalLightData_ = nullptr;
-	}
 }
 
 void Object3d::SetEnableLighting(bool enable)
 {
-	if (!materialResource) return;
-	Material* data = nullptr;
-	materialResource->Map(0, nullptr, reinterpret_cast<void**>(&data));
-	if (data)
-	{
-		data->enableLighting = enable ? 1 : 0;
-		D3D12_RANGE written = { 0, sizeof(Material) };
-		materialResource->Unmap(0, &written);
-	}
+	materialData_.enableLighting = enable ? 1 : 0;
 }
 
 void Object3d::SetColor(const Vector4& color)
 {
-	if (!materialResource) return;
-	Material* data = nullptr;
-	materialResource->Map(0, nullptr, reinterpret_cast<void**>(&data));
-	if (data)
-	{
-		data->color = color;
-		D3D12_RANGE written = { 0, sizeof(Material) };
-		materialResource->Unmap(0, &written);
-	}
+	materialData_.color = color;
 }
 
 void Object3d::SetReflectionFactor(float factor)
 {
-	if (!materialResource) return;
-	Material* data = nullptr;
-	materialResource->Map(0, nullptr, reinterpret_cast<void**>(&data));
-	if (data)
-	{
-		data->reflectionFactor = factor;
-		D3D12_RANGE written = { 0, sizeof(Material) };
-		materialResource->Unmap(0, &written);
-	}
+	materialData_.reflectionFactor = factor;
 }
 
 void Object3d::SetFresnelF0(float f0)
 {
-	if (!materialResource) return;
-	Material* data = nullptr;
-	materialResource->Map(0, nullptr, reinterpret_cast<void**>(&data));
-	if (data)
-	{
-		data->fresnelF0 = f0;
-		D3D12_RANGE written = { 0, sizeof(Material) };
-		materialResource->Unmap(0, &written);
-	}
+	materialData_.fresnelF0 = f0;
 }
 
 void Object3d::MaterialResource()
 {
-	if (object3dCom_ && object3dCom_->GetDirectXCom())
-	{
-		DirectXCom* dxCommon = object3dCom_->GetDirectXCom();
-		// マテリアル用のリソースを作成（1個分）
-		materialResource = dxCommon->CreateBufferResource(dxCommon->GetDevice().Get(), sizeof(Material));
-		// 書き込み用アドレスを取得してメンバーに保持
-		materialResource->Map(0, nullptr, reinterpret_cast<void**>(&materialData_));
-		// 初期値を設定
-		materialData_->color = { 1.0f,1.0f,1.0f,1.0f };
-		materialData_->enableLighting = false;
-		materialData_->specularModel = 0;
-		materialData_->reflectionFactor = 0.5f;
-		materialData_->fresnelF0 = 0.04f;
-		materialData_->shininess = 16.0f;
-		materialData_->uvTransform = MakeIdentity4x4();
-
-		// マテリアルは初期化時に一度だけ書き込む想定のため、MapしたらすぐにUnmapする
-		// 書き込み範囲を指定してGPUへ変更を通知する
-		D3D12_RANGE writtenRange = { 0, sizeof(Material) };
-		materialResource->Unmap(0, &writtenRange);
-
-		materialData_ = nullptr;
-	}
+	// 初期値を設定
+	materialData_.color = { 1.0f,1.0f,1.0f,1.0f };
+	materialData_.enableLighting = false;
+	materialData_.specularModel = 0;
+	materialData_.reflectionFactor = 0.5f;
+	materialData_.fresnelF0 = 0.04f;
+	materialData_.shininess = 16.0f;
+	materialData_.uvTransform = MakeIdentity4x4();
 }
 
 void Object3d::TransformationMatrixResource()
 {
-	if (object3dCom_ && object3dCom_->GetDirectXCom())
-	{
-		DirectXCom* dxCommon = object3dCom_->GetDirectXCom();
-		// Transformation
-		transformationMatrixResource = dxCommon->CreateBufferResource(dxCommon->GetDevice().Get(), sizeof(TransformationMatrix));
-		// 書き込み用アドレスを取得してメンバーに保持
-		transformationMatrixResource->Map(0, nullptr, reinterpret_cast<void**>(&transformationMatrixData_));
-
-		transformationMatrixData_->WVP = MakeIdentity4x4();
-		transformationMatrixData_->World = MakeIdentity4x4();
-	}
+	transformationMatrixData_.WVP = MakeIdentity4x4();
+	transformationMatrixData_.World = MakeIdentity4x4();
 }
 
 void Object3d::DirectionalLightResource()
 {
-	// マッピング前にバッファを作成し、セーフティチェックを行う
-	if (object3dCom_ && object3dCom_->GetDirectXCom())
-	{
-		DirectXCom* dxCommon = object3dCom_->GetDirectXCom();
-		// ディレクショナルライト用のCBVリソースを作成
-		directionalLightResource = dxCommon->CreateBufferResource(dxCommon->GetDevice().Get(), sizeof(DirectionalLight));
-		// 書き込み用アドレスを取得
-		directionalLightResource->Map(0, nullptr, reinterpret_cast<void**>(&directionalLightData_));
+	// 初期値を書き込む
+	directionalLightData_.color = { 1.0f, 1.0f, 1.0f, 1.0f };
+	directionalLightData_.direction = { 0.0f, -1.0f, 0.0f };
+	directionalLightData_.intensity = 1.0f;
+}
 
-		// 初期値を書き込む
-		directionalLightData_->color = { 1.0f, 1.0f, 1.0f, 1.0f };
-		directionalLightData_->direction = { 0.0f, -1.0f, 0.0f };
-		directionalLightData_->intensity = 1.0f;
+void Object3d::PrepareConstantBuffers(DirectXCom* dx)
+{
+	if (!dx) return;
+	auto* cbAllocator = dx->GetCBAllocator();
+	if (!cbAllocator) return;
 
-		// 必要に応じてアンマップ（頻繁に更新しない場合）
-		directionalLightResource->Unmap(0, nullptr);
-		directionalLightData_ = nullptr;
-	}
+	// マテリアルバッファの割り当てとコピー
+	auto matAlloc = cbAllocator->Allocate(sizeof(Material));
+	std::memcpy(matAlloc.cpuAddress, &materialData_, sizeof(Material));
+	materialGpuAddress_ = matAlloc.gpuAddress;
+
+	// 変換行列バッファの割り当てとコピー
+	auto transAlloc = cbAllocator->Allocate(sizeof(TransformationMatrix));
+	std::memcpy(transAlloc.cpuAddress, &transformationMatrixData_, sizeof(TransformationMatrix));
+	transformationMatrixGpuAddress_ = transAlloc.gpuAddress;
+
+	// ライトバッファの割り当てとコピー
+	auto lightAlloc = cbAllocator->Allocate(sizeof(DirectionalLight));
+	std::memcpy(lightAlloc.cpuAddress, &directionalLightData_, sizeof(DirectionalLight));
+	directionalLightGpuAddress_ = lightAlloc.gpuAddress;
 }

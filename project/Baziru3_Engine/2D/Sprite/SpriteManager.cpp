@@ -1,4 +1,5 @@
 #include "SpriteManager.h"
+#include "Log.h"
 #include "DebugCamera.h"
 #include "SpriteCom.h"
 #include "WindowsAPI.h"
@@ -63,9 +64,8 @@ void SpriteManager::DrawAll(const RenderContext& ctx, DebugCamera* debugCamera, 
     for (auto& sp : sprites_)
     {
         if (!sp) continue;
-        sp->Update();
         if (ctx.light) sp->SetDirectionalLightResource(ctx.light->GetDirectionalLightResource());
-        sp->Draw();
+        sp->Draw(ctx.commandList);
     }
 
     // 外部スプライト群（Gameが持つやつ）も同じ処理
@@ -74,9 +74,8 @@ void SpriteManager::DrawAll(const RenderContext& ctx, DebugCamera* debugCamera, 
         for (auto& sp : *externalSprites)
         {
             if (!sp) continue;
-            sp->Update();
             if (ctx.light) sp->SetDirectionalLightResource(ctx.light->GetDirectionalLightResource());
-            sp->Draw();
+            sp->Draw(ctx.commandList);
         }
     }
 }

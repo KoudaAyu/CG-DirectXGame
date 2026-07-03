@@ -40,7 +40,7 @@ public:
 	 * @param spriteCom スプライト共通設定オブジェクトのポインタ
 	 * @param textureFilePath テクスチャファイルのパス
 	 */
-	void Initialize(SpriteCom* spriteCom, const std::string& textureFilePath);
+	void Initialize(SpriteCom* spriteCom, const std::string& textureFilePath, TextureManager* textureManager = nullptr);
 
 	/**
 	 * @brief スプライトの更新（行列計算など）を行います
@@ -50,7 +50,7 @@ public:
 	/**
 	 * @brief スプライトの描画コマンドを発行します
 	 */
-	void Draw();
+	void Draw(ID3D12GraphicsCommandList* commandList = nullptr);
 
 	/**
 	 * @brief スプライトの終了・リソース解放処理を行います
@@ -74,7 +74,8 @@ public:
 	 */
 	static std::unique_ptr<Sprite> Create(SpriteCom* spriteCom,
 		uint32_t textureHandle,
-		const Vector2& position);
+		const Vector2& position,
+		TextureManager* textureManager = nullptr);
 
 	/**
 	 * @brief スプライトを生成する簡易ヘルパー（詳細指定オーバーロード）
@@ -85,7 +86,8 @@ public:
 	 */
 	static std::unique_ptr<Sprite> Create(SpriteCom* spriteCom,
 		const Sprite::Transform& transform,
-		const std::string& texturePath);
+		const std::string& texturePath,
+		TextureManager* textureManager = nullptr);
 
 
 public:
@@ -95,24 +97,16 @@ public:
 	const D3D12_VERTEX_BUFFER_VIEW& GetVertexBufferViewSprite() const { return vertexBufferViewSprite_; }
 	const D3D12_INDEX_BUFFER_VIEW& GetIndexBufferViewSprite() const { return indexBufferViewSprite_; }
 
-	Microsoft::WRL::ComPtr<ID3D12Resource> GetMaterialResourceSprite() const { return materialResourceSprite_; }
 	void SetUVTransform(const Matrix4x4& uv)
 	{
-		if (materialData_)
-		{
-			materialData_->uvTransform = uv;
-		}
+		materialData_.uvTransform = uv;
 	}
-	Material* GetMaterialDataSprite() const { return materialData_; }
+	Material* GetMaterialDataSprite() { return &materialData_; }
 	void SetTransformationMatrix(const Matrix4x4& wvp, const Matrix4x4& world)
 	{
-		if (transformationMatrixDataSprite_)
-		{
-			transformationMatrixDataSprite_->WVP = wvp;
-			transformationMatrixDataSprite_->World = world;
-		}
+		transformationMatrixDataSprite_.WVP = wvp;
+		transformationMatrixDataSprite_.World = world;
 	}
-	const Microsoft::WRL::ComPtr<ID3D12Resource>& GetTransformationMatrixResourceSprite() const { return transformationMatrixResourceSprite_; }
 
 	//Spriteの座標関係
 	const Vector2& GetPosition() const { return position_; }
@@ -123,8 +117,8 @@ public:
 	void SetRotation(const float rotation) { this->rotation_ = rotation; }
 
 	//Spriteの色
-	const Vector4& GetColor() const { return materialData_->color; }
-	void SetColor(const Vector4& color) { materialData_->color = color; }
+	const Vector4& GetColor() const { return materialData_.color; }
+	void SetColor(const Vector4& color) { const_cast<Sprite*>(this)->materialData_.color = color; }
 
 	//Spriteの大きさ関係
 	const Vector2& GetSize() const { return size_; }
@@ -168,11 +162,9 @@ private:
 	DirectXCom* dxCommon_ = nullptr;
 	SpriteCom* spriteCom_ = nullptr;
     VertexData* vertexData_ = nullptr;
-    Material* materialData_ = nullptr;
+    Material materialData_{};
   
     Baziru3::PersistentMap<VertexData> vertexMap_;
-    Baziru3::PersistentMap<Material> materialMap_;
-    Baziru3::PersistentMap<TransformationMatrix> transformationMatrixMap_;
 
 private:
 	Microsoft::WRL::ComPtr<ID3D12Resource> vertexResourceSprite_ = nullptr;
@@ -180,13 +172,12 @@ private:
 	D3D12_VERTEX_BUFFER_VIEW vertexBufferViewSprite_{};
 	D3D12_INDEX_BUFFER_VIEW indexBufferViewSprite_{};
 	uint32_t* indexDataSprite_ = nullptr;
-	Microsoft::WRL::ComPtr<ID3D12Resource> materialResourceSprite_ = nullptr;
-	Microsoft::WRL::ComPtr<ID3D12Resource> transformationMatrixResourceSprite_ = nullptr;
-	TransformationMatrix* transformationMatrixDataSprite_ = nullptr;
+	TransformationMatrix transformationMatrixDataSprite_{};
 
 	// 新規: 描画時に使うハンドル/リソース
 	D3D12_GPU_DESCRIPTOR_HANDLE textureHandleGPU_{};
 	Microsoft::WRL::ComPtr<ID3D12Resource> directionalLightResource_ = nullptr;
 
 	uint32_t textureIndex_ = 0;
+	TextureManager* textureManager_ = nullptr;
 };
