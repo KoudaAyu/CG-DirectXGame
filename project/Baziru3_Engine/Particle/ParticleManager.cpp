@@ -27,9 +27,10 @@ ParticleManager::~ParticleManager()
 	}
 }
 
-void ParticleManager::Initialize(Camera* camera)
+void ParticleManager::Initialize(Camera* camera, TextureManager* textureManager)
 {
 	camera_ = camera;
+	textureManager_ = textureManager ? textureManager : TextureManager::GetInstance();
 	SetupDraw(dxCommon->GetCommandList().Get());
 
     Random::SeedEngine();
@@ -67,7 +68,7 @@ void ParticleManager::Initialize(Camera* camera)
 	}
 
 	// インスタンシング用 StructuredBuffer の SRV を SRVManager 経由で作成する
-	SRVManager* srvManager = TextureManager::GetInstance()->GetSRVManager();
+	SRVManager* srvManager = textureManager_->GetSRVManager();
 	assert(srvManager);
 
 	instancingSrvIndex_ = srvManager->Allocate();
@@ -175,7 +176,7 @@ void ParticleManager::Finalize()
     
     try
     {
-        SRVManager* srvManager = TextureManager::GetInstance()->GetSRVManager();
+        SRVManager* srvManager = textureManager_->GetSRVManager();
         if (srvManager)
         {
             if (instancingSrvIndex_ >= 3 && instancingSrvIndex_ < SRVManager::kMaxSRVCount)
@@ -373,7 +374,7 @@ void ParticleManager::Update(float deltaTime)
 				}
 				else
 				{
-					g.srvHandle = TextureManager::GetInstance()->GetSrvHandleGPU(curTex);
+					g.srvHandle = textureManager_->GetSrvHandleGPU(curTex);
 				}
 				outGroups.push_back(g);
 
@@ -392,7 +393,7 @@ void ParticleManager::Update(float deltaTime)
 		}
 		else
 		{
-			g.srvHandle = TextureManager::GetInstance()->GetSrvHandleGPU(curTex);
+			g.srvHandle = textureManager_->GetSrvHandleGPU(curTex);
 		}
 		outGroups.push_back(g);
 	};
@@ -415,7 +416,7 @@ void ParticleManager::Update(float deltaTime)
 	barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
 	commandList->ResourceBarrier(1, &barrier);
 
-	SRVManager* srvManager = TextureManager::GetInstance()->GetSRVManager();
+	SRVManager* srvManager = textureManager_->GetSRVManager();
 	if (srvManager)
 	{
 		srvManager->PreDraw();
@@ -707,34 +708,10 @@ void ParticleManager::InitializeBlend()
 	blendDesc.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
 	blendDesc.RenderTarget[0].BlendEnable = TRUE;
 
-	//--ノーマルブレンド------------------------------
-	/*blendDesc.RenderTarget[0].SrcBlend = D3D12_BLEND_SRC_ALPHA;
-	blendDesc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
-	blendDesc.RenderTarget[0].DestBlend = D3D12_BLEND_INV_SRC_ALPHA;*/
-	//--------------------------------------------
-
 	//--加算ブレンド------------------------------
 	blendDesc.RenderTarget[0].SrcBlend = D3D12_BLEND_ONE;
 	blendDesc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
 	blendDesc.RenderTarget[0].DestBlend = D3D12_BLEND_ONE;
-	//--------------------------------------------
-
-	//--減算ブレンド------------------------------
-	/*blendDesc.RenderTarget[0].SrcBlend = D3D12_BLEND_ONE;
-	blendDesc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_REV_SUBTRACT;
-	blendDesc.RenderTarget[0].DestBlend = D3D12_BLEND_ONE;*/
-	//--------------------------------------------
-
-	//--乗算ブレンド------------------------------
-	/*blendDesc.RenderTarget[0].SrcBlend = D3D12_BLEND_DEST_COLOR;
-	blendDesc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
-	blendDesc.RenderTarget[0].DestBlend = D3D12_BLEND_ZERO;*/
-	//--------------------------------------------
-
-	//--スクリーン合成------------------------------
-	/*blendDesc.RenderTarget[0].SrcBlend = D3D12_BLEND_INV_DEST_COLOR;
-	blendDesc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
-	blendDesc.RenderTarget[0].DestBlend = D3D12_BLEND_ONE;*/
 	//--------------------------------------------
 
 

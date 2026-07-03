@@ -8,13 +8,20 @@
 #include <ostream>
 
 #include <array>
+#include <memory>
 #include <chrono>
-
 #include "DirectXTex.h"
+
+class ConstantBufferAllocator;
+class StackAllocator;
 
 
 #include"WindowsAPI.h"
+#include "Baziru3_Engine/Base/Srv/DescriptorHeap.h"
 
+/**
+ * @brief DirectX12の共通処理を管理するクラス
+ */
 class DirectXCom
 {
 public:
@@ -37,8 +44,14 @@ public:
 
 	void UpdateFixFPS();
 
+	/**
+	 * @brief DirectX12のシステム全体を初期化します
+	 */
 	void Initialize();
 
+	/**
+	 * @brief DirectX12のシステムを終了し、確保した全リソースを解放します
+	 */
 	void Finalize();
 
 	void DebugLayer();
@@ -96,20 +109,33 @@ public:
 
 	void InitializeImGui();
 
+	/**
+	 * @brief 描画前処理を行い、レンダーターゲットをクリアして書き込み可能状態にします
+	 */
 	void PreDraw();
 
+	/**
+	 * @brief 描画後処理を行い、コマンドリストをクローズ・実行して画面をフリップします
+	 */
 	void PostDraw();
 
 	void ExecuteAndWaitForGPU();
 
   
 
+	/**
+	 * @brief HLSLシェーダーファイルをコンパイルしてバイナリデータを取得します
+	 * @param filePath シェーダーファイルへのパス
+	 * @param profile シェーダープロファイル (例: L"vs_6_0")
+	 * @param dxcUtils DXCユーティリティ
+	 * @param dxcCompiler DXCコンパイラ
+	 * @param includeHandler インクルードハンドラ
+	 * @param logStream ログ出力用ストリーム
+	 * @return コンパイルされたシェーダーバイナリ
+	 */
 	Microsoft::WRL::ComPtr<IDxcBlob> CompileShader(
-		//CompilerするShaderファイルへのパス
 		const std::wstring& filePath,
-		//Compilerに使用するProfile
 		const wchar_t* profile,
-		//初期化で生成したもの3つ
 		Microsoft::WRL::ComPtr<IDxcUtils> dxcUtils,
 		Microsoft::WRL::ComPtr<IDxcCompiler3> dxcCompiler,
 		Microsoft::WRL::ComPtr<IDxcIncludeHandler> includeHandler,
@@ -147,6 +173,14 @@ public:
 	{
 		return commandList;
 	}
+	Microsoft::WRL::ComPtr<ID3D12CommandAllocator>& GetWorkerCommandAllocator()
+	{
+		return workerCommandAllocator_;
+	}
+	Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList>& GetWorkerCommandList()
+	{
+		return workerCommandList_;
+	}
 
 	Microsoft::WRL::ComPtr<ID3D12CommandQueue>& GetCommandQueue()
 	{
@@ -160,18 +194,21 @@ public:
 	{
 		return swapChainDesc;
 	}
-	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap>& GetRtvDescriptorHeap()
+	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> GetRtvDescriptorHeap() const
 	{
-		return rtvDescriptorHeap;
+		return rtvDescriptorHeap_.GetHeap();
 	}
-	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap>& GetSrvDescriptorHeap()
+	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> GetSrvDescriptorHeap() const
 	{
-		return srvDescriptorHeap;
+		return srvDescriptorHeap_.GetHeap();
 	}
-	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap>& GetDsvDescriptorHeap()
+	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> GetDsvDescriptorHeap() const
 	{
-		return dsvDescriptorHeap;
+		return dsvDescriptorHeap_.GetHeap();
 	}
+	DescriptorHeap& GetSrvHeap() { return srvDescriptorHeap_; }
+	DescriptorHeap& GetRtvHeap() { return rtvDescriptorHeap_; }
+	DescriptorHeap& GetDsvHeap() { return dsvDescriptorHeap_; }
 	uint32_t GetDescriptorSizeSRV() const
 	{
 		return device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
@@ -260,7 +297,7 @@ private:
 	Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> commandList = nullptr;
 	Microsoft::WRL::ComPtr<ID3D12CommandQueue> commandQueue = nullptr;
 	D3D12_COMMAND_QUEUE_DESC commandQueueDesc{};
-	ID3D12InfoQueue* infoQueue = nullptr;
+	Microsoft::WRL::ComPtr<ID3D12InfoQueue> infoQueue = nullptr;
 	Microsoft::WRL::ComPtr<IDXGISwapChain4> swapChain;
 	DXGI_SWAP_CHAIN_DESC1 swapChainDesc{};
 	D3D12_RENDER_TARGET_VIEW_DESC rtvDesc{};
@@ -281,24 +318,32 @@ private:
 	D3D12_RESOURCE_BARRIER barrier{};
 	UINT backBufferIndex;
 
+	// ワーカー用（並列コマンド記録用）
+	Microsoft::WRL::ComPtr<ID3D12CommandAllocator> workerCommandAllocator_ = nullptr;
+	Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> workerCommandList_ = nullptr;
+
 	//DescriptorSizeを取得しておく
 	
-	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> rtvDescriptorHeap = nullptr;
-	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> srvDescriptorHeap = nullptr;
-	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> dsvDescriptorHeap = nullptr;
+	DescriptorHeap rtvDescriptorHeap_;
+	DescriptorHeap srvDescriptorHeap_;
+	DescriptorHeap dsvDescriptorHeap_;
 
-	Microsoft::WRL::ComPtr<ID3D12Device> device_ = nullptr;
 
-	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> descriptorHeap_;
 	uint32_t descriptorSize_;
 
 	std::ostream& logStream;
 
 	WindowAPI* windowAPI = nullptr;
+	std::unique_ptr<ConstantBufferAllocator> cbAllocator_ = nullptr;
+	std::unique_ptr<StackAllocator> stackAllocator_ = nullptr;
 
 public:
     // Provide access to WindowAPI for callers that need window information
     WindowAPI* GetWindowAPI() const { return windowAPI; }
+	D3D12_CPU_DESCRIPTOR_HANDLE GetRtvHandle(UINT index) const { return rtvHandles[index]; }
+	void PrintDebugMessages();
+	ConstantBufferAllocator* GetCBAllocator() const { return cbAllocator_.get(); }
+	StackAllocator* GetStackAllocator() const { return stackAllocator_.get(); }
 
 
 	//最大SRV数(Texture枚数)

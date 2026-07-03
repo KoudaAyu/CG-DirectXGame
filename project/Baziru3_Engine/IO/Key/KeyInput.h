@@ -1,6 +1,5 @@
 #pragma once
 
-#define DIRECTIONPUT_VECTOR         0x0800 // 定数名は変更しません
 #include<dinput.h>
 #pragma comment(lib, "dinput8.lib")
 #pragma comment(lib, "dxguid.lib")

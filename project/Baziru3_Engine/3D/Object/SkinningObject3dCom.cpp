@@ -102,17 +102,14 @@ void SkinningObject3dCom::Draw(Object3d* object, const ::RenderContext& ctx, con
         ctx.commandList->SetPipelineState(pipelineState.Get());
     }
 
+    // 描画用の定数バッファをアロケート・転送
+    object->PrepareConstantBuffers(dxCommon);
+
     // Material (CBV at b0, Pixel Shader) -> Index 0
-    if (object->GetMaterialResource())
-    {
-        ctx.commandList->SetGraphicsRootConstantBufferView(0, object->GetMaterialResource()->GetGPUVirtualAddress());
-    }
+    ctx.commandList->SetGraphicsRootConstantBufferView(0, object->GetMaterialGPUAddress());
 
     // Transformation Matrix (CBV at b0, Vertex Shader) -> Index 1
-    if (object->GetTransformationMatrixResource())
-    {
-        ctx.commandList->SetGraphicsRootConstantBufferView(1, object->GetTransformationMatrixResource()->GetGPUVirtualAddress());
-    }
+    ctx.commandList->SetGraphicsRootConstantBufferView(1, object->GetTransformationMatrixGPUAddress());
 
     // Texture Descriptor Table (t3, Pixel Shader) -> Index 2
     if (ctx.textureHandle.ptr != 0)
