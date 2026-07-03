@@ -35,7 +35,7 @@ void SceneManager::ChangeScene(const std::string& sceneName)
 
 	if (!sceneFactory_)
 	{
-		sceneFactory_.reset(new SceneFactory());
+		sceneFactory_ = std::make_unique<SceneFactory>();
 	}
 
   if (nextScene_ || isSceneTransitioning_)

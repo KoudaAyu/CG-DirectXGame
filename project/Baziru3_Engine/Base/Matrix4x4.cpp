@@ -68,7 +68,7 @@ Matrix4x4 MakeRotateXMatrix(float radian)
 	return result;
 }
 
-Matrix4x4 Multiply(Matrix4x4 m1, Matrix4x4 m2)
+Matrix4x4 Multiply(const Matrix4x4& m1, const Matrix4x4& m2)
 {
 	Matrix4x4 result;
 
@@ -95,7 +95,7 @@ Matrix4x4 Multiply(Matrix4x4 m1, Matrix4x4 m2)
 	return result;
 }
 
-Matrix4x4 Inverse(Matrix4x4 m)
+Matrix4x4 Inverse(const Matrix4x4& m)
 {
 	Matrix4x4 result;
 	float InverseVector =

@@ -1,4 +1,5 @@
 #include"Model.h"
+#include "BufferUtil.h"
 #include<cassert>
 #include<fstream>
 #include<sstream>
@@ -252,48 +253,27 @@ Model::MaterialData Model::LoadMaterialTemplateFile(const std::string& direcroty
 
 void Model::VertexResource()
 {
-    //VertexResourceの生成
     if (modelCom_ && modelCom_->GetDirectXCom())
     {
         DirectXCom* dxCommon = modelCom_->GetDirectXCom();
-        // 現在保持している頂点数に応じたサイズで確保（未設定の場合は最小1頂点分）
-        size_t vertexCount = modelData_.vertices.size();
-        if (vertexCount == 0) { vertexCount = 1; }
-        size_t bufferSize = sizeof(Sprite::VertexData) * vertexCount;
 
-        vertexResource = dxCommon->CreateBufferResource(dxCommon->GetDevice().Get(), bufferSize);
-
-        // VertexBufferView を設定（値の設定のみ）
-        vertexBufferView_.BufferLocation = vertexResource->GetGPUVirtualAddress();
-        vertexBufferView_.SizeInBytes = static_cast<UINT>(bufferSize);
-        vertexBufferView_.StrideInBytes = sizeof(Sprite::VertexData);
-
-        // 書き込み用アドレスを取得してメンバーに保持
-        vertexResource->Map(0, nullptr, reinterpret_cast<void**>(&vertexData_));
-
-        // 可能なら読み込んだモデル頂点をアップロード
         if (!modelData_.vertices.empty())
         {
-            std::memcpy(vertexData_, modelData_.vertices.data(), sizeof(Sprite::VertexData) * modelData_.vertices.size());
+            vertexResource = BufferUtil::CreateVertexBuffer(dxCommon, modelData_.vertices, vertexBufferView_);
         }
-
-        vertexResource->Unmap(0, nullptr);
-        vertexData_ = nullptr;
+        else
+        {
+            size_t bufferSize = sizeof(Sprite::VertexData);
+            vertexResource = dxCommon->CreateBufferResource(dxCommon->GetDevice().Get(), bufferSize);
+            vertexBufferView_.BufferLocation = vertexResource->GetGPUVirtualAddress();
+            vertexBufferView_.SizeInBytes = static_cast<UINT>(bufferSize);
+            vertexBufferView_.StrideInBytes = sizeof(Sprite::VertexData);
+        }
 
         // --- インデックスバッファの作成とアップロード ---
         if (!modelData_.indices.empty())
         {
-            size_t indexCount = modelData_.indices.size();
-            size_t indexBufferSize = sizeof(uint32_t) * indexCount;
-            indexResource = dxCommon->CreateBufferResource(dxCommon->GetDevice().Get(), indexBufferSize);
-            uint32_t* mappedIndex = nullptr;
-            indexResource->Map(0, nullptr, reinterpret_cast<void**>(&mappedIndex));
-            std::memcpy(mappedIndex, modelData_.indices.data(), indexBufferSize);
-            indexResource->Unmap(0, nullptr);
-
-            indexBufferView.BufferLocation = indexResource->GetGPUVirtualAddress();
-            indexBufferView.SizeInBytes = static_cast<UINT>(indexBufferSize);
-            indexBufferView.Format = DXGI_FORMAT_R32_UINT;
+            indexResource = BufferUtil::CreateIndexBuffer(dxCommon, modelData_.indices, indexBufferView);
         }
     }
 }

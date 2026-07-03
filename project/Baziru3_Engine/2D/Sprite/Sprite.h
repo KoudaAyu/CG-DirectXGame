@@ -32,7 +32,7 @@ public:
 	Sprite();
 	~Sprite();
 
-	void Initialize(SpriteCom* spriteCom,std::string textureFilePath);
+	void Initialize(SpriteCom* spriteCom, const std::string& textureFilePath);
 	void Update();
 	void Draw();
 

@@ -132,9 +132,8 @@ void DirectXCom::Finalize()
 	device.Reset();
 	dxgiFactory.Reset();
 
-	// 生のポインタをクリア
-	infoQueue = nullptr;
-
+	infoQueue.Reset();
+	debugController.Reset();
 }
 
 void DirectXCom::DebugLayer()
@@ -250,9 +249,6 @@ void DirectXCom::SetupD3D12InfoQueue()
 		filter.DenyList.pSeverityList = serverities; //抑制するメッセージの重要度
 
 		infoQueue->PushStorageFilter(&filter); //フィルターを適用する
-
-		//解放
-		infoQueue->Release();
 	}
 #endif
 }

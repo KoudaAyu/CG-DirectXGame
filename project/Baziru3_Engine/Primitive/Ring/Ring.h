@@ -26,7 +26,6 @@ public:
 
 private:
     std::vector<Vertex> CreateMesh(uint32_t ringDivide, float outerRadius, float innerRadius) const;
-    void CreateVertexBuffer(const std::vector<Vertex>& verts);
 
 private:
     DirectXCom* dxCommon_ = nullptr;

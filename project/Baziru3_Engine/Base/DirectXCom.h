@@ -15,6 +15,9 @@
 
 #include"WindowsAPI.h"
 
+/**
+ * @brief DirectX12の共通処理を管理するクラス
+ */
 class DirectXCom
 {
 public:
@@ -37,8 +40,14 @@ public:
 
 	void UpdateFixFPS();
 
+	/**
+	 * @brief DirectX12のシステム全体を初期化します
+	 */
 	void Initialize();
 
+	/**
+	 * @brief DirectX12のシステムを終了し、確保した全リソースを解放します
+	 */
 	void Finalize();
 
 	void DebugLayer();
@@ -96,20 +105,33 @@ public:
 
 	void InitializeImGui();
 
+	/**
+	 * @brief 描画前処理を行い、レンダーターゲットをクリアして書き込み可能状態にします
+	 */
 	void PreDraw();
 
+	/**
+	 * @brief 描画後処理を行い、コマンドリストをクローズ・実行して画面をフリップします
+	 */
 	void PostDraw();
 
 	void ExecuteAndWaitForGPU();
 
   
 
+	/**
+	 * @brief HLSLシェーダーファイルをコンパイルしてバイナリデータを取得します
+	 * @param filePath シェーダーファイルへのパス
+	 * @param profile シェーダープロファイル (例: L"vs_6_0")
+	 * @param dxcUtils DXCユーティリティ
+	 * @param dxcCompiler DXCコンパイラ
+	 * @param includeHandler インクルードハンドラ
+	 * @param logStream ログ出力用ストリーム
+	 * @return コンパイルされたシェーダーバイナリ
+	 */
 	Microsoft::WRL::ComPtr<IDxcBlob> CompileShader(
-		//CompilerするShaderファイルへのパス
 		const std::wstring& filePath,
-		//Compilerに使用するProfile
 		const wchar_t* profile,
-		//初期化で生成したもの3つ
 		Microsoft::WRL::ComPtr<IDxcUtils> dxcUtils,
 		Microsoft::WRL::ComPtr<IDxcCompiler3> dxcCompiler,
 		Microsoft::WRL::ComPtr<IDxcIncludeHandler> includeHandler,
@@ -260,7 +282,7 @@ private:
 	Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> commandList = nullptr;
 	Microsoft::WRL::ComPtr<ID3D12CommandQueue> commandQueue = nullptr;
 	D3D12_COMMAND_QUEUE_DESC commandQueueDesc{};
-	ID3D12InfoQueue* infoQueue = nullptr;
+	Microsoft::WRL::ComPtr<ID3D12InfoQueue> infoQueue = nullptr;
 	Microsoft::WRL::ComPtr<IDXGISwapChain4> swapChain;
 	DXGI_SWAP_CHAIN_DESC1 swapChainDesc{};
 	D3D12_RENDER_TARGET_VIEW_DESC rtvDesc{};
@@ -287,9 +309,7 @@ private:
 	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> srvDescriptorHeap = nullptr;
 	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> dsvDescriptorHeap = nullptr;
 
-	Microsoft::WRL::ComPtr<ID3D12Device> device_ = nullptr;
 
-	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> descriptorHeap_;
 	uint32_t descriptorSize_;
 
 	std::ostream& logStream;

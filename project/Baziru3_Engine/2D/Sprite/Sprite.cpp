@@ -41,7 +41,7 @@ Sprite::~Sprite()
 
 
 
-void Sprite::Initialize(SpriteCom* spriteCom, std::string textureFilePath)
+void Sprite::Initialize(SpriteCom* spriteCom, const std::string& textureFilePath)
 {
 	this->spriteCom = spriteCom;
 	assert(spriteCom);
