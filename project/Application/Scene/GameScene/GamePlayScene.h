@@ -105,6 +105,14 @@ public:
         cameraShakeIntensity_ = intensity;
     }
 
+    /// <summary>
+    /// ヒットストップ（時間一時停止）を誘発します
+    /// </summary>
+    /// <param name="duration">効果時間(秒)</param>
+    void TriggerHitStop(float duration) {
+        hitStopTimer_ = duration;
+    }
+
 private:
     float AdvanceDeltaTime();
     void InitializeEnvironment();
@@ -198,6 +206,9 @@ private:
     float cameraShakeTime_ = 0.0f;
     float cameraShakeIntensity_ = 0.0f;
     float cameraShakeDurationMax_ = 1.0f;
+
+    // --- ヒットストップ用パラメータ ---
+    float hitStopTimer_ = 0.0f;
 
     // --- ビネット＆リロード完了時の演出パラメータ ---
     Sprite* vignetteSprite_ = nullptr;

@@ -37,6 +37,7 @@ void GamePlayScene::InitializeScene()
 	assert(directXCom != nullptr);
 
 	lastTime_ = std::chrono::steady_clock::now();
+	hitStopTimer_ = 0.0f;
 
 	object3dCom = GetObject3dCom();
 	skinningObject3dCom = GetSkinningObject3dCom();
@@ -1332,6 +1333,17 @@ void GamePlayScene::Update()
 	float realDeltaTime = AdvanceDeltaTime();
 	float deltaTime = realDeltaTime;
 
+	// ヒットストップ処理の更新
+	if (hitStopTimer_ > 0.0f)
+	{
+		hitStopTimer_ -= realDeltaTime;
+		deltaTime *= 0.15f;
+		if (hitStopTimer_ <= 0.0f)
+		{
+			hitStopTimer_ = 0.0f;
+		}
+	}
+
 	// クリア演出中のスローモーション処理
 	if (isGameCleared_)
 	{
@@ -1394,7 +1406,7 @@ void GamePlayScene::Update()
 	// カメラシェイクの更新
 	if (camera_ && cameraShakeTime_ > 0.0f)
 	{
-		cameraShakeTime_ -= deltaTime;
+		cameraShakeTime_ -= realDeltaTime;
 		float progress = cameraShakeTime_ / cameraShakeDurationMax_;
 		float currentIntensity = cameraShakeIntensity_ * progress * progress; // スムーズな減衰
 		float rx = ((float)rand() / RAND_MAX * 2.0f - 1.0f) * currentIntensity;

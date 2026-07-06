@@ -61,6 +61,16 @@ void CollisionSystem::ResolveBulletCollisions()
 						Vector4 color = isCritical ? Vector4{ 1.0f, 0.9f, 0.0f, 1.0f } : Vector4{ 1.0f, 1.0f, 1.0f, 1.0f };
 						if (isCritical) text += "!";
 						scene_->AddFloatingText(enemyPos + Vector3{ 0.0f, 1.2f, 0.0f }, text, color, isCritical);
+
+						// ヒットストップをトリガー（通常ヒットはカクつき防止のため行わず、クリティカル・死亡時のみに限定）
+						if (scene_->enemy_->IsDead())
+						{
+							scene_->TriggerHitStop(0.12f); // 撃破時は長めのスロー
+						}
+						else if (isCritical)
+						{
+							scene_->TriggerHitStop(0.05f); // クリティカル時は一瞬のスロー
+						}
 					}
 
 					// 敵死亡時の派手な羽・フラッシュ・煙のバーストエフェクトとカメラ揺らし
@@ -121,6 +131,16 @@ void CollisionSystem::ResolveBulletCollisions()
 						Vector4 color = isCritical ? Vector4{ 1.0f, 0.9f, 0.0f, 1.0f } : Vector4{ 1.0f, 1.0f, 1.0f, 1.0f };
 						if (isCritical) text += "!";
 						scene_->AddFloatingText(enemyPos + Vector3{ 0.0f, 1.2f, 0.0f }, text, color, isCritical);
+
+						// ヒットストップをトリガー（通常ヒットはカクつき防止のため行わず、クリティカル・死亡時のみに限定）
+						if (scene_->movingEnemy_->IsDead())
+						{
+							scene_->TriggerHitStop(0.12f); // 撃破時は長めのスロー
+						}
+						else if (isCritical)
+						{
+							scene_->TriggerHitStop(0.05f); // クリティカル時は一瞬のスロー
+						}
 					}
 
 					if (scene_->movingEnemy_->IsDead())
@@ -178,6 +198,7 @@ void CollisionSystem::ResolveBulletCollisions()
 					{
 						scene_->vignetteAlpha_ = 0.6f;          // 画面周囲に赤い被弾ビネット効果
 						scene_->TriggerCameraShake(0.25f, 0.5f); // 被弾カメラシェイク
+						scene_->TriggerHitStop(0.04f);           // 被弾時の短いスローモーション
 						scene_->AddFloatingText(playerPos + Vector3{ 0.0f, 1.0f, 0.0f }, "WARNING -20", { 1.0f, 0.1f, 0.1f, 1.0f }, true);
 
 						if (scene_->particleManager && scene_->appParticleManager_)
@@ -296,6 +317,8 @@ void CollisionSystem::ResolveContactDamage()
 		if (scene_->player_->GetHP() < prevHp)
 		{
 			scene_->vignetteAlpha_ = 0.6f;
+			scene_->TriggerCameraShake(0.25f, 0.5f);
+			scene_->TriggerHitStop(0.06f); // 接触被弾時のスローモーション
 			scene_->AddFloatingText(scene_->player_->GetPosition() + Vector3{0.0f, 1.0f, 0.0f}, "WARNING -20", {1.0f, 0.1f, 0.1f, 1.0f}, true);
 		}
 	}
@@ -310,6 +333,8 @@ void CollisionSystem::ResolveContactDamage()
 			if (scene_->player_->GetHP() < prevHp)
 			{
 				scene_->vignetteAlpha_ = 0.6f;
+				scene_->TriggerCameraShake(0.25f, 0.5f);
+				scene_->TriggerHitStop(0.06f); // 接触被弾時のスローモーション
 				scene_->AddFloatingText(scene_->player_->GetPosition() + Vector3{0.0f, 1.0f, 0.0f}, "WARNING -20", {1.0f, 0.1f, 0.1f, 1.0f}, true);
 			}
 		}
