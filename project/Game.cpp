@@ -483,11 +483,6 @@ void Game::Draw()
 	dx->GetCommandList()->RSSetViewports(1, &dx->GetViewport());
 	dx->GetCommandList()->RSSetScissorRects(1, &dx->GetScissorRect());
 
-	if (fadeApplication_)
-	{
-		fadeApplication_->Draw();
-	}
-
 	// End off-screen rendering
 	if (offScreenRendering_)
 	{
@@ -506,6 +501,11 @@ void Game::Draw()
 		GpuProfiler::GetInstance()->BeginProfile(dx->GetCommandList().Get(), "PostProcess Draw");
 		offScreenRendering_->DrawToBackBuffer(dx->GetCommandList().Get());
 		GpuProfiler::GetInstance()->EndProfile(dx->GetCommandList().Get(), "PostProcess Draw");
+	}
+
+	if (fadeApplication_)
+	{
+		fadeApplication_->Draw();
 	}
 
 	// Draw object debug logs if necessary
