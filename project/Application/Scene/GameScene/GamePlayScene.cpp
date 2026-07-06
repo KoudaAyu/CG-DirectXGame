@@ -671,11 +671,6 @@ void GamePlayScene::UpdateParticles(float deltaTime)
 	{
 		appParticleManager_->Update(deltaTime, player_ ? player_->GetPosition() : Vector3{ 0.0f, 0.0f, 0.0f });
 	}
-
-	if (particleManager)
-	{
-		particleManager->Update(deltaTime);
-	}
 }
 
 void GamePlayScene::UpdateSprites(float deltaTime)
