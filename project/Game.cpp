@@ -716,7 +716,6 @@ void Game::DrawParticles(const RenderContext& ctx)
 		if (gameplayScene && gameplayScene->GetAppParticleManager())
 		{
 			gameplayScene->GetAppParticleManager()->Draw(ctx, model_.get(), UINT(modelData.vertices.size()));
-			return;
 		}
 	}
 	particleRenderer_.Draw(ctx, particleManager.get(), model_.get(), UINT(modelData.vertices.size()));
