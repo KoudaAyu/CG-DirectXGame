@@ -542,7 +542,7 @@ void GamePlayScene::UpdateParticles(float deltaTime)
 				float dist = maxRange * (i / 10.0f);
 				Vector3 p = {
 					pos.x + std::sin(startAngle) * dist,
-					pos.y + 0.05f,
+					pos.y + 0.15f,
 					pos.z + std::cos(startAngle) * dist
 				};
 				appParticleManager_->EmitSparkWithVelocity(
@@ -551,7 +551,7 @@ void GamePlayScene::UpdateParticles(float deltaTime)
 					{ 0.0f, 0.0f, 0.0f }, // No rise, stay flat on the ground
 					color,
 					0.22f, // Larger size
-					0.02f, // 1-frame lifetime to prevent lag
+					0.10f, // Extended lifetime to survive frame delta variations
 					particleTextureB
 				);
 			}
@@ -562,7 +562,7 @@ void GamePlayScene::UpdateParticles(float deltaTime)
 				float dist = maxRange * (i / 10.0f);
 				Vector3 p = {
 					pos.x + std::sin(endAngle) * dist,
-					pos.y + 0.05f,
+					pos.y + 0.15f,
 					pos.z + std::cos(endAngle) * dist
 				};
 				appParticleManager_->EmitSparkWithVelocity(
@@ -571,7 +571,7 @@ void GamePlayScene::UpdateParticles(float deltaTime)
 					{ 0.0f, 0.0f, 0.0f },
 					color,
 					0.22f,
-					0.02f,
+					0.10f,
 					particleTextureB
 				);
 			}
@@ -582,7 +582,7 @@ void GamePlayScene::UpdateParticles(float deltaTime)
 				float angle = startAngle + i * (fov / 16.0f);
 				Vector3 p = {
 					pos.x + std::sin(angle) * maxRange,
-					pos.y + 0.05f,
+					pos.y + 0.15f,
 					pos.z + std::cos(angle) * maxRange
 				};
 				appParticleManager_->EmitSparkWithVelocity(
@@ -591,7 +591,7 @@ void GamePlayScene::UpdateParticles(float deltaTime)
 					{ 0.0f, 0.0f, 0.0f },
 					color,
 					0.22f,
-					0.02f,
+					0.10f,
 					particleTextureB
 				);
 			}
