@@ -9,6 +9,9 @@
 #include "Bullet.h"
 #include "Obstacle.h"
 #include "Baziru3_Engine/Collision/CollisionManager.h"
+#include "Baziru3_Engine/Collision/SphereCollider.h"
+#include "Baziru3_Engine/Collision/BoxCollider.h"
+#include "Baziru3_Engine/Collision/CapsuleCollider.h"
 #include <cmath>
 #include <random>
 
@@ -124,22 +127,22 @@ void MovingEnemy::Update(WindowAPI* windowAPI, const Vector3* targetPosition, co
         if (hpBarBg_ && windowAPI)
         {
             hpBarBg_->SetSize({ 0.0f, 0.0f });
-            hpBarBg_->UpdateTransformOnly(windowAPI);
+            hpBarBg_->Update();
         }
         if (hpBarFg_ && windowAPI)
         {
             hpBarFg_->SetSize({ 0.0f, 0.0f });
-            hpBarFg_->UpdateTransformOnly(windowAPI);
+            hpBarFg_->Update();
         }
         if (alertBar_ && windowAPI)
         {
             alertBar_->SetSize({ 0.0f, 0.0f });
-            alertBar_->UpdateTransformOnly(windowAPI);
+            alertBar_->Update();
         }
         if (alertDot_ && windowAPI)
         {
             alertDot_->SetSize({ 0.0f, 0.0f });
-            alertDot_->UpdateTransformOnly(windowAPI);
+            alertDot_->Update();
         }
 
         if (object3d_)
@@ -378,20 +381,20 @@ void MovingEnemy::Update(WindowAPI* windowAPI, const Vector3* targetPosition, co
             hpBarBg_->SetPosition({ screenX - bgWidth * 0.5f, screenY });
             hpBarBg_->SetSize({ bgWidth, bgHeight });
             hpBarBg_->SetColor({ 0.1f, 0.1f, 0.1f, 1.0f });
-            hpBarBg_->UpdateTransformOnly(windowAPI);
+            hpBarBg_->Update();
 
             // 前景バー (オレンジレッドで差別化)
             hpBarFg_->SetPosition({ screenX - bgWidth * 0.5f, screenY });
             hpBarFg_->SetSize({ fgWidth, bgHeight });
             hpBarFg_->SetColor({ 1.0f, 0.5f, 0.0f, 1.0f });
-            hpBarFg_->UpdateTransformOnly(windowAPI);
+            hpBarFg_->Update();
         }
         else
         {
             hpBarBg_->SetSize({ 0.0f, 0.0f });
-            hpBarBg_->UpdateTransformOnly(windowAPI);
+            hpBarBg_->Update();
             hpBarFg_->SetSize({ 0.0f, 0.0f });
-            hpBarFg_->UpdateTransformOnly(windowAPI);
+            hpBarFg_->Update();
         }
     }
 
@@ -426,28 +429,28 @@ void MovingEnemy::Update(WindowAPI* windowAPI, const Vector3* targetPosition, co
                 alertBar_->SetPosition({ screenX, screenY - 5.0f });
                 alertBar_->SetSize({ 6.0f, 16.0f });
                 alertBar_->SetColor({ 1.0f, 0.15f, 0.15f, 1.0f }); // 警告の赤色
-                alertBar_->UpdateTransformOnly(windowAPI);
+                alertBar_->Update();
 
                 // 点 (alertDot_) Anchor={0.5f, 0.0f}
                 alertDot_->SetPosition({ screenX, screenY });
                 alertDot_->SetSize({ 6.0f, 6.0f });
                 alertDot_->SetColor({ 1.0f, 0.15f, 0.15f, 1.0f });
-                alertDot_->UpdateTransformOnly(windowAPI);
+                alertDot_->Update();
             }
             else
             {
                 alertBar_->SetSize({ 0.0f, 0.0f });
-                alertBar_->UpdateTransformOnly(windowAPI);
+                alertBar_->Update();
                 alertDot_->SetSize({ 0.0f, 0.0f });
-                alertDot_->UpdateTransformOnly(windowAPI);
+                alertDot_->Update();
             }
         }
         else
         {
             alertBar_->SetSize({ 0.0f, 0.0f });
-            alertBar_->UpdateTransformOnly(windowAPI);
+            alertBar_->Update();
             alertDot_->SetSize({ 0.0f, 0.0f });
-            alertDot_->UpdateTransformOnly(windowAPI);
+            alertDot_->Update();
         }
     }
 }
@@ -576,7 +579,34 @@ bool MovingEnemy::HasLineOfSight(const Vector3& playerPos, const std::vector<std
     {
         if (!obs || !obs->GetCollider()) continue;
         float hitDist = 0.0f;
-        if (CollisionManager::CheckRayCollider(enemyPos, rayDir, distToPlayer, obs->GetCollider(), hitDist))
+        
+        Collider* col = obs->GetCollider();
+        CollisionData data;
+        data.originalCollider = col;
+        data.type = col->GetType();
+        data.attribute = col->GetAttribute();
+        data.worldPosition = col->GetWorldPosition();
+        data.isTrigger = col->IsTrigger();
+
+        if (data.type == ColliderType::Sphere)
+        {
+            SphereCollider* sphere = static_cast<SphereCollider*>(col);
+            data.shape.radius = sphere->GetRadius();
+        }
+        else if (data.type == ColliderType::Box)
+        {
+            BoxCollider* box = static_cast<BoxCollider*>(col);
+            data.shape.size = box->GetSize();
+            data.shape.rotation = box->GetWorldRotation();
+        }
+        else if (data.type == ColliderType::Capsule)
+        {
+            CapsuleCollider* capsule = static_cast<CapsuleCollider*>(col);
+            data.shape.radius = capsule->GetRadius();
+            data.shape.height = capsule->GetHeight();
+        }
+
+        if (CollisionManager::CheckRayCollider(enemyPos, rayDir, distToPlayer, data, hitDist))
         {
             return false; // 障害物に遮蔽されている
         }

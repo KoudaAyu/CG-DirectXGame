@@ -37,8 +37,6 @@ public:
 		sceneManager_ = sceneManager;
 	}
 
-	virtual const char* GetSceneType() const { return "BaseScene"; }
-
 protected:
 	// 各種マネージャへの簡単アクセス用ショートカットゲッター
 	Object3dCom* GetObject3dCom() const;

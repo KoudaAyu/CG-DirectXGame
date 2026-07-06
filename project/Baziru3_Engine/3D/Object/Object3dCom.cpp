@@ -39,22 +39,10 @@ void Object3dCom::Draw(Object3d* object, const RenderContext& ctx, const Object3
 	ctx.commandList->SetGraphicsRootSignature(GetRootSignature().Get());
 	ctx.commandList->SetPipelineState(GetPipelineState().Get());
    
-	// Ensure the descriptor table root parameter is always initialized before Draw.
-	// GPU-based validation requires a valid root argument even if no custom texture is bound.
-	D3D12_GPU_DESCRIPTOR_HANDLE srvHandle = ctx.textureHandle;
-	if (srvHandle.ptr == 0 && dxCommon)
-	{
-		// Fallback to the texture index stored in the model's material.
-		uint32_t texIdx = modelData.material.textureIndex;
-		if (texIdx != 0 && texIdx != UINT32_MAX)
-		{
-			srvHandle = dxCommon->GetSRVHandleGPU(texIdx);
-		}
-	}
-	if (srvHandle.ptr != 0)
-	{
-		ctx.commandList->SetGraphicsRootDescriptorTable(2, srvHandle);
-	}
+    if (ctx.textureHandle.ptr != 0)
+    {
+        ctx.commandList->SetGraphicsRootDescriptorTable(2, ctx.textureHandle);
+    }
 
     uint32_t skyboxIndex = SceneManager::GetInstance()->GetSkyboxTextureIndex();
     D3D12_GPU_DESCRIPTOR_HANDLE skyboxHandle{};

@@ -15,7 +15,7 @@ public:
 	void Update() override;
 	void Draw(SceneRenderRequests& renderRequests) override;
 
-	const char* GetSceneType() const override { return "CLEAR"; }
+	const char* GetSceneType() const { return "CLEAR"; }
 
 private:
 	DirectXCom* dxCommon_ = nullptr;

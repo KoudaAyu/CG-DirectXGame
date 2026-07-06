@@ -685,7 +685,7 @@ void GamePlayScene::UpdateSprites(float deltaTime)
 		WindowAPI* windowAPI = directXCom->GetWindowAPI();
 		if (windowAPI)
 		{
-			spriteManager_->Update(windowAPI, &debugCamera_);
+			spriteManager_->Update();
 		}
 	}
 
@@ -724,7 +724,7 @@ void GamePlayScene::UpdateSprites(float deltaTime)
 			if (speedLineAlpha_ <= 0.0f)
 			{
 				line->SetSize({ 0.0f, 0.0f });
-				line->UpdateTransformOnly(windowAPI);
+				line->Update();
 				continue;
 			}
 
@@ -751,7 +751,7 @@ void GamePlayScene::UpdateSprites(float deltaTime)
 			line->SetSize({ lineWidth, lineHeight });
 			
 			line->SetColor({ 1.0f, 1.0f, 1.0f, speedLineAlpha_ });
-			line->UpdateTransformOnly(windowAPI);
+			line->Update();
 		}
 	}
 
@@ -776,7 +776,7 @@ void GamePlayScene::UpdateSprites(float deltaTime)
 	}
 
 	cur->SetPosition(pos);
-	cur->UpdateTransformOnly(directXCom ? directXCom->GetWindowAPI() : nullptr);
+	cur->Update();
 
 	if (mouseInput.PushButton(0))
 	{
@@ -826,7 +826,7 @@ void GamePlayScene::UpdateSprites(float deltaTime)
 		// 被弾赤フラッシュ（一時）と瀕死赤鼓動（持続）の強い方を適用
 		float finalAlpha = (std::max)(vignetteAlpha_, lowHpVignette);
 		vignetteSprite_->SetColor({ 1.0f, 0.0f, 0.0f, finalAlpha });
-		vignetteSprite_->UpdateTransformOnly(windowAPI);
+		vignetteSprite_->Update();
 	}
 }
 
@@ -1258,8 +1258,8 @@ void GamePlayScene::UpdatePlayerHpBar()
 
 	const float ratio = player_->GetHPRatio();
 	playerHpBarFg_->SetSize({ 200.0f * ratio, 16.0f });
-	playerHpBarBg_->UpdateTransformOnly(directXCom->GetWindowAPI());
-	playerHpBarFg_->UpdateTransformOnly(directXCom->GetWindowAPI());
+	playerHpBarBg_->Update();
+	playerHpBarFg_->Update();
 
 	// プレイヤーの頭上にフローティング表示するリロードプログレスバーの更新
 	if (playerReloadBarBg_ && playerReloadBarFg_)
@@ -1297,29 +1297,29 @@ void GamePlayScene::UpdatePlayerHpBar()
 				playerReloadBarBg_->SetPosition({ screenX - bgWidth * 0.5f, screenY });
 				playerReloadBarBg_->SetSize({ bgWidth, bgHeight });
 				playerReloadBarBg_->SetColor({ 0.1f, 0.1f, 0.1f, 0.8f });
-				playerReloadBarBg_->UpdateTransformOnly(windowAPI);
+				playerReloadBarBg_->Update();
 
 				// 前景バー (黄緑・若草色で被ダメージの赤点滅時でもハッキリ見分けがつく色)
 				playerReloadBarFg_->SetPosition({ screenX - bgWidth * 0.5f, screenY });
 				playerReloadBarFg_->SetSize({ bgWidth * reloadRatio, bgHeight });
 				playerReloadBarFg_->SetColor({ 0.0f, 1.0f, 0.5f, 1.0f });
-				playerReloadBarFg_->UpdateTransformOnly(windowAPI);
+				playerReloadBarFg_->Update();
 			}
 			else
 			{
 				playerReloadBarBg_->SetSize({ 0.0f, 0.0f });
-				playerReloadBarBg_->UpdateTransformOnly(windowAPI);
+				playerReloadBarBg_->Update();
 				playerReloadBarFg_->SetSize({ 0.0f, 0.0f });
-				playerReloadBarFg_->UpdateTransformOnly(windowAPI);
+				playerReloadBarFg_->Update();
 			}
 		}
 		else
 		{
 			// 非表示
 			playerReloadBarBg_->SetSize({ 0.0f, 0.0f });
-			playerReloadBarBg_->UpdateTransformOnly(windowAPI);
+			playerReloadBarBg_->Update();
 			playerReloadBarFg_->SetSize({ 0.0f, 0.0f });
-			playerReloadBarFg_->UpdateTransformOnly(windowAPI);
+			playerReloadBarFg_->Update();
 		}
 	}
 }
@@ -1634,7 +1634,7 @@ void GamePlayScene::Draw(SceneRenderRequests& renderRequests)
 
 	if (spriteManager_)
 	{
-		spriteManager_->DrawAll(ctx, &debugCamera_, &sprites, false);
+		spriteManager_->DrawAll(ctx, &debugCamera_, &sprites);
 	}
 
 #ifdef USE_IMGUI

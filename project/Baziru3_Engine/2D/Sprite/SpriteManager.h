@@ -15,9 +15,9 @@ class SpriteManager
 {
 public:
 	void Initialize(SpriteCom* spriteCom,const std::string& texturePath, size_t count);
-	void Update(WindowAPI* windowAPI = nullptr, DebugCamera* debugCamera = nullptr);
+	void Update();
 	void Draw();
-    void DrawAll(const RenderContext& ctx, DebugCamera* debugCamera, const std::vector < std::unique_ptr<Sprite>>* externalSprites = nullptr, bool updateExternal = true );
+	void DrawAll(const RenderContext& ctx, DebugCamera* debugCamera, const std::vector < std::unique_ptr<Sprite>>* externalSprites = nullptr );
 	void DrawAll(DebugCamera* debugCamera = nullptr, const std::vector<std::unique_ptr<Sprite>>* externalSprites = nullptr);
 
 	std::vector<std::unique_ptr<Sprite>>& GetSprites();

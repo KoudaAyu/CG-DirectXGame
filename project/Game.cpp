@@ -88,7 +88,7 @@ void Game::Initialize()
 	debugCamera_.Initialize(window);
 
 	SpriteManager* uiSpriteManager = engine_ ? engine_->GetSpriteManager() : nullptr;
-	debugUI = std::make_unique<DebugUI>(materialManager_.get(), uiSpriteManager, camera_.get(), &transformObject, &useMonsterBall, &drawObject, &drawSprite, &debugCamera_);
+	debugUI = std::make_unique<DebugUI>(materialManager_.get(), uiSpriteManager, camera_.get(), &transformObject, &useMonsterBall, &drawObject, &drawSprite);
 	debugUI->Initialize();
 
 	fadeApplication_ = std::make_unique<FadeApplication>();
@@ -332,8 +332,7 @@ void Game::Update()
 			}
 
 			cur->SetPosition(pos);
-            // 軽量な変換行列更新
-			cur->UpdateTransformOnly(engine_ ? engine_->GetWindowAPI() : nullptr);
+            cur->Update();
             // 左ボタン押下中は赤にする
 			if (mouseInput.PushButton(0))
 			{
@@ -351,9 +350,6 @@ void Game::Update()
 	//{
 	//	particles.splice(particles.end(), ParticleEmitter{}.Emit(emitter, particleManager->GetRandomEngine(), *particleManager));
 	//}
-=======
-
->>>>>>> GE3_Game
 }
 
 void Game::Draw()
@@ -706,7 +702,7 @@ void Game::DrawSprites(const RenderContext& ctx)
     if (sm)
 	{
 		// external sprites updated separately for performance
-		sm->DrawAll(ctx, &debugCamera_, &sprites, false);
+		sm->DrawAll(ctx, &debugCamera_, &sprites);
 	}
 }
 

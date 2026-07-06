@@ -39,7 +39,7 @@ public:
 	{
 	}
 
-	const char* GetSceneType() const override { return "GAMEOVER"; }
+	const char* GetSceneType() const { return "GAMEOVER"; }
 
 private:
 	KeyInput* input_ = nullptr;

@@ -18,4 +18,3 @@ void Light::Initialize(DirectXCom* dxCommon)
 	// 書き込み完了後はUnmapを呼ぶ
 	directionalLight->Unmap(0, nullptr);
 }
-

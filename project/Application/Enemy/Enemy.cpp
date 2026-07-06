@@ -9,6 +9,9 @@
 #include "Bullet.h"
 #include "Obstacle.h"
 #include "Baziru3_Engine/Collision/CollisionManager.h"
+#include "Baziru3_Engine/Collision/SphereCollider.h"
+#include "Baziru3_Engine/Collision/BoxCollider.h"
+#include "Baziru3_Engine/Collision/CapsuleCollider.h"
 #include <cmath>
 #include <random>
 
@@ -120,12 +123,12 @@ void Enemy::Update(WindowAPI* windowAPI, const Vector3* targetPosition, const st
         if (hpBarBg_ && windowAPI)
         {
             hpBarBg_->SetSize({ 0.0f, 0.0f });
-            hpBarBg_->UpdateTransformOnly(windowAPI);
+            hpBarBg_->Update();
         }
         if (hpBarFg_ && windowAPI)
         {
             hpBarFg_->SetSize({ 0.0f, 0.0f });
-            hpBarFg_->UpdateTransformOnly(windowAPI);
+            hpBarFg_->Update();
         }
 
         if (object3d_)
@@ -322,20 +325,20 @@ void Enemy::Update(WindowAPI* windowAPI, const Vector3* targetPosition, const st
             hpBarBg_->SetPosition({ screenX - bgWidth * 0.5f, screenY });
             hpBarBg_->SetSize({ bgWidth, bgHeight });
             hpBarBg_->SetColor({ 0.1f, 0.1f, 0.1f, 1.0f });
-            hpBarBg_->UpdateTransformOnly(windowAPI);
+            hpBarBg_->Update();
 
             // 前景バー (左端揃えでゲージ変化)
             hpBarFg_->SetPosition({ screenX - bgWidth * 0.5f, screenY });
             hpBarFg_->SetSize({ fgWidth, bgHeight });
             hpBarFg_->SetColor({ 0.0f, 1.0f, 0.0f, 1.0f });
-            hpBarFg_->UpdateTransformOnly(windowAPI);
+            hpBarFg_->Update();
         }
         else
         {
             hpBarBg_->SetSize({ 0.0f, 0.0f });
-            hpBarBg_->UpdateTransformOnly(windowAPI);
+            hpBarBg_->Update();
             hpBarFg_->SetSize({ 0.0f, 0.0f });
-            hpBarFg_->UpdateTransformOnly(windowAPI);
+            hpBarFg_->Update();
         }
     }
 }
@@ -353,7 +356,34 @@ bool Enemy::HasLineOfSight(const Vector3& playerPos, const std::vector<std::uniq
     {
         if (!obs || !obs->GetCollider()) continue;
         float hitDist = 0.0f;
-        if (CollisionManager::CheckRayCollider(enemyPos, rayDir, distToPlayer, obs->GetCollider(), hitDist))
+        
+        Collider* col = obs->GetCollider();
+        CollisionData data;
+        data.originalCollider = col;
+        data.type = col->GetType();
+        data.attribute = col->GetAttribute();
+        data.worldPosition = col->GetWorldPosition();
+        data.isTrigger = col->IsTrigger();
+
+        if (data.type == ColliderType::Sphere)
+        {
+            SphereCollider* sphere = static_cast<SphereCollider*>(col);
+            data.shape.radius = sphere->GetRadius();
+        }
+        else if (data.type == ColliderType::Box)
+        {
+            BoxCollider* box = static_cast<BoxCollider*>(col);
+            data.shape.size = box->GetSize();
+            data.shape.rotation = box->GetWorldRotation();
+        }
+        else if (data.type == ColliderType::Capsule)
+        {
+            CapsuleCollider* capsule = static_cast<CapsuleCollider*>(col);
+            data.shape.radius = capsule->GetRadius();
+            data.shape.height = capsule->GetHeight();
+        }
+
+        if (CollisionManager::CheckRayCollider(enemyPos, rayDir, distToPlayer, data, hitDist))
         {
             return false; // 障害物に遮蔽されている
         }

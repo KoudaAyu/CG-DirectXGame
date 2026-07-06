@@ -12,7 +12,6 @@ public:
 	void Initialize(DirectXCom* dxCommon);
 	Microsoft::WRL::ComPtr<ID3D12Resource> GetDirectionalLightResource() const { return directionalLight; }
 
-
 private:
 	DirectXCom* directXCom = nullptr;
 

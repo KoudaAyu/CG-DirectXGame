@@ -315,7 +315,8 @@ void ParticleManager::Update(float deltaTime)
 				continue;
 			}
 
-			Matrix4x4 rotZ = MakeRotateZMatrix(it->transform.GetRotate().z);
+			Vector3 rot = it->transform.GetRotate();
+			Matrix4x4 rotZ = MakeRotateZMatrix(rot.z);
 			Matrix4x4 finalRotation = Multiply(rotZ, billboardMatrix);
 			Matrix4x4 worldMatrix = MakeAffineMatrix(
 				it->transform.GetScale(), finalRotation, it->transform.GetTranslate());
@@ -333,8 +334,8 @@ void ParticleManager::Update(float deltaTime)
 				++writeIndex;
 			}
 
-			Vector3 nextTranslate = it->transform.GetTranslate() + it->velocity * deltaTime;
-			it->transform.SetTranslate(nextTranslate);
+			it->transform.SetTranslate(
+				it->transform.GetTranslate() + it->velocity * deltaTime);
 
 			++it;
 		}
@@ -437,11 +438,6 @@ void ParticleManager::Draw(ID3D12GraphicsCommandList* commandList, const RenderC
 {
 	if (!commandList) return;
 
-	// Determine requested draw mode for this call.
-	DrawMode requestedMode = (vertexCount == 0) ? DrawMode::Ring : DrawMode::External;
-	const std::vector<InstanceGroup>* drawGroups = (requestedMode == DrawMode::Ring) ? &effectInstanceGroups_ : &normalInstanceGroups_;
-	const uint32_t drawInstanceCount = (requestedMode == DrawMode::Ring) ? effectInstanceCount_ : normalInstanceCount_;
-
 	// PSOとルートシグネチャをセット
 	SetupDraw(commandList);
 
@@ -482,70 +478,63 @@ void ParticleManager::Draw(ID3D12GraphicsCommandList* commandList, const RenderC
 		}
 	}
 
-    // テクスチャごとに描画する
-    if (drawInstanceCount == 0) return;
-
-    // vertexCount が有効か確認する
-    UINT vc = vertexCount;
-    if (vc == 0)
-    {
-        vc = (ring_ && ring_->GetVertexCount() > 0) ? ring_->GetVertexCount() : 6u;
-    }
-
-	// Ring は通常 Particle と描画対象を分離したため、位置オフセットは行わない。
-	bool appliedOffset = false;
-	std::vector<Matrix4x4> originalWorld;
-	std::vector<Matrix4x4> originalWVP;
-	if (requestedMode == DrawMode::Ring)
+	UINT vc = vertexCount;
+	if (vc == 0)
 	{
-		appliedOffset = false;
+		vc = (ring_ && ring_->GetVertexCount() > 0) ? ring_->GetVertexCount() : 6u;
 	}
 
-    for (const auto& g : *drawGroups)
-    {
-        if (g.count == 0) continue;
-        // このグループのテクスチャ SRV をテクスチャ用ルートパラメータにバインドする
-		// 有効な SRV がない場合は GPU 検証エラーを避けるためこのグループの描画をスキップする
-        if (g.srvHandle.ptr == 0)
-        {
-            continue;
-        }
-
-        commandList->SetGraphicsRoot32BitConstant(RootParam::Particle::kInstanceOffset, g.start, 0);
-        commandList->SetGraphicsRootDescriptorTable(RootParam::Particle::kTextureTable, g.srvHandle);
-        commandList->DrawInstanced(vc, g.count, 0, 0);
-    }
-
-	// restore instanceData if we modified it for ring offset
-	if (appliedOffset)
-	{
-		const uint32_t startIndex = drawGroups->empty() ? 0 : (*drawGroups)[0].start;
-		for (uint32_t i = 0; i < drawInstanceCount; ++i)
-		{
-			const uint32_t instanceIndex = startIndex + i;
-			instanceData[instanceIndex].World = originalWorld[i];
-			instanceData[instanceIndex].WVP = originalWVP[i];
-		}
-	}
+	commandList->DrawInstanced(vc, numInstance, 0, 0);
 }
 
 ParticleManager::Particle ParticleManager::MakeNewParticles(std::mt19937& randomEngine, const Vector3& translate)
 {
+	std::uniform_real_distribution<float> distribution(-1.0f, 1.0f);
 	Particle particle;
-	particle.transform.Initialize();
-	particle.transform.SetTranslate(translate);
-
-	std::uniform_real_distribution<float> distVelocity(-1.0f, 1.0f);
-	particle.velocity = { distVelocity(randomEngine), distVelocity(randomEngine), distVelocity(randomEngine) };
-
-	std::uniform_real_distribution<float> distColor(0.5f, 1.0f);
+	particle.transform.SetScale({ 1.0f,1.0f,1.0f });
+	particle.transform.SetRotate({ 0.0f,0.0f,0.0f });
+	Vector3 randomTranslate{ distribution(randomEngine), distribution(randomEngine), distribution(randomEngine) };
+	particle.transform.SetTranslate({ translate + randomTranslate });
+	particle.velocity = { distribution(randomEngine), distribution(randomEngine), distribution(randomEngine) };
+	std::uniform_real_distribution<float> distColor(0.0f, 1.0f);
 	particle.color = { distColor(randomEngine), distColor(randomEngine), distColor(randomEngine), 1.0f };
-
-	std::uniform_real_distribution<float> distLifeTime(1.0f, 3.0f);
-	particle.lifeTime = distLifeTime(randomEngine);
+	std::uniform_real_distribution<float> distTime(1.0f, 3.0f);
+	particle.lifeTime = distTime(randomEngine);
 	particle.currentTime = 0.0f;
-
 	return particle;
+}
+
+ParticleManager::Particle ParticleManager::MakeHieEffect(std::mt19937& randomEngine, const Vector3& translate)
+{
+    Particle particle;
+
+    // ランダム回転
+    std::uniform_real_distribution<float> distRotate(0.0f, std::numbers::pi_v<float> * 2.0f);
+    float rotZ = distRotate(randomEngine);
+    particle.transform.SetRotate({ 0.0f, 0.0f, rotZ });
+
+    // 縦方向にばらつきを持たせた縦長パーティクル
+    std::uniform_real_distribution<float> distScaleX(0.03f, 0.08f); // 横幅
+    std::uniform_real_distribution<float> distScaleY(0.6f, 1.6f);   // 縦幅
+    float sx = distScaleX(randomEngine);
+    float sy = distScaleY(randomEngine);
+    particle.transform.SetScale({ sx, sy, 1.0f }); // Z は 1
+
+    // 発生位置
+    particle.transform.SetTranslate(translate);
+
+    // velocity を 0 に固定
+    particle.velocity = { 0.0f, 0.0f, 0.0f };
+
+    // 色は白
+    particle.color = { 1.0f, 1.0f, 1.0f, 1.0f };
+
+    // 寿命に少しばらつきを持たせる
+    std::uniform_real_distribution<float> distTime(0.7f, 1.3f);
+    particle.lifeTime = distTime(randomEngine);
+    particle.currentTime = 0.0f;
+
+    return particle;
 }
 
 

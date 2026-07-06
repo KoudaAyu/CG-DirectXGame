@@ -87,7 +87,7 @@ void Cylinder::Update()
     {
         worldMatrix_ = MakeAffineMatrix(transform_.scale, transform_.rotate, transform_.translate);
     }
-    viewMatrix_ = camera_->GetViewMatrix();
+    viewMatrix_ = Inverse(camera_->GetWorldMatrix());
     wvpMatrix_ = Multiply(worldMatrix_, Multiply(viewMatrix_, camera_->GetProjectionMatrix()));
     transformationMatrixData_->WVP = wvpMatrix_;
     transformationMatrixData_->World = worldMatrix_;

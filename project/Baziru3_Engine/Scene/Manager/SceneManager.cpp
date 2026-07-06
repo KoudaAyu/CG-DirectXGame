@@ -32,23 +32,25 @@ SceneManager::~SceneManager()
 
 void SceneManager::ChangeScene(const std::string& sceneName)
 {
+
 	if (!sceneFactory_)
 	{
 		sceneFactory_ = std::make_unique<SceneFactory>();
 	}
 
-	if (nextScene_ || isSceneTransitioning_)
-	{
-		Logger::Log(logStream_, "SceneManager::ChangeScene() ignored because a transition is already in progress.\n");
-		return;
-	}
+  if (nextScene_ || isSceneTransitioning_)
+    {
+        Logger::Log(logStream_, "SceneManager::ChangeScene() ignored because a transition is already in progress.\n");
+        return;
+    }
 
+	
 	auto newScene = sceneFactory_->CreateScene(sceneName);
-	if (!newScene)
-	{
-		Logger::Log(logStream_, "SceneManager::ChangeScene() failed to create scene.\n");
-		return;
-	}
+   if (!newScene)
+    {
+        Logger::Log(logStream_, "SceneManager::ChangeScene() failed to create scene.\n");
+        return;
+    }
 
 	nextScene_ = std::move(newScene);
 }
@@ -102,20 +104,8 @@ void SceneManager::Update(float deltaTime)
 
 void SceneManager::ApplyPendingSceneChange()
 {
-    if (!nextScene_ && !isSceneTransitioning_) return;
+    if (!nextScene_) return;
 
-	// 1. フェードイン待ち（シーン切り替えが完了し、フェードインの最中）の場合
-	if (isSceneTransitioning_ && hasSwitchedSceneDuringFade_)
-	{
-		if (fadeApplication_ && !fadeApplication_->IsBusy())
-		{
-			isSceneTransitioning_ = false;
-			hasSwitchedSceneDuringFade_ = false;
-		}
-		return;
-	}
-
-	// 2. 新しいシーン切り替えの開始、またはフェードアウト待ち
    if (!scene_ || !fadeApplication_ || !fadeApplication_->IsAvailable())
     {
         CommitPendingSceneChange();
@@ -142,7 +132,13 @@ void SceneManager::ApplyPendingSceneChange()
         hasSwitchedSceneDuringFade_ = true;
         fadeApplication_->StartFadeIn();
         return;
-	}
+    }
+
+    if (!fadeApplication_->IsBusy())
+    {
+        isSceneTransitioning_ = false;
+        hasSwitchedSceneDuringFade_ = false;
+    }
 }
 
 void SceneManager::CommitPendingSceneChange()

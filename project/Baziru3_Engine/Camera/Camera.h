@@ -1,10 +1,7 @@
 #pragma once
 
 #include"Transform.h"
-#include <Windows.h>
-#include <cstdio>
 #include"Matrix4x4.h"
-#include "../Base/KeyInput.h"
 
 #include <wrl.h>
 #include <d3d12.h>
@@ -27,19 +24,24 @@ public:
 	
 	void Finalize();
 
-	// Enable WASD control for camera
-	void SetControlEnabled(bool enabled) { controlEnabled_ = enabled; }
-	bool IsControlEnabled() const { return controlEnabled_; }
-
 public:
 
 	const Matrix4x4& GetWorldMatrix() const
 	{
 		return worldMatrix_;
 	}
-    const Matrix4x4& GetViewMatrix() const;
-	const Matrix4x4& GetProjectionMatrix() const;
-	const Matrix4x4& GetViewProjectionMatrix() const;
+	const Matrix4x4& GetViewMatrix() const
+	{
+		return viewMatrix_;
+	}
+	const Matrix4x4& GetProjectionMatrix() const
+	{
+		return projectionMatrix_;
+	}
+	const Matrix4x4& GetViewProjectionMatrix() const
+	{
+		return viewProjectionMatrix_;
+	}
 	const Vector3& GetRotate() const { return transform_.GetRotate(); }
 	const Vector3& GetTranslate() const { return transform_.GetTranslate(); }
 
@@ -47,11 +49,11 @@ public:
 
 	void SetRotate(const Vector3& rotate)
 	{
-       transform_.SetRotate(rotate);
+		transform_.SetRotate(rotate);
 	}
 	void SetTranslate(const Vector3& translate)
 	{
-     transform_.SetTranslate(translate);
+		transform_.SetTranslate(translate);
 	}
 	float GetFovY() const
 	{
@@ -90,11 +92,6 @@ public:
 	CameraForGPU* GetCameraData() const { return cameraData; }
 	Microsoft::WRL::ComPtr<ID3D12Resource> GetCameraResource() const { return cameraResource; }
 
-	// Debug camera override: when enabled, Camera will use DebugCamera's view/projection for rendering
-	void SetDebugCameraOverride(const class DebugCamera* dbg) { debugOverride_ = dbg; }
-	void EnableDebugCameraOverride(bool enable) { useDebugOverride_ = enable; }
-	bool IsDebugCameraOverrideEnabled() const { return useDebugOverride_; }
-
 private:
 	Transform transform_;
 	// 回転
@@ -119,14 +116,7 @@ private:
 
 	// DirectX 関連
 	DirectXCom* directXCom_ = nullptr;
-    // input for camera control
-	KeyInput keyInput_;
-	bool controlEnabled_ = false;
-    Microsoft::WRL::ComPtr<ID3D12Resource> cameraResource;
+	Microsoft::WRL::ComPtr<ID3D12Resource> cameraResource;
 	CameraForGPU* cameraData = nullptr;
-
-	// Optional debug camera override pointer (not owning)
-	const class DebugCamera* debugOverride_ = nullptr;
-	bool useDebugOverride_ = false;
 
 };

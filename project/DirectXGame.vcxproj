@@ -48,7 +48,6 @@
     <ClCompile Include="Baziru3_Engine\Camera\DebugCamera\DebugCamera.cpp" />
     <ClCompile Include="Baziru3_Engine\Base\DirectXCom.cpp" />
     <ClCompile Include="Baziru3_Engine\Collision\CollisionManager.cpp" />
-    <ClCompile Include="Baziru3_Engine\IO\Key\KeyInput.cpp" />
     <ClCompile Include="Baziru3_Engine\Base\Log\Log.cpp" />
     <ClCompile Include="Baziru3_Engine\Base\Matrix4x4.cpp" />
     <ClCompile Include="Baziru3_Engine\Base\ResourceLeakCheck.cpp" />
@@ -231,8 +230,8 @@
     <ClInclude Include="Baziru3_Engine\Base\DirectXCom.h" />
     <ClInclude Include="Baziru3_Engine\Base\Allocator\ConstantBufferAllocator.h" />
     <ClInclude Include="Baziru3_Engine\Base\ImGui\ImGuiManager.h" />
-    <ClInclude Include="Baziru3_Engine\IO\Key\KeyInput.h" />
     <ClInclude Include="Baziru3_Engine\Base\Log\Log.h" />
+    <ClInclude Include="Baziru3_Engine\Base\KeyInput.h" />
     <ClInclude Include="Baziru3_Engine\Base\Matrix4x4.h" />
     <ClInclude Include="Baziru3_Engine\Base\ResourceLeakCheck.h" />
     <ClInclude Include="Baziru3_Engine\Base\StringUtil.h" />

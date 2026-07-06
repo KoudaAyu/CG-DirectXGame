@@ -274,7 +274,7 @@
     <ClInclude Include="Baziru3_Engine\Camera\DebugCamera\DebugCamera.h" />
     <ClInclude Include="Baziru3_Engine\Base\DirectXCom.h" />
     <ClInclude Include="Baziru3_Engine\Base\ImGui\ImGuiManager.h" />
-    <ClInclude Include="Baziru3_Engine\IO\Key\KeyInput.h" />
+    <ClInclude Include="Baziru3_Engine\Base\KeyInput.h" />
     <ClInclude Include="Baziru3_Engine\Base\Log\Log.h" />
     <ClInclude Include="Baziru3_Engine\Base\Matrix4x4.h">
       <Filter>ヘッダー ファイル</Filter>
