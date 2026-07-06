@@ -446,7 +446,7 @@ void Game::Draw()
 
 	sphereRenderer_.Draw(ctx, renderRequests);
 
-	if (drawObject)
+	if (!renderRequests.sceneDrawn && drawObject)
 	{
 		if (object3dCom && object3d_)
 		{
@@ -716,6 +716,7 @@ void Game::DrawParticles(const RenderContext& ctx)
 		if (gameplayScene && gameplayScene->GetAppParticleManager())
 		{
 			gameplayScene->GetAppParticleManager()->Draw(ctx, model_.get(), UINT(modelData.vertices.size()));
+			return; // ゲームプレイ中はフレームワーク側のデバッグ用パーティクル描画をスキップ
 		}
 	}
 	particleRenderer_.Draw(ctx, particleManager.get(), model_.get(), UINT(modelData.vertices.size()));
