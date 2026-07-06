@@ -3,7 +3,7 @@
 #include "Object3dCom.h"
 #include "TextureManager.h"
 #include "SceneManager.h"
-#include "CustomObject3dRenderer.h"
+
 #include "RenderContext.h"
 #include "Bullet.h"
 #include <Windows.h>
@@ -453,7 +453,7 @@ void Player::Draw(const RenderContext& ctx)
         object3d_->Update(); // WVP行列を再計算してGPUに送るためUpdate
     }
 
-    CustomObject3dRenderer::GetInstance()->Draw(object3d_.get(), playerCtx, modelData, true);
+    object3dCom_->Draw(object3d_.get(), playerCtx, modelData, true);
 
     // 描画後は論理座標を元に戻して座標ドリフトを防ぐ
     if (hitFlashTimer_ > 0.0f)

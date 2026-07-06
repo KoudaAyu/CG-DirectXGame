@@ -3,7 +3,7 @@
 #include "Object3dCom.h"
 #include "TextureManager.h"
 #include "RenderContext.h"
-#include "CustomObject3dRenderer.h"
+
 #include "WindowsAPI.h"
 #include "Sprite.h"
 #include "Bullet.h"
@@ -454,7 +454,7 @@ void Enemy::Draw(const RenderContext& ctx)
         object3d_->Update(); // WVP行列を再計算してGPUに送るためUpdate
     }
 
-    CustomObject3dRenderer::GetInstance()->Draw(object3d_.get(), enemyCtx, modelData, true);
+    object3dCom_->Draw(object3d_.get(), enemyCtx, modelData, true);
 
     // 描画後は論理座標を元に戻して座標ドリフトを防ぐ
     if (hitFlashTimer_ > 0.0f)

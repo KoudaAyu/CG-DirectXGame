@@ -23,6 +23,7 @@ private:
     Vector3 position_;
     float radius_;
     std::unique_ptr<BoxCollider> collider_;
+    Object3dCom* object3dCom_ = nullptr;
     uint32_t defaultTextureIndex_ = UINT32_MAX;
 };
 

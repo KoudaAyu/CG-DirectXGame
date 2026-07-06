@@ -1,10 +1,11 @@
 #include "Obstacle.h"
 #include "TextureManager.h"
-#include "CustomObject3dRenderer.h"
+
 #include "Baziru3_Engine/Collision/CollisionManager.h"
 
 void Obstacle::Initialize(Object3dCom* object3dCom, Camera* camera, const Vector3& position, float radius)
 {
+    object3dCom_ = object3dCom;
     position_ = position;
     radius_ = radius;
 
@@ -55,7 +56,7 @@ void Obstacle::Draw(const RenderContext& ctx)
         obsCtx.textureHandle = TextureManager::GetInstance()->GetSrvHandleGPU(texIdx);
     }
 
-    CustomObject3dRenderer::GetInstance()->Draw(object3d_.get(), obsCtx, modelData, true);
+    object3dCom_->Draw(object3d_.get(), obsCtx, modelData, true);
 }
 
 void Obstacle::Finalize()

@@ -90,7 +90,7 @@
     <ClCompile Include="Application\Subsystem\SubsystemFactory.cpp" />
     <ClCompile Include="Application\Player\Player.cpp" />
     <ClCompile Include="Application\Obstacle.cpp" />
-    <ClCompile Include="Application\Subsystem\CustomObject3dRenderer.cpp" />
+
     <ClCompile Include="Baziru3_Engine\3D\Object\SkinningObject3dCom.cpp" />
     <ClCompile Include="Baziru3_Engine\Graphics\GpuProfiler.cpp" />
   </ItemGroup>
@@ -277,7 +277,7 @@
     <ClInclude Include="Application\Subsystem\SubsystemFactory.h" />
     <ClInclude Include="Application\Player\Player.h" />
     <ClInclude Include="Application\Obstacle.h" />
-    <ClInclude Include="Application\Subsystem\CustomObject3dRenderer.h" />
+
     <ClInclude Include="Baziru3_Engine\3D\Object\SkinningObject3dCom.h" />
     <ClInclude Include="Baziru3_Engine\Graphics\GpuProfiler.h" />
   </ItemGroup>

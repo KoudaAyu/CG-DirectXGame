@@ -337,9 +337,7 @@
     <ClInclude Include="Bullet.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
-    <ClInclude Include="Application\Subsystem\CustomObject3dRenderer.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
+
     <ClInclude Include="Baziru3_Engine\3D\Object\SkinningObject3dCom.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>

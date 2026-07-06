@@ -14,7 +14,7 @@
 #include"RenderContext.h"
 #include"RootParam.h"
 #include"SubsystemFactory.h"
-#include "CustomObject3dRenderer.h"
+
 
 #ifdef USE_IMGUI
 #include <imgui.h>
@@ -40,7 +40,7 @@ void Game::Initialize()
 	LogEngineDiagnostics();
 
 	InitializeSceneCore();
-	CustomObject3dRenderer::GetInstance()->Initialize(dx);
+
 
 	InitializeModelResources();
 
@@ -120,7 +120,7 @@ void Game::Initialize()
 
 void Game::Finalize()
 {
-	CustomObject3dRenderer::GetInstance()->Finalize();
+
 	// ImGuiの終了処理
 #ifdef USE_IMGUI
 	if (imguiManager)
@@ -450,7 +450,7 @@ void Game::Draw()
 	{
 		if (object3dCom && object3d_)
 		{
-			CustomObject3dRenderer::GetInstance()->Draw(object3d_.get(), ctx, modelData, drawObject);
+			object3dCom->Draw(object3d_.get(), ctx, modelData, drawObject);
 		}
 	}
 	GpuProfiler::GetInstance()->EndProfile(dx->GetCommandList().Get(), "Scene Draw");

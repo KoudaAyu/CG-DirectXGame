@@ -17,7 +17,7 @@
 #include <Windows.h>
 
 #include "GamePlayScene.h"
-#include "CustomObject3dRenderer.h"
+
 #include "imgui.h"
 #include "CombatSystem.h"
 #include "CollisionSystem.h"
@@ -35,7 +35,7 @@ void GamePlayScene::InitializeScene()
 	directXCom = dxCommon_;
 	camera_ = BaseScene::camera_;
 	assert(directXCom != nullptr);
-	CustomObject3dRenderer::GetInstance()->Initialize(directXCom);
+
 	lastTime_ = std::chrono::steady_clock::now();
 
 	object3dCom = GetObject3dCom();
@@ -278,7 +278,7 @@ void GamePlayScene::InitializeAudioAndParticles()
 
 void GamePlayScene::Finalize()
 {
-	CustomObject3dRenderer::GetInstance()->Finalize();
+
 	if (hitEffect_)
 	{
 		hitEffect_->Finalize();
