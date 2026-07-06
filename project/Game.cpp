@@ -1,7 +1,10 @@
 #include"Game.h"
 #include "DebugUI.h"
+#include "Baziru3_Engine/Base/Pipeline/PipelineStateManager.h"
+#include <future>
 
 #include <combaseapi.h>
+
 
 #include <sstream>
 #include <iomanip>
@@ -17,6 +20,7 @@
 #include <imgui_impl_win32.h>
 #include <imgui_impl_dx12.h>
 #endif
+#include "Baziru3_Engine/Graphics/GpuProfiler.h"
 
 void Game::Initialize()
 {
@@ -102,6 +106,11 @@ void Game::Initialize()
 	// OffScreenRendering の初期化
 	offScreenRendering_ = std::make_unique<OffScreenRendering>(logStream, dx);
 	offScreenRendering_->Initialize(0, 0, DXGI_FORMAT_R8G8B8A8_UNORM_SRGB, { 1.0f, 0.0f, 0.0f, 1.0f });
+
+	if (debugUI)
+	{
+		debugUI->SetOffScreenRendering(offScreenRendering_.get());
+	}
 
 	// 遅延していたアップロードバッファの解放とGPU同期待ちを一括実行
 	TextureManager::GetInstance()->ReleaseUploadBuffers();
@@ -243,6 +252,11 @@ void Game::Update()
 {
 	Framework::Update();
 
+	if (engine_)
+	{
+		PipelineStateManager::GetInstance()->Update(engine_->GetDirectXCom());
+	}
+
 	if (audioManager_)
 	{
 		audioManager_->Update();
@@ -257,11 +271,7 @@ void Game::Update()
     // Update scenes and engine subsystems. Use fixed timestep here (same as scenes expect).
 	SceneManager::GetInstance()->Update(1.0f / 60.0f);
 
-	//if (windowAPI->ProcessMassage())
-	//{
-	//	//ゲームループ抜ける
-	//	break;
-	//}
+
 
 
 	//ImGuiにここからフレームが始まる趣旨をつたえる
@@ -285,7 +295,9 @@ void Game::Update()
 	{
 		debugUI->Update();
 	}
-#endif
+#endif // USE_IMGUI
+
+
 
 
 
@@ -339,6 +351,9 @@ void Game::Update()
 	//{
 	//	particles.splice(particles.end(), ParticleEmitter{}.Emit(emitter, particleManager->GetRandomEngine(), *particleManager));
 	//}
+=======
+
+>>>>>>> GE3_Game
 }
 
 void Game::Draw()
@@ -357,11 +372,6 @@ void Game::Draw()
 		offScreenRendering_->Begin(dx->GetCommandList().Get());
 	}
 
-	if (offScreenRendering_)
-	{
-		offScreenRendering_->Begin(dx->GetCommandList().Get());
-	}
-
 	if (object3dCom) object3dCom->PreDraw();
 
 	RenderContext ctx = PrepareRenderContext();
@@ -375,6 +385,57 @@ void Game::Draw()
 	{
 		Logger::Log(logStream, "Warning: camera GPU resource not available before SceneManager draw.\n");
 	}
+
+	// スプライトの更新処理を一括でメインスレッドで行う（サブスレッドでのGPUメモリ書き込み競合を回避するため）
+	SpriteManager* sm = engine_ ? engine_->GetSpriteManager() : nullptr;
+	if (sm)
+	{
+		sm->Update();
+	}
+	for (auto& sp : sprites)
+	{
+		if (sp) sp->Update();
+	}
+
+	// === [サブスレッド] Sprite 描画コマンドの並列記録を開始 ===
+	RenderContext workerCtx = ctx;
+	workerCtx.commandList = dx->GetWorkerCommandList().Get();
+
+	auto spriteFuture = std::async(std::launch::async, [this, workerCtx, dx]() {
+		dx->GetWorkerCommandAllocator()->Reset();
+		dx->GetWorkerCommandList()->Reset(dx->GetWorkerCommandAllocator().Get(), nullptr);
+
+		// パイプラインステート、RTV/DSV、ビューポート、記述子ヒープの設定
+		D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle{};
+		D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle{};
+		if (offScreenRendering_)
+		{
+			dsvHandle = offScreenRendering_->GetDsvHandle();
+			rtvHandle = offScreenRendering_->GetRtvHandle();
+		}
+		else
+		{
+			UINT backBufferIndex = dx->GetSwapChain()->GetCurrentBackBufferIndex();
+			dsvHandle = dx->GetDsvHeap().GetCPUDescriptorHandle(0);
+			rtvHandle = dx->GetRtvHandle(backBufferIndex);
+		}
+		workerCtx.commandList->OMSetRenderTargets(1, &rtvHandle, false, &dsvHandle);
+
+		ID3D12DescriptorHeap* descriptorHeaps[] = { dx->GetSrvDescriptorHeap().Get() };
+		workerCtx.commandList->SetDescriptorHeaps(1, descriptorHeaps);
+
+		workerCtx.commandList->RSSetViewports(1, &dx->GetViewport());
+		workerCtx.commandList->RSSetScissorRects(1, &dx->GetScissorRect());
+
+		DrawSprites(workerCtx);
+
+		dx->GetWorkerCommandList()->Close();
+	});
+
+	// === [メインスレッド] 3Dオブジェクト等の描画コマンド記録 ===
+
+	// 1. Scene Drawの計測
+	GpuProfiler::GetInstance()->BeginProfile(dx->GetCommandList().Get(), "Scene Draw");
 
 	if (SceneManager::GetInstance())
 	{
@@ -395,12 +456,36 @@ void Game::Draw()
 			CustomObject3dRenderer::GetInstance()->Draw(object3d_.get(), ctx, modelData, drawObject);
 		}
 	}
-	DrawSprites(ctx);
+	GpuProfiler::GetInstance()->EndProfile(dx->GetCommandList().Get(), "Scene Draw");
 
+	// 3. Particle Drawの計測 (通常のパーティクル描画)
+	GpuProfiler::GetInstance()->BeginProfile(dx->GetCommandList().Get(), "Particle Draw");
 	if (renderRequests.sceneDrawn)
 	{
 		DrawParticles(ctx);
 	}
+	GpuProfiler::GetInstance()->EndProfile(dx->GetCommandList().Get(), "Particle Draw");
+
+	// === 前半のコマンドリスト記録を終了し、GPUに即時提出（オフスクリーン3D描画の確定） ===
+	dx->GetCommandList()->Close();
+	ID3D12CommandList* mainLists1[] = { dx->GetCommandList().Get() };
+	dx->GetCommandQueue()->ExecuteCommandLists(1, mainLists1);
+
+	// === [サブスレッド] Sprite 描画コマンド記録完了を同期的に待機し、提出 ===
+	spriteFuture.get();
+	ID3D12CommandList* workerLists[] = { dx->GetWorkerCommandList().Get() };
+	dx->GetCommandQueue()->ExecuteCommandLists(1, workerLists);
+
+	// === 後半のコマンド記録（ポストプロセス以降）の開始 ===
+	// アロケーターはリセットせず、コマンドリストのみをリセットして記録を再開
+	dx->GetCommandList()->Reset(dx->GetCommandAllocator().Get(), nullptr);
+
+	// ビューポート、記述子ヒープ、ターゲットの再設定（リセットによりクリアされるため）
+	ID3D12DescriptorHeap* descriptorHeaps[] = { dx->GetSrvDescriptorHeap().Get() };
+	dx->GetCommandList()->SetDescriptorHeaps(1, descriptorHeaps);
+	dx->GetCommandList()->RSSetViewports(1, &dx->GetViewport());
+	dx->GetCommandList()->RSSetScissorRects(1, &dx->GetScissorRect());
+
 	if (fadeApplication_)
 	{
 		fadeApplication_->Draw();
@@ -420,8 +505,10 @@ void Game::Draw()
 			offScreenRendering_->SetProjectionInverse(Inverse(camera_->GetProjectionMatrix()));
 		}
 
-		// Draw off-screen texture (with post-effect) to backbuffer
+		// 4. PostProcess (OffScreen Rendering) Drawの計測
+		GpuProfiler::GetInstance()->BeginProfile(dx->GetCommandList().Get(), "PostProcess Draw");
 		offScreenRendering_->DrawToBackBuffer(dx->GetCommandList().Get());
+		GpuProfiler::GetInstance()->EndProfile(dx->GetCommandList().Get(), "PostProcess Draw");
 	}
 
 	// Draw object debug logs if necessary

@@ -12,9 +12,6 @@ KeyInput::~KeyInput()
 
 void KeyInput::Initialize(WindowAPI* windowAPI)
 {
-
-	/*HRESULT hr;*/
-
 	 // DirectInputの初期化
 	HRESULT result = DirectInput8Create(windowAPI->GetHInstance(), DIRECTINPUT_VERSION, IID_IDirectInput8, (void**)&directInput, nullptr);
 	assert(SUCCEEDED(result) && directInput != nullptr); // 失敗時停止

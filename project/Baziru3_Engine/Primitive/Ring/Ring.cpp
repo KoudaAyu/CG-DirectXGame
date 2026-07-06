@@ -1,4 +1,5 @@
 #include "Ring.h"
+#include "BufferUtil.h"
 
 #include <cmath>
 #include <cstring>
@@ -15,7 +16,7 @@ void Ring::Initialize(DirectXCom* dxCommon, uint32_t ringDivide, float outerRadi
     }
 
     auto verts = CreateMesh(ringDivide, outerRadius, innerRadius);
-    CreateVertexBuffer(verts);
+    vertexBuffer_ = BufferUtil::CreateVertexBuffer(dxCommon_, verts, vertexBufferView_);
     vertexCount_ = static_cast<uint32_t>(verts.size());
 }
 
@@ -67,22 +68,4 @@ std::vector<Ring::Vertex> Ring::CreateMesh(uint32_t ringDivide, float outerRadiu
     return verts;
 }
 
-void Ring::CreateVertexBuffer(const std::vector<Vertex>& verts)
-{
-    if (!dxCommon_ || verts.empty())
-    {
-        return;
-    }
 
-    size_t sizeInBytes = verts.size() * sizeof(Vertex);
-    vertexBuffer_ = dxCommon_->CreateBufferResource(dxCommon_->GetDevice(), sizeInBytes);
-
-    void* mapped = nullptr;
-    vertexBuffer_->Map(0, nullptr, &mapped);
-    std::memcpy(mapped, verts.data(), sizeInBytes);
-    vertexBuffer_->Unmap(0, nullptr);
-
-    vertexBufferView_.BufferLocation = vertexBuffer_->GetGPUVirtualAddress();
-    vertexBufferView_.SizeInBytes = static_cast<UINT>(sizeInBytes);
-    vertexBufferView_.StrideInBytes = static_cast<UINT>(sizeof(Vertex));
-}

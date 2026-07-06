@@ -4,9 +4,6 @@
 #include <format>
 #include <thread>
 #include <vector>
-#include <timeapi.h>
-
-#pragma comment(lib, "winmm.lib")
 
 #include"d3dx12.h"
 #pragma comment(lib,"d3d12.lib")
@@ -17,6 +14,8 @@
 #include"StringUtil.h"
 
 #include"ImGuiManager.h"
+#include "Baziru3_Engine/Base/Allocator/ConstantBufferAllocator.h"
+#include "Baziru3_Engine/Base/Allocator/StackAllocator.h"
 
 using namespace Microsoft::WRL;
 
@@ -38,6 +37,8 @@ void DirectXCom::UpdateFixFPS()
 {
 	// 1/60秒ぴったりの時間
 	const std::chrono::microseconds kMinTime(uint64_t(1000000.0f / 60.0f));
+	// 1/60秒よりわずかに短い時間
+	const std::chrono::microseconds kMinCheckTime(uint64_t(1000000.0f / 65.0f));
 
 	// 現在時間を取得
 	std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
@@ -45,23 +46,14 @@ void DirectXCom::UpdateFixFPS()
 	std::chrono::microseconds elapsed =
 		std::chrono::duration_cast<std::chrono::microseconds>(now - refrence_);
 
-	// 1/60秒経っていない場合
-	if (elapsed < kMinTime)
+	// 1/60秒(わずかに短い時間)経っていない場合
+	if (elapsed < kMinCheckTime)
 	{
-		// 1/60秒経過するまでループ
+		// 1/60秒経過するまで微小なスリープを繰り返す
 		while (std::chrono::steady_clock::now() - refrence_ < kMinTime)
 		{
-			auto remaining = kMinTime - std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - refrence_);
-			// 1.5ms以上残り時間があるなら1msスリープ (タイマー精度1ms設定を前提)
-			if (remaining > std::chrono::microseconds(1500))
-			{
-				std::this_thread::sleep_for(std::chrono::milliseconds(1));
-			}
-			else
-			{
-				// 残り僅かならスレッド譲渡してビジーウェイトを避ける
-				std::this_thread::yield();
-			}
+			// 1マイクロ秒スリープ
+			std::this_thread::sleep_for(std::chrono::microseconds(1));
 		}
 	}
 
@@ -73,9 +65,6 @@ void DirectXCom::Initialize()
 {
 	assert(windowAPI);
 	this->windowAPI = windowAPI;
-
-	// Windowsタイマーの分解能を1msに設定して高精度なFPS制御を可能にする
-	timeBeginPeriod(1);
 
 	InitializeFixFPS();
 
@@ -93,6 +82,14 @@ void DirectXCom::Initialize()
 	CerateScissorRect();
 	CreateDxcCompiler();
 	InitializeImGui();
+
+	// 定数バッファアロケーターの生成・初期化
+	cbAllocator_ = std::make_unique<ConstantBufferAllocator>(this);
+	cbAllocator_->Initialize();
+
+	// スタックアロケーターの生成・初期化
+	stackAllocator_ = std::make_unique<StackAllocator>();
+	stackAllocator_->Initialize(16 * 1024 * 1024); // 16MB
 }
 
 void DirectXCom::Finalize()
@@ -120,9 +117,9 @@ void DirectXCom::Finalize()
 	// スワップチェーンのリソースを解放する前に、コマンドリストとコマンドアロケーターをリセットしておく
 	for (auto& res : swapChainResources) res.Reset();
 
-	rtvDescriptorHeap.Reset();
-	srvDescriptorHeap.Reset();
-	dsvDescriptorHeap.Reset();
+	rtvDescriptorHeap_.Finalize();
+	srvDescriptorHeap_.Finalize();
+	dsvDescriptorHeap_.Finalize();
 	descriptorHeap.Reset();
 	depthStencilResource.Reset();
 	commandList.Reset();
@@ -145,11 +142,19 @@ void DirectXCom::Finalize()
 	device.Reset();
 	dxgiFactory.Reset();
 
-	// 生のポインタをクリア
-	infoQueue = nullptr;
+	infoQueue.Reset();
+	debugController.Reset();
 
-	// Windowsタイマー分解能の設定を解除
-	timeEndPeriod(1);
+	if (cbAllocator_)
+	{
+		cbAllocator_->Finalize();
+		cbAllocator_.reset();
+	}
+
+	if (stackAllocator_)
+	{
+		stackAllocator_.reset();
+	}
 }
 
 void DirectXCom::DebugLayer()
@@ -247,7 +252,7 @@ void DirectXCom::SetupD3D12InfoQueue()
 		infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_ERROR, true);
 
 		//警告時に止まる
-		infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_WARNING, false);
+		infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_WARNING, true);
 
 
 
@@ -265,9 +270,6 @@ void DirectXCom::SetupD3D12InfoQueue()
 		filter.DenyList.pSeverityList = serverities; //抑制するメッセージの重要度
 
 		infoQueue->PushStorageFilter(&filter); //フィルターを適用する
-
-		//解放
-		infoQueue->Release();
 	}
 #endif
 }
@@ -277,6 +279,14 @@ void DirectXCom::InitializeCommandList()
 	CreateCommandAllocator();
 	CreateCommandList();
 	CreateCommandQueue();
+
+	// ワーカー用の作成
+	hr = device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&workerCommandAllocator_));
+	assert(SUCCEEDED(hr));
+	hr = device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, workerCommandAllocator_.Get(), nullptr, IID_PPV_ARGS(&workerCommandList_));
+	assert(SUCCEEDED(hr));
+	// 初期状態は Close しておく
+	workerCommandList_->Close();
 }
 
 //コマンドアロケーターを生成する
@@ -321,6 +331,21 @@ void DirectXCom::CreateSwapChain()
 	hr = (dxgiFactory->CreateSwapChainForHwnd(commandQueue.Get(), windowAPI->GetHwnd(), &swapChainDesc, nullptr, nullptr, reinterpret_cast<IDXGISwapChain1**>(swapChain.GetAddressOf())));
 	//スワップチェーンの生成に失敗した場合はエラー
 	assert(SUCCEEDED(hr));
+}
+
+void DirectXCom::CreateUnroaderedAccessView(const Microsoft::WRL::ComPtr<ID3D12Resource>& resource,
+	UINT NumElements, UINT structureByteStride,D3D12_CPU_DESCRIPTOR_HANDLE uavCpuDescriptorHandle)
+{
+    D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc{};
+    uavDesc.Format = DXGI_FORMAT_UNKNOWN; //Format
+	uavDesc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER; //View Dimension
+	uavDesc.Buffer.FirstElement = 0;
+	uavDesc.Buffer.NumElements = NumElements; //要素数
+	uavDesc.Buffer.CounterOffsetInBytes = 0; //カウンターオフセット
+	uavDesc.Buffer.Flags = D3D12_BUFFER_UAV_FLAG_NONE; //フラグ
+	uavDesc.Buffer.StructureByteStride = structureByteStride; //ストライド
+
+	device->CreateUnorderedAccessView(resource.Get(), nullptr, &uavDesc, uavCpuDescriptorHandle);
 }
 
 Microsoft::WRL::ComPtr<ID3D12Resource> DirectXCom::CreateDepthStencilTextureResource(const Microsoft::WRL::ComPtr<ID3D12Device>& device, int32_t width, int32_t height)
@@ -378,13 +403,9 @@ void DirectXCom::CreateDescriptorHeaps()
 	const uint32_t descriptorSizeDSV = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
 
 
-	//RTV用のヒープでディスクリプタの数は2。RTVはShader内でふれるものではないため、ShaderVisibleはfalse
-	rtvDescriptorHeap = CreateDescriptorHeap(device.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_RTV, 2, false);
-
-	srvDescriptorHeap = CreateDescriptorHeap(device.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, kMaxSRVCount, true);
-
-	//DSV用のヒープでディスクリプタの数は1。DSVはShader内で触れるものではないため、ShaderVisibleはfalse
-	dsvDescriptorHeap = CreateDescriptorHeap(device.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_DSV, 1, false);
+	rtvDescriptorHeap_.Initialize(device.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_RTV, 2, false);
+	srvDescriptorHeap_.Initialize(device.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, kMacSRVCount, true);
+	dsvDescriptorHeap_.Initialize(device.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_DSV, 1, false);
 
 }
 
@@ -402,7 +423,7 @@ void DirectXCom::InitializeRenderTargetView()
 	rtvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB; //出力結果をSRGBに変換して書き込む
 	rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D; //2Dテクスチャとして書き込む
 	//ディスクリプタの先頭を取得する
-	D3D12_CPU_DESCRIPTOR_HANDLE rtvStartHandle = rtvDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
+	D3D12_CPU_DESCRIPTOR_HANDLE rtvStartHandle = rtvDescriptorHeap_.GetCPUDescriptorHandle(0);
 
 
 	UINT descriptorSize = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
@@ -437,7 +458,7 @@ void DirectXCom::InitializeDepthStencilView()
 	dsvDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;//Format。基本的にはResourceに合わせる
 	dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;//2dTexture
 	//DSVHeapの先頭にDSVを作る
-	device->CreateDepthStencilView(depthStencilResource.Get(), &dsvDesc, dsvDescriptorHeap->GetCPUDescriptorHandleForHeapStart());
+	device->CreateDepthStencilView(depthStencilResource.Get(), &dsvDesc, dsvDescriptorHeap_.GetCPUDescriptorHandle(0));
 }
 
 void DirectXCom::CreateFence()
@@ -498,6 +519,16 @@ void DirectXCom::InitializeImGui()
 
 void DirectXCom::PreDraw()
 {
+	if (cbAllocator_)
+	{
+		cbAllocator_->BeginFrame();
+	}
+
+	if (stackAllocator_)
+	{
+		stackAllocator_->Reset();
+	}
+
 	//これから書き込むバックバッファのインデックスを取得する
 	backBufferIndex = swapChain->GetCurrentBackBufferIndex();
 
@@ -517,7 +548,7 @@ void DirectXCom::PreDraw()
 	commandList->ResourceBarrier(1, &barrier);
 
 	//描画先のRTVとDSVを設定する
-	D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = dsvDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
+	D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = dsvDescriptorHeap_.GetCPUDescriptorHandle(0);
 	commandList->OMSetRenderTargets(1, &rtvHandles[backBufferIndex], false, &dsvHandle);
 
 	float clearColor[] = { 0.1f,0.25f,0.5f,1.0f };//RGBAの値。青っぽい色
@@ -526,7 +557,7 @@ void DirectXCom::PreDraw()
 	commandList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 
 	//描画用のDescriptorHeapの設定
-	ID3D12DescriptorHeap* descriptorHeaps[] = { srvDescriptorHeap.Get() };
+	ID3D12DescriptorHeap* descriptorHeaps[] = { srvDescriptorHeap_.GetHeap() };
 	commandList->SetDescriptorHeaps(1, descriptorHeaps);
 
 	//コマンドを積む
@@ -565,6 +596,7 @@ void DirectXCom::PostDraw()
 		return;
 	}
 
+	PrintDebugMessages();
 	ID3D12CommandList* commandLists[] = { commandList.Get() };
 	commandQueue->ExecuteCommandLists(1, commandLists);
 
@@ -574,7 +606,7 @@ void DirectXCom::PostDraw()
 	{
 		Logger::Log(logStream, std::format("DirectXCom::PostDraw - device removed or error after ExecuteCommandLists hr=0x{:08X}\n", static_cast<unsigned int>(deviceRemoved)));
 	}
-	//GUPとOSに画面の交換を要求するa
+	//GUPとOSに画面の交換を要求する
 	swapChain->Present(1, 0);
 
 	//Fenceの値を更新
@@ -603,6 +635,13 @@ void DirectXCom::PostDraw()
 	hr = (commandList->Reset(commandAllocator.Get(), nullptr));
 	//コマンドリストのリセットに失敗した場合はエラー
 	assert(SUCCEEDED(hr));
+
+	// ワーカー用の次フレーム準備
+	hr = workerCommandAllocator_->Reset();
+	assert(SUCCEEDED(hr));
+	hr = workerCommandList_->Reset(workerCommandAllocator_.Get(), nullptr);
+	assert(SUCCEEDED(hr));
+	workerCommandList_->Close();
 
 }
 
@@ -814,8 +853,6 @@ Microsoft::WRL::ComPtr<ID3D12Resource> DirectXCom::CreateTextureResource(const D
 	//2. 利用するHeapの設定
 	D3D12_HEAP_PROPERTIES heapProperties{};
 	heapProperties.Type = D3D12_HEAP_TYPE_DEFAULT;//細かい設定を行う
-	//heapProperties.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_WRITE_BACK;//WriteBackポリシーでCPUアクセス可能
-	//heapProperties.MemoryPoolPreference = D3D12_MEMORY_POOL_L0;//プロセッサの近くに配列
 
 	//3. Resourceを生成する
 	Microsoft::WRL::ComPtr<ID3D12Resource> resource = nullptr;
@@ -832,22 +869,12 @@ Microsoft::WRL::ComPtr<ID3D12Resource> DirectXCom::CreateTextureResource(const D
 
 D3D12_CPU_DESCRIPTOR_HANDLE DirectXCom::GetSRVHandleCPU(uint32_t index)
 {
-	// Use the actual SRV descriptor heap
-	D3D12_CPU_DESCRIPTOR_HANDLE handleCPU =
-		srvDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
-	UINT increment = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-	handleCPU.ptr += (static_cast<SIZE_T>(increment) * index);
-	return handleCPU;
+	return srvDescriptorHeap_.GetCPUDescriptorHandle(index);
 }
 
 D3D12_GPU_DESCRIPTOR_HANDLE DirectXCom::GetSRVHandleGPU(uint32_t index)
 {
-	// Use the actual SRV descriptor heap
-	D3D12_GPU_DESCRIPTOR_HANDLE handleGPU =
-		srvDescriptorHeap->GetGPUDescriptorHandleForHeapStart();
-	UINT increment = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-	handleGPU.ptr += (static_cast<UINT64>(increment) * index);
-	return handleGPU;
+	return srvDescriptorHeap_.GetGPUDescriptorHandle(index);
 }
 
 
@@ -864,3 +891,19 @@ const D3D_FEATURE_LEVEL DirectXCom::featureLevels[] = {
 };
 
 const size_t DirectXCom::featureLevelNamesCount = sizeof(DirectXCom::featureLevelNames) / sizeof(DirectXCom::featureLevelNames[0]);
+
+void DirectXCom::PrintDebugMessages()
+{
+	if (!infoQueue) return;
+	UINT64 messageCount = infoQueue->GetNumStoredMessagesAllowedByRetrievalFilter();
+	for (UINT64 i = 0; i < messageCount; i++)
+	{
+		SIZE_T messageLength = 0;
+		infoQueue->GetMessage(i, nullptr, &messageLength);
+		std::vector<byte> messageBytes(messageLength);
+		D3D12_MESSAGE* message = reinterpret_cast<D3D12_MESSAGE*>(messageBytes.data());
+		infoQueue->GetMessage(i, message, &messageLength);
+		Logger::Log(logStream, std::format("[D3D12 ERROR/WARNING] {}\n", message->pDescription));
+	}
+	infoQueue->ClearStoredMessages();
+}

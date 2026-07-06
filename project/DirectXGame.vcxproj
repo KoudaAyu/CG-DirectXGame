@@ -38,6 +38,7 @@
     <ClCompile Include="Baziru3_Engine\Audio\AudioManager.cpp" />
     <ClCompile Include="Baziru3_Engine\Scene\BaseScene.cpp" />
     <ClCompile Include="Baziru3_Engine\2D\Texture\TextureManager.cpp" />
+    <ClCompile Include="Baziru3_Engine\Base\Srv\DescriptorHeap.cpp" />
     <ClCompile Include="Baziru3_Engine\3D\Object\Object3d.cpp" />
     <ClCompile Include="Baziru3_Engine\3D\Object\Object3dCom.cpp" />
     <ClCompile Include="Baziru3_Engine\Audio\Sound.cpp" />
@@ -49,11 +50,15 @@
     <ClCompile Include="Baziru3_Engine\Collision\CollisionManager.cpp" />
     <ClCompile Include="Baziru3_Engine\IO\Key\KeyInput.cpp" />
     <ClCompile Include="Baziru3_Engine\Base\Log\Log.cpp" />
-    <ClCompile Include="Baziru3_Engine\Math\Matrix4x4.cpp" />
-    <ClCompile Include="Baziru3_Engine\Base\ResourceLeakCheek.cpp" />
+    <ClCompile Include="Baziru3_Engine\Base\Matrix4x4.cpp" />
+    <ClCompile Include="Baziru3_Engine\Base\ResourceLeakCheck.cpp" />
+    <ClCompile Include="Baziru3_Engine\Base\Allocator\ConstantBufferAllocator.cpp" />
+    <ClCompile Include="Baziru3_Engine\Base\Allocator\StackAllocator.cpp" />
+    <ClCompile Include="Baziru3_Engine\Base\KeyInput.cpp" />
     <ClCompile Include="Baziru3_Engine\Base\StringUtil.cpp" />
     <ClCompile Include="Baziru3_Engine\Base\Transform.cpp" />
     <ClCompile Include="Baziru3_Engine\Base\Windows\WindowsAPI.cpp" />
+    <ClCompile Include="Baziru3_Engine\Base\Pipeline\PipelineStateManager.cpp" />
     <ClCompile Include="Baziru3_Engine\SkyBox\SkyboxCom.cpp" />
     <ClCompile Include="Baziru3_Engine\Platform\Windows\CrashDump.cpp" />
     <ClCompile Include="Baziru3_Engine\Base\DebugUI.cpp" />
@@ -88,9 +93,10 @@
     <ClCompile Include="Application\Obstacle.cpp" />
     <ClCompile Include="Application\Subsystem\CustomObject3dRenderer.cpp" />
     <ClCompile Include="Baziru3_Engine\3D\Object\SkinningObject3dCom.cpp" />
+    <ClCompile Include="Baziru3_Engine\Graphics\GpuProfiler.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <FxCompile Include="Resources\CG4\SkinningObject3d.VS.hlsl">
+    <FxCompile Include="Resources\shaders\InitializeParticle.CS.hlsl">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
@@ -116,6 +122,17 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
     </FxCompile>
     <FxCompile Include="Resources\shaders\BoxFilter.PS.hlsl">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </FxCompile>
+    <FxCompile Include="Resources\shaders\Skinning.CS.hlsl">
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Compute</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">4.0</ShaderModel>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Compute</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4.0</ShaderModel>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Development|x64'">Compute</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Development|x64'">4.0</ShaderModel>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
@@ -212,11 +229,12 @@
     <ClInclude Include="Baziru3_Engine\Base\RootParam.h" />
     <ClInclude Include="Baziru3_Engine\Camera\DebugCamera\DebugCamera.h" />
     <ClInclude Include="Baziru3_Engine\Base\DirectXCom.h" />
+    <ClInclude Include="Baziru3_Engine\Base\Allocator\ConstantBufferAllocator.h" />
     <ClInclude Include="Baziru3_Engine\Base\ImGui\ImGuiManager.h" />
     <ClInclude Include="Baziru3_Engine\IO\Key\KeyInput.h" />
     <ClInclude Include="Baziru3_Engine\Base\Log\Log.h" />
-    <ClInclude Include="Baziru3_Engine\Math\Matrix4x4.h" />
-    <ClInclude Include="Baziru3_Engine\Base\ResourceLeakCheek.h" />
+    <ClInclude Include="Baziru3_Engine\Base\Matrix4x4.h" />
+    <ClInclude Include="Baziru3_Engine\Base\ResourceLeakCheck.h" />
     <ClInclude Include="Baziru3_Engine\Base\StringUtil.h" />
     <ClInclude Include="Baziru3_Engine\Base\Transform.h" />
     <ClInclude Include="Baziru3_Engine\Base\Vector.h" />
@@ -225,7 +243,9 @@
     <ClInclude Include="Baziru3_Engine\2D\Sprite\Sprite.h" />
     <ClInclude Include="Baziru3_Engine\2D\Sprite\SpriteCom.h" />
     <ClInclude Include="Baziru3_Engine\Base\Operator.h" />
+    <ClInclude Include="Baziru3_Engine\Base\Pipeline\PipelineStateManager.h" />
     <ClInclude Include="Baziru3_Engine\2D\Texture\TextureManager.h" />
+    <ClInclude Include="Baziru3_Engine\Base\Srv\DescriptorHeap.h" />
     <ClInclude Include="Baziru3_Engine\SkyBox\SkyboxCom.h" />
     <ClInclude Include="Baziru3_Engine\Platform\Windows\CrashDump.h" />
     <ClInclude Include="Baziru3_Engine\Base\DebugUI.h" />
@@ -260,6 +280,7 @@
     <ClInclude Include="Application\Obstacle.h" />
     <ClInclude Include="Application\Subsystem\CustomObject3dRenderer.h" />
     <ClInclude Include="Baziru3_Engine\3D\Object\SkinningObject3dCom.h" />
+    <ClInclude Include="Baziru3_Engine\Graphics\GpuProfiler.h" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="externals\DirectXTex\DirectXTex_Desktop_2022_Win10.vcxproj">
@@ -416,4 +437,8 @@
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
+  <Target Name="CopyDxCompilerDll" AfterTargets="Build">
+    <Copy SourceFiles="$(WindowsSdkDir)Redist\D3D\x64\dxcompiler.dll" DestinationFiles="$(OutDir)dxcompiler.dll" Condition="Exists('$(WindowsSdkDir)Redist\D3D\x64\dxcompiler.dll')" />
+    <Copy SourceFiles="$(WindowsSdkDir)Redist\D3D\x64\dxil.dll" DestinationFiles="$(OutDir)dxil.dll" Condition="Exists('$(WindowsSdkDir)Redist\D3D\x64\dxil.dll')" />
+  </Target>
 </Project>

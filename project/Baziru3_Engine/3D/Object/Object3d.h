@@ -56,7 +56,7 @@ public:
 		float intensity;
 	};
 
-	void Initialize(Object3dCom* object3dCom, const ModelData& modelData);
+	void Initialize(Object3dCom* object3dCom, const ModelData& modelData, TextureManager* textureManager = nullptr);
 
 	// アニメーション・スケルトン・スキンクラスターをまとめてセットアップする
 	// アプリ側で読み込んだ Animation と Skeleton、Model::ModelData を渡す
@@ -103,9 +103,11 @@ public:
 	Camera* GetCamera() const { return camera_; }
 	void SetObject3dCom(Object3dCom* object3dCom) { object3dCom_ = object3dCom; }
 
-	const Microsoft::WRL::ComPtr<ID3D12Resource>& GetTransformationMatrixResource() const { return transformationMatrixResource; }
-	const Microsoft::WRL::ComPtr<ID3D12Resource>& GetMaterialResource() const { return materialResource; }
-	const Microsoft::WRL::ComPtr<ID3D12Resource>& GetDirectionalLightResource() const { return directionalLightResource; }
+	D3D12_GPU_VIRTUAL_ADDRESS GetTransformationMatrixGPUAddress() const { return transformationMatrixGpuAddress_; }
+	D3D12_GPU_VIRTUAL_ADDRESS GetMaterialGPUAddress() const { return materialGpuAddress_; }
+	D3D12_GPU_VIRTUAL_ADDRESS GetDirectionalLightGPUAddress() const { return directionalLightGpuAddress_; }
+	const Microsoft::WRL::ComPtr<ID3D12Resource>& GetVertexResource() const { return vertexResource; }
+	void PrepareConstantBuffers(DirectXCom* dx);
 
 	const D3D12_VERTEX_BUFFER_VIEW& GetVertexBufferView() const { return vertexBufferView_; }
 	const D3D12_INDEX_BUFFER_VIEW& GetIndexBufferView() const { return indexBufferView_; }
@@ -114,14 +116,15 @@ public:
 	void SetRotate(const Vector3& r) { transform.SetRotate(r); }
 	void SetTranslate(const Vector3& t) { transform.SetTranslate(t); }
 	void SetScale(const Vector3& s) { transform.SetScale(s); }
-	Vector3 GetRotate() const { return transform.GetRotate(); }
-	Vector3 GetTranslate() const { return transform.GetTranslate(); }
-	Vector3 GetScale() const { return transform.GetScale(); }
+	const Vector3& GetRotate() const { return transform.GetRotate(); }
+	const Vector3& GetTranslate() const { return transform.GetTranslate(); }
+	const Vector3& GetScale() const { return transform.GetScale(); }
 	const ModelData& GetModelData() const { return modelData_; }
-	void SetColor(const Vector4& color);
-	Vector4 GetColor() const { return color_; }
 
 	void SetEnableLighting(bool enable);
+	void SetColor(const Vector4& color);
+	void SetReflectionFactor(float factor);
+	void SetFresnelF0(float f0);
 
 	// デルタタイム設定 (Animator の時間進行に使用)
 	void SetDeltaTime(float dt) { deltaTime_ = dt; }
@@ -141,7 +144,6 @@ private:
 	Transform transform_;
 
     ModelData modelData_; // モデルデータを保持
-	Vector4 color_ = { 1.0f, 1.0f, 1.0f, 1.0f };
 
 	//バッファリソース
 	Microsoft::WRL::ComPtr<ID3D12Resource> vertexResource = nullptr;
@@ -153,20 +155,15 @@ private:
 	Microsoft::WRL::ComPtr<ID3D12Resource> indexResource = nullptr;
 	D3D12_INDEX_BUFFER_VIEW indexBufferView_{};
 
-	//バッファリソース
-	Microsoft::WRL::ComPtr<ID3D12Resource> materialResource = nullptr;
-	//バッファリソース内のデータを指すポインタ
-	Material* materialData_ = nullptr;
+	// 定数データの実体
+	Material materialData_{};
+	TransformationMatrix transformationMatrixData_{};
+	DirectionalLight directionalLightData_{};
 
-	//バッファリソース
-	Microsoft::WRL::ComPtr<ID3D12Resource> transformationMatrixResource = nullptr;
-	//バッファリソース内のデータを指すポインタ
-	TransformationMatrix* transformationMatrixData_ = nullptr;
-
-	// ディレクショナルライト用のバッファリソース
-	Microsoft::WRL::ComPtr<ID3D12Resource> directionalLightResource = nullptr;
-	// バッファリソース内のデータを指すポインタ
-	DirectionalLight* directionalLightData_ = nullptr;
+	// 毎フレーム割り当てられるGPU仮想アドレスのキャッシュ
+	D3D12_GPU_VIRTUAL_ADDRESS materialGpuAddress_ = 0;
+	D3D12_GPU_VIRTUAL_ADDRESS transformationMatrixGpuAddress_ = 0;
+	D3D12_GPU_VIRTUAL_ADDRESS directionalLightGpuAddress_ = 0;
 
 	// アニメーション / スケルトン / スキンクラスター
 	Animator animator_;
@@ -175,4 +172,5 @@ private:
 	SkinClusterLender skinClusterLender_;
 	bool skinClusterInitialized_ = false;
 	float deltaTime_ = 1.0f / 60.0f;
+	TextureManager* textureManager_ = nullptr;
 };

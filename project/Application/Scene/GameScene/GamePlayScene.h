@@ -83,6 +83,7 @@ public:
     void Draw(SceneRenderRequests& renderRequests) override;
 
     void SetSpriteCom(SpriteCom* spriteCom) { this->spriteCom = spriteCom; }
+    Emitter& GetEmitter() { return emitter; }
 
 	// --- ゲッター & ユーティリティ ---
     bool IsGameCleared() const { return isGameCleared_; }

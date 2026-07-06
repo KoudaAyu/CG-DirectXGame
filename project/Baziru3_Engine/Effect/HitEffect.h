@@ -20,6 +20,29 @@
 class HitEffect
 {
 public:
+    struct Desc
+    {
+        DirectXCom* dxCommon = nullptr;
+        Object3dCom* object3dCom = nullptr;
+        MaterialManager* materialManager = nullptr;
+        Light* light = nullptr;
+        Camera* camera = nullptr;
+        ParticleManager* particleManager = nullptr;
+        uint32_t ringDivide = 64;
+        float outerRadius = 1.0f;
+        float innerRadius = 0.2f;
+        uint32_t cylinderDivide = 32;
+        float topRadius = 1.0f;
+        float bottomRadius = 1.0f;
+        float height = 3.0f;
+        bool ringEnabled = false;
+        bool cylinderEnabled = true;
+        float effectDuration = 0.35f;
+        Vector3 cylinderScale = { 1.0f, 1.0f, 1.0f };
+    };
+
+    static std::unique_ptr<HitEffect> Create(const Desc& desc);
+
     void Initialize(DirectXCom* dxCommon, Object3dCom* object3dCom, MaterialManager* materialManager, Light* light, Camera* camera,
         uint32_t ringDivide = 64, float outerRadius = 1.0f, float innerRadius = 0.2f,
         uint32_t cylinderDivide = 32, float topRadius = 1.0f, float bottomRadius = 1.0f, float height = 3.0f);

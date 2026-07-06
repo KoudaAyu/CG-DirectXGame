@@ -25,18 +25,18 @@ enum class CollisionAttribute
     Obstacle   // 障害物（カバー等）
 };
 
-/// <summary>
-/// コライダーの基底クラス
-/// すべての当たり判定形状クラス（Sphere, Box, Capsule）のベースとなります。
-/// </summary>
+/**
+ * @brief コライダーの基底クラス
+ * @details すべての当たり判定形状クラス（Sphere, Box, Capsule）のベースとなります。
+ */
 class Collider
 {
 public:
-    /// <summary>
-    /// コンストラクタ
-    /// </summary>
-    /// <param name="type">コライダーの形状タイプ</param>
-    /// <param name="attribute">衝突グループ属性</param>
+	/**
+	 * @brief コンストラクタ
+	 * @param type コライダーの形状タイプ
+	 * @param attribute 衝突グループ属性
+	 */
     Collider(ColliderType type, CollisionAttribute attribute)
         : type_(type)
         , attribute_(attribute)
@@ -55,15 +55,17 @@ public:
     void SetPositionOffset(const Vector3& offset) { positionOffset_ = offset; }
     const Vector3& GetPositionOffset() const { return positionOffset_; }
 
-    /// <summary>
-    /// コライダーの現在の世界座標を取得（オフセット含む）
-    /// 派生クラス側でターゲットの本体座標とオフセットを合成して返します。
-    /// </summary>
+	/**
+	 * @brief コライダーの現在の世界座標を取得（オフセット含む）
+	 * @details 派生クラス側でターゲットの本体座標とオフセットを合成して返します。
+	 * @return コライダーのグローバル座標
+	 */
     virtual Vector3 GetWorldPosition() const = 0;
 
-    /// <summary>
-    /// コライダーの現在の世界座標を設定（親オブジェクトの座標を補正）
-    /// </summary>
+	/**
+	 * @brief コライダーの現在の世界座標を設定（親オブジェクトの座標を補正）
+	 * @param pos 設定する世界座標
+	 */
     virtual void SetWorldPosition(const Vector3& pos) = 0;
 
     /// <summary>
@@ -80,9 +82,10 @@ public:
 
     // --- 衝突イベントコールバック ---
     
-    /// <summary>
-    /// 他のコライダーと衝突した際に呼び出されるコールバックを設定します。
-    /// </summary>
+	/**
+	 * @brief 他のコライダーと衝突した際に呼び出されるコールバックを設定します。
+	 * @param callback 衝突時コールバック関数ポインタ
+	 */
     void SetOnCollision(std::function<void(Collider* other)> callback) { onCollision_ = callback; }
     
     /// <summary>

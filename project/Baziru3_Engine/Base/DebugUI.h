@@ -8,6 +8,7 @@ class DebugCamera;
 class MaterialManager;
 class OffScreenRendering;
 class SpriteManager;
+class OffScreenRendering;
 
 class DebugUI
 {
@@ -19,6 +20,8 @@ public:
     void Initialize();
     void Update();
     void Finalize();
+    void SetOffScreenRendering(OffScreenRendering* offScreenRendering) { offScreenRendering_ = offScreenRendering; }
+
     void SetOffScreenRendering(OffScreenRendering* offScreenRendering) { offScreenRendering_ = offScreenRendering; }
 
 private:
