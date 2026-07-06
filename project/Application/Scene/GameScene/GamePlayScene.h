@@ -88,6 +88,7 @@ public:
 	// --- ゲッター & ユーティリティ ---
     bool IsGameCleared() const { return isGameCleared_; }
     float GetExtractionTimer() const { return extractionTimer_; }
+    AppParticleManager* GetAppParticleManager() const { return appParticleManager_.get(); }
     const char* GetSceneType() const { return "GAMEPLAY"; }
     Vector3 GetPlayerPosition() const { return player_ ? player_->GetPosition() : Vector3{ 0.0f, 0.0f, 0.0f }; }
     Player* GetPlayer() const { return player_.get(); }

@@ -1,11 +1,73 @@
 #include "AppParticleManager.h"
 #include <algorithm>
 #include <cmath>
+#include "DirectXCom.h"
+#include <cassert>
+#include "RootParam.h"
+#include "TextureManager.h"
+#include "Light.h"
+#include "Camera.h"
+#include <iostream>
 
 void AppParticleManager::Initialize(ParticleManager* enginePM)
 {
 	enginePM_ = enginePM;
 	particles_.clear();
+
+	if (!enginePM_) return;
+
+	DirectXCom* dxCommon = enginePM_->GetDxCommon();
+	if (!dxCommon) return;
+
+	// ルートシグネチャはエンジン側のものをそのまま使い回す
+	rootSignature_ = enginePM_->GetRootSignature();
+
+	// 自前シェーダーのコンパイル
+	Microsoft::WRL::ComPtr<IDxcBlob> vertexShaderBlob = dxCommon->CompileShader(
+		L"Application/Shaders/AppParticle.VS.hlsl",
+		L"vs_6_0",
+		dxCommon->GetDxcUtils().Get(),
+		dxCommon->GetDxcCompiler(),
+		dxCommon->GetIncludeHandler(),
+		std::clog
+	);
+	assert(vertexShaderBlob != nullptr && "AppParticle VS Compile Failed");
+
+	Microsoft::WRL::ComPtr<IDxcBlob> pixelShaderBlob = dxCommon->CompileShader(
+		L"Application/Shaders/AppParticle.PS.hlsl",
+		L"ps_6_0",
+		dxCommon->GetDxcUtils().Get(),
+		dxCommon->GetDxcCompiler(),
+		dxCommon->GetIncludeHandler(),
+		std::clog
+	);
+	assert(pixelShaderBlob != nullptr && "AppParticle PS Compile Failed");
+
+	// PSO Desc の作成
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc{};
+	psoDesc.pRootSignature = rootSignature_.Get();
+	psoDesc.InputLayout = enginePM_->GetInputLayoutDesc();
+	psoDesc.VS = { vertexShaderBlob->GetBufferPointer(), vertexShaderBlob->GetBufferSize() };
+	psoDesc.PS = { pixelShaderBlob->GetBufferPointer(), pixelShaderBlob->GetBufferSize() };
+	psoDesc.BlendState = enginePM_->GetBlendDesc();
+	psoDesc.RasterizerState = enginePM_->GetRasterizerDesc();
+	
+	// パーティクル用の深度ステンシル設定
+	D3D12_DEPTH_STENCIL_DESC depthStencilDesc{};
+	depthStencilDesc.DepthEnable = TRUE;
+	depthStencilDesc.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO;
+	depthStencilDesc.DepthFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
+	psoDesc.DepthStencilState = depthStencilDesc;
+	
+	psoDesc.NumRenderTargets = 1;
+	psoDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
+	psoDesc.DSVFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
+	psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+	psoDesc.SampleDesc.Count = 1;
+	psoDesc.SampleMask = D3D12_DEFAULT_SAMPLE_MASK;
+
+	HRESULT hr = dxCommon->GetDevice()->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&pipelineState_));
+	assert(SUCCEEDED(hr) && "CreateGraphicsPipelineState failed for AppParticle");
 }
 
 void AppParticleManager::Update(float deltaTime, const Vector3& playerPos)
@@ -473,6 +535,69 @@ void AppParticleManager::EmitDeathFlash(std::mt19937& randomEngine, const Vector
 		p.bounceElasticity = 0.0f;
 		p.angularVelocity = 1.2f;
 		particles_.push_back(p);
+	}
+}
+
+void AppParticleManager::Draw(const RenderContext& ctx, Model* model, UINT externalVertexCount)
+{
+	if (!ctx.commandList || !enginePM_ || !pipelineState_) return;
+
+	// 描画するインスタンス数の取得
+	uint32_t numInstance = enginePM_->GetNumInstance();
+	if (numInstance == 0) return;
+
+	// 1. PSOとルートシグネチャをセット
+	ctx.commandList->SetGraphicsRootSignature(rootSignature_.Get());
+	ctx.commandList->SetPipelineState(pipelineState_.Get());
+	ctx.commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+	// 2. マテリアルCBVとCPU用インスタンシングSRVをセット
+	ctx.commandList->SetGraphicsRootConstantBufferView(RootParam::Particle::kMaterial, ctx.materialGPUAddress);
+	ctx.commandList->SetGraphicsRootDescriptorTable(RootParam::Particle::kInstancing, enginePM_->GetInstancingSrvHandleGPU());
+
+	// 3. Light と Camera の CBV をセット
+	if (ctx.light)
+	{
+		ctx.commandList->SetGraphicsRootConstantBufferView(
+			RootParam::Particle::kLight,
+			ctx.light->GetDirectionalLightResource()->GetGPUVirtualAddress());
+	}
+	else
+	{
+		ctx.commandList->SetGraphicsRootConstantBufferView(RootParam::Particle::kLight, 0);
+	}
+
+	ctx.commandList->SetGraphicsRootConstantBufferView(
+		RootParam::Particle::kCamera,
+		ctx.camera && ctx.camera->GetCameraResource()
+			? ctx.camera->GetCameraResource()->GetGPUVirtualAddress()
+			: 0);
+
+	// 4. 頂点バッファのバインド
+	UINT vc = externalVertexCount;
+	if (model && vc > 0)
+	{
+		model->Bind(ctx.commandList);
+	}
+	else
+	{
+		vc = 6;
+	}
+
+	// 5. テクスチャグループごとにインスタンシング描画
+	const auto& groups = enginePM_->GetInstanceGroups();
+	for (const auto& g : groups)
+	{
+		if (g.count == 0) continue;
+		if (g.srvHandle.ptr != 0)
+		{
+			ctx.commandList->SetGraphicsRootDescriptorTable(RootParam::Particle::kTextureTable, g.srvHandle);
+		}
+		
+		// インスタンスオフセット（b3）をセット
+		ctx.commandList->SetGraphicsRoot32BitConstant(RootParam::Particle::kInstanceOffset, g.start, 0);
+		
+		ctx.commandList->DrawInstanced(vc, g.count, 0, 0);
 	}
 }
 

@@ -2,6 +2,7 @@
 #include "DebugUI.h"
 #include "Baziru3_Engine/Base/Pipeline/PipelineStateManager.h"
 #include <future>
+#include "Application/Scene/GameScene/GamePlayScene.h"
 
 #include <combaseapi.h>
 
@@ -708,6 +709,16 @@ void Game::DrawSprites(const RenderContext& ctx)
 
 void Game::DrawParticles(const RenderContext& ctx)
 {
+	BaseScene* currentScene = SceneManager::GetInstance()->GetCurrentScene();
+	if (currentScene)
+	{
+		GamePlayScene* gameplayScene = dynamic_cast<GamePlayScene*>(currentScene);
+		if (gameplayScene && gameplayScene->GetAppParticleManager())
+		{
+			gameplayScene->GetAppParticleManager()->Draw(ctx, model_.get(), UINT(modelData.vertices.size()));
+			return;
+		}
+	}
 	particleRenderer_.Draw(ctx, particleManager.get(), model_.get(), UINT(modelData.vertices.size()));
 }
 

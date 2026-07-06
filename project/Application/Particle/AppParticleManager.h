@@ -4,6 +4,10 @@
 #include "Vector.h"
 #include "Transform.h"
 #include "ParticleManager.h"
+#include <wrl.h>
+#include <d3d12.h>
+#include "RenderContext.h"
+#include "Model.h"
 
 struct AppParticle
 {
@@ -45,7 +49,16 @@ public:
 	void EmitMuzzleFlare(std::mt19937& randomEngine, const Vector3& position, float scale, const Vector4& color, float lifeTime, uint32_t textureIndex);
 	void EmitDeathFlash(std::mt19937& randomEngine, const Vector3& position, float scale, const Vector4& color, float lifeTime, uint32_t textureIndex);
 
+
+
 private:
 	ParticleManager* enginePM_ = nullptr;
 	std::list<AppParticle> particles_;
+
+	// CPUパーティクル用の自前 PSO とルートシグネチャ
+	Microsoft::WRL::ComPtr<ID3D12RootSignature> rootSignature_ = nullptr;
+	Microsoft::WRL::ComPtr<ID3D12PipelineState> pipelineState_ = nullptr;
+
+public:
+	void Draw(const RenderContext& ctx, Model* model, UINT externalVertexCount);
 };
