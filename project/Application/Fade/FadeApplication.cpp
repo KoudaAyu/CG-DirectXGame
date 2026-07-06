@@ -59,14 +59,25 @@ void FadeApplication::Update()
         return;
     }
 
+    auto now = std::chrono::steady_clock::now();
+    float deltaTime = std::chrono::duration<float>(now - lastTime_).count();
+    lastTime_ = now;
+
+    if (deltaTime > 0.1f)
+    {
+        deltaTime = 1.0f / 60.0f;
+    }
+
+    float speedMultiplier = deltaTime * 60.0f;
+
     switch (state_)
     {
     case State::FadeOut:
-       alpha_ = (std::min)(1.0f, alpha_ + fadeSpeed_);
+        alpha_ = (std::min)(1.0f, alpha_ + fadeSpeed_ * speedMultiplier);
         break;
 
     case State::FadeIn:
-       alpha_ = (std::max)(0.0f, alpha_ - fadeSpeed_);
+        alpha_ = (std::max)(0.0f, alpha_ - fadeSpeed_ * speedMultiplier);
         if (alpha_ <= 0.0f)
         {
             state_ = State::None;
@@ -103,12 +114,14 @@ void FadeApplication::StartFadeOut(int frameCount)
 {
     state_ = State::FadeOut;
     fadeSpeed_ = CalculateFadeSpeed(frameCount);
+    lastTime_ = std::chrono::steady_clock::now();
 }
 
 void FadeApplication::StartFadeIn(int frameCount)
 {
     state_ = State::FadeIn;
     fadeSpeed_ = CalculateFadeSpeed(frameCount);
+    lastTime_ = std::chrono::steady_clock::now();
 }
 
 bool FadeApplication::IsAvailable() const

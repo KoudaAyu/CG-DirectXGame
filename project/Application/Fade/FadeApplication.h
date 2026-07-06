@@ -4,6 +4,8 @@
 
 #include <memory>
 
+#include <chrono>
+
 class SpriteCom;
 class WindowAPI;
 
@@ -41,4 +43,5 @@ private:
     State state_ = State::None;
     float alpha_ = 0.0f;
     float fadeSpeed_ = 0.0f;
+    std::chrono::steady_clock::time_point lastTime_;
 };
