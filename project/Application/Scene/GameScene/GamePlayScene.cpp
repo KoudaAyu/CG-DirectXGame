@@ -21,6 +21,10 @@
 #include "imgui.h"
 #include "CombatSystem.h"
 #include "CollisionSystem.h"
+#include "Baziru3_Engine/Collision/CollisionManager.h"
+#include "Baziru3_Engine/Collision/SphereCollider.h"
+#include "Baziru3_Engine/Collision/BoxCollider.h"
+#include "Baziru3_Engine/Collision/CapsuleCollider.h"
 
 GamePlayScene::GamePlayScene()
 {
@@ -55,6 +59,21 @@ void GamePlayScene::InitializeScene()
 
 	combatSystem_ = std::make_unique<CombatSystem>(this);
 	collisionSystem_ = std::make_unique<CollisionSystem>(this);
+
+	// --- チュートリアル用の的と看板の初期配置 ---
+	targets_.clear();
+	auto t1 = std::make_unique<Target>();
+	t1->Initialize(object3dCom, camera_, { -3.0f, 0.0f, 16.0f }, 0.8f);
+	targets_.push_back(std::move(t1));
+
+	auto t2 = std::make_unique<Target>();
+	t2->Initialize(object3dCom, camera_, { 3.0f, 0.0f, 16.0f }, 0.8f);
+	targets_.push_back(std::move(t2));
+
+	auto t3 = std::make_unique<Target>();
+	t3->Initialize(object3dCom, camera_, { 0.0f, 0.0f, 26.0f }, 0.8f);
+	targets_.push_back(std::move(t3));
+	allTargetsDestroyed_ = false;
 }
 
 void GamePlayScene::InitializeEnvironment()
@@ -82,7 +101,7 @@ void GamePlayScene::InitializeEnvironment()
 	goalRing_->Initialize(directXCom, object3dCom, materialManager, light, camera_, 64, 1.5f, 1.2f);
 	goalRingTransform_.rotate = { 1.570796f, 0.0f, 0.0f };
 	goalRingTransform_.scale = { 1.0f, 1.0f, 1.0f };
-	goalRingTransform_.translate = { 0.0f, 0.01f, 10.0f };
+	goalRingTransform_.translate = { 0.0f, 0.01f, 32.0f };
 	isGameCleared_ = false;
 	extractionTimer_ = 5.0f;
 }
@@ -322,6 +341,12 @@ void GamePlayScene::Finalize()
 		}
 	}
 	obstacles_.clear();
+
+	for (auto& t : targets_)
+	{
+		if (t) t->Finalize();
+	}
+	targets_.clear();
 }
 
 float GamePlayScene::AdvanceDeltaTime()
@@ -357,7 +382,7 @@ void GamePlayScene::UpdateExtractionGoal(float deltaTime)
 	const float dist = std::sqrt(dx * dx + dz * dz);
 	constexpr float kExtractionRadius = 1.5f;
 
-	if (dist <= kExtractionRadius)
+	if (dist <= kExtractionRadius && allTargetsDestroyed_)
 	{
 		if (!isGameCleared_)
 		{
@@ -472,11 +497,26 @@ void GamePlayScene::UpdateEnvironment()
 			transformSphere.scale.y *= pulse;
 			transformSphere.scale.z *= pulse;
 		}
+		else if (!allTargetsDestroyed_)
+		{
+			// 的が残っている間は脱出ゲートを保護する赤いバリアとして表示
+			transformSphere.translate = goalRingTransform_.translate;
+			transformSphere.translate.y = 0.5f;
+			transformSphere.scale = { 1.8f, 1.8f, 1.8f };
+			
+			// バリアの鼓動
+			static float barrierTimer = 0.0f;
+			barrierTimer += kFixedDeltaTime * 4.0f;
+			float pulse = 1.0f + 0.05f * std::sin(barrierTimer);
+			transformSphere.scale.x *= pulse;
+			transformSphere.scale.y *= pulse;
+			transformSphere.scale.z *= pulse;
+		}
 		else
 		{
-			// 非回避時は従来通りの初期静的配置
-			transformSphere.translate = { -2.0f, 0.0f, 0.0f };
-			transformSphere.scale = { 1.0f, 1.0f, 1.0f };
+			// 画面外の遠くか、あるいはスケール0に設定して非表示にする
+			transformSphere.translate = { 0.0f, -100.0f, 0.0f };
+			transformSphere.scale = { 0.0f, 0.0f, 0.0f };
 		}
 		
 		sphere_->SetTransform(transformSphere);
@@ -1361,6 +1401,25 @@ void GamePlayScene::Update()
 
 	UpdateEnvironment();
 	UpdateObstacles();
+
+	// 的の更新
+	for (auto& t : targets_)
+	{
+		if (t) t->Update(deltaTime);
+	}
+
+	// すべての的が破壊されたかチェック
+	bool anyTargetAlive = false;
+	for (const auto& t : targets_)
+	{
+		if (t && !t->IsDead())
+		{
+			anyTargetAlive = true;
+			break;
+		}
+	}
+	allTargetsDestroyed_ = !anyTargetAlive;
+
 	UpdateSprites(deltaTime);
 	UpdateDebugInput();
 	UpdateCharacters(deltaTime);
@@ -1514,31 +1573,31 @@ void GamePlayScene::InitializeObstacles()
 
 	// 障害物を6つ配置 (左部グループ、右部グループ、奥ゴール前グループの3つの束に分けて配置)
 	
-	// --- 左側グループ (X = -4.5f 〜 -5.5f 付近の束) ---
+	// --- 左側グループ (X = -5.0f 付近の配置) ---
 	auto obs1 = std::make_unique<Obstacle>();
-	obs1->Initialize(object3dCom, camera_, { -4.5f, 0.0f, 3.5f }, 1.0f);
+	obs1->Initialize(object3dCom, camera_, { -5.0f, 0.0f, 8.0f }, 1.0f);
 	obstacles_.push_back(std::move(obs1));
 
 	auto obs2 = std::make_unique<Obstacle>();
-	obs2->Initialize(object3dCom, camera_, { -5.5f, 0.0f, 5.5f }, 1.0f);
+	obs2->Initialize(object3dCom, camera_, { -5.0f, 0.0f, 18.0f }, 1.0f);
 	obstacles_.push_back(std::move(obs2));
 
-	// --- 右側グループ (X = 4.5f 〜 5.5f 付近の束) ---
+	// --- 右側グループ (X = 5.0f 付近の配置) ---
 	auto obs3 = std::make_unique<Obstacle>();
-	obs3->Initialize(object3dCom, camera_, { 4.5f, 0.0f, 3.5f }, 1.0f);
+	obs3->Initialize(object3dCom, camera_, { 5.0f, 0.0f, 8.0f }, 1.0f);
 	obstacles_.push_back(std::move(obs3));
 
 	auto obs4 = std::make_unique<Obstacle>();
-	obs4->Initialize(object3dCom, camera_, { 5.5f, 0.0f, 5.5f }, 1.0f);
+	obs4->Initialize(object3dCom, camera_, { 5.0f, 0.0f, 18.0f }, 1.0f);
 	obstacles_.push_back(std::move(obs4));
 
-	// --- 奥・ゴール前グループ (脱出リング手前のカバー用の束) ---
+	// --- 奥・ゴール前グループ (脱出リング手前のカバー用の配置) ---
 	auto obs5 = std::make_unique<Obstacle>();
-	obs5->Initialize(object3dCom, camera_, { -1.2f, 0.0f, 8.5f }, 1.0f);
+	obs5->Initialize(object3dCom, camera_, { -2.0f, 0.0f, 29.0f }, 1.0f);
 	obstacles_.push_back(std::move(obs5));
 
 	auto obs6 = std::make_unique<Obstacle>();
-	obs6->Initialize(object3dCom, camera_, { 1.2f, 0.0f, 8.5f }, 1.0f);
+	obs6->Initialize(object3dCom, camera_, { 2.0f, 0.0f, 29.0f }, 1.0f);
 	obstacles_.push_back(std::move(obs6));
 }
 
@@ -1611,9 +1670,20 @@ void GamePlayScene::Draw(SceneRenderRequests& renderRequests)
 		}
 	}
 
+	// 的の描画
+	for (auto& t : targets_)
+	{
+		if (t)
+		{
+			t->Draw(ctx);
+		}
+	}
+
 	if (goalRing_)
 	{
-		D3D12_GPU_DESCRIPTOR_HANDLE handle = TextureManager::GetInstance()->GetSrvHandleGPU(cylinderTextureIndex_);
+		// 的が残っている間は、警告色である monsterBall.png をテクスチャとして渡して赤く見せる
+		uint32_t ringTex = allTargetsDestroyed_ ? cylinderTextureIndex_ : TextureManager::GetInstance()->Load("Resources/monsterBall.png");
+		D3D12_GPU_DESCRIPTOR_HANDLE handle = TextureManager::GetInstance()->GetSrvHandleGPU(ringTex);
 		if (handle.ptr != 0)
 		{
 			goalRing_->Draw(handle);
@@ -1637,6 +1707,16 @@ void GamePlayScene::Draw(SceneRenderRequests& renderRequests)
 				sphere_->Draw(handle);
 			}
 		}
+		else if (!allTargetsDestroyed_)
+		{
+			// 的が残っている間は赤い半透明バリアとしてオーバーレイ描画
+			sphere_->SetOverlayDraw(true);
+			D3D12_GPU_DESCRIPTOR_HANDLE handle = TextureManager::GetInstance()->GetSrvHandleGPU(particleTextureB);
+			if (handle.ptr != 0)
+			{
+				sphere_->Draw(handle);
+			}
+		}
 	}
 
 	if (spriteManager_)
@@ -1645,6 +1725,183 @@ void GamePlayScene::Draw(SceneRenderRequests& renderRequests)
 	}
 
 #ifdef USE_IMGUI
+	// 画面下部に常時表示する操作方法案内 UI
+	{
+		ImGui::SetNextWindowPos(ImVec2(ImGui::GetIO().DisplaySize.x * 0.5f - 240.0f, ImGui::GetIO().DisplaySize.y * 0.82f), ImGuiCond_Always);
+		ImGui::SetNextWindowSize(ImVec2(480.0f, 100.0f), ImGuiCond_Always);
+		ImGui::Begin("Tutorial Guide", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings);
+		
+		ImDrawList* dl = ImGui::GetWindowDrawList();
+		ImVec2 min = ImGui::GetWindowPos();
+		ImVec2 max = ImVec2(min.x + 480.0f, min.y + 100.0f);
+		dl->AddRectFilled(min, max, IM_COL32(15, 20, 30, 200), 8.0f);
+		dl->AddRect(min, max, IM_COL32(0, 255, 128, 255), 8.0f, 0, 1.5f);
+		
+		ImGui::SetCursorPos(ImVec2(20.0f, 15.0f));
+		ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.1f, 1.0f, 0.6f, 1.0f));
+		ImGui::TextWrapped((const char*)u8"【基本操作】\n[W][A][S][D] : 移動  /  [マウス] : 照準  /  [SPACE] : 回避\n[左クリック] : 通常射撃  /  [右クリック] : 散弾  /  [R] : リロード\n※ 3つの的をすべて壊し、奥の脱出エリアへ向かえ！");
+		ImGui::PopStyleColor();
+		
+		ImGui::End();
+	}
+
+	// --- タクティカルレーザーサイトの描画 ---
+	if (player_ && !player_->IsDead() && camera_)
+	{
+		ImGuiIO& io = ImGui::GetIO();
+		float width = io.DisplaySize.x;
+		float height = io.DisplaySize.y;
+		if (width > 0.0f && height > 0.0f)
+		{
+			const Matrix4x4& vp = camera_->GetViewProjectionMatrix();
+			ImDrawList* drawList = ImGui::GetForegroundDrawList();
+
+			auto project3DTo2D = [&](const Vector3& pos3D, ImVec2& outPos) -> bool {
+				float w = pos3D.x * vp.m[0][3] + pos3D.y * vp.m[1][3] + pos3D.z * vp.m[2][3] + vp.m[3][3];
+				if (w <= 0.0f) return false;
+				float x = (pos3D.x * vp.m[0][0] + pos3D.y * vp.m[1][0] + pos3D.z * vp.m[2][0] + vp.m[3][0]) / w;
+				float y = (pos3D.x * vp.m[0][1] + pos3D.y * vp.m[1][1] + pos3D.z * vp.m[2][1] + vp.m[3][1]) / w;
+				outPos.x = (x + 1.0f) * 0.5f * width;
+				outPos.y = (1.0f - y) * 0.5f * height;
+				return true;
+			};
+
+			Vector3 gunPos = player_->GetPosition() + Vector3{ 0.0f, 0.25f, 0.0f }; // 少し浮かせた位置から射出
+			float rotY = player_->GetRotation().y;
+			Vector3 dir = { std::sin(rotY), 0.0f, std::cos(rotY) };
+
+			// レイキャストで障害物衝突距離を測定 (自前で回転を考慮したRay-OBB判定を行うことで、弾丸の判定と100%同期)
+			float laserRange = 25.0f; // 最大長
+			for (const auto& obs : obstacles_)
+			{
+				if (!obs) continue;
+				
+				BoxCollider* colliders[2] = { obs->GetCollider(), obs->GetCollider2() };
+				for (int c = 0; c < 2; ++c)
+				{
+					BoxCollider* col = colliders[c];
+					if (!col) continue;
+
+					Vector3 size = col->GetSize();
+					Vector3 oPos = obs->GetPosition();
+					float rotY = col->GetWorldRotation().y;
+
+					// 1. レイの始点と方向をフェンスのローカル空間に変換 (逆回転 -rotY)
+					float rx = gunPos.x - oPos.x;
+					float ry = gunPos.y - oPos.y;
+					float rz = gunPos.z - oPos.z;
+
+					float cosR = std::cos(-rotY);
+					float sinR = std::sin(-rotY);
+					
+					Vector3 lxStart = {
+						rx * cosR - rz * sinR,
+						ry,
+						rx * sinR + rz * cosR
+					};
+
+					Vector3 lxDir = {
+						dir.x * cosR - dir.z * sinR,
+						dir.y,
+						dir.x * sinR + dir.z * cosR
+					};
+
+					// 2. ローカル空間でのRay-AABB交差判定
+					float hx = size.x * 0.5f;
+					float hy = size.y * 0.5f;
+					float hz = size.z * 0.5f;
+
+					float tmin = 0.0f;
+					float tmax = laserRange;
+					bool intersect = true;
+
+					// X軸スラブ判定
+					if (std::abs(lxDir.x) < 1e-6f)
+					{
+						if (lxStart.x < -hx || lxStart.x > hx) intersect = false;
+					}
+					else
+					{
+						float ood = 1.0f / lxDir.x;
+						float t1 = (-hx - lxStart.x) * ood;
+						float t2 = (hx - lxStart.x) * ood;
+						if (t1 > t2) std::swap(t1, t2);
+						if (t1 > tmin) tmin = t1;
+						if (t2 < tmax) tmax = t2;
+						if (tmin > tmax) intersect = false;
+					}
+
+					// Y軸スラブ判定
+					if (intersect && std::abs(lxDir.y) < 1e-6f)
+					{
+						if (lxStart.y < -hy || lxStart.y > hy) intersect = false;
+					}
+					else if (intersect)
+					{
+						float ood = 1.0f / lxDir.y;
+						float t1 = (-hy - lxStart.y) * ood;
+						float t2 = (hy - lxStart.y) * ood;
+						if (t1 > t2) std::swap(t1, t2);
+						if (t1 > tmin) tmin = t1;
+						if (t2 < tmax) tmax = t2;
+						if (tmin > tmax) intersect = false;
+					}
+
+					// Z軸スラブ判定
+					if (intersect && std::abs(lxDir.z) < 1e-6f)
+					{
+						if (lxStart.z < -hz || lxStart.z > hz) intersect = false;
+					}
+					else if (intersect)
+					{
+						float ood = 1.0f / lxDir.z;
+						float t1 = (-hz - lxStart.z) * ood;
+						float t2 = (hz - lxStart.z) * ood;
+						if (t1 > t2) std::swap(t1, t2);
+						if (t1 > tmin) tmin = t1;
+						if (t2 < tmax) tmax = t2;
+						if (tmin > tmax) intersect = false;
+					}
+
+					if (intersect && tmax >= 0.0f)
+					{
+						float hitDist = tmin;
+						if (hitDist < 0.0f) hitDist = 0.0f;
+						if (hitDist < laserRange)
+						{
+							laserRange = hitDist;
+						}
+					}
+				}
+			}
+
+			Vector3 endPos = gunPos + dir * laserRange;
+			ImVec2 start2D, end2D;
+			if (project3DTo2D(gunPos, start2D) && project3DTo2D(endPos, end2D))
+			{
+				// レーザー光線 (赤い半透明ライン)
+				drawList->AddLine(start2D, end2D, IM_COL32(255, 30, 30, 160), 2.0f);
+				// 照準ドット (衝突位置の赤い点)
+				drawList->AddCircleFilled(end2D, 4.0f, IM_COL32(255, 80, 80, 220));
+				drawList->AddCircle(end2D, 6.0f, IM_COL32(255, 0, 0, 120), 0, 1.0f);
+			}
+		}
+	}
+
+	// デバッグ用の的復活ボタン (画面右下に固定配置して重なりを防ぐ)
+	ImGui::SetNextWindowPos(ImVec2(ImGui::GetIO().DisplaySize.x - 220.0f, ImGui::GetIO().DisplaySize.y - 120.0f), ImGuiCond_FirstUseEver);
+	ImGui::SetNextWindowSize(ImVec2(200.0f, 90.0f), ImGuiCond_FirstUseEver);
+	ImGui::Begin("Debug Controls");
+	if (ImGui::Button("Reset Targets"))
+	{
+		for (auto& t : targets_)
+		{
+			if (t) t->Reset();
+		}
+		allTargetsDestroyed_ = false;
+	}
+	ImGui::End();
+
 	if (showDebugGizmos_ && camera_)
 	{
 		ImGuiIO& io = ImGui::GetIO();

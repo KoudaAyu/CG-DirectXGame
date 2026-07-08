@@ -56,6 +56,7 @@ void Bullet::Initialize(Object3dCom* object3dCom, Camera* camera, const Vector3&
         object3d_->SetColor({ 1.0f, 0.2f, 0.2f, 1.0f });
     }
 
+    prevPosition_ = startPosition;
     object3d_->Update();
 }
 
@@ -65,6 +66,8 @@ void Bullet::Update(float deltaTime)
     {
         return;
     }
+
+    prevPosition_ = object3d_->GetTranslate();
 
     Vector3 pos = object3d_->GetTranslate();
     const float frameScale = deltaTime * 60.0f;

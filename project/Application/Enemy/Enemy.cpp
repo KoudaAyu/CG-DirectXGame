@@ -21,22 +21,22 @@ void Enemy::Initialize(Object3dCom* object3dCom, Camera* camera)
     camera_ = camera;
 
     Object3d::ModelData model = Object3d::LoadObjFile("Resources", "plane.obj");
+
+    // 敵として分かりやすくするため、警告色である monsterBall.png を強制設定
+    defaultTextureIndex_ = TextureManager::GetInstance()->Load("Resources/monsterBall.png");
+    model.material.textureIndex = defaultTextureIndex_;
+
     object3d_ = std::make_unique<Object3d>();
     object3d_->Initialize(object3dCom_, model);
 
-    position_ = { 3.0f, 0.0f, 3.0f };
+    position_ = { 4.0f, 0.0f, 13.0f };
     object3d_->SetTranslate(position_);
     object3d_->SetScale({ 1.0f, 1.0f, 1.0f });
-    object3d_->SetColor({ 1.0f, 1.0f, 1.0f, 1.0f });
+    object3d_->SetColor({ 1.2f, 0.4f, 0.4f, 1.0f });
 
     // コライダーの初期化と登録
     collider_ = std::make_unique<SphereCollider>(0.6f, &position_, CollisionAttribute::Enemy);
     CollisionManager::GetInstance()->RegisterCollider(collider_.get());
-
-    if (model.material.textureFilePath.empty())
-    {
-        defaultTextureIndex_ = TextureManager::GetInstance()->Load("Resources/uvChecker.png");
-    }
 
     hp_ = maxHp_;
     isDead_ = false;
@@ -114,9 +114,9 @@ void Enemy::Update(WindowAPI* windowAPI, const Vector3* targetPosition, const st
             alertTimer_ = 0.0f;
             if (object3d_)
             {
-                position_ = { 3.0f, 0.0f, 3.0f };
+                position_ = { 4.0f, 0.0f, 13.0f };
                 object3d_->SetTranslate(position_);
-                object3d_->SetColor({ 1.0f, 1.0f, 1.0f, 1.0f });
+                object3d_->SetColor({ 1.2f, 0.4f, 0.4f, 1.0f });
             }
         }
 
@@ -277,7 +277,7 @@ void Enemy::Update(WindowAPI* windowAPI, const Vector3* targetPosition, const st
         if (hitFlashTimer_ <= 0.0f)
         {
             hitFlashTimer_ = 0.0f;
-            object3d_->SetColor({ 1.0f, 1.0f, 1.0f, 1.0f });
+            object3d_->SetColor({ 1.2f, 0.4f, 0.4f, 1.0f });
         }
     }
 
@@ -433,11 +433,7 @@ void Enemy::Draw(const RenderContext& ctx)
 
     RenderContext enemyCtx = ctx;
     const Object3d::ModelData& modelData = object3d_->GetModelData();
-    uint32_t texIdx = modelData.material.textureIndex;
-    if (texIdx == 0 || texIdx == UINT32_MAX)
-    {
-        texIdx = defaultTextureIndex_;
-    }
+    uint32_t texIdx = defaultTextureIndex_;
     if (enemyCtx.textureHandle.ptr == 0 && texIdx != 0 && texIdx != UINT32_MAX)
     {
         enemyCtx.textureHandle = TextureManager::GetInstance()->GetSrvHandleGPU(texIdx);

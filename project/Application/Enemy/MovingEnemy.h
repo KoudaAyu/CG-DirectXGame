@@ -89,8 +89,8 @@ private:
 
     // AI Patrol parameters
     AIState state_ = AIState::Patrol;
-    Vector3 patrolA_ = { -6.0f, 0.0f, 6.0f };
-    Vector3 patrolB_ = { 6.0f, 0.0f, 6.0f };
+    Vector3 patrolA_ = { -5.0f, 0.0f, 26.0f };
+    Vector3 patrolB_ = { 5.0f, 0.0f, 26.0f };
     bool movingToB_ = true;
     float moveSpeed_ = 0.035f; // 歩き速度
 

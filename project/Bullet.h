@@ -25,12 +25,14 @@ public:
     bool IsDead() const { return isDead_; }
     BulletOwner GetOwner() const { return owner_; }
     Vector3 GetPosition() const { return object3d_ ? object3d_->GetTranslate() : Vector3{ 0.0f, 0.0f, 0.0f }; }
+    Vector3 GetPrevPosition() const { return prevPosition_; }
     Vector3 GetDirection() const { return direction_; }
     bool IsNearMissTriggered() const { return nearMissTriggered_; }
     void TriggerNearMiss() { nearMissTriggered_ = true; }
 
 private:
     std::unique_ptr<Object3d> object3d_;
+    Vector3 prevPosition_ = { 0.0f, 0.0f, 0.0f };
     Object3dCom* object3dCom_ = nullptr;
     Camera* camera_ = nullptr;
 

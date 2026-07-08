@@ -183,6 +183,59 @@ void CollisionSystem::ResolveBulletCollisions()
 					continue;
 				}
 			}
+
+			// --- プレイヤーの弾丸と的（Target）の衝突判定 ---
+			for (auto& target : scene_->GetTargets())
+			{
+				if (target && !target->IsDead())
+				{
+					const Vector3 targetPos = target->GetPosition();
+					if (scene_->IsWithinRadius(bulletPos, targetPos, scene_->bulletHitRadius_ + target->GetRadius()))
+					{
+						int prevHp = target->GetHP();
+						target->OnHit(1); // 1ダメージ
+						int dmg = prevHp - target->GetHP();
+						if (dmg > 0)
+						{
+							bool isCritical = (rand() % 100 < 30);
+							std::string text = std::to_string(dmg);
+							Vector4 color = isCritical ? Vector4{ 1.0f, 0.9f, 0.0f, 1.0f } : Vector4{ 1.0f, 1.0f, 1.0f, 1.0f };
+							if (isCritical) text += "!";
+							scene_->AddFloatingText(targetPos + Vector3{ 0.0f, 1.0f, 0.0f }, text, color, isCritical);
+
+							scene_->TriggerHitStop(0.04f);
+						}
+
+						if (target->IsDead())
+						{
+							scene_->TriggerCameraShake(0.35f, 0.6f);
+							if (scene_->hitEffect_)
+							{
+								scene_->hitEffect_->Play(targetPos);
+								scene_->hitEffect_->SpawnPlaneParticles(targetPos);
+							}
+							if (scene_->particleManager && scene_->appParticleManager_)
+							{
+								scene_->appParticleManager_->EmitDeathFlash(scene_->particleManager->GetRandomEngine(), targetPos, 4.0f, { 1.0f, 0.8f, 0.2f, 1.0f }, 0.35f, scene_->starburstTextureIndex_);
+
+								for (int i = 0; i < 40; ++i)
+								{
+									scene_->appParticleManager_->EmitFeather(scene_->particleManager->GetRandomEngine(), targetPos, { 1.0f, 0.9f, 0.6f, 1.0f }, scene_->particleTextureB);
+								}
+								for (int i = 0; i < 20; ++i)
+								{
+									scene_->appParticleManager_->EmitSpark(scene_->particleManager->GetRandomEngine(), targetPos, {0,0,0}, { 1.0f, 0.6f, 0.2f, 1.0f }, 0.15f, 1.2f, scene_->particleTextureB);
+								}
+							}
+							scene_->AddFloatingText(targetPos + Vector3{ 0.0f, 1.5f, 0.0f }, "TARGET DESTROYED", { 0.0f, 1.0f, 0.5f, 1.0f }, true);
+						}
+
+						bullet->Finalize();
+						break;
+					}
+				}
+			}
+			if (bullet->IsDead()) continue;
 		}
 		else if (bullet->GetOwner() == BulletOwner::Enemy)
 		{
@@ -228,15 +281,139 @@ void CollisionSystem::ResolveObstacleCollisions()
 	{
 		if (!bullet || bullet->IsDead()) continue;
 		Vector3 bPos = bullet->GetPosition();
+		
 		for (auto& obs : scene_->obstacles_)
 		{
 			if (!obs) continue;
-			Vector3 oPos = obs->GetPosition();
-			float dx = bPos.x - oPos.x;
-			float dz = bPos.z - oPos.z;
-			float dist = std::sqrt(dx * dx + dz * dz);
-			float minDist = scene_->bulletHitRadius_ + obs->GetRadius();
-			if (dist < minDist)
+			
+			// X字型フェンスを構成する2枚のコライダーそれぞれと判定
+			BoxCollider* colliders[2] = { obs->GetCollider(), obs->GetCollider2() };
+			bool hit = false;
+			
+			for (int c = 0; c < 2; ++c)
+			{
+				BoxCollider* col = colliders[c];
+				if (!col) continue;
+				
+				Vector3 size = col->GetSize();
+				Vector3 oPos = obs->GetPosition();
+				
+				// コライダーのY軸回転角度を取得
+				float rotY = col->GetWorldRotation().y;
+				
+				// 前フレーム位置と現フレーム位置
+				Vector3 bPosPrev = bullet->GetPrevPosition();
+				
+				// 弾丸の相対開始座標
+				float rxStart = bPosPrev.x - oPos.x;
+				float ryStart = bPosPrev.y - oPos.y;
+				float rzStart = bPosPrev.z - oPos.z;
+				
+				// 弾丸の移動差分
+				float dxMove = bPos.x - bPosPrev.x;
+				float dyMove = bPos.y - bPosPrev.y;
+				float dzMove = bPos.z - bPosPrev.z;
+				
+				// ローカル空間への逆回転変換 (OBB判定のため、弾をフェンスのローカル空間に回転移動)
+				float cosR = std::cos(-rotY);
+				float sinR = std::sin(-rotY);
+				
+				// ローカル空間での開始点
+				float lxStart = rxStart * cosR - rzStart * sinR;
+				float lyStart = ryStart;
+				float lzStart = rxStart * sinR + rzStart * cosR;
+				
+				// ローカル空間での差分ベクトル
+				float lxDelta = dxMove * cosR - dzMove * sinR;
+				float lyDelta = dyMove;
+				float lzDelta = dxMove * sinR + dzMove * cosR;
+				
+				// ローカル空間内でのAABB判定 (スラブ線分判定)
+				float hx = size.x * 0.5f;
+				float hy = size.y * 0.5f;
+				float hz = size.z * 0.5f;
+				
+				// 弾丸の厚み分だけAABBのサイズを太らせる (弾丸の半径を追加)
+				float radius = scene_->bulletHitRadius_;
+				hx += radius;
+				hy += radius;
+				hz += radius;
+				
+				float tmin = 0.0f;
+				float tmax = 1.0f;
+				bool intersect = true;
+				
+				// X軸スラブ判定
+				if (std::abs(lxDelta) < 1e-6f)
+				{
+					if (lxStart < -hx || lxStart > hx) intersect = false;
+				}
+				else
+				{
+					float ood = 1.0f / lxDelta;
+					float t1 = (-hx - lxStart) * ood;
+					float t2 = (hx - lxStart) * ood;
+					if (t1 > t2) std::swap(t1, t2);
+					if (t1 > tmin) tmin = t1;
+					if (t2 < tmax) tmax = t2;
+					if (tmin > tmax) intersect = false;
+				}
+				
+				// Y軸スラブ判定
+				if (intersect && std::abs(lyDelta) < 1e-6f)
+				{
+					if (lyStart < -hy || lyStart > hy) intersect = false;
+				}
+				else if (intersect)
+				{
+					float ood = 1.0f / lyDelta;
+					float t1 = (-hy - lyStart) * ood;
+					float t2 = (hy - lyStart) * ood;
+					if (t1 > t2) std::swap(t1, t2);
+					if (t1 > tmin) tmin = t1;
+					if (t2 < tmax) tmax = t2;
+					if (tmin > tmax) intersect = false;
+				}
+				
+				// Z軸スラブ判定
+				if (intersect && std::abs(lzDelta) < 1e-6f)
+				{
+					if (lzStart < -hz || lzStart > hz) intersect = false;
+				}
+				else if (intersect)
+				{
+					float ood = 1.0f / lzDelta;
+					float t1 = (-hz - lzStart) * ood;
+					float t2 = (hz - lzStart) * ood;
+					if (t1 > t2) std::swap(t1, t2);
+					if (t1 > tmin) tmin = t1;
+					if (t2 < tmax) tmax = t2;
+					if (tmin > tmax) intersect = false;
+				}
+				
+				if (intersect && tmax >= 0.0f && tmin <= 1.0f)
+				{
+					hit = true;
+					
+					// エフェクトの発生位置を衝突交点に変更
+					float cx_local = lxStart + lxDelta * tmin;
+					float cy_local = lyStart + lyDelta * tmin;
+					float cz_local = lzStart + lzDelta * tmin;
+					
+					float cosR_pos = std::cos(rotY);
+					float sinR_pos = std::sin(rotY);
+					Vector3 hitWorldPos = {
+						oPos.x + (cx_local * cosR_pos - cz_local * sinR_pos),
+						oPos.y + cy_local,
+						oPos.z + (cx_local * sinR_pos + cz_local * cosR_pos)
+					};
+					
+					bPos = hitWorldPos; // パーティクル発生用座標を交点に設定
+					break;
+				}
+			}
+			
+			if (hit)
 			{
 				// 木製の障害物に着弾した際のおがくず（飛散）パーティクル演出
 				if (scene_->particleManager && scene_->appParticleManager_)

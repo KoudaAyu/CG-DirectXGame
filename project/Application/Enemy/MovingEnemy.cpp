@@ -28,16 +28,15 @@ void MovingEnemy::Initialize(Object3dCom* object3dCom, Camera* camera)
     position_ = patrolA_;
     object3d_->SetTranslate(position_);
     object3d_->SetScale({ 1.0f, 1.0f, 1.0f });
-    object3d_->SetColor({ 0.8f, 0.9f, 1.0f, 1.0f }); // わずかに青みがかったアヒルにして差別化
+    object3d_->SetColor({ 1.2f, 0.4f, 0.4f, 1.0f });
 
     // コライダーの初期化と登録
     collider_ = std::make_unique<SphereCollider>(0.6f, &position_, CollisionAttribute::Enemy);
     CollisionManager::GetInstance()->RegisterCollider(collider_.get());
 
-    if (model.material.textureFilePath.empty())
-    {
-        defaultTextureIndex_ = TextureManager::GetInstance()->Load("Resources/uvChecker.png");
-    }
+    // 敵として分かりやすくするため、警告色である monsterBall.png を強制設定
+    defaultTextureIndex_ = TextureManager::GetInstance()->Load("Resources/monsterBall.png");
+    model.material.textureIndex = defaultTextureIndex_;
 
     hp_ = maxHp_;
     isDead_ = false;
@@ -228,6 +227,7 @@ void MovingEnemy::Update(WindowAPI* windowAPI, const Vector3* targetPosition, co
     // --- AI状態ごとの行動ロジック ---
     if (state_ == AIState::Patrol)
     {
+        if (hitFlashTimer_ <= 0.0f) object3d_->SetColor({ 1.2f, 0.4f, 0.4f, 1.0f });
         // パトロール移動
         Vector3 dest = movingToB_ ? patrolB_ : patrolA_;
         float dx = dest.x - currentPos.x;
@@ -256,6 +256,7 @@ void MovingEnemy::Update(WindowAPI* windowAPI, const Vector3* targetPosition, co
     }
     else if (state_ == AIState::Investigate)
     {
+        if (hitFlashTimer_ <= 0.0f) object3d_->SetColor({ 1.2f, 0.8f, 0.4f, 1.0f });
         // 音源の捜索: 音がした方向へ移動して捜索
         float dx = investigateTarget_.x - currentPos.x;
         float dz = investigateTarget_.z - currentPos.z;
@@ -276,11 +277,12 @@ void MovingEnemy::Update(WindowAPI* windowAPI, const Vector3* targetPosition, co
         if (searchTimer_ <= 0.0f)
         {
             state_ = AIState::Patrol; // パトロールへ戻る
-            object3d_->SetColor({ 0.8f, 0.9f, 1.0f, 1.0f });
+            object3d_->SetColor({ 1.2f, 0.4f, 0.4f, 1.0f });
         }
     }
     else if (state_ == AIState::Chase)
     {
+        if (hitFlashTimer_ <= 0.0f) object3d_->SetColor({ 1.5f, 0.2f, 0.2f, 1.0f });
         if (targetPosition)
         {
             float dx = targetPosition->x - currentPos.x;
@@ -324,11 +326,11 @@ void MovingEnemy::Update(WindowAPI* windowAPI, const Vector3* targetPosition, co
             hitFlashTimer_ = 0.0f;
             if (state_ == AIState::Chase)
             {
-                object3d_->SetColor({ 1.0f, 0.9f, 0.6f, 1.0f });
+                object3d_->SetColor({ 1.5f, 0.2f, 0.2f, 1.0f });
             }
             else
             {
-                object3d_->SetColor({ 0.8f, 0.9f, 1.0f, 1.0f });
+                object3d_->SetColor({ 1.2f, 0.4f, 0.4f, 1.0f });
             }
         }
     }
@@ -487,11 +489,7 @@ void MovingEnemy::Draw(const RenderContext& ctx)
 
     RenderContext enemyCtx = ctx;
     const Object3d::ModelData& modelData = object3d_->GetModelData();
-    uint32_t texIdx = modelData.material.textureIndex;
-    if (texIdx == 0 || texIdx == UINT32_MAX)
-    {
-        texIdx = defaultTextureIndex_;
-    }
+    uint32_t texIdx = defaultTextureIndex_;
     if (enemyCtx.textureHandle.ptr == 0 && texIdx != 0 && texIdx != UINT32_MAX)
     {
         enemyCtx.textureHandle = TextureManager::GetInstance()->GetSrvHandleGPU(texIdx);

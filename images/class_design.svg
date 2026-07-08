@@ -1,0 +1,131 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 600" width="100%" height="100%" style="background: #12131a; font-family: 'Helvetica Neue', Arial, sans-serif;">
+  <!-- Definitions for gradients and markers -->
+  <defs>
+    <!-- Background grid -->
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#ffffff" stroke-width="1" opacity="0.04" />
+    </pattern>
+    
+    <!-- Neon Gradients -->
+    <linearGradient id="blueGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00f2fe" />
+      <stop offset="100%" stop-color="#4facfe" />
+    </linearGradient>
+    <linearGradient id="purpleGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#b180ff" />
+      <stop offset="100%" stop-color="#8033ff" />
+    </linearGradient>
+    <linearGradient id="orangeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffb347" />
+      <stop offset="100%" stop-color="#ffcc33" />
+    </linearGradient>
+    <linearGradient id="greenGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0df3a3" />
+      <stop offset="100%" stop-color="#02aab0" />
+    </linearGradient>
+
+    <!-- Arrow Marker -->
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#888e9b" />
+    </marker>
+    <!-- Inherit Arrow (Triangle white empty) -->
+    <marker id="inherit" viewBox="0 0 12 12" refX="10" refY="6" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 10 6 L 0 0 L 0 12 Z" fill="#12131a" stroke="#888e9b" stroke-width="2" />
+    </marker>
+  </defs>
+
+  <!-- Apply Grid Background -->
+  <rect width="100%" height="100%" fill="url(#grid)" />
+
+  <!-- TITLE -->
+  <text x="50" y="50" fill="#ffffff" font-size="24" font-weight="bold" letter-spacing="1">Behavior Tree クラス設計図</text>
+  <text x="50" y="80" fill="#888e9b" font-size="14">ポリモーフィズムと責任分離を両立した継承構造</text>
+
+  <!-- ==================== NODES ==================== -->
+
+  <!-- INode (Interface) -->
+  <g transform="translate(380, 80)">
+    <rect width="240" height="120" rx="12" fill="#1c1e29" stroke="url(#blueGrad)" stroke-width="3" />
+    <rect width="240" height="30" rx="0" fill="url(#blueGrad)" opacity="0.15" />
+    <!-- Content -->
+    <text x="120" y="24" fill="#00f2fe" font-size="13" font-weight="bold" text-anchor="middle">«interface»</text>
+    <text x="120" y="48" fill="#ffffff" font-size="18" font-weight="bold" text-anchor="middle">INode</text>
+    <line x1="10" y1="65" x2="230" y2="65" stroke="#2a2d3d" stroke-width="1" />
+    <text x="20" y="85" fill="#888e9b" font-size="12"># name / index / tag</text>
+    <text x="20" y="105" fill="#e2e8f0" font-size="12">+ Initialize() / Update()*</text>
+  </g>
+
+  <!-- Composite (Middle Left) -->
+  <g transform="translate(180, 270)">
+    <rect width="220" height="100" rx="10" fill="#1c1e29" stroke="url(#purpleGrad)" stroke-width="2" />
+    <!-- Content -->
+    <text x="110" y="32" fill="#b180ff" font-size="16" font-weight="bold" text-anchor="middle">Composite</text>
+    <line x1="10" y1="45" x2="210" y2="45" stroke="#2a2d3d" stroke-width="1" />
+    <text x="20" y="65" fill="#888e9b" font-size="11"># children: vector&lt;INode*&gt;</text>
+    <text x="20" y="85" fill="#e2e8f0" font-size="12">+ AddChild(INode* child)</text>
+  </g>
+
+  <!-- Task (Middle Right) -->
+  <g transform="translate(600, 270)">
+    <rect width="220" height="100" rx="10" fill="#1c1e29" stroke="url(#orangeGrad)" stroke-width="2" />
+    <!-- Content -->
+    <text x="110" y="32" fill="#ffb347" font-size="16" font-weight="bold" text-anchor="middle">Task</text>
+    <line x1="10" y1="45" x2="210" y2="45" stroke="#2a2d3d" stroke-width="1" />
+    <text x="20" y="65" fill="#888e9b" font-size="11"># actor: Actor*</text>
+    <text x="20" y="85" fill="#e2e8f0" font-size="12">+ SetActor(Actor* actor)</text>
+  </g>
+
+  <!-- Selector (Bottom Left 1) -->
+  <g transform="translate(70, 440)">
+    <rect width="180" height="80" rx="8" fill="#1c1e29" stroke="url(#greenGrad)" stroke-width="2" />
+    <text x="90" y="32" fill="#0df3a3" font-size="15" font-weight="bold" text-anchor="middle">Selector</text>
+    <line x1="10" y1="42" x2="170" y2="42" stroke="#2a2d3d" stroke-width="1" />
+    <text x="15" y="62" fill="#e2e8f0" font-size="11">いずれかが成功で終了</text>
+  </g>
+
+  <!-- Sequence (Bottom Left 2) -->
+  <g transform="translate(280, 440)">
+    <rect width="180" height="80" rx="8" fill="#1c1e29" stroke="url(#greenGrad)" stroke-width="2" />
+    <text x="90" y="32" fill="#0df3a3" font-size="15" font-weight="bold" text-anchor="middle">Sequence</text>
+    <line x1="10" y1="42" x2="170" y2="42" stroke="#2a2d3d" stroke-width="1" />
+    <text x="15" y="62" fill="#e2e8f0" font-size="11">全て成功で順次実行</text>
+  </g>
+
+  <!-- Action (Bottom Right 1) -->
+  <g transform="translate(540, 440)">
+    <rect width="160" height="80" rx="8" fill="#1c1e29" stroke="url(#orangeGrad)" stroke-width="1.5" />
+    <text x="80" y="35" fill="#ffffff" font-size="15" font-weight="bold" text-anchor="middle">Action</text>
+    <line x1="10" y1="45" x2="150" y2="45" stroke="#2a2d3d" stroke-width="1" />
+    <text x="80" y="65" fill="#888e9b" font-size="11" text-anchor="middle">具体的な行動の実行</text>
+  </g>
+
+  <!-- Condition (Bottom Right 2) -->
+  <g transform="translate(730, 440)">
+    <rect width="160" height="80" rx="8" fill="#1c1e29" stroke="url(#orangeGrad)" stroke-width="1.5" />
+    <text x="80" y="35" fill="#ffffff" font-size="15" font-weight="bold" text-anchor="middle">Condition</text>
+    <line x1="10" y1="45" x2="150" y2="45" stroke="#2a2d3d" stroke-width="1" />
+    <text x="80" y="65" fill="#888e9b" font-size="11" text-anchor="middle">条件判定ノード</text>
+  </g>
+
+
+  <!-- ==================== LINES / CONNECTIONS ==================== -->
+
+  <!-- INode -> Composite (Inheritance) -->
+  <path d="M 290 270 L 290 230 L 460 230 L 460 202" fill="none" stroke="#888e9b" stroke-width="2" marker-end="url(#inherit)" />
+
+  <!-- INode -> Task (Inheritance) -->
+  <path d="M 710 270 L 710 230 L 540 230 L 540 202" fill="none" stroke="#888e9b" stroke-width="2" marker-end="url(#inherit)" />
+
+  <!-- Composite -> Selector -->
+  <path d="M 160 440 L 160 400 L 290 400 L 290 372" fill="none" stroke="#888e9b" stroke-width="2" marker-end="url(#inherit)" />
+
+  <!-- Composite -> Sequence -->
+  <path d="M 370 440 L 370 400 L 290 400 L 290 372" fill="none" stroke="#888e9b" stroke-width="2" marker-end="url(#inherit)" />
+
+  <!-- Task -> Action -->
+  <path d="M 620 440 L 620 400 L 710 400 L 710 372" fill="none" stroke="#888e9b" stroke-width="2" marker-end="url(#inherit)" />
+
+  <!-- Task -> Condition -->
+  <path d="M 810 440 L 810 400 L 710 400 L 710 372" fill="none" stroke="#888e9b" stroke-width="2" marker-end="url(#inherit)" />
+
+</svg>

@@ -29,6 +29,8 @@
 #include "../../Enemy/MovingEnemy.h"
 #include "../../../Bullet.h"
 #include "../../Obstacle.h"
+#include "Target.h"
+#include "TutorialSign.h"
 
 class Camera;
 class SpriteCom;
@@ -93,6 +95,8 @@ public:
     Vector3 GetPlayerPosition() const { return player_ ? player_->GetPosition() : Vector3{ 0.0f, 0.0f, 0.0f }; }
     Player* GetPlayer() const { return player_.get(); }
     Vector3 GetGoalPosition() const { return goalRingTransform_.translate; }
+    const std::vector<std::unique_ptr<Target>>& GetTargets() const { return targets_; }
+    std::vector<std::unique_ptr<Target>>& GetTargets() { return targets_; }
 
 	/// <summary>
 	/// カメラシェイク（揺れ）エフェクトを誘発します
@@ -154,6 +158,8 @@ private:
     std::unique_ptr<Sphere> sphere_;
     std::unique_ptr<Ring> goalRing_;
     std::unique_ptr<HitEffect> hitEffect_;
+    std::vector<std::unique_ptr<Target>> targets_;
+    bool allTargetsDestroyed_ = false;
 
     // --- 分割されたサブシステム ---
     std::unique_ptr<CombatSystem> combatSystem_;

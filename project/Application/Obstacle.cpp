@@ -18,10 +18,18 @@ void Obstacle::Initialize(Object3dCom* object3dCom, Camera* camera, const Vector
     object3d_->SetTranslate(position_);
     object3d_->SetScale({ radius_, radius_, radius_ });
 
-    // コライダーの初期化と登録
-    Vector3 boxSize = { 4.24f * radius_, 2.0f * radius_, 2.45f * radius_ };
-    collider_ = std::make_unique<BoxCollider>(boxSize, &position_, nullptr, CollisionAttribute::Obstacle);
+    // X字のフェンスを構成する2枚の板の回転角 (45度と-45度) を設定
+    rot1_ = { 0.0f, 0.785398f, 0.0f };
+    rot2_ = { 0.0f, -0.785398f, 0.0f };
+
+    // 1枚のフェンス板のサイズ (正確な対角線の幅4.24fと、すり抜けを防ぐ厚み0.4fに再調整)
+    Vector3 boxSize = { 4.24f * radius_, 2.0f * radius_, 0.4f * radius_ };
+    
+    collider_ = std::make_unique<BoxCollider>(boxSize, &position_, &rot1_, CollisionAttribute::Obstacle);
+    collider2_ = std::make_unique<BoxCollider>(boxSize, &position_, &rot2_, CollisionAttribute::Obstacle);
+    
     CollisionManager::GetInstance()->RegisterCollider(collider_.get());
+    CollisionManager::GetInstance()->RegisterCollider(collider2_.get());
 
     // テクスチャ設定
     if (model.material.textureFilePath.empty())
@@ -65,6 +73,11 @@ void Obstacle::Finalize()
     {
         CollisionManager::GetInstance()->UnregisterCollider(collider_.get());
         collider_.reset();
+    }
+    if (collider2_)
+    {
+        CollisionManager::GetInstance()->UnregisterCollider(collider2_.get());
+        collider2_.reset();
     }
     if (object3d_)
     {
