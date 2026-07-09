@@ -675,6 +675,14 @@ void CollisionManager::DrawDebug(Camera* camera)
 	}
 	prevF1 = curF1;
 
+	// ImGui Debug Window to verify execution and states
+	ImGui::Begin("Collision Debug Overlay Settings");
+	ImGui::Checkbox("Show Debug Wireframes (F1 Toggle)", &showDebugColliders);
+	ImGui::Text("Active Spheres: %zu", Sphere::GetInstances().size());
+	ImGui::Text("Active Object3ds: %zu", Object3d::GetInstances().size());
+	ImGui::Text("Camera: %s", camera ? "Valid" : "Null");
+	ImGui::End();
+
 	if (!showDebugColliders || !camera) return;
 
 	ImGuiIO& io = ImGui::GetIO();
