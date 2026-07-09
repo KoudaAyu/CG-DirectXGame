@@ -1,6 +1,7 @@
 #include "Animation.h"
 
 #include "Keyframe.h"
+#include "BinaryAssetUtil.h"
 
 #include <assimp/Importer.hpp>
 #include <assimp/scene.h>
@@ -10,28 +11,39 @@
 Animation LoadAnimationFile(const std::string& directoryPath, const std::string& filename)
 {
 	Animation animation; // 今回作るアニメーション
-	Assimp::Importer importer;
+	const std::string fullPath = directoryPath + "/" + filename;
+	const std::string cachePath = BinaryAssetUtil::GetCachePath(fullPath, ".banim");
 
-	std::string fullPath = directoryPath + "/" + filename;
+	// キャッシュが有効な場合はバイナリからロード
+	if (BinaryAssetUtil::IsCacheValid(fullPath, cachePath))
+	{
+		if (BinaryAssetUtil::LoadBAnim(cachePath, animation))
+		{
+			OutputDebugStringA(("[Binary Cache] Loaded animation from cache: " + cachePath + "\n").c_str());
+			return animation;
+		}
+	}
+
+	Assimp::Importer importer;
 	const aiScene* scene = importer.ReadFile(fullPath, aiProcess_Triangulate | aiProcess_FlipUVs);
 	assert(scene->mNumAnimations != 0); //アニメーションがない
 	aiAnimation* animationAssimp = scene->mAnimations[0]; // 最初のアニメーションを使う
-   const double ticksPerSecond = (animationAssimp->mTicksPerSecond != 0.0) ? animationAssimp->mTicksPerSecond : 1.0;
+	const double ticksPerSecond = (animationAssimp->mTicksPerSecond != 0.0) ? animationAssimp->mTicksPerSecond : 1.0;
 	animation.duration = static_cast<float>(animationAssimp->mDuration / ticksPerSecond); // アニメーションの全体の長さを秒で計算
 
 	// アニメーションの各チャネルを処理
 	for (uint32_t channelIndex = 0; channelIndex < animationAssimp->mNumChannels; ++channelIndex)
 	{
 		aiNodeAnim* nodeAnimationAssimp = animationAssimp->mChannels[channelIndex];
-        ::NodeAnimation& nodeAnimData = animation.nodeAnimations[nodeAnimationAssimp->mNodeName.C_Str()];
+		::NodeAnimation& nodeAnimData = animation.nodeAnimations[nodeAnimationAssimp->mNodeName.C_Str()];
 
 		for (uint32_t keyIndex = 0; keyIndex < nodeAnimationAssimp->mNumPositionKeys; ++keyIndex)
 		{
 			aiVectorKey& keyAssimp = nodeAnimationAssimp->mPositionKeys[keyIndex];
 			Keyframe<Vector3> keyframe;
-           keyframe.time = static_cast<float>(keyAssimp.mTime / ticksPerSecond); // キーフレームの時刻を秒で計算
+			keyframe.time = static_cast<float>(keyAssimp.mTime / ticksPerSecond); // キーフレームの時刻を秒で計算
 			keyframe.value = { keyAssimp.mValue.x, keyAssimp.mValue.y, keyAssimp.mValue.z };
-            nodeAnimData.translate.push_back(keyframe);
+			nodeAnimData.translate.push_back(keyframe);
 		}
 
 		for (uint32_t keyIndex = 0; keyIndex < nodeAnimationAssimp->mNumRotationKeys; ++keyIndex)
@@ -40,7 +52,7 @@ Animation LoadAnimationFile(const std::string& directoryPath, const std::string&
 			Keyframe<Quaternion> keyframe;
 			keyframe.time = static_cast<float>(keyAssimp.mTime / ticksPerSecond);
 			keyframe.value = Quaternion(keyAssimp.mValue.x, keyAssimp.mValue.y, keyAssimp.mValue.z, keyAssimp.mValue.w);
-           nodeAnimData.rotate.push_back(keyframe);
+			nodeAnimData.rotate.push_back(keyframe);
 		}
 
 		for (uint32_t keyIndex = 0; keyIndex < nodeAnimationAssimp->mNumScalingKeys; ++keyIndex)
@@ -49,10 +61,15 @@ Animation LoadAnimationFile(const std::string& directoryPath, const std::string&
 			Keyframe<Vector3> keyframe;
 			keyframe.time = static_cast<float>(keyAssimp.mTime / ticksPerSecond);
 			keyframe.value = { keyAssimp.mValue.x, keyAssimp.mValue.y, keyAssimp.mValue.z };
-            nodeAnimData.scale.push_back(keyframe);
+			nodeAnimData.scale.push_back(keyframe);
 		}
-
 	}
 
-   return animation;
-};
+	// キャッシュとして保存
+	if (BinaryAssetUtil::SaveBAnim(cachePath, animation))
+	{
+		OutputDebugStringA(("[Binary Cache] Saved animation cache: " + cachePath + "\n").c_str());
+	}
+
+	return animation;
+}

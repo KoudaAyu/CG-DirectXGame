@@ -72,6 +72,7 @@ public:
 	 * @param filename モデルファイルのファイル名
 	 */
 	void Initialize(ModelCom* modelCom, const std::string& directorypath, const std::string& filename);
+	void Initialize(ModelCom* modelCom, const std::string& directorypath, const std::string& filename, const ModelData& modelData);
 	
 	/**
 	 * @brief モデルの更新処理を行います

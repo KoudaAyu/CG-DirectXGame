@@ -115,9 +115,12 @@ bool Sound::LoadFileToSoundData(const std::string& filename, SoundData& out)
 			BYTE* pData = nullptr;
 			DWORD currentLength = 0;
 			pBuffer->Lock(&pData, nullptr, &currentLength);
-			size_t oldSize = out.buffer.size();
-			out.buffer.resize(oldSize + currentLength);
-			memcpy(&out.buffer[oldSize], pData, currentLength);
+			if (currentLength > 0)
+			{
+				size_t oldSize = out.buffer.size();
+				out.buffer.resize(oldSize + currentLength);
+				std::memcpy(&out.buffer[oldSize], pData, currentLength);
+			}
 			pBuffer->Unlock();
 		}
 	}
