@@ -7,6 +7,9 @@
 #include "DirectXCom.h"
 #include "Baziru3_Engine/Base/Allocator/StackAllocator.h"
 #include "Baziru3_Engine/Scene/Manager/SceneManager.h"
+#include "Baziru3_Engine/Camera/Camera.h"
+#include <imgui.h>
+#include <Windows.h>
 #include <cmath>
 #include <algorithm>
 
@@ -656,4 +659,246 @@ bool CollisionManager::CheckRayBox(const Vector3& rayStart, const Vector3& rayDi
 
     outDist = tmin;
     return true;
+}
+
+void CollisionManager::DrawDebug(Camera* camera)
+{
+#ifdef USE_IMGUI
+	static bool showDebugColliders = true;
+	static bool prevF1 = false;
+	bool curF1 = (GetAsyncKeyState(VK_F1) & 0x8000) != 0;
+	if (curF1 && !prevF1)
+	{
+		showDebugColliders = !showDebugColliders;
+	}
+	prevF1 = curF1;
+
+	if (!showDebugColliders || !camera) return;
+
+	ImGuiIO& io = ImGui::GetIO();
+	float width = io.DisplaySize.x;
+	float height = io.DisplaySize.y;
+
+	if (width <= 0.0f || height <= 0.0f) return;
+
+	const Matrix4x4& vp = camera->GetViewProjectionMatrix();
+	ImDrawList* drawList = ImGui::GetForegroundDrawList();
+
+	auto project3DTo2D = [&](const Vector3& pos3D, ImVec2& outPos) -> bool {
+		float w = pos3D.x * vp.m[0][3] + pos3D.y * vp.m[1][3] + pos3D.z * vp.m[2][3] + vp.m[3][3];
+		if (w <= 0.0f) return false;
+		float x = (pos3D.x * vp.m[0][0] + pos3D.y * vp.m[1][0] + pos3D.z * vp.m[2][0] + vp.m[3][0]) / w;
+		float y = (pos3D.x * vp.m[0][1] + pos3D.y * vp.m[1][1] + pos3D.z * vp.m[2][1] + vp.m[3][1]) / w;
+		outPos.x = (x + 1.0f) * 0.5f * width;
+		outPos.y = (1.0f - y) * 0.5f * height;
+		return true;
+	};
+
+	for (Collider* col : colliders_)
+	{
+		if (!col || !col->IsEnabled()) continue;
+
+		// Determine color by attribute
+		ImU32 colColor = ImGui::ColorConvertFloat4ToU32({ 1.0f, 1.0f, 1.0f, 0.7f }); // default white
+		if (col->GetAttribute() == CollisionAttribute::Player)
+		{
+			colColor = ImGui::ColorConvertFloat4ToU32({ 0.0f, 1.0f, 0.5f, 0.8f }); // Neon green
+		}
+		else if (col->GetAttribute() == CollisionAttribute::Enemy)
+		{
+			colColor = ImGui::ColorConvertFloat4ToU32({ 1.0f, 0.2f, 0.2f, 0.8f }); // Red
+		}
+		else if (col->GetAttribute() == CollisionAttribute::Obstacle)
+		{
+			colColor = ImGui::ColorConvertFloat4ToU32({ 0.3f, 0.7f, 1.0f, 0.7f }); // Light blue
+		}
+		else if (col->GetAttribute() == CollisionAttribute::Bullet)
+		{
+			colColor = ImGui::ColorConvertFloat4ToU32({ 1.0f, 0.8f, 0.0f, 0.8f }); // Yellow
+		}
+
+		Vector3 worldPos = col->GetWorldPosition();
+
+		if (col->GetType() == ColliderType::Sphere)
+		{
+			SphereCollider* sphere = static_cast<SphereCollider*>(col);
+			float radius = sphere->GetRadius();
+
+			// Draw horizontal circle
+			const int numSegments = 16;
+			std::vector<ImVec2> pts2D;
+			for (int i = 0; i <= numSegments; ++i)
+			{
+				float angle = i * (6.2831853f / numSegments);
+				Vector3 p3D = {
+					worldPos.x + std::cos(angle) * radius,
+					worldPos.y,
+					worldPos.z + std::sin(angle) * radius
+				};
+				ImVec2 p2D;
+				if (project3DTo2D(p3D, p2D))
+				{
+					pts2D.push_back(p2D);
+				}
+			}
+			if (pts2D.size() > 1)
+			{
+				drawList->AddPolyline(pts2D.data(), (int)pts2D.size(), colColor, false, 2.0f);
+			}
+
+			// Draw vertical circle
+			pts2D.clear();
+			for (int i = 0; i <= numSegments; ++i)
+			{
+				float angle = i * (6.2831853f / numSegments);
+				Vector3 p3D = {
+					worldPos.x + std::cos(angle) * radius,
+					worldPos.y + std::sin(angle) * radius,
+					worldPos.z
+				};
+				ImVec2 p2D;
+				if (project3DTo2D(p3D, p2D))
+				{
+					pts2D.push_back(p2D);
+				}
+			}
+			if (pts2D.size() > 1)
+			{
+				drawList->AddPolyline(pts2D.data(), (int)pts2D.size(), colColor, false, 2.0f);
+			}
+		}
+		else if (col->GetType() == ColliderType::Box)
+		{
+			BoxCollider* box = static_cast<BoxCollider*>(col);
+			Vector3 ext = box->GetExtents();
+			Vector3 rot = box->GetWorldRotation();
+
+			// 8 local corners
+			Vector3 localCorners[8] = {
+				{ -ext.x, -ext.y, -ext.z },
+				{  ext.x, -ext.y, -ext.z },
+				{  ext.x, -ext.y,  ext.z },
+				{ -ext.x, -ext.y,  ext.z },
+				{ -ext.x,  ext.y, -ext.z },
+				{  ext.x,  ext.y, -ext.z },
+				{  ext.x,  ext.y,  ext.z },
+				{ -ext.x,  ext.y,  ext.z }
+			};
+
+			// Rotate and translate to world space
+			Vector3 worldCorners[8];
+			for (int i = 0; i < 8; ++i)
+			{
+				// Rotate Euler Yaw-Pitch-Roll
+				// Pitch (X)
+				float cosX = std::cos(rot.x);
+				float sinX = std::sin(rot.x);
+				Vector3 pt1 = {
+					localCorners[i].x,
+					localCorners[i].y * cosX - localCorners[i].z * sinX,
+					localCorners[i].y * sinX + localCorners[i].z * cosX
+				};
+
+				// Yaw (Y)
+				float cosY = std::cos(rot.y);
+				float sinY = std::sin(rot.y);
+				Vector3 pt2 = {
+					pt1.x * cosY + pt1.z * sinY,
+					pt1.y,
+					-pt1.x * sinY + pt1.z * cosY
+				};
+
+				// Roll (Z)
+				float cosZ = std::cos(rot.z);
+				float sinZ = std::sin(rot.z);
+				Vector3 pt3 = {
+					pt2.x * cosZ - pt2.y * sinZ,
+					pt2.x * sinZ + pt2.y * cosZ,
+					pt2.z
+				};
+
+				worldCorners[i] = pt3 + worldPos;
+			}
+
+			// Project to 2D
+			ImVec2 screenCorners[8];
+			bool projected[8];
+			for (int i = 0; i < 8; ++i)
+			{
+				projected[i] = project3DTo2D(worldCorners[i], screenCorners[i]);
+			}
+
+			// Draw bottom face
+			if (projected[0] && projected[1] && projected[2] && projected[3])
+			{
+				ImVec2 pts[5] = { screenCorners[0], screenCorners[1], screenCorners[2], screenCorners[3], screenCorners[0] };
+				drawList->AddPolyline(pts, 5, colColor, false, 2.0f);
+			}
+			// Draw top face
+			if (projected[4] && projected[5] && projected[6] && projected[7])
+			{
+				ImVec2 pts[5] = { screenCorners[4], screenCorners[5], screenCorners[6], screenCorners[7], screenCorners[4] };
+				drawList->AddPolyline(pts, 5, colColor, false, 2.0f);
+			}
+			// Draw vertical edges
+			for (int i = 0; i < 4; ++i)
+			{
+				if (projected[i] && projected[i + 4])
+				{
+					drawList->AddLine(screenCorners[i], screenCorners[i + 4], colColor, 2.0f);
+				}
+			}
+		}
+		else if (col->GetType() == ColliderType::Capsule)
+		{
+			CapsuleCollider* capsule = static_cast<CapsuleCollider*>(col);
+			float radius = capsule->GetRadius();
+			float halfH = capsule->GetHeight() * 0.5f;
+
+			Vector3 bottomCenter = worldPos - Vector3{ 0.0f, halfH, 0.0f };
+			Vector3 topCenter = worldPos + Vector3{ 0.0f, halfH, 0.0f };
+
+			// Draw bottom circle
+			const int numSegments = 16;
+			std::vector<ImVec2> ptsBottom;
+			std::vector<ImVec2> ptsTop;
+			for (int i = 0; i <= numSegments; ++i)
+			{
+				float angle = i * (6.2831853f / numSegments);
+				Vector3 pBottom = {
+					bottomCenter.x + std::cos(angle) * radius,
+					bottomCenter.y,
+					bottomCenter.z + std::sin(angle) * radius
+				};
+				Vector3 pTop = {
+					topCenter.x + std::cos(angle) * radius,
+					topCenter.y,
+					topCenter.z + std::sin(angle) * radius
+				};
+
+				ImVec2 pB2D, pT2D;
+				if (project3DTo2D(pBottom, pB2D)) ptsBottom.push_back(pB2D);
+				if (project3DTo2D(pTop, pT2D)) ptsTop.push_back(pT2D);
+			}
+			if (ptsBottom.size() > 1) drawList->AddPolyline(ptsBottom.data(), (int)ptsBottom.size(), colColor, false, 2.0f);
+			if (ptsTop.size() > 1) drawList->AddPolyline(ptsTop.data(), (int)ptsTop.size(), colColor, false, 2.0f);
+
+			// Draw vertical side lines
+			Vector3 sides[4] = {
+				{  radius, 0.0f, 0.0f },
+				{ -radius, 0.0f, 0.0f },
+				{ 0.0f, 0.0f,  radius },
+				{ 0.0f, 0.0f, -radius }
+			};
+			for (int i = 0; i < 4; ++i)
+			{
+				ImVec2 pB2D, pT2D;
+				if (project3DTo2D(bottomCenter + sides[i], pB2D) && project3DTo2D(topCenter + sides[i], pT2D))
+				{
+					drawList->AddLine(pB2D, pT2D, colColor, 2.0f);
+				}
+			}
+		}
+	}
+#endif
 }

@@ -9,11 +9,16 @@ class MaterialManager;
 class SpriteManager;
 class OffScreenRendering;
 
+namespace BaziruEngine::AI {
+    class BehaviorTreeEditor;
+}
+
 class DebugUI
 {
 public:
     DebugUI(MaterialManager* materialManager, SpriteManager* spriteManager, Camera* camera,
             Sprite::Transform* transformObject, bool* useMonsterBall, bool* drawObject, bool* drawSprite);
+    ~DebugUI(); // デストラクタ明示的宣言
 
     void Initialize();
     void Update();
@@ -37,5 +42,6 @@ private:
 
     std::vector<std::unique_ptr<Sprite>> sprites;
 
+    std::unique_ptr<BaziruEngine::AI::BehaviorTreeEditor> btEditor_ = nullptr;
 };
 

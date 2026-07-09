@@ -120,6 +120,14 @@ uint32_t TextureManager::Load(const std::string& filePath)
 		return it->second.srvIndex_;
 	}
 
+	{
+		std::ostringstream oss;
+		oss << "[Debug TM] Load START file=" << filePath 
+		    << " directXCom_=" << std::hex << (uintptr_t)directXCom_
+		    << " srvMgr->dx=" << (uintptr_t)(srvManager_ ? srvManager_->GetDirectXCom() : nullptr) << std::dec << "\n";
+		OutputDebugStringA(oss.str().c_str());
+	}
+
 	//SRVManagerの初期化
 	if (!srvManager_)
 	{
@@ -184,6 +192,14 @@ uint32_t TextureManager::Load(const std::string& filePath)
 	{
 		std::ostringstream oss;
 		oss << "TextureManager::Load - file='" << filePath << "' srvIndex=" << srvIndex << " srvMgr=0x" << std::hex << (unsigned long long)(uintptr_t)srvManager_.get() << " gpu.ptr=0x" << (unsigned long long)textureData.srvHandleGPU_.ptr << std::dec << "\n";
+		OutputDebugStringA(oss.str().c_str());
+	}
+
+	{
+		std::ostringstream oss;
+		oss << "[Debug TM] Load END file=" << filePath 
+		    << " directXCom_=" << std::hex << (uintptr_t)directXCom_
+		    << " srvMgr->dx=" << (uintptr_t)(srvManager_ ? srvManager_->GetDirectXCom() : nullptr) << std::dec << "\n";
 		OutputDebugStringA(oss.str().c_str());
 	}
 

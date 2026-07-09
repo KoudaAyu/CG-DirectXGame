@@ -87,6 +87,13 @@ public:
     /// </summary>
     bool Raycast(const Vector3& rayStart, const Vector3& rayDir, float maxDist, Collider*& outHitCollider, float& outHitDist);
 
+    const std::vector<Collider*>& GetColliders() const { return colliders_; }
+
+    /// <summary>
+    /// すべての登録コライダーを画面上に3Dワイヤーフレーム表示します
+    /// </summary>
+    void DrawDebug(class Camera* camera);
+
     /// <summary>
     /// レイと個別コライダーの交差判定ブリッジ
     /// </summary>
