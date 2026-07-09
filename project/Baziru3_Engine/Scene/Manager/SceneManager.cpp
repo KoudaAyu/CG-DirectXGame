@@ -189,10 +189,6 @@ void SceneManager::Draw(SceneRenderRequests& renderRequests)
         }
     }
 
-    if (camera_)
-    {
-        CollisionManager::GetInstance()->DrawDebug(camera_);
-    }
 }
 
 void SceneManager::DrawSkybox(ID3D12GraphicsCommandList* commandList) const

@@ -7,6 +7,7 @@
 #include "ParticleManager.h"
 #include "Application/Scene/GameScene/GamePlayScene.h"
 #include "BehaviorTreeEditor.h"
+#include "Baziru3_Engine/Collision/CollisionManager.h"
 #include <imgui.h>
 
 DebugUI::DebugUI(MaterialManager* materialManager, SpriteManager* spriteManager, Camera* camera,
@@ -319,6 +320,11 @@ void DebugUI::Update()
     if (btEditor_)
     {
         btEditor_->Draw();
+    }
+
+    if (camera_)
+    {
+        CollisionManager::GetInstance()->DrawDebug(camera_);
     }
 #endif
 }
