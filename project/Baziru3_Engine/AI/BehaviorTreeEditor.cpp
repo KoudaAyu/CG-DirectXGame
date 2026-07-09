@@ -271,11 +271,18 @@ void BehaviorTreeEditor::Draw() {
     // メニューバーでの保存・読込処理
     if (ImGui::BeginMenuBar()) {
         if (ImGui::BeginMenu("File")) {
-            if (ImGui::MenuItem("Load Load Tree (test_tree.json)")) {
+            if (ImGui::MenuItem("Load test_tree.json")) {
                 LoadTree("test_tree.json");
             }
-            if (ImGui::MenuItem("Save Save Tree (test_tree.json)")) {
+            if (ImGui::MenuItem("Save test_tree.json")) {
                 SaveTree("test_tree.json");
+            }
+            ImGui::Separator();
+            if (ImGui::MenuItem("Load test_cover_tree.json")) {
+                LoadTree("test_cover_tree.json");
+            }
+            if (ImGui::MenuItem("Save test_cover_tree.json")) {
+                SaveTree("test_cover_tree.json");
             }
             ImGui::EndMenu();
         }
