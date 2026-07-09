@@ -11,6 +11,7 @@ class Bullet;
 class Sprite;
 class WindowAPI;
 class Obstacle;
+#include "Baziru3_Engine/AI/BehaviorTree.h"
 
 class MovingEnemy
 {
@@ -102,4 +103,7 @@ private:
     
     const float fovAngle_ = 65.0f * (3.14159265f / 180.0f); // 視野角 65度 (ラジアン)
     const float maxSightRange_ = 12.0f; // 最大視認距離
+
+    std::unique_ptr<BaziruEngine::AI::BehaviorTree> behaviorTree_;
+    bool useBehaviorTree_ = true;
 };

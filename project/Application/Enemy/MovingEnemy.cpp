@@ -1,4 +1,5 @@
 #include "MovingEnemy.h"
+#include "Baziru3_Engine/AI/BehaviorTree.h"
 #include "Object3d.h"
 #include "Object3dCom.h"
 #include "TextureManager.h"
@@ -45,6 +46,16 @@ void MovingEnemy::Initialize(Object3dCom* object3dCom, Camera* camera)
     shotCooldownTimer_ = shotCooldown_;
     state_ = AIState::Patrol;
     movingToB_ = true;
+
+    behaviorTree_ = std::make_unique<BaziruEngine::AI::BehaviorTree>();
+    if (behaviorTree_->LoadFromJSON("test_cover_tree.json"))
+    {
+        OutputDebugStringA("[MovingEnemy] Successfully loaded test_cover_tree.json\n");
+    }
+    else
+    {
+        OutputDebugStringA("[MovingEnemy] Failed to load test_cover_tree.json\n");
+    }
 }
 
 bool MovingEnemy::FaceTarget(const Vector3& targetPosition, float deltaTime)
@@ -285,23 +296,39 @@ void MovingEnemy::Update(WindowAPI* windowAPI, const Vector3* targetPosition, co
         if (hitFlashTimer_ <= 0.0f) object3d_->SetColor({ 1.5f, 0.2f, 0.2f, 1.0f });
         if (targetPosition)
         {
-            float dx = targetPosition->x - currentPos.x;
-            float dz = targetPosition->z - currentPos.z;
-            float distToPlayer = std::sqrt(dx * dx + dz * dz);
-
             FaceTarget(*targetPosition, deltaTime);
 
             // 驚きフリーズ中（!マーク表示中）は移動しない
             if (alertTimer_ <= 0.0f)
             {
-                // プレイヤーと一定距離を保ちながら追跡
-                if (distToPlayer > 4.5f)
+                if (behaviorTree_ && useBehaviorTree_)
                 {
-                    float vx = (dx / distToPlayer) * moveSpeed_ * 0.9f * frameScale; // プレイヤーが逃げ切れるように追跡速度を少し落とす (0.9f)
-                    float vz = (dz / distToPlayer) * moveSpeed_ * 0.9f * frameScale;
-                    position_.x += vx;
-                    position_.z += vz;
+                    // Blackboard状態の同期
+                    auto blackboard = behaviorTree_->GetBlackboard();
+                    blackboard->Set<Vector3>("AgentPosition", position_);
+                    blackboard->Set<Vector3>("ThreatPosition", *targetPosition);
+
+                    // ツリーを更新
+                    behaviorTree_->Update();
+
+                    // 新しい座標を反映
+                    position_ = blackboard->Get<Vector3>("AgentPosition");
                     object3d_->SetTranslate(position_);
+                }
+                else
+                {
+                    float dx = targetPosition->x - currentPos.x;
+                    float dz = targetPosition->z - currentPos.z;
+                    float distToPlayer = std::sqrt(dx * dx + dz * dz);
+                    // プレイヤーと一定距離を保ちながら追跡
+                    if (distToPlayer > 4.5f)
+                    {
+                        float vx = (dx / distToPlayer) * moveSpeed_ * 0.9f * frameScale; // プレイヤーが逃げ切れるように追跡速度を少し落とす (0.9f)
+                        float vz = (dz / distToPlayer) * moveSpeed_ * 0.9f * frameScale;
+                        position_.x += vx;
+                        position_.z += vz;
+                        object3d_->SetTranslate(position_);
+                    }
                 }
             }
         }
