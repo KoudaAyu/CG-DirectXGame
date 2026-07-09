@@ -14,6 +14,11 @@ class Light;
 class Sphere
 {
 public:
+	static const std::vector<Sphere*>& GetInstances() { return instances_; }
+private:
+	static std::vector<Sphere*> instances_;
+
+public:
 
 	Sphere();
 	~Sphere();

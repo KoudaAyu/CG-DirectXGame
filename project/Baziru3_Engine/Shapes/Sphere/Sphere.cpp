@@ -6,12 +6,23 @@
 #include "SceneManager.h"
 #include "TextureManager.h"
 
+#include <algorithm>
+
+std::vector<Sphere*> Sphere::instances_;
+
 Sphere::Sphere()
 {
+	instances_.push_back(this);
 }
 
 Sphere::~Sphere()
 {
+	auto it = std::find(instances_.begin(), instances_.end(), this);
+	if (it != instances_.end())
+	{
+		instances_.erase(it);
+	}
+
 	if (transformationMatrixResourceSphere && transformationMatrixDataSphere)
 	{
 		D3D12_RANGE written = { 0, sizeof(TransformationMatrix) };

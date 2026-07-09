@@ -8,6 +8,8 @@
 #include "Baziru3_Engine/Base/Allocator/StackAllocator.h"
 #include "Baziru3_Engine/Scene/Manager/SceneManager.h"
 #include "Baziru3_Engine/Camera/Camera.h"
+#include "Baziru3_Engine/Shapes/Sphere/Sphere.h"
+#include "Baziru3_Engine/3D/Object/Object3d.h"
 #include <imgui.h>
 #include <Windows.h>
 #include <cmath>
@@ -896,6 +898,200 @@ void CollisionManager::DrawDebug(Camera* camera)
 				if (project3DTo2D(bottomCenter + sides[i], pB2D) && project3DTo2D(topCenter + sides[i], pT2D))
 				{
 					drawList->AddLine(pB2D, pT2D, colColor, 2.0f);
+				}
+			}
+		}
+	}
+
+	// --- Draw Sphere Instances (Visual only) ---
+	ImU32 sphereVisualColor = ImGui::ColorConvertFloat4ToU32({ 1.0f, 0.4f, 0.7f, 0.7f }); // Pink
+	for (Sphere* s : Sphere::GetInstances())
+	{
+		if (!s) continue;
+		Vector3 worldPos = s->GetTransform().translate;
+		float radius = 1.0f * s->GetTransform().scale.x;
+
+		// Draw horizontal circle
+		const int numSegments = 16;
+		std::vector<ImVec2> pts2D;
+		for (int i = 0; i <= numSegments; ++i)
+		{
+			float angle = i * (6.2831853f / numSegments);
+			Vector3 p3D = {
+				worldPos.x + std::cos(angle) * radius,
+				worldPos.y,
+				worldPos.z + std::sin(angle) * radius
+			};
+			ImVec2 p2D;
+			if (project3DTo2D(p3D, p2D))
+			{
+				pts2D.push_back(p2D);
+			}
+		}
+		if (pts2D.size() > 1)
+		{
+			drawList->AddPolyline(pts2D.data(), (int)pts2D.size(), sphereVisualColor, false, 2.0f);
+		}
+
+		// Draw vertical circle
+		pts2D.clear();
+		for (int i = 0; i <= numSegments; ++i)
+		{
+			float angle = i * (6.2831853f / numSegments);
+			Vector3 p3D = {
+				worldPos.x + std::cos(angle) * radius,
+				worldPos.y + std::sin(angle) * radius,
+				worldPos.z
+			};
+			ImVec2 p2D;
+			if (project3DTo2D(p3D, p2D))
+			{
+				pts2D.push_back(p2D);
+			}
+		}
+		if (pts2D.size() > 1)
+		{
+			drawList->AddPolyline(pts2D.data(), (int)pts2D.size(), sphereVisualColor, false, 2.0f);
+		}
+	}
+
+	// --- Draw Object3d Instances (Visual only) ---
+	ImU32 objVisualColor = ImGui::ColorConvertFloat4ToU32({ 0.0f, 1.0f, 0.5f, 0.7f }); // Neon Green
+	for (Object3d* obj : Object3d::GetInstances())
+	{
+		if (!obj) continue;
+		Vector3 worldPos = obj->GetTranslate();
+
+		// If skeleton joints are present, draw as a Capsule. Otherwise draw as a Box.
+		if (!obj->GetSkeleton().joints.empty())
+		{
+			// Capsule representation
+			float radius = 0.3f * obj->GetScale().x;
+			float height = 1.2f * obj->GetScale().y;
+
+			Vector3 bottomCenter = worldPos + Vector3{ 0.0f, radius, 0.0f };
+			Vector3 topCenter = worldPos + Vector3{ 0.0f, radius + height, 0.0f };
+
+			// Draw bottom circle
+			const int numSegments = 16;
+			std::vector<ImVec2> ptsBottom;
+			std::vector<ImVec2> ptsTop;
+			for (int i = 0; i <= numSegments; ++i)
+			{
+				float angle = i * (6.2831853f / numSegments);
+				Vector3 pBottom = {
+					bottomCenter.x + std::cos(angle) * radius,
+					bottomCenter.y,
+					bottomCenter.z + std::sin(angle) * radius
+				};
+				Vector3 pTop = {
+					topCenter.x + std::cos(angle) * radius,
+					topCenter.y,
+					topCenter.z + std::sin(angle) * radius
+				};
+
+				ImVec2 pB2D, pT2D;
+				if (project3DTo2D(pBottom, pB2D)) ptsBottom.push_back(pB2D);
+				if (project3DTo2D(pTop, pT2D)) ptsTop.push_back(pT2D);
+			}
+			if (ptsBottom.size() > 1) drawList->AddPolyline(ptsBottom.data(), (int)ptsBottom.size(), objVisualColor, false, 2.0f);
+			if (ptsTop.size() > 1) drawList->AddPolyline(ptsTop.data(), (int)ptsTop.size(), objVisualColor, false, 2.0f);
+
+			// Draw vertical side lines
+			Vector3 sides[4] = {
+				{  radius, 0.0f, 0.0f },
+				{ -radius, 0.0f, 0.0f },
+				{ 0.0f, 0.0f,  radius },
+				{ 0.0f, 0.0f, -radius }
+			};
+			for (int i = 0; i < 4; ++i)
+			{
+				ImVec2 pB2D, pT2D;
+				if (project3DTo2D(bottomCenter + sides[i], pB2D) && project3DTo2D(topCenter + sides[i], pT2D))
+				{
+					drawList->AddLine(pB2D, pT2D, objVisualColor, 2.0f);
+				}
+			}
+		}
+		else
+		{
+			// Box representation
+			Vector3 ext = { 1.0f * obj->GetScale().x, 1.0f * obj->GetScale().y, 1.0f * obj->GetScale().z };
+			Vector3 rot = obj->GetRotate();
+
+			// 8 local corners
+			Vector3 localCorners[8] = {
+				{ -ext.x, -ext.y, -ext.z },
+				{  ext.x, -ext.y, -ext.z },
+				{  ext.x, -ext.y,  ext.z },
+				{ -ext.x, -ext.y,  ext.z },
+				{ -ext.x,  ext.y, -ext.z },
+				{  ext.x,  ext.y, -ext.z },
+				{  ext.x,  ext.y,  ext.z },
+				{ -ext.x,  ext.y,  ext.z }
+			};
+
+			// Rotate and translate to world space
+			Vector3 worldCorners[8];
+			for (int i = 0; i < 8; ++i)
+			{
+				// Rotate Euler Yaw-Pitch-Roll
+				// Pitch (X)
+				float cosX = std::cos(rot.x);
+				float sinX = std::sin(rot.x);
+				Vector3 pt1 = {
+					localCorners[i].x,
+					localCorners[i].y * cosX - localCorners[i].z * sinX,
+					localCorners[i].y * sinX + localCorners[i].z * cosX
+				};
+
+				// Yaw (Y)
+				float cosY = std::cos(rot.y);
+				float sinY = std::sin(rot.y);
+				Vector3 pt2 = {
+					pt1.x * cosY + pt1.z * sinY,
+					pt1.y,
+					-pt1.x * sinY + pt1.z * cosY
+				};
+
+				// Roll (Z)
+				float cosZ = std::cos(rot.z);
+				float sinZ = std::sin(rot.z);
+				Vector3 pt3 = {
+					pt2.x * cosZ - pt2.y * sinZ,
+					pt2.x * sinZ + pt2.y * cosZ,
+					pt2.z
+				};
+
+				worldCorners[i] = pt3 + worldPos;
+			}
+
+			// Project to 2D
+			ImVec2 screenCorners[8];
+			bool projected[8];
+			for (int i = 0; i < 8; ++i)
+			{
+				projected[i] = project3DTo2D(worldCorners[i], screenCorners[i]);
+			}
+
+			// Draw bottom face
+			if (projected[0] && projected[1] && projected[2] && projected[3])
+			{
+				ImVec2 pts[5] = { screenCorners[0], screenCorners[1], screenCorners[2], screenCorners[3], screenCorners[0] };
+				drawList->AddPolyline(pts, 5, objVisualColor, false, 2.0f);
+			}
+			// Draw top face
+			if (projected[4] && projected[5] && projected[6] && projected[7])
+			{
+				ImVec2 pts[5] = { screenCorners[4], screenCorners[5], screenCorners[6], screenCorners[7], screenCorners[4] };
+				drawList->AddPolyline(pts, 5, objVisualColor, false, 2.0f);
+			}
+			// Draw vertical edges
+			for (int i = 0; i < 4; ++i)
+			{
+				if (projected[i] && projected[i + 4])
+				{
+					drawList->AddLine(screenCorners[i], screenCorners[i + 4], objVisualColor, 2.0f);
 				}
 			}
 		}

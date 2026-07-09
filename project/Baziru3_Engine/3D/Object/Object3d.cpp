@@ -495,8 +495,23 @@ void Object3d::VertexResource()
 	}
 }
 
+#include <algorithm>
+
+std::vector<Object3d*> Object3d::instances_;
+
+Object3d::Object3d()
+{
+	instances_.push_back(this);
+}
+
 Object3d::~Object3d()
 {
+	auto it = std::find(instances_.begin(), instances_.end(), this);
+	if (it != instances_.end())
+	{
+		instances_.erase(it);
+	}
+
 	// 持続的にマップされたリソースがある場合は安全にアンマップする
 	// 二重アンマップを避けるため、CPU側のポインタが nullptr でない場合のみ Unmap する
 	if (vertexResource && vertexData_ != nullptr)

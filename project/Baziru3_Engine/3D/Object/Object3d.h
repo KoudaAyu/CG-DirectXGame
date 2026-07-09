@@ -19,6 +19,11 @@ class SkinningObject3dCom;
 class Object3d
 {
 public:
+	static const std::vector<Object3d*>& GetInstances() { return instances_; }
+private:
+	static std::vector<Object3d*> instances_;
+
+public:
 
     // GPU用の定数バッファ(CB)レイアウトには MaterialManager.h のグローバルな `Material` を使用
 
@@ -55,6 +60,8 @@ public:
 		Vector3 direction;
 		float intensity;
 	};
+
+	Object3d();
 
 	void Initialize(Object3dCom* object3dCom, const ModelData& modelData, TextureManager* textureManager = nullptr);
 
