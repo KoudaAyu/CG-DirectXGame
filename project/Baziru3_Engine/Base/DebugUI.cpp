@@ -6,6 +6,7 @@
 #include "OffScreenRendering.h"
 #include "ParticleManager.h"
 #include "Application/Scene/GameScene/GamePlayScene.h"
+#include "BehaviorTreeEditor.h"
 #include <imgui.h>
 
 DebugUI::DebugUI(MaterialManager* materialManager, SpriteManager* spriteManager, Camera* camera,
@@ -14,8 +15,15 @@ DebugUI::DebugUI(MaterialManager* materialManager, SpriteManager* spriteManager,
 {
 }
 
+DebugUI::~DebugUI()
+{
+}
+
 void DebugUI::Initialize()
 {
+#ifdef USE_IMGUI
+    btEditor_ = std::make_unique<BaziruEngine::AI::BehaviorTreeEditor>();
+#endif
 }
 
 void DebugUI::Update()
@@ -308,9 +316,18 @@ void DebugUI::Update()
         ImGui::PlotLines("##FPSGraph", fpsHistory, 120, fpsHistoryOffset, label, 0.0f, 120.0f, ImVec2(0, 80.0f));
     }
     ImGui::End();
+    if (btEditor_)
+    {
+        btEditor_->Draw();
+    }
 #endif
 }
 
 void DebugUI::Finalize()
 {
+#ifdef USE_IMGUI
+    if (btEditor_) {
+        btEditor_.reset();
+    }
+#endif
 }

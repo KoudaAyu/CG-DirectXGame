@@ -27,6 +27,7 @@ public:
 	uint32_t AllocateAt(uint32_t index);
 
 	void Free(uint32_t index);
+	DirectXCom* GetDirectXCom() const { return directXCom_; }
 
 public:
 	void SeTGraphicsRootDescriptorTable(UINT RootParameterIndex, uint32_t srvIndex)

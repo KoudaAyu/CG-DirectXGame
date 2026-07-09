@@ -12,6 +12,8 @@
 #include <cassert>
 #include<memory>
 #include <Log.h>
+#include "ModelManager.h"
+#include "AsyncLoader.h"
 
 namespace {
     static std::unique_ptr<SceneManager>& SceneManagerStorage()
@@ -28,6 +30,9 @@ SceneManager::~SceneManager()
 		scene_->Finalize();
 		scene_.reset();
 	}
+	AsyncLoader::GetInstance()->Finalize();
+	AsyncLoader::Destroy();
+	ModelManager::Destroy();
 }
 
 void SceneManager::ChangeScene(const std::string& sceneName)
@@ -73,6 +78,8 @@ void SceneManager::Destroy()
 void SceneManager::Initialize(DirectXCom* dxCommon)
 {
 	dxCommon_ = dxCommon;
+	ModelManager::GetInstance()->Initialize(dxCommon);
+	AsyncLoader::GetInstance()->Initialize(ModelManager::GetInstance()->modelCom_.get());
 }
 
 void SceneManager::Update(float deltaTime)
@@ -83,6 +90,7 @@ void SceneManager::Update(float deltaTime)
 		return;
 	}
 
+	AsyncLoader::GetInstance()->Update();
 
     ApplyPendingSceneChange();
 

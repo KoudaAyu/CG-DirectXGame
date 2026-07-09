@@ -5,6 +5,7 @@
 #include<sstream>
 #include<cstring>
 #include "TextureManager.h"
+#include "BinaryAssetUtil.h"
 
 
 
@@ -15,6 +16,25 @@ void Model::Initialize(ModelCom* modelCom, const std::string& directoryPath, con
 
     //Modelの読み込み
     modelData_ = LoadObjFile(directoryPath, filename);
+
+    //頂点データとマテリアルの初期化
+    VertexResource();
+    MaterialResource();
+
+    // テクスチャロードはパスが有効なときのみ実行
+    if (!modelData_.material.textureFilePath.empty())
+    {
+        // TextureManagerにDirectXコンテキストが渡っていることを前提にする
+        TextureManager::GetInstance()->LoadTexture(modelData_.material.textureFilePath);
+        modelData_.material.textureIndex =
+            TextureManager::GetInstance()->GetTextureIndexByFilePath(modelData_.material.textureFilePath);
+    }
+}
+
+void Model::Initialize(ModelCom* modelCom, const std::string& directoryPath, const std::string& filename, const ModelData& modelData)
+{
+    modelCom_ = modelCom;
+    modelData_ = modelData;
 
     //頂点データとマテリアルの初期化
     VertexResource();
@@ -298,9 +318,20 @@ void Model::MaterialResource()
 Model::ModelData Model::LoadModelFile(const std::string& directoryPath, const std::string& filename)
 {
 	Model::ModelData modelData;
-	Assimp::Importer importer;
-
 	const std::string fullPath = directoryPath + "/" + filename;
+	const std::string cachePath = BinaryAssetUtil::GetCachePath(fullPath, ".bmodel");
+
+	// キャッシュが有効な場合はバイナリからロード
+	if (BinaryAssetUtil::IsCacheValid(fullPath, cachePath))
+	{
+		if (BinaryAssetUtil::LoadBModel(cachePath, modelData))
+		{
+			OutputDebugStringA(("[Binary Cache] Loaded model from cache: " + cachePath + "\n").c_str());
+			return modelData;
+		}
+	}
+
+	Assimp::Importer importer;
 	const aiScene* scene = importer.ReadFile(fullPath, aiProcess_Triangulate | aiProcess_FlipUVs | aiProcess_GenNormals);
 	assert(scene != nullptr);
 	assert(scene->mRootNode != nullptr);
@@ -413,6 +444,12 @@ Model::ModelData Model::LoadModelFile(const std::string& directoryPath, const st
 				});
 			}
 		}
+	}
+
+	// キャッシュとして保存
+	if (BinaryAssetUtil::SaveBModel(cachePath, modelData))
+	{
+		OutputDebugStringA(("[Binary Cache] Saved model cache: " + cachePath + "\n").c_str());
 	}
 
 	return modelData;
