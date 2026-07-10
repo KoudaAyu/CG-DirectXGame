@@ -229,7 +229,7 @@ void Object3d::Update()
 	{
 		const Matrix4x4& vp = camera_->GetViewProjectionMatrix();
 		const Vector3& pos = transform.GetTranslate();
-		float radius = 2.0f;
+		float radius = 8.0f;
 
 		float x = pos.x * vp.m[0][0] + pos.y * vp.m[1][0] + pos.z * vp.m[2][0] + vp.m[3][0];
 		float y = pos.x * vp.m[0][1] + pos.y * vp.m[1][1] + pos.z * vp.m[2][1] + vp.m[3][1];
