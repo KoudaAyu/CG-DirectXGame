@@ -90,18 +90,28 @@ void SkinningObject3dCom::Draw(Object3d* object, const ::RenderContext& ctx, con
     barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
     barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
     barrier.Transition.pResource = skinCluster.uavResource.Get();
-    barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COMMON;
-    barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
     barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-    ctx.commandList->ResourceBarrier(1, &barrier);
 
-    // 2. スキンニング実行
-    Skinning(object, ctx.commandList);
+    if (object->IsShared())
+    {
+        barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COMMON;
+        barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER;
+        ctx.commandList->ResourceBarrier(1, &barrier);
+    }
+    else
+    {
+        barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COMMON;
+        barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+        ctx.commandList->ResourceBarrier(1, &barrier);
 
-    // 3. 頂点バッファとして読み込むためのバリア
-    barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
-    barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER;
-    ctx.commandList->ResourceBarrier(1, &barrier);
+        // 2. スキンニング実行
+        Skinning(object, ctx.commandList);
+
+        // 3. 頂点バッファとして読み込むためのバリア
+        barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+        barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER;
+        ctx.commandList->ResourceBarrier(1, &barrier);
+    }
 
     if (rootSignature)
     {

@@ -64,6 +64,7 @@ public:
 	Object3d();
 
 	void Initialize(Object3dCom* object3dCom, const ModelData& modelData, TextureManager* textureManager = nullptr);
+	void InitializeShared(Object3dCom* object3dCom, Object3d* masterObject);
 
 	// アニメーション・スケルトン・スキンクラスターをまとめてセットアップする
 	// アプリ側で読み込んだ Animation と Skeleton、Model::ModelData を渡す
@@ -147,6 +148,7 @@ public:
 	const Skeleton& GetSkeleton() const { return skeleton_; }
 	Skeleton& GetSkeleton() { return skeleton_; }
 	const SkinCluster& GetSkinCluster() const { return skinCluster_; }
+	bool IsShared() const { return isShared_; }
 
 private:
 	Transform transform;
@@ -190,4 +192,5 @@ private:
 	TextureManager* textureManager_ = nullptr;
 	bool isDrawnThisFrame_ = false;
 	bool wasDrawnLastFrame_ = false;
+	bool isShared_ = false;
 };

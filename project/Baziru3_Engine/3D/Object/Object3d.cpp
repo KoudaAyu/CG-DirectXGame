@@ -151,6 +151,36 @@ void Object3d::Initialize(Object3dCom* object3dCom, const ModelData& modelData, 
 	cameraTransform = { {1.0f,1.0f,1.0f}, {0.0f,0.0f,0.0f}, {0.0f,0.0f,-10.0f} };
 }
 
+void Object3d::InitializeShared(Object3dCom* object3dCom, Object3d* masterObject)
+{
+	object3dCom_ = object3dCom;
+	if (object3dCom_)
+	{
+		camera_ = object3dCom_->GetDefaultCamera();
+	}
+	textureManager_ = masterObject->textureManager_;
+	modelData_ = masterObject->modelData_;
+
+	// Share vertex and index resources from masterObject without allocating!
+	vertexResource = masterObject->vertexResource;
+	vertexBufferView_ = masterObject->vertexBufferView_;
+	indexResource = masterObject->indexResource;
+	indexBufferView_ = masterObject->indexBufferView_;
+
+	// Copy material settings
+	materialData_ = masterObject->materialData_;
+	directionalLightData_ = masterObject->directionalLightData_;
+
+	// Copy skinning / animator reference
+	skeleton_ = masterObject->skeleton_;
+	skinCluster_ = masterObject->skinCluster_;
+	skinClusterInitialized_ = masterObject->skinClusterInitialized_;
+	isShared_ = true;
+
+	transform = { {1.0f,1.0f,1.0f}, {0.0f,0.0f,0.0f}, {0.0f,0.0f,0.0f} };
+	cameraTransform = { {1.0f,1.0f,1.0f}, {0.0f,0.0f,0.0f}, {0.0f,0.0f,-10.0f} };
+}
+
 void Object3d::SetupAnimation(const Animation* animation, const Skeleton& skeleton, const Model::ModelData& modelData)
 {
 	if (!object3dCom_) return;
@@ -193,23 +223,26 @@ void Object3d::Update()
 
 	// ステップ1: アニメーション時間を進める
 	// ステップ2: 骨ごとのLocal情報を更新する
-	if (animator_.HasAnimation())
+	if (!isShared_)
 	{
-		animator_.Update(deltaTime_);
-		// ステップ3: SkeletonSpaceの情報を更新する
-		animator_.ApplyTo(skeleton_);
-	}
+		if (animator_.HasAnimation())
+		{
+			animator_.Update(deltaTime_);
+			// ステップ3: SkeletonSpaceの情報を更新する
+			animator_.ApplyTo(skeleton_);
+		}
 
-	if (!skeleton_.joints.empty())
-	{
-		// ステップ3: 現在の骨ごとのLocal情報を基にSkeletonSpaceの情報を更新する
-		skeleton_.Update();
-	}
+		if (!skeleton_.joints.empty())
+		{
+			// ステップ3: 現在の骨ごとのLocal情報を基にSkeletonSpaceの情報を更新する
+			skeleton_.Update();
+		}
 
-	// ステップ4: SkinClusterのMatrixPaletteを更新する
-	if (skinClusterInitialized_)
-	{
-		skinClusterLender_.Update(skinCluster_, skeleton_);
+		// ステップ4: SkinClusterのMatrixPaletteを更新する
+		if (skinClusterInitialized_)
+		{
+			skinClusterLender_.Update(skinCluster_, skeleton_);
+		}
 	}
 
 	Matrix4x4 worldMatrix = MakeAffineMatrix(transform.GetScale(), transform.GetRotate(), transform.GetTranslate());

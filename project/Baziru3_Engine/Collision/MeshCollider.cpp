@@ -1,11 +1,12 @@
 #include "MeshCollider.h"
 #include "CollisionManager.h"
 
-MeshCollider::MeshCollider(Object3d* object3d, CollisionAttribute attribute)
+MeshCollider::MeshCollider(Object3d* object3d, CollisionAttribute attribute, MeshCollider* sharedSource)
     : Collider(ColliderType::Mesh, attribute)
     , object3d_(object3d)
+    , sharedSource_(sharedSource)
 {
-    if (object3d_)
+    if (!sharedSource_ && object3d_)
     {
         const auto& modelData = object3d_->GetModelData();
         skinnedPositions_.reserve(modelData.vertices.size());
@@ -32,6 +33,7 @@ void MeshCollider::SetWorldPosition(const Vector3& pos)
 
 void MeshCollider::Update()
 {
+    if (sharedSource_) return; // Shared colliders use the source's AABBTree and skinnedPositions
     if (!object3d_ || !object3d_->HasAnimation()) return;
 
     // Frame-level caching to prevent double-updates

@@ -104,16 +104,12 @@ void GamePlayScene::InitializeScene()
 			for (int c = 0; c < cols; ++c)
 			{
 				auto obj = std::make_unique<Object3d>();
-				obj->Initialize(object3dCom, animatedCubeModelData);
+				obj->InitializeShared(object3dCom, animatedCube_.get());
 				obj->SetTranslate({ startX + c * spacingX, 0.0f, startZ + r * spacingZ });
 				obj->SetScale({ 1.0f, 1.0f, 1.0f });
 				obj->SetEnableLighting(true);
-				if (animation_.duration > 0.0f && !animation_.nodeAnimations.empty() && !skeleton_.joints.empty())
-				{
-					obj->SetupAnimation(&animation_, skeleton_, skinModelData);
-				}
 
-				auto col = std::make_unique<MeshCollider>(obj.get(), CollisionAttribute::Enemy);
+				auto col = std::make_unique<MeshCollider>(obj.get(), CollisionAttribute::Enemy, animatedCubeCollider_.get());
 				CollisionManager::GetInstance()->RegisterCollider(col.get());
 
 				crowd_.push_back(std::move(obj));
