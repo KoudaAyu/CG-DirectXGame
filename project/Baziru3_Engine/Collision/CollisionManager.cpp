@@ -1058,9 +1058,7 @@ void CollisionManager::DrawDebug(Camera* camera)
 				std::vector<std::pair<Vector3, Vector3>> boundsList;
 				meshCollider->GetAABBTree().GetNodesAtDepth(3, boundsList);
 
-				Vector3 rot = obj->GetRotate();
-				Vector3 scale = obj->GetScale();
-				Vector3 pos = obj->GetTranslate();
+				Matrix4x4 world = obj->GetWorldMatrix();
 
 				for (const auto& bounds : boundsList)
 				{
@@ -1069,47 +1067,24 @@ void CollisionManager::DrawDebug(Camera* camera)
 
 					// 8 local corners
 					Vector3 localCorners[8] = {
-						{ minB.x * scale.x, minB.y * scale.y, minB.z * scale.z },
-						{ maxB.x * scale.x, minB.y * scale.y, minB.z * scale.z },
-						{ maxB.x * scale.x, minB.y * scale.y, maxB.z * scale.z },
-						{ minB.x * scale.x, minB.y * scale.y, maxB.z * scale.z },
-						{ minB.x * scale.x, maxB.y * scale.y, minB.z * scale.z },
-						{ maxB.x * scale.x, maxB.y * scale.y, minB.z * scale.z },
-						{ maxB.x * scale.x, maxB.y * scale.y, maxB.z * scale.z },
-						{ minB.x * scale.x, maxB.y * scale.y, maxB.z * scale.z }
+						{ minB.x, minB.y, minB.z },
+						{ maxB.x, minB.y, minB.z },
+						{ maxB.x, minB.y, maxB.z },
+						{ minB.x, minB.y, maxB.z },
+						{ minB.x, maxB.y, minB.z },
+						{ maxB.x, maxB.y, minB.z },
+						{ maxB.x, maxB.y, maxB.z },
+						{ minB.x, maxB.y, maxB.z }
 					};
 
 					Vector3 worldCorners[8];
 					for (int i = 0; i < 8; ++i)
 					{
-						// Pitch (X)
-						float cosX = std::cos(rot.x);
-						float sinX = std::sin(rot.x);
-						Vector3 pt1 = {
-							localCorners[i].x,
-							localCorners[i].y * cosX - localCorners[i].z * sinX,
-							localCorners[i].y * sinX + localCorners[i].z * cosX
+						worldCorners[i] = {
+							localCorners[i].x * world.m[0][0] + localCorners[i].y * world.m[1][0] + localCorners[i].z * world.m[2][0] + world.m[3][0],
+							localCorners[i].x * world.m[0][1] + localCorners[i].y * world.m[1][1] + localCorners[i].z * world.m[2][1] + world.m[3][1],
+							localCorners[i].x * world.m[0][2] + localCorners[i].y * world.m[1][2] + localCorners[i].z * world.m[2][2] + world.m[3][2]
 						};
-
-						// Yaw (Y)
-						float cosY = std::cos(rot.y);
-						float sinY = std::sin(rot.y);
-						Vector3 pt2 = {
-							pt1.x * cosY + pt1.z * sinY,
-							pt1.y,
-							-pt1.x * sinY + pt1.z * cosY
-						};
-
-						// Roll (Z)
-						float cosZ = std::cos(rot.z);
-						float sinZ = std::sin(rot.z);
-						Vector3 pt3 = {
-							pt2.x * cosZ - pt2.y * sinZ,
-							pt2.x * sinZ + pt2.y * cosZ,
-							pt2.z
-						};
-
-						worldCorners[i] = pt3 + pos;
 					}
 
 					ImVec2 screenCorners[8];
