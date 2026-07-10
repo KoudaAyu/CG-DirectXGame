@@ -1083,7 +1083,7 @@ void CollisionManager::DrawDebug(Camera* camera)
 					// Clamp step to avoid division by zero or negative bounds
 					int step = (std::max)(3, wireframeStep_);
 
-					for (size_t i = 0; i < modelData.indices.size(); i += step)
+					for (size_t i = 0; i + 2 < modelData.indices.size(); i += step)
 					{
 						uint32_t idx0 = modelData.indices[i];
 						uint32_t idx1 = modelData.indices[i + 1];
