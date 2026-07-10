@@ -57,6 +57,8 @@ private:
     std::unique_ptr<HitEffect> hitEffect_;
     std::unique_ptr<Object3d> animatedCube_;
     std::unique_ptr<MeshCollider> animatedCubeCollider_;
+    std::vector<std::unique_ptr<Object3d>> crowd_;
+    std::vector<std::unique_ptr<MeshCollider>> crowdColliders_;
     std::unique_ptr<Sphere> sphere_;
     Skeleton skeleton_{};
     Animation animation_{};

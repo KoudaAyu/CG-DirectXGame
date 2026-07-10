@@ -34,7 +34,7 @@ public:
 	static const size_t featureLevelNamesCount;
 
 	// 公開SRV最大数定数
-	static constexpr uint32_t kMaxSRVCount = 512;
+	static constexpr uint32_t kMaxSRVCount = 8192;
 	static constexpr uint32_t GetMaxSRVCount() { return kMaxSRVCount; }
 
 	DirectXCom(WindowAPI* windowAPI, std::ostream& logStream);
@@ -347,7 +347,7 @@ public:
 
 
 	//最大SRV数(Texture枚数)
-	static const uint32_t kMacSRVCount = 512;
+	static const uint32_t kMacSRVCount = 8192;
 
 	std::chrono::steady_clock::time_point refrence_;
 
