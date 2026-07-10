@@ -840,6 +840,22 @@ void CollisionManager::DrawDebug(Camera* camera)
 	{
 		if (!col || !col->IsEnabled()) continue;
 
+		Vector3 worldPos = col->GetWorldPosition();
+
+		// Apply distance culling to avoid drawing tens of thousands of lines on the CPU for distant objects
+		if (camera && col->GetAttribute() != CollisionAttribute::Player)
+		{
+			Vector3 camPos = camera->GetTranslate();
+			float dx = worldPos.x - camPos.x;
+			float dy = worldPos.y - camPos.y;
+			float dz = worldPos.z - camPos.z;
+			float distSq = dx * dx + dy * dy + dz * dz;
+			if (distSq > 40.0f * 40.0f)
+			{
+				continue;
+			}
+		}
+
 		// Determine color by attribute
 		ImU32 colColor = ImGui::ColorConvertFloat4ToU32({ 1.0f, 1.0f, 1.0f, 0.7f }); // default white
 		if (col->GetAttribute() == CollisionAttribute::Player)
@@ -858,8 +874,6 @@ void CollisionManager::DrawDebug(Camera* camera)
 		{
 			colColor = ImGui::ColorConvertFloat4ToU32({ 1.0f, 0.8f, 0.0f, 0.8f }); // Yellow
 		}
-
-		Vector3 worldPos = col->GetWorldPosition();
 
 		if (col->GetType() == ColliderType::Sphere)
 		{
