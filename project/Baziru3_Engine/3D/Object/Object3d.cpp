@@ -256,10 +256,6 @@ void Object3d::Update()
 		}
 	}
 
-	if (isCulled_)
-	{
-		return; // Culled! Bypassing all C++ CPU logic for off-screen characters
-	}
 
 	// ステップ1: アニメーション時間を進める
 	// ステップ2: 骨ごとのLocal情報を更新する
