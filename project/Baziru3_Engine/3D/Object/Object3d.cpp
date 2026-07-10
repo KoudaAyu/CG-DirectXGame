@@ -245,7 +245,28 @@ void Object3d::Update()
 		}
 	}
 
-	Matrix4x4 worldMatrix = MakeAffineMatrix(transform.GetScale(), transform.GetRotate(), transform.GetTranslate());
+	Matrix4x4 worldMatrix;
+	const Vector3& scale = transform.GetScale();
+	const Vector3& rotate = transform.GetRotate();
+	const Vector3& translate = transform.GetTranslate();
+
+	// Specialized fast Y-rotation matrix constructor for grid crowd
+	if (rotate.x == 0.0f && rotate.z == 0.0f &&
+		scale.x == 1.0f && scale.y == 1.0f && scale.z == 1.0f)
+	{
+		float y = rotate.y;
+		float sinY = std::sin(y);
+		float cosY = std::cos(y);
+
+		worldMatrix.m[0][0] = cosY;  worldMatrix.m[0][1] = 0.0f; worldMatrix.m[0][2] = -sinY; worldMatrix.m[0][3] = 0.0f;
+		worldMatrix.m[1][0] = 0.0f;  worldMatrix.m[1][1] = 1.0f; worldMatrix.m[1][2] = 0.0f;  worldMatrix.m[1][3] = 0.0f;
+		worldMatrix.m[2][0] = sinY;  worldMatrix.m[2][1] = 0.0f; worldMatrix.m[2][2] = cosY;  worldMatrix.m[2][3] = 0.0f;
+		worldMatrix.m[3][0] = translate.x;   worldMatrix.m[3][1] = translate.y;  worldMatrix.m[3][2] = translate.z;   worldMatrix.m[3][3] = 1.0f;
+	}
+	else
+	{
+		worldMatrix = MakeAffineMatrix(scale, rotate, translate);
+	}
 
 	Matrix4x4 viewMatrix;
 	Matrix4x4 projectionMatrix;
@@ -267,8 +288,19 @@ void Object3d::Update()
 	// WVP を更新
 	transformationMatrixData_.WVP = Multiply(worldMatrix, Multiply(viewMatrix, projectionMatrix));
 	transformationMatrixData_.World = worldMatrix;
-	// WorldInverseTranspose を計算して格納（法線変換用）
-	transformationMatrixData_.WorldInverseTranspose = Transpose(Inverse(worldMatrix));
+
+	// Highly optimized WorldInverseTranspose calculation for objects with scale of 1
+	if (scale.x == 1.0f && scale.y == 1.0f && scale.z == 1.0f)
+	{
+		transformationMatrixData_.WorldInverseTranspose = worldMatrix;
+		transformationMatrixData_.WorldInverseTranspose.m[3][0] = 0.0f;
+		transformationMatrixData_.WorldInverseTranspose.m[3][1] = 0.0f;
+		transformationMatrixData_.WorldInverseTranspose.m[3][2] = 0.0f;
+	}
+	else
+	{
+		transformationMatrixData_.WorldInverseTranspose = Transpose(Inverse(worldMatrix));
+	}
 }
 
 void Object3d::Draw(ID3D12GraphicsCommandList* commandList)
