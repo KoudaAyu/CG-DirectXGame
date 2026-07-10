@@ -810,7 +810,11 @@ void CollisionManager::DrawDebug(Camera* camera)
 	// ImGui Debug Window to verify execution and states
 	ImGui::Begin("Collision Debug Overlay Settings");
 	ImGui::Checkbox("Show Debug Wireframes (F1 Toggle)", &showDebugColliders);
-	ImGui::Checkbox("Show Hit-Area Mesh Scan (Wireframe)", &showMeshWireframe_);
+	ImGui::Checkbox("Show Precise Mesh Wireframe", &showMeshWireframe_);
+	if (showMeshWireframe_)
+	{
+		ImGui::SliderInt("Wireframe Density (Lower=Denser)", &wireframeStep_, 3, 30);
+	}
 	ImGui::Text("Active Spheres: %zu", Sphere::GetInstances().size());
 	ImGui::Text("Active Object3ds: %zu", Object3d::GetInstances().size());
 	ImGui::Text("Camera: %s", camera ? "Valid" : "Null");
@@ -1055,48 +1059,31 @@ void CollisionManager::DrawDebug(Camera* camera)
 				const auto& skinnedPositions = meshCollider->GetSkinnedPositions();
 				const auto& modelData = obj->GetModelData();
 
-				// 1. Draw actual skinned mesh wireframe near the hit point (Local Scan Effect) if enabled
-				if (showMeshWireframe_ && lastRaycast_.hit && lastRaycast_.hitMesh && !skinnedPositions.empty() && !modelData.indices.empty())
+				// 1. Draw actual skinned mesh wireframe (with dynamically configurable density) if enabled
+				if (showMeshWireframe_ && !skinnedPositions.empty() && !modelData.indices.empty())
 				{
-					Matrix4x4 invWorld = Inverse(world);
-					Vector3 localHitPoint = {
-						lastRaycast_.hitPoint.x * invWorld.m[0][0] + lastRaycast_.hitPoint.y * invWorld.m[1][0] + lastRaycast_.hitPoint.z * invWorld.m[2][0] + invWorld.m[3][0],
-						lastRaycast_.hitPoint.x * invWorld.m[0][1] + lastRaycast_.hitPoint.y * invWorld.m[1][1] + lastRaycast_.hitPoint.z * invWorld.m[2][1] + invWorld.m[3][1],
-						lastRaycast_.hitPoint.x * invWorld.m[0][2] + lastRaycast_.hitPoint.y * invWorld.m[1][2] + lastRaycast_.hitPoint.z * invWorld.m[2][2] + invWorld.m[3][2]
-					};
-
-					float scanRadius = 0.5f; // Local space scan radius
-					float scanRadiusSq = scanRadius * scanRadius;
-
 					std::vector<ImVec2> projectedPts;
 					projectedPts.resize(skinnedPositions.size());
 					std::vector<bool> projectedValid;
 					projectedValid.resize(skinnedPositions.size());
 
-					// Only project vertices that are close to the hit point
 					for (size_t i = 0; i < skinnedPositions.size(); ++i)
 					{
 						const auto& pt = skinnedPositions[i];
-						float dx = pt.x - localHitPoint.x;
-						float dy = pt.y - localHitPoint.y;
-						float dz = pt.z - localHitPoint.z;
-						if (dx * dx + dy * dy + dz * dz <= scanRadiusSq)
-						{
-							Vector3 worldPt = {
-								pt.x * world.m[0][0] + pt.y * world.m[1][0] + pt.z * world.m[2][0] + world.m[3][0],
-								pt.x * world.m[0][1] + pt.y * world.m[1][1] + pt.z * world.m[2][1] + world.m[3][1],
-								pt.x * world.m[0][2] + pt.y * world.m[1][2] + pt.z * world.m[2][2] + world.m[3][2]
-							};
-							projectedValid[i] = project3DTo2D(worldPt, projectedPts[i]);
-						}
-						else
-						{
-							projectedValid[i] = false;
-						}
+						Vector3 worldPt = {
+							pt.x * world.m[0][0] + pt.y * world.m[1][0] + pt.z * world.m[2][0] + world.m[3][0],
+							pt.x * world.m[0][1] + pt.y * world.m[1][1] + pt.z * world.m[2][1] + world.m[3][1],
+							pt.x * world.m[0][2] + pt.y * world.m[1][2] + pt.z * world.m[2][2] + world.m[3][2]
+						};
+						projectedValid[i] = project3DTo2D(worldPt, projectedPts[i]);
 					}
 
-					ImU32 wireColor = ImGui::ColorConvertFloat4ToU32({ 0.0f, 1.0f, 0.5f, 0.6f }); // Glowing green wireframe
-					for (size_t i = 0; i < modelData.indices.size(); i += 3)
+					ImU32 wireColor = ImGui::ColorConvertFloat4ToU32({ 0.0f, 1.0f, 0.5f, 0.35f }); // Green wireframe
+					
+					// Clamp step to avoid division by zero or negative bounds
+					int step = (std::max)(3, wireframeStep_);
+
+					for (size_t i = 0; i < modelData.indices.size(); i += step)
 					{
 						uint32_t idx0 = modelData.indices[i];
 						uint32_t idx1 = modelData.indices[i + 1];
@@ -1104,31 +1091,12 @@ void CollisionManager::DrawDebug(Camera* camera)
 
 						if (idx0 < projectedPts.size() && idx1 < projectedPts.size() && idx2 < projectedPts.size())
 						{
-							if (projectedValid[idx0] || projectedValid[idx1] || projectedValid[idx2])
-							{
-								auto ensureProjected = [&](uint32_t idx) {
-									if (!projectedValid[idx])
-									{
-										const auto& pt = skinnedPositions[idx];
-										Vector3 worldPt = {
-											pt.x * world.m[0][0] + pt.y * world.m[1][0] + pt.z * world.m[2][0] + world.m[3][0],
-											pt.x * world.m[0][1] + pt.y * world.m[1][1] + pt.z * world.m[2][1] + world.m[3][1],
-											pt.x * world.m[0][2] + pt.y * world.m[1][2] + pt.z * world.m[2][2] + world.m[3][2]
-										};
-										projectedValid[idx] = project3DTo2D(worldPt, projectedPts[idx]);
-									}
-								};
-								ensureProjected(idx0);
-								ensureProjected(idx1);
-								ensureProjected(idx2);
-
-								if (projectedValid[idx0] && projectedValid[idx1])
-									drawList->AddLine(projectedPts[idx0], projectedPts[idx1], wireColor, 1.2f);
-								if (projectedValid[idx1] && projectedValid[idx2])
-									drawList->AddLine(projectedPts[idx1], projectedPts[idx2], wireColor, 1.2f);
-								if (projectedValid[idx2] && projectedValid[idx0])
-									drawList->AddLine(projectedPts[idx2], projectedPts[idx0], wireColor, 1.2f);
-							}
+							if (projectedValid[idx0] && projectedValid[idx1])
+								drawList->AddLine(projectedPts[idx0], projectedPts[idx1], wireColor, 1.0f);
+							if (projectedValid[idx1] && projectedValid[idx2])
+								drawList->AddLine(projectedPts[idx1], projectedPts[idx2], wireColor, 1.0f);
+							if (projectedValid[idx2] && projectedValid[idx0])
+								drawList->AddLine(projectedPts[idx2], projectedPts[idx0], wireColor, 1.0f);
 						}
 					}
 				}

@@ -107,6 +107,8 @@ public:
     uint32_t GetFrameCount() const { return frameCount_; }
     bool IsShowMeshWireframe() const { return showMeshWireframe_; }
     void SetShowMeshWireframe(bool show) { showMeshWireframe_ = show; }
+    int GetWireframeStep() const { return wireframeStep_; }
+    void SetWireframeStep(int step) { wireframeStep_ = step; }
 
 private:
     CollisionManager() = default;
@@ -130,6 +132,7 @@ private:
     std::vector<Collider*> colliders_; // 登録された全アクティブコライダーのリスト (生ポインタ参照)
     uint32_t frameCount_ = 0;
     bool showMeshWireframe_ = true; // デフォルトで有効（ちびキャラの精密さを確認するため）
+    int wireframeStep_ = 15; // ワイヤーフレームの間引きステップ数 (デフォルト15で超高速描画)
 
     // 空間ハッシュ用ユーティリティ
     static int32_t CalculateGridIndex(float pos) {
