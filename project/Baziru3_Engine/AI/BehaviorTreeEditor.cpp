@@ -332,7 +332,10 @@ void BehaviorTreeEditor::Draw() {
 
     // 🎨 [左側] ノードエディタキャンバスの描画
     ed::SetCurrentEditor(editorContext_);
-    ed::Begin("MyNodeEditor", ImVec2(0.0f, 0.0f));
+    ImVec2 canvasSize = ImGui::GetContentRegionAvail();
+    if (canvasSize.x < 100.0f) canvasSize.x = 100.0f;
+    if (canvasSize.y < 100.0f) canvasSize.y = 100.0f;
+    ed::Begin("MyNodeEditor", canvasSize);
 
     // A. ノードの描画
     for (auto& node : nodes_) {
