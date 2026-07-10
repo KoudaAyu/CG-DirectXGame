@@ -1,5 +1,6 @@
 #include "Object3dCom.h"
 #include "Baziru3_Engine/Base/Pipeline/PipelineStateManager.h"
+#include "Baziru3_Engine/Collision/CollisionManager.h"
 #include "SceneManager.h"
 #include "TextureManager.h"
 #include "Light.h"
@@ -76,11 +77,22 @@ void Object3dCom::Draw(Object3d* object, const RenderContext& ctx, const Object3
     {
         Logger::Log(logStream, "Warning: camera GPU resource not available when drawing object. Skipping draw.\n");
         return;
-    }
+	}
 
 	if (object)
 	{
 		object->Draw(ctx.commandList);
+
+		// GPU-accelerated wireframe overlay draw (if enabled in Collision Debug panel)
+		if (CollisionManager::GetInstance()->IsShowDebugColliders() && CollisionManager::GetInstance()->IsShowMeshWireframe())
+		{
+			auto wireframePSO = GetWireframePipelineState();
+			if (wireframePSO)
+			{
+				ctx.commandList->SetPipelineState(wireframePSO.Get());
+				object->Draw(ctx.commandList);
+			}
+		}
 	}
 }
 
@@ -102,4 +114,9 @@ const Microsoft::WRL::ComPtr<ID3D12PipelineState>& Object3dCom::GetEffectPipelin
 const Microsoft::WRL::ComPtr<ID3D12PipelineState>& Object3dCom::GetOverlayPipelineState() const
 {
 	return PipelineStateManager::GetInstance()->GetPipelineState("Object3D_Overlay");
+}
+
+const Microsoft::WRL::ComPtr<ID3D12PipelineState>& Object3dCom::GetWireframePipelineState() const
+{
+	return PipelineStateManager::GetInstance()->GetPipelineState("Object3D_Wireframe");
 }

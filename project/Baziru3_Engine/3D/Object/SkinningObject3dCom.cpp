@@ -2,6 +2,7 @@
 #include "Light.h"
 #include "SceneManager.h"
 #include "TextureManager.h"
+#include "Baziru3_Engine/Collision/CollisionManager.h"
 
 // 参照メンバー logStream を初期化するコンストラクタ定義
 SkinningObject3dCom::SkinningObject3dCom(std::ostream& logStream)
@@ -47,6 +48,15 @@ void SkinningObject3dCom::CreateGraphicsPipelineState()
         if (pipelineState == nullptr)
         {
             dxCommon->SetHr(dxCommon->GetDevice()->CreateGraphicsPipelineState(&desc, IID_PPV_ARGS(&pipelineState)));
+            assert(SUCCEEDED(dxCommon->GetHr()));
+        }
+        if (pipelineStateWireframe == nullptr)
+        {
+            auto descWire = desc;
+            descWire.RasterizerState.FillMode = D3D12_FILL_MODE_WIREFRAME;
+            descWire.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO; // 防止Z-fighting
+            descWire.PS = { wireframePixelShaderBlob->GetBufferPointer(), wireframePixelShaderBlob->GetBufferSize() };
+            dxCommon->SetHr(dxCommon->GetDevice()->CreateGraphicsPipelineState(&descWire, IID_PPV_ARGS(&pipelineStateWireframe)));
             assert(SUCCEEDED(dxCommon->GetHr()));
         }
     }
@@ -172,6 +182,23 @@ void SkinningObject3dCom::Draw(Object3d* object, const ::RenderContext& ctx, con
     else
     {
         ctx.commandList->DrawInstanced(static_cast<UINT>(modelData.vertices.size()), 1, 0, 0);
+    }
+
+    // GPU-accelerated wireframe overlay draw (if enabled in Collision Debug panel)
+    if (CollisionManager::GetInstance()->IsShowDebugColliders() && CollisionManager::GetInstance()->IsShowMeshWireframe())
+    {
+        if (pipelineStateWireframe)
+        {
+            ctx.commandList->SetPipelineState(pipelineStateWireframe.Get());
+            if (object->HasIndexBuffer())
+            {
+                ctx.commandList->DrawIndexedInstanced(static_cast<UINT>(modelData.indices.size()), 1, 0, 0, 0);
+            }
+            else
+            {
+                ctx.commandList->DrawInstanced(static_cast<UINT>(modelData.vertices.size()), 1, 0, 0);
+            }
+        }
     }
 
     // 4. 描画終了後にCOMMON状態に戻す
@@ -375,6 +402,10 @@ void SkinningObject3dCom::ShaderCompile()
     pixelShaderBlob = dxCommon->CompileShader(L"Resources/shaders/Object3d.PS.hlsl",
         L"ps_6_0", dxCommon->GetDxcUtils().Get(), dxCommon->GetDxcCompiler(), dxCommon->GetIncludeHandler(), logStream);
     assert(pixelShaderBlob != nullptr);
+
+    wireframePixelShaderBlob = dxCommon->CompileShader(L"Resources/shaders/DebugWireframe.PS.hlsl",
+        L"ps_6_0", dxCommon->GetDxcUtils().Get(), dxCommon->GetDxcCompiler(), dxCommon->GetIncludeHandler(), logStream);
+    assert(wireframePixelShaderBlob != nullptr);
 }
 
 void SkinningObject3dCom::InitializeGraphicPipeline()
