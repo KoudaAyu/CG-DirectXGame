@@ -14,13 +14,12 @@ public:
         {
             // Build AABB Tree from model data vertices and indices
             const auto& modelData = object3d_->GetModelData();
-            std::vector<Vector3> positions;
-            positions.reserve(modelData.vertices.size());
+            skinnedPositions_.reserve(modelData.vertices.size());
             for (const auto& v : modelData.vertices)
             {
-                positions.push_back({ v.position.x, v.position.y, v.position.z });
+                skinnedPositions_.push_back({ v.position.x, v.position.y, v.position.z });
             }
-            aabbTree_.Build(positions, modelData.indices);
+            aabbTree_.Build(skinnedPositions_, modelData.indices);
         }
     }
 
@@ -41,6 +40,7 @@ public:
 
     Object3d* GetObject3d() const { return object3d_; }
     const BaziruEngine::Collision::AABBTree& GetAABBTree() const { return aabbTree_; }
+    const std::vector<Vector3>& GetSkinnedPositions() const { return skinnedPositions_; }
 
     void Update()
     {
@@ -51,8 +51,8 @@ public:
 
         if (skinCluster.mappedInfluence.empty() || skinCluster.mappedPalette.empty()) return;
 
-        std::vector<Vector3> skinnedPositions;
-        skinnedPositions.resize(modelData.vertices.size());
+        skinnedPositions_.clear();
+        skinnedPositions_.resize(modelData.vertices.size());
 
         for (size_t i = 0; i < modelData.vertices.size(); ++i)
         {
@@ -85,18 +85,19 @@ public:
 
             if (!processed)
             {
-                skinnedPositions[i] = { v.position.x, v.position.y, v.position.z };
+                skinnedPositions_[i] = { v.position.x, v.position.y, v.position.z };
             }
             else
             {
-                skinnedPositions[i] = skinnedPos;
+                skinnedPositions_[i] = skinnedPos;
             }
         }
 
-        aabbTree_.Build(skinnedPositions, modelData.indices);
+        aabbTree_.Build(skinnedPositions_, modelData.indices);
     }
 
 private:
     Object3d* object3d_ = nullptr;
     BaziruEngine::Collision::AABBTree aabbTree_;
+    std::vector<Vector3> skinnedPositions_;
 };

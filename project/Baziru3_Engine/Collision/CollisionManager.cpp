@@ -1054,11 +1054,51 @@ void CollisionManager::DrawDebug(Camera* camera)
 			if (meshCollider && meshCollider->GetObject3d())
 			{
 				Object3d* obj = meshCollider->GetObject3d();
-				
+				const auto& skinnedPositions = meshCollider->GetSkinnedPositions();
+				const auto& modelData = obj->GetModelData();
+				Matrix4x4 world = obj->GetWorldMatrix();
+
+				// 1. Draw actual skinned mesh wireframe (extremely precise)
+				if (!skinnedPositions.empty() && !modelData.indices.empty())
+				{
+					std::vector<ImVec2> projectedPts;
+					projectedPts.resize(skinnedPositions.size());
+					std::vector<bool> projectedValid;
+					projectedValid.resize(skinnedPositions.size());
+
+					for (size_t i = 0; i < skinnedPositions.size(); ++i)
+					{
+						const auto& pt = skinnedPositions[i];
+						Vector3 worldPt = {
+							pt.x * world.m[0][0] + pt.y * world.m[1][0] + pt.z * world.m[2][0] + world.m[3][0],
+							pt.x * world.m[0][1] + pt.y * world.m[1][1] + pt.z * world.m[2][1] + world.m[3][1],
+							pt.x * world.m[0][2] + pt.y * world.m[1][2] + pt.z * world.m[2][2] + world.m[3][2]
+						};
+						projectedValid[i] = project3DTo2D(worldPt, projectedPts[i]);
+					}
+
+					ImU32 wireColor = ImGui::ColorConvertFloat4ToU32({ 0.0f, 1.0f, 0.5f, 0.35f }); // Green wireframe
+					for (size_t i = 0; i < modelData.indices.size(); i += 3)
+					{
+						uint32_t idx0 = modelData.indices[i];
+						uint32_t idx1 = modelData.indices[i + 1];
+						uint32_t idx2 = modelData.indices[i + 2];
+
+						if (idx0 < projectedPts.size() && idx1 < projectedPts.size() && idx2 < projectedPts.size())
+						{
+							if (projectedValid[idx0] && projectedValid[idx1])
+								drawList->AddLine(projectedPts[idx0], projectedPts[idx1], wireColor, 1.0f);
+							if (projectedValid[idx1] && projectedValid[idx2])
+								drawList->AddLine(projectedPts[idx1], projectedPts[idx2], wireColor, 1.0f);
+							if (projectedValid[idx2] && projectedValid[idx0])
+								drawList->AddLine(projectedPts[idx2], projectedPts[idx0], wireColor, 1.0f);
+						}
+					}
+				}
+
+				// 2. Draw hierarchical AABB tree bounds (Depth 3)
 				std::vector<std::pair<Vector3, Vector3>> boundsList;
 				meshCollider->GetAABBTree().GetNodesAtDepth(3, boundsList);
-
-				Matrix4x4 world = obj->GetWorldMatrix();
 
 				for (const auto& bounds : boundsList)
 				{
@@ -1094,7 +1134,7 @@ void CollisionManager::DrawDebug(Camera* camera)
 						projected[i] = project3DTo2D(worldCorners[i], screenCorners[i]);
 					}
 
-					ImU32 hierarchyColor = ImGui::ColorConvertFloat4ToU32({ 0.0f, 1.0f, 0.5f, 0.4f }); // Semi-transparent green
+					ImU32 hierarchyColor = ImGui::ColorConvertFloat4ToU32({ 0.0f, 1.0f, 0.5f, 0.25f }); // Semi-transparent green for boxes
 					if (projected[0] && projected[1] && projected[2] && projected[3])
 					{
 						ImVec2 pts[5] = { screenCorners[0], screenCorners[1], screenCorners[2], screenCorners[3], screenCorners[0] };
