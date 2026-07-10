@@ -970,7 +970,7 @@ void CollisionManager::DrawDebug(Camera* camera)
 		if (!obj || !obj->WasDrawnLastFrame()) continue;
 		Vector3 worldPos = obj->GetTranslate();
 
-		// If skeleton joints are present, draw as a Capsule that dynamically wraps all active joint world coordinates!
+		// If skeleton joints are present, draw as a Box wrapping all joint world coordinates!
 		if (!obj->GetSkeleton().joints.empty())
 		{
 			const auto& skeleton = obj->GetSkeleton();
@@ -993,55 +993,44 @@ void CollisionManager::DrawDebug(Camera* camera)
 
 			if (minX < maxX && minY < maxY && minZ < maxZ)
 			{
-				Vector3 center = { (minX + maxX) * 0.5f, (minY + maxY) * 0.5f, (minZ + maxZ) * 0.5f };
-				float height = (maxY - minY);
-				float widthX = (maxX - minX);
-				float widthZ = (maxZ - minZ);
-				float radius = (std::max)(widthX, widthZ) * 0.5f;
-
-				// Adjust capsule height (cannot be smaller than radius)
-				float halfHeight = (std::max)(0.0f, height * 0.5f - radius);
-				Vector3 bottomCenter = { center.x, center.y - halfHeight, center.z };
-				Vector3 topCenter = { center.x, center.y + halfHeight, center.z };
-
-				// Draw bottom circle
-				const int numSegments = 16;
-				std::vector<ImVec2> ptsBottom;
-				std::vector<ImVec2> ptsTop;
-				for (int i = 0; i <= numSegments; ++i)
-				{
-					float angle = i * (6.2831853f / numSegments);
-					Vector3 pBottom = {
-						bottomCenter.x + std::cos(angle) * radius,
-						bottomCenter.y,
-						bottomCenter.z + std::sin(angle) * radius
-					};
-					Vector3 pTop = {
-						topCenter.x + std::cos(angle) * radius,
-						topCenter.y,
-						topCenter.z + std::sin(angle) * radius
-					};
-
-					ImVec2 pB2D, pT2D;
-					if (project3DTo2D(pBottom, pB2D)) ptsBottom.push_back(pB2D);
-					if (project3DTo2D(pTop, pT2D)) ptsTop.push_back(pT2D);
-				}
-				if (ptsBottom.size() > 1) drawList->AddPolyline(ptsBottom.data(), (int)ptsBottom.size(), objVisualColor, false, 2.0f);
-				if (ptsTop.size() > 1) drawList->AddPolyline(ptsTop.data(), (int)ptsTop.size(), objVisualColor, false, 2.0f);
-
-				// Draw vertical side lines
-				Vector3 sides[4] = {
-					{  radius, 0.0f, 0.0f },
-					{ -radius, 0.0f, 0.0f },
-					{ 0.0f, 0.0f,  radius },
-					{ 0.0f, 0.0f, -radius }
+				// 8 world corner coordinates
+				Vector3 worldCorners[8] = {
+					{ minX, minY, minZ },
+					{ maxX, minY, minZ },
+					{ maxX, minY, maxZ },
+					{ minX, minY, maxZ },
+					{ minX, maxY, minZ },
+					{ maxX, maxY, minZ },
+					{ maxX, maxY, maxZ },
+					{ minX, maxY, maxZ }
 				};
+
+				// Project to 2D
+				ImVec2 screenCorners[8];
+				bool projected[8];
+				for (int i = 0; i < 8; ++i)
+				{
+					projected[i] = project3DTo2D(worldCorners[i], screenCorners[i]);
+				}
+
+				// Draw bottom face
+				if (projected[0] && projected[1] && projected[2] && projected[3])
+				{
+					ImVec2 pts[5] = { screenCorners[0], screenCorners[1], screenCorners[2], screenCorners[3], screenCorners[0] };
+					drawList->AddPolyline(pts, 5, objVisualColor, false, 2.0f);
+				}
+				// Draw top face
+				if (projected[4] && projected[5] && projected[6] && projected[7])
+				{
+					ImVec2 pts[5] = { screenCorners[4], screenCorners[5], screenCorners[6], screenCorners[7], screenCorners[4] };
+					drawList->AddPolyline(pts, 5, objVisualColor, false, 2.0f);
+				}
+				// Draw vertical edges
 				for (int i = 0; i < 4; ++i)
 				{
-					ImVec2 pB2D, pT2D;
-					if (project3DTo2D(bottomCenter + sides[i], pB2D) && project3DTo2D(topCenter + sides[i], pT2D))
+					if (projected[i] && projected[i + 4])
 					{
-						drawList->AddLine(pB2D, pT2D, objVisualColor, 2.0f);
+						drawList->AddLine(screenCorners[i], screenCorners[i + 4], objVisualColor, 2.0f);
 					}
 				}
 			}
