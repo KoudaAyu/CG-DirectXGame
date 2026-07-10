@@ -347,6 +347,42 @@ void Object3d::Draw(Object3dCom* object3dCom, SkinningObject3dCom* skinningObjec
 	ctx.light = SceneManager::GetInstance()->GetLight();
 	ctx.materialGPUAddress = 0;
 
+	// View Frustum Culling optimization to skip rendering of off-screen objects
+	if (ctx.camera)
+	{
+		const Vector3& scale = transform.GetScale();
+		if (scale.x <= 10.0f && scale.y <= 10.0f && scale.z <= 10.0f)
+		{
+			const Matrix4x4& vp = ctx.camera->GetViewProjectionMatrix();
+			const Vector3& pos = transform.GetTranslate();
+			float radius = 2.0f;
+
+			float x = pos.x * vp.m[0][0] + pos.y * vp.m[1][0] + pos.z * vp.m[2][0] + vp.m[3][0];
+			float y = pos.x * vp.m[0][1] + pos.y * vp.m[1][1] + pos.z * vp.m[2][1] + vp.m[3][1];
+			float z = pos.x * vp.m[0][2] + pos.y * vp.m[1][2] + pos.z * vp.m[2][2] + vp.m[3][2];
+			float w = pos.x * vp.m[0][3] + pos.y * vp.m[1][3] + pos.z * vp.m[2][3] + vp.m[3][3];
+
+			if (w > 0.0f)
+			{
+				float clipX = x / w;
+				float clipY = y / w;
+				float clipZ = z / w;
+				float margin = radius / w;
+
+				if (clipX < -1.0f - margin || clipX > 1.0f + margin ||
+					clipY < -1.0f - margin || clipY > 1.0f + margin ||
+					clipZ < 0.0f - margin || clipZ > 1.0f + margin)
+				{
+					return; // Culled! Skip drawing entirely!
+				}
+			}
+			else
+			{
+				return; // Behind camera!
+			}
+		}
+	}
+
 	// テクスチャ解決
 	const auto& modelData = GetModelData();
 	if (modelData.material.textureIndex != TextureManager::kInvalidTextureIndex)
