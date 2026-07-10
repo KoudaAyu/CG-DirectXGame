@@ -37,6 +37,15 @@ void MeshCollider::Update()
     // Frame-level caching to prevent double-updates
     uint32_t currentFrame = CollisionManager::GetInstance()->GetFrameCount();
     if (lastUpdatedFrame_ == currentFrame) return;
+
+    // Update rate throttling (Temporal sub-sampling):
+    // Update animated collision geometry once every 2 frames (30Hz) to cut CPU load in half.
+    // Stagger the updates based on the collider's unique pointer address to distribute the workload evenly across frames!
+    // Since world-matrix translation/rotation is evaluated every frame, character movement remains 100% real-time.
+    if ((currentFrame + (reinterpret_cast<uintptr_t>(this) >> 4)) % 2 != 0)
+    {
+        return;
+    }
     lastUpdatedFrame_ = currentFrame;
 
     const auto& modelData = object3d_->GetModelData();
@@ -62,6 +71,7 @@ void MeshCollider::Update()
         const VertexInfluence& influence = influences[i];
         Vector3 skinnedPos = { 0.0f, 0.0f, 0.0f };
         bool processed = false;
+        float weightSum = 0.0f;
 
         for (int j = 0; j < 4; ++j)
         {
@@ -81,6 +91,13 @@ void MeshCollider::Update()
                     skinnedPos.y += vTransformed.y * w;
                     skinnedPos.z += vTransformed.z * w;
                     processed = true;
+
+                    // Optimization: Break out early if weights have summed to 1.0 (avoids unnecessary iterations)
+                    weightSum += w;
+                    if (weightSum >= 0.999f)
+                    {
+                        break;
+                    }
                 }
             }
         }
