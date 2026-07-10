@@ -104,6 +104,8 @@ public:
     static bool CheckRayMesh(const Vector3& rayStart, const Vector3& rayDir, float maxDist, const CollisionData& meshData, float& outDist);
     static bool CheckRaySkeleton(const Vector3& rayStart, const Vector3& rayDir, float maxDist, const CollisionData& skeletonData, float& outDist);
 
+    uint32_t GetFrameCount() const { return frameCount_; }
+
 private:
     CollisionManager() = default;
     ~CollisionManager() = default;
@@ -124,6 +126,7 @@ private:
 
 private:
     std::vector<Collider*> colliders_; // 登録された全アクティブコライダーのリスト (生ポインタ参照)
+    uint32_t frameCount_ = 0;
 
     // 空間ハッシュ用ユーティリティ
     static int32_t CalculateGridIndex(float pos) {

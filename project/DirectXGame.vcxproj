@@ -82,6 +82,7 @@
     <ClCompile Include="Application\Subsystem\SubsystemFactory.cpp" />
     <ClCompile Include="Baziru3_Engine\Collision\CollisionManager.cpp" />
     <ClCompile Include="Baziru3_Engine\Collision\AABBTree.cpp" />
+    <ClCompile Include="Baziru3_Engine\Collision\MeshCollider.cpp" />
     <ClCompile Include="Baziru3_Engine\Graphics\GpuProfiler.cpp" />
     <ClCompile Include="Baziru3_Engine\AI\BehaviorNode.cpp" />
     <ClCompile Include="Baziru3_Engine\AI\BehaviorNodeFactory.cpp" />
