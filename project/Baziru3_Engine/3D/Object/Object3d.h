@@ -128,6 +128,13 @@ public:
 	const Vector3& GetScale() const { return transform.GetScale(); }
 	const ModelData& GetModelData() const { return modelData_; }
 
+	void MarkDrawn() { isDrawnThisFrame_ = true; }
+	bool WasDrawnLastFrame() const { return wasDrawnLastFrame_; }
+	void ResetFrameDrawFlags() {
+		wasDrawnLastFrame_ = isDrawnThisFrame_;
+		isDrawnThisFrame_ = false;
+	}
+
 	void SetEnableLighting(bool enable);
 	void SetColor(const Vector4& color);
 	void SetReflectionFactor(float factor);
@@ -180,4 +187,6 @@ private:
 	bool skinClusterInitialized_ = false;
 	float deltaTime_ = 1.0f / 60.0f;
 	TextureManager* textureManager_ = nullptr;
+	bool isDrawnThisFrame_ = false;
+	bool wasDrawnLastFrame_ = false;
 };

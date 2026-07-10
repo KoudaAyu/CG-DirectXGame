@@ -240,6 +240,7 @@ void Object3d::Update()
 
 void Object3d::Draw(ID3D12GraphicsCommandList* commandList)
 {
+	MarkDrawn();
 	DirectXCom* dx = object3dCom_ ? object3dCom_->GetDirectXCom() : nullptr;
 	if (dx)
 	{
@@ -267,6 +268,7 @@ void Object3d::Draw(ID3D12GraphicsCommandList* commandList)
 
 void Object3d::Draw(Object3dCom* object3dCom, SkinningObject3dCom* skinningObject3dCom)
 {
+	MarkDrawn();
 	Object3dCom* com = object3dCom ? object3dCom : object3dCom_;
 	if (!com) return;
 	DirectXCom* dx = com->GetDirectXCom();

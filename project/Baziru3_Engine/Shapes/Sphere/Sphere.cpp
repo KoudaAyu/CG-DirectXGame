@@ -172,6 +172,7 @@ void Sphere::Update()
 
 void Sphere::Draw(D3D12_GPU_DESCRIPTOR_HANDLE textureSrvHandle)
 {
+	MarkDrawn();
 
 	if (!directXCom_ || !object3dCom_ || !materialManager_ || !light_)
 	{

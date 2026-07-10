@@ -36,8 +36,17 @@ public:
 	TransformationMatrix* GetTransformationMatrixDataSphere() const { return transformationMatrixDataSphere; }
 	Microsoft::WRL::ComPtr<ID3D12Resource> GetTransformationMatrixResourceSphere() const { return transformationMatrixResourceSphere; }
 	void SetTransform(const Sprite::Transform& transform) { this->transform = transform; }
- void SetOverlayDraw(bool enabled) { overlayDraw_ = enabled; }
+	void SetOverlayDraw(bool enabled) { overlayDraw_ = enabled; }
+	bool IsOverlayDraw() const { return overlayDraw_; }
 	Sprite::Transform& GetTransform() { return transform; }
+
+	void MarkDrawn() { isDrawnThisFrame_ = true; }
+	bool WasDrawnLastFrame() const { return wasDrawnLastFrame_; }
+	void ResetFrameDrawFlags() {
+		wasDrawnLastFrame_ = isDrawnThisFrame_;
+		isDrawnThisFrame_ = false;
+	}
+
 private:
 	DirectXCom* directXCom_ = nullptr;
 	Object3dCom* object3dCom_ = nullptr;
@@ -76,5 +85,7 @@ private:
 	Matrix4x4 viewMatrix;
 	Matrix4x4 WVPMatrix;
   bool overlayDraw_ = false;
+  bool isDrawnThisFrame_ = false;
+  bool wasDrawnLastFrame_ = false;
 };
 

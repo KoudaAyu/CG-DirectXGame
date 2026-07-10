@@ -915,7 +915,7 @@ void CollisionManager::DrawDebug(Camera* camera)
 	ImU32 sphereVisualColor = ImGui::ColorConvertFloat4ToU32({ 1.0f, 0.4f, 0.7f, 0.7f }); // Pink
 	for (Sphere* s : Sphere::GetInstances())
 	{
-		if (!s) continue;
+		if (!s || s->IsOverlayDraw() || !s->WasDrawnLastFrame()) continue;
 		Vector3 worldPos = s->GetTransform().translate;
 		float radius = 1.0f * s->GetTransform().scale.x;
 
@@ -967,139 +967,184 @@ void CollisionManager::DrawDebug(Camera* camera)
 	ImU32 objVisualColor = ImGui::ColorConvertFloat4ToU32({ 0.0f, 1.0f, 0.5f, 0.7f }); // Neon Green
 	for (Object3d* obj : Object3d::GetInstances())
 	{
-		if (!obj) continue;
+		if (!obj || !obj->WasDrawnLastFrame()) continue;
 		Vector3 worldPos = obj->GetTranslate();
 
-		// If skeleton joints are present, draw as a Capsule. Otherwise draw as a Box.
+		// If skeleton joints are present, draw as a Capsule that dynamically wraps all active joint world coordinates!
 		if (!obj->GetSkeleton().joints.empty())
 		{
-			// Capsule representation
-			float radius = 0.3f * obj->GetScale().x;
-			float height = 1.2f * obj->GetScale().y;
+			const auto& skeleton = obj->GetSkeleton();
+			Matrix4x4 modelWorldMatrix = MakeAffineMatrix(obj->GetScale(), obj->GetRotate(), obj->GetTranslate());
 
-			Vector3 bottomCenter = worldPos + Vector3{ 0.0f, radius, 0.0f };
-			Vector3 topCenter = worldPos + Vector3{ 0.0f, radius + height, 0.0f };
+			float minX = 1e9f, maxX = -1e9f;
+			float minY = 1e9f, maxY = -1e9f;
+			float minZ = 1e9f, maxZ = -1e9f;
 
-			// Draw bottom circle
-			const int numSegments = 16;
-			std::vector<ImVec2> ptsBottom;
-			std::vector<ImVec2> ptsTop;
-			for (int i = 0; i <= numSegments; ++i)
+			for (size_t jointIndex = 0; jointIndex < skeleton.joints.size(); ++jointIndex)
 			{
-				float angle = i * (6.2831853f / numSegments);
-				Vector3 pBottom = {
-					bottomCenter.x + std::cos(angle) * radius,
-					bottomCenter.y,
-					bottomCenter.z + std::sin(angle) * radius
-				};
-				Vector3 pTop = {
-					topCenter.x + std::cos(angle) * radius,
-					topCenter.y,
-					topCenter.z + std::sin(angle) * radius
-				};
-
-				ImVec2 pB2D, pT2D;
-				if (project3DTo2D(pBottom, pB2D)) ptsBottom.push_back(pB2D);
-				if (project3DTo2D(pTop, pT2D)) ptsTop.push_back(pT2D);
+				Vector3 pt = skeleton.GetJointWorldPosition(jointIndex, modelWorldMatrix);
+				if (pt.x < minX) minX = pt.x;
+				if (pt.x > maxX) maxX = pt.x;
+				if (pt.y < minY) minY = pt.y;
+				if (pt.y > maxY) maxY = pt.y;
+				if (pt.z < minZ) minZ = pt.z;
+				if (pt.z > maxZ) maxZ = pt.z;
 			}
-			if (ptsBottom.size() > 1) drawList->AddPolyline(ptsBottom.data(), (int)ptsBottom.size(), objVisualColor, false, 2.0f);
-			if (ptsTop.size() > 1) drawList->AddPolyline(ptsTop.data(), (int)ptsTop.size(), objVisualColor, false, 2.0f);
 
-			// Draw vertical side lines
-			Vector3 sides[4] = {
-				{  radius, 0.0f, 0.0f },
-				{ -radius, 0.0f, 0.0f },
-				{ 0.0f, 0.0f,  radius },
-				{ 0.0f, 0.0f, -radius }
-			};
-			for (int i = 0; i < 4; ++i)
+			if (minX < maxX && minY < maxY && minZ < maxZ)
 			{
-				ImVec2 pB2D, pT2D;
-				if (project3DTo2D(bottomCenter + sides[i], pB2D) && project3DTo2D(topCenter + sides[i], pT2D))
+				Vector3 center = { (minX + maxX) * 0.5f, (minY + maxY) * 0.5f, (minZ + maxZ) * 0.5f };
+				float height = (maxY - minY);
+				float widthX = (maxX - minX);
+				float widthZ = (maxZ - minZ);
+				float radius = (std::max)(widthX, widthZ) * 0.5f;
+
+				// Adjust capsule height (cannot be smaller than radius)
+				float halfHeight = (std::max)(0.0f, height * 0.5f - radius);
+				Vector3 bottomCenter = { center.x, center.y - halfHeight, center.z };
+				Vector3 topCenter = { center.x, center.y + halfHeight, center.z };
+
+				// Draw bottom circle
+				const int numSegments = 16;
+				std::vector<ImVec2> ptsBottom;
+				std::vector<ImVec2> ptsTop;
+				for (int i = 0; i <= numSegments; ++i)
 				{
-					drawList->AddLine(pB2D, pT2D, objVisualColor, 2.0f);
+					float angle = i * (6.2831853f / numSegments);
+					Vector3 pBottom = {
+						bottomCenter.x + std::cos(angle) * radius,
+						bottomCenter.y,
+						bottomCenter.z + std::sin(angle) * radius
+					};
+					Vector3 pTop = {
+						topCenter.x + std::cos(angle) * radius,
+						topCenter.y,
+						topCenter.z + std::sin(angle) * radius
+					};
+
+					ImVec2 pB2D, pT2D;
+					if (project3DTo2D(pBottom, pB2D)) ptsBottom.push_back(pB2D);
+					if (project3DTo2D(pTop, pT2D)) ptsTop.push_back(pT2D);
+				}
+				if (ptsBottom.size() > 1) drawList->AddPolyline(ptsBottom.data(), (int)ptsBottom.size(), objVisualColor, false, 2.0f);
+				if (ptsTop.size() > 1) drawList->AddPolyline(ptsTop.data(), (int)ptsTop.size(), objVisualColor, false, 2.0f);
+
+				// Draw vertical side lines
+				Vector3 sides[4] = {
+					{  radius, 0.0f, 0.0f },
+					{ -radius, 0.0f, 0.0f },
+					{ 0.0f, 0.0f,  radius },
+					{ 0.0f, 0.0f, -radius }
+				};
+				for (int i = 0; i < 4; ++i)
+				{
+					ImVec2 pB2D, pT2D;
+					if (project3DTo2D(bottomCenter + sides[i], pB2D) && project3DTo2D(topCenter + sides[i], pT2D))
+					{
+						drawList->AddLine(pB2D, pT2D, objVisualColor, 2.0f);
+					}
 				}
 			}
 		}
 		else
 		{
-			// Box representation
-			Vector3 ext = { 1.0f * obj->GetScale().x, 1.0f * obj->GetScale().y, 1.0f * obj->GetScale().z };
-			Vector3 rot = obj->GetRotate();
-
-			// 8 local corners
-			Vector3 localCorners[8] = {
-				{ -ext.x, -ext.y, -ext.z },
-				{  ext.x, -ext.y, -ext.z },
-				{  ext.x, -ext.y,  ext.z },
-				{ -ext.x, -ext.y,  ext.z },
-				{ -ext.x,  ext.y, -ext.z },
-				{  ext.x,  ext.y, -ext.z },
-				{  ext.x,  ext.y,  ext.z },
-				{ -ext.x,  ext.y,  ext.z }
-			};
-
-			// Rotate and translate to world space
-			Vector3 worldCorners[8];
-			for (int i = 0; i < 8; ++i)
+			// Box representation based on mesh vertices local bounding box
+			const auto& modelData = obj->GetModelData();
+			if (!modelData.vertices.empty())
 			{
-				// Rotate Euler Yaw-Pitch-Roll
-				// Pitch (X)
-				float cosX = std::cos(rot.x);
-				float sinX = std::sin(rot.x);
-				Vector3 pt1 = {
-					localCorners[i].x,
-					localCorners[i].y * cosX - localCorners[i].z * sinX,
-					localCorners[i].y * sinX + localCorners[i].z * cosX
-				};
-
-				// Yaw (Y)
-				float cosY = std::cos(rot.y);
-				float sinY = std::sin(rot.y);
-				Vector3 pt2 = {
-					pt1.x * cosY + pt1.z * sinY,
-					pt1.y,
-					-pt1.x * sinY + pt1.z * cosY
-				};
-
-				// Roll (Z)
-				float cosZ = std::cos(rot.z);
-				float sinZ = std::sin(rot.z);
-				Vector3 pt3 = {
-					pt2.x * cosZ - pt2.y * sinZ,
-					pt2.x * sinZ + pt2.y * cosZ,
-					pt2.z
-				};
-
-				worldCorners[i] = pt3 + worldPos;
-			}
-
-			// Project to 2D
-			ImVec2 screenCorners[8];
-			bool projected[8];
-			for (int i = 0; i < 8; ++i)
-			{
-				projected[i] = project3DTo2D(worldCorners[i], screenCorners[i]);
-			}
-
-			// Draw bottom face
-			if (projected[0] && projected[1] && projected[2] && projected[3])
-			{
-				ImVec2 pts[5] = { screenCorners[0], screenCorners[1], screenCorners[2], screenCorners[3], screenCorners[0] };
-				drawList->AddPolyline(pts, 5, objVisualColor, false, 2.0f);
-			}
-			// Draw top face
-			if (projected[4] && projected[5] && projected[6] && projected[7])
-			{
-				ImVec2 pts[5] = { screenCorners[4], screenCorners[5], screenCorners[6], screenCorners[7], screenCorners[4] };
-				drawList->AddPolyline(pts, 5, objVisualColor, false, 2.0f);
-			}
-			// Draw vertical edges
-			for (int i = 0; i < 4; ++i)
-			{
-				if (projected[i] && projected[i + 4])
+				float minX = 1e9f, maxX = -1e9f;
+				float minY = 1e9f, maxY = -1e9f;
+				float minZ = 1e9f, maxZ = -1e9f;
+				for (const auto& v : modelData.vertices)
 				{
-					drawList->AddLine(screenCorners[i], screenCorners[i + 4], objVisualColor, 2.0f);
+					if (v.position.x < minX) minX = v.position.x;
+					if (v.position.x > maxX) maxX = v.position.x;
+					if (v.position.y < minY) minY = v.position.y;
+					if (v.position.y > maxY) maxY = v.position.y;
+					if (v.position.z < minZ) minZ = v.position.z;
+					if (v.position.z > maxZ) maxZ = v.position.z;
+				}
+
+				if (minX < maxX && minY < maxY && minZ < maxZ)
+				{
+					Vector3 rot = obj->GetRotate();
+					Vector3 scale = obj->GetScale();
+
+					// 8 local corner coordinates
+					Vector3 localCorners[8] = {
+						{ minX * scale.x, minY * scale.y, minZ * scale.z },
+						{ maxX * scale.x, minY * scale.y, minZ * scale.z },
+						{ maxX * scale.x, minY * scale.y, maxZ * scale.z },
+						{ minX * scale.x, minY * scale.y, maxZ * scale.z },
+						{ minX * scale.x, maxY * scale.y, minZ * scale.z },
+						{ maxX * scale.x, maxY * scale.y, minZ * scale.z },
+						{ maxX * scale.x, maxY * scale.y, maxZ * scale.z },
+						{ minX * scale.x, maxY * scale.y, maxZ * scale.z }
+					};
+
+					// Rotate and translate to world space
+					Vector3 worldCorners[8];
+					for (int i = 0; i < 8; ++i)
+					{
+						// Rotate Euler Yaw-Pitch-Roll
+						// Pitch (X)
+						float cosX = std::cos(rot.x);
+						float sinX = std::sin(rot.x);
+						Vector3 pt1 = {
+							localCorners[i].x,
+							localCorners[i].y * cosX - localCorners[i].z * sinX,
+							localCorners[i].y * sinX + localCorners[i].z * cosX
+						};
+
+						// Yaw (Y)
+						float cosY = std::cos(rot.y);
+						float sinY = std::sin(rot.y);
+						Vector3 pt2 = {
+							pt1.x * cosY + pt1.z * sinY,
+							pt1.y,
+							-pt1.x * sinY + pt1.z * cosY
+						};
+
+						// Roll (Z)
+						float cosZ = std::cos(rot.z);
+						float sinZ = std::sin(rot.z);
+						Vector3 pt3 = {
+							pt2.x * cosZ - pt2.y * sinZ,
+							pt2.x * sinZ + pt2.y * cosZ,
+							pt2.z
+						};
+
+						worldCorners[i] = pt3 + worldPos;
+					}
+
+					// Project to 2D
+					ImVec2 screenCorners[8];
+					bool projected[8];
+					for (int i = 0; i < 8; ++i)
+					{
+						projected[i] = project3DTo2D(worldCorners[i], screenCorners[i]);
+					}
+
+					// Draw bottom face
+					if (projected[0] && projected[1] && projected[2] && projected[3])
+					{
+						ImVec2 pts[5] = { screenCorners[0], screenCorners[1], screenCorners[2], screenCorners[3], screenCorners[0] };
+						drawList->AddPolyline(pts, 5, objVisualColor, false, 2.0f);
+					}
+					// Draw top face
+					if (projected[4] && projected[5] && projected[6] && projected[7])
+					{
+						ImVec2 pts[5] = { screenCorners[4], screenCorners[5], screenCorners[6], screenCorners[7], screenCorners[4] };
+						drawList->AddPolyline(pts, 5, objVisualColor, false, 2.0f);
+					}
+					// Draw vertical edges
+					for (int i = 0; i < 4; ++i)
+					{
+						if (projected[i] && projected[i + 4])
+						{
+							drawList->AddLine(screenCorners[i], screenCorners[i + 4], objVisualColor, 2.0f);
+						}
+					}
 				}
 			}
 		}
