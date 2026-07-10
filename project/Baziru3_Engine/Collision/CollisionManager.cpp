@@ -563,6 +563,10 @@ bool CollisionManager::Raycast(const Vector3& rayStart, const Vector3& rayDir, f
     {
         lastRaycast_.hitPoint = rayStart + rayDir * closestDist;
     }
+    else
+    {
+        lastRaycast_.hitMesh = false;
+    }
 
     return hit;
 }
@@ -729,9 +733,24 @@ bool CollisionManager::CheckRayMesh(const Vector3& rayStart, const Vector3& rayD
 
     float localHitDist = 0.0f;
     Vector3 localHitNormal = { 0, 1, 0 };
-    if (aabbTree.Raycast(localStart, localDirNorm, localMaxDist, localHitDist, localHitNormal))
+    Vector3 localV0, localV1, localV2;
+    if (aabbTree.Raycast(localStart, localDirNorm, localMaxDist, localHitDist, localHitNormal, localV0, localV1, localV2))
     {
         outDist = localHitDist / localDirLen;
+
+        auto transformPt = [&](const Vector3& pt) -> Vector3 {
+            return {
+                pt.x * world.m[0][0] + pt.y * world.m[1][0] + pt.z * world.m[2][0] + world.m[3][0],
+                pt.x * world.m[0][1] + pt.y * world.m[1][1] + pt.z * world.m[2][1] + world.m[3][1],
+                pt.x * world.m[0][2] + pt.y * world.m[1][2] + pt.z * world.m[2][2] + world.m[3][2]
+            };
+        };
+
+        GetInstance()->lastRaycast_.hitMesh = true;
+        GetInstance()->lastRaycast_.hitTriV0 = transformPt(localV0);
+        GetInstance()->lastRaycast_.hitTriV1 = transformPt(localV1);
+        GetInstance()->lastRaycast_.hitTriV2 = transformPt(localV2);
+
         return true;
     }
     return false;
@@ -1035,13 +1054,18 @@ void CollisionManager::DrawDebug(Camera* camera)
 			if (meshCollider && meshCollider->GetObject3d())
 			{
 				Object3d* obj = meshCollider->GetObject3d();
-				Vector3 minB, maxB;
-				if (meshCollider->GetAABBTree().GetRootBounds(minB, maxB))
+				
+				std::vector<std::pair<Vector3, Vector3>> boundsList;
+				meshCollider->GetAABBTree().GetNodesAtDepth(3, boundsList);
+
+				Vector3 rot = obj->GetRotate();
+				Vector3 scale = obj->GetScale();
+				Vector3 pos = obj->GetTranslate();
+
+				for (const auto& bounds : boundsList)
 				{
-					// Draw the root bounding box of the AABB tree in world space
-					Vector3 rot = obj->GetRotate();
-					Vector3 scale = obj->GetScale();
-					Vector3 pos = obj->GetTranslate();
+					Vector3 minB = bounds.first;
+					Vector3 maxB = bounds.second;
 
 					// 8 local corners
 					Vector3 localCorners[8] = {
@@ -1095,24 +1119,22 @@ void CollisionManager::DrawDebug(Camera* camera)
 						projected[i] = project3DTo2D(worldCorners[i], screenCorners[i]);
 					}
 
-					// Draw bottom face
+					ImU32 hierarchyColor = ImGui::ColorConvertFloat4ToU32({ 0.0f, 1.0f, 0.5f, 0.4f }); // Semi-transparent green
 					if (projected[0] && projected[1] && projected[2] && projected[3])
 					{
 						ImVec2 pts[5] = { screenCorners[0], screenCorners[1], screenCorners[2], screenCorners[3], screenCorners[0] };
-						drawList->AddPolyline(pts, 5, colColor, false, 2.0f);
+						drawList->AddPolyline(pts, 5, hierarchyColor, false, 1.0f);
 					}
-					// Draw top face
 					if (projected[4] && projected[5] && projected[6] && projected[7])
 					{
 						ImVec2 pts[5] = { screenCorners[4], screenCorners[5], screenCorners[6], screenCorners[7], screenCorners[4] };
-						drawList->AddPolyline(pts, 5, colColor, false, 2.0f);
+						drawList->AddPolyline(pts, 5, hierarchyColor, false, 1.0f);
 					}
-					// Draw vertical edges
 					for (int i = 0; i < 4; ++i)
 					{
 						if (projected[i] && projected[i + 4])
 						{
-							drawList->AddLine(screenCorners[i], screenCorners[i + 4], colColor, 2.0f);
+							drawList->AddLine(screenCorners[i], screenCorners[i + 4], hierarchyColor, 1.0f);
 						}
 					}
 				}
@@ -1412,6 +1434,20 @@ void CollisionManager::DrawDebug(Camera* camera)
 			if (project3DTo2D(lastRaycast_.hitPoint, h2D))
 			{
 				drawList->AddCircleFilled(h2D, 5.0f, ImGui::ColorConvertFloat4ToU32({ 0.0f, 1.0f, 1.0f, 1.0f }), 8); // Cyan point
+			}
+
+			if (lastRaycast_.hitMesh)
+			{
+				ImVec2 p0, p1, p2;
+				if (project3DTo2D(lastRaycast_.hitTriV0, p0) &&
+					project3DTo2D(lastRaycast_.hitTriV1, p1) &&
+					project3DTo2D(lastRaycast_.hitTriV2, p2))
+				{
+					// Draw filled red triangle
+					drawList->AddTriangleFilled(p0, p1, p2, ImGui::ColorConvertFloat4ToU32({ 1.0f, 0.0f, 0.0f, 0.5f }));
+					// Draw bright yellow outline
+					drawList->AddTriangle(p0, p1, p2, ImGui::ColorConvertFloat4ToU32({ 1.0f, 1.0f, 0.0f, 0.9f }), 2.0f);
+				}
 			}
 		}
 	}

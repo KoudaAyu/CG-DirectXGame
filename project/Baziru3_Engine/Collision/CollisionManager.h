@@ -143,5 +143,9 @@ private:
         Vector3 end;
         bool hit = false;
         Vector3 hitPoint;
+        bool hitMesh = false;
+        Vector3 hitTriV0;
+        Vector3 hitTriV1;
+        Vector3 hitTriV2;
     } lastRaycast_;
 };

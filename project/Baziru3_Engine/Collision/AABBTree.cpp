@@ -126,10 +126,10 @@ int AABBTree::BuildRecursive(std::vector<BVHTriangle>& tris, int start, int end)
     return parentIdx;
 }
 
-bool AABBTree::Raycast(const Vector3& rayStart, const Vector3& rayDir, float maxDist, float& outHitDist, Vector3& outHitNormal) const
+bool AABBTree::Raycast(const Vector3& rayStart, const Vector3& rayDir, float maxDist, float& outHitDist, Vector3& outHitNormal, Vector3& outV0, Vector3& outV1, Vector3& outV2) const
 {
     if (nodes_.empty()) return false;
-    return RaycastRecursive(0, rayStart, rayDir, maxDist, outHitDist, outHitNormal);
+    return RaycastRecursive(0, rayStart, rayDir, maxDist, outHitDist, outHitNormal, outV0, outV1, outV2);
 }
 
 bool AABBTree::GetRootBounds(Vector3& outMin, Vector3& outMax) const
@@ -140,7 +140,14 @@ bool AABBTree::GetRootBounds(Vector3& outMin, Vector3& outMax) const
     return true;
 }
 
-bool AABBTree::RaycastRecursive(int nodeIndex, const Vector3& rayStart, const Vector3& rayDir, float maxDist, float& outHitDist, Vector3& outHitNormal) const
+void AABBTree::GetNodesAtDepth(int targetDepth, std::vector<std::pair<Vector3, Vector3>>& outBounds) const
+{
+    outBounds.clear();
+    if (nodes_.empty()) return;
+    GetNodesAtDepthRecursive(0, 0, targetDepth, outBounds);
+}
+
+bool AABBTree::RaycastRecursive(int nodeIndex, const Vector3& rayStart, const Vector3& rayDir, float maxDist, float& outHitDist, Vector3& outHitNormal, Vector3& outV0, Vector3& outV1, Vector3& outV2) const
 {
     const auto& node = nodes_[nodeIndex];
     if (!TestRayAABB(rayStart, rayDir, maxDist, node.minBounds, node.maxBounds))
@@ -151,6 +158,7 @@ bool AABBTree::RaycastRecursive(int nodeIndex, const Vector3& rayStart, const Ve
         bool hit = false;
         float nearestDist = maxDist;
         Vector3 nearestNormal = { 0, 1, 0 };
+        Vector3 nearestV0, nearestV1, nearestV2;
 
         for (const auto& tri : node.triangles)
         {
@@ -161,6 +169,9 @@ bool AABBTree::RaycastRecursive(int nodeIndex, const Vector3& rayStart, const Ve
                 hit = true;
                 nearestDist = dist;
                 nearestNormal = normal;
+                nearestV0 = tri.v0;
+                nearestV1 = tri.v1;
+                nearestV2 = tri.v2;
             }
         }
 
@@ -168,6 +179,9 @@ bool AABBTree::RaycastRecursive(int nodeIndex, const Vector3& rayStart, const Ve
         {
             outHitDist = nearestDist;
             outHitNormal = nearestNormal;
+            outV0 = nearestV0;
+            outV1 = nearestV1;
+            outV2 = nearestV2;
             return true;
         }
         return false;
@@ -175,11 +189,13 @@ bool AABBTree::RaycastRecursive(int nodeIndex, const Vector3& rayStart, const Ve
 
     float leftDist = maxDist;
     Vector3 leftNormal;
-    bool leftHit = RaycastRecursive(node.leftChild, rayStart, rayDir, maxDist, leftDist, leftNormal);
+    Vector3 leftV0, leftV1, leftV2;
+    bool leftHit = RaycastRecursive(node.leftChild, rayStart, rayDir, maxDist, leftDist, leftNormal, leftV0, leftV1, leftV2);
 
     float rightDist = maxDist;
     Vector3 rightNormal;
-    bool rightHit = RaycastRecursive(node.rightChild, rayStart, rayDir, leftHit ? leftDist : maxDist, rightDist, rightNormal);
+    Vector3 rightV0, rightV1, rightV2;
+    bool rightHit = RaycastRecursive(node.rightChild, rayStart, rayDir, leftHit ? leftDist : maxDist, rightDist, rightNormal, rightV0, rightV1, rightV2);
 
     if (leftHit && rightHit)
     {
@@ -187,11 +203,17 @@ bool AABBTree::RaycastRecursive(int nodeIndex, const Vector3& rayStart, const Ve
         {
             outHitDist = leftDist;
             outHitNormal = leftNormal;
+            outV0 = leftV0;
+            outV1 = leftV1;
+            outV2 = leftV2;
         }
         else
         {
             outHitDist = rightDist;
             outHitNormal = rightNormal;
+            outV0 = rightV0;
+            outV1 = rightV1;
+            outV2 = rightV2;
         }
         return true;
     }
@@ -199,16 +221,37 @@ bool AABBTree::RaycastRecursive(int nodeIndex, const Vector3& rayStart, const Ve
     {
         outHitDist = leftDist;
         outHitNormal = leftNormal;
+        outV0 = leftV0;
+        outV1 = leftV1;
+        outV2 = leftV2;
         return true;
     }
     else if (rightHit)
     {
         outHitDist = rightDist;
         outHitNormal = rightNormal;
+        outV0 = rightV0;
+        outV1 = rightV1;
+        outV2 = rightV2;
         return true;
     }
 
     return false;
+}
+
+void AABBTree::GetNodesAtDepthRecursive(int nodeIndex, int currentDepth, int targetDepth, std::vector<std::pair<Vector3, Vector3>>& outBounds) const
+{
+    if (nodeIndex < 0 || nodeIndex >= static_cast<int>(nodes_.size())) return;
+
+    const auto& node = nodes_[nodeIndex];
+    if (currentDepth == targetDepth || node.IsLeaf())
+    {
+        outBounds.push_back({ node.minBounds, node.maxBounds });
+        return;
+    }
+
+    GetNodesAtDepthRecursive(node.leftChild, currentDepth + 1, targetDepth, outBounds);
+    GetNodesAtDepthRecursive(node.rightChild, currentDepth + 1, targetDepth, outBounds);
 }
 
 bool AABBTree::TestRayAABB(const Vector3& rayStart, const Vector3& rayDir, float maxDist, const Vector3& minBounds, const Vector3& maxBounds)

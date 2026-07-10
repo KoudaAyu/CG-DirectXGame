@@ -33,18 +33,24 @@ public:
     void Build(const std::vector<Vector3>& vertices, const std::vector<uint32_t>& indices);
 
     /// <summary>
-    /// レイとAABB木の交差判定を行い、最も近い交点情報を取得します
+    /// レイとAABB木の交差判定を行い、最も近い交点情報および交差した三角形を取得します
     /// </summary>
-    bool Raycast(const Vector3& rayStart, const Vector3& rayDir, float maxDist, float& outHitDist, Vector3& outHitNormal) const;
+    bool Raycast(const Vector3& rayStart, const Vector3& rayDir, float maxDist, float& outHitDist, Vector3& outHitNormal, Vector3& outV0, Vector3& outV1, Vector3& outV2) const;
 
     /// <summary>
     /// 木全体のルートノードのAABB（モデル全体を包む境界）を取得します
     /// </summary>
     bool GetRootBounds(Vector3& outMin, Vector3& outMax) const;
 
+    /// <summary>
+    /// 特定の深さにあるすべてのノードの境界ボックスを取得します（デバッグ用）
+    /// </summary>
+    void GetNodesAtDepth(int targetDepth, std::vector<std::pair<Vector3, Vector3>>& outBounds) const;
+
 private:
     int BuildRecursive(std::vector<BVHTriangle>& tris, int start, int end);
-    bool RaycastRecursive(int nodeIndex, const Vector3& rayStart, const Vector3& rayDir, float maxDist, float& outHitDist, Vector3& outHitNormal) const;
+    bool RaycastRecursive(int nodeIndex, const Vector3& rayStart, const Vector3& rayDir, float maxDist, float& outHitDist, Vector3& outHitNormal, Vector3& outV0, Vector3& outV1, Vector3& outV2) const;
+    void GetNodesAtDepthRecursive(int nodeIndex, int currentDepth, int targetDepth, std::vector<std::pair<Vector3, Vector3>>& outBounds) const;
 
     static bool TestRayAABB(const Vector3& rayStart, const Vector3& rayDir, float maxDist, const Vector3& minBounds, const Vector3& maxBounds);
     static bool TestRayTriangle(const Vector3& rayStart, const Vector3& rayDir, float maxDist, const Vector3& v0, const Vector3& v1, const Vector3& v2, float& outDist, Vector3& outNormal);
