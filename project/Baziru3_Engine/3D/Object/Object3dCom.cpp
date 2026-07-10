@@ -86,11 +86,29 @@ void Object3dCom::Draw(Object3d* object, const RenderContext& ctx, const Object3
 		// GPU-accelerated wireframe overlay draw (if enabled in Collision Debug panel)
 		if (CollisionManager::GetInstance()->IsShowDebugColliders() && CollisionManager::GetInstance()->IsShowMeshWireframe())
 		{
-			auto wireframePSO = GetWireframePipelineState();
-			if (wireframePSO)
+			bool drawWireframe = true;
+			if (ctx.camera)
 			{
-				ctx.commandList->SetPipelineState(wireframePSO.Get());
-				object->Draw(ctx.commandList);
+				Vector3 camPos = ctx.camera->GetTranslate();
+				Vector3 objPos = object->GetTranslate();
+				float dx = objPos.x - camPos.x;
+				float dy = objPos.y - camPos.y;
+				float dz = objPos.z - camPos.z;
+				float distSq = dx * dx + dy * dy + dz * dz;
+				if (distSq > 40.0f * 40.0f) // Skip wireframe if further than 40 units
+				{
+					drawWireframe = false;
+				}
+			}
+
+			if (drawWireframe)
+			{
+				auto wireframePSO = GetWireframePipelineState();
+				if (wireframePSO)
+				{
+					ctx.commandList->SetPipelineState(wireframePSO.Get());
+					object->Draw(ctx.commandList);
+				}
 			}
 		}
 	}
