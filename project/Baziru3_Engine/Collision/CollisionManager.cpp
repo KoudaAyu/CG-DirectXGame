@@ -105,6 +105,15 @@ bool CollisionManager::ShouldCollide(CollisionAttribute a, CollisionAttribute b)
 
 void CollisionManager::Update()
 {
+    // Update all mesh colliders if they are animated
+    for (Collider* col : colliders_)
+    {
+        if (col && col->IsEnabled() && col->GetType() == ColliderType::Mesh)
+        {
+            static_cast<MeshCollider*>(col)->Update();
+        }
+    }
+
     if (colliders_.size() < 2) return;
 
     // 1. 各コライダーから衝突判定に必要なデータのみを抽出した連続配列を構築 (DOD化)
@@ -688,6 +697,9 @@ bool CollisionManager::CheckRayMesh(const Vector3& rayStart, const Vector3& rayD
 {
     MeshCollider* meshCollider = static_cast<MeshCollider*>(meshData.originalCollider);
     if (!meshCollider || !meshCollider->GetObject3d()) return false;
+
+    // CPU skinning update if animated
+    meshCollider->Update();
 
     Object3d* obj = meshCollider->GetObject3d();
     const auto& aabbTree = meshCollider->GetAABBTree();

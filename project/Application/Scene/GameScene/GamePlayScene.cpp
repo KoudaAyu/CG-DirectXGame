@@ -4,6 +4,7 @@
 #include"SkinningObject3dCom.h"
 #include"Model.h"
 #include "SceneManager.h"
+#include "Baziru3_Engine/Collision/CollisionManager.h"
 #include "MaterialManager.h"
 #include "Light.h"
 #include "ParticleManager.h"
@@ -85,6 +86,10 @@ void GamePlayScene::InitializeScene()
 		{
 			skeletonDebug_.Initialize(directXCom, object3dCom, materialManager, light, camera_, skeleton_);
 		}
+
+		// Register skinned Mesh Collider
+		animatedCubeCollider_ = std::make_unique<MeshCollider>(animatedCube_.get(), CollisionAttribute::Enemy);
+		CollisionManager::GetInstance()->RegisterCollider(animatedCubeCollider_.get());
 	}
 
 	//スプライト共通テクスチャ読み込み
@@ -148,6 +153,11 @@ void GamePlayScene::Finalize()
       hitEffect_->Finalize();
 		hitEffect_.reset();
 	}
+    if (animatedCubeCollider_)
+    {
+        CollisionManager::GetInstance()->UnregisterCollider(animatedCubeCollider_.get());
+        animatedCubeCollider_.reset();
+    }
     hitEffectInitialized = false;
 }
 
