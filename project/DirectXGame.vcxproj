@@ -81,6 +81,7 @@
     <ClCompile Include="Baziru3_Engine\Base\Srv\SRVManager.cpp" />
     <ClCompile Include="Application\Subsystem\SubsystemFactory.cpp" />
     <ClCompile Include="Baziru3_Engine\Collision\CollisionManager.cpp" />
+    <ClCompile Include="Baziru3_Engine\Collision\AABBTree.cpp" />
     <ClCompile Include="Baziru3_Engine\Graphics\GpuProfiler.cpp" />
     <ClCompile Include="Baziru3_Engine\AI\BehaviorNode.cpp" />
     <ClCompile Include="Baziru3_Engine\AI\BehaviorNodeFactory.cpp" />
@@ -273,6 +274,9 @@
     <ClInclude Include="Baziru3_Engine\Collision\BoxCollider.h" />
     <ClInclude Include="Baziru3_Engine\Collision\CapsuleCollider.h" />
     <ClInclude Include="Baziru3_Engine\Collision\CollisionManager.h" />
+    <ClInclude Include="Baziru3_Engine\Collision\AABBTree.h" />
+    <ClInclude Include="Baziru3_Engine\Collision\MeshCollider.h" />
+    <ClInclude Include="Baziru3_Engine\Collision\SkeletonCollider.h" />
     <ClInclude Include="Baziru3_Engine\Graphics\GpuProfiler.h" />
     <ClInclude Include="Baziru3_Engine\AI\BehaviorNode.h" />
     <ClInclude Include="Baziru3_Engine\AI\BehaviorNodeFactory.h" />

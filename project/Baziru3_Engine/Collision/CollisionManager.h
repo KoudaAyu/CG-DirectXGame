@@ -101,6 +101,8 @@ public:
 
     static bool CheckRaySphere(const Vector3& rayStart, const Vector3& rayDir, float maxDist, const CollisionData& sphere, float& outDist);
     static bool CheckRayBox(const Vector3& rayStart, const Vector3& rayDir, float maxDist, const CollisionData& box, float& outDist);
+    static bool CheckRayMesh(const Vector3& rayStart, const Vector3& rayDir, float maxDist, const CollisionData& meshData, float& outDist);
+    static bool CheckRaySkeleton(const Vector3& rayStart, const Vector3& rayDir, float maxDist, const CollisionData& skeletonData, float& outDist);
 
 private:
     CollisionManager() = default;
@@ -133,4 +135,13 @@ private:
                      (static_cast<uint32_t>(z) * 83492791);
         return h % kGridTableSize;
     }
+
+private:
+    struct LastRaycastData {
+        bool exists = false;
+        Vector3 start;
+        Vector3 end;
+        bool hit = false;
+        Vector3 hitPoint;
+    } lastRaycast_;
 };

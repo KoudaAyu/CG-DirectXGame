@@ -127,6 +127,7 @@ public:
 	const Vector3& GetTranslate() const { return transform.GetTranslate(); }
 	const Vector3& GetScale() const { return transform.GetScale(); }
 	const ModelData& GetModelData() const { return modelData_; }
+	const Matrix4x4& GetWorldMatrix() const { return transformationMatrixData_.World; }
 
 	void MarkDrawn() { isDrawnThisFrame_ = true; }
 	bool WasDrawnLastFrame() const { return wasDrawnLastFrame_; }

@@ -3,6 +3,8 @@
 #include "SphereCollider.h"
 #include "BoxCollider.h"
 #include "CapsuleCollider.h"
+#include "MeshCollider.h"
+#include "SkeletonCollider.h"
 #include "Matrix4x4.h"
 #include "DirectXCom.h"
 #include "Baziru3_Engine/Base/Allocator/StackAllocator.h"
@@ -542,6 +544,17 @@ bool CollisionManager::Raycast(const Vector3& rayStart, const Vector3& rayDir, f
         outHitCollider = closestCollider;
         outHitDist = closestDist;
     }
+
+    // Save debug raycast coordinates
+    lastRaycast_.exists = true;
+    lastRaycast_.start = rayStart;
+    lastRaycast_.end = rayStart + rayDir * maxDist;
+    lastRaycast_.hit = hit;
+    if (hit)
+    {
+        lastRaycast_.hitPoint = rayStart + rayDir * closestDist;
+    }
+
     return hit;
 }
 
@@ -556,6 +569,14 @@ bool CollisionManager::CheckRayCollider(const Vector3& rayStart, const Vector3& 
     else if (type == ColliderType::Box)
     {
         return CheckRayBox(rayStart, rayDir, maxDist, collider, outDist);
+    }
+    else if (type == ColliderType::Mesh)
+    {
+        return CheckRayMesh(rayStart, rayDir, maxDist, collider, outDist);
+    }
+    else if (type == ColliderType::Skeleton)
+    {
+        return CheckRaySkeleton(rayStart, rayDir, maxDist, collider, outDist);
     }
     return false;
 }
@@ -661,6 +682,93 @@ bool CollisionManager::CheckRayBox(const Vector3& rayStart, const Vector3& rayDi
 
     outDist = tmin;
     return true;
+}
+
+bool CollisionManager::CheckRayMesh(const Vector3& rayStart, const Vector3& rayDir, float maxDist, const CollisionData& meshData, float& outDist)
+{
+    MeshCollider* meshCollider = static_cast<MeshCollider*>(meshData.originalCollider);
+    if (!meshCollider || !meshCollider->GetObject3d()) return false;
+
+    Object3d* obj = meshCollider->GetObject3d();
+    const auto& aabbTree = meshCollider->GetAABBTree();
+
+    Matrix4x4 world = obj->GetWorldMatrix();
+    Matrix4x4 invWorld = Inverse(world);
+
+    // Transform Ray start to local space
+    Vector3 localStart = {
+        rayStart.x * invWorld.m[0][0] + rayStart.y * invWorld.m[1][0] + rayStart.z * invWorld.m[2][0] + invWorld.m[3][0],
+        rayStart.x * invWorld.m[0][1] + rayStart.y * invWorld.m[1][1] + rayStart.z * invWorld.m[2][1] + invWorld.m[3][1],
+        rayStart.x * invWorld.m[0][2] + rayStart.y * invWorld.m[1][2] + rayStart.z * invWorld.m[2][2] + invWorld.m[3][2]
+    };
+
+    // Transform Ray direction to local space
+    Vector3 localDir = {
+        rayDir.x * invWorld.m[0][0] + rayDir.y * invWorld.m[1][0] + rayDir.z * invWorld.m[2][0],
+        rayDir.x * invWorld.m[0][1] + rayDir.y * invWorld.m[1][1] + rayDir.z * invWorld.m[2][1],
+        rayDir.x * invWorld.m[0][2] + rayDir.y * invWorld.m[1][2] + rayDir.z * invWorld.m[2][2]
+    };
+
+    float localDirLen = std::sqrt(localDir.x * localDir.x + localDir.y * localDir.y + localDir.z * localDir.z);
+    if (localDirLen < 1e-6f) return false;
+
+    Vector3 localDirNorm = { localDir.x / localDirLen, localDir.y / localDirLen, localDir.z / localDirLen };
+    float localMaxDist = maxDist * localDirLen;
+
+    float localHitDist = 0.0f;
+    Vector3 localHitNormal = { 0, 1, 0 };
+    if (aabbTree.Raycast(localStart, localDirNorm, localMaxDist, localHitDist, localHitNormal))
+    {
+        outDist = localHitDist / localDirLen;
+        return true;
+    }
+    return false;
+}
+
+bool CollisionManager::CheckRaySkeleton(const Vector3& rayStart, const Vector3& rayDir, float maxDist, const CollisionData& skeletonData, float& outDist)
+{
+    SkeletonCollider* skelCollider = static_cast<SkeletonCollider*>(skeletonData.originalCollider);
+    if (!skelCollider || !skelCollider->GetObject3d()) return false;
+
+    Object3d* obj = skelCollider->GetObject3d();
+    const auto& skeleton = obj->GetSkeleton();
+    if (skeleton.joints.empty()) return false;
+
+    Matrix4x4 modelWorldMatrix = MakeAffineMatrix(obj->GetScale(), obj->GetRotate(), obj->GetTranslate());
+
+    bool hit = false;
+    float closestDist = maxDist;
+
+    for (size_t i = 0; i < skeleton.joints.size(); ++i)
+    {
+        Vector3 jointPos = skeleton.GetJointWorldPosition(i, modelWorldMatrix);
+        float radius = skelCollider->GetJointRadius(skeleton.joints[i].name);
+
+        Vector3 m = rayStart - jointPos;
+        float b = Dot(m, rayDir);
+        float c = Dot(m, m) - radius * radius;
+
+        if (c > 0.0f && b > 0.0f) continue;
+
+        float discr = b * b - c;
+        if (discr < 0.0f) continue;
+
+        float t = -b - std::sqrt(discr);
+        if (t < 0.0f) t = 0.0f;
+
+        if (t < closestDist)
+        {
+            closestDist = t;
+            hit = true;
+        }
+    }
+
+    if (hit)
+    {
+        outDist = closestDist;
+        return true;
+    }
+    return false;
 }
 
 void CollisionManager::DrawDebug(Camera* camera)
@@ -909,6 +1017,142 @@ void CollisionManager::DrawDebug(Camera* camera)
 				}
 			}
 		}
+		else if (col->GetType() == ColliderType::Mesh)
+		{
+			MeshCollider* meshCollider = static_cast<MeshCollider*>(col);
+			if (meshCollider && meshCollider->GetObject3d())
+			{
+				Object3d* obj = meshCollider->GetObject3d();
+				Vector3 minB, maxB;
+				if (meshCollider->GetAABBTree().GetRootBounds(minB, maxB))
+				{
+					// Draw the root bounding box of the AABB tree in world space
+					Vector3 rot = obj->GetRotate();
+					Vector3 scale = obj->GetScale();
+					Vector3 pos = obj->GetTranslate();
+
+					// 8 local corners
+					Vector3 localCorners[8] = {
+						{ minB.x * scale.x, minB.y * scale.y, minB.z * scale.z },
+						{ maxB.x * scale.x, minB.y * scale.y, minB.z * scale.z },
+						{ maxB.x * scale.x, minB.y * scale.y, maxB.z * scale.z },
+						{ minB.x * scale.x, minB.y * scale.y, maxB.z * scale.z },
+						{ minB.x * scale.x, maxB.y * scale.y, minB.z * scale.z },
+						{ maxB.x * scale.x, maxB.y * scale.y, minB.z * scale.z },
+						{ maxB.x * scale.x, maxB.y * scale.y, maxB.z * scale.z },
+						{ minB.x * scale.x, maxB.y * scale.y, maxB.z * scale.z }
+					};
+
+					Vector3 worldCorners[8];
+					for (int i = 0; i < 8; ++i)
+					{
+						// Pitch (X)
+						float cosX = std::cos(rot.x);
+						float sinX = std::sin(rot.x);
+						Vector3 pt1 = {
+							localCorners[i].x,
+							localCorners[i].y * cosX - localCorners[i].z * sinX,
+							localCorners[i].y * sinX + localCorners[i].z * cosX
+						};
+
+						// Yaw (Y)
+						float cosY = std::cos(rot.y);
+						float sinY = std::sin(rot.y);
+						Vector3 pt2 = {
+							pt1.x * cosY + pt1.z * sinY,
+							pt1.y,
+							-pt1.x * sinY + pt1.z * cosY
+						};
+
+						// Roll (Z)
+						float cosZ = std::cos(rot.z);
+						float sinZ = std::sin(rot.z);
+						Vector3 pt3 = {
+							pt2.x * cosZ - pt2.y * sinZ,
+							pt2.x * sinZ + pt2.y * cosZ,
+							pt2.z
+						};
+
+						worldCorners[i] = pt3 + pos;
+					}
+
+					ImVec2 screenCorners[8];
+					bool projected[8];
+					for (int i = 0; i < 8; ++i)
+					{
+						projected[i] = project3DTo2D(worldCorners[i], screenCorners[i]);
+					}
+
+					// Draw bottom face
+					if (projected[0] && projected[1] && projected[2] && projected[3])
+					{
+						ImVec2 pts[5] = { screenCorners[0], screenCorners[1], screenCorners[2], screenCorners[3], screenCorners[0] };
+						drawList->AddPolyline(pts, 5, colColor, false, 2.0f);
+					}
+					// Draw top face
+					if (projected[4] && projected[5] && projected[6] && projected[7])
+					{
+						ImVec2 pts[5] = { screenCorners[4], screenCorners[5], screenCorners[6], screenCorners[7], screenCorners[4] };
+						drawList->AddPolyline(pts, 5, colColor, false, 2.0f);
+					}
+					// Draw vertical edges
+					for (int i = 0; i < 4; ++i)
+					{
+						if (projected[i] && projected[i + 4])
+						{
+							drawList->AddLine(screenCorners[i], screenCorners[i + 4], colColor, 2.0f);
+						}
+					}
+				}
+			}
+		}
+		else if (col->GetType() == ColliderType::Skeleton)
+		{
+			SkeletonCollider* skelCollider = static_cast<SkeletonCollider*>(col);
+			if (skelCollider && skelCollider->GetObject3d())
+			{
+				Object3d* obj = skelCollider->GetObject3d();
+				const auto& skeleton = obj->GetSkeleton();
+				if (!skeleton.joints.empty())
+				{
+					Matrix4x4 modelWorldMatrix = MakeAffineMatrix(obj->GetScale(), obj->GetRotate(), obj->GetTranslate());
+					for (size_t i = 0; i < skeleton.joints.size(); ++i)
+					{
+						Vector3 jointPos = skeleton.GetJointWorldPosition(i, modelWorldMatrix);
+						float radius = skelCollider->GetJointRadius(skeleton.joints[i].name);
+
+						const int numSegments = 8;
+						std::vector<ImVec2> pts2D;
+						for (int j = 0; j <= numSegments; ++j)
+						{
+							float angle = j * (6.2831853f / numSegments);
+							Vector3 p3D = {
+								jointPos.x + std::cos(angle) * radius,
+								jointPos.y,
+								jointPos.z + std::sin(angle) * radius
+							};
+							ImVec2 p2D;
+							if (project3DTo2D(p3D, p2D)) pts2D.push_back(p2D);
+						}
+						if (pts2D.size() > 1) drawList->AddPolyline(pts2D.data(), (int)pts2D.size(), colColor, false, 1.5f);
+
+						pts2D.clear();
+						for (int j = 0; j <= numSegments; ++j)
+						{
+							float angle = j * (6.2831853f / numSegments);
+							Vector3 p3D = {
+								jointPos.x + std::cos(angle) * radius,
+								jointPos.y + std::sin(angle) * radius,
+								jointPos.z
+							};
+							ImVec2 p2D;
+							if (project3DTo2D(p3D, p2D)) pts2D.push_back(p2D);
+						}
+						if (pts2D.size() > 1) drawList->AddPolyline(pts2D.data(), (int)pts2D.size(), colColor, false, 1.5f);
+					}
+				}
+			}
+		}
 	}
 
 	// --- Draw Sphere Instances (Visual only) ---
@@ -1135,6 +1379,27 @@ void CollisionManager::DrawDebug(Camera* camera)
 						}
 					}
 				}
+			}
+		}
+	}
+
+	// Draw last raycast line for debugging
+	if (lastRaycast_.exists)
+	{
+		ImVec2 s2D, e2D;
+		if (project3DTo2D(lastRaycast_.start, s2D) && project3DTo2D(lastRaycast_.end, e2D))
+		{
+			ImU32 rayColor = lastRaycast_.hit ? ImGui::ColorConvertFloat4ToU32({ 1.0f, 0.0f, 0.0f, 0.9f })  // Red if hit
+			                                  : ImGui::ColorConvertFloat4ToU32({ 1.0f, 0.8f, 0.0f, 0.6f }); // Gold if miss
+			drawList->AddLine(s2D, e2D, rayColor, 3.0f);
+		}
+
+		if (lastRaycast_.hit)
+		{
+			ImVec2 h2D;
+			if (project3DTo2D(lastRaycast_.hitPoint, h2D))
+			{
+				drawList->AddCircleFilled(h2D, 5.0f, ImGui::ColorConvertFloat4ToU32({ 0.0f, 1.0f, 1.0f, 1.0f }), 8); // Cyan point
 			}
 		}
 	}
