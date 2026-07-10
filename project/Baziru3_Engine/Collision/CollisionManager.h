@@ -105,6 +105,8 @@ public:
     static bool CheckRaySkeleton(const Vector3& rayStart, const Vector3& rayDir, float maxDist, const CollisionData& skeletonData, float& outDist);
 
     uint32_t GetFrameCount() const { return frameCount_; }
+    bool IsShowMeshWireframe() const { return showMeshWireframe_; }
+    void SetShowMeshWireframe(bool show) { showMeshWireframe_ = show; }
 
 private:
     CollisionManager() = default;
@@ -127,6 +129,7 @@ private:
 private:
     std::vector<Collider*> colliders_; // 登録された全アクティブコライダーのリスト (生ポインタ参照)
     uint32_t frameCount_ = 0;
+    bool showMeshWireframe_ = true; // デフォルトで有効（ちびキャラの精密さを確認するため）
 
     // 空間ハッシュ用ユーティリティ
     static int32_t CalculateGridIndex(float pos) {

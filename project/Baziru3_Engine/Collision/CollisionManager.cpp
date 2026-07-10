@@ -810,6 +810,7 @@ void CollisionManager::DrawDebug(Camera* camera)
 	// ImGui Debug Window to verify execution and states
 	ImGui::Begin("Collision Debug Overlay Settings");
 	ImGui::Checkbox("Show Debug Wireframes (F1 Toggle)", &showDebugColliders);
+	ImGui::Checkbox("Show Precise Mesh Wireframe", &showMeshWireframe_);
 	ImGui::Text("Active Spheres: %zu", Sphere::GetInstances().size());
 	ImGui::Text("Active Object3ds: %zu", Object3d::GetInstances().size());
 	ImGui::Text("Camera: %s", camera ? "Valid" : "Null");
@@ -1051,6 +1052,46 @@ void CollisionManager::DrawDebug(Camera* camera)
 
 				Object3d* obj = meshCollider->GetObject3d();
 				Matrix4x4 world = obj->GetWorldMatrix();
+				const auto& skinnedPositions = meshCollider->GetSkinnedPositions();
+				const auto& modelData = obj->GetModelData();
+
+				// 1. Draw actual skinned mesh wireframe (optimized with step 6) if enabled
+				if (showMeshWireframe_ && !skinnedPositions.empty() && !modelData.indices.empty())
+				{
+					std::vector<ImVec2> projectedPts;
+					projectedPts.resize(skinnedPositions.size());
+					std::vector<bool> projectedValid;
+					projectedValid.resize(skinnedPositions.size());
+
+					for (size_t i = 0; i < skinnedPositions.size(); ++i)
+					{
+						const auto& pt = skinnedPositions[i];
+						Vector3 worldPt = {
+							pt.x * world.m[0][0] + pt.y * world.m[1][0] + pt.z * world.m[2][0] + world.m[3][0],
+							pt.x * world.m[0][1] + pt.y * world.m[1][1] + pt.z * world.m[2][1] + world.m[3][1],
+							pt.x * world.m[0][2] + pt.y * world.m[1][2] + pt.z * world.m[2][2] + world.m[3][2]
+						};
+						projectedValid[i] = project3DTo2D(worldPt, projectedPts[i]);
+					}
+
+					ImU32 wireColor = ImGui::ColorConvertFloat4ToU32({ 0.0f, 1.0f, 0.5f, 0.25f }); // Green wireframe
+					for (size_t i = 0; i < modelData.indices.size(); i += 6) // Step by 6 to optimize performance
+					{
+						uint32_t idx0 = modelData.indices[i];
+						uint32_t idx1 = modelData.indices[i + 1];
+						uint32_t idx2 = modelData.indices[i + 2];
+
+						if (idx0 < projectedPts.size() && idx1 < projectedPts.size() && idx2 < projectedPts.size())
+						{
+							if (projectedValid[idx0] && projectedValid[idx1])
+								drawList->AddLine(projectedPts[idx0], projectedPts[idx1], wireColor, 0.8f);
+							if (projectedValid[idx1] && projectedValid[idx2])
+								drawList->AddLine(projectedPts[idx1], projectedPts[idx2], wireColor, 0.8f);
+							if (projectedValid[idx2] && projectedValid[idx0])
+								drawList->AddLine(projectedPts[idx2], projectedPts[idx0], wireColor, 0.8f);
+						}
+					}
+				}
 
 				// 2. Draw hierarchical AABB tree bounds (Depth 3)
 				std::vector<std::pair<Vector3, Vector3>> boundsList;
