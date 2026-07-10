@@ -132,6 +132,7 @@ public:
 
 	void MarkDrawn() { isDrawnThisFrame_ = true; }
 	bool WasDrawnLastFrame() const { return wasDrawnLastFrame_; }
+	bool IsCulled() const { return isCulled_; }
 	void ResetFrameDrawFlags() {
 		wasDrawnLastFrame_ = isDrawnThisFrame_;
 		isDrawnThisFrame_ = false;
@@ -193,4 +194,5 @@ private:
 	bool isDrawnThisFrame_ = false;
 	bool wasDrawnLastFrame_ = false;
 	bool isShared_ = false;
+	bool isCulled_ = false;
 };

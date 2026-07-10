@@ -221,6 +221,46 @@ void Object3d::Update()
 		camera_ = object3dCom_->GetDefaultCamera();
 	}
 
+	const Vector3& scale = transform.GetScale();
+
+	// View Frustum Culling inside Update to bypass animation, skeletal updates, and matrix math for off-screen objects
+	isCulled_ = false;
+	if (camera_ && scale.x <= 10.0f && scale.y <= 10.0f && scale.z <= 10.0f)
+	{
+		const Matrix4x4& vp = camera_->GetViewProjectionMatrix();
+		const Vector3& pos = transform.GetTranslate();
+		float radius = 2.0f;
+
+		float x = pos.x * vp.m[0][0] + pos.y * vp.m[1][0] + pos.z * vp.m[2][0] + vp.m[3][0];
+		float y = pos.x * vp.m[0][1] + pos.y * vp.m[1][1] + pos.z * vp.m[2][1] + vp.m[3][1];
+		float z = pos.x * vp.m[0][2] + pos.y * vp.m[1][2] + pos.z * vp.m[2][2] + vp.m[3][2];
+		float w = pos.x * vp.m[0][3] + pos.y * vp.m[1][3] + pos.z * vp.m[2][3] + vp.m[3][3];
+
+		if (w > 0.0f)
+		{
+			float clipX = x / w;
+			float clipY = y / w;
+			float clipZ = z / w;
+			float margin = radius / w;
+
+			if (clipX < -1.0f - margin || clipX > 1.0f + margin ||
+				clipY < -1.0f - margin || clipY > 1.0f + margin ||
+				clipZ < 0.0f - margin || clipZ > 1.0f + margin)
+			{
+				isCulled_ = true;
+			}
+		}
+		else
+		{
+			isCulled_ = true;
+		}
+	}
+
+	if (isCulled_)
+	{
+		return; // Culled! Bypassing all C++ CPU logic for off-screen characters
+	}
+
 	// ステップ1: アニメーション時間を進める
 	// ステップ2: 骨ごとのLocal情報を更新する
 	if (!isShared_)
@@ -246,7 +286,6 @@ void Object3d::Update()
 	}
 
 	Matrix4x4 worldMatrix;
-	const Vector3& scale = transform.GetScale();
 	const Vector3& rotate = transform.GetRotate();
 	const Vector3& translate = transform.GetTranslate();
 
@@ -339,6 +378,8 @@ void Object3d::Draw(Object3dCom* object3dCom, SkinningObject3dCom* skinningObjec
 	DirectXCom* dx = com->GetDirectXCom();
 	if (!dx) return;
 
+	if (isCulled_) return;
+
 	// RenderContext を内部で解決・構築
 	RenderContext ctx{};
 	ctx.commandList = dx->GetCommandList().Get();
@@ -346,42 +387,6 @@ void Object3d::Draw(Object3dCom* object3dCom, SkinningObject3dCom* skinningObjec
 	ctx.camera = camera_ ? camera_ : com->GetDefaultCamera();
 	ctx.light = SceneManager::GetInstance()->GetLight();
 	ctx.materialGPUAddress = 0;
-
-	// View Frustum Culling optimization to skip rendering of off-screen objects
-	if (ctx.camera)
-	{
-		const Vector3& scale = transform.GetScale();
-		if (scale.x <= 10.0f && scale.y <= 10.0f && scale.z <= 10.0f)
-		{
-			const Matrix4x4& vp = ctx.camera->GetViewProjectionMatrix();
-			const Vector3& pos = transform.GetTranslate();
-			float radius = 2.0f;
-
-			float x = pos.x * vp.m[0][0] + pos.y * vp.m[1][0] + pos.z * vp.m[2][0] + vp.m[3][0];
-			float y = pos.x * vp.m[0][1] + pos.y * vp.m[1][1] + pos.z * vp.m[2][1] + vp.m[3][1];
-			float z = pos.x * vp.m[0][2] + pos.y * vp.m[1][2] + pos.z * vp.m[2][2] + vp.m[3][2];
-			float w = pos.x * vp.m[0][3] + pos.y * vp.m[1][3] + pos.z * vp.m[2][3] + vp.m[3][3];
-
-			if (w > 0.0f)
-			{
-				float clipX = x / w;
-				float clipY = y / w;
-				float clipZ = z / w;
-				float margin = radius / w;
-
-				if (clipX < -1.0f - margin || clipX > 1.0f + margin ||
-					clipY < -1.0f - margin || clipY > 1.0f + margin ||
-					clipZ < 0.0f - margin || clipZ > 1.0f + margin)
-				{
-					return; // Culled! Skip drawing entirely!
-				}
-			}
-			else
-			{
-				return; // Behind camera!
-			}
-		}
-	}
 
 	// テクスチャ解決
 	const auto& modelData = GetModelData();
