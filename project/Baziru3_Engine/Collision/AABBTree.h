@@ -11,6 +11,9 @@ struct BVHTriangle {
     Vector3 v1;
     Vector3 v2;
     uint32_t index; // 元の三角形のインデックス
+    uint32_t vidx0;
+    uint32_t vidx1;
+    uint32_t vidx2;
 };
 
 struct BVHNode {
@@ -33,6 +36,11 @@ public:
     void Build(const std::vector<Vector3>& vertices, const std::vector<uint32_t>& indices);
 
     /// <summary>
+    /// 既存のAABB木（BVH）のツリー構造を維持したまま、アニメーション後の頂点に合わせて境界ボックスのみを更新（Refit）します
+    /// </summary>
+    void Update(const std::vector<Vector3>& vertices);
+
+    /// <summary>
     /// レイとAABB木の交差判定を行い、最も近い交点情報および交差した三角形を取得します
     /// </summary>
     bool Raycast(const Vector3& rayStart, const Vector3& rayDir, float maxDist, float& outHitDist, Vector3& outHitNormal, Vector3& outV0, Vector3& outV1, Vector3& outV2) const;
@@ -49,6 +57,7 @@ public:
 
 private:
     int BuildRecursive(std::vector<BVHTriangle>& tris, int start, int end);
+    void UpdateRecursive(int nodeIndex, const std::vector<Vector3>& vertices);
     bool RaycastRecursive(int nodeIndex, const Vector3& rayStart, const Vector3& rayDir, float maxDist, float& outHitDist, Vector3& outHitNormal, Vector3& outV0, Vector3& outV1, Vector3& outV2) const;
     void GetNodesAtDepthRecursive(int nodeIndex, int currentDepth, int targetDepth, std::vector<std::pair<Vector3, Vector3>>& outBounds) const;
 

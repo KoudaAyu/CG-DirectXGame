@@ -44,13 +44,22 @@ void MeshCollider::Update()
 
     if (skinCluster.mappedInfluence.empty() || skinCluster.mappedPalette.empty()) return;
 
-    skinnedPositions_.clear();
-    skinnedPositions_.resize(modelData.vertices.size());
+    const size_t vertexCount = modelData.vertices.size();
+    if (vertexCount == 0) return;
 
-    for (size_t i = 0; i < modelData.vertices.size(); ++i)
+    skinnedPositions_.resize(vertexCount);
+
+    // Bypass debug vector index bounds checks in Debug mode via raw pointers
+    const Sprite::VertexData* vertices = modelData.vertices.data();
+    const VertexInfluence* influences = skinCluster.mappedInfluence.data();
+    const WellForGPU* palette = skinCluster.mappedPalette.data();
+    const size_t paletteSize = skinCluster.mappedPalette.size();
+    Vector3* skinnedOut = skinnedPositions_.data();
+
+    for (size_t i = 0; i < vertexCount; ++i)
     {
-        const auto& v = modelData.vertices[i];
-        const auto& influence = skinCluster.mappedInfluence[i];
+        const Sprite::VertexData& v = vertices[i];
+        const VertexInfluence& influence = influences[i];
         Vector3 skinnedPos = { 0.0f, 0.0f, 0.0f };
         bool processed = false;
 
@@ -60,9 +69,9 @@ void MeshCollider::Update()
             if (w > 0.0f)
             {
                 int32_t jointIdx = influence.jointIndices[j];
-                if (jointIdx >= 0 && jointIdx < static_cast<int32_t>(skinCluster.mappedPalette.size()))
+                if (jointIdx >= 0 && jointIdx < static_cast<int32_t>(paletteSize))
                 {
-                    const Matrix4x4& m = skinCluster.mappedPalette[jointIdx].skeletonSpaceMatrix;
+                    const Matrix4x4& m = palette[jointIdx].skeletonSpaceMatrix;
                     Vector3 vTransformed = {
                         v.position.x * m.m[0][0] + v.position.y * m.m[1][0] + v.position.z * m.m[2][0] + m.m[3][0],
                         v.position.x * m.m[0][1] + v.position.y * m.m[1][1] + v.position.z * m.m[2][1] + m.m[3][1],
@@ -76,15 +85,9 @@ void MeshCollider::Update()
             }
         }
 
-        if (!processed)
-        {
-            skinnedPositions_[i] = { v.position.x, v.position.y, v.position.z };
-        }
-        else
-        {
-            skinnedPositions_[i] = skinnedPos;
-        }
+        skinnedOut[i] = processed ? skinnedPos : Vector3{ v.position.x, v.position.y, v.position.z };
     }
 
-    aabbTree_.Build(skinnedPositions_, modelData.indices);
+    // Refit bounding boxes bottom-up instead of rebuilding the entire tree structure every frame (thousands of times faster!)
+    aabbTree_.Update(skinnedPositions_);
 }

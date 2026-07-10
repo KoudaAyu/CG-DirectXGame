@@ -49,6 +49,9 @@ void AABBTree::Build(const std::vector<Vector3>& vertices, const std::vector<uin
         tri.v1 = vertices[indices[i + 1]];
         tri.v2 = vertices[indices[i + 2]];
         tri.index = static_cast<uint32_t>(i / 3);
+        tri.vidx0 = indices[i];
+        tri.vidx1 = indices[i + 1];
+        tri.vidx2 = indices[i + 2];
         tris.push_back(tri);
     }
 
@@ -342,6 +345,65 @@ bool AABBTree::TestRayTriangle(const Vector3& rayStart, const Vector3& rayDir, f
         return true;
     }
     return false;
+}
+
+void AABBTree::Update(const std::vector<Vector3>& vertices)
+{
+    if (nodes_.empty() || vertices.empty()) return;
+    UpdateRecursive(0, vertices);
+}
+
+void AABBTree::UpdateRecursive(int nodeIndex, const std::vector<Vector3>& vertices)
+{
+    auto& node = nodes_[nodeIndex];
+    if (node.IsLeaf())
+    {
+        node.minBounds = { 1e9f, 1e9f, 1e9f };
+        node.maxBounds = { -1e9f, -1e9f, -1e9f };
+        for (auto& tri : node.triangles)
+        {
+            tri.v0 = vertices[tri.vidx0];
+            tri.v1 = vertices[tri.vidx1];
+            tri.v2 = vertices[tri.vidx2];
+            
+            node.minBounds.x = (std::min)({ node.minBounds.x, tri.v0.x, tri.v1.x, tri.v2.x });
+            node.minBounds.y = (std::min)({ node.minBounds.y, tri.v0.y, tri.v1.y, tri.v2.y });
+            node.minBounds.z = (std::min)({ node.minBounds.z, tri.v0.z, tri.v1.z, tri.v2.z });
+            
+            node.maxBounds.x = (std::max)({ node.maxBounds.x, tri.v0.x, tri.v1.x, tri.v2.x });
+            node.maxBounds.y = (std::max)({ node.maxBounds.y, tri.v0.y, tri.v1.y, tri.v2.y });
+            node.maxBounds.z = (std::max)({ node.maxBounds.z, tri.v0.z, tri.v1.z, tri.v2.z });
+        }
+    }
+    else
+    {
+        if (node.leftChild != -1) UpdateRecursive(node.leftChild, vertices);
+        if (node.rightChild != -1) UpdateRecursive(node.rightChild, vertices);
+        
+        node.minBounds = { 1e9f, 1e9f, 1e9f };
+        node.maxBounds = { -1e9f, -1e9f, -1e9f };
+        
+        if (node.leftChild != -1)
+        {
+            const auto& left = nodes_[node.leftChild];
+            node.minBounds.x = (std::min)(node.minBounds.x, left.minBounds.x);
+            node.minBounds.y = (std::min)(node.minBounds.y, left.minBounds.y);
+            node.minBounds.z = (std::min)(node.minBounds.z, left.minBounds.z);
+            node.maxBounds.x = (std::max)(node.maxBounds.x, left.maxBounds.x);
+            node.maxBounds.y = (std::max)(node.maxBounds.y, left.maxBounds.y);
+            node.maxBounds.z = (std::max)(node.maxBounds.z, left.maxBounds.z);
+        }
+        if (node.rightChild != -1)
+        {
+            const auto& right = nodes_[node.rightChild];
+            node.minBounds.x = (std::min)(node.minBounds.x, right.minBounds.x);
+            node.minBounds.y = (std::min)(node.minBounds.y, right.minBounds.y);
+            node.minBounds.z = (std::min)(node.minBounds.z, right.minBounds.z);
+            node.maxBounds.x = (std::max)(node.maxBounds.x, right.maxBounds.x);
+            node.maxBounds.y = (std::max)(node.maxBounds.y, right.maxBounds.y);
+            node.maxBounds.z = (std::max)(node.maxBounds.z, right.maxBounds.z);
+        }
+    }
 }
 
 } // namespace BaziruEngine::Collision
