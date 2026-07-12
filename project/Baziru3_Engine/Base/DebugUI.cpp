@@ -22,10 +22,6 @@ DebugUI::~DebugUI()
 {
 }
 
-DebugUI::~DebugUI()
-{
-}
-
 void DebugUI::Initialize()
 {
 #ifdef USE_IMGUI
