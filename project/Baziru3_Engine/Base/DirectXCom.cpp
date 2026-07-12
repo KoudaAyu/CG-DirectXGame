@@ -16,6 +16,7 @@
 #include"ImGuiManager.h"
 #include "Baziru3_Engine/Base/Allocator/ConstantBufferAllocator.h"
 #include "Baziru3_Engine/Base/Allocator/StackAllocator.h"
+#include "Baziru3_Engine/Graphics/GpuProfiler.h"
 
 using namespace Microsoft::WRL;
 
@@ -90,10 +91,16 @@ void DirectXCom::Initialize()
 	// スタックアロケーターの生成・初期化
 	stackAllocator_ = std::make_unique<StackAllocator>();
 	stackAllocator_->Initialize(16 * 1024 * 1024); // 16MB
+
+	// GPUプロファイラーの初期化
+	GpuProfiler::GetInstance()->Initialize(device.Get(), commandQueue.Get());
 }
 
 void DirectXCom::Finalize()
 {
+	// GPUプロファイラーの解放
+	GpuProfiler::GetInstance()->Finalize();
+
 	// GPUが処理を終えるのを待つ
 	if (commandQueue)
 	{
