@@ -95,6 +95,16 @@ public:
     static bool CheckRaySphere(const Vector3& rayStart, const Vector3& rayDir, float maxDist, const CollisionData& sphere, float& outDist);
     static bool CheckRayBox(const Vector3& rayStart, const Vector3& rayDir, float maxDist, const CollisionData& box, float& outDist);
 
+    /// <summary>
+    /// アクティブコライダーのリストを取得します
+    /// </summary>
+    const std::vector<Collider*>& GetColliders() const { return colliders_; }
+
+    /// <summary>
+    /// 前回の衝突判定の所要時間（ミリ秒）を取得します
+    /// </summary>
+    float GetLastUpdateDurationMs() const { return lastUpdateDurationMs_; }
+
 private:
     CollisionManager() = default;
     ~CollisionManager() = default;
@@ -115,6 +125,7 @@ private:
 
 private:
     std::vector<Collider*> colliders_; // 登録された全アクティブコライダーのリスト (生ポインタ参照)
+    float lastUpdateDurationMs_ = 0.0f; // 前回の衝突判定処理時間 (ミリ秒)
 
     // 空間ハッシュ用ユーティリティ
     static int32_t CalculateGridIndex(float pos) {

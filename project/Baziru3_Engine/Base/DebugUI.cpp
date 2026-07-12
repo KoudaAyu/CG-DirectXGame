@@ -7,6 +7,8 @@
 #include "ParticleManager.h"
 #include "Application/Scene/GameScene/GamePlayScene.h"
 #include "BehaviorTreeEditor.h"
+#include "Baziru3_Engine/Graphics/GpuProfiler.h"
+#include "Baziru3_Engine/Collision/CollisionManager.h"
 #include <imgui.h>
 
 DebugUI::DebugUI(MaterialManager* materialManager, SpriteManager* spriteManager, Camera* camera,
@@ -313,7 +315,62 @@ void DebugUI::Update()
 
         char label[64];
         std::snprintf(label, sizeof(label), "Min: %.1f | Max: %.1f", minFps, maxFps);
-        ImGui::PlotLines("##FPSGraph", fpsHistory, 120, fpsHistoryOffset, label, 0.0f, 120.0f, ImVec2(0, 80.0f));
+        ImGui::PlotLines("##FPSGraph", fpsHistory, 120, fpsHistoryOffset, label, 0.0f, 120.0f, ImVec2(0, 50.0f));
+
+        ImGui::Separator();
+        ImGui::Text("--- CPU/GPU Stage Profiler ---");
+
+        // GPU プロファイル結果の回収と履歴の更新
+        const auto& gpuResults = GpuProfiler::GetInstance()->GetResults();
+        for (const auto& res : gpuResults)
+        {
+            auto& history = performanceHistory_[res.name];
+            if (history.size() < kMaxHistoryFrames)
+            {
+                history.resize(kMaxHistoryFrames, 0.0f);
+            }
+            history[historyOffset_] = res.timeMs;
+        }
+
+        // CPU 衝突判定（Collision）の所要時間を追加
+        float collisionTime = CollisionManager::GetInstance()->GetLastUpdateDurationMs();
+        auto& colHistory = performanceHistory_["Collision (CPU)"];
+        if (colHistory.size() < kMaxHistoryFrames)
+        {
+            colHistory.resize(kMaxHistoryFrames, 0.0f);
+        }
+        colHistory[historyOffset_] = collisionTime;
+
+        // オフセットを進める
+        historyOffset_ = (historyOffset_ + 1) % kMaxHistoryFrames;
+
+        // 各ステージの時間数値表示と個別の折れ線グラフ描画
+        for (auto& pair : performanceHistory_)
+        {
+            const std::string& name = pair.first;
+            const std::vector<float>& history = pair.second;
+
+            // 直近の値を取得
+            float lastVal = history[historyOffset_ == 0 ? kMaxHistoryFrames - 1 : historyOffset_ - 1];
+
+            ImGui::Text("%s: %.3f ms", name.c_str(), lastVal);
+            
+            // グラフ用に最大値を動的計算してスケールを合わせる
+            float maxVal = 0.1f;
+            for (float v : history)
+            {
+                if (v > maxVal) maxVal = v;
+            }
+            // 少しマージンを足す
+            maxVal *= 1.2f;
+
+            char graphLabel[64];
+            std::snprintf(graphLabel, sizeof(graphLabel), "Max: %.2f ms", maxVal);
+            
+            // プロット
+            std::string imguiId = "##" + name;
+            ImGui::PlotLines(imguiId.c_str(), history.data(), kMaxHistoryFrames, historyOffset_, graphLabel, 0.0f, maxVal, ImVec2(0, 35.0f));
+        }
     }
     ImGui::End();
     if (btEditor_)
