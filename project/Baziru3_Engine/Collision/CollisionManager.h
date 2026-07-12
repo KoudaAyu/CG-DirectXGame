@@ -112,6 +112,11 @@ public:
     bool IsShowDebugColliders() const { return showDebugColliders_; }
     void SetShowDebugColliders(bool show) { showDebugColliders_ = show; }
 
+    /// <summary>
+    /// 前回の衝突判定の所要時間（ミリ秒）を取得します
+    /// </summary>
+    float GetLastUpdateDurationMs() const { return lastUpdateDurationMs_; }
+
 private:
     CollisionManager() = default;
     ~CollisionManager() = default;
@@ -136,6 +141,7 @@ private:
     bool showMeshWireframe_ = true; // デフォルトで有効（ちびキャラの精密さを確認するため）
     int wireframeStep_ = 15; // ワイヤーフレームの間引きステップ数 (デフォルト15で超高速描画)
     bool showDebugColliders_ = true; // デフォルトで有効 (F1トグル)
+    float lastUpdateDurationMs_ = 0.0f; // 前回の衝突判定処理時間 (ミリ秒)
 
     // 空間ハッシュ用ユーティリティ
     static int32_t CalculateGridIndex(float pos) {

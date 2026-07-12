@@ -16,6 +16,7 @@
 #include <Windows.h>
 #include <cmath>
 #include <algorithm>
+#include <chrono>
 
 // =========================================================================
 // ベクトル数学のインラインヘルパー関数
@@ -114,9 +115,14 @@ bool CollisionManager::ShouldCollide(CollisionAttribute a, CollisionAttribute b)
 
 void CollisionManager::Update()
 {
+    auto startTime = std::chrono::steady_clock::now();
     frameCount_++;
 
-    if (colliders_.size() < 2) return;
+    if (colliders_.size() < 2)
+    {
+        lastUpdateDurationMs_ = 0.0f;
+        return;
+    }
 
     // 1. 各コライダーから衝突判定に必要なデータのみを抽出した連続配列を構築 (DOD化)
     std::vector<CollisionData> dataList;
@@ -155,11 +161,19 @@ void CollisionManager::Update()
         dataList.push_back(data);
     }
 
-    if (dataList.size() < 2) return;
+    if (dataList.size() < 2)
+    {
+        lastUpdateDurationMs_ = 0.0f;
+        return;
+    }
 
     // 2. 空間ハッシュテーブルの取得と初期化 (StackAllocator を使用して動的ヒープ確保を回避)
     DirectXCom* dxCommon = SceneManager::GetInstance()->GetDirectXCom();
-    if (!dxCommon) return;
+    if (!dxCommon)
+    {
+        lastUpdateDurationMs_ = 0.0f;
+        return;
+    }
     StackAllocator* stackAllocator = dxCommon->GetStackAllocator();
     
     SpatialHashCell* gridTable = static_cast<SpatialHashCell*>(stackAllocator->Allocate(
@@ -307,6 +321,9 @@ void CollisionManager::Update()
             }
         }
     }
+
+    auto endTime = std::chrono::steady_clock::now();
+    lastUpdateDurationMs_ = std::chrono::duration<float, std::milli>(endTime - startTime).count();
 }
 
 bool CollisionManager::CheckCollision(const CollisionData& a, const CollisionData& b, Vector3& outPushDir, float& outPushLen)

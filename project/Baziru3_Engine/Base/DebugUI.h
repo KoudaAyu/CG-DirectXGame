@@ -2,6 +2,8 @@
 #include "Sprite.h"
 #include <memory>
 #include <vector>
+#include <unordered_map>
+#include <string>
 
 class Camera;
 class DebugCamera;
@@ -43,5 +45,10 @@ private:
     std::vector<std::unique_ptr<Sprite>> sprites;
 
     std::unique_ptr<BaziruEngine::AI::BehaviorTreeEditor> btEditor_ = nullptr;
+
+    // パフォーマンス履歴データ
+    static constexpr int kMaxHistoryFrames = 100;
+    std::unordered_map<std::string, std::vector<float>> performanceHistory_;
+    int historyOffset_ = 0;
 };
 
