@@ -141,12 +141,6 @@
     <ClCompile Include="Baziru3_Engine\Collision\CollisionManager.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
-    <ClCompile Include="Baziru3_Engine\Collision\AABBTree.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="Baziru3_Engine\Collision\MeshCollider.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
     <ClCompile Include="Baziru3_Engine\SkyBox\SkyBox.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
@@ -210,45 +204,31 @@
     <ClCompile Include="Baziru3_Engine\Base\OffScreenRendering\RenderTexture.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
-    <ClCompile Include="Baziru3_Engine\AI\BehaviorNode.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="Baziru3_Engine\AI\BehaviorNodeFactory.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="Baziru3_Engine\AI\BehaviorTree.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="Baziru3_Engine\AI\BehaviorTreeEditor.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="Baziru3_Engine\AI\Blackboard.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="Baziru3_Engine\AI\CompositeNodes.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="Baziru3_Engine\AI\CoverNodes.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="Baziru3_Engine\AI\NavMesh.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="Baziru3_Engine\AI\PathfindingNodes.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
     <ClCompile Include="Baziru3_Engine\Base\AsyncLoader.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
     <ClCompile Include="Baziru3_Engine\Base\BinaryAssetUtil.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
-    <ClCompile Include="Baziru3_Engine\IO\Mouse\MouseInput.cpp">
-      <Filter>ソース ファイル</Filter>
-    <ClCompile Include="externals\imgui-node-editor\crude_json.cpp">
+    <ClCompile Include="Baziru3_Engine\AI\Blackboard.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
-    <ClCompile Include="externals\imgui-node-editor\imgui_canvas.cpp">
+    <ClCompile Include="Baziru3_Engine\AI\BehaviorNode.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\AI\CompositeNodes.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\AI\BehaviorTree.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\AI\BehaviorNodeFactory.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\AI\BehaviorTreeEditor.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\AI\CoverNodes.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
     <ClCompile Include="Baziru3_Engine\AI\NavMesh.cpp">
@@ -261,6 +241,12 @@
       <Filter>ソース ファイル</Filter>
     </ClCompile>
     <ClCompile Include="externals\imgui-node-editor\imgui_node_editor_api.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="externals\imgui-node-editor\imgui_canvas.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="externals\imgui-node-editor\crude_json.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
   </ItemGroup>
@@ -400,58 +386,7 @@
     <ClInclude Include="Baziru3_Engine\3D\Object\SkinningObject3dCom.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
-    <ClInclude Include="Baziru3_Engine\Collision\Collider.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
-    <ClInclude Include="Baziru3_Engine\Collision\SphereCollider.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
-    <ClInclude Include="Baziru3_Engine\Collision\BoxCollider.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
-    <ClInclude Include="Baziru3_Engine\Collision\CapsuleCollider.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
-    <ClInclude Include="Baziru3_Engine\Collision\CollisionManager.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
-    <ClInclude Include="Baziru3_Engine\Collision\AABBTree.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
-    <ClInclude Include="Baziru3_Engine\Collision\MeshCollider.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
-    <ClInclude Include="Baziru3_Engine\Collision\SkeletonCollider.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
     <ClInclude Include="Baziru3_Engine\Graphics\GpuProfiler.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
-    <ClInclude Include="Baziru3_Engine\AI\BehaviorNode.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
-    <ClInclude Include="Baziru3_Engine\AI\BehaviorNodeFactory.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
-    <ClInclude Include="Baziru3_Engine\AI\BehaviorTree.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
-    <ClInclude Include="Baziru3_Engine\AI\BehaviorTreeEditor.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
-    <ClInclude Include="Baziru3_Engine\AI\Blackboard.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
-    <ClInclude Include="Baziru3_Engine\AI\CompositeNodes.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
-    <ClInclude Include="Baziru3_Engine\AI\CoverNodes.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
-    <ClInclude Include="Baziru3_Engine\AI\NavMesh.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
-    <ClInclude Include="Baziru3_Engine\AI\PathfindingNodes.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
     <ClInclude Include="Baziru3_Engine\Base\AsyncLoader.h">
@@ -460,18 +395,25 @@
     <ClInclude Include="Baziru3_Engine\Base\BinaryAssetUtil.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
-    <ClInclude Include="Baziru3_Engine\IO\Mouse\MouseInput.h">
-      <Filter>ヘッダー ファイル</Filter>
-    <ClInclude Include="externals\imgui-node-editor\crude_json.h">
+    <ClInclude Include="Baziru3_Engine\AI\Blackboard.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
-    <ClInclude Include="externals\imgui-node-editor\imgui_bezier_math.h">
+    <ClInclude Include="Baziru3_Engine\AI\BehaviorNode.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
-    <ClInclude Include="externals\imgui-node-editor\imgui_canvas.h">
+    <ClInclude Include="Baziru3_Engine\AI\CompositeNodes.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
-    <ClInclude Include="externals\imgui-node-editor\imgui_extra_math.h">
+    <ClInclude Include="Baziru3_Engine\AI\BehaviorTree.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="Baziru3_Engine\AI\BehaviorNodeFactory.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="Baziru3_Engine\AI\BehaviorTreeEditor.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="Baziru3_Engine\AI\CoverNodes.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
     <ClInclude Include="Baziru3_Engine\AI\NavMesh.h">
@@ -486,7 +428,13 @@
     <ClInclude Include="externals\imgui-node-editor\imgui_node_editor_internal.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
-    <ClInclude Include="externals\nlohmann\json.hpp">
+    <ClInclude Include="externals\imgui-node-editor\imgui_node_editor_internal.inl">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="externals\imgui-node-editor\imgui_canvas.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="externals\imgui-node-editor\crude_json.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
   </ItemGroup>

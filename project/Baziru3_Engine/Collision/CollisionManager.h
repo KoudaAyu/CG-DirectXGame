@@ -117,16 +117,6 @@ public:
     /// </summary>
     float GetLastUpdateDurationMs() const { return lastUpdateDurationMs_; }
 
-    /// <summary>
-    /// アクティブコライダーのリストを取得します
-    /// </summary>
-    const std::vector<Collider*>& GetColliders() const { return colliders_; }
-
-    /// <summary>
-    /// 前回の衝突判定の所要時間（ミリ秒）を取得します
-    /// </summary>
-    float GetLastUpdateDurationMs() const { return lastUpdateDurationMs_; }
-
 private:
     CollisionManager() = default;
     ~CollisionManager() = default;
