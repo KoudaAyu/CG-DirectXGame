@@ -176,6 +176,7 @@ void Object3d::InitializeShared(Object3dCom* object3dCom, Object3d* masterObject
 	skinCluster_ = masterObject->skinCluster_;
 	skinClusterInitialized_ = masterObject->skinClusterInitialized_;
 	isShared_ = true;
+	masterObject_ = masterObject;
 
 	transform = { {1.0f,1.0f,1.0f}, {0.0f,0.0f,0.0f}, {0.0f,0.0f,0.0f} };
 	cameraTransform = { {1.0f,1.0f,1.0f}, {0.0f,0.0f,0.0f}, {0.0f,0.0f,-10.0f} };
@@ -681,18 +682,32 @@ void Object3d::PrepareConstantBuffers(DirectXCom* dx)
 	auto* cbAllocator = dx->GetCBAllocator();
 	if (!cbAllocator) return;
 
-	// マテリアルバッファの割り当てとコピー
-	auto matAlloc = cbAllocator->Allocate(sizeof(Material));
-	std::memcpy(matAlloc.cpuAddress, &materialData_, sizeof(Material));
-	materialGpuAddress_ = matAlloc.gpuAddress;
+	// マテリアルバッファの割り当てとコピー (共有オブジェクトならマスタのアドレスを使い回す)
+	if (isShared_ && masterObject_)
+	{
+		materialGpuAddress_ = masterObject_->materialGpuAddress_;
+	}
+	else
+	{
+		auto matAlloc = cbAllocator->Allocate(sizeof(Material));
+		std::memcpy(matAlloc.cpuAddress, &materialData_, sizeof(Material));
+		materialGpuAddress_ = matAlloc.gpuAddress;
+	}
 
-	// 変換行列バッファの割り当てとコピー
+	// 変換行列バッファの割り当てとコピー (これは個別位置が違うので必須)
 	auto transAlloc = cbAllocator->Allocate(sizeof(TransformationMatrix));
 	std::memcpy(transAlloc.cpuAddress, &transformationMatrixData_, sizeof(TransformationMatrix));
 	transformationMatrixGpuAddress_ = transAlloc.gpuAddress;
 
-	// ライトバッファの割り当てとコピー
-	auto lightAlloc = cbAllocator->Allocate(sizeof(DirectionalLight));
-	std::memcpy(lightAlloc.cpuAddress, &directionalLightData_, sizeof(DirectionalLight));
-	directionalLightGpuAddress_ = lightAlloc.gpuAddress;
+	// ライトバッファの割り当てとコピー (共有オブジェクトならマスタのアドレスを使い回す)
+	if (isShared_ && masterObject_)
+	{
+		directionalLightGpuAddress_ = masterObject_->directionalLightGpuAddress_;
+	}
+	else
+	{
+		auto lightAlloc = cbAllocator->Allocate(sizeof(DirectionalLight));
+		std::memcpy(lightAlloc.cpuAddress, &directionalLightData_, sizeof(DirectionalLight));
+		directionalLightGpuAddress_ = lightAlloc.gpuAddress;
+	}
 }

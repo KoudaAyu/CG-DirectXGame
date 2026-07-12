@@ -195,4 +195,5 @@ private:
 	bool wasDrawnLastFrame_ = false;
 	bool isShared_ = false;
 	bool isCulled_ = false;
+	Object3d* masterObject_ = nullptr;
 };
