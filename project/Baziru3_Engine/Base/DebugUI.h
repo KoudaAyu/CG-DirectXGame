@@ -46,9 +46,18 @@ private:
 
     std::unique_ptr<BaziruEngine::AI::BehaviorTreeEditor> btEditor_ = nullptr;
 
-    // パフォーマンス履歴データ
+    // パフォーマンス履歴データ (毎フレームの動的ヒープ確保を回避する固定配列構造)
     static constexpr int kMaxHistoryFrames = 100;
-    std::unordered_map<std::string, std::vector<float>> performanceHistory_;
+    static constexpr int kMaxStages = 16;
+    
+    struct StageProfile
+    {
+        char name[64];
+        float history[kMaxHistoryFrames];
+        bool active;
+    };
+    
+    StageProfile stages_[kMaxStages];
     int historyOffset_ = 0;
 };
 
