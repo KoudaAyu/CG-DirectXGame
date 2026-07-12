@@ -32,6 +32,9 @@ void DebugUI::Initialize()
 void DebugUI::Update()
 {
 #ifdef USE_IMGUI
+    // GPUプロファイル結果を前フレームから回収する
+    GpuProfiler::GetInstance()->ResolveResults();
+
     ImGui::ShowDemoWindow();
 
     ImGui::Begin("Windows");
