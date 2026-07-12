@@ -81,20 +81,13 @@ namespace BinaryAssetUtil
 
     bool IsCacheValid(const std::string& originalPath, const std::string& cachePath)
     {
-        if (!fs::exists(cachePath) || !fs::exists(originalPath))
+        // 開発速度・起動速度向上のため、キャッシュファイルが存在すれば即座に有効とみなす！
+        // （OneDrive同期フォルダ上での fs::last_write_time の極度の遅延を回避するため）
+        if (fs::exists(cachePath))
         {
-            return false;
+            return true;
         }
-        try
-        {
-            auto origTime = fs::last_write_time(originalPath);
-            auto cacheTime = fs::last_write_time(cachePath);
-            return cacheTime >= origTime;
-        }
-        catch (...)
-        {
-            return false;
-        }
+        return false;
     }
 
     // ModelData のシリアライズ
