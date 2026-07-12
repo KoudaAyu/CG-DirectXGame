@@ -91,9 +91,9 @@ void GamePlayScene::InitializeScene()
 		animatedCubeCollider_ = std::make_unique<MeshCollider>(animatedCube_.get(), CollisionAttribute::Enemy);
 		CollisionManager::GetInstance()->RegisterCollider(animatedCubeCollider_.get());
 
-		// Spawn 600 animated characters in a grid
-		const int cols = 30;
-		const int rows = 20;
+		// Spawn 600 animated characters in a grid (Disabled for 1 character mode)
+		const int cols = 0;
+		const int rows = 0;
 		const float spacingX = 4.0f;
 		const float spacingZ = 4.0f;
 		const float startX = -((cols - 1) * spacingX) / 2.0f;
