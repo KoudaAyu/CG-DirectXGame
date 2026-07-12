@@ -68,13 +68,46 @@ void AppParticleManager::Initialize(ParticleManager* enginePM)
 
 	HRESULT hr = dxCommon->GetDevice()->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&pipelineState_));
 	assert(SUCCEEDED(hr) && "CreateGraphicsPipelineState failed for AppParticle");
+
+	// 自前インスタンシング用リソースの作成とマップ
+	instancingResource_ = dxCommon->CreateBufferResource(dxCommon->GetDevice(), sizeof(ParticleManager::ParticleForGPU) * kNumMaxInstances);
+	instancingResource_->Map(0, nullptr, reinterpret_cast<void**>(&instanceData_));
+
+	// SRV の作成
+	auto* srvManager = TextureManager::GetInstance()->GetSRVManager();
+	assert(srvManager);
+	instancingSrvIndex_ = srvManager->Allocate();
+	srvManager->CreateSRVForStructuredBuffer(
+		instancingSrvIndex_,
+		instancingResource_.Get(),
+		kNumMaxInstances,
+		sizeof(ParticleManager::ParticleForGPU)
+	);
+	instancingSrvHandleGPU_ = srvManager->GetGPUDescriptorHandle(instancingSrvIndex_);
+}
+
+AppParticleManager::~AppParticleManager()
+{
+	if (instancingResource_ && instanceData_)
+	{
+		D3D12_RANGE writtenRange = { 0, static_cast<SIZE_T>(sizeof(ParticleManager::ParticleForGPU) * kNumMaxInstances) };
+		instancingResource_->Unmap(0, &writtenRange);
+		instanceData_ = nullptr;
+	}
+
+	if (instancingSrvIndex_ != 0)
+	{
+		auto* srvManager = TextureManager::GetInstance()->GetSRVManager();
+		if (srvManager)
+		{
+			srvManager->Free(instancingSrvIndex_);
+		}
+	}
 }
 
 void AppParticleManager::Update(float deltaTime, const Vector3& playerPos)
 {
 	if (!enginePM_) return;
-
-	std::list<ParticleManager::Particle> tempParticles;
 
 	auto it = particles_.begin();
 	while (it != particles_.end())
@@ -119,36 +152,7 @@ void AppParticleManager::Update(float deltaTime, const Vector3& playerPos)
 		rot.z += it->angularVelocity * deltaTime;
 		it->transform.SetRotate(rot);
 
-		// Construct standard ParticleManager::Particle
-		ParticleManager::Particle p;
-		p.transform = it->transform;
-		p.velocity = { 0.0f, 0.0f, 0.0f }; // Standard PM update doesn't move it
-
-		// Set lifetime and current time to achieve target alpha using formula:
-		// alpha = 1.0f - (currentTime / lifeTime)
-		float targetAlpha = 1.0f - (it->currentTime / it->lifeTime);
-		targetAlpha = (std::clamp)(targetAlpha, 0.0f, 1.0f);
-
-		// To prevent duplicate trails, we set lifeTime and currentTime such that 
-		// it gets drawn this frame and gets deleted exactly in the next frame.
-		// We must use the engine's constant timestep (1/60s) for this mapping because 
-		// the engine's ParticleManager is always updated with 1/60s, regardless of slow-mo.
-		float engineDeltaTime = 1.0f / 60.0f;
-		float epsilon = 0.001f;
-		float tAlpha = (std::clamp)(targetAlpha, epsilon, 1.0f - epsilon);
-		p.lifeTime = engineDeltaTime / tAlpha;
-		p.currentTime = p.lifeTime * (1.0f - tAlpha) - engineDeltaTime;
-
-		p.color = it->color;
-		p.textureIndex = it->textureIndex;
-
-		tempParticles.push_back(p);
 		++it;
-	}
-
-	if (!tempParticles.empty())
-	{
-		enginePM_->AddParticles(tempParticles);
 	}
 }
 
@@ -540,22 +544,97 @@ void AppParticleManager::EmitDeathFlash(std::mt19937& randomEngine, const Vector
 
 void AppParticleManager::Draw(const RenderContext& ctx, Model* model, UINT externalVertexCount)
 {
-	if (!ctx.commandList || !enginePM_ || !pipelineState_) return;
+	if (!ctx.commandList || !enginePM_ || !pipelineState_ || !ctx.camera) return;
 
-	// 描画するインスタンス数の取得
-	uint32_t numInstance = enginePM_->GetNumInstance();
-	if (numInstance == 0) return;
+	uint32_t totalParticles = static_cast<uint32_t>(particles_.size());
+	if (totalParticles == 0) return;
 
-	// 1. PSOとルートシグネチャをセット
+	// 1. ビルボード行列とビュープロジェクション行列の作成
+	Matrix4x4 backToFrontMatrix = MakeRotateYMatrix(0.0f);
+	Matrix4x4 billboardMatrix = Multiply(backToFrontMatrix, ctx.camera->GetWorldMatrix());
+	billboardMatrix.m[3][0] = 0.0f;
+	billboardMatrix.m[3][1] = 0.0f;
+	billboardMatrix.m[3][2] = 0.0f;
+
+	Matrix4x4 viewProjection = Multiply(ctx.camera->GetViewMatrix(), ctx.camera->GetProjectionMatrix());
+
+	// 2. アクティブなパーティクルを収集してソート
+	std::vector<const AppParticle*> activeParticles;
+	activeParticles.reserve(totalParticles);
+	for (const auto& p : particles_)
+	{
+		activeParticles.push_back(&p);
+	}
+
+	std::sort(activeParticles.begin(), activeParticles.end(), [](const AppParticle* a, const AppParticle* b) {
+		return a->textureIndex < b->textureIndex;
+	});
+
+	// 3. インスタンスデータとグループの書き込み
+	instanceGroups_.clear();
+	uint32_t currentWriteIndex = 0;
+
+	for (size_t i = 0; i < activeParticles.size(); ++i)
+	{
+		if (currentWriteIndex >= kNumMaxInstances)
+		{
+			break;
+		}
+
+		const auto& p = *activeParticles[i];
+
+		if (instanceGroups_.empty() || instanceGroups_.back().textureIndex != p.textureIndex)
+		{
+			ParticleManager::InstanceGroup newGroup;
+			newGroup.textureIndex = p.textureIndex;
+			newGroup.start = currentWriteIndex;
+			newGroup.count = 0;
+			newGroup.srvHandle = TextureManager::GetInstance()->GetSrvHandleGPU(p.textureIndex);
+			instanceGroups_.push_back(newGroup);
+		}
+
+		instanceGroups_.back().count++;
+
+		// ビルボード＆Z回転行列を乗算
+		Matrix4x4 localRot = MakeRotateZMatrix(p.transform.GetRotate().z);
+		Matrix4x4 finalRot = Multiply(localRot, billboardMatrix);
+		Matrix4x4 worldMatrix = MakeAffineMatrix(p.transform.GetScale(), finalRot, p.transform.GetTranslate());
+		Matrix4x4 WVP = Multiply(worldMatrix, viewProjection);
+
+		// アルファ値を考慮して色を設定
+		Vector4 color = p.color;
+		float alpha = 1.0f - (p.currentTime / p.lifeTime);
+		color.w = (std::clamp)(alpha * p.color.w, 0.0f, 1.0f);
+
+		instanceData_[currentWriteIndex].WVP = WVP;
+		instanceData_[currentWriteIndex].World = worldMatrix;
+		instanceData_[currentWriteIndex].color = color;
+		instanceData_[currentWriteIndex].textureIndex = p.textureIndex;
+
+		currentWriteIndex++;
+	}
+
+	numInstance_ = currentWriteIndex;
+	if (numInstance_ == 0) return;
+
+	// 残りのインスタンスデータをクリア
+	for (uint32_t i = numInstance_; i < kNumMaxInstances; ++i)
+	{
+		instanceData_[i].WVP = MakeIdentity4x4();
+		instanceData_[i].World = MakeIdentity4x4();
+		instanceData_[i].color = { 0,0,0,0 };
+		instanceData_[i].textureIndex = TextureManager::kInvalidTextureIndex;
+	}
+
+	// 4. PSOとルートシグネチャをセット
 	ctx.commandList->SetGraphicsRootSignature(rootSignature_.Get());
 	ctx.commandList->SetPipelineState(pipelineState_.Get());
 	ctx.commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-	// 2. マテリアルCBVとCPU用インスタンシングSRVをセット
+	// 5. 各パラメーターをセット
 	ctx.commandList->SetGraphicsRootConstantBufferView(RootParam::Particle::kMaterial, ctx.materialGPUAddress);
-	ctx.commandList->SetGraphicsRootDescriptorTable(RootParam::Particle::kInstancing, enginePM_->GetInstancingSrvHandleGPU());
+	ctx.commandList->SetGraphicsRootDescriptorTable(RootParam::Particle::kInstancing, instancingSrvHandleGPU_);
 
-	// 3. Light と Camera の CBV をセット
 	if (ctx.light)
 	{
 		ctx.commandList->SetGraphicsRootConstantBufferView(
@@ -569,11 +648,9 @@ void AppParticleManager::Draw(const RenderContext& ctx, Model* model, UINT exter
 
 	ctx.commandList->SetGraphicsRootConstantBufferView(
 		RootParam::Particle::kCamera,
-		ctx.camera && ctx.camera->GetCameraResource()
-			? ctx.camera->GetCameraResource()->GetGPUVirtualAddress()
-			: 0);
+		ctx.camera->GetCameraResource() ? ctx.camera->GetCameraResource()->GetGPUVirtualAddress() : 0);
 
-	// 4. 頂点バッファのバインド
+	// 6. 頂点バッファのバインド
 	UINT vc = externalVertexCount;
 	if (model && vc > 0)
 	{
@@ -584,19 +661,16 @@ void AppParticleManager::Draw(const RenderContext& ctx, Model* model, UINT exter
 		vc = 6;
 	}
 
-	// 5. テクスチャグループごとにインスタンシング描画
-	const auto& groups = enginePM_->GetInstanceGroups();
-	for (const auto& g : groups)
+	// 7. テクスチャグループごとに描画
+	for (const auto& g : instanceGroups_)
 	{
 		if (g.count == 0) continue;
 		if (g.srvHandle.ptr != 0)
 		{
 			ctx.commandList->SetGraphicsRootDescriptorTable(RootParam::Particle::kTextureTable, g.srvHandle);
 		}
-		
-		// インスタンスオフセット（b3）をセット
+
 		ctx.commandList->SetGraphicsRoot32BitConstant(RootParam::Particle::kInstanceOffset, g.start, 0);
-		
 		ctx.commandList->DrawInstanced(vc, g.count, 0, 0);
 	}
 }
