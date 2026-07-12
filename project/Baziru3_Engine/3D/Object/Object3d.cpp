@@ -339,6 +339,10 @@ void Object3d::Update()
 	}
 }
 
+static ID3D12GraphicsCommandList* s_lastCommandList = nullptr;
+static D3D12_GPU_VIRTUAL_ADDRESS s_lastVertexAddress = 0;
+static D3D12_GPU_VIRTUAL_ADDRESS s_lastIndexAddress = 0;
+
 void Object3d::Draw(ID3D12GraphicsCommandList* commandList)
 {
 	if (isCulled_) return;
@@ -350,16 +354,37 @@ void Object3d::Draw(ID3D12GraphicsCommandList* commandList)
 		PrepareConstantBuffers(dx);
 	}
 
-	commandList->IASetVertexBuffers(0, 1, &vertexBufferView_);
-	commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-   if (indexResource && !modelData_.indices.empty())
+	// コマンドリストが切り替わった場合はステートキャッシュを無効化
+	if (s_lastCommandList != commandList)
 	{
-		commandList->IASetIndexBuffer(&indexBufferView_);
+		s_lastCommandList = commandList;
+		s_lastVertexAddress = 0;
+		s_lastIndexAddress = 0;
 	}
+
+	// 頂点バッファのバインド (前回と同じバッファならスキップ)
+	if (s_lastVertexAddress != vertexBufferView_.BufferLocation)
+	{
+		commandList->IASetVertexBuffers(0, 1, &vertexBufferView_);
+		s_lastVertexAddress = vertexBufferView_.BufferLocation;
+	}
+
+	commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+	// インデックスバッファのバインド (前回と同じバッファならスキップ)
+	if (indexResource && !modelData_.indices.empty())
+	{
+		if (s_lastIndexAddress != indexBufferView_.BufferLocation)
+		{
+			commandList->IASetIndexBuffer(&indexBufferView_);
+			s_lastIndexAddress = indexBufferView_.BufferLocation;
+		}
+	}
+
 	commandList->SetGraphicsRootConstantBufferView(RootParam::Object3D::kMaterial, materialGpuAddress_);
 	commandList->SetGraphicsRootConstantBufferView(RootParam::Object3D::kTransform, transformationMatrixGpuAddress_);
 	commandList->SetGraphicsRootConstantBufferView(RootParam::Object3D::kLight, directionalLightGpuAddress_);
-   if (indexResource && !modelData_.indices.empty())
+	if (indexResource && !modelData_.indices.empty())
 	{
 		commandList->DrawIndexedInstanced(static_cast<UINT>(modelData_.indices.size()), 1, 0, 0, 0);
 	}
