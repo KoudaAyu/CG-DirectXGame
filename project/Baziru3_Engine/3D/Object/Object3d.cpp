@@ -342,6 +342,8 @@ void Object3d::Update()
 static ID3D12GraphicsCommandList* s_lastCommandList = nullptr;
 static D3D12_GPU_VIRTUAL_ADDRESS s_lastVertexAddress = 0;
 static D3D12_GPU_VIRTUAL_ADDRESS s_lastIndexAddress = 0;
+static D3D12_GPU_VIRTUAL_ADDRESS s_lastMaterialAddress = 0;
+static D3D12_GPU_VIRTUAL_ADDRESS s_lastLightAddress = 0;
 
 void Object3d::Draw(ID3D12GraphicsCommandList* commandList)
 {
@@ -360,6 +362,8 @@ void Object3d::Draw(ID3D12GraphicsCommandList* commandList)
 		s_lastCommandList = commandList;
 		s_lastVertexAddress = 0;
 		s_lastIndexAddress = 0;
+		s_lastMaterialAddress = 0;
+		s_lastLightAddress = 0;
 	}
 
 	// 頂点バッファのバインド (前回と同じバッファならスキップ)
@@ -381,9 +385,23 @@ void Object3d::Draw(ID3D12GraphicsCommandList* commandList)
 		}
 	}
 
-	commandList->SetGraphicsRootConstantBufferView(RootParam::Object3D::kMaterial, materialGpuAddress_);
+	// マテリアル定数バッファのバインド (前回と同じアドレスならスキップ)
+	if (s_lastMaterialAddress != materialGpuAddress_)
+	{
+		commandList->SetGraphicsRootConstantBufferView(RootParam::Object3D::kMaterial, materialGpuAddress_);
+		s_lastMaterialAddress = materialGpuAddress_;
+	}
+
+	// 変換行列はオブジェクトごとに異なるため、必ず設定する
 	commandList->SetGraphicsRootConstantBufferView(RootParam::Object3D::kTransform, transformationMatrixGpuAddress_);
-	commandList->SetGraphicsRootConstantBufferView(RootParam::Object3D::kLight, directionalLightGpuAddress_);
+
+	// ライト定数バッファのバインド (前回と同じアドレスならスキップ)
+	if (s_lastLightAddress != directionalLightGpuAddress_)
+	{
+		commandList->SetGraphicsRootConstantBufferView(RootParam::Object3D::kLight, directionalLightGpuAddress_);
+		s_lastLightAddress = directionalLightGpuAddress_;
+	}
+
 	if (indexResource && !modelData_.indices.empty())
 	{
 		commandList->DrawIndexedInstanced(static_cast<UINT>(modelData_.indices.size()), 1, 0, 0, 0);
