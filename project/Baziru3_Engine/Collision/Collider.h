@@ -10,7 +10,9 @@ enum class ColliderType
 {
     Sphere,  // 球
     Box,     // 直方体 (OBB/AABB)
-    Capsule  // カプセル
+    Capsule, // カプセル
+    Mesh,    // メッシュ (ポリゴン精密判定)
+    Skeleton // スケルトン (関節ごとの球体コライダー)
 };
 
 /// <summary>

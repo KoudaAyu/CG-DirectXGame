@@ -2,6 +2,8 @@
 #include "Sprite.h"
 #include <memory>
 #include <vector>
+#include <unordered_map>
+#include <string>
 
 class Camera;
 class DebugCamera;
@@ -43,5 +45,19 @@ private:
     std::vector<std::unique_ptr<Sprite>> sprites;
 
     std::unique_ptr<BaziruEngine::AI::BehaviorTreeEditor> btEditor_ = nullptr;
+
+    // パフォーマンス履歴データ (毎フレームの動的ヒープ確保を回避する固定配列構造)
+    static constexpr int kMaxHistoryFrames = 100;
+    static constexpr int kMaxStages = 16;
+    
+    struct StageProfile
+    {
+        char name[64];
+        float history[kMaxHistoryFrames];
+        bool active;
+    };
+    
+    StageProfile stages_[kMaxStages];
+    int historyOffset_ = 0;
 };
 

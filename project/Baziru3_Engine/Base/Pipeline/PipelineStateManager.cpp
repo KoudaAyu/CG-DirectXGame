@@ -34,6 +34,7 @@ void PipelineStateManager::Initialize(DirectXCom* dxCommon)
 	registerShader("SpritePS", L"Resources/shaders/Sprite.PS.hlsl");
 	registerShader("Object3DVS", L"Resources/shaders/Object3D.VS.hlsl");
 	registerShader("Object3DPS", L"Resources/shaders/Object3D.PS.hlsl");
+	registerShader("DebugWireframePS", L"Resources/shaders/DebugWireframe.PS.hlsl");
 
 	// パイプラインステートおよびルートシグネチャの構築
 	CreateSpritePipelines(dxCommon);
@@ -367,6 +368,11 @@ void PipelineStateManager::CreateObject3dPipelines(DirectXCom* dxCommon)
 		dxCommon->GetDxcUtils().Get(), dxCommon->GetDxcCompiler(), dxCommon->GetIncludeHandler(), std::cout);
 	assert(pixelShaderBlob != nullptr);
 
+	Microsoft::WRL::ComPtr<IDxcBlob> wireframePixelShaderBlob = dxCommon->CompileShader(
+		L"Resources/shaders/DebugWireframe.PS.hlsl", L"ps_6_0",
+		dxCommon->GetDxcUtils().Get(), dxCommon->GetDxcCompiler(), dxCommon->GetIncludeHandler(), std::cout);
+	assert(wireframePixelShaderBlob != nullptr);
+
 	// 3. インプットレイアウト
 	D3D12_INPUT_ELEMENT_DESC inputElementDescs[3]{};
 	inputElementDescs[0].SemanticName = "POSITION";
@@ -438,5 +444,17 @@ void PipelineStateManager::CreateObject3dPipelines(DirectXCom* dxCommon)
 		hr = dxCommon->GetDevice()->CreateGraphicsPipelineState(&desc, IID_PPV_ARGS(&pipelineStateOverlay));
 		assert(SUCCEEDED(hr));
 		pipelineStates_["Object3D_Overlay"] = pipelineStateOverlay;
+
+		// ワイヤーフレーム (デプステスト有効、デプス書き込み無効、ワイヤーフレーム描画モード)
+		desc.DepthStencilState.DepthEnable = TRUE;
+		desc.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO; // Zファイティング防止
+		desc.DepthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
+		desc.RasterizerState.FillMode = D3D12_FILL_MODE_WIREFRAME;
+		desc.PS = { wireframePixelShaderBlob->GetBufferPointer(), wireframePixelShaderBlob->GetBufferSize() };
+		
+		Microsoft::WRL::ComPtr<ID3D12PipelineState> pipelineStateWireframe;
+		hr = dxCommon->GetDevice()->CreateGraphicsPipelineState(&desc, IID_PPV_ARGS(&pipelineStateWireframe));
+		assert(SUCCEEDED(hr));
+		pipelineStates_["Object3D_Wireframe"] = pipelineStateWireframe;
 	}
 }

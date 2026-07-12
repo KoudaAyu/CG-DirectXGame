@@ -11,6 +11,42 @@ namespace BaziruEngine::AI {
 // ==========================================
 
 BehaviorTreeEditor::BehaviorTreeEditor() {
+    // Sanitize settings file to prevent infinite grid loop freeze from corrupted zoom
+    std::string settingsPath = "bt_editor_layout.json";
+    std::ifstream checkFile(settingsPath);
+    if (checkFile.is_open())
+    {
+        nlohmann::json settingsJson;
+        bool needReset = false;
+        try {
+            checkFile >> settingsJson;
+            if (settingsJson.contains("view") && settingsJson["view"].contains("zoom"))
+            {
+                float zoom = settingsJson["view"]["zoom"];
+                if (zoom < 0.001f) // Corrupted or extremely tiny zoom causing infinite loop
+                {
+                    needReset = true;
+                }
+            }
+        } catch (...) {
+            // Ignore parse errors
+        }
+        checkFile.close();
+
+        if (needReset)
+        {
+            settingsJson["view"]["zoom"] = 1.0f;
+            if (settingsJson["view"].contains("scroll"))
+            {
+                settingsJson["view"]["scroll"]["x"] = 0.0f;
+                settingsJson["view"]["scroll"]["y"] = 0.0f;
+            }
+            std::ofstream saveFile(settingsPath);
+            saveFile << settingsJson.dump();
+            saveFile.close();
+        }
+    }
+
     // imgui-node-editorのコンテキスト生成
     ed::Config config;
     config.SettingsFile = "bt_editor_layout.json"; // ノード位置自動保存用ファイル
@@ -271,11 +307,18 @@ void BehaviorTreeEditor::Draw() {
     // メニューバーでの保存・読込処理
     if (ImGui::BeginMenuBar()) {
         if (ImGui::BeginMenu("File")) {
-            if (ImGui::MenuItem("Load Load Tree (test_tree.json)")) {
+            if (ImGui::MenuItem("Load test_tree.json")) {
                 LoadTree("test_tree.json");
             }
-            if (ImGui::MenuItem("Save Save Tree (test_tree.json)")) {
+            if (ImGui::MenuItem("Save test_tree.json")) {
                 SaveTree("test_tree.json");
+            }
+            ImGui::Separator();
+            if (ImGui::MenuItem("Load test_cover_tree.json")) {
+                LoadTree("test_cover_tree.json");
+            }
+            if (ImGui::MenuItem("Save test_cover_tree.json")) {
+                SaveTree("test_cover_tree.json");
             }
             ImGui::EndMenu();
         }
@@ -289,7 +332,10 @@ void BehaviorTreeEditor::Draw() {
 
     // 🎨 [左側] ノードエディタキャンバスの描画
     ed::SetCurrentEditor(editorContext_);
-    ed::Begin("MyNodeEditor", ImVec2(0.0f, 0.0f));
+    ImVec2 canvasSize = ImGui::GetContentRegionAvail();
+    if (canvasSize.x < 100.0f) canvasSize.x = 100.0f;
+    if (canvasSize.y < 100.0f) canvasSize.y = 100.0f;
+    ed::Begin("MyNodeEditor", canvasSize);
 
     // A. ノードの描画
     for (auto& node : nodes_) {

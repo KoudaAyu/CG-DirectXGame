@@ -7,11 +7,18 @@
 #include "ParticleManager.h"
 #include "Application/Scene/GameScene/GamePlayScene.h"
 #include "BehaviorTreeEditor.h"
+#include "Baziru3_Engine/Graphics/GpuProfiler.h"
+#include "Baziru3_Engine/Collision/CollisionManager.h"
 #include <imgui.h>
 
 DebugUI::DebugUI(MaterialManager* materialManager, SpriteManager* spriteManager, Camera* camera,
     Sprite::Transform* transformObject, bool* useMonsterBall, bool* drawObject, bool* drawSprite)
     : materialManager_(materialManager), spriteManager_(spriteManager), camera_(camera), transformObject_(transformObject), useMonsterBall_(useMonsterBall), drawObject_(drawObject), drawSprite_(drawSprite)
+{
+    std::memset(stages_, 0, sizeof(stages_));
+}
+
+DebugUI::~DebugUI()
 {
 }
 
@@ -29,6 +36,9 @@ void DebugUI::Initialize()
 void DebugUI::Update()
 {
 #ifdef USE_IMGUI
+    // GPUプロファイル結果を前フレームから回収する
+    GpuProfiler::GetInstance()->ResolveResults();
+
     ImGui::ShowDemoWindow();
 
     ImGui::Begin("Windows");
@@ -313,7 +323,81 @@ void DebugUI::Update()
 
         char label[64];
         std::snprintf(label, sizeof(label), "Min: %.1f | Max: %.1f", minFps, maxFps);
-        ImGui::PlotLines("##FPSGraph", fpsHistory, 120, fpsHistoryOffset, label, 0.0f, 120.0f, ImVec2(0, 80.0f));
+        ImGui::PlotLines("##FPSGraph", fpsHistory, 120, fpsHistoryOffset, label, 0.0f, 120.0f, ImVec2(0, 50.0f));
+
+        ImGui::Separator();
+        ImGui::Text("--- CPU/GPU Stage Profiler ---");
+
+        // 1. 全ステージの active フラグをリセット
+        for (int i = 0; i < kMaxStages; ++i)
+        {
+            stages_[i].active = false;
+        }
+
+        // Helper: 名前からステージのインデックスを取得、無ければ新規登録
+        auto getStageIndex = [&](const std::string& name) -> int {
+            for (int i = 0; i < kMaxStages; ++i)
+            {
+                if (stages_[i].name[0] == '\0') // 空きスロット
+                {
+                    strcpy_s(stages_[i].name, sizeof(stages_[i].name), name.c_str());
+                    return i;
+                }
+                if (std::strcmp(stages_[i].name, name.c_str()) == 0)
+                {
+                    return i;
+                }
+            }
+            return -1; // 満杯
+        };
+
+        // GPU プロファイル結果の回収と履歴の更新
+        const auto& gpuResults = GpuProfiler::GetInstance()->GetResults();
+        for (const auto& res : gpuResults)
+        {
+            int idx = getStageIndex(res.name);
+            if (idx >= 0)
+            {
+                stages_[idx].active = true;
+                stages_[idx].history[historyOffset_] = res.timeMs;
+            }
+        }
+
+        // CPU 衝突判定（Collision）の所要時間を追加
+        float collisionTime = CollisionManager::GetInstance()->GetLastUpdateDurationMs();
+        int colIdx = getStageIndex("Collision (CPU)");
+        if (colIdx >= 0)
+        {
+            stages_[colIdx].active = true;
+            stages_[colIdx].history[historyOffset_] = collisionTime;
+        }
+
+        // オフセットを進める
+        historyOffset_ = (historyOffset_ + 1) % kMaxHistoryFrames;
+
+        // 各ステージの時間数値表示と個別の折れ線グラフ描画
+        for (int i = 0; i < kMaxStages; ++i)
+        {
+            if (stages_[i].name[0] == '\0') continue; // 未使用
+
+            float lastVal = stages_[i].history[historyOffset_ == 0 ? kMaxHistoryFrames - 1 : historyOffset_ - 1];
+
+            ImGui::Text("%s: %.3f ms", stages_[i].name, lastVal);
+            
+            // グラフ用に最大値を動的計算してスケールを合わせる
+            float maxVal = 0.1f;
+            for (int j = 0; j < kMaxHistoryFrames; ++j)
+            {
+                if (stages_[i].history[j] > maxVal) maxVal = stages_[i].history[j];
+            }
+            maxVal *= 1.2f;
+
+            char graphLabel[64];
+            std::snprintf(graphLabel, sizeof(graphLabel), "Max: %.2f ms", maxVal);
+            
+            std::string imguiId = "##" + std::string(stages_[i].name);
+            ImGui::PlotLines(imguiId.c_str(), stages_[i].history, kMaxHistoryFrames, historyOffset_, graphLabel, 0.0f, maxVal, ImVec2(0, 35.0f));
+        }
     }
     ImGui::End();
     if (btEditor_)

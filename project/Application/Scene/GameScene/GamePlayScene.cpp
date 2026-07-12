@@ -4,6 +4,7 @@
 #include"SkinningObject3dCom.h"
 #include"Model.h"
 #include "SceneManager.h"
+#include "Baziru3_Engine/Collision/CollisionManager.h"
 #include "MaterialManager.h"
 #include "Light.h"
 #include "ParticleManager.h"
@@ -85,6 +86,36 @@ void GamePlayScene::InitializeScene()
 		{
 			skeletonDebug_.Initialize(directXCom, object3dCom, materialManager, light, camera_, skeleton_);
 		}
+
+		// Register skinned Mesh Collider
+		animatedCubeCollider_ = std::make_unique<MeshCollider>(animatedCube_.get(), CollisionAttribute::Enemy);
+		CollisionManager::GetInstance()->RegisterCollider(animatedCubeCollider_.get());
+
+		// Spawn 600 animated characters in a grid
+		const int cols = 30;
+		const int rows = 20;
+		const float spacingX = 4.0f;
+		const float spacingZ = 4.0f;
+		const float startX = -((cols - 1) * spacingX) / 2.0f;
+		const float startZ = 10.0f;
+
+		for (int r = 0; r < rows; ++r)
+		{
+			for (int c = 0; c < cols; ++c)
+			{
+				auto obj = std::make_unique<Object3d>();
+				obj->InitializeShared(object3dCom, animatedCube_.get());
+				obj->SetTranslate({ startX + c * spacingX, 0.0f, startZ + r * spacingZ });
+				obj->SetScale({ 1.0f, 1.0f, 1.0f });
+				obj->SetEnableLighting(true);
+
+				auto col = std::make_unique<MeshCollider>(obj.get(), CollisionAttribute::Enemy, animatedCubeCollider_.get());
+				CollisionManager::GetInstance()->RegisterCollider(col.get());
+
+				crowd_.push_back(std::move(obj));
+				crowdColliders_.push_back(std::move(col));
+			}
+		}
 	}
 
 	//スプライト共通テクスチャ読み込み
@@ -148,6 +179,17 @@ void GamePlayScene::Finalize()
       hitEffect_->Finalize();
 		hitEffect_.reset();
 	}
+    if (animatedCubeCollider_)
+    {
+        CollisionManager::GetInstance()->UnregisterCollider(animatedCubeCollider_.get());
+        animatedCubeCollider_.reset();
+    }
+    for (auto& col : crowdColliders_)
+    {
+        CollisionManager::GetInstance()->UnregisterCollider(col.get());
+    }
+    crowdColliders_.clear();
+    crowd_.clear();
     hitEffectInitialized = false;
 }
 
@@ -175,6 +217,19 @@ void GamePlayScene::Update()
 			animatedCube_->SetFresnelF0(materialManager->GetMaterialFresnelF0());
 		}
 		animatedCube_->Update(); // ステップ1〜4はエンジン層で実行される
+	}
+
+	for (auto& obj : crowd_)
+	{
+		Vector3 rotate = obj->GetRotate();
+		rotate.y += 0.01f;
+		obj->SetRotate(rotate);
+		if (materialManager)
+		{
+			obj->SetReflectionFactor(materialManager->GetMaterialReflectionFactor());
+			obj->SetFresnelF0(materialManager->GetMaterialFresnelF0());
+		}
+		obj->Update();
 	}
 
 	if (skeletonDebug_.IsInitialized() && animatedCube_)
@@ -300,4 +355,8 @@ void GamePlayScene::Draw(SceneRenderRequests& renderRequests)
 		animatedCube_->Draw(object3dCom, skinningObject3dCom);
 	}
 
+	for (auto& obj : crowd_)
+	{
+		obj->Draw(object3dCom, skinningObject3dCom);
+	}
 }

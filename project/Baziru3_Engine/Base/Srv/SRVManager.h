@@ -10,7 +10,7 @@ public:
 	void Initialize(DirectXCom* directXCom);
 
 
-	static constexpr uint32_t kMaxSRVCount = 512;
+	static constexpr uint32_t kMaxSRVCount = 8192;
 
 	//SRV作成
 	void CreateSRVForTexture2D(uint32_t srvIndex, ID3D12Resource* pResource, DXGI_FORMAT Format, UINT MipLeveles);

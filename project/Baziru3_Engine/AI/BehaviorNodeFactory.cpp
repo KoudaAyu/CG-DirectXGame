@@ -1,6 +1,7 @@
 #include "BehaviorNodeFactory.h"
 #include "CompositeNodes.h"
 #include "CoverNodes.h"
+#include "PathfindingNodes.h"
 
 namespace BaziruEngine::AI {
 
@@ -30,6 +31,8 @@ void BehaviorNodeFactory::RegisterBuiltinNodes() {
     RegisterNode<SequenceNode>("SequenceNode");
     RegisterNode<DetectCoverNode>("DetectCoverNode");
     RegisterNode<MoveToCoverNode>("MoveToCoverNode");
+    RegisterNode<FindPathNode>("FindPathNode");
+    RegisterNode<FollowPathNode>("FollowPathNode");
 }
 
 } // namespace BaziruEngine::AI

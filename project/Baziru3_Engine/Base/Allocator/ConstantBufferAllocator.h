@@ -16,7 +16,7 @@ public:
     ConstantBufferAllocator(DirectXCom* dxCommon);
     ~ConstantBufferAllocator() = default;
 
-    void Initialize(size_t bufferSize = 256 * 1024); // デフォルト 256KB
+    void Initialize(size_t bufferSize = 8 * 1024 * 1024); // デフォルト 8MB
     void Finalize();
 
     // 毎フレームの開始時に呼び出し、現在のフレームの書き込み領域の同期・更新を行う

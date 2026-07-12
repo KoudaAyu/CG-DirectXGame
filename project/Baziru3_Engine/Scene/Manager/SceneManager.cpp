@@ -14,6 +14,9 @@
 #include <Log.h>
 #include "ModelManager.h"
 #include "AsyncLoader.h"
+#include "Baziru3_Engine/Collision/CollisionManager.h"
+#include "Baziru3_Engine/3D/Object/Object3d.h"
+#include "Baziru3_Engine/Shapes/Sphere/Sphere.h"
 
 namespace {
     static std::unique_ptr<SceneManager>& SceneManagerStorage()
@@ -84,6 +87,15 @@ void SceneManager::Initialize(DirectXCom* dxCommon)
 
 void SceneManager::Update(float deltaTime)
 {
+	for (Object3d* obj : Object3d::GetInstances())
+	{
+		if (obj) obj->ResetFrameDrawFlags();
+	}
+	for (Sphere* s : Sphere::GetInstances())
+	{
+		if (s) s->ResetFrameDrawFlags();
+	}
+
 	if (!dxCommon_)
 	{
         Logger::Log(logStream_, "SceneManager::Update() called before DirectXCom is set.");
@@ -187,6 +199,7 @@ void SceneManager::Draw(SceneRenderRequests& renderRequests)
             renderRequests.sceneDrawn = true;
         }
     }
+
 }
 
 void SceneManager::DrawSkybox(ID3D12GraphicsCommandList* commandList) const
