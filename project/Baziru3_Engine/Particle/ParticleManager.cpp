@@ -315,22 +315,8 @@ void ParticleManager::Update(float deltaTime)
 				continue;
 			}
 
-			Vector3 rot = it->transform.GetRotate();
-			Matrix4x4 rotZ = MakeRotateZMatrix(rot.z);
-			Matrix4x4 finalRotation = Multiply(rotZ, billboardMatrix);
-			Matrix4x4 worldMatrix = MakeAffineMatrix(
-				it->transform.GetScale(), finalRotation, it->transform.GetTranslate());
-			Matrix4x4 wvpMatrix = Multiply(
-				worldMatrix, Multiply(camera_->GetViewMatrix(), camera_->GetProjectionMatrix()));
-
-			if (writeIndex < kNumMaxInstances)
+			if (writeIndex < kMaxGPUParticles)
 			{
-				instanceData[writeIndex].WVP = wvpMatrix;
-				instanceData[writeIndex].World = worldMatrix;
-				instanceData[writeIndex].color = it->color;
-				float alpha = 1.0f - (it->currentTime / it->lifeTime);
-				instanceData[writeIndex].color.w = alpha;
-				instanceData[writeIndex].textureIndex = it->textureIndex;
 				++writeIndex;
 			}
 
@@ -341,68 +327,14 @@ void ParticleManager::Update(float deltaTime)
 		}
 	};
 
-  const uint32_t normalStart = writeIndex;
+	const uint32_t normalStart = writeIndex;
 	updateParticleList(particles);
-    normalInstanceCount_ = writeIndex - normalStart;
+	normalInstanceCount_ = writeIndex - normalStart;
 
 	const uint32_t effectStart = writeIndex;
 	updateParticleList(effectParticles);
-   effectInstanceCount_ = writeIndex - effectStart;
+	effectInstanceCount_ = writeIndex - effectStart;
 	numInstance = writeIndex;
-
-   auto buildInstanceGroups = [&](uint32_t start, uint32_t count, std::vector<InstanceGroup>& outGroups)
-	{
-		outGroups.clear();
-		if (count == 0)
-		{
-			return;
-		}
-
-		uint32_t curStart = start;
-		uint32_t curTex = instanceData[start].textureIndex;
-		for (uint32_t i = start + 1; i < start + count; ++i)
-		{
-			if (instanceData[i].textureIndex != curTex)
-			{
-				InstanceGroup g;
-				g.textureIndex = curTex;
-				g.start = curStart;
-				g.count = i - curStart;
-				if (curTex == TextureManager::kInvalidTextureIndex)
-				{
-					g.srvHandle = {};
-				}
-				else
-				{
-					g.srvHandle = textureManager_->GetSrvHandleGPU(curTex);
-				}
-				outGroups.push_back(g);
-
-				curStart = i;
-				curTex = instanceData[i].textureIndex;
-			}
-		}
-
-		InstanceGroup g;
-		g.textureIndex = curTex;
-		g.start = curStart;
-		g.count = start + count - curStart;
-		if (curTex == TextureManager::kInvalidTextureIndex)
-		{
-			g.srvHandle = {};
-		}
-		else
-		{
-			g.srvHandle = textureManager_->GetSrvHandleGPU(curTex);
-		}
-		outGroups.push_back(g);
-	};
-
-	buildInstanceGroups(normalStart, normalInstanceCount_, normalInstanceGroups_);
-	buildInstanceGroups(effectStart, effectInstanceCount_, effectInstanceGroups_);
-	instanceGroups.clear();
-	instanceGroups.insert(instanceGroups.end(), normalInstanceGroups_.begin(), normalInstanceGroups_.end());
-	instanceGroups.insert(instanceGroups.end(), effectInstanceGroups_.begin(), effectInstanceGroups_.end());
 
 	// Update CSの実行
 	ID3D12GraphicsCommandList* commandList = dxCommon->GetCommandList().Get();

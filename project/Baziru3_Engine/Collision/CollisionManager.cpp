@@ -21,6 +21,15 @@
 // ベクトル数学のインラインヘルパー関数
 // =========================================================================
 
+inline Vector3 Cross(const Vector3& a, const Vector3& b)
+{
+    return {
+        a.y * b.z - a.z * b.y,
+        a.z * b.x - a.x * b.z,
+        a.x * b.y - a.y * b.x
+    };
+}
+
 inline float Dot(const Vector3& a, const Vector3& b)
 {
     return a.x * b.x + a.y * b.y + a.z * b.z;
@@ -333,6 +342,27 @@ bool CollisionManager::CheckCollision(const CollisionData& a, const CollisionDat
         outPushDir = outPushDir * -1.0f;
         return hit;
     }
+    // 4. ボックス vs ボックス (Box - Box)
+    if (typeA == ColliderType::Box && typeB == ColliderType::Box)
+    {
+        return CheckBoxBox(a, b, outPushDir, outPushLen);
+    }
+    // 5. ボックス vs カプセル (Box - Capsule)
+    if (typeA == ColliderType::Box && typeB == ColliderType::Capsule)
+    {
+        return CheckBoxCapsule(a, b, outPushDir, outPushLen);
+    }
+    if (typeA == ColliderType::Capsule && typeB == ColliderType::Box)
+    {
+        bool hit = CheckBoxCapsule(b, a, outPushDir, outPushLen);
+        outPushDir = outPushDir * -1.0f;
+        return hit;
+    }
+    // 6. カプセル vs カプセル (Capsule - Capsule)
+    if (typeA == ColliderType::Capsule && typeB == ColliderType::Capsule)
+    {
+        return CheckCapsuleCapsule(a, b, outPushDir, outPushLen);
+    }
 
     return false;
 }
@@ -485,16 +515,267 @@ bool CollisionManager::CheckSphereCapsule(const CollisionData& sphere, const Col
 
 bool CollisionManager::CheckBoxBox(const CollisionData& a, const CollisionData& b, Vector3& outPushDir, float& outPushLen)
 {
-    return false;
+    // OBB同士の交差判定 (分離軸定理: SAT)
+    Vector3 rotA = a.shape.rotation;
+    Matrix4x4 RA = Multiply(MakeRotateXMatrix(rotA.x), Multiply(MakeRotateYMatrix(rotA.y), MakeRotateZMatrix(rotA.z)));
+    Vector3 uA[3] = {
+        { RA.m[0][0], RA.m[0][1], RA.m[0][2] },
+        { RA.m[1][0], RA.m[1][1], RA.m[1][2] },
+        { RA.m[2][0], RA.m[2][1], RA.m[2][2] }
+    };
+
+    Vector3 rotB = b.shape.rotation;
+    Matrix4x4 RB = Multiply(MakeRotateXMatrix(rotB.x), Multiply(MakeRotateYMatrix(rotB.y), MakeRotateZMatrix(rotB.z)));
+    Vector3 uB[3] = {
+        { RB.m[0][0], RB.m[0][1], RB.m[0][2] },
+        { RB.m[1][0], RB.m[1][1], RB.m[1][2] },
+        { RB.m[2][0], RB.m[2][1], RB.m[2][2] }
+    };
+
+    Vector3 T = b.worldPosition - a.worldPosition;
+    Vector3 hA = a.shape.size * 0.5f;
+    Vector3 hB = b.shape.size * 0.5f;
+
+    Vector3 axes[15];
+    int axisCount = 0;
+
+    // Aのローカル軸
+    for (int i = 0; i < 3; ++i) axes[axisCount++] = uA[i];
+    // Bのローカル軸
+    for (int i = 0; i < 3; ++i) axes[axisCount++] = uB[i];
+
+    // 外積軸
+    for (int i = 0; i < 3; ++i)
+    {
+        for (int j = 0; j < 3; ++j)
+        {
+            Vector3 crossAxis = Cross(uA[i], uB[j]);
+            if (LengthSq(crossAxis) > 1e-5f)
+            {
+                axes[axisCount++] = Normalize(crossAxis);
+            }
+        }
+    }
+
+    float minOverlap = 1e30f;
+    Vector3 bestAxis = { 0.0f, 0.0f, 0.0f };
+
+    for (int i = 0; i < axisCount; ++i)
+    {
+        Vector3 L = axes[i];
+        if (LengthSq(L) < 1e-5f) continue;
+        L = Normalize(L);
+
+        // 投影半径の計算
+        float rA = hA.x * std::abs(Dot(uA[0], L)) + hA.y * std::abs(Dot(uA[1], L)) + hA.z * std::abs(Dot(uA[2], L));
+        float rB = hB.x * std::abs(Dot(uB[0], L)) + hB.y * std::abs(Dot(uB[1], L)) + hB.z * std::abs(Dot(uB[2], L));
+
+        // 中心間距離の投影
+        float distance = std::abs(Dot(T, L));
+
+        // 重なり幅
+        float overlap = (rA + rB) - distance;
+
+        if (overlap < 0.0f)
+        {
+            return false; // 分離軸が見つかった
+        }
+
+        if (overlap < minOverlap)
+        {
+            minOverlap = overlap;
+            bestAxis = L;
+        }
+    }
+
+    outPushLen = minOverlap;
+    if (Dot(T, bestAxis) < 0.0f)
+    {
+        outPushDir = bestAxis * -1.0f;
+    }
+    else
+    {
+        outPushDir = bestAxis;
+    }
+
+    return true;
 }
 
 bool CollisionManager::CheckBoxCapsule(const CollisionData& box, const CollisionData& capsule, Vector3& outPushDir, float& outPushLen)
 {
-    return false;
+    Vector3 bPos = box.worldPosition;
+    Vector3 rot = box.shape.rotation;
+    Matrix4x4 R = Multiply(MakeRotateXMatrix(rot.x), Multiply(MakeRotateYMatrix(rot.y), MakeRotateZMatrix(rot.z)));
+    Vector3 uA[3] = {
+        { R.m[0][0], R.m[0][1], R.m[0][2] },
+        { R.m[1][0], R.m[1][1], R.m[1][2] },
+        { R.m[2][0], R.m[2][1], R.m[2][2] }
+    };
+
+    Vector3 extents = box.shape.size * 0.5f;
+
+    float halfH = capsule.shape.height * 0.5f;
+    Vector3 P0 = capsule.worldPosition - Vector3{ 0.0f, halfH, 0.0f };
+    Vector3 P1 = capsule.worldPosition + Vector3{ 0.0f, halfH, 0.0f };
+
+    // 1. カプセル線分をBoxのローカル空間に変換
+    Vector3 offset0 = P0 - bPos;
+    Vector3 localP0 = { Dot(offset0, uA[0]), Dot(offset0, uA[1]), Dot(offset0, uA[2]) };
+    Vector3 offset1 = P1 - bPos;
+    Vector3 localP1 = { Dot(offset1, uA[0]), Dot(offset1, uA[1]), Dot(offset1, uA[2]) };
+
+    // 2. AABBと線分の最短点を見つけるためのパラメータ t 候補
+    std::vector<float> tCandidates;
+    tCandidates.push_back(0.0f);
+    tCandidates.push_back(1.0f);
+
+    Vector3 segmentDir = localP1 - localP0;
+
+    auto checkPlaneIntersection = [&](float value, float p0Val, float dirVal) {
+        if (std::abs(dirVal) > 1e-5f)
+        {
+            float t = (value - p0Val) / dirVal;
+            if (t >= 0.0f && t <= 1.0f)
+            {
+                tCandidates.push_back(t);
+            }
+        }
+    };
+
+    // AABB の各境界プレーンとの交点
+    checkPlaneIntersection(extents.x, localP0.x, segmentDir.x);
+    checkPlaneIntersection(-extents.x, localP0.x, segmentDir.x);
+    checkPlaneIntersection(extents.y, localP0.y, segmentDir.y);
+    checkPlaneIntersection(-extents.y, localP0.y, segmentDir.y);
+    checkPlaneIntersection(extents.z, localP0.z, segmentDir.z);
+    checkPlaneIntersection(-extents.z, localP0.z, segmentDir.z);
+
+    float bestT = 0.0f;
+    float minSqDist = 1e30f;
+
+    for (float t : tCandidates)
+    {
+        Vector3 pt = localP0 + segmentDir * t;
+        Vector3 closest = {
+            Clamp(pt.x, -extents.x, extents.x),
+            Clamp(pt.y, -extents.y, extents.y),
+            Clamp(pt.z, -extents.z, extents.z)
+        };
+        float sqDist = LengthSq(pt - closest);
+        if (sqDist < minSqDist)
+        {
+            minSqDist = sqDist;
+            bestT = t;
+        }
+    }
+
+    // 3. 特定した最短接近点 Q (ワールド座標)
+    Vector3 Q = P0 + (P1 - P0) * bestT;
+
+    // 4. Qを中心とする球とBoxの衝突判定へ帰着
+    CollisionData sphereData;
+    sphereData.originalCollider = capsule.originalCollider; // 押し戻し処理用にコライダーへの参照を保持
+    sphereData.type = ColliderType::Sphere;
+    sphereData.attribute = capsule.attribute;
+    sphereData.worldPosition = Q;
+    sphereData.shape.radius = capsule.shape.radius;
+
+    // 球 vs Box 判定を呼び出す (押し戻し方向と量はそのまま使える)
+    return CheckSphereBox(sphereData, box, outPushDir, outPushLen);
 }
 
 bool CollisionManager::CheckCapsuleCapsule(const CollisionData& a, const CollisionData& b, Vector3& outPushDir, float& outPushLen)
 {
+    float halfHA = a.shape.height * 0.5f;
+    Vector3 P0 = a.worldPosition - Vector3{ 0.0f, halfHA, 0.0f };
+    Vector3 P1 = a.worldPosition + Vector3{ 0.0f, halfHA, 0.0f };
+
+    float halfHB = b.shape.height * 0.5f;
+    Vector3 Q0 = b.worldPosition - Vector3{ 0.0f, halfHB, 0.0f };
+    Vector3 Q1 = b.worldPosition + Vector3{ 0.0f, halfHB, 0.0f };
+
+    Vector3 u = P1 - P0;
+    Vector3 v = Q1 - Q0;
+    Vector3 w = P0 - Q0;
+    float a_val = Dot(u, u);
+    float b_val = Dot(u, v);
+    float c_val = Dot(v, v);
+    float d_val = Dot(u, w);
+    float e_val = Dot(v, w);
+    float D = a_val * c_val - b_val * b_val;
+    float sc, sN, sD = D;
+    float tc, tN, tD = D;
+
+    if (D < 1e-5f)
+    {
+        sN = 0.0f;
+        sD = 1.0f;
+        tN = e_val;
+        tD = c_val;
+    }
+    else
+    {
+        sN = (b_val * e_val - c_val * d_val);
+        tN = (a_val * e_val - b_val * d_val);
+        if (sN < 0.0f)
+        {
+            sN = 0.0f;
+            tN = e_val;
+            tD = c_val;
+        }
+        else if (sN > sD)
+        {
+            sN = sD;
+            tN = e_val + b_val;
+            tD = c_val;
+        }
+    }
+
+    if (tN < 0.0f)
+    {
+        tN = 0.0f;
+        if (-d_val < 0.0f)
+            sN = 0.0f;
+        else if (-d_val > a_val)
+            sN = sD;
+        else {
+            sN = -d_val;
+            sD = a_val;
+        }
+    }
+    else if (tN > tD)
+    {
+        tN = tD;
+        if ((-d_val + b_val) < 0.0f)
+            sN = 0.0f;
+        else if ((-d_val + b_val) > a_val)
+            sN = sD;
+        else {
+            sN = (-d_val + b_val);
+            sD = a_val;
+        }
+    }
+
+    sc = (std::abs(sN) < 1e-5f ? 0.0f : sN / sD);
+    tc = (std::abs(tN) < 1e-5f ? 0.0f : tN / tD);
+
+    Vector3 dP = w + (u * sc) - (v * tc);
+    float dist = Length(dP);
+    float minDist = a.shape.radius + b.shape.radius;
+
+    if (dist < minDist)
+    {
+        outPushLen = minDist - dist;
+        if (dist > 1e-4f)
+        {
+            outPushDir = Normalize(dP);
+        }
+        else
+        {
+            outPushDir = { 0.0f, 0.0f, 1.0f };
+        }
+        return true;
+    }
     return false;
 }
 
