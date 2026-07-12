@@ -531,6 +531,9 @@ void DirectXCom::PreDraw()
 		cbAllocator_->BeginFrame();
 	}
 
+	// GPUプロファイラーのフレーム開始
+	GpuProfiler::GetInstance()->BeginFrame(commandList.Get());
+
 	if (stackAllocator_)
 	{
 		stackAllocator_->Reset();
@@ -586,6 +589,9 @@ void DirectXCom::PostDraw()
 	barrier.Transition.StateAfter = (D3D12_RESOURCE_STATE_PRESENT);
 	//TransitionBarrierを張る
 	commandList->ResourceBarrier(1, &barrier);
+
+	// GPUプロファイラーのフレーム終了（Resolveコマンドを積む）
+	GpuProfiler::GetInstance()->EndFrame(commandList.Get());
 
 	//コマンドリストの内容を下記率させる。すべてのコマンドを積んでからCloseする
 	hr = (commandList->Close());
