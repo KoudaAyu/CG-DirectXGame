@@ -22,15 +22,7 @@
 #include "Sprite.h"
 #include "SpriteManager.h"
 #include "DebugCamera.h"
-#include "Baziru3_Engine/IO/Mouse/MouseInput.h"
-#include "Baziru3_Engine/Particle/Ring.h"
-#include "../../Player/Player.h"
-#include "../../Enemy/Enemy.h"
-#include "../../Enemy/MovingEnemy.h"
-#include "../../../Bullet.h"
-#include "../../Obstacle.h"
-#include "Target.h"
-#include "TutorialSign.h"
+#include "Baziru3_Engine/Collision/MeshCollider.h"
 
 class Camera;
 class SpriteCom;
@@ -147,14 +139,11 @@ private:
     Object3dCom* object3dCom = nullptr;
     SkinningObject3dCom* skinningObject3dCom = nullptr;
     ParticleManager* particleManager = nullptr;
-    std::unique_ptr<AppParticleManager> appParticleManager_;
-    SpriteCom* spriteCom = nullptr;
-
-    // --- ゲームエンティティ & オブジェクト ---
-    std::unique_ptr<Player> player_;
-    std::unique_ptr<Enemy> enemy_;
-    std::unique_ptr<MovingEnemy> movingEnemy_;
-    std::vector<std::unique_ptr<Obstacle>> obstacles_;
+    std::unique_ptr<HitEffect> hitEffect_;
+    std::unique_ptr<Object3d> animatedCube_;
+    std::unique_ptr<MeshCollider> animatedCubeCollider_;
+    std::vector<std::unique_ptr<Object3d>> crowd_;
+    std::vector<std::unique_ptr<MeshCollider>> crowdColliders_;
     std::unique_ptr<Sphere> sphere_;
     std::unique_ptr<Ring> goalRing_;
     std::unique_ptr<HitEffect> hitEffect_;

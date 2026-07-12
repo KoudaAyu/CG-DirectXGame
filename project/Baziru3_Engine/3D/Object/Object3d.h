@@ -19,6 +19,11 @@ class SkinningObject3dCom;
 class Object3d
 {
 public:
+	static const std::vector<Object3d*>& GetInstances() { return instances_; }
+private:
+	static std::vector<Object3d*> instances_;
+
+public:
 
     // GPU用の定数バッファ(CB)レイアウトには MaterialManager.h のグローバルな `Material` を使用
 
@@ -56,7 +61,10 @@ public:
 		float intensity;
 	};
 
+	Object3d();
+
 	void Initialize(Object3dCom* object3dCom, const ModelData& modelData, TextureManager* textureManager = nullptr);
+	void InitializeShared(Object3dCom* object3dCom, Object3d* masterObject);
 
 	// アニメーション・スケルトン・スキンクラスターをまとめてセットアップする
 	// アプリ側で読み込んだ Animation と Skeleton、Model::ModelData を渡す
@@ -120,6 +128,15 @@ public:
 	const Vector3& GetTranslate() const { return transform.GetTranslate(); }
 	const Vector3& GetScale() const { return transform.GetScale(); }
 	const ModelData& GetModelData() const { return modelData_; }
+	const Matrix4x4& GetWorldMatrix() const { return transformationMatrixData_.World; }
+
+	void MarkDrawn() { isDrawnThisFrame_ = true; }
+	bool WasDrawnLastFrame() const { return wasDrawnLastFrame_; }
+	bool IsCulled() const { return isCulled_; }
+	void ResetFrameDrawFlags() {
+		wasDrawnLastFrame_ = isDrawnThisFrame_;
+		isDrawnThisFrame_ = false;
+	}
 
 	void SetEnableLighting(bool enable);
 	void SetColor(const Vector4& color);
@@ -132,6 +149,7 @@ public:
 	const Skeleton& GetSkeleton() const { return skeleton_; }
 	Skeleton& GetSkeleton() { return skeleton_; }
 	const SkinCluster& GetSkinCluster() const { return skinCluster_; }
+	bool IsShared() const { return isShared_; }
 
 private:
 	Transform transform;
@@ -173,4 +191,9 @@ private:
 	bool skinClusterInitialized_ = false;
 	float deltaTime_ = 1.0f / 60.0f;
 	TextureManager* textureManager_ = nullptr;
+	bool isDrawnThisFrame_ = false;
+	bool wasDrawnLastFrame_ = false;
+	bool isShared_ = false;
+	bool isCulled_ = false;
+	Object3d* masterObject_ = nullptr;
 };

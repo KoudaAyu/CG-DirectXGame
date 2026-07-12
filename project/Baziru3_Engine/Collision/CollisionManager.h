@@ -87,6 +87,13 @@ public:
     /// </summary>
     bool Raycast(const Vector3& rayStart, const Vector3& rayDir, float maxDist, Collider*& outHitCollider, float& outHitDist);
 
+    const std::vector<Collider*>& GetColliders() const { return colliders_; }
+
+    /// <summary>
+    /// すべての登録コライダーを画面上に3Dワイヤーフレーム表示します
+    /// </summary>
+    void DrawDebug(class Camera* camera);
+
     /// <summary>
     /// レイと個別コライダーの交差判定ブリッジ
     /// </summary>
@@ -94,6 +101,21 @@ public:
 
     static bool CheckRaySphere(const Vector3& rayStart, const Vector3& rayDir, float maxDist, const CollisionData& sphere, float& outDist);
     static bool CheckRayBox(const Vector3& rayStart, const Vector3& rayDir, float maxDist, const CollisionData& box, float& outDist);
+    static bool CheckRayMesh(const Vector3& rayStart, const Vector3& rayDir, float maxDist, const CollisionData& meshData, float& outDist);
+    static bool CheckRaySkeleton(const Vector3& rayStart, const Vector3& rayDir, float maxDist, const CollisionData& skeletonData, float& outDist);
+
+    uint32_t GetFrameCount() const { return frameCount_; }
+    bool IsShowMeshWireframe() const { return showMeshWireframe_; }
+    void SetShowMeshWireframe(bool show) { showMeshWireframe_ = show; }
+    int GetWireframeStep() const { return wireframeStep_; }
+    void SetWireframeStep(int step) { wireframeStep_ = step; }
+    bool IsShowDebugColliders() const { return showDebugColliders_; }
+    void SetShowDebugColliders(bool show) { showDebugColliders_ = show; }
+
+    /// <summary>
+    /// 前回の衝突判定の所要時間（ミリ秒）を取得します
+    /// </summary>
+    float GetLastUpdateDurationMs() const { return lastUpdateDurationMs_; }
 
     /// <summary>
     /// アクティブコライダーのリストを取得します
@@ -125,6 +147,10 @@ private:
 
 private:
     std::vector<Collider*> colliders_; // 登録された全アクティブコライダーのリスト (生ポインタ参照)
+    uint32_t frameCount_ = 0;
+    bool showMeshWireframe_ = true; // デフォルトで有効（ちびキャラの精密さを確認するため）
+    int wireframeStep_ = 15; // ワイヤーフレームの間引きステップ数 (デフォルト15で超高速描画)
+    bool showDebugColliders_ = true; // デフォルトで有効 (F1トグル)
     float lastUpdateDurationMs_ = 0.0f; // 前回の衝突判定処理時間 (ミリ秒)
 
     // 空間ハッシュ用ユーティリティ
@@ -137,4 +163,17 @@ private:
                      (static_cast<uint32_t>(z) * 83492791);
         return h % kGridTableSize;
     }
+
+private:
+    struct LastRaycastData {
+        bool exists = false;
+        Vector3 start;
+        Vector3 end;
+        bool hit = false;
+        Vector3 hitPoint;
+        bool hitMesh = false;
+        Vector3 hitTriV0;
+        Vector3 hitTriV1;
+        Vector3 hitTriV2;
+    } lastRaycast_;
 };

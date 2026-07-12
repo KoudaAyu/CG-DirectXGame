@@ -35,6 +35,7 @@ public:
 	const Microsoft::WRL::ComPtr<ID3D12PipelineState>& GetPipelineState() const;
 	const Microsoft::WRL::ComPtr<ID3D12PipelineState>& GetEffectPipelineState() const;
 	const Microsoft::WRL::ComPtr<ID3D12PipelineState>& GetOverlayPipelineState() const;
+	const Microsoft::WRL::ComPtr<ID3D12PipelineState>& GetWireframePipelineState() const;
 	const Microsoft::WRL::ComPtr<ID3D12RootSignature>& GetRootSignature() const;
 
 private:

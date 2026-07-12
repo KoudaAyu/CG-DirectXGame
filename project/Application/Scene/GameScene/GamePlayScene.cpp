@@ -1,5 +1,6 @@
 
 #include "SceneManager.h"
+#include "Baziru3_Engine/Collision/CollisionManager.h"
 #include "MaterialManager.h"
 #include "Light.h"
 #include "ParticleManager.h"
@@ -80,7 +81,91 @@ void GamePlayScene::InitializeEnvironment()
 {
 	if (!object3dCom || !materialManager || !light || !particleManager)
 	{
-		return;
+        hitEffect_ = std::make_unique<HitEffect>();
+		hitEffect_->Initialize(directXCom, object3dCom, materialManager, light, camera_, 64, 1.0f, 0.2f, 32, 1.0f, 1.0f, 3.0f);
+       hitEffect_->SetParticleManager(particleManager);
+		hitEffect_->SetCylinderEnabled(true);
+      hitEffect_->SetRingEnabled(true);
+       hitEffect_->SetEffectDuration(0.35f);
+		Sprite::Transform transformCylinder = { {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };
+		hitEffect_->GetCylinderTransform() = transformCylinder;
+       hitEffect_->Update(kDeltaTime);
+		hitEffectInitialized = true;
+
+		sphere_ = std::make_unique<Sphere>();
+		sphere_->Initialize(directXCom, object3dCom, materialManager, light, camera_);
+		sphereInitialized = true;
+
+		uvTransformSprite = {
+			{1.0f, 1.0f, 1.0f},
+			{0.0f, 0.0f, 0.0f},
+			{0.0f, 0.0f, 0.0f}
+		};
+
+		// Model::LoadModelFile でボーンウェイト込みデータを取得
+		Model::ModelData skinModelData = Model::LoadModelFile("Resources/CG4/human", "walk.gltf");
+
+		// Object3d 用にコピー（頂点・インデックス・マテリアル）
+		Object3d::ModelData animatedCubeModelData;
+		animatedCubeModelData.vertices = skinModelData.vertices;
+		animatedCubeModelData.indices  = skinModelData.indices;
+		animatedCubeModelData.material.textureFilePath = skinModelData.material.textureFilePath;
+		if (!animatedCubeModelData.material.textureFilePath.empty())
+		{
+			animatedCubeModelData.material.textureIndex = TextureManager::GetInstance()->Load(animatedCubeModelData.material.textureFilePath);
+			skinModelData.material.textureIndex = animatedCubeModelData.material.textureIndex;
+		}
+
+		animatedCube_ = std::make_unique<Object3d>();
+		animatedCube_->Initialize(object3dCom, animatedCubeModelData);
+		animatedCube_->SetTranslate({ 2.0f, 0.0f, 0.0f });
+		animatedCube_->SetScale({ 1.0f, 1.0f, 1.0f });
+		animatedCube_->SetEnableLighting(true);
+		animatedCubeInitialized_ = true;
+
+		animation_ = LoadAnimationFile("Resources/CG4/human", "walk.gltf");
+		skeleton_ = SkeletonLoader{}.LoadSkeletonFile("Resources/CG4/human", "walk.gltf");
+
+		if (animation_.duration > 0.0f && !animation_.nodeAnimations.empty() && !skeleton_.joints.empty())
+		{
+			// skinModelData にボーンウェイトが入っているので正しく渡す
+			animatedCube_->SetupAnimation(&animation_, skeleton_, skinModelData);
+		}
+
+		if (!skeleton_.joints.empty())
+		{
+			skeletonDebug_.Initialize(directXCom, object3dCom, materialManager, light, camera_, skeleton_);
+		}
+
+		// Register skinned Mesh Collider
+		animatedCubeCollider_ = std::make_unique<MeshCollider>(animatedCube_.get(), CollisionAttribute::Enemy);
+		CollisionManager::GetInstance()->RegisterCollider(animatedCubeCollider_.get());
+
+		// Spawn 600 animated characters in a grid (Disabled for 1 character mode)
+		const int cols = 0;
+		const int rows = 0;
+		const float spacingX = 4.0f;
+		const float spacingZ = 4.0f;
+		const float startX = -((cols - 1) * spacingX) / 2.0f;
+		const float startZ = 10.0f;
+
+		for (int r = 0; r < rows; ++r)
+		{
+			for (int c = 0; c < cols; ++c)
+			{
+				auto obj = std::make_unique<Object3d>();
+				obj->InitializeShared(object3dCom, animatedCube_.get());
+				obj->SetTranslate({ startX + c * spacingX, 0.0f, startZ + r * spacingZ });
+				obj->SetScale({ 1.0f, 1.0f, 1.0f });
+				obj->SetEnableLighting(true);
+
+				auto col = std::make_unique<MeshCollider>(obj.get(), CollisionAttribute::Enemy, animatedCubeCollider_.get());
+				CollisionManager::GetInstance()->RegisterCollider(col.get());
+
+				crowd_.push_back(std::move(obj));
+				crowdColliders_.push_back(std::move(col));
+			}
+		}
 	}
 
 	hitEffect_ = std::make_unique<HitEffect>();
@@ -304,49 +389,18 @@ void GamePlayScene::Finalize()
 		hitEffect_->Finalize();
 		hitEffect_.reset();
 	}
-	hitEffectInitialized = false;
-
-	if (goalRing_)
-	{
-		goalRing_->Finalize();
-		goalRing_.reset();
-	}
-
-	if (combatSystem_) { combatSystem_.reset(); }
-	if (collisionSystem_) { collisionSystem_.reset(); }
-
-	if (player_)
-	{
-		player_->Finalize();
-		player_.reset();
-	}
-
-	if (enemy_)
-	{
-		enemy_->Finalize();
-		enemy_.reset();
-	}
-
-	if (movingEnemy_)
-	{
-		movingEnemy_->Finalize();
-		movingEnemy_.reset();
-	}
-
-	for (auto& obs : obstacles_)
-	{
-		if (obs)
-		{
-			obs->Finalize();
-		}
-	}
-	obstacles_.clear();
-
-	for (auto& t : targets_)
-	{
-		if (t) t->Finalize();
-	}
-	targets_.clear();
+    if (animatedCubeCollider_)
+    {
+        CollisionManager::GetInstance()->UnregisterCollider(animatedCubeCollider_.get());
+        animatedCubeCollider_.reset();
+    }
+    for (auto& col : crowdColliders_)
+    {
+        CollisionManager::GetInstance()->UnregisterCollider(col.get());
+    }
+    crowdColliders_.clear();
+    crowd_.clear();
+    hitEffectInitialized = false;
 }
 
 float GamePlayScene::AdvanceDeltaTime()
@@ -532,12 +586,38 @@ void GamePlayScene::UpdateEnvironment()
 	}
 }
 
-void GamePlayScene::UpdateParticles(float deltaTime)
-{
-	// 初期状態からテスト用エミッターが連続でパーティクルを出し続けるのを停止
-	/*
-	emitter.frequencyTime += deltaTime;
-	if (emitter.frequencyTime >= emitter.frequency && particleManager)
+	for (auto& obj : crowd_)
+	{
+		Vector3 rotate = obj->GetRotate();
+		rotate.y += 0.01f;
+		obj->SetRotate(rotate);
+		if (materialManager)
+		{
+			obj->SetReflectionFactor(materialManager->GetMaterialReflectionFactor());
+			obj->SetFresnelF0(materialManager->GetMaterialFresnelF0());
+		}
+		obj->Update();
+	}
+
+	if (skeletonDebug_.IsInitialized() && animatedCube_)
+	{
+		const Matrix4x4 modelWorldMatrix = MakeAffineMatrix(
+			animatedCube_->GetScale(),
+			animatedCube_->GetRotate(),
+			animatedCube_->GetTranslate());
+		skeletonDebug_.Sync(animatedCube_->GetSkeleton(), modelWorldMatrix);
+	}
+
+   if (hitEffectInitialized && hitEffect_)
+	{
+        hitEffect_->SetPlaneParticleCount(emitter.count);
+       hitEffect_->Update(kDeltaTime);
+	}
+
+	//パーティクルの更新
+	emitter.frequencyTime += kDeltaTime;
+
+	if (emitter.frequencyTime >= emitter.frequency)
 	{
 		auto newParticles = particleEmitter.Emit(emitter, particleManager->GetRandomEngine(), *particleManager);
 		for (auto& p : newParticles)
@@ -1724,341 +1804,10 @@ void GamePlayScene::Draw(SceneRenderRequests& renderRequests)
 		spriteManager_->DrawAll(ctx, &debugCamera_, &sprites);
 	}
 
-#ifdef USE_IMGUI
-	// 画面下部に常時表示する操作方法案内 UI
+	for (auto& obj : crowd_)
 	{
-		ImGui::SetNextWindowPos(ImVec2(ImGui::GetIO().DisplaySize.x * 0.5f - 240.0f, ImGui::GetIO().DisplaySize.y * 0.82f), ImGuiCond_Always);
-		ImGui::SetNextWindowSize(ImVec2(480.0f, 100.0f), ImGuiCond_Always);
-		ImGui::Begin("Tutorial Guide", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings);
-		
-		ImDrawList* dl = ImGui::GetWindowDrawList();
-		ImVec2 min = ImGui::GetWindowPos();
-		ImVec2 max = ImVec2(min.x + 480.0f, min.y + 100.0f);
-		dl->AddRectFilled(min, max, IM_COL32(15, 20, 30, 200), 8.0f);
-		dl->AddRect(min, max, IM_COL32(0, 255, 128, 255), 8.0f, 0, 1.5f);
-		
-		ImGui::SetCursorPos(ImVec2(20.0f, 15.0f));
-		ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.1f, 1.0f, 0.6f, 1.0f));
-		ImGui::TextWrapped((const char*)u8"【基本操作】\n[W][A][S][D] : 移動  /  [マウス] : 照準  /  [SPACE] : 回避\n[左クリック] : 通常射撃  /  [右クリック] : 散弾  /  [R] : リロード\n※ 3つの的をすべて壊し、奥の脱出エリアへ向かえ！");
-		ImGui::PopStyleColor();
-		
-		ImGui::End();
+		obj->Draw(object3dCom, skinningObject3dCom);
 	}
-
-	// --- タクティカルレーザーサイトの描画 ---
-	if (player_ && !player_->IsDead() && camera_)
-	{
-		ImGuiIO& io = ImGui::GetIO();
-		float width = io.DisplaySize.x;
-		float height = io.DisplaySize.y;
-		if (width > 0.0f && height > 0.0f)
-		{
-			const Matrix4x4& vp = camera_->GetViewProjectionMatrix();
-			ImDrawList* drawList = ImGui::GetForegroundDrawList();
-
-			auto project3DTo2D = [&](const Vector3& pos3D, ImVec2& outPos) -> bool {
-				float w = pos3D.x * vp.m[0][3] + pos3D.y * vp.m[1][3] + pos3D.z * vp.m[2][3] + vp.m[3][3];
-				if (w <= 0.0f) return false;
-				float x = (pos3D.x * vp.m[0][0] + pos3D.y * vp.m[1][0] + pos3D.z * vp.m[2][0] + vp.m[3][0]) / w;
-				float y = (pos3D.x * vp.m[0][1] + pos3D.y * vp.m[1][1] + pos3D.z * vp.m[2][1] + vp.m[3][1]) / w;
-				outPos.x = (x + 1.0f) * 0.5f * width;
-				outPos.y = (1.0f - y) * 0.5f * height;
-				return true;
-			};
-
-			Vector3 gunPos = player_->GetPosition() + Vector3{ 0.0f, 0.25f, 0.0f }; // 少し浮かせた位置から射出
-			float rotY = player_->GetRotation().y;
-			Vector3 dir = { std::sin(rotY), 0.0f, std::cos(rotY) };
-
-			// レイキャストで障害物衝突距離を測定 (自前で回転を考慮したRay-OBB判定を行うことで、弾丸の判定と100%同期)
-			float laserRange = 25.0f; // 最大長
-			for (const auto& obs : obstacles_)
-			{
-				if (!obs) continue;
-				
-				BoxCollider* colliders[2] = { obs->GetCollider(), obs->GetCollider2() };
-				for (int c = 0; c < 2; ++c)
-				{
-					BoxCollider* col = colliders[c];
-					if (!col) continue;
-
-					Vector3 size = col->GetSize();
-					Vector3 oPos = obs->GetPosition();
-					float rotY = col->GetWorldRotation().y;
-
-					// 1. レイの始点と方向をフェンスのローカル空間に変換 (逆回転 -rotY)
-					float rx = gunPos.x - oPos.x;
-					float ry = gunPos.y - oPos.y;
-					float rz = gunPos.z - oPos.z;
-
-					float cosR = std::cos(-rotY);
-					float sinR = std::sin(-rotY);
-					
-					Vector3 lxStart = {
-						rx * cosR - rz * sinR,
-						ry,
-						rx * sinR + rz * cosR
-					};
-
-					Vector3 lxDir = {
-						dir.x * cosR - dir.z * sinR,
-						dir.y,
-						dir.x * sinR + dir.z * cosR
-					};
-
-					// 2. ローカル空間でのRay-AABB交差判定
-					float hx = size.x * 0.5f;
-					float hy = size.y * 0.5f;
-					float hz = size.z * 0.5f;
-
-					float tmin = 0.0f;
-					float tmax = laserRange;
-					bool intersect = true;
-
-					// X軸スラブ判定
-					if (std::abs(lxDir.x) < 1e-6f)
-					{
-						if (lxStart.x < -hx || lxStart.x > hx) intersect = false;
-					}
-					else
-					{
-						float ood = 1.0f / lxDir.x;
-						float t1 = (-hx - lxStart.x) * ood;
-						float t2 = (hx - lxStart.x) * ood;
-						if (t1 > t2) std::swap(t1, t2);
-						if (t1 > tmin) tmin = t1;
-						if (t2 < tmax) tmax = t2;
-						if (tmin > tmax) intersect = false;
-					}
-
-					// Y軸スラブ判定
-					if (intersect && std::abs(lxDir.y) < 1e-6f)
-					{
-						if (lxStart.y < -hy || lxStart.y > hy) intersect = false;
-					}
-					else if (intersect)
-					{
-						float ood = 1.0f / lxDir.y;
-						float t1 = (-hy - lxStart.y) * ood;
-						float t2 = (hy - lxStart.y) * ood;
-						if (t1 > t2) std::swap(t1, t2);
-						if (t1 > tmin) tmin = t1;
-						if (t2 < tmax) tmax = t2;
-						if (tmin > tmax) intersect = false;
-					}
-
-					// Z軸スラブ判定
-					if (intersect && std::abs(lxDir.z) < 1e-6f)
-					{
-						if (lxStart.z < -hz || lxStart.z > hz) intersect = false;
-					}
-					else if (intersect)
-					{
-						float ood = 1.0f / lxDir.z;
-						float t1 = (-hz - lxStart.z) * ood;
-						float t2 = (hz - lxStart.z) * ood;
-						if (t1 > t2) std::swap(t1, t2);
-						if (t1 > tmin) tmin = t1;
-						if (t2 < tmax) tmax = t2;
-						if (tmin > tmax) intersect = false;
-					}
-
-					if (intersect && tmax >= 0.0f)
-					{
-						float hitDist = tmin;
-						if (hitDist < 0.0f) hitDist = 0.0f;
-						if (hitDist < laserRange)
-						{
-							laserRange = hitDist;
-						}
-					}
-				}
-			}
-
-			Vector3 endPos = gunPos + dir * laserRange;
-			ImVec2 start2D, end2D;
-			if (project3DTo2D(gunPos, start2D) && project3DTo2D(endPos, end2D))
-			{
-				// レーザー光線 (赤い半透明ライン)
-				drawList->AddLine(start2D, end2D, IM_COL32(255, 30, 30, 160), 2.0f);
-				// 照準ドット (衝突位置の赤い点)
-				drawList->AddCircleFilled(end2D, 4.0f, IM_COL32(255, 80, 80, 220));
-				drawList->AddCircle(end2D, 6.0f, IM_COL32(255, 0, 0, 120), 0, 1.0f);
-			}
-		}
-	}
-
-	// デバッグ用の的復活ボタン (画面右下に固定配置して重なりを防ぐ)
-	ImGui::SetNextWindowPos(ImVec2(ImGui::GetIO().DisplaySize.x - 220.0f, ImGui::GetIO().DisplaySize.y - 120.0f), ImGuiCond_FirstUseEver);
-	ImGui::SetNextWindowSize(ImVec2(200.0f, 90.0f), ImGuiCond_FirstUseEver);
-	ImGui::Begin("Debug Controls");
-	if (ImGui::Button("Reset Targets"))
-	{
-		for (auto& t : targets_)
-		{
-			if (t) t->Reset();
-		}
-		allTargetsDestroyed_ = false;
-	}
-	ImGui::End();
-
-	if (showDebugGizmos_ && camera_)
-	{
-		ImGuiIO& io = ImGui::GetIO();
-		float width = io.DisplaySize.x;
-		float height = io.DisplaySize.y;
-
-		if (width > 0.0f && height > 0.0f)
-		{
-			const Matrix4x4& vp = camera_->GetViewProjectionMatrix();
-			ImDrawList* drawList = ImGui::GetForegroundDrawList();
-
-			auto project3DTo2D = [&](const Vector3& pos3D, ImVec2& outPos) -> bool {
-				float w = pos3D.x * vp.m[0][3] + pos3D.y * vp.m[1][3] + pos3D.z * vp.m[2][3] + vp.m[3][3];
-				if (w <= 0.0f) return false;
-				float x = (pos3D.x * vp.m[0][0] + pos3D.y * vp.m[1][0] + pos3D.z * vp.m[2][0] + vp.m[3][0]) / w;
-				float y = (pos3D.x * vp.m[0][1] + pos3D.y * vp.m[1][1] + pos3D.z * vp.m[2][1] + vp.m[3][1]) / w;
-				outPos.x = (x + 1.0f) * 0.5f * width;
-				outPos.y = (1.0f - y) * 0.5f * height;
-				return true;
-			};
-
-			// 1. Draw Player Noise Ring
-			if (playerSoundRadius_ > 0.0f && player_)
-			{
-				Vector3 playerPos = player_->GetPosition();
-				const int numSegments = 32;
-				std::vector<ImVec2> points2D;
-				for (int i = 0; i <= numSegments; ++i)
-				{
-					float angle = i * (6.2831853f / numSegments);
-					Vector3 p3D = {
-						playerPos.x + std::cos(angle) * playerSoundRadius_,
-						playerPos.y,
-						playerPos.z + std::sin(angle) * playerSoundRadius_
-					};
-					ImVec2 p2D;
-					if (project3DTo2D(p3D, p2D))
-					{
-						points2D.push_back(p2D);
-					}
-				}
-				if (points2D.size() > 1)
-				{
-					float alpha = 1.0f - (playerSoundRadius_ / playerSoundMaxRadius_);
-					ImU32 color = ImGui::ColorConvertFloat4ToU32({ 0.0f, 0.8f, 1.0f, alpha * 0.5f });
-					drawList->AddPolyline(points2D.data(), (int)points2D.size(), color, false, 2.5f);
-				}
-			}
-
-			// Helper to draw vision cone
-			auto drawVisionCone = [&](const Vector3& enemyPos, float yaw, float fov, float maxRange, ImU32 color) {
-				const int numSegments = 16;
-				std::vector<ImVec2> points2D;
-				ImVec2 center2D;
-				if (project3DTo2D(enemyPos, center2D))
-				{
-					points2D.push_back(center2D);
-				}
-				else
-				{
-					return;
-				}
-
-				float halfFov = fov * 0.5f;
-				float startAngle = yaw - halfFov;
-
-				for (int i = 0; i <= numSegments; ++i)
-				{
-					float angle = startAngle + i * (fov / numSegments);
-					Vector3 p3D = {
-						enemyPos.x + std::sin(angle) * maxRange,
-						enemyPos.y,
-						enemyPos.z + std::cos(angle) * maxRange
-					};
-					ImVec2 p2D;
-					if (project3DTo2D(p3D, p2D))
-					{
-						points2D.push_back(p2D);
-					}
-				}
-
-				if (points2D.size() > 2)
-				{
-					drawList->AddPolyline(points2D.data(), (int)points2D.size(), color, true, 2.0f);
-					ImU32 fillColor = (color & 0x00FFFFFF) | 0x15000000;
-					drawList->AddConvexPolyFilled(points2D.data(), (int)points2D.size(), fillColor);
-				}
-			};
-
-			// 2. Draw Enemy Vision Cone & Stats
-			if (enemy_ && !enemy_->IsDead())
-			{
-				Vector3 pos = enemy_->GetPosition();
-				float yaw = enemy_->GetYaw();
-				float fov = enemy_->GetFieldOfView();
-				float range = enemy_->GetMaxSightRange();
-				
-				ImU32 color = ImGui::ColorConvertFloat4ToU32({ 0.0f, 1.0f, 0.0f, 0.8f });
-				std::string stateName = "PATROL";
-				if (enemy_->GetAIState() == Enemy::AIState::Investigate)
-				{
-					color = ImGui::ColorConvertFloat4ToU32({ 1.0f, 0.6f, 0.0f, 0.8f });
-					stateName = "INVESTIGATE";
-				}
-				else if (enemy_->GetAIState() == Enemy::AIState::Chase)
-				{
-					color = ImGui::ColorConvertFloat4ToU32({ 1.0f, 0.1f, 0.1f, 0.8f });
-					stateName = "CHASE";
-				}
-
-				drawVisionCone(pos, yaw, fov, range, color);
-
-				ImVec2 head2D;
-				if (project3DTo2D(pos + Vector3{ 0.0f, 1.8f, 0.0f }, head2D))
-				{
-					char buf[128];
-					sprintf_s(buf, "%s (Alert: %.0f%%)", stateName.c_str(), enemy_->GetDetectionMeter() * 100.0f);
-					drawList->AddText(ImVec2(head2D.x - 50.0f, head2D.y), color, buf);
-				}
-			}
-
-			// 3. Draw MovingEnemy Vision Cone & Stats
-			if (movingEnemy_ && !movingEnemy_->IsDead())
-			{
-				Vector3 pos = movingEnemy_->GetPosition();
-				float yaw = movingEnemy_->GetYaw();
-				float fov = movingEnemy_->GetFieldOfView();
-				float range = movingEnemy_->GetMaxSightRange();
-				
-				ImU32 color = ImGui::ColorConvertFloat4ToU32({ 0.0f, 1.0f, 0.0f, 0.8f });
-				std::string stateName = "PATROL";
-				if (movingEnemy_->GetAIState() == MovingEnemy::AIState::Investigate)
-				{
-					color = ImGui::ColorConvertFloat4ToU32({ 1.0f, 0.6f, 0.0f, 0.8f });
-					stateName = "INVESTIGATE";
-				}
-				else if (movingEnemy_->GetAIState() == MovingEnemy::AIState::Chase)
-				{
-					color = ImGui::ColorConvertFloat4ToU32({ 1.0f, 0.1f, 0.1f, 0.8f });
-					stateName = "CHASE";
-				}
-
-				drawVisionCone(pos, yaw, fov, range, color);
-
-				ImVec2 head2D;
-				if (project3DTo2D(pos + Vector3{ 0.0f, 1.8f, 0.0f }, head2D))
-				{
-					char buf[128];
-					sprintf_s(buf, "%s (Alert: %.0f%%)", stateName.c_str(), movingEnemy_->GetDetectionMeter() * 100.0f);
-					drawList->AddText(ImVec2(head2D.x - 50.0f, head2D.y), color, buf);
-				}
-			}
-		}
-	}
-#endif
-
-	renderRequests.sceneDrawn = true;
 }
 
 void GamePlayScene::AddFloatingText(const Vector3& worldPos, const std::string& text, const Vector4& color, bool isCritical)

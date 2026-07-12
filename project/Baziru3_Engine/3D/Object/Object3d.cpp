@@ -151,6 +151,37 @@ void Object3d::Initialize(Object3dCom* object3dCom, const ModelData& modelData, 
 	cameraTransform = { {1.0f,1.0f,1.0f}, {0.0f,0.0f,0.0f}, {0.0f,0.0f,-10.0f} };
 }
 
+void Object3d::InitializeShared(Object3dCom* object3dCom, Object3d* masterObject)
+{
+	object3dCom_ = object3dCom;
+	if (object3dCom_)
+	{
+		camera_ = object3dCom_->GetDefaultCamera();
+	}
+	textureManager_ = masterObject->textureManager_;
+	modelData_ = masterObject->modelData_;
+
+	// Share vertex and index resources from masterObject without allocating!
+	vertexResource = masterObject->vertexResource;
+	vertexBufferView_ = masterObject->vertexBufferView_;
+	indexResource = masterObject->indexResource;
+	indexBufferView_ = masterObject->indexBufferView_;
+
+	// Copy material settings
+	materialData_ = masterObject->materialData_;
+	directionalLightData_ = masterObject->directionalLightData_;
+
+	// Copy skinning / animator reference
+	skeleton_ = masterObject->skeleton_;
+	skinCluster_ = masterObject->skinCluster_;
+	skinClusterInitialized_ = masterObject->skinClusterInitialized_;
+	isShared_ = true;
+	masterObject_ = masterObject;
+
+	transform = { {1.0f,1.0f,1.0f}, {0.0f,0.0f,0.0f}, {0.0f,0.0f,0.0f} };
+	cameraTransform = { {1.0f,1.0f,1.0f}, {0.0f,0.0f,0.0f}, {0.0f,0.0f,-10.0f} };
+}
+
 void Object3d::SetupAnimation(const Animation* animation, const Skeleton& skeleton, const Model::ModelData& modelData)
 {
 	if (!object3dCom_) return;
@@ -191,28 +222,92 @@ void Object3d::Update()
 		camera_ = object3dCom_->GetDefaultCamera();
 	}
 
+	const Vector3& scale = transform.GetScale();
+
+	// View Frustum Culling inside Update to bypass animation, skeletal updates, and matrix math for off-screen objects
+	isCulled_ = false;
+	if (camera_ && scale.x <= 10.0f && scale.y <= 10.0f && scale.z <= 10.0f)
+	{
+		const Matrix4x4& vp = camera_->GetViewProjectionMatrix();
+		const Vector3& pos = transform.GetTranslate();
+		float radius = 8.0f;
+
+		float x = pos.x * vp.m[0][0] + pos.y * vp.m[1][0] + pos.z * vp.m[2][0] + vp.m[3][0];
+		float y = pos.x * vp.m[0][1] + pos.y * vp.m[1][1] + pos.z * vp.m[2][1] + vp.m[3][1];
+		float z = pos.x * vp.m[0][2] + pos.y * vp.m[1][2] + pos.z * vp.m[2][2] + vp.m[3][2];
+		float w = pos.x * vp.m[0][3] + pos.y * vp.m[1][3] + pos.z * vp.m[2][3] + vp.m[3][3];
+
+		if (w > 0.0f)
+		{
+			float clipX = x / w;
+			float clipY = y / w;
+			float clipZ = z / w;
+			float margin = radius / w;
+
+			if (clipX < -1.0f - margin || clipX > 1.0f + margin ||
+				clipY < -1.0f - margin || clipY > 1.0f + margin ||
+				clipZ < 0.0f - margin || clipZ > 1.0f + margin)
+			{
+				isCulled_ = true;
+			}
+		}
+		else
+		{
+			isCulled_ = true;
+		}
+	}
+
+
+	if (isCulled_)
+	{
+		return;
+	}
+
 	// ステップ1: アニメーション時間を進める
 	// ステップ2: 骨ごとのLocal情報を更新する
-	if (animator_.HasAnimation())
+	if (!isShared_)
 	{
-		animator_.Update(deltaTime_);
-		// ステップ3: SkeletonSpaceの情報を更新する
-		animator_.ApplyTo(skeleton_);
+		if (animator_.HasAnimation())
+		{
+			animator_.Update(deltaTime_);
+			// ステップ3: SkeletonSpaceの情報を更新する
+			animator_.ApplyTo(skeleton_);
+		}
+
+		if (!skeleton_.joints.empty())
+		{
+			// ステップ3: 現在の骨ごとのLocal情報を基にSkeletonSpaceの情報を更新する
+			skeleton_.Update();
+		}
+
+		// ステップ4: SkinClusterのMatrixPaletteを更新する
+		if (skinClusterInitialized_)
+		{
+			skinClusterLender_.Update(skinCluster_, skeleton_);
+		}
 	}
 
-	if (!skeleton_.joints.empty())
-	{
-		// ステップ3: 現在の骨ごとのLocal情報を基にSkeletonSpaceの情報を更新する
-		skeleton_.Update();
-	}
+	Matrix4x4 worldMatrix;
+	const Vector3& rotate = transform.GetRotate();
+	const Vector3& translate = transform.GetTranslate();
 
-	// ステップ4: SkinClusterのMatrixPaletteを更新する
-	if (skinClusterInitialized_)
+	// Specialized fast Y-rotation matrix constructor for grid crowd
+	if (rotate.x == 0.0f && rotate.z == 0.0f &&
+		scale.x == 1.0f && scale.y == 1.0f && scale.z == 1.0f)
 	{
-		skinClusterLender_.Update(skinCluster_, skeleton_);
-	}
+		float y = rotate.y;
+		float sinY = std::sin(y);
+		float cosY = std::cos(y);
 
-	Matrix4x4 worldMatrix = MakeAffineMatrix(transform.GetScale(), transform.GetRotate(), transform.GetTranslate());
+		worldMatrix.m[0][0] = cosY;  worldMatrix.m[0][1] = 0.0f; worldMatrix.m[0][2] = -sinY; worldMatrix.m[0][3] = 0.0f;
+		worldMatrix.m[1][0] = 0.0f;  worldMatrix.m[1][1] = 1.0f; worldMatrix.m[1][2] = 0.0f;  worldMatrix.m[1][3] = 0.0f;
+		worldMatrix.m[2][0] = sinY;  worldMatrix.m[2][1] = 0.0f; worldMatrix.m[2][2] = cosY;  worldMatrix.m[2][3] = 0.0f;
+		worldMatrix.m[3][0] = translate.x;   worldMatrix.m[3][1] = translate.y;  worldMatrix.m[3][2] = translate.z;   worldMatrix.m[3][3] = 1.0f;
+	}
+	else
+	{
+		worldMatrix = MakeAffineMatrix(scale, rotate, translate);
+	}
 
 	Matrix4x4 viewMatrix;
 	Matrix4x4 projectionMatrix;
@@ -234,28 +329,85 @@ void Object3d::Update()
 	// WVP を更新
 	transformationMatrixData_.WVP = Multiply(worldMatrix, Multiply(viewMatrix, projectionMatrix));
 	transformationMatrixData_.World = worldMatrix;
-	// WorldInverseTranspose を計算して格納（法線変換用）
-	transformationMatrixData_.WorldInverseTranspose = Transpose(Inverse(worldMatrix));
+
+	// Highly optimized WorldInverseTranspose calculation for objects with scale of 1
+	if (scale.x == 1.0f && scale.y == 1.0f && scale.z == 1.0f)
+	{
+		transformationMatrixData_.WorldInverseTranspose = worldMatrix;
+		transformationMatrixData_.WorldInverseTranspose.m[3][0] = 0.0f;
+		transformationMatrixData_.WorldInverseTranspose.m[3][1] = 0.0f;
+		transformationMatrixData_.WorldInverseTranspose.m[3][2] = 0.0f;
+	}
+	else
+	{
+		transformationMatrixData_.WorldInverseTranspose = Transpose(Inverse(worldMatrix));
+	}
 }
+
+static ID3D12GraphicsCommandList* s_lastCommandList = nullptr;
+static D3D12_GPU_VIRTUAL_ADDRESS s_lastVertexAddress = 0;
+static D3D12_GPU_VIRTUAL_ADDRESS s_lastIndexAddress = 0;
+static D3D12_GPU_VIRTUAL_ADDRESS s_lastMaterialAddress = 0;
+static D3D12_GPU_VIRTUAL_ADDRESS s_lastLightAddress = 0;
 
 void Object3d::Draw(ID3D12GraphicsCommandList* commandList)
 {
+	if (isCulled_) return;
+
+	MarkDrawn();
 	DirectXCom* dx = object3dCom_ ? object3dCom_->GetDirectXCom() : nullptr;
 	if (dx)
 	{
 		PrepareConstantBuffers(dx);
 	}
 
-	commandList->IASetVertexBuffers(0, 1, &vertexBufferView_);
-	commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-   if (indexResource && !modelData_.indices.empty())
+	// コマンドリストが切り替わった場合はステートキャッシュを無効化
+	if (s_lastCommandList != commandList)
 	{
-		commandList->IASetIndexBuffer(&indexBufferView_);
+		s_lastCommandList = commandList;
+		s_lastVertexAddress = 0;
+		s_lastIndexAddress = 0;
+		s_lastMaterialAddress = 0;
+		s_lastLightAddress = 0;
 	}
-	commandList->SetGraphicsRootConstantBufferView(RootParam::Object3D::kMaterial, materialGpuAddress_);
+
+	// 頂点バッファのバインド (前回と同じバッファならスキップ)
+	if (s_lastVertexAddress != vertexBufferView_.BufferLocation)
+	{
+		commandList->IASetVertexBuffers(0, 1, &vertexBufferView_);
+		s_lastVertexAddress = vertexBufferView_.BufferLocation;
+	}
+
+	commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+	// インデックスバッファのバインド (前回と同じバッファならスキップ)
+	if (indexResource && !modelData_.indices.empty())
+	{
+		if (s_lastIndexAddress != indexBufferView_.BufferLocation)
+		{
+			commandList->IASetIndexBuffer(&indexBufferView_);
+			s_lastIndexAddress = indexBufferView_.BufferLocation;
+		}
+	}
+
+	// マテリアル定数バッファのバインド (前回と同じアドレスならスキップ)
+	if (s_lastMaterialAddress != materialGpuAddress_)
+	{
+		commandList->SetGraphicsRootConstantBufferView(RootParam::Object3D::kMaterial, materialGpuAddress_);
+		s_lastMaterialAddress = materialGpuAddress_;
+	}
+
+	// 変換行列はオブジェクトごとに異なるため、必ず設定する
 	commandList->SetGraphicsRootConstantBufferView(RootParam::Object3D::kTransform, transformationMatrixGpuAddress_);
-	commandList->SetGraphicsRootConstantBufferView(RootParam::Object3D::kLight, directionalLightGpuAddress_);
-   if (indexResource && !modelData_.indices.empty())
+
+	// ライト定数バッファのバインド (前回と同じアドレスならスキップ)
+	if (s_lastLightAddress != directionalLightGpuAddress_)
+	{
+		commandList->SetGraphicsRootConstantBufferView(RootParam::Object3D::kLight, directionalLightGpuAddress_);
+		s_lastLightAddress = directionalLightGpuAddress_;
+	}
+
+	if (indexResource && !modelData_.indices.empty())
 	{
 		commandList->DrawIndexedInstanced(static_cast<UINT>(modelData_.indices.size()), 1, 0, 0, 0);
 	}
@@ -267,10 +419,13 @@ void Object3d::Draw(ID3D12GraphicsCommandList* commandList)
 
 void Object3d::Draw(Object3dCom* object3dCom, SkinningObject3dCom* skinningObject3dCom)
 {
+	MarkDrawn();
 	Object3dCom* com = object3dCom ? object3dCom : object3dCom_;
 	if (!com) return;
 	DirectXCom* dx = com->GetDirectXCom();
 	if (!dx) return;
+
+	if (isCulled_) return;
 
 	// RenderContext を内部で解決・構築
 	RenderContext ctx{};
@@ -495,8 +650,24 @@ void Object3d::VertexResource()
 	}
 }
 
+#include <algorithm>
+
+std::vector<Object3d*> Object3d::instances_;
+
+Object3d::Object3d()
+{
+	instances_.push_back(this);
+}
+
 Object3d::~Object3d()
 {
+	auto it = std::find(instances_.begin(), instances_.end(), this);
+	if (it != instances_.end())
+	{
+		*it = instances_.back();
+		instances_.pop_back();
+	}
+
 	// 持続的にマップされたリソースがある場合は安全にアンマップする
 	// 二重アンマップを避けるため、CPU側のポインタが nullptr でない場合のみ Unmap する
 	if (vertexResource && vertexData_ != nullptr)
@@ -559,18 +730,32 @@ void Object3d::PrepareConstantBuffers(DirectXCom* dx)
 	auto* cbAllocator = dx->GetCBAllocator();
 	if (!cbAllocator) return;
 
-	// マテリアルバッファの割り当てとコピー
-	auto matAlloc = cbAllocator->Allocate(sizeof(Material));
-	std::memcpy(matAlloc.cpuAddress, &materialData_, sizeof(Material));
-	materialGpuAddress_ = matAlloc.gpuAddress;
+	// マテリアルバッファの割り当てとコピー (共有オブジェクトならマスタのアドレスを使い回す)
+	if (isShared_ && masterObject_)
+	{
+		materialGpuAddress_ = masterObject_->materialGpuAddress_;
+	}
+	else
+	{
+		auto matAlloc = cbAllocator->Allocate(sizeof(Material));
+		std::memcpy(matAlloc.cpuAddress, &materialData_, sizeof(Material));
+		materialGpuAddress_ = matAlloc.gpuAddress;
+	}
 
-	// 変換行列バッファの割り当てとコピー
+	// 変換行列バッファの割り当てとコピー (これは個別位置が違うので必須)
 	auto transAlloc = cbAllocator->Allocate(sizeof(TransformationMatrix));
 	std::memcpy(transAlloc.cpuAddress, &transformationMatrixData_, sizeof(TransformationMatrix));
 	transformationMatrixGpuAddress_ = transAlloc.gpuAddress;
 
-	// ライトバッファの割り当てとコピー
-	auto lightAlloc = cbAllocator->Allocate(sizeof(DirectionalLight));
-	std::memcpy(lightAlloc.cpuAddress, &directionalLightData_, sizeof(DirectionalLight));
-	directionalLightGpuAddress_ = lightAlloc.gpuAddress;
+	// ライトバッファの割り当てとコピー (共有オブジェクトならマスタのアドレスを使い回す)
+	if (isShared_ && masterObject_)
+	{
+		directionalLightGpuAddress_ = masterObject_->directionalLightGpuAddress_;
+	}
+	else
+	{
+		auto lightAlloc = cbAllocator->Allocate(sizeof(DirectionalLight));
+		std::memcpy(lightAlloc.cpuAddress, &directionalLightData_, sizeof(DirectionalLight));
+		directionalLightGpuAddress_ = lightAlloc.gpuAddress;
+	}
 }

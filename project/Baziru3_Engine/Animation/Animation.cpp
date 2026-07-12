@@ -8,10 +8,27 @@
 #include <assimp/postprocess.h>
 #include<cassert>
 
+#include <unordered_map>
+#include <mutex>
+
+static std::unordered_map<std::string, Animation> s_animationCache;
+static std::mutex s_animationCacheMutex;
+
 Animation LoadAnimationFile(const std::string& directoryPath, const std::string& filename)
 {
-	Animation animation; // 今回作るアニメーション
 	const std::string fullPath = directoryPath + "/" + filename;
+
+	// メモリキャッシュ確認
+	{
+		std::lock_guard<std::mutex> lock(s_animationCacheMutex);
+		auto it = s_animationCache.find(fullPath);
+		if (it != s_animationCache.end())
+		{
+			return it->second;
+		}
+	}
+
+	Animation animation;
 	const std::string cachePath = BinaryAssetUtil::GetCachePath(fullPath, ".banim");
 
 	// キャッシュが有効な場合はバイナリからロード
@@ -20,6 +37,11 @@ Animation LoadAnimationFile(const std::string& directoryPath, const std::string&
 		if (BinaryAssetUtil::LoadBAnim(cachePath, animation))
 		{
 			OutputDebugStringA(("[Binary Cache] Loaded animation from cache: " + cachePath + "\n").c_str());
+			// メモリキャッシュに登録
+			{
+				std::lock_guard<std::mutex> lock(s_animationCacheMutex);
+				s_animationCache[fullPath] = animation;
+			}
 			return animation;
 		}
 	}
@@ -69,6 +91,12 @@ Animation LoadAnimationFile(const std::string& directoryPath, const std::string&
 	if (BinaryAssetUtil::SaveBAnim(cachePath, animation))
 	{
 		OutputDebugStringA(("[Binary Cache] Saved animation cache: " + cachePath + "\n").c_str());
+	}
+
+	// メモリキャッシュに登録
+	{
+		std::lock_guard<std::mutex> lock(s_animationCacheMutex);
+		s_animationCache[fullPath] = animation;
 	}
 
 	return animation;

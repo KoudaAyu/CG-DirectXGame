@@ -97,11 +97,28 @@ Skeleton SkeletonLoader::CreateSkeleton(const AnimNode& rootNode)
 	return skeleton;
 }
 
+#include <unordered_map>
+#include <mutex>
+
+static std::unordered_map<std::string, Skeleton> s_skeletonCache;
+static std::mutex s_skeletonCacheMutex;
+
 Skeleton SkeletonLoader::LoadSkeletonFile(const std::string& directoryPath, const std::string& filename)
 {
 	const std::string fullPath = directoryPath + "/" + filename;
-	const std::string cachePath = BinaryAssetUtil::GetCachePath(fullPath, ".bskel");
+
+	// メモリキャッシュ確認
+	{
+		std::lock_guard<std::mutex> lock(s_skeletonCacheMutex);
+		auto it = s_skeletonCache.find(fullPath);
+		if (it != s_skeletonCache.end())
+		{
+			return it->second;
+		}
+	}
+
 	Skeleton skeleton;
+	const std::string cachePath = BinaryAssetUtil::GetCachePath(fullPath, ".bskel");
 
 	// キャッシュが有効な場合はバイナリからロード
 	if (BinaryAssetUtil::IsCacheValid(fullPath, cachePath))
@@ -109,6 +126,11 @@ Skeleton SkeletonLoader::LoadSkeletonFile(const std::string& directoryPath, cons
 		if (BinaryAssetUtil::LoadBSkel(cachePath, skeleton))
 		{
 			OutputDebugStringA(("[Binary Cache] Loaded skeleton from cache: " + cachePath + "\n").c_str());
+			// メモリキャッシュに登録
+			{
+				std::lock_guard<std::mutex> lock(s_skeletonCacheMutex);
+				s_skeletonCache[fullPath] = skeleton;
+			}
 			return skeleton;
 		}
 	}
@@ -133,6 +155,12 @@ Skeleton SkeletonLoader::LoadSkeletonFile(const std::string& directoryPath, cons
 	if (BinaryAssetUtil::SaveBSkel(cachePath, skeleton))
 	{
 		OutputDebugStringA(("[Binary Cache] Saved skeleton cache: " + cachePath + "\n").c_str());
+	}
+
+	// メモリキャッシュに登録
+	{
+		std::lock_guard<std::mutex> lock(s_skeletonCacheMutex);
+		s_skeletonCache[fullPath] = skeleton;
 	}
 
 	return skeleton;

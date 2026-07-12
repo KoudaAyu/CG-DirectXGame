@@ -315,10 +315,27 @@ void Model::MaterialResource()
     }
 }
 
+#include <unordered_map>
+#include <mutex>
+
+static std::unordered_map<std::string, Model::ModelData> s_modelCache;
+static std::mutex s_modelCacheMutex;
+
 Model::ModelData Model::LoadModelFile(const std::string& directoryPath, const std::string& filename)
 {
-	Model::ModelData modelData;
 	const std::string fullPath = directoryPath + "/" + filename;
+
+	// メモリキャッシュ確認
+	{
+		std::lock_guard<std::mutex> lock(s_modelCacheMutex);
+		auto it = s_modelCache.find(fullPath);
+		if (it != s_modelCache.end())
+		{
+			return it->second;
+		}
+	}
+
+	Model::ModelData modelData;
 	const std::string cachePath = BinaryAssetUtil::GetCachePath(fullPath, ".bmodel");
 
 	// キャッシュが有効な場合はバイナリからロード
@@ -327,6 +344,11 @@ Model::ModelData Model::LoadModelFile(const std::string& directoryPath, const st
 		if (BinaryAssetUtil::LoadBModel(cachePath, modelData))
 		{
 			OutputDebugStringA(("[Binary Cache] Loaded model from cache: " + cachePath + "\n").c_str());
+			// メモリキャッシュに登録
+			{
+				std::lock_guard<std::mutex> lock(s_modelCacheMutex);
+				s_modelCache[fullPath] = modelData;
+			}
 			return modelData;
 		}
 	}
@@ -450,6 +472,12 @@ Model::ModelData Model::LoadModelFile(const std::string& directoryPath, const st
 	if (BinaryAssetUtil::SaveBModel(cachePath, modelData))
 	{
 		OutputDebugStringA(("[Binary Cache] Saved model cache: " + cachePath + "\n").c_str());
+	}
+
+	// メモリキャッシュに登録
+	{
+		std::lock_guard<std::mutex> lock(s_modelCacheMutex);
+		s_modelCache[fullPath] = modelData;
 	}
 
 	return modelData;
