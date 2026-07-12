@@ -92,13 +92,7 @@ void SkinningObject3dCom::Draw(Object3d* object, const ::RenderContext& ctx, con
     barrier.Transition.pResource = skinCluster.uavResource.Get();
     barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
 
-    if (object->IsShared())
-    {
-        barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COMMON;
-        barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER;
-        ctx.commandList->ResourceBarrier(1, &barrier);
-    }
-    else
+    if (!object->IsShared())
     {
         barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COMMON;
         barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
