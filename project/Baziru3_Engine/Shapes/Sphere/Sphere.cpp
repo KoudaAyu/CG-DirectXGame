@@ -20,7 +20,8 @@ Sphere::~Sphere()
 	auto it = std::find(instances_.begin(), instances_.end(), this);
 	if (it != instances_.end())
 	{
-		instances_.erase(it);
+		*it = instances_.back();
+		instances_.pop_back();
 	}
 
 	if (transformationMatrixResourceSphere && transformationMatrixDataSphere)

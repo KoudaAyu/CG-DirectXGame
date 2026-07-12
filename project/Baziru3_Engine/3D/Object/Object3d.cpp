@@ -615,7 +615,8 @@ Object3d::~Object3d()
 	auto it = std::find(instances_.begin(), instances_.end(), this);
 	if (it != instances_.end())
 	{
-		instances_.erase(it);
+		*it = instances_.back();
+		instances_.pop_back();
 	}
 
 	// 持続的にマップされたリソースがある場合は安全にアンマップする
