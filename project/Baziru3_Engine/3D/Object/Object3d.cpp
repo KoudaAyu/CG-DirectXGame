@@ -340,6 +340,8 @@ void Object3d::Update()
 
 void Object3d::Draw(ID3D12GraphicsCommandList* commandList)
 {
+	if (isCulled_) return;
+
 	MarkDrawn();
 	DirectXCom* dx = object3dCom_ ? object3dCom_->GetDirectXCom() : nullptr;
 	if (dx)
