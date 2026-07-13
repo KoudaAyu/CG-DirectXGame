@@ -56,6 +56,7 @@ public:
 
     // 音源検知のトリガー
     void HearNoise(const Vector3& noisePosition);
+    void AlertEnemy(const Vector3& targetPos);
 
 private:
     bool FaceTarget(const Vector3& targetPosition, float deltaTime = 0.016f);
@@ -107,4 +108,11 @@ private:
 
     std::unique_ptr<BaziruEngine::AI::BehaviorTree> behaviorTree_;
     bool useBehaviorTree_ = true;
+
+    // --- カバー＆ピーク射撃用追加パラメータ ---
+    bool isPeeking_ = false;
+    float peekTimer_ = 0.0f;
+    Vector3 activePeekPos_ = { 0.0f, 0.0f, 0.0f };
+    Vector3 actualCoverPos_ = { 0.0f, 0.0f, 0.0f };
+    float coverIgnoreTimer_ = 0.0f;
 };

@@ -15,6 +15,8 @@
 #include <cassert>
 #include <cmath>
 #include <Windows.h>
+#include <fstream>
+#include "Baziru3_Engine/AI/NavMesh.h"
 
 #include "GamePlayScene.h"
 
@@ -1044,7 +1046,7 @@ void GamePlayScene::UpdateCharacters(float deltaTime)
 						float dist = std::sqrt(dx * dx + dz * dz);
 						if (dist <= maxRad)
 						{
-							// enemy_->HearNoise(playerPos); // 将来音に反応する敵用に残す
+							enemy_->HearNoise(playerPos);
 						}
 					}
 					if (movingEnemy_ && !movingEnemy_->IsDead())
@@ -1054,7 +1056,7 @@ void GamePlayScene::UpdateCharacters(float deltaTime)
 						float dist = std::sqrt(dx * dx + dz * dz);
 						if (dist <= maxRad)
 						{
-							// movingEnemy_->HearNoise(playerPos); // 将来音に反応する敵用に残す
+							movingEnemy_->HearNoise(playerPos);
 						}
 					}
 					
@@ -1145,7 +1147,7 @@ void GamePlayScene::UpdateCharacters(float deltaTime)
 							float dist = std::sqrt(dx * dx + dz * dz);
 							if (dist <= maxRad)
 							{
-								// enemy_->HearNoise(playerPos); // 将来音に反応する敵用に残す
+								enemy_->HearNoise(playerPos);
 							}
 						}
 						if (movingEnemy_ && !movingEnemy_->IsDead())
@@ -1155,7 +1157,7 @@ void GamePlayScene::UpdateCharacters(float deltaTime)
 							float dist = std::sqrt(dx * dx + dz * dz);
 							if (dist <= maxRad)
 							{
-								// movingEnemy_->HearNoise(playerPos); // 将来音に反応する敵用に残す
+								movingEnemy_->HearNoise(playerPos);
 							}
 						}
 					}
@@ -1187,6 +1189,19 @@ void GamePlayScene::UpdateCharacters(float deltaTime)
 	if (movingEnemy_)
 	{
 		movingEnemy_->Update(windowAPI, target, obstacles_, deltaTime);
+	}
+
+	// 1体が発見したら周囲の仲間に無線で位置を伝達（グループ連携無線）
+	if (enemy_ && movingEnemy_ && player_ && !player_->IsDead())
+	{
+		if (enemy_->GetAIState() == Enemy::AIState::Chase && !enemy_->IsDead())
+		{
+			movingEnemy_->AlertEnemy(player_->GetPosition());
+		}
+		if (movingEnemy_->GetAIState() == MovingEnemy::AIState::Chase && !movingEnemy_->IsDead())
+		{
+			enemy_->AlertEnemy(player_->GetPosition());
+		}
 	}
 
 	// 敵の復活時演出 (Enemy Respawn Effects - 光の召喚ピラー)
@@ -1799,6 +1814,9 @@ void GamePlayScene::Draw(SceneRenderRequests& renderRequests)
 				}
 				else if (data.type == ColliderType::Box)
 				{
+					// レーザーサイトはフェンスの隙間をすり抜けられるよう、簡易BoxではなくMeshColliderで判定を行います
+					continue;
+					
 					BoxCollider* box = static_cast<BoxCollider*>(col);
 					data.shape.size = box->GetSize();
 					data.shape.rotation = box->GetWorldRotation();
@@ -1808,6 +1826,10 @@ void GamePlayScene::Draw(SceneRenderRequests& renderRequests)
 					CapsuleCollider* capsule = static_cast<CapsuleCollider*>(col);
 					data.shape.radius = capsule->GetRadius();
 					data.shape.height = capsule->GetHeight();
+				}
+				else if (data.type == ColliderType::Mesh)
+				{
+					// メッシュコライダーは追加の形状パラメータ設定不要
 				}
 
 				float dist = 0.0f;

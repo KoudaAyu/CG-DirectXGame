@@ -57,8 +57,7 @@ void CombatSystem::UpdateCombat(float deltaTime)
 				float dist = std::sqrt(dx * dx + dz * dz);
 				if (dist <= maxRad)
 				{
-					// 将来的に音へ反応するAI実装用
-					// scene_->enemy_->HearNoise(playerPos);
+					scene_->enemy_->HearNoise(playerPos);
 				}
 			}
 			if (scene_->movingEnemy_ && !scene_->movingEnemy_->IsDead())
@@ -68,7 +67,7 @@ void CombatSystem::UpdateCombat(float deltaTime)
 				float dist = std::sqrt(dx * dx + dz * dz);
 				if (dist <= maxRad)
 				{
-					// scene_->movingEnemy_->HearNoise(playerPos);
+					scene_->movingEnemy_->HearNoise(playerPos);
 				}
 			}
 

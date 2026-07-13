@@ -3,13 +3,21 @@
   "Children": [
     {
       "Type": "DetectCoverNode",
-      "RayCount": 8,
-      "MaxDistance": 15.0,
+      "RayCount": 16,
+      "MaxDistance": 20.0,
       "MinCoverDistance": 1.5
     },
     {
-      "Type": "MoveToCoverNode",
-      "Speed": 5.0
+      "Type": "FindPathNode",
+      "TargetKey": "CoverPosition",
+      "PathKey": "CoverPath",
+      "AgentRadius": 0.85
+    },
+    {
+      "Type": "FollowPathNode",
+      "Speed": 4.5,
+      "PathKey": "CoverPath",
+      "ArrivalTolerance": 0.3
     }
   ]
 }

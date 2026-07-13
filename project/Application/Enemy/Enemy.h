@@ -53,6 +53,7 @@ public:
 
     // 音源検知のトリガー
     void HearNoise(const Vector3& noisePosition);
+    void AlertEnemy(const Vector3& targetPos);
 
 private:
     bool FaceTarget(const Vector3& targetPosition, float deltaTime = 0.016f);
