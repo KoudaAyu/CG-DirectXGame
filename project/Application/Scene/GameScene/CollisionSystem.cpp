@@ -8,6 +8,9 @@
 #include "ParticleManager.h"
 #include "Baziru3_Engine/Effect/HitEffect.h"
 #include "Baziru3_Engine/Collision/CollisionManager.h"
+#include "Baziru3_Engine/Collision/SphereCollider.h"
+#include "Baziru3_Engine/Collision/BoxCollider.h"
+#include "Baziru3_Engine/Collision/CapsuleCollider.h"
 #include "CombatSystem.h"
 #include <cmath>
 #include <algorithm>
@@ -23,7 +26,8 @@ void CollisionSystem::Update()
 {
 	CollisionManager::GetInstance()->Update(); // エンジンの衝突判定更新
 	ResolveBulletCollisions();      // 弾丸とキャラクターの衝突
-	ResolveObstacleCollisions();    // キャラクター・弾丸と障害物の衝突
+	ResolveObstacleCollisions();    // 弾丸と障害物の衝突 (MeshColliderによる精密判定)
+	ResolveCharacterObstacleCollisions(); // キャラクターと障害物の衝突 (手動押し出し解決)
 	ResolveContactDamage();        // プレイヤーと敵の直接接触によるダメージ
 }
 
@@ -270,210 +274,129 @@ void CollisionSystem::ResolveBulletCollisions()
 	}
 }
 
-// キャラクターおよび弾丸と障害物（Obstacle）の衝突判定とめり込み補正
+// 弾丸と障害物（Obstacle）の精密衝突判定 (MeshColliderを使用したポリゴン精密判定)
 void CollisionSystem::ResolveObstacleCollisions()
 {
-	// --- 弾丸と障害物の衝突判定 ---
 	if (!scene_->combatSystem_) return;
 	auto& bullets = scene_->combatSystem_->GetBullets();
 
 	for (auto& bullet : bullets)
 	{
 		if (!bullet || bullet->IsDead()) continue;
+		Vector3 bPosPrev = bullet->GetPrevPosition();
 		Vector3 bPos = bullet->GetPosition();
-		
-		for (auto& obs : scene_->obstacles_)
+		Vector3 diff = bPos - bPosPrev;
+		float len = std::sqrt(diff.x * diff.x + diff.y * diff.y + diff.z * diff.z);
+		if (len < 1e-4f) continue;
+		Vector3 dir = { diff.x / len, diff.y / len, diff.z / len };
+
+		bool hitObstacle = false;
+		float closestDist = len;
+
+		auto& colliders = CollisionManager::GetInstance()->GetColliders();
+		for (Collider* col : colliders)
 		{
-			if (!obs) continue;
-			
-			// X字型フェンスを構成する2枚のコライダーそれぞれと判定
-			BoxCollider* colliders[2] = { obs->GetCollider(), obs->GetCollider2() };
-			bool hit = false;
-			
-			for (int c = 0; c < 2; ++c)
+			if (!col || !col->IsEnabled() || col->GetAttribute() != CollisionAttribute::Obstacle)
 			{
-				BoxCollider* col = colliders[c];
-				if (!col) continue;
-				
-				Vector3 size = col->GetSize();
-				Vector3 oPos = obs->GetPosition();
-				
-				// コライダーのY軸回転角度を取得
-				float rotY = col->GetWorldRotation().y;
-				
-				// 前フレーム位置と現フレーム位置
-				Vector3 bPosPrev = bullet->GetPrevPosition();
-				
-				// 弾丸の相対開始座標
-				float rxStart = bPosPrev.x - oPos.x;
-				float ryStart = bPosPrev.y - oPos.y;
-				float rzStart = bPosPrev.z - oPos.z;
-				
-				// 弾丸の移動差分
-				float dxMove = bPos.x - bPosPrev.x;
-				float dyMove = bPos.y - bPosPrev.y;
-				float dzMove = bPos.z - bPosPrev.z;
-				
-				// ローカル空間への逆回転変換 (OBB判定のため、弾をフェンスのローカル空間に回転移動)
-				float cosR = std::cos(-rotY);
-				float sinR = std::sin(-rotY);
-				
-				// ローカル空間での開始点
-				float lxStart = rxStart * cosR - rzStart * sinR;
-				float lyStart = ryStart;
-				float lzStart = rxStart * sinR + rzStart * cosR;
-				
-				// ローカル空間での差分ベクトル
-				float lxDelta = dxMove * cosR - dzMove * sinR;
-				float lyDelta = dyMove;
-				float lzDelta = dxMove * sinR + dzMove * cosR;
-				
-				// ローカル空間内でのAABB判定 (スラブ線分判定)
-				float hx = size.x * 0.5f;
-				float hy = size.y * 0.5f;
-				float hz = size.z * 0.5f;
-				
-				// 弾丸の厚み分だけAABBのサイズを太らせる (弾丸の半径を追加)
-				float radius = scene_->bulletHitRadius_;
-				hx += radius;
-				hy += radius;
-				hz += radius;
-				
-				float tmin = 0.0f;
-				float tmax = 1.0f;
-				bool intersect = true;
-				
-				// X軸スラブ判定
-				if (std::abs(lxDelta) < 1e-6f)
-				{
-					if (lxStart < -hx || lxStart > hx) intersect = false;
-				}
-				else
-				{
-					float ood = 1.0f / lxDelta;
-					float t1 = (-hx - lxStart) * ood;
-					float t2 = (hx - lxStart) * ood;
-					if (t1 > t2) std::swap(t1, t2);
-					if (t1 > tmin) tmin = t1;
-					if (t2 < tmax) tmax = t2;
-					if (tmin > tmax) intersect = false;
-				}
-				
-				// Y軸スラブ判定
-				if (intersect && std::abs(lyDelta) < 1e-6f)
-				{
-					if (lyStart < -hy || lyStart > hy) intersect = false;
-				}
-				else if (intersect)
-				{
-					float ood = 1.0f / lyDelta;
-					float t1 = (-hy - lyStart) * ood;
-					float t2 = (hy - lyStart) * ood;
-					if (t1 > t2) std::swap(t1, t2);
-					if (t1 > tmin) tmin = t1;
-					if (t2 < tmax) tmax = t2;
-					if (tmin > tmax) intersect = false;
-				}
-				
-				// Z軸スラブ判定
-				if (intersect && std::abs(lzDelta) < 1e-6f)
-				{
-					if (lzStart < -hz || lzStart > hz) intersect = false;
-				}
-				else if (intersect)
-				{
-					float ood = 1.0f / lzDelta;
-					float t1 = (-hz - lzStart) * ood;
-					float t2 = (hz - lzStart) * ood;
-					if (t1 > t2) std::swap(t1, t2);
-					if (t1 > tmin) tmin = t1;
-					if (t2 < tmax) tmax = t2;
-					if (tmin > tmax) intersect = false;
-				}
-				
-				if (intersect && tmax >= 0.0f && tmin <= 1.0f)
-				{
-					hit = true;
-					
-					// エフェクトの発生位置を衝突交点に変更
-					float cx_local = lxStart + lxDelta * tmin;
-					float cy_local = lyStart + lyDelta * tmin;
-					float cz_local = lzStart + lzDelta * tmin;
-					
-					float cosR_pos = std::cos(rotY);
-					float sinR_pos = std::sin(rotY);
-					Vector3 hitWorldPos = {
-						oPos.x + (cx_local * cosR_pos - cz_local * sinR_pos),
-						oPos.y + cy_local,
-						oPos.z + (cx_local * sinR_pos + cz_local * cosR_pos)
-					};
-					
-					bPos = hitWorldPos; // パーティクル発生用座標を交点に設定
-					break;
-				}
+				continue;
 			}
-			
-			if (hit)
+
+			CollisionData data;
+			data.originalCollider = col;
+			data.type = col->GetType();
+			data.attribute = col->GetAttribute();
+			data.worldPosition = col->GetWorldPosition();
+			data.isTrigger = col->IsTrigger();
+
+			if (data.type == ColliderType::Sphere)
 			{
-				// 木製の障害物に着弾した際のおがくず（飛散）パーティクル演出
-				if (scene_->particleManager && scene_->appParticleManager_)
+				SphereCollider* sphere = static_cast<SphereCollider*>(col);
+				data.shape.radius = sphere->GetRadius();
+			}
+			else if (data.type == ColliderType::Box)
+			{
+				BoxCollider* box = static_cast<BoxCollider*>(col);
+				data.shape.size = box->GetSize();
+				data.shape.rotation = box->GetWorldRotation();
+			}
+			else if (data.type == ColliderType::Capsule)
+			{
+				CapsuleCollider* capsule = static_cast<CapsuleCollider*>(col);
+				data.shape.radius = capsule->GetRadius();
+				data.shape.height = capsule->GetHeight();
+			}
+
+			float dist = 0.0f;
+			if (CollisionManager::CheckRayCollider(bPosPrev, dir, closestDist, data, dist))
+			{
+				closestDist = dist;
+				hitObstacle = true;
+			}
+		}
+
+		if (hitObstacle)
+		{
+			// 着弾交点
+			Vector3 hitWorldPos = bPosPrev + dir * closestDist;
+			bPos = hitWorldPos; // エフェクト発生座標を交点に設定
+
+			// 木製の障害物に着弾した際のおがくず（飛散）パーティクル演出
+			if (scene_->particleManager && scene_->appParticleManager_)
+			{
+				scene_->appParticleManager_->EmitMuzzleFlare(
+					scene_->particleManager->GetRandomEngine(),
+					bPos,
+					0.32f,
+					{ 1.0f, 0.9f, 0.6f, 0.9f },
+					0.06f,
+					scene_->particleTextureB
+				);
+
+				// 木片（フェンス素材テクスチャ）のバースト
+				for (int i = 0; i < 8; ++i)
 				{
-					scene_->appParticleManager_->EmitMuzzleFlare(
+					std::uniform_real_distribution<float> colorDist(0.0f, 0.15f);
+					float r = 0.5f + colorDist(scene_->particleManager->GetRandomEngine());
+					float g = 0.35f + colorDist(scene_->particleManager->GetRandomEngine());
+					float b = 0.15f + colorDist(scene_->particleManager->GetRandomEngine());
+					
+					std::uniform_real_distribution<float> chipScale(0.1f, 0.25f);
+					scene_->appParticleManager_->EmitSpark(
 						scene_->particleManager->GetRandomEngine(),
 						bPos,
-						0.32f,
-						{ 1.0f, 0.9f, 0.6f, 0.9f },
-						0.06f,
-						scene_->particleTextureB
+						{0, 0, 0},
+						{ r, g, b, 1.0f },
+						chipScale(scene_->particleManager->GetRandomEngine()),
+						0.5f,
+						scene_->fenceTextureIndex_
 					);
-
-					// 木片（フェンス素材テクスチャ）のバースト
-					for (int i = 0; i < 8; ++i)
-					{
-						std::uniform_real_distribution<float> colorDist(0.0f, 0.15f);
-						float r = 0.5f + colorDist(scene_->particleManager->GetRandomEngine());
-						float g = 0.35f + colorDist(scene_->particleManager->GetRandomEngine());
-						float b = 0.15f + colorDist(scene_->particleManager->GetRandomEngine());
-						
-						std::uniform_real_distribution<float> chipScale(0.1f, 0.25f);
-						scene_->appParticleManager_->EmitSpark(
-							scene_->particleManager->GetRandomEngine(),
-							bPos,
-							{0, 0, 0},
-							{ r, g, b, 1.0f },
-							chipScale(scene_->particleManager->GetRandomEngine()),
-							0.5f,
-							scene_->fenceTextureIndex_
-						);
-					}
-					
-					// 細かいおがくずの浮遊煙
-					for (int i = 0; i < 6; ++i)
-					{
-						std::uniform_real_distribution<float> colorDist(0.0f, 0.1f);
-						float r = 0.7f + colorDist(scene_->particleManager->GetRandomEngine());
-						float g = 0.55f + colorDist(scene_->particleManager->GetRandomEngine());
-						float b = 0.35f + colorDist(scene_->particleManager->GetRandomEngine());
-						
-						std::uniform_real_distribution<float> velDist(-2.0f, 2.0f);
-						std::uniform_real_distribution<float> velUp(1.0f, 3.0f);
-						Vector3 vel = { velDist(scene_->particleManager->GetRandomEngine()), velUp(scene_->particleManager->GetRandomEngine()), velDist(scene_->particleManager->GetRandomEngine()) };
-
-						scene_->appParticleManager_->EmitDustWithVelocity(
-							scene_->particleManager->GetRandomEngine(),
-							bPos,
-							0.6f,
-							{ r, g, b, 0.8f },
-							vel,
-							1.3f,
-							scene_->fenceTextureIndex_
-						);
-					}
 				}
+				
+				// 細かいおがくずの浮遊煙
+				for (int i = 0; i < 6; ++i)
+				{
+					std::uniform_real_distribution<float> colorDist(0.0f, 0.1f);
+					float r = 0.7f + colorDist(scene_->particleManager->GetRandomEngine());
+					float g = 0.55f + colorDist(scene_->particleManager->GetRandomEngine());
+					float b = 0.35f + colorDist(scene_->particleManager->GetRandomEngine());
+					
+					std::uniform_real_distribution<float> velDist(-2.0f, 2.0f);
+					std::uniform_real_distribution<float> velUp(1.0f, 3.0f);
+					Vector3 vel = { velDist(scene_->particleManager->GetRandomEngine()), velUp(scene_->particleManager->GetRandomEngine()), velDist(scene_->particleManager->GetRandomEngine()) };
 
-				bullet->Finalize();
-				break;
+					scene_->appParticleManager_->EmitDustWithVelocity(
+						scene_->particleManager->GetRandomEngine(),
+						bPos,
+						0.6f,
+						{ r, g, b, 0.8f },
+						vel,
+						1.3f,
+						scene_->fenceTextureIndex_
+					);
+				}
 			}
+
+			bullet->Finalize();
 		}
 	}
 }
@@ -513,6 +436,103 @@ void CollisionSystem::ResolveContactDamage()
 				scene_->TriggerCameraShake(0.25f, 0.5f);
 				scene_->TriggerHitStop(0.06f); // 接触被弾時のスローモーション
 				scene_->AddFloatingText(scene_->player_->GetPosition() + Vector3{0.0f, 1.0f, 0.0f}, "WARNING -20", {1.0f, 0.1f, 0.1f, 1.0f}, true);
+			}
+		}
+	}
+}
+
+// プレイヤーおよび移動敵と障害物(BoxCollider)との手動めり込み解決（押し出し補正）
+void CollisionSystem::ResolveCharacterObstacleCollisions()
+{
+	// 1. プレイヤーと障害物の押し出し解決
+	if (scene_->player_ && !scene_->player_->IsDead())
+	{
+		Vector3 playerPos = scene_->player_->GetPosition();
+		SphereCollider* playerCol = scene_->player_->GetCollider();
+		if (playerCol)
+		{
+			CollisionData playerColData;
+			playerColData.originalCollider = playerCol;
+			playerColData.type = ColliderType::Sphere;
+			playerColData.attribute = CollisionAttribute::Player;
+			playerColData.worldPosition = playerPos;
+			playerColData.isTrigger = false;
+			playerColData.shape.radius = playerCol->GetRadius();
+
+			for (auto& obs : scene_->obstacles_)
+			{
+				if (!obs) continue;
+				BoxCollider* colliders[2] = { obs->GetCollider(), obs->GetCollider2() };
+				for (int c = 0; c < 2; ++c)
+				{
+					BoxCollider* boxCol = colliders[c];
+					if (!boxCol) continue;
+
+					CollisionData boxColData;
+					boxColData.originalCollider = boxCol;
+					boxColData.type = ColliderType::Box;
+					boxColData.attribute = CollisionAttribute::Obstacle;
+					boxColData.worldPosition = boxCol->GetWorldPosition();
+					boxColData.isTrigger = false;
+					boxColData.shape.size = boxCol->GetSize();
+					boxColData.shape.rotation = boxCol->GetWorldRotation();
+
+					Vector3 pushDir = { 0.0f, 0.0f, 0.0f };
+					float pushLen = 0.0f;
+					if (CollisionManager::CheckSphereBox(playerColData, boxColData, pushDir, pushLen))
+					{
+						// 箱から球へ押し戻すため、-pushDir * pushLen を減算
+						playerPos = playerPos - pushDir * pushLen;
+						scene_->player_->SetPosition(playerPos);
+						playerColData.worldPosition = playerPos;
+					}
+				}
+			}
+		}
+	}
+
+	// 2. 移動敵と障害物の押し出し解決
+	if (scene_->movingEnemy_ && !scene_->movingEnemy_->IsDead())
+	{
+		Vector3 enemyPos = scene_->movingEnemy_->GetPosition();
+		SphereCollider* enemyCol = scene_->movingEnemy_->GetCollider();
+		if (enemyCol)
+		{
+			CollisionData enemyColData;
+			enemyColData.originalCollider = enemyCol;
+			enemyColData.type = ColliderType::Sphere;
+			enemyColData.attribute = CollisionAttribute::Enemy;
+			enemyColData.worldPosition = enemyPos;
+			enemyColData.isTrigger = false;
+			enemyColData.shape.radius = enemyCol->GetRadius();
+
+			for (auto& obs : scene_->obstacles_)
+			{
+				if (!obs) continue;
+				BoxCollider* colliders[2] = { obs->GetCollider(), obs->GetCollider2() };
+				for (int c = 0; c < 2; ++c)
+				{
+					BoxCollider* boxCol = colliders[c];
+					if (!boxCol) continue;
+
+					CollisionData boxColData;
+					boxColData.originalCollider = boxCol;
+					boxColData.type = ColliderType::Box;
+					boxColData.attribute = CollisionAttribute::Obstacle;
+					boxColData.worldPosition = boxCol->GetWorldPosition();
+					boxColData.isTrigger = false;
+					boxColData.shape.size = boxCol->GetSize();
+					boxColData.shape.rotation = boxCol->GetWorldRotation();
+
+					Vector3 pushDir = { 0.0f, 0.0f, 0.0f };
+					float pushLen = 0.0f;
+					if (CollisionManager::CheckSphereBox(enemyColData, boxColData, pushDir, pushLen))
+					{
+						enemyPos = enemyPos - pushDir * pushLen;
+						scene_->movingEnemy_->SetPosition(enemyPos);
+						enemyColData.worldPosition = enemyPos;
+					}
+				}
 			}
 		}
 	}

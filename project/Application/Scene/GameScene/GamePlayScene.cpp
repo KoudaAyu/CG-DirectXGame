@@ -20,6 +20,7 @@
 
 #include "imgui.h"
 #include "CombatSystem.h"
+#include "Bullet.h"
 #include "CollisionSystem.h"
 #include "Baziru3_Engine/Collision/CollisionManager.h"
 #include "Baziru3_Engine/Collision/SphereCollider.h"
@@ -1766,113 +1767,60 @@ void GamePlayScene::Draw(SceneRenderRequests& renderRequests)
 				return true;
 			};
 
-			Vector3 gunPos = player_->GetPosition() + Vector3{ 0.0f, 0.25f, 0.0f }; // 少し浮かせた位置から射出
 			float rotY = player_->GetRotation().y;
 			Vector3 dir = { std::sin(rotY), 0.0f, std::cos(rotY) };
+			// 実際の弾丸のスポーン位置計算 (前方 0.5f、高さ 0.2f) と完全に同期させる
+			Vector3 gunPos = Bullet::ComputeSpawnPosition(player_->GetPosition(), dir, Vector3{ 0.0f, 0.2f, 0.5f });
 
-			// レイキャストで障害物衝突距離を測定 (自前で回転を考慮したRay-OBB判定を行うことで、弾丸の判定と100%同期)
+			// レイキャストで障害物のみ(Obstacle)との衝突距離を測定 (自キャラのコライダーへの即時衝突を防ぐため)
 			float laserRange = 25.0f; // 最大長
-			for (const auto& obs : obstacles_)
+			bool hitObstacle = false;
+			float closestDist = laserRange;
+			
+			auto& colliders = CollisionManager::GetInstance()->GetColliders();
+			for (Collider* col : colliders)
 			{
-				if (!obs) continue;
-				
-				BoxCollider* colliders[2] = { obs->GetCollider(), obs->GetCollider2() };
-				for (int c = 0; c < 2; ++c)
+				if (!col || !col->IsEnabled() || col->GetAttribute() != CollisionAttribute::Obstacle)
 				{
-					BoxCollider* col = colliders[c];
-					if (!col) continue;
-
-					Vector3 size = col->GetSize();
-					Vector3 oPos = obs->GetPosition();
-					float rotY = col->GetWorldRotation().y;
-
-					// 1. レイの始点と方向をフェンスのローカル空間に変換 (逆回転 -rotY)
-					float rx = gunPos.x - oPos.x;
-					float ry = gunPos.y - oPos.y;
-					float rz = gunPos.z - oPos.z;
-
-					float cosR = std::cos(-rotY);
-					float sinR = std::sin(-rotY);
-					
-					Vector3 lxStart = {
-						rx * cosR - rz * sinR,
-						ry,
-						rx * sinR + rz * cosR
-					};
-
-					Vector3 lxDir = {
-						dir.x * cosR - dir.z * sinR,
-						dir.y,
-						dir.x * sinR + dir.z * cosR
-					};
-
-					// 2. ローカル空間でのRay-AABB交差判定
-					float hx = size.x * 0.5f;
-					float hy = size.y * 0.5f;
-					float hz = size.z * 0.5f;
-
-					float tmin = 0.0f;
-					float tmax = laserRange;
-					bool intersect = true;
-
-					// X軸スラブ判定
-					if (std::abs(lxDir.x) < 1e-6f)
-					{
-						if (lxStart.x < -hx || lxStart.x > hx) intersect = false;
-					}
-					else
-					{
-						float ood = 1.0f / lxDir.x;
-						float t1 = (-hx - lxStart.x) * ood;
-						float t2 = (hx - lxStart.x) * ood;
-						if (t1 > t2) std::swap(t1, t2);
-						if (t1 > tmin) tmin = t1;
-						if (t2 < tmax) tmax = t2;
-						if (tmin > tmax) intersect = false;
-					}
-
-					// Y軸スラブ判定
-					if (intersect && std::abs(lxDir.y) < 1e-6f)
-					{
-						if (lxStart.y < -hy || lxStart.y > hy) intersect = false;
-					}
-					else if (intersect)
-					{
-						float ood = 1.0f / lxDir.y;
-						float t1 = (-hy - lxStart.y) * ood;
-						float t2 = (hy - lxStart.y) * ood;
-						if (t1 > t2) std::swap(t1, t2);
-						if (t1 > tmin) tmin = t1;
-						if (t2 < tmax) tmax = t2;
-						if (tmin > tmax) intersect = false;
-					}
-
-					// Z軸スラブ判定
-					if (intersect && std::abs(lxDir.z) < 1e-6f)
-					{
-						if (lxStart.z < -hz || lxStart.z > hz) intersect = false;
-					}
-					else if (intersect)
-					{
-						float ood = 1.0f / lxDir.z;
-						float t1 = (-hz - lxStart.z) * ood;
-						float t2 = (hz - lxStart.z) * ood;
-						if (t1 > t2) std::swap(t1, t2);
-						if (t1 > tmin) tmin = t1;
-						if (t2 < tmax) tmax = t2;
-						if (tmin > tmax) intersect = false;
-					}
-
-					if (intersect && tmax >= 0.0f)
-					{
-						float hitDist = tmin;
-						if (hitDist < 0.0f) hitDist = 0.0f;
-						if (hitDist < laserRange)
-						{
-							laserRange = hitDist;
-						}
-					}
+					continue;
 				}
+
+				CollisionData data;
+				data.originalCollider = col;
+				data.type = col->GetType();
+				data.attribute = col->GetAttribute();
+				data.worldPosition = col->GetWorldPosition();
+				data.isTrigger = col->IsTrigger();
+
+				if (data.type == ColliderType::Sphere)
+				{
+					SphereCollider* sphere = static_cast<SphereCollider*>(col);
+					data.shape.radius = sphere->GetRadius();
+				}
+				else if (data.type == ColliderType::Box)
+				{
+					BoxCollider* box = static_cast<BoxCollider*>(col);
+					data.shape.size = box->GetSize();
+					data.shape.rotation = box->GetWorldRotation();
+				}
+				else if (data.type == ColliderType::Capsule)
+				{
+					CapsuleCollider* capsule = static_cast<CapsuleCollider*>(col);
+					data.shape.radius = capsule->GetRadius();
+					data.shape.height = capsule->GetHeight();
+				}
+
+				float dist = 0.0f;
+				if (CollisionManager::CheckRayCollider(gunPos, dir, closestDist, data, dist))
+				{
+					closestDist = dist;
+					hitObstacle = true;
+				}
+			}
+
+			if (hitObstacle)
+			{
+				laserRange = closestDist;
 			}
 
 			Vector3 endPos = gunPos + dir * laserRange;

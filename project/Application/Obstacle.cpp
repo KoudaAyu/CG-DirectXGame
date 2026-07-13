@@ -28,8 +28,10 @@ void Obstacle::Initialize(Object3dCom* object3dCom, Camera* camera, const Vector
     collider_ = std::make_unique<BoxCollider>(boxSize, &position_, &rot1_, CollisionAttribute::Obstacle);
     collider2_ = std::make_unique<BoxCollider>(boxSize, &position_, &rot2_, CollisionAttribute::Obstacle);
     
-    CollisionManager::GetInstance()->RegisterCollider(collider_.get());
-    CollisionManager::GetInstance()->RegisterCollider(collider2_.get());
+    // 物理押し出し用BoxColliderはエンジン(CollisionManager)には登録せず、CollisionSystem側で手動解決する
+    // これにより、エンジンの自動レイキャスト判定はMeshColliderのポリゴンにのみ精密衝突するようになる
+    meshCollider_ = std::make_unique<MeshCollider>(object3d_.get(), CollisionAttribute::Obstacle);
+    CollisionManager::GetInstance()->RegisterCollider(meshCollider_.get());
 
     // テクスチャ設定
     if (model.material.textureFilePath.empty())
@@ -69,14 +71,17 @@ void Obstacle::Draw(const RenderContext& ctx)
 
 void Obstacle::Finalize()
 {
+    if (meshCollider_)
+    {
+        CollisionManager::GetInstance()->UnregisterCollider(meshCollider_.get());
+        meshCollider_.reset();
+    }
     if (collider_)
     {
-        CollisionManager::GetInstance()->UnregisterCollider(collider_.get());
         collider_.reset();
     }
     if (collider2_)
     {
-        CollisionManager::GetInstance()->UnregisterCollider(collider2_.get());
         collider2_.reset();
     }
     if (object3d_)
