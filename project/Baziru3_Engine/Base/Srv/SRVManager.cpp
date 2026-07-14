@@ -114,5 +114,8 @@ uint32_t SRVManager::AllocateAt(uint32_t index)
 
 void SRVManager::Free(uint32_t index)
 {
-	directXCom_->GetSrvHeap().Free(index);
+	if (directXCom_)
+	{
+		directXCom_->GetSrvHeap().Free(index);
+	}
 }

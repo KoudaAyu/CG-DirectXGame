@@ -1,15 +1,11 @@
 #include "SkyBox.h"
+#include "Baziru3_Engine/Base/Allocator/ConstantBufferAllocator.h"
 
 #include <cassert>
 #include <cstring>
 
 SkyBox::~SkyBox()
 {
-	if (transformationMatrixResource_ && transformationMatrixData_)
-	{
-		transformationMatrixResource_->Unmap(0, nullptr);
-		transformationMatrixData_ = nullptr;
-	}
 }
 
 void SkyBox::Initialize(DirectXCom* directXCom, Camera* camera)
@@ -86,7 +82,6 @@ void SkyBox::CreateBuffers()
 {
 	vertexResource_ = directXCom_->CreateBufferResource(directXCom_->GetDevice().Get(), sizeof(Sprite::VertexData) * vertexData.size());
 	indexResource_ = directXCom_->CreateBufferResource(directXCom_->GetDevice().Get(), sizeof(uint32_t) * indexData_.size());
-	transformationMatrixResource_ = directXCom_->CreateBufferResource(directXCom_->GetDevice().Get(), sizeof(TransformationMatrix));
 
 	Sprite::VertexData* mappedVertex = nullptr;
 	vertexResource_->Map(0, nullptr, reinterpret_cast<void**>(&mappedVertex));
@@ -98,10 +93,9 @@ void SkyBox::CreateBuffers()
 	std::memcpy(mappedIndex, indexData_.data(), sizeof(uint32_t) * indexData_.size());
 	indexResource_->Unmap(0, nullptr);
 
-	transformationMatrixResource_->Map(0, nullptr, reinterpret_cast<void**>(&transformationMatrixData_));
-	transformationMatrixData_->World = MakeIdentity4x4();
-	transformationMatrixData_->WVP = MakeIdentity4x4();
-	transformationMatrixData_->WorldInverseTranspose = MakeIdentity4x4();
+	transformationMatrixData_.World = MakeIdentity4x4();
+	transformationMatrixData_.WVP = MakeIdentity4x4();
+	transformationMatrixData_.WorldInverseTranspose = MakeIdentity4x4();
 
 	vertexBufferView_.BufferLocation = vertexResource_->GetGPUVirtualAddress();
 	vertexBufferView_.SizeInBytes = static_cast<UINT>(sizeof(Sprite::VertexData) * vertexData.size());
@@ -114,7 +108,7 @@ void SkyBox::CreateBuffers()
 
 void SkyBox::UpdateTransformationMatrix()
 {
-	if (!camera_ || !transformationMatrixData_)
+	if (!camera_)
 	{
 		return;
 	}
@@ -123,9 +117,9 @@ void SkyBox::UpdateTransformationMatrix()
 	Matrix4x4 worldMatrix = MakeAffineMatrix(Vector3{ 50.0f, 50.0f, 50.0f }, Vector3{ 0.0f, 0.0f, 0.0f }, cameraPosition);
 	Matrix4x4 wvpMatrix = Multiply(worldMatrix, Multiply(camera_->GetViewMatrix(), camera_->GetProjectionMatrix()));
 
-	transformationMatrixData_->World = worldMatrix;
-	transformationMatrixData_->WVP = wvpMatrix;
-	transformationMatrixData_->WorldInverseTranspose = MakeIdentity4x4();
+	transformationMatrixData_.World = worldMatrix;
+	transformationMatrixData_.WVP = wvpMatrix;
+	transformationMatrixData_.WorldInverseTranspose = MakeIdentity4x4();
 }
 
 void SkyBox::Draw(ID3D12GraphicsCommandList* commandList, D3D12_GPU_DESCRIPTOR_HANDLE textureHandle)
@@ -135,10 +129,15 @@ void SkyBox::Draw(ID3D12GraphicsCommandList* commandList, D3D12_GPU_DESCRIPTOR_H
 		return;
 	}
 
+	auto* cbAllocator = directXCom_->GetCBAllocator();
+	assert(cbAllocator);
+	auto transAlloc = cbAllocator->Allocate(sizeof(TransformationMatrix));
+	std::memcpy(transAlloc.cpuAddress, &transformationMatrixData_, sizeof(TransformationMatrix));
+
 	commandList->IASetVertexBuffers(0, 1, &vertexBufferView_);
 	commandList->IASetIndexBuffer(&indexBufferView_);
 	commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-	commandList->SetGraphicsRootConstantBufferView(0, transformationMatrixResource_->GetGPUVirtualAddress());
+	commandList->SetGraphicsRootConstantBufferView(0, transAlloc.gpuAddress);
 	commandList->SetGraphicsRootDescriptorTable(1, textureHandle);
 	commandList->DrawIndexedInstanced(static_cast<UINT>(indexData_.size()), 1, 0, 0, 0);
 }

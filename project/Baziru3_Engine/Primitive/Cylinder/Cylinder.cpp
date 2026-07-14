@@ -130,7 +130,7 @@ void Cylinder::Draw(D3D12_GPU_DESCRIPTOR_HANDLE textureSrvHandle)
     commandList->SetGraphicsRootConstantBufferView(1, transformationMatrixResource_->GetGPUVirtualAddress());
     commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandle);
     commandList->SetGraphicsRootConstantBufferView(3, light_->GetDirectionalLightResource()->GetGPUVirtualAddress());
-    commandList->SetGraphicsRootConstantBufferView(4, camera_->GetCameraResource()->GetGPUVirtualAddress());
+    commandList->SetGraphicsRootConstantBufferView(4, camera_ ? camera_->GetCameraGpuAddress() : 0);
 
     uint32_t skyboxIndex = SceneManager::GetInstance()->GetSkyboxTextureIndex();
     D3D12_GPU_DESCRIPTOR_HANDLE skyboxHandle{};

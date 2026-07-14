@@ -3,6 +3,8 @@
 #include <vector>
 #include <memory>
 #include <cmath>
+#include <unordered_map>
+#include <unordered_set>
 
 struct CollisionData
 {
@@ -117,6 +119,11 @@ public:
     /// </summary>
     float GetLastUpdateDurationMs() const { return lastUpdateDurationMs_; }
 
+    /// <summary>
+    /// 属性ごとの衝突可否（衝突フィルタマトリクス）を設定します
+    /// </summary>
+    void SetCollisionFilter(CollisionAttribute a, CollisionAttribute b, bool enable);
+
 private:
     CollisionManager() = default;
     ~CollisionManager() = default;
@@ -131,7 +138,6 @@ private:
 
     /// <summary>
     /// 属性タグに基づいて、そもそも衝突判定を行うべきグループ同士かフィルタリングします。
-    /// （例: 敵の弾丸同士は衝突させない等）
     /// </summary>
     bool ShouldCollide(CollisionAttribute a, CollisionAttribute b) const;
 
@@ -142,6 +148,17 @@ private:
     int wireframeStep_ = 15; // ワイヤーフレームの間引きステップ数 (デフォルト15で超高速描画)
     bool showDebugColliders_ = true; // デフォルトで有効 (F1トグル)
     float lastUpdateDurationMs_ = 0.0f; // 前回の衝突判定処理時間 (ミリ秒)
+
+    // 衝突マトリクス管理用 (ビットマスク)
+    std::unordered_map<CollisionAttribute, uint32_t> collisionMasks_;
+
+    // トリガーライフサイクル検知用ペア
+    struct TriggerPair {
+        Collider* a = nullptr;
+        Collider* b = nullptr;
+    };
+    std::vector<TriggerPair> previousTriggerPairs_;
+    std::vector<TriggerPair> currentTriggerPairs_;
 
     // 空間ハッシュ用ユーティリティ
     static int32_t CalculateGridIndex(float pos) {

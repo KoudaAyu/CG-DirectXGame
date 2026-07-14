@@ -47,25 +47,29 @@ void SpriteManager::Draw()
         return;
     }
 
-    ctx.commandList = spriteCom_->GetDxCommon()->GetCommandList().Get();
-    ctx.windowAPI = spriteCom_->GetDxCommon()->GetWindowAPI();
-    DrawAll(ctx, nullptr, nullptr);
+    RenderContext buildCtx(
+        spriteCom_->GetDxCommon()->GetCommandList().Get(),
+        spriteCom_->GetDxCommon()->GetWindowAPI(),
+        nullptr,
+        nullptr
+    );
+    DrawAll(buildCtx, nullptr, nullptr);
 }
 
 void SpriteManager::DrawAll(const RenderContext& ctx, DebugCamera* debugCamera, const std::vector<std::unique_ptr<Sprite>>* externalSprites)
 {
-    if (!ctx.commandList)
+    if (!ctx.GetRawCommandList())
     {
         Logger::Log(std::cout, "SpriteManager::DrawAll called with null commandList. Skipping.\n");
         return;
     }
-    spriteCom_->SetupDraw(ctx.commandList);
+    spriteCom_->SetupDraw(ctx.GetRawCommandList());
 
     for (auto& sp : sprites_)
     {
         if (!sp) continue;
-        if (ctx.light) sp->SetDirectionalLightResource(ctx.light->GetDirectionalLightResource());
-        sp->Draw(ctx.commandList);
+        if (ctx.GetLight()) sp->SetDirectionalLightResource(ctx.GetLight()->GetDirectionalLightResource());
+        sp->Draw(ctx.GetRawCommandList());
     }
 
     // 外部スプライト群（Gameが持つやつ）も同じ処理
@@ -74,8 +78,8 @@ void SpriteManager::DrawAll(const RenderContext& ctx, DebugCamera* debugCamera, 
         for (auto& sp : *externalSprites)
         {
             if (!sp) continue;
-            if (ctx.light) sp->SetDirectionalLightResource(ctx.light->GetDirectionalLightResource());
-            sp->Draw(ctx.commandList);
+            if (ctx.GetLight()) sp->SetDirectionalLightResource(ctx.GetLight()->GetDirectionalLightResource());
+            sp->Draw(ctx.GetRawCommandList());
         }
     }
 }

@@ -100,8 +100,8 @@ public:
 
 	const ModelData& GetModelData() const { return modelData_; }
 	const D3D12_VERTEX_BUFFER_VIEW& GetVertexBufferView() const { return vertexBufferView_; }
-	ID3D12Resource* GetMaterialResource() const { return materialResource.Get(); }
-	Material* GetMaterialData() const { return materialData_; }
+	const Material* GetMaterialData() const { return &materialData_; }
+	Material* GetMaterialData() { return &materialData_; }
 
 
 
@@ -131,8 +131,6 @@ public:
 
 	void VertexResource();
 
-	void MaterialResource();
-
 
 private:
 
@@ -153,9 +151,8 @@ private:
 	// バッファリソースの使い道を補足するバッファビュー
 	D3D12_VERTEX_BUFFER_VIEW vertexBufferView_{};
 
-	// マテリアル用リソース
-	Microsoft::WRL::ComPtr<ID3D12Resource> materialResource = nullptr;
-	Material* materialData_ = nullptr;
+	// マテリアル用実データ
+	Material materialData_{};
 
 	// インデックスバッファ用リソース
 	Microsoft::WRL::ComPtr<ID3D12Resource> indexResource = nullptr;

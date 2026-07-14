@@ -17,9 +17,13 @@ void Model::Initialize(ModelCom* modelCom, const std::string& directoryPath, con
     //Modelの読み込み
     modelData_ = LoadObjFile(directoryPath, filename);
 
-    //頂点データとマテリアルの初期化
+    //頂点データの初期化
     VertexResource();
-    MaterialResource();
+
+    // マテリアルの初期化
+    materialData_.color = { 1.0f,1.0f,1.0f,1.0f };
+    materialData_.enableLighting = false;
+    materialData_.uvTransform = MakeIdentity4x4();
 
     // テクスチャロードはパスが有効なときのみ実行
     if (!modelData_.material.textureFilePath.empty())
@@ -36,9 +40,13 @@ void Model::Initialize(ModelCom* modelCom, const std::string& directoryPath, con
     modelCom_ = modelCom;
     modelData_ = modelData;
 
-    //頂点データとマテリアルの初期化
+    //頂点データの初期化
     VertexResource();
-    MaterialResource();
+
+    // マテリアルの初期化
+    materialData_.color = { 1.0f,1.0f,1.0f,1.0f };
+    materialData_.enableLighting = false;
+    materialData_.uvTransform = MakeIdentity4x4();
 
     // テクスチャロードはパスが有効なときのみ実行
     if (!modelData_.material.textureFilePath.empty())
@@ -298,22 +306,7 @@ void Model::VertexResource()
     }
 }
 
-void Model::MaterialResource()
-{
-    if (modelCom_ && modelCom_->GetDirectXCom())
-    {
-        DirectXCom* dxCommon = modelCom_->GetDirectXCom();
-        // マテリアル用のリソースを作成（1個分）
-        materialResource = dxCommon->CreateBufferResource(dxCommon->GetDevice().Get(), sizeof(Material));
-        // 書き込み用アドレスを取得してメンバーに保持
-        materialResource->Map(0, nullptr, reinterpret_cast<void**>(&materialData_));
-        // 初期値を設定
-        materialData_->color = { 1.0f,1.0f,1.0f,1.0f };
-        materialData_->enableLighting = false;
-        materialData_->uvTransform = MakeIdentity4x4();
-
-    }
-}
+// MaterialResource is deprecated and removed. Local initialization is handled in Initialize().
 
 #include <unordered_map>
 #include <mutex>
