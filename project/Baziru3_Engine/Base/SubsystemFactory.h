@@ -9,7 +9,6 @@ struct InitConfig
 	bool enableImGui = true;
 };
 
-
 class DirectXCom;
 class SpriteCom;
 class SpriteManager;
@@ -34,4 +33,3 @@ public:
 	static void FinalizeAll(SubsystemResult& r, std::ostream& logStream);
 
 };
-

@@ -62,4 +62,3 @@ void EngineContext::Finalize()
     res_ = {};
 	logStream_ = nullptr;
 }
-

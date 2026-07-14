@@ -2,7 +2,7 @@
 #include "SceneFactory.h"
 
 #include "Baziru3_Engine\Graphics\SceneRenderRequests.h"
-#include "FadeApplication.h"
+#include "../Fade.h"
 #include "SkyBox.h"
 #include "SkyboxCom.h"
 #include "TextureManager.h"

@@ -1,11 +1,11 @@
-#include "FadeApplication.h"
+#include "Fade.h"
 
 #include "SpriteCom.h"
 #include "WindowsAPI.h"
 
 #include <algorithm>
 
-void FadeApplication::Initialize(SpriteCom* spriteCom, WindowAPI* windowAPI)
+void Fade::Initialize(SpriteCom* spriteCom, WindowAPI* windowAPI)
 {
     spriteCom_ = spriteCom;
     windowAPI_ = windowAPI;
@@ -37,7 +37,7 @@ void FadeApplication::Initialize(SpriteCom* spriteCom, WindowAPI* windowAPI)
     ApplyColor();
 }
 
-void FadeApplication::Finalize()
+void Fade::Finalize()
 {
     if (fadeSprite_)
     {
@@ -52,7 +52,7 @@ void FadeApplication::Finalize()
     fadeSpeed_ = 0.0f;
 }
 
-void FadeApplication::Update()
+void Fade::Update()
 {
     if (!fadeSprite_)
     {
@@ -92,7 +92,7 @@ void FadeApplication::Update()
     ApplyColor();
 }
 
-void FadeApplication::Draw()
+void Fade::Draw()
 {
     if (!fadeSprite_ || !spriteCom_ || !windowAPI_ || alpha_ <= 0.0f)
     {
@@ -110,36 +110,36 @@ void FadeApplication::Draw()
     fadeSprite_->Draw();
 }
 
-void FadeApplication::StartFadeOut(int frameCount)
+void Fade::StartFadeOut(int frameCount)
 {
     state_ = State::FadeOut;
     fadeSpeed_ = CalculateFadeSpeed(frameCount);
     lastTime_ = std::chrono::steady_clock::now();
 }
 
-void FadeApplication::StartFadeIn(int frameCount)
+void Fade::StartFadeIn(int frameCount)
 {
     state_ = State::FadeIn;
     fadeSpeed_ = CalculateFadeSpeed(frameCount);
     lastTime_ = std::chrono::steady_clock::now();
 }
 
-bool FadeApplication::IsAvailable() const
+bool Fade::IsAvailable() const
 {
     return fadeSprite_ && spriteCom_ && windowAPI_;
 }
 
-bool FadeApplication::IsBusy() const
+bool Fade::IsBusy() const
 {
     return state_ != State::None;
 }
 
-bool FadeApplication::IsFadeOutFinished() const
+bool Fade::IsFadeOutFinished() const
 {
     return state_ == State::FadeOut && alpha_ >= 1.0f;
 }
 
-void FadeApplication::ApplyColor()
+void Fade::ApplyColor()
 {
     if (!fadeSprite_)
     {
@@ -149,7 +149,7 @@ void FadeApplication::ApplyColor()
     fadeSprite_->SetColor({ 0.0f, 0.0f, 0.0f, alpha_ });
 }
 
-float FadeApplication::CalculateFadeSpeed(int frameCount)
+float Fade::CalculateFadeSpeed(int frameCount)
 {
   return 1.0f / static_cast<float>((std::max)(1, frameCount));
 }

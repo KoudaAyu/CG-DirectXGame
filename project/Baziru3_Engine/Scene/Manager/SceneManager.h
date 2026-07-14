@@ -17,7 +17,7 @@ class SpriteCom;
 class AudioManager;
 class SkyBox;
 class SkyboxCom;
-class FadeApplication;
+class Fade;
 struct ID3D12GraphicsCommandList;
 struct SceneRenderRequests;
 
@@ -86,8 +86,8 @@ public:
 	ParticleManager* GetParticleManager() const { return particleManager_; }
 	void SetSpriteCom(SpriteCom* v) { spriteCom_ = v; }
 	SpriteCom* GetSpriteCom() const { return spriteCom_; }
-	void SetFadeApplication(FadeApplication* v) { fadeApplication_ = v; }
-	FadeApplication* GetFadeApplication() const { return fadeApplication_; }
+	void SetFadeApplication(Fade* v) { fadeApplication_ = v; }
+	Fade* GetFadeApplication() const { return fadeApplication_; }
 
 	
 	void SetAudioManager(AudioManager* v) { audioManager_ = v; }
@@ -124,7 +124,7 @@ private:
 	SkyboxCom* skyboxCom_ = nullptr;
 	uint32_t skyboxTextureIndex_ = 0;
 	bool showSkybox_ = true;
-	FadeApplication* fadeApplication_ = nullptr;
+	Fade* fadeApplication_ = nullptr;
 	bool isSceneTransitioning_ = false;
 	bool hasSwitchedSceneDuringFade_ = false;
 

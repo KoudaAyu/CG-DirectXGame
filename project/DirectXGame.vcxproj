@@ -27,7 +27,7 @@
     <ClCompile Include="Baziru3_Engine\Animation\Skeleton\Skeleton.cpp" />
     <ClCompile Include="Baziru3_Engine\Animation\Skeleton\SkeletonDebug.cpp" />
     <ClCompile Include="Baziru3_Engine\Effect\HitEffect.cpp" />
-    <ClCompile Include="Application\Fade\FadeApplication.cpp" />
+    <ClCompile Include="Baziru3_Engine\Scene\Fade.cpp" />
     <ClCompile Include="Baziru3_Engine\Graphics\Particle\ParticleRenderer.cpp" />
     <ClCompile Include="Baziru3_Engine\Graphics\Sphere\SphereRenderer.cpp" />
     <ClCompile Include="Baziru3_Engine\IO\Mouse\MouseInput.cpp" />
@@ -63,9 +63,9 @@
     <ClCompile Include="Baziru3_Engine\SkyBox\SkyboxCom.cpp" />
     <ClCompile Include="Baziru3_Engine\Platform\Windows\CrashDump.cpp" />
     <ClCompile Include="Baziru3_Engine\Base\DebugUI.cpp" />
-    <ClCompile Include="Application\Fade\Framework.cpp" />
+    <ClCompile Include="Application\Framework.cpp" />
     <ClCompile Include="Bullet.cpp" />
-    <ClCompile Include="EngineContext.cpp" />
+    <ClCompile Include="Baziru3_Engine\Base\EngineContext.cpp" />
     <ClCompile Include="Game.cpp" />
     <ClCompile Include="Application\Scene\GameScene\GamePlayScene.cpp" />
     <ClCompile Include="Application\Scene\GameScene\CollisionSystem.cpp" />
@@ -89,13 +89,15 @@
     <ClCompile Include="Baziru3_Engine\Shapes\Sphere\Sphere.cpp" />
     <ClCompile Include="Baziru3_Engine\2D\Sprite\SpriteManager.cpp" />
     <ClCompile Include="Baziru3_Engine\Base\Srv\SRVManager.cpp" />
-    <ClCompile Include="Application\Subsystem\SubsystemFactory.cpp" />
     <ClCompile Include="Application\Player\Player.cpp" />
     <ClCompile Include="Application\Obstacle.cpp" />
     <ClCompile Include="Application\Scene\GameScene\Target.cpp" />
     <ClCompile Include="Application\Scene\GameScene\TutorialSign.cpp" />
-
     <ClCompile Include="Baziru3_Engine\3D\Object\SkinningObject3dCom.cpp" />
+    <ClCompile Include="Baziru3_Engine\Base\SubsystemFactory.cpp" />
+    <ClCompile Include="Baziru3_Engine\Collision\CollisionManager.cpp" />
+    <ClCompile Include="Baziru3_Engine\Collision\AABBTree.cpp" />
+    <ClCompile Include="Baziru3_Engine\Collision\MeshCollider.cpp" />
     <ClCompile Include="Baziru3_Engine\Graphics\GpuProfiler.cpp" />
     <ClCompile Include="Baziru3_Engine\Base\AsyncLoader.cpp" />
     <ClCompile Include="Baziru3_Engine\Base\BinaryAssetUtil.cpp" />
@@ -219,8 +221,8 @@
     <ClInclude Include="Baziru3_Engine\Animation\Skeleton\Skeleton.h" />
     <ClInclude Include="Baziru3_Engine\Animation\Skeleton\SkeletonDebug.h" />
     <ClInclude Include="Baziru3_Engine\Effect\HitEffect.h" />
-    <ClInclude Include="Application\Fade\FadeApplication.h" />
     <ClInclude Include="Application\Particle\AppParticleManager.h" />
+    <ClInclude Include="Baziru3_Engine\Scene\Fade.h" />
     <ClInclude Include="Baziru3_Engine\Graphics\Particle\ParticleRenderer.h" />
     <ClInclude Include="Baziru3_Engine\Graphics\SceneRenderRequests.h" />
     <ClInclude Include="Baziru3_Engine\Graphics\Sphere\SphereDrawRequests.h" />
@@ -270,11 +272,11 @@
     <ClInclude Include="Baziru3_Engine\SkyBox\SkyboxCom.h" />
     <ClInclude Include="Baziru3_Engine\Platform\Windows\CrashDump.h" />
     <ClInclude Include="Baziru3_Engine\Base\DebugUI.h" />
-    <ClInclude Include="Application\Fade\Framework.h" />
     <ClInclude Include="Application\Enemy\Enemy.h" />
     <ClInclude Include="Application\Enemy\MovingEnemy.h" />
     <ClInclude Include="Bullet.h" />
-    <ClInclude Include="EngineContext.h" />
+    <ClInclude Include="Application\Framework.h" />
+    <ClInclude Include="Baziru3_Engine\Base\EngineContext.h" />
     <ClInclude Include="Game.h" />
     <ClInclude Include="Application\Scene\GameScene\GamePlayScene.h" />
     <ClInclude Include="Application\Scene\GameScene\CollisionSystem.h" />
@@ -296,13 +298,20 @@
     <ClInclude Include="Baziru3_Engine\2D\Sprite\SpriteManager.h" />
     <ClInclude Include="Baziru3_Engine\Base\Srv\SRVManager.h" />
     <ClInclude Include="Application\Scene\TitleScene\TitleScene.h" />
-    <ClInclude Include="Application\Subsystem\SubsystemFactory.h" />
     <ClInclude Include="Application\Player\Player.h" />
     <ClInclude Include="Application\Obstacle.h" />
     <ClInclude Include="Application\Scene\GameScene\Target.h" />
     <ClInclude Include="Application\Scene\GameScene\TutorialSign.h" />
-
     <ClInclude Include="Baziru3_Engine\3D\Object\SkinningObject3dCom.h" />
+    <ClInclude Include="Baziru3_Engine\Base\SubsystemFactory.h" />
+    <ClInclude Include="Baziru3_Engine\Collision\Collider.h" />
+    <ClInclude Include="Baziru3_Engine\Collision\SphereCollider.h" />
+    <ClInclude Include="Baziru3_Engine\Collision\BoxCollider.h" />
+    <ClInclude Include="Baziru3_Engine\Collision\CapsuleCollider.h" />
+    <ClInclude Include="Baziru3_Engine\Collision\CollisionManager.h" />
+    <ClInclude Include="Baziru3_Engine\Collision\AABBTree.h" />
+    <ClInclude Include="Baziru3_Engine\Collision\MeshCollider.h" />
+    <ClInclude Include="Baziru3_Engine\Collision\SkeletonCollider.h" />
     <ClInclude Include="Baziru3_Engine\Graphics\GpuProfiler.h" />
     <ClInclude Include="Baziru3_Engine\Base\AsyncLoader.h" />
     <ClInclude Include="Baziru3_Engine\Base\BinaryAssetUtil.h" />

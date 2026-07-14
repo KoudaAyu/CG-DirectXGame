@@ -1,7 +1,6 @@
 #pragma once
 
 #include "Sprite.h"
-
 #include <memory>
 
 #include <chrono>
@@ -9,7 +8,7 @@
 class SpriteCom;
 class WindowAPI;
 
-class FadeApplication
+class Fade
 {
 public:
     void Initialize(SpriteCom* spriteCom, WindowAPI* windowAPI);

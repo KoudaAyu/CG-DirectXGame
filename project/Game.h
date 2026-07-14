@@ -6,7 +6,7 @@
 #include"Camera.h"
 #include"CrashDump.h"
 #include"DirectXCom.h"
-#include"EngineContext.h"
+#include"Baziru3_Engine/Base/EngineContext.h"
 #include"Framework.h"
 #include"ImGuiManager.h"
 #include"Light.h"
@@ -35,7 +35,7 @@
 #include"WindowsAPI.h"
 #include "Baziru3_Engine/IO/Mouse/MouseInput.h"
 #include "DebugUI.h"
-#include "FadeApplication.h"
+#include "Baziru3_Engine/Scene/Fade.h"
 
 #include <vector>
 #include <random>
@@ -125,7 +125,7 @@ private:
 	std::unique_ptr<AudioManager> audioManager_;
 	std::unique_ptr<MaterialManager> materialManager_;
 	std::unique_ptr<DebugUI> debugUI; // debug UI
-    std::unique_ptr<FadeApplication> fadeApplication_;
+    std::unique_ptr<Fade> fadeApplication_;
 private:
 	std::vector<std::unique_ptr<Sprite>>sprites;
     // index of cursor sprite in sprites vector, -1 if none

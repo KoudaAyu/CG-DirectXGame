@@ -13,7 +13,7 @@
 #include "Baziru3_Engine\Graphics\SceneRenderRequests.h"
 #include"RenderContext.h"
 #include"RootParam.h"
-#include"SubsystemFactory.h"
+#include"Baziru3_Engine/Base/SubsystemFactory.h"
 
 
 #ifdef USE_IMGUI
@@ -92,7 +92,7 @@ void Game::Initialize()
 	debugUI = std::make_unique<DebugUI>(materialManager_.get(), uiSpriteManager, camera_.get(), &transformObject, &useMonsterBall, &drawObject, &drawSprite);
 	debugUI->Initialize();
 
-	fadeApplication_ = std::make_unique<FadeApplication>();
+	fadeApplication_ = std::make_unique<Fade>();
 	fadeApplication_->Initialize(spriteCom, window);
 	SceneManager::GetInstance()->SetFadeApplication(fadeApplication_.get());
 
