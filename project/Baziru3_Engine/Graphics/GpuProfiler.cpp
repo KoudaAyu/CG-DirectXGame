@@ -17,6 +17,7 @@ GpuProfiler* GpuProfiler::GetInstance()
 /// </summary>
 void GpuProfiler::Initialize(ID3D12Device* device, ID3D12CommandQueue* commandQueue, uint32_t maxProfiles)
 {
+    std::lock_guard<std::mutex> lock(mutex_);
     maxProfiles_ = maxProfiles;
     // 1つの計測パスにつき、開始と終了で2つのタイムスタンプを使用します
     queryCount_ = maxProfiles_ * 2;
@@ -69,6 +70,7 @@ void GpuProfiler::Initialize(ID3D12Device* device, ID3D12CommandQueue* commandQu
 /// </summary>
 void GpuProfiler::Finalize()
 {
+    std::lock_guard<std::mutex> lock(mutex_);
     readbackBuffer_.Reset();
     queryHeap_.Reset();
     profiles_.clear();
@@ -82,6 +84,7 @@ void GpuProfiler::Finalize()
 /// </summary>
 void GpuProfiler::BeginFrame(ID3D12GraphicsCommandList* commandList)
 {
+    std::lock_guard<std::mutex> lock(mutex_);
     assert(!isFrameActive_);
     isFrameActive_ = true;
 
@@ -98,6 +101,7 @@ void GpuProfiler::BeginFrame(ID3D12GraphicsCommandList* commandList)
 /// </summary>
 void GpuProfiler::EndFrame(ID3D12GraphicsCommandList* commandList)
 {
+    std::lock_guard<std::mutex> lock(mutex_);
     assert(isFrameActive_);
     isFrameActive_ = false;
 
@@ -120,6 +124,7 @@ void GpuProfiler::EndFrame(ID3D12GraphicsCommandList* commandList)
 /// </summary>
 void GpuProfiler::BeginProfile(ID3D12GraphicsCommandList* commandList, const std::string& name)
 {
+    std::lock_guard<std::mutex> lock(mutex_);
     if (!isFrameActive_) return;
 
     // マップから計測パス情報を検索し、未登録の場合は新規登録します
@@ -154,6 +159,7 @@ void GpuProfiler::BeginProfile(ID3D12GraphicsCommandList* commandList, const std
 /// </summary>
 void GpuProfiler::EndProfile(ID3D12GraphicsCommandList* commandList, const std::string& name)
 {
+    std::lock_guard<std::mutex> lock(mutex_);
     if (!isFrameActive_) return;
 
     auto it = profiles_.find(name);
@@ -170,6 +176,7 @@ void GpuProfiler::EndProfile(ID3D12GraphicsCommandList* commandList, const std::
 /// </summary>
 void GpuProfiler::ResolveResults()
 {
+    std::lock_guard<std::mutex> lock(mutex_);
     if (profileOrder_.empty()) return;
 
     // CPUからリードバックバッファをマップしてアクセス可能にします

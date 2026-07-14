@@ -87,10 +87,8 @@ public:
 	{
 		farZ_ = farZ;
 	}
-
-	// Access to GPU-side camera data and resource
-	CameraForGPU* GetCameraData() const { return cameraData; }
-	Microsoft::WRL::ComPtr<ID3D12Resource> GetCameraResource() const { return cameraResource; }
+	// Access to GPU-side camera virtual address
+	D3D12_GPU_VIRTUAL_ADDRESS GetCameraGpuAddress() const { return cameraGpuAddress_; }
 
 private:
 	Transform transform_;
@@ -116,7 +114,7 @@ private:
 
 	// DirectX 関連
 	DirectXCom* directXCom_ = nullptr;
-	Microsoft::WRL::ComPtr<ID3D12Resource> cameraResource;
-	CameraForGPU* cameraData = nullptr;
+	CameraForGPU cameraData_{};
+	D3D12_GPU_VIRTUAL_ADDRESS cameraGpuAddress_ = 0;
 
 };

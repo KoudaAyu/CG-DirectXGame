@@ -15,6 +15,7 @@
 
 class Object3dCom;
 class SkinningObject3dCom;
+class RenderContext;
 
 class Object3d
 {
@@ -72,8 +73,8 @@ public:
 
 	void Update();
 
-	void Draw(ID3D12GraphicsCommandList* commandList);
 	void Draw(Object3dCom* object3dCom, SkinningObject3dCom* skinningObject3dCom);
+	void Draw(const RenderContext& ctx);
 
 	/// <summary>
 	/// .mtlファイルの読み込み
@@ -150,6 +151,9 @@ public:
 	Skeleton& GetSkeleton() { return skeleton_; }
 	const SkinCluster& GetSkinCluster() const { return skinCluster_; }
 	bool IsShared() const { return isShared_; }
+
+private:
+	void DrawInternal(const RenderContext& ctx);
 
 private:
 	Transform transform;

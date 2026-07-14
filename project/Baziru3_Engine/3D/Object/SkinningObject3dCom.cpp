@@ -142,9 +142,9 @@ void SkinningObject3dCom::Draw(Object3d* object, const ::RenderContext& ctx, con
     }
 
     // Camera (CBV at b2, Pixel Shader) -> Index 4
-    if (ctx.camera->GetCameraResource())
+    if (ctx.camera->GetCameraGpuAddress() != 0)
     {
-        ctx.commandList->SetGraphicsRootConstantBufferView(4, ctx.camera->GetCameraResource()->GetGPUVirtualAddress());
+        ctx.commandList->SetGraphicsRootConstantBufferView(4, ctx.camera->GetCameraGpuAddress());
     }
     else
     {

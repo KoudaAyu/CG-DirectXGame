@@ -26,8 +26,8 @@ void ParticleRenderer::Draw(const RenderContext& ctx, ParticleManager* particleM
 
     ctx.commandList->SetGraphicsRootConstantBufferView(
         RootParam::Particle::kCamera,
-        ctx.camera && ctx.camera->GetCameraResource()
-            ? ctx.camera->GetCameraResource()->GetGPUVirtualAddress()
+        ctx.camera && ctx.camera->GetCameraGpuAddress() != 0
+            ? ctx.camera->GetCameraGpuAddress()
             : 0);
 
     if (particleManager->GetNumInstance() == 0)
