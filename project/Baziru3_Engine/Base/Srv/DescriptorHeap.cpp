@@ -81,13 +81,19 @@ void DescriptorHeap::Free(uint32_t index)
 {
 	if (index >= maxDescriptors_)
 	{
-		assert(false && "DescriptorHeap::Free - invalid index");
+		OutputDebugStringA("DescriptorHeap::Free - ERROR: invalid index\n");
+		return;
+	}
+
+	// 0, 1, 2番目は予約領域のため解放をスキップする
+	if (index < 3)
+	{
 		return;
 	}
 
 	if (!allocatedFlags_[index])
 	{
-		assert(false && "DescriptorHeap::Free - index already free");
+		OutputDebugStringA("DescriptorHeap::Free - WARNING: index already free\n");
 		return;
 	}
 

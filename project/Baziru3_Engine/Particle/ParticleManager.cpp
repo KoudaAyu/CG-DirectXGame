@@ -392,9 +392,9 @@ void ParticleManager::Draw(ID3D12GraphicsCommandList* commandList, const RenderC
 	}
 	
 	// Camera
-	if (ctx.camera && ctx.camera->GetCameraResource())
+	if (ctx.camera && ctx.camera->GetCameraGpuAddress() != 0)
 	{
-		commandList->SetGraphicsRootConstantBufferView(RootParam::Particle::kCamera, ctx.camera->GetCameraResource()->GetGPUVirtualAddress());
+		commandList->SetGraphicsRootConstantBufferView(RootParam::Particle::kCamera, ctx.camera->GetCameraGpuAddress());
 	}
 	
 	// PerView

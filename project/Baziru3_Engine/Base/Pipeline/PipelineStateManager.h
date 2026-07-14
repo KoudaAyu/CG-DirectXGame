@@ -39,7 +39,12 @@ private:
 	void CreateObject3dPipelines(DirectXCom* dxCommon);
 
 private:
+	void LoadPipelineLibrary(ID3D12Device* device);
+	void SavePipelineLibrary();
+
+private:
 	std::unordered_map<std::string, Microsoft::WRL::ComPtr<ID3D12PipelineState>> pipelineStates_;
 	std::unordered_map<std::string, Microsoft::WRL::ComPtr<ID3D12RootSignature>> rootSignatures_;
 	std::unordered_map<std::string, ShaderFileInfo> watchedShaders_;
+	Microsoft::WRL::ComPtr<ID3D12PipelineLibrary> pipelineLibrary_ = nullptr;
 };

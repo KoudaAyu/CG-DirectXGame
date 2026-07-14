@@ -27,6 +27,14 @@ enum class CollisionAttribute
     Obstacle   // 障害物（カバー等）
 };
 
+struct CollisionInfo
+{
+    class Collider* other = nullptr; // 衝突相手
+    Vector3 contactPoint{};          // 衝突点（ワールド座標）
+    Vector3 normal{};                // 衝突法線（相手から自分への方向）
+    float depth = 0.0f;              // めり込み深さ
+};
+
 /**
  * @brief コライダーの基底クラス
  * @details すべての当たり判定形状クラス（Sphere, Box, Capsule）のベースとなります。
@@ -83,17 +91,34 @@ public:
 	 * @param callback 衝突時コールバック関数ポインタ
 	 */
     void SetOnCollision(std::function<void(Collider* other)> callback) { onCollision_ = callback; }
+    void SetOnCollision(std::function<void(const CollisionInfo& info)> callback) { onCollisionInfo_ = callback; }
+
+    // --- トリガーイベントコールバック ---
+    void SetOnTriggerEnter(std::function<void(Collider* other)> callback) { onTriggerEnter_ = callback; }
+    void SetOnTriggerStay(std::function<void(Collider* other)> callback) { onTriggerStay_ = callback; }
+    void SetOnTriggerExit(std::function<void(Collider* other)> callback) { onTriggerExit_ = callback; }
     
     /// <summary>
     /// 衝突イベントをトリガーします。
     /// </summary>
-    void OnCollision(Collider* other)
+    void OnCollision(const CollisionInfo& info)
     {
+        if (onCollisionInfo_)
+        {
+            onCollisionInfo_(info);
+        }
         if (onCollision_)
         {
-            onCollision_(other);
+            onCollision_(info.other);
         }
     }
+
+    /// <summary>
+    /// トリガーイベントを呼び出します。
+    /// </summary>
+    void OnTriggerEnter(Collider* other) { if (onTriggerEnter_) onTriggerEnter_(other); }
+    void OnTriggerStay(Collider* other)  { if (onTriggerStay_)  onTriggerStay_(other); }
+    void OnTriggerExit(Collider* other)  { if (onTriggerExit_)  onTriggerExit_(other); }
 
 private:
     ColliderType type_;                                     // 形状タイプ
@@ -102,4 +127,10 @@ private:
     bool isTrigger_;                                        // トリガー設定 (trueなら押し出し補正をスキップ)
     bool isEnabled_;                                        // 有効状態フラグ
     std::function<void(Collider* other)> onCollision_;      // 衝突時コールバック関数
+    std::function<void(const CollisionInfo& info)> onCollisionInfo_; // 詳細衝突コールバック
+
+    // トリガー用コールバック
+    std::function<void(Collider* other)> onTriggerEnter_;
+    std::function<void(Collider* other)> onTriggerStay_;
+    std::function<void(Collider* other)> onTriggerExit_;
 };

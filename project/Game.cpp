@@ -215,9 +215,7 @@ void Game::Finalize()
 		offScreenRendering_.reset();
 	}
 
-	// 7) Ensure TextureManager releases GPU resources before engine teardown
-	try { TextureManager::GetInstance()->Finalize(); }
-	catch (...) { Logger::Log(logStream, "TextureManager finalize failed\n"); }
+	// 7) Ensure TextureManager releases GPU resources (delegated to engine_->Finalize())
 
 	// 8) Engine teardown
 	if (engine_)
@@ -317,9 +315,9 @@ void Game::Draw()
 	RenderContext ctx = PrepareRenderContext();
 	SceneRenderRequests renderRequests{};
 
-	if (camera_ && camera_->GetCameraResource())
+	if (camera_ && camera_->GetCameraGpuAddress() != 0)
 	{
-		dx->GetCommandList()->SetGraphicsRootConstantBufferView(4, camera_->GetCameraResource()->GetGPUVirtualAddress());
+		dx->GetCommandList()->SetGraphicsRootConstantBufferView(4, camera_->GetCameraGpuAddress());
 	}
 	else
 	{
@@ -367,7 +365,9 @@ void Game::Draw()
 		workerCtx.commandList->RSSetViewports(1, &dx->GetViewport());
 		workerCtx.commandList->RSSetScissorRects(1, &dx->GetScissorRect());
 
+		GpuProfiler::GetInstance()->BeginProfile(workerCtx.commandList, "Sprite Draw");
 		DrawSprites(workerCtx);
+		GpuProfiler::GetInstance()->EndProfile(workerCtx.commandList, "Sprite Draw");
 
 		dx->GetWorkerCommandList()->Close();
 	});
@@ -629,9 +629,9 @@ void Game::DrawObjects(const RenderContext& ctx)
 		ctx.commandList->SetGraphicsRootConstantBufferView(3, 0);
 	}
 
-	if (ctx.camera && ctx.camera->GetCameraResource())
+	if (ctx.camera && ctx.camera->GetCameraGpuAddress() != 0)
 	{
-		ctx.commandList->SetGraphicsRootConstantBufferView(4, ctx.camera->GetCameraResource()->GetGPUVirtualAddress());
+		ctx.commandList->SetGraphicsRootConstantBufferView(4, ctx.camera->GetCameraGpuAddress());
 	}
 	else
 	{
@@ -639,7 +639,7 @@ void Game::DrawObjects(const RenderContext& ctx)
 		return;
 	}
 
-	object3d_->Draw(ctx.commandList);
+	object3d_->Draw(ctx);
 
 	if (drawObject)
 	{

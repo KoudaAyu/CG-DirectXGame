@@ -352,7 +352,7 @@ static D3D12_GPU_VIRTUAL_ADDRESS s_lastIndexAddress = 0;
 static D3D12_GPU_VIRTUAL_ADDRESS s_lastMaterialAddress = 0;
 static D3D12_GPU_VIRTUAL_ADDRESS s_lastLightAddress = 0;
 
-void Object3d::Draw(ID3D12GraphicsCommandList* commandList)
+void Object3d::DrawInternal(const RenderContext& ctx)
 {
 	if (isCulled_) return;
 
@@ -364,9 +364,9 @@ void Object3d::Draw(ID3D12GraphicsCommandList* commandList)
 	}
 
 	// コマンドリストが切り替わった場合はステートキャッシュを無効化
-	if (s_lastCommandList != commandList)
+	if (s_lastCommandList != ctx.GetRawCommandList())
 	{
-		s_lastCommandList = commandList;
+		s_lastCommandList = ctx.GetRawCommandList();
 		s_lastVertexAddress = 0;
 		s_lastIndexAddress = 0;
 		s_lastMaterialAddress = 0;
@@ -376,18 +376,18 @@ void Object3d::Draw(ID3D12GraphicsCommandList* commandList)
 	// 頂点バッファのバインド (前回と同じバッファならスキップ)
 	if (s_lastVertexAddress != vertexBufferView_.BufferLocation)
 	{
-		commandList->IASetVertexBuffers(0, 1, &vertexBufferView_);
+		ctx.IASetVertexBuffers(0, 1, &vertexBufferView_);
 		s_lastVertexAddress = vertexBufferView_.BufferLocation;
 	}
 
-	commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+	ctx.IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
 	// インデックスバッファのバインド (前回と同じバッファならスキップ)
 	if (indexResource && !modelData_.indices.empty())
 	{
 		if (s_lastIndexAddress != indexBufferView_.BufferLocation)
 		{
-			commandList->IASetIndexBuffer(&indexBufferView_);
+			ctx.IASetIndexBuffer(&indexBufferView_);
 			s_lastIndexAddress = indexBufferView_.BufferLocation;
 		}
 	}
@@ -395,27 +395,27 @@ void Object3d::Draw(ID3D12GraphicsCommandList* commandList)
 	// マテリアル定数バッファのバインド (前回と同じアドレスならスキップ)
 	if (s_lastMaterialAddress != materialGpuAddress_)
 	{
-		commandList->SetGraphicsRootConstantBufferView(RootParam::Object3D::kMaterial, materialGpuAddress_);
+		ctx.SetGraphicsRootConstantBufferView(RootParam::Object3D::kMaterial, materialGpuAddress_);
 		s_lastMaterialAddress = materialGpuAddress_;
 	}
 
 	// 変換行列はオブジェクトごとに異なるため、必ず設定する
-	commandList->SetGraphicsRootConstantBufferView(RootParam::Object3D::kTransform, transformationMatrixGpuAddress_);
+	ctx.SetGraphicsRootConstantBufferView(RootParam::Object3D::kTransform, transformationMatrixGpuAddress_);
 
 	// ライト定数バッファのバインド (前回と同じアドレスならスキップ)
 	if (s_lastLightAddress != directionalLightGpuAddress_)
 	{
-		commandList->SetGraphicsRootConstantBufferView(RootParam::Object3D::kLight, directionalLightGpuAddress_);
+		ctx.SetGraphicsRootConstantBufferView(RootParam::Object3D::kLight, directionalLightGpuAddress_);
 		s_lastLightAddress = directionalLightGpuAddress_;
 	}
 
 	if (indexResource && !modelData_.indices.empty())
 	{
-		commandList->DrawIndexedInstanced(static_cast<UINT>(modelData_.indices.size()), 1, 0, 0, 0);
+		ctx.DrawIndexedInstanced(static_cast<UINT>(modelData_.indices.size()), 1, 0, 0, 0);
 	}
 	else
 	{
-		commandList->DrawInstanced(static_cast<UINT>(modelData_.vertices.size()), 1, 0, 0);
+		ctx.DrawInstanced(static_cast<UINT>(modelData_.vertices.size()), 1, 0, 0);
 	}
 }
 
@@ -430,12 +430,12 @@ void Object3d::Draw(Object3dCom* object3dCom, SkinningObject3dCom* skinningObjec
 	if (isCulled_) return;
 
 	// RenderContext を内部で解決・構築
-	RenderContext ctx{};
-	ctx.commandList = dx->GetCommandList().Get();
-	ctx.windowAPI = dx->GetWindowAPI();
-	ctx.camera = camera_ ? camera_ : com->GetDefaultCamera();
-	ctx.light = SceneManager::GetInstance()->GetLight();
-	ctx.materialGPUAddress = 0;
+	RenderContext ctx(
+		dx->GetCommandList().Get(),
+		dx->GetWindowAPI(),
+		camera_ ? camera_ : com->GetDefaultCamera(),
+		SceneManager::GetInstance()->GetLight()
+	);
 
 	// テクスチャ解決
 	const auto& modelData = GetModelData();
@@ -445,11 +445,11 @@ void Object3d::Draw(Object3dCom* object3dCom, SkinningObject3dCom* skinningObjec
 		{
 			textureManager_ = TextureManager::GetInstance();
 		}
-		ctx.textureHandle = textureManager_->GetSrvHandleGPU(modelData.material.textureIndex);
+		ctx.SetTextureHandle(textureManager_->GetSrvHandleGPU(modelData.material.textureIndex));
 	}
 	else
 	{
-		ctx.textureHandle = {};
+		ctx.SetTextureHandle({});
 	}
 
 	// ジョイント（ボーン）があればスキニングシェーダー、なければ通常シェーダーで描画
@@ -764,30 +764,30 @@ void Object3d::PrepareConstantBuffers(DirectXCom* dx)
 
 void Object3d::Draw(const RenderContext& ctx)
 {
-	if (!ctx.commandList) return;
+	if (!ctx.GetRawCommandList()) return;
 
 	// 1. テクスチャのバインド
-	if (ctx.textureHandle.ptr != 0)
+	if (ctx.GetTextureHandle().ptr != 0)
 	{
-		ctx.commandList->SetGraphicsRootDescriptorTable(RootParam::Object3D::kTextureTable, ctx.textureHandle);
+		ctx.SetGraphicsRootDescriptorTable(RootParam::Object3D::kTextureTable, ctx.GetTextureHandle());
 	}
 
 	// 2. ライトのバインド
-	if (ctx.light)
+	if (ctx.GetLight())
 	{
-		ctx.commandList->SetGraphicsRootConstantBufferView(RootParam::Object3D::kLight, ctx.light->GetDirectionalLightResource()->GetGPUVirtualAddress());
+		ctx.SetGraphicsRootConstantBufferView(RootParam::Object3D::kLight, ctx.GetLight()->GetDirectionalLightResource()->GetGPUVirtualAddress());
 	}
 	else
 	{
-		ctx.commandList->SetGraphicsRootConstantBufferView(RootParam::Object3D::kLight, 0);
+		ctx.SetGraphicsRootConstantBufferView(RootParam::Object3D::kLight, 0);
 	}
 
 	// 3. カメラのバインド
-	if (ctx.camera && ctx.camera->GetCameraResource())
+	if (ctx.GetCamera() && ctx.GetCamera()->GetCameraGpuAddress() != 0)
 	{
-		ctx.commandList->SetGraphicsRootConstantBufferView(RootParam::Object3D::kCamera, ctx.camera->GetCameraResource()->GetGPUVirtualAddress());
+		ctx.SetGraphicsRootConstantBufferView(RootParam::Object3D::kCamera, ctx.GetCamera()->GetCameraGpuAddress());
 	}
 
 	// 4. Object3d 自身の描画処理を実行
-	Draw(ctx.commandList);
+	DrawInternal(ctx);
 }

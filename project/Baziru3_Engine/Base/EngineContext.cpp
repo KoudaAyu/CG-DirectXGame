@@ -86,8 +86,7 @@ bool EngineContext::Initialize(std::ostream& log, const InitConfig& cfg)
     particleManager_ = std::make_unique<ParticleManager>(*logStream_, res_.directXCom.get());
     particleManager_->Initialize(camera_.get());
 
-    imguiManager_ = std::make_unique<ImGuiManager>();
-    imguiManager_->Initialize(res_.windowAPI.get(), res_.directXCom.get());
+    // ImGuiManager の初期化はアプリケーション層 (Game.cpp) で行われるためここでは行わない
 
     // SceneManager への参照設定
     SceneManager::GetInstance()->SetFadeApplication(fade_.get());
@@ -122,8 +121,10 @@ void EngineContext::Finalize()
         Logger::Log(*logStream_, "EngineContext: Finalizing subsystems\n");
     }
 
-    // サブシステムの一括破棄
-    if (imguiManager_) { imguiManager_->Finalize(); imguiManager_.reset(); }
+    // 他のサブシステム（パーティクルやカメラなど）が破棄される前に、SceneManager を安全に破棄する
+    SceneManager::Destroy();
+
+    // サブシステムの一括破棄 (imguiManager_ は使用しないため破棄もしない)
     if (particleManager_) { particleManager_->Finalize(); particleManager_.reset(); }
     if (skybox_) { skybox_.reset(); }
     if (skyboxCom_) { skyboxCom_.reset(); }

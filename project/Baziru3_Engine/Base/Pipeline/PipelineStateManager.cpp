@@ -1,9 +1,11 @@
 #include "PipelineStateManager.h"
 #include "DirectXCom.h"
 #include "Log.h"
+#include "StringUtil.h"
 #include <cassert>
 #include <iostream>
 #include <vector>
+#include <fstream>
 
 PipelineStateManager* PipelineStateManager::GetInstance()
 {
@@ -19,6 +21,9 @@ void PipelineStateManager::Initialize(DirectXCom* dxCommon)
 	pipelineStates_.clear();
 	rootSignatures_.clear();
 	watchedShaders_.clear();
+
+	// PSOキャッシュのロード
+	LoadPipelineLibrary(dxCommon->GetDevice().Get());
 
 	// ファイル監視の登録
 	auto registerShader = [this](const std::string& key, const std::wstring& path) {
@@ -43,6 +48,9 @@ void PipelineStateManager::Initialize(DirectXCom* dxCommon)
 
 void PipelineStateManager::Finalize()
 {
+	SavePipelineLibrary();
+	pipelineLibrary_.Reset();
+
 	pipelineStates_.clear();
 	rootSignatures_.clear();
 	watchedShaders_.clear();
@@ -267,9 +275,14 @@ void PipelineStateManager::CreateSpritePipelines(DirectXCom* dxCommon)
 		desc.DSVFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
 
 		Microsoft::WRL::ComPtr<ID3D12PipelineState> pipelineState;
-		hr = dxCommon->GetDevice()->CreateGraphicsPipelineState(&desc, IID_PPV_ARGS(&pipelineState));
-		assert(SUCCEEDED(hr));
-
+		std::wstring psoNameW = StringUtil::ConvertString(setup.name);
+		HRESULT hrLoad = pipelineLibrary_->LoadGraphicsPipeline(psoNameW.c_str(), &desc, IID_PPV_ARGS(&pipelineState));
+		if (FAILED(hrLoad))
+		{
+			hr = dxCommon->GetDevice()->CreateGraphicsPipelineState(&desc, IID_PPV_ARGS(&pipelineState));
+			assert(SUCCEEDED(hr));
+			pipelineLibrary_->StorePipeline(psoNameW.c_str(), pipelineState.Get());
+		}
 		pipelineStates_[setup.name] = pipelineState;
 	}
 }
@@ -427,22 +440,37 @@ void PipelineStateManager::CreateObject3dPipelines(DirectXCom* dxCommon)
 		desc.DSVFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
 
 		Microsoft::WRL::ComPtr<ID3D12PipelineState> pipelineState;
-		hr = dxCommon->GetDevice()->CreateGraphicsPipelineState(&desc, IID_PPV_ARGS(&pipelineState));
-		assert(SUCCEEDED(hr));
+		HRESULT hrLoad = pipelineLibrary_->LoadGraphicsPipeline(L"Object3D_Normal", &desc, IID_PPV_ARGS(&pipelineState));
+		if (FAILED(hrLoad))
+		{
+			hr = dxCommon->GetDevice()->CreateGraphicsPipelineState(&desc, IID_PPV_ARGS(&pipelineState));
+			assert(SUCCEEDED(hr));
+			pipelineLibrary_->StorePipeline(L"Object3D_Normal", pipelineState.Get());
+		}
 		pipelineStates_["Object3D_Normal"] = pipelineState;
 
 		// エフェクト (デプスライト無効)
 		desc.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO;
 		Microsoft::WRL::ComPtr<ID3D12PipelineState> pipelineStateEffect;
-		hr = dxCommon->GetDevice()->CreateGraphicsPipelineState(&desc, IID_PPV_ARGS(&pipelineStateEffect));
-		assert(SUCCEEDED(hr));
+		hrLoad = pipelineLibrary_->LoadGraphicsPipeline(L"Object3D_Effect", &desc, IID_PPV_ARGS(&pipelineStateEffect));
+		if (FAILED(hrLoad))
+		{
+			hr = dxCommon->GetDevice()->CreateGraphicsPipelineState(&desc, IID_PPV_ARGS(&pipelineStateEffect));
+			assert(SUCCEEDED(hr));
+			pipelineLibrary_->StorePipeline(L"Object3D_Effect", pipelineStateEffect.Get());
+		}
 		pipelineStates_["Object3D_Effect"] = pipelineStateEffect;
 
 		// オーバーレイ (デプステスト無効)
 		desc.DepthStencilState.DepthEnable = FALSE;
 		Microsoft::WRL::ComPtr<ID3D12PipelineState> pipelineStateOverlay;
-		hr = dxCommon->GetDevice()->CreateGraphicsPipelineState(&desc, IID_PPV_ARGS(&pipelineStateOverlay));
-		assert(SUCCEEDED(hr));
+		hrLoad = pipelineLibrary_->LoadGraphicsPipeline(L"Object3D_Overlay", &desc, IID_PPV_ARGS(&pipelineStateOverlay));
+		if (FAILED(hrLoad))
+		{
+			hr = dxCommon->GetDevice()->CreateGraphicsPipelineState(&desc, IID_PPV_ARGS(&pipelineStateOverlay));
+			assert(SUCCEEDED(hr));
+			pipelineLibrary_->StorePipeline(L"Object3D_Overlay", pipelineStateOverlay.Get());
+		}
 		pipelineStates_["Object3D_Overlay"] = pipelineStateOverlay;
 
 		// ワイヤーフレーム (デプステスト有効、デプス書き込み無効、ワイヤーフレーム描画モード)
@@ -453,8 +481,73 @@ void PipelineStateManager::CreateObject3dPipelines(DirectXCom* dxCommon)
 		desc.PS = { wireframePixelShaderBlob->GetBufferPointer(), wireframePixelShaderBlob->GetBufferSize() };
 		
 		Microsoft::WRL::ComPtr<ID3D12PipelineState> pipelineStateWireframe;
-		hr = dxCommon->GetDevice()->CreateGraphicsPipelineState(&desc, IID_PPV_ARGS(&pipelineStateWireframe));
-		assert(SUCCEEDED(hr));
+		hrLoad = pipelineLibrary_->LoadGraphicsPipeline(L"Object3D_Wireframe", &desc, IID_PPV_ARGS(&pipelineStateWireframe));
+		if (FAILED(hrLoad))
+		{
+			hr = dxCommon->GetDevice()->CreateGraphicsPipelineState(&desc, IID_PPV_ARGS(&pipelineStateWireframe));
+			assert(SUCCEEDED(hr));
+			pipelineLibrary_->StorePipeline(L"Object3D_Wireframe", pipelineStateWireframe.Get());
+		}
 		pipelineStates_["Object3D_Wireframe"] = pipelineStateWireframe;
+	}
+}
+
+void PipelineStateManager::LoadPipelineLibrary(ID3D12Device* device)
+{
+	std::wstring cachePath = L"Resources/shaders/PsoCache.bin";
+	std::vector<uint8_t> cacheData;
+
+	if (std::filesystem::exists(cachePath))
+	{
+		std::ifstream file(cachePath, std::ios::binary | std::ios::ate);
+		if (file.is_open())
+		{
+			size_t size = file.tellg();
+			cacheData.resize(size);
+			file.seekg(0, std::ios::beg);
+			file.read(reinterpret_cast<char*>(cacheData.data()), size);
+			file.close();
+		}
+	}
+
+	Microsoft::WRL::ComPtr<ID3D12Device1> device1;
+	if (SUCCEEDED(device->QueryInterface(IID_PPV_ARGS(&device1))))
+	{
+		HRESULT hr = S_OK;
+		if (!cacheData.empty())
+		{
+			hr = device1->CreatePipelineLibrary(cacheData.data(), cacheData.size(), IID_PPV_ARGS(&pipelineLibrary_));
+			if (FAILED(hr))
+			{
+				cacheData.clear();
+			}
+		}
+
+		if (cacheData.empty())
+		{
+			device1->CreatePipelineLibrary(nullptr, 0, IID_PPV_ARGS(&pipelineLibrary_));
+		}
+	}
+}
+
+void PipelineStateManager::SavePipelineLibrary()
+{
+	if (!pipelineLibrary_) return;
+
+	size_t serializedSize = pipelineLibrary_->GetSerializedSize();
+	if (serializedSize == 0) return;
+
+	std::vector<uint8_t> buffer(serializedSize);
+	HRESULT hr = pipelineLibrary_->Serialize(buffer.data(), serializedSize);
+	if (SUCCEEDED(hr))
+	{
+		std::wstring cachePath = L"Resources/shaders/PsoCache.bin";
+		std::filesystem::create_directories(std::filesystem::path(cachePath).parent_path());
+		std::ofstream file(cachePath, std::ios::binary);
+		if (file.is_open())
+		{
+			file.write(reinterpret_cast<const char*>(buffer.data()), serializedSize);
+			file.close();
+		}
 	}
 }

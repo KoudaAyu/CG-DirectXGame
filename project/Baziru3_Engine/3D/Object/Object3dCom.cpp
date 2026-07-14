@@ -69,9 +69,9 @@ void Object3dCom::Draw(Object3d* object, const RenderContext& ctx, const Object3
         ctx.commandList->SetGraphicsRootConstantBufferView(3, 0);
     }
 
-    if (ctx.camera->GetCameraResource())
+    if (ctx.camera->GetCameraGpuAddress() != 0)
     {
-        ctx.commandList->SetGraphicsRootConstantBufferView(4, ctx.camera->GetCameraResource()->GetGPUVirtualAddress());
+        ctx.commandList->SetGraphicsRootConstantBufferView(4, ctx.camera->GetCameraGpuAddress());
     }
     else
     {
@@ -81,7 +81,7 @@ void Object3dCom::Draw(Object3d* object, const RenderContext& ctx, const Object3
 
 	if (object)
 	{
-		object->Draw(ctx.commandList);
+		object->Draw(ctx);
 
 		// GPU-accelerated wireframe overlay draw (if enabled in Collision Debug panel)
 		if (CollisionManager::GetInstance()->IsShowDebugColliders() && CollisionManager::GetInstance()->IsShowMeshWireframe())
@@ -107,7 +107,7 @@ void Object3dCom::Draw(Object3d* object, const RenderContext& ctx, const Object3
 				if (wireframePSO)
 				{
 					ctx.commandList->SetPipelineState(wireframePSO.Get());
-					object->Draw(ctx.commandList);
+					object->Draw(ctx);
 				}
 			}
 		}

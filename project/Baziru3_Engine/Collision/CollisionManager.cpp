@@ -74,11 +74,39 @@ CollisionManager* CollisionManager::GetInstance()
 void CollisionManager::Initialize()
 {
     colliders_.clear();
+    previousTriggerPairs_.clear();
+    currentTriggerPairs_.clear();
+
+    // デフォルトの衝突フィルタの設定 (ビットマスクの初期化)
+    collisionMasks_.clear();
+    
+    uint32_t maskPlayer   = (1 << static_cast<uint32_t>(CollisionAttribute::Enemy)) |
+                            (1 << static_cast<uint32_t>(CollisionAttribute::Bullet)) |
+                            (1 << static_cast<uint32_t>(CollisionAttribute::Obstacle));
+    
+    uint32_t maskEnemy    = (1 << static_cast<uint32_t>(CollisionAttribute::Player)) |
+                            (1 << static_cast<uint32_t>(CollisionAttribute::Bullet)) |
+                            (1 << static_cast<uint32_t>(CollisionAttribute::Obstacle));
+    
+    uint32_t maskBullet   = (1 << static_cast<uint32_t>(CollisionAttribute::Player)) |
+                            (1 << static_cast<uint32_t>(CollisionAttribute::Enemy)) |
+                            (1 << static_cast<uint32_t>(CollisionAttribute::Obstacle));
+    
+    uint32_t maskObstacle = (1 << static_cast<uint32_t>(CollisionAttribute::Player)) |
+                            (1 << static_cast<uint32_t>(CollisionAttribute::Enemy)) |
+                            (1 << static_cast<uint32_t>(CollisionAttribute::Bullet));
+
+    collisionMasks_[CollisionAttribute::Player]   = maskPlayer;
+    collisionMasks_[CollisionAttribute::Enemy]    = maskEnemy;
+    collisionMasks_[CollisionAttribute::Bullet]   = maskBullet;
+    collisionMasks_[CollisionAttribute::Obstacle] = maskObstacle;
 }
 
 void CollisionManager::Finalize()
 {
     colliders_.clear();
+    previousTriggerPairs_.clear();
+    currentTriggerPairs_.clear();
 }
 
 void CollisionManager::RegisterCollider(Collider* collider)
@@ -98,19 +126,36 @@ void CollisionManager::UnregisterCollider(Collider* collider)
     }
 }
 
+void CollisionManager::SetCollisionFilter(CollisionAttribute a, CollisionAttribute b, bool enable)
+{
+    uint32_t bitB = 1 << static_cast<uint32_t>(b);
+    uint32_t bitA = 1 << static_cast<uint32_t>(a);
+
+    if (enable)
+    {
+        collisionMasks_[a] |= bitB;
+        collisionMasks_[b] |= bitA;
+    }
+    else
+    {
+        collisionMasks_[a] &= ~bitB;
+        collisionMasks_[b] &= ~bitA;
+    }
+}
+
 bool CollisionManager::ShouldCollide(CollisionAttribute a, CollisionAttribute b) const
 {
-    // 弾丸同士は衝突しない
-    if (a == CollisionAttribute::Bullet && b == CollisionAttribute::Bullet)
+    auto itA = collisionMasks_.find(a);
+    auto itB = collisionMasks_.find(b);
+    if (itA == collisionMasks_.end() || itB == collisionMasks_.end())
     {
-        return false;
+        return true;
     }
-    // 障害物同士も衝突しない
-    if (a == CollisionAttribute::Obstacle && b == CollisionAttribute::Obstacle)
-    {
-        return false;
-    }
-    return true;
+
+    uint32_t bitA = 1 << static_cast<uint32_t>(a);
+    uint32_t bitB = 1 << static_cast<uint32_t>(b);
+
+    return (itA->second & bitB) && (itB->second & bitA);
 }
 
 void CollisionManager::Update()
@@ -287,11 +332,15 @@ void CollisionManager::Update()
 
                 if (CheckCollision(colA, colB, pushDir, pushLen))
                 {
-                    colA.originalCollider->OnCollision(colB.originalCollider);
-                    colB.originalCollider->OnCollision(colA.originalCollider);
-
-                    if (!colA.isTrigger && !colB.isTrigger)
+                    if (colA.isTrigger || colB.isTrigger)
                     {
+                        // トリガーイベント登録 (物理的押し出しは行わない)
+                        TriggerPair pair{ colA.originalCollider, colB.originalCollider };
+                        currentTriggerPairs_.push_back(pair);
+                    }
+                    else
+                    {
+                        // 物理的衝突（押し出し処理）
                         bool isAFixed = (colA.attribute == CollisionAttribute::Obstacle);
                         bool isBFixed = (colB.attribute == CollisionAttribute::Obstacle);
 
@@ -316,11 +365,67 @@ void CollisionManager::Update()
                             colA.worldPosition = newPosA;
                             colB.worldPosition = newPosB;
                         }
+
+                        // 物理的衝突のコールバックを発行 (OnCollision)
+                        Vector3 contactPoint = (colA.worldPosition + colB.worldPosition) * 0.5f;
+
+                        CollisionInfo infoToA;
+                        infoToA.other = colB.originalCollider;
+                        infoToA.contactPoint = contactPoint;
+                        infoToA.normal = pushDir; // 相手から自分への方向
+                        infoToA.depth = pushLen;
+                        colA.originalCollider->OnCollision(infoToA);
+
+                        CollisionInfo infoToB;
+                        infoToB.other = colA.originalCollider;
+                        infoToB.contactPoint = contactPoint;
+                        infoToB.normal = pushDir * -1.0f; // 自分から相手への方向
+                        infoToB.depth = pushLen;
+                        colB.originalCollider->OnCollision(infoToB);
                     }
                 }
             }
         }
     }
+
+    // --- トリガーライフサイクルイベントの発行 ---
+    for (const auto& current : currentTriggerPairs_)
+    {
+        auto it = std::find_if(previousTriggerPairs_.begin(), previousTriggerPairs_.end(), [&](const TriggerPair& p) {
+            return (p.a == current.a && p.b == current.b) || (p.a == current.b && p.b == current.a);
+        });
+
+        if (it != previousTriggerPairs_.end())
+        {
+            // 前フレームにも存在した => Stay
+            current.a->OnTriggerStay(current.b);
+            current.b->OnTriggerStay(current.a);
+        }
+        else
+        {
+            // 新規衝突 => Enter
+            current.a->OnTriggerEnter(current.b);
+            current.b->OnTriggerEnter(current.a);
+        }
+    }
+
+    // 前フレームにあったが、現フレームで衝突しなくなったペア => Exit
+    for (const auto& prev : previousTriggerPairs_)
+    {
+        auto it = std::find_if(currentTriggerPairs_.begin(), currentTriggerPairs_.end(), [&](const TriggerPair& p) {
+            return (p.a == prev.a && p.b == prev.b) || (p.a == prev.b && p.b == prev.a);
+        });
+
+        if (it == currentTriggerPairs_.end())
+        {
+            prev.a->OnTriggerExit(prev.b);
+            prev.b->OnTriggerExit(prev.a);
+        }
+    }
+
+    // トリガー履歴の更新
+    previousTriggerPairs_ = std::move(currentTriggerPairs_);
+    currentTriggerPairs_.clear();
 
     auto endTime = std::chrono::steady_clock::now();
     lastUpdateDurationMs_ = std::chrono::duration<float, std::milli>(endTime - startTime).count();

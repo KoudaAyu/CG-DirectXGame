@@ -61,6 +61,7 @@
     <ClCompile Include="Application\Framework.cpp" />
     <ClCompile Include="Baziru3_Engine\Base\EngineAssert.cpp" />
     <ClCompile Include="Baziru3_Engine\Base\EngineContext.cpp" />
+    <ClCompile Include="Baziru3_Engine\Base\RenderContext.cpp" />
     <ClCompile Include="Game.cpp" />
     <ClCompile Include="Application\Scene\GameScene\GamePlayScene.cpp" />
     <ClCompile Include="Baziru3_Engine\Light\Light.cpp" />

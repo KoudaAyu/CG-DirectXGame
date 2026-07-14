@@ -209,9 +209,9 @@ void Sphere::Draw(D3D12_GPU_DESCRIPTOR_HANDLE textureSrvHandle)
 
 	commandList->SetGraphicsRootConstantBufferView(3, light_->GetDirectionalLightResource()->GetGPUVirtualAddress());
 
-	if (camera_ && camera_->GetCameraResource())
+	if (camera_ && camera_->GetCameraGpuAddress() != 0)
 	{
-		commandList->SetGraphicsRootConstantBufferView(4, camera_->GetCameraResource()->GetGPUVirtualAddress());
+		commandList->SetGraphicsRootConstantBufferView(4, camera_->GetCameraGpuAddress());
 	}
 	else
 	{
