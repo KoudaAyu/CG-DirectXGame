@@ -97,10 +97,7 @@
     <ClCompile Include="Application\Scene\GameScene\TutorialSign.cpp" />
     <ClCompile Include="Baziru3_Engine\3D\Object\SkinningObject3dCom.cpp" />
     <ClCompile Include="Baziru3_Engine\Base\SubsystemFactory.cpp" />
-    <ClCompile Include="Baziru3_Engine\Collision\CollisionManager.cpp" />
     <ClCompile Include="Baziru3_Engine\Collision\Collider.cpp" />
-    <ClCompile Include="Baziru3_Engine\Collision\AABBTree.cpp" />
-    <ClCompile Include="Baziru3_Engine\Collision\MeshCollider.cpp" />
     <ClCompile Include="Baziru3_Engine\Graphics\GpuProfiler.cpp" />
     <ClCompile Include="Baziru3_Engine\Base\AsyncLoader.cpp" />
     <ClCompile Include="Baziru3_Engine\Base\BinaryAssetUtil.cpp" />
