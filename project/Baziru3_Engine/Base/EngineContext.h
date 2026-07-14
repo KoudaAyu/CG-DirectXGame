@@ -28,4 +28,3 @@ private:
 
 	bool finalized_ = false;
 };
-

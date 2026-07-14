@@ -26,7 +26,7 @@
     <ClCompile Include="Baziru3_Engine\Animation\Skeleton\Skeleton.cpp" />
     <ClCompile Include="Baziru3_Engine\Animation\Skeleton\SkeletonDebug.cpp" />
     <ClCompile Include="Baziru3_Engine\Effect\HitEffect.cpp" />
-    <ClCompile Include="Application\FadeApplication.cpp" />
+    <ClCompile Include="Baziru3_Engine\Scene\Fade.cpp" />
     <ClCompile Include="Baziru3_Engine\Graphics\Particle\ParticleRenderer.cpp" />
     <ClCompile Include="Baziru3_Engine\Graphics\Sphere\SphereRenderer.cpp" />
     <ClCompile Include="Baziru3_Engine\Primitive\Cylinder\Cylinder.cpp" />
@@ -59,7 +59,7 @@
     <ClCompile Include="Baziru3_Engine\Platform\Windows\CrashDump.cpp" />
     <ClCompile Include="Baziru3_Engine\Base\DebugUI.cpp" />
     <ClCompile Include="Application\Framework.cpp" />
-    <ClCompile Include="EngineContext.cpp" />
+    <ClCompile Include="Baziru3_Engine\Base\EngineContext.cpp" />
     <ClCompile Include="Game.cpp" />
     <ClCompile Include="Application\Scene\GameScene\GamePlayScene.cpp" />
     <ClCompile Include="Baziru3_Engine\Light\Light.cpp" />
@@ -79,7 +79,7 @@
     <ClCompile Include="Baziru3_Engine\Shapes\Sphere\Sphere.cpp" />
     <ClCompile Include="Baziru3_Engine\2D\Sprite\SpriteManager.cpp" />
     <ClCompile Include="Baziru3_Engine\Base\Srv\SRVManager.cpp" />
-    <ClCompile Include="Application\Subsystem\SubsystemFactory.cpp" />
+    <ClCompile Include="Baziru3_Engine\Base\SubsystemFactory.cpp" />
     <ClCompile Include="Baziru3_Engine\Collision\CollisionManager.cpp" />
     <ClCompile Include="Baziru3_Engine\Collision\AABBTree.cpp" />
     <ClCompile Include="Baziru3_Engine\Collision\MeshCollider.cpp" />
@@ -208,7 +208,7 @@
     <ClInclude Include="Baziru3_Engine\Animation\Skeleton\Skeleton.h" />
     <ClInclude Include="Baziru3_Engine\Animation\Skeleton\SkeletonDebug.h" />
     <ClInclude Include="Baziru3_Engine\Effect\HitEffect.h" />
-    <ClInclude Include="Application\FadeApplication.h" />
+    <ClInclude Include="Baziru3_Engine\Scene\Fade.h" />
     <ClInclude Include="Baziru3_Engine\Graphics\Particle\ParticleRenderer.h" />
     <ClInclude Include="Baziru3_Engine\Graphics\SceneRenderRequests.h" />
     <ClInclude Include="Baziru3_Engine\Graphics\Sphere\SphereDrawRequests.h" />
@@ -250,7 +250,7 @@
     <ClInclude Include="Baziru3_Engine\Platform\Windows\CrashDump.h" />
     <ClInclude Include="Baziru3_Engine\Base\DebugUI.h" />
     <ClInclude Include="Application\Framework.h" />
-    <ClInclude Include="EngineContext.h" />
+    <ClInclude Include="Baziru3_Engine\Base\EngineContext.h" />
     <ClInclude Include="Game.h" />
     <ClInclude Include="Application\Scene\GameScene\GamePlayScene.h" />
     <ClInclude Include="Baziru3_Engine\Particle\ParticleEmitter.h" />
@@ -269,7 +269,7 @@
     <ClInclude Include="Baziru3_Engine\2D\Sprite\SpriteManager.h" />
     <ClInclude Include="Baziru3_Engine\Base\Srv\SRVManager.h" />
     <ClInclude Include="Application\Scene\TitleScene\TitleScene.h" />
-    <ClInclude Include="Application\Subsystem\SubsystemFactory.h" />
+    <ClInclude Include="Baziru3_Engine\Base\SubsystemFactory.h" />
     <ClInclude Include="Baziru3_Engine\Collision\Collider.h" />
     <ClInclude Include="Baziru3_Engine\Collision\SphereCollider.h" />
     <ClInclude Include="Baziru3_Engine\Collision\BoxCollider.h" />
