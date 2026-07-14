@@ -39,15 +39,9 @@ public:
 	 * @param type コライダーの形状タイプ
 	 * @param attribute 衝突グループ属性
 	 */
-    Collider(ColliderType type, CollisionAttribute attribute)
-        : type_(type)
-        , attribute_(attribute)
-        , positionOffset_({ 0.0f, 0.0f, 0.0f })
-        , isTrigger_(false)
-        , isEnabled_(true)
-    {}
+    Collider(ColliderType type, CollisionAttribute attribute);
 
-    virtual ~Collider() = default;
+    virtual ~Collider();
 
     // --- ゲッター / セッター ---
     

@@ -1,4 +1,6 @@
 #include "Object3d.h"
+#include "RenderContext.h"
+#include "Light.h"
 #include "Object3dCom.h"
 #include "Matrix4x4.h"
 #include "RootParam.h"
@@ -758,4 +760,34 @@ void Object3d::PrepareConstantBuffers(DirectXCom* dx)
 		std::memcpy(lightAlloc.cpuAddress, &directionalLightData_, sizeof(DirectionalLight));
 		directionalLightGpuAddress_ = lightAlloc.gpuAddress;
 	}
+}
+
+void Object3d::Draw(const RenderContext& ctx)
+{
+	if (!ctx.commandList) return;
+
+	// 1. テクスチャのバインド
+	if (ctx.textureHandle.ptr != 0)
+	{
+		ctx.commandList->SetGraphicsRootDescriptorTable(RootParam::Object3D::kTextureTable, ctx.textureHandle);
+	}
+
+	// 2. ライトのバインド
+	if (ctx.light)
+	{
+		ctx.commandList->SetGraphicsRootConstantBufferView(RootParam::Object3D::kLight, ctx.light->GetDirectionalLightResource()->GetGPUVirtualAddress());
+	}
+	else
+	{
+		ctx.commandList->SetGraphicsRootConstantBufferView(RootParam::Object3D::kLight, 0);
+	}
+
+	// 3. カメラのバインド
+	if (ctx.camera && ctx.camera->GetCameraResource())
+	{
+		ctx.commandList->SetGraphicsRootConstantBufferView(RootParam::Object3D::kCamera, ctx.camera->GetCameraResource()->GetGPUVirtualAddress());
+	}
+
+	// 4. Object3d 自身の描画処理を実行
+	Draw(ctx.commandList);
 }

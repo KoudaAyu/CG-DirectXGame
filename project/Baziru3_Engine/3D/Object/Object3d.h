@@ -15,6 +15,7 @@
 
 class Object3dCom;
 class SkinningObject3dCom;
+struct RenderContext;
 
 class Object3d
 {
@@ -74,6 +75,7 @@ public:
 
 	void Draw(ID3D12GraphicsCommandList* commandList);
 	void Draw(Object3dCom* object3dCom, SkinningObject3dCom* skinningObject3dCom);
+	void Draw(const RenderContext& ctx);
 
 	/// <summary>
 	/// .mtlファイルの読み込み
