@@ -13,96 +13,10 @@ void AppParticleManager::Initialize(ParticleManager* enginePM)
 {
 	enginePM_ = enginePM;
 	particles_.clear();
-
-	if (!enginePM_) return;
-
-	DirectXCom* dxCommon = enginePM_->GetDxCommon();
-	if (!dxCommon) return;
-
-	// ルートシグネチャはエンジン側のものをそのまま使い回す
-	rootSignature_ = enginePM_->GetRootSignature();
-
-	// 自前シェーダーのコンパイル
-	Microsoft::WRL::ComPtr<IDxcBlob> vertexShaderBlob = dxCommon->CompileShader(
-		L"Application/Shaders/AppParticle.VS.hlsl",
-		L"vs_6_0",
-		dxCommon->GetDxcUtils().Get(),
-		dxCommon->GetDxcCompiler(),
-		dxCommon->GetIncludeHandler(),
-		std::clog
-	);
-	assert(vertexShaderBlob != nullptr && "AppParticle VS Compile Failed");
-
-	Microsoft::WRL::ComPtr<IDxcBlob> pixelShaderBlob = dxCommon->CompileShader(
-		L"Application/Shaders/AppParticle.PS.hlsl",
-		L"ps_6_0",
-		dxCommon->GetDxcUtils().Get(),
-		dxCommon->GetDxcCompiler(),
-		dxCommon->GetIncludeHandler(),
-		std::clog
-	);
-	assert(pixelShaderBlob != nullptr && "AppParticle PS Compile Failed");
-
-	// PSO Desc の作成
-	D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc{};
-	psoDesc.pRootSignature = rootSignature_.Get();
-	psoDesc.InputLayout = enginePM_->GetInputLayoutDesc();
-	psoDesc.VS = { vertexShaderBlob->GetBufferPointer(), vertexShaderBlob->GetBufferSize() };
-	psoDesc.PS = { pixelShaderBlob->GetBufferPointer(), pixelShaderBlob->GetBufferSize() };
-	psoDesc.BlendState = enginePM_->GetBlendDesc();
-	psoDesc.RasterizerState = enginePM_->GetRasterizerDesc();
-	
-	// パーティクル用の深度ステンシル設定
-	D3D12_DEPTH_STENCIL_DESC depthStencilDesc{};
-	depthStencilDesc.DepthEnable = TRUE;
-	depthStencilDesc.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO;
-	depthStencilDesc.DepthFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
-	psoDesc.DepthStencilState = depthStencilDesc;
-	
-	psoDesc.NumRenderTargets = 1;
-	psoDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
-	psoDesc.DSVFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
-	psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-	psoDesc.SampleDesc.Count = 1;
-	psoDesc.SampleMask = D3D12_DEFAULT_SAMPLE_MASK;
-
-	HRESULT hr = dxCommon->GetDevice()->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&pipelineState_));
-	assert(SUCCEEDED(hr) && "CreateGraphicsPipelineState failed for AppParticle");
-
-	// 自前インスタンシング用リソースの作成とマップ
-	instancingResource_ = dxCommon->CreateBufferResource(dxCommon->GetDevice(), sizeof(ParticleManager::ParticleForGPU) * kNumMaxInstances);
-	instancingResource_->Map(0, nullptr, reinterpret_cast<void**>(&instanceData_));
-
-	// SRV の作成
-	auto* srvManager = TextureManager::GetInstance()->GetSRVManager();
-	assert(srvManager);
-	instancingSrvIndex_ = srvManager->Allocate();
-	srvManager->CreateSRVForStructuredBuffer(
-		instancingSrvIndex_,
-		instancingResource_.Get(),
-		kNumMaxInstances,
-		sizeof(ParticleManager::ParticleForGPU)
-	);
-	instancingSrvHandleGPU_ = srvManager->GetGPUDescriptorHandle(instancingSrvIndex_);
 }
 
 AppParticleManager::~AppParticleManager()
 {
-	if (instancingResource_ && instanceData_)
-	{
-		D3D12_RANGE writtenRange = { 0, static_cast<SIZE_T>(sizeof(ParticleManager::ParticleForGPU) * kNumMaxInstances) };
-		instancingResource_->Unmap(0, &writtenRange);
-		instanceData_ = nullptr;
-	}
-
-	if (instancingSrvIndex_ != 0)
-	{
-		auto* srvManager = TextureManager::GetInstance()->GetSRVManager();
-		if (srvManager)
-		{
-			srvManager->Free(instancingSrvIndex_);
-		}
-	}
 }
 
 void AppParticleManager::Update(float deltaTime, const Vector3& playerPos)
@@ -542,137 +456,32 @@ void AppParticleManager::EmitDeathFlash(std::mt19937& randomEngine, const Vector
 	}
 }
 
-void AppParticleManager::Draw(const RenderContext& ctx, Model* model, UINT externalVertexCount)
+void AppParticleManager::Draw()
 {
-	if (!ctx.commandList || !enginePM_ || !pipelineState_ || !ctx.camera) return;
+	if (!enginePM_) return;
 
-	uint32_t totalParticles = static_cast<uint32_t>(particles_.size());
-	if (totalParticles == 0) return;
+	enginePM_->ClearParticles();
 
-	// 1. ビルボード行列とビュープロジェクション行列の作成
-	Matrix4x4 backToFrontMatrix = MakeRotateYMatrix(0.0f);
-	Matrix4x4 billboardMatrix = Multiply(backToFrontMatrix, ctx.camera->GetWorldMatrix());
-	billboardMatrix.m[3][0] = 0.0f;
-	billboardMatrix.m[3][1] = 0.0f;
-	billboardMatrix.m[3][2] = 0.0f;
-
-	Matrix4x4 viewProjection = Multiply(ctx.camera->GetViewMatrix(), ctx.camera->GetProjectionMatrix());
-
-	// 2. アクティブなパーティクルを収集してソート
-	std::vector<const AppParticle*> activeParticles;
-	activeParticles.reserve(totalParticles);
-	for (const auto& p : particles_)
+	std::list<ParticleManager::Particle> tempParticles;
+	for (const auto& ap : particles_)
 	{
-		activeParticles.push_back(&p);
+		ParticleManager::Particle p;
+		p.transform = ap.transform;
+		p.velocity = ap.velocity;
+		p.color = ap.color;
+
+		// アルファフェードの計算をCPU側で行って色に反映
+		float alpha = 1.0f - (ap.currentTime / ap.lifeTime);
+		p.color.w = (std::clamp)(alpha * ap.color.w, 0.0f, 1.0f);
+
+		p.lifeTime = ap.lifeTime;
+		p.currentTime = ap.currentTime;
+		p.textureIndex = ap.textureIndex;
+
+		tempParticles.push_back(p);
 	}
 
-	std::sort(activeParticles.begin(), activeParticles.end(), [](const AppParticle* a, const AppParticle* b) {
-		return a->textureIndex < b->textureIndex;
-	});
-
-	// 3. インスタンスデータとグループの書き込み
-	instanceGroups_.clear();
-	uint32_t currentWriteIndex = 0;
-
-	for (size_t i = 0; i < activeParticles.size(); ++i)
-	{
-		if (currentWriteIndex >= kNumMaxInstances)
-		{
-			break;
-		}
-
-		const auto& p = *activeParticles[i];
-
-		if (instanceGroups_.empty() || instanceGroups_.back().textureIndex != p.textureIndex)
-		{
-			ParticleManager::InstanceGroup newGroup;
-			newGroup.textureIndex = p.textureIndex;
-			newGroup.start = currentWriteIndex;
-			newGroup.count = 0;
-			newGroup.srvHandle = TextureManager::GetInstance()->GetSrvHandleGPU(p.textureIndex);
-			instanceGroups_.push_back(newGroup);
-		}
-
-		instanceGroups_.back().count++;
-
-		// ビルボード＆Z回転行列を乗算
-		Matrix4x4 localRot = MakeRotateZMatrix(p.transform.GetRotate().z);
-		Matrix4x4 finalRot = Multiply(localRot, billboardMatrix);
-		Matrix4x4 worldMatrix = MakeAffineMatrix(p.transform.GetScale(), finalRot, p.transform.GetTranslate());
-		Matrix4x4 WVP = Multiply(worldMatrix, viewProjection);
-
-		// アルファ値を考慮して色を設定
-		Vector4 color = p.color;
-		float alpha = 1.0f - (p.currentTime / p.lifeTime);
-		color.w = (std::clamp)(alpha * p.color.w, 0.0f, 1.0f);
-
-		instanceData_[currentWriteIndex].WVP = WVP;
-		instanceData_[currentWriteIndex].World = worldMatrix;
-		instanceData_[currentWriteIndex].color = color;
-		instanceData_[currentWriteIndex].textureIndex = p.textureIndex;
-
-		currentWriteIndex++;
-	}
-
-	numInstance_ = currentWriteIndex;
-	if (numInstance_ == 0) return;
-
-	// 残りのインスタンスデータをクリア
-	for (uint32_t i = numInstance_; i < kNumMaxInstances; ++i)
-	{
-		instanceData_[i].WVP = MakeIdentity4x4();
-		instanceData_[i].World = MakeIdentity4x4();
-		instanceData_[i].color = { 0,0,0,0 };
-		instanceData_[i].textureIndex = TextureManager::kInvalidTextureIndex;
-	}
-
-	// 4. PSOとルートシグネチャをセット
-	ctx.commandList->SetGraphicsRootSignature(rootSignature_.Get());
-	ctx.commandList->SetPipelineState(pipelineState_.Get());
-	ctx.commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-
-	// 5. 各パラメーターをセット
-	ctx.commandList->SetGraphicsRootConstantBufferView(RootParam::Particle::kMaterial, ctx.materialGPUAddress);
-	ctx.commandList->SetGraphicsRootDescriptorTable(RootParam::Particle::kInstancing, instancingSrvHandleGPU_);
-
-	if (ctx.light)
-	{
-		ctx.commandList->SetGraphicsRootConstantBufferView(
-			RootParam::Particle::kLight,
-			ctx.light->GetDirectionalLightResource()->GetGPUVirtualAddress());
-	}
-	else
-	{
-		ctx.commandList->SetGraphicsRootConstantBufferView(RootParam::Particle::kLight, 0);
-	}
-
-	ctx.commandList->SetGraphicsRootConstantBufferView(
-		RootParam::Particle::kCamera,
-		ctx.camera->GetCameraResource() ? ctx.camera->GetCameraResource()->GetGPUVirtualAddress() : 0);
-
-	// 6. 頂点バッファのバインド
-	UINT vc = externalVertexCount;
-	if (model && vc > 0)
-	{
-		model->Bind(ctx.commandList);
-	}
-	else
-	{
-		vc = 6;
-	}
-
-	// 7. テクスチャグループごとに描画
-	for (const auto& g : instanceGroups_)
-	{
-		if (g.count == 0) continue;
-		if (g.srvHandle.ptr != 0)
-		{
-			ctx.commandList->SetGraphicsRootDescriptorTable(RootParam::Particle::kTextureTable, g.srvHandle);
-		}
-
-		ctx.commandList->SetGraphicsRoot32BitConstant(RootParam::Particle::kInstanceOffset, g.start, 0);
-		ctx.commandList->DrawInstanced(vc, g.count, 0, 0);
-	}
+	enginePM_->AddParticles(tempParticles);
 }
 
 

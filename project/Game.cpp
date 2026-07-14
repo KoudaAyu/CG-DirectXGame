@@ -715,8 +715,7 @@ void Game::DrawParticles(const RenderContext& ctx)
 		GamePlayScene* gameplayScene = dynamic_cast<GamePlayScene*>(currentScene);
 		if (gameplayScene && gameplayScene->GetAppParticleManager())
 		{
-			gameplayScene->GetAppParticleManager()->Draw(ctx, model_.get(), UINT(modelData.vertices.size()));
-			return; // ゲームプレイ中はフレームワーク側のデバッグ用パーティクル描画をスキップ
+			gameplayScene->GetAppParticleManager()->Draw();
 		}
 	}
 	particleRenderer_.Draw(ctx, particleManager.get(), model_.get(), UINT(modelData.vertices.size()));
