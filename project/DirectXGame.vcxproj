@@ -59,6 +59,7 @@
     <ClCompile Include="Baziru3_Engine\Platform\Windows\CrashDump.cpp" />
     <ClCompile Include="Baziru3_Engine\Base\DebugUI.cpp" />
     <ClCompile Include="Application\Framework.cpp" />
+    <ClCompile Include="Baziru3_Engine\Base\EngineAssert.cpp" />
     <ClCompile Include="Baziru3_Engine\Base\EngineContext.cpp" />
     <ClCompile Include="Game.cpp" />
     <ClCompile Include="Application\Scene\GameScene\GamePlayScene.cpp" />
@@ -251,6 +252,7 @@
     <ClInclude Include="Baziru3_Engine\Platform\Windows\CrashDump.h" />
     <ClInclude Include="Baziru3_Engine\Base\DebugUI.h" />
     <ClInclude Include="Application\Framework.h" />
+    <ClInclude Include="Baziru3_Engine\Base\EngineAssert.h" />
     <ClInclude Include="Baziru3_Engine\Base\EngineContext.h" />
     <ClInclude Include="Game.h" />
     <ClInclude Include="Application\Scene\GameScene\GamePlayScene.h" />

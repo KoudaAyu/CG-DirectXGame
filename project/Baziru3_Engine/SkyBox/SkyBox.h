@@ -33,11 +33,10 @@ private:
 
     Microsoft::WRL::ComPtr<ID3D12Resource> vertexResource_ = nullptr;
     Microsoft::WRL::ComPtr<ID3D12Resource> indexResource_ = nullptr;
-    Microsoft::WRL::ComPtr<ID3D12Resource> transformationMatrixResource_ = nullptr;
 
     D3D12_VERTEX_BUFFER_VIEW vertexBufferView_{};
     D3D12_INDEX_BUFFER_VIEW indexBufferView_{};
 
-    TransformationMatrix* transformationMatrixData_ = nullptr;
+    TransformationMatrix transformationMatrixData_{};
 };
 

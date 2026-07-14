@@ -3,5 +3,6 @@
 class ResourceLeakCheck
 {
 public:
+	ResourceLeakCheck();
 	~ResourceLeakCheck();
 };

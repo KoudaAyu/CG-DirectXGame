@@ -22,11 +22,17 @@
 #include "SkyboxCom.h"
 #include "SkyBox.h"
 #include "SceneManager.h"
+#include "EngineAssert.h"
 
 #ifdef USE_IMGUI
 #include <imgui.h>
 #include <imgui_impl_win32.h>
 #include <imgui_impl_dx12.h>
+#endif
+
+#if defined(_DEBUG)
+#include <crtdbg.h>
+#define new new(_NORMAL_BLOCK, __FILE__, __LINE__)
 #endif
 
 EngineContext::~EngineContext()
