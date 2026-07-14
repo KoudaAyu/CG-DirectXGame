@@ -290,53 +290,13 @@ void CollisionSystem::ResolveObstacleCollisions()
 		if (len < 1e-4f) continue;
 		Vector3 dir = { diff.x / len, diff.y / len, diff.z / len };
 
-		bool hitObstacle = false;
-		float closestDist = len;
+		Collider* hitCollider = nullptr;
+		float hitDist = len;
 
-		auto& colliders = CollisionManager::GetInstance()->GetColliders();
-		for (Collider* col : colliders)
-		{
-			if (!col || !col->IsEnabled() || col->GetAttribute() != CollisionAttribute::Obstacle)
-			{
-				continue;
-			}
-
-			CollisionData data;
-			data.originalCollider = col;
-			data.type = col->GetType();
-			data.attribute = col->GetAttribute();
-			data.worldPosition = col->GetWorldPosition();
-			data.isTrigger = col->IsTrigger();
-
-			if (data.type == ColliderType::Sphere)
-			{
-				SphereCollider* sphere = static_cast<SphereCollider*>(col);
-				data.shape.radius = sphere->GetRadius();
-			}
-			else if (data.type == ColliderType::Box)
-			{
-				// 銃弾もフェンスの隙間をすり抜けられるよう、簡易BoxではなくMeshColliderで判定を行います
-				continue;
-			}
-			else if (data.type == ColliderType::Capsule)
-			{
-				CapsuleCollider* capsule = static_cast<CapsuleCollider*>(col);
-				data.shape.radius = capsule->GetRadius();
-				data.shape.height = capsule->GetHeight();
-			}
-
-			float dist = 0.0f;
-			if (CollisionManager::CheckRayCollider(bPosPrev, dir, closestDist, data, dist))
-			{
-				closestDist = dist;
-				hitObstacle = true;
-			}
-		}
-
-		if (hitObstacle)
+		if (CollisionManager::GetInstance()->Raycast(bPosPrev, dir, len, hitCollider, hitDist))
 		{
 			// 着弾交点
-			Vector3 hitWorldPos = bPosPrev + dir * closestDist;
+			Vector3 hitWorldPos = bPosPrev + dir * hitDist;
 			bPos = hitWorldPos; // エフェクト発生座標を交点に設定
 
 			// 木製の障害物に着弾した際のおがくず（飛散）パーティクル演出
