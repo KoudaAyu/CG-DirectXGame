@@ -42,15 +42,15 @@ C++ および DirectX 12 を用いてスクラッチから構築した、自作3
 #### 【図面：定数バッファアロケータのトリプルバッファリング同期構造】
 ```mermaid
 graph TD
-    subgraph CPU [CPU 側 (データ書き込み)]
+    subgraph CPU ["CPU 側 (データ書き込み)"]
         Alloc[ConstantBufferAllocator] -->|Allocate| Frame0[Frame Buffer 0]
         Alloc -->|Allocate| Frame1[Frame Buffer 1]
         Alloc -->|Allocate| Frame2[Frame Buffer 2]
     end
-    subgraph GPU [GPU 側 (レンダリング実行)]
+    subgraph GPU ["GPU 側 (レンダリング実行)"]
         Frame0 -->|GPUが読み出し中| Draw[描画コマンド実行]
     end
-    subgraph Sync [同期制御]
+    subgraph Sync ["同期制御"]
         Fence[Fence Value 同期] -.->|GPU読み出し完了まで| Frame0
         Fence -.->|安全になったらCPU書き込み許可| Alloc
     end
@@ -83,7 +83,7 @@ graph TD
     Hash -->|ハッシュテーブルへ登録| Table[SpatialHashCells テーブル]
     Table -->|同一 & 隣接セル内のみ抽出| Filter[衝突判定ペアを構築]
     Filter -->|総当たり回数を大幅削減| Compare[精密衝突判定実行]
-    Compare -->|めり込みあり| Push[押し出し解決 & コールバック起動]
+    Compare -->|めり込みあり| Push["押し出し解決 & コールバック起動"]
 ```
 
 ---
@@ -104,13 +104,13 @@ AI（Behavior Tree）の挙動調整のたびにソースコードの再コン�
 #### 【図面：Behavior Tree と Blackboard メモリの連携構成】
 ```mermaid
 graph TD
-    subgraph Decision [意思決定部 (BehaviorTree)]
+    subgraph Decision ["意思決定部 (BehaviorTree)"]
         Root[Root Node] -->|Tick| Selector[Selector Node]
         Selector -->|失敗なら次へ| Sequence[Sequence Node]
         Sequence -->|成功なら次へ| Cond[Condition Node]
-        Cond -->|True| Action[Action Node (移動/攻撃等)]
+        Cond -->|True| Action["Action Node (移動/攻撃等)"]
     end
-    subgraph Data [データ部 (Blackboard)]
+    subgraph Data ["データ部 (Blackboard)"]
         BB[Blackboard Memory] <-->|標的・速度等のパラメータ読み書き| Action
         BB <-->|状態チェック| Cond
     end
