@@ -117,35 +117,34 @@ draw.text((50, 20), "起動時に一括でプール確保 ➔ フレーム終了
 img.save(os.path.join(output_dir, "slide_stack.png"))
 
 # ----------------------------------------------------
-# 4. Spatial Hash Diagram (slide_spatial_hash.png) - ★文字被りとセルの同化を完全に解決
+# 4. Spatial Hash Diagram (slide_spatial_hash.png) - ★色のチョイスをさらに見やすくプロ仕様に調整
 # ----------------------------------------------------
 img = Image.new("RGB", (650, 280), BG_COLOR)
 draw = ImageDraw.Draw(img)
 
-# グリッドの描画 (セル幅を50px➔60pxに拡大し余白を確保、線の明るさを少しアップ)
+# グリッドの描画 (セル幅を60px、開始座標を設定)
 grid_size = 60
 start_x, start_y = 40, 25
 cols, rows = 4, 4
 
-# セルA (列0, 行0) の背景を「薄い半透明の青」でハイライト！
-# (これにより、同じセル内にいるキャラクター同士が判定される仕組みが直感的に伝わります)
-draw.rectangle([start_x, start_y, start_x + grid_size, start_y + grid_size], fill=(30, 60, 95))
+# ★セルA (列0, 行0) の背景を、青オブジェクトが最も綺麗に映える「落ち着いたオリーブゴールド(65, 58, 40)」に改善！
+draw.rectangle([start_x, start_y, start_x + grid_size, start_y + grid_size], fill=(65, 58, 40))
 
-# グリッド枠線を描画
-GRID_LINE_COLOR = (70, 80, 90) # 背景に溶け込まない明るさに修正
+# グリッド枠線を描画 (背景と上品に調和する青暗いグレー(55, 62, 72)に修正)
+GRID_LINE_COLOR = (55, 62, 72)
 for i in range(cols + 1):
     draw.line([(start_x + i * grid_size, start_y), (start_x + i * grid_size, start_y + rows * grid_size)], fill=GRID_LINE_COLOR, width=1)
 for i in range(rows + 1):
     draw.line([(start_x, start_y + i * grid_size), (start_x + cols * grid_size, start_y + i * grid_size)], fill=GRID_LINE_COLOR, width=1)
 
-# セルラベル (日本語「セルA」「セルB」にし、境界線に被らないようパディング+5ピクセルを徹底)
-draw.text((start_x + 5, start_y + 5), "セルA", fill=BLUE, font=font_small)
-draw.text((start_x + grid_size + 5, start_y + 5), "セルB", fill=LIGHT_GRAY, font=font_small)
+# セルラベル (セルAの文字を完全な白(WHITE)にして、オリーブ背景の上でもクッキリ浮かび上がらせる)
+draw.text((start_x + 6, start_y + 5), "セルA", fill=WHITE, font=font_small)
+draw.text((start_x + grid_size + 6, start_y + 5), "セルB", fill=LIGHT_GRAY, font=font_small)
 
-# オブジェクト (明るい色＋白枠、位置を文字と被らないよう微調整)
+# オブジェクト (明るいスカイブルー＋白枠)
 draw.ellipse([start_x + 18, start_y + 22, start_x + 38, start_y + 42], fill=BLUE, outline=WHITE)  # Obj1 in セルA 上
 draw.ellipse([start_x + 20, start_y + 80, start_x + 40, start_y + 100], fill=BLUE, outline=WHITE) # Obj2 in セルA 下
-draw.ellipse([start_x + 195, start_y + 135, start_x + 215, start_y + 155], fill=GREEN, outline=WHITE) # Obj3 (遠く離れた別のセル)
+draw.ellipse([start_x + 195, start_y + 135, start_x + 215, start_y + 155], fill=GREEN, outline=WHITE) # Obj3 (遠隔)
 
 # 衝突判定ライン (セルA内の2つの青オブジェクトを結ぶ赤い判定線)
 draw.line([start_x + 28, start_y + 42, start_x + 30, start_y + 80], fill=RED, width=2)
@@ -245,7 +244,7 @@ draw = ImageDraw.Draw(img)
 draw.rectangle([30, 30, 570, 200], fill=None, outline=BLUE, width=3)
 draw.text((45, 38), "◆ Root AABB (モデル全体を包む箱)", fill=BLUE, font=font_medium)
 
-# 2) 左の緑 of 箱 (Left AABB)
+# 2) 左の緑の箱 (Left AABB)
 draw.rectangle([50, 65, 275, 185], fill=None, outline=GREEN, width=2)
 draw.text((65, 73), "Left AABB (左側)", fill=GREEN, font=font_medium)
 
