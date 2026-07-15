@@ -8,15 +8,15 @@ from PIL import Image, ImageDraw, ImageFont
 output_dir = r"c:\Users\k024g\OneDrive\デスクトップ\Engine_ver2026\project\Resources\slides"
 os.makedirs(output_dir, exist_ok=True)
 
-# 共通の色定義 (GitHubダークテーマ準拠のおしゃれなフラット配色)
+# 共通の色定義 (★暗い背景の上でも文字がはっきりと読めるように、高輝度のパステルカラーに調整)
 BG_COLOR = (22, 27, 34)       # #161b22 (スライドの背景色と完全一致)
 TEXT_COLOR = (240, 246, 252)  # #f0f6fc (白文字)
-BLUE = (88, 166, 255)         # #58a6ff
-GREEN = (63, 185, 80)         # #3fb950
-RED = (248, 81, 73)           # #f85149
-ORANGE = (210, 153, 34)       # #d29922
+BLUE = (130, 200, 255)         # 明るいスカイブルー (視認性大幅アップ)
+GREEN = (120, 230, 140)        # 明るいライムグリーン (視認性大幅アップ)
+RED = (255, 110, 110)          # 明るい赤 (視認性大幅アップ)
+ORANGE = (240, 180, 70)        # 明るいオレンジ (視認性大幅アップ)
 GRAY = (48, 54, 61)           # #30363d
-LIGHT_GRAY = (139, 148, 158)  # #8b949e
+LIGHT_GRAY = (190, 200, 210)  # 明るいプラチナグレー (視認性大幅アップ)
 WHITE = (255, 255, 255)
 
 # フォントの読み込み (Windowsの標準フォント)
@@ -75,7 +75,7 @@ img.save(os.path.join(output_dir, "slide_system.png"))
 # ----------------------------------------------------
 img = Image.new("RGB", (650, 280), BG_COLOR)
 draw = ImageDraw.Draw(img)
-# CPU & GPU Labels
+# CPU & GPU Labels (高輝度の色でハッキリ表示)
 draw.text((40, 30), "CPU 側 (データ書き込み)", fill=BLUE, font=font_large)
 draw.text((430, 30), "GPU 側 (レンダリング)", fill=GREEN, font=font_large)
 # アロケータ (幅広にしてテキストとの干渉を防ぐ)
@@ -134,7 +134,7 @@ draw.text((start_x + 58, start_y + 8), "Cell B", fill=LIGHT_GRAY, font=font_smal
 draw.ellipse([start_x + 15, start_y + 15, start_x + 35, start_y + 35], fill=BLUE, outline=WHITE)  # Obj1 in Cell A
 draw.ellipse([start_x + 20, start_y + 70, start_x + 40, start_y + 90], fill=BLUE, outline=WHITE)  # Obj2 in Cell A (下)
 draw.ellipse([start_x + 165, start_y + 115, start_x + 185, start_y + 135], fill=GREEN, outline=WHITE) # Obj3 in Cell
-# 衝突判定ライン
+# 衝突判定ライン (明るい赤)
 draw.line([start_x + 25, start_y + 35, start_x + 30, start_y + 70], fill=RED, width=2)
 # フローテキスト (矢印の始点をX=270から離す)
 draw_arrow(draw, (275, 125), (330, 125), BLUE)
@@ -142,12 +142,12 @@ draw.text((345, 60), "ワールド座標 / セルサイズ\n➔ セル所属判�
 img.save(os.path.join(output_dir, "slide_spatial_hash.png"))
 
 # ----------------------------------------------------
-# 5. DOD vs OOP Diagram (slide_dod.png)
+# 5. DOD vs OOP Diagram (slide_dod.png) - ★タイトルの文字色を高輝度に変更して視認性を確保
 # ----------------------------------------------------
 img = Image.new("RGB", (650, 280), BG_COLOR)
 draw = ImageDraw.Draw(img)
-# OOP
-draw.text((40, 20), "従来の設計 (OOP: オブジェクト指向)", fill=LIGHT_GRAY, font=font_large)
+# OOP (暗いグレーから、白に変更してハッキリ読めるようにする)
+draw.text((40, 20), "従来の設計 (OOP: オブジェクト指向)", fill=TEXT_COLOR, font=font_large)
 draw.rounded_rectangle([30, 60, 150, 95], radius=4, fill=GRAY)
 draw.text((42, 70), "Obj A (ポインタ)", fill=TEXT_COLOR, font=font_small)
 draw.rounded_rectangle([190, 110, 310, 145], radius=4, fill=GRAY)
@@ -158,17 +158,17 @@ draw.text((42, 170), "Obj C (ポインタ)", fill=TEXT_COLOR, font=font_small)
 draw_arrow(draw, (150, 77), (190, 118), RED)
 draw_arrow(draw, (190, 137), (150, 177), RED)
 draw.text((330, 118), "➔ メモリが散在しキャッシュミス多発", fill=RED, font=font_medium)
-# DOD
+# DOD (暗い緑から、明るいライムグリーンに変更してハッキリ読めるようにする)
 draw.text((40, 210), "最適化設計 (DOD: データ指向設計)", fill=GREEN, font=font_large)
 # 連続メモリ
 draw.rectangle([40, 240, 610, 270], fill=GRAY, outline=GREEN, width=1)
 draw.rectangle([41, 241, 200, 269], fill=GREEN)
-draw.text((50, 248), "Data A (位置/コライダー)", fill=BG_COLOR, font=font_small)
+draw.text((50, 247), "Data A (位置/コライダー)", fill=BG_COLOR, font=font_small)
 draw.rectangle([201, 241, 360, 269], fill=GREEN)
-draw.text((210, 248), "Data B (位置/コライダー)", fill=BG_COLOR, font=font_small)
+draw.text((210, 247), "Data B (位置/コライダー)", fill=BG_COLOR, font=font_small)
 draw.rectangle([361, 241, 520, 269], fill=GREEN)
-draw.text((370, 248), "Data C (位置/コライダー)", fill=BG_COLOR, font=font_small)
-draw.text((530, 248), "連続メモリ", fill=TEXT_COLOR, font=font_small)
+draw.text((370, 247), "Data C (位置/コライダー)", fill=BG_COLOR, font=font_small)
+draw.text((530, 247), "連続メモリ", fill=TEXT_COLOR, font=font_small)
 img.save(os.path.join(output_dir, "slide_dod.png"))
 
 # ----------------------------------------------------
@@ -195,13 +195,13 @@ draw.rounded_rectangle([450, 60, 630, 200], radius=8, fill=BLUE)
 draw.text((465, 75), "Blackboard\n(共有メモリ)", fill=BG_COLOR, font=font_large)
 # テキスト描画位置を矢印接続部分より上(Y=125)にずらして被りを完全排除
 draw.text((465, 125), "・Target: Player\n・MoveSpeed: 5.0", fill=BG_COLOR, font=font_medium)
-# 接続矢印：Actionの右端(365)からBlackboardの左端(450)を正確に接続 (箱の内部に侵入させない)
+# 接続矢印：Action of 右端(365)からBlackboardの左端(450)を正確に接続 (箱の内部に侵入させない)
 draw_arrow(draw, (365, 185), (450, 185), RED, width=2)
 draw_arrow(draw, (450, 165), (365, 165), GREEN, width=2)
 img.save(os.path.join(output_dir, "slide_bt_bb.png"))
 
 # ----------------------------------------------------
-# 7. BVH / AABB Tree (slide_bvh.png) - ★三角形の色を見やすくし、文字のセンタリング（中央寄せ）を完全自動計算に修正
+# 7. BVH / AABB Tree (slide_bvh.png)
 # ----------------------------------------------------
 img = Image.new("RGB", (650, 280), BG_COLOR)
 draw = ImageDraw.Draw(img)
@@ -217,42 +217,38 @@ draw.text((65, 73), "Left AABB (左側)", fill=GREEN, font=font_medium)
 draw.rectangle([305, 65, 550, 185], fill=None, outline=ORANGE, width=2)
 draw.text((320, 73), "Right AABB (右側)", fill=ORANGE, font=font_medium)
 
-# 4) 左箱の中の三角形ポリゴン (★背景と同化しないよう「明るいライトグレー(170, 180, 195)」に変更し、白枠で境界を際立たせる)
-POLY_FILL = (170, 180, 195)
+# 4) 左箱の中の三角形ポリゴン (明るいプラチナグレーに変更し、白枠で際立たせる)
+POLY_FILL = (210, 220, 235)
 draw.polygon([(80, 165), (120, 95), (160, 155)], fill=POLY_FILL, outline=WHITE)
 draw.polygon([(180, 175), (210, 110), (250, 165)], fill=POLY_FILL, outline=WHITE)
 
-# 5) 右箱の中の三角形ポリゴン (★同じく明るい色に変更)
+# 5) 右箱の中の三角形ポリゴン
 draw.polygon([(340, 155), (380, 95), (420, 165)], fill=POLY_FILL, outline=WHITE)
 draw.polygon([(450, 175), (480, 110), (520, 160)], fill=POLY_FILL, outline=WHITE)
 
-# 6) レーザー光線 (明るく鮮やかな赤)
+# 6) レーザー光線 (明るい赤)
 draw.line([10, 130, 140, 130], fill=RED, width=3)
 draw_arrow(draw, (140, 130), (200, 130), RED, width=3)
 draw.text((10, 105), "レーザー光線", fill=RED, font=font_medium)
 
-# 7) 右箱のスキップ説明の赤い箱 (★横幅を310pxに大幅に広げ、位置をX=250へ変更し、はみ出しを完全防止)
+# 7) 右箱のスキップ説明の赤い箱 (横幅310pxに広げ、センタリング配置)
 box_left, box_top, box_right, box_bottom = 250, 210, 560, 260
 draw.rounded_rectangle([box_left, box_top, box_right, box_bottom], radius=4, fill=(180, 50, 50))
 
-# ★文字の位置を「赤い箱のド真ん中」に配置するための自動センタリング計算
+# センタリングの自動計算
 text_content = "【右箱は非衝突】 ➔ 中身の計算を全スキップ！"
-# テキストの長さ（ピクセル幅）を取得
 try:
     text_width = draw.textlength(text_content, font=font_small)
 except AttributeError:
-    # 古いPILバージョン対策用の代替計算 (1文字あたり約8〜13ピクセル)
     text_width = len(text_content.encode('utf-8')) * 7.5
 
 box_width = box_right - box_left
 box_height = box_bottom - box_top
-# 横方向のセンタリング開始位置
 text_x = box_left + (box_width - text_width) / 2
-# 縦方向のセンタリング開始位置
 text_y = box_top + (box_height - 13) / 2
 
 draw.text((text_x, text_y), text_content, fill=WHITE, font=font_small)
 
 img.save(os.path.join(output_dir, "slide_bvh.png"))
 
-print("すべての画像から文字被りを解消し、中央寄せを自動計算にして再生成しました！")
+print("すべての画像の色とレイアウトを完璧に再生成しました！")
