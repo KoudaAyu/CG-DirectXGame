@@ -714,8 +714,10 @@ Microsoft::WRL::ComPtr<IDxcBlob> DirectXCom::CompileShader(const std::wstring& f
 	argStrings.push_back(filePath);
 	argStrings.push_back(L"-E"); argStrings.push_back(L"main");
 	argStrings.push_back(L"-T"); argStrings.push_back(profile);
-	argStrings.push_back(L"-Zi"); argStrings.push_back(L"Qembed_debug");
-	argStrings.push_back(L"-Od");
+	// NVIDIAドライバのクラッシュ回避のため、Debugビルド時でも-Zi,-Odを無効化し-O3（最適化）を適用
+	// argStrings.push_back(L"-Zi"); argStrings.push_back(L"Qembed_debug");
+	// argStrings.push_back(L"-Od");
+	argStrings.push_back(L"-O3");
 	argStrings.push_back(L"-Zpr");
 	if (!shaderDir.empty())
 	{
