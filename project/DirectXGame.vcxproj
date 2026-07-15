@@ -305,14 +305,7 @@
     <ClInclude Include="Application\Scene\GameScene\TutorialSign.h" />
     <ClInclude Include="Baziru3_Engine\3D\Object\SkinningObject3dCom.h" />
     <ClInclude Include="Baziru3_Engine\Base\SubsystemFactory.h" />
-    <ClInclude Include="Baziru3_Engine\Collision\Collider.h" />
-    <ClInclude Include="Baziru3_Engine\Collision\SphereCollider.h" />
-    <ClInclude Include="Baziru3_Engine\Collision\BoxCollider.h" />
-    <ClInclude Include="Baziru3_Engine\Collision\CapsuleCollider.h" />
-    <ClInclude Include="Baziru3_Engine\Collision\CollisionManager.h" />
-    <ClInclude Include="Baziru3_Engine\Collision\AABBTree.h" />
-    <ClInclude Include="Baziru3_Engine\Collision\MeshCollider.h" />
-    <ClInclude Include="Baziru3_Engine\Collision\SkeletonCollider.h" />
+
     <ClInclude Include="Baziru3_Engine\Graphics\GpuProfiler.h" />
     <ClInclude Include="Baziru3_Engine\Base\AsyncLoader.h" />
     <ClInclude Include="Baziru3_Engine\Base\BinaryAssetUtil.h" />
