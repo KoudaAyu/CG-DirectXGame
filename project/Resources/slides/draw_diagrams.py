@@ -19,7 +19,7 @@ GRAY = (48, 54, 61)           # #30363d
 LIGHT_GRAY = (190, 200, 210)  # 明るいプラチナグレー (視認性大幅アップ)
 WHITE = (255, 255, 255)
 
-# フォントの読み込み (Windowsの標準フォント)
+# フォントの読み込み (Windows of 標準フォント)
 font_path = "C:\\Windows\\Fonts\\msgothic.ttc"
 try:
     font_large = ImageFont.truetype(font_path, 20)
@@ -142,7 +142,7 @@ draw.text((345, 60), "ワールド座標 / セルサイズ\n➔ セル所属判�
 img.save(os.path.join(output_dir, "slide_spatial_hash.png"))
 
 # ----------------------------------------------------
-# 5. DOD vs OOP Diagram (slide_dod.png) - ★一本の連続した緑色のバーに改善
+# 5. DOD vs OOP Diagram (slide_dod.png) - ★文字と境界の「ぶつかり」を完全排除
 # ----------------------------------------------------
 img = Image.new("RGB", (650, 280), BG_COLOR)
 draw = ImageDraw.Draw(img)
@@ -160,17 +160,37 @@ draw_arrow(draw, (190, 137), (150, 177), RED)
 draw.text((330, 118), "➔ メモリが散在しキャッシュミス多発", fill=RED, font=font_medium)
 # DOD
 draw.text((40, 210), "最適化設計 (DOD: データ指向設計)", fill=GREEN, font=font_large)
-# 連続メモリ (★全体をGREENで塗りつぶし、黒枠線で一本のバーにする)
-draw.rectangle([40, 240, 610, 270], fill=GREEN, outline=BG_COLOR, width=1)
-# Data A, B, C の間に黒の縦線を引いてデータを視覚的に区切る
-draw.line([(200, 240), (200, 270)], fill=BG_COLOR, width=1)
-draw.line([(360, 240), (360, 270)], fill=BG_COLOR, width=1)
-draw.line([(520, 240), (520, 270)], fill=BG_COLOR, width=1)
-# テキスト描画 (★文字色をすべて黒「BG_COLOR」にして、緑のバーの上に綺麗に表示)
-draw.text((50, 247), "Data A (位置/コライダー)", fill=BG_COLOR, font=font_small)
-draw.text((210, 247), "Data B (位置/コライダー)", fill=BG_COLOR, font=font_small)
-draw.text((370, 247), "Data C (位置/コライダー)", fill=BG_COLOR, font=font_small)
-draw.text((532, 247), "連続メモリ", fill=BG_COLOR, font=font_small)
+
+# 連続メモリ (全体をGREENで塗りつぶした一本のバー)
+box_l, box_t, box_r, box_b = 40, 240, 610, 270
+draw.rectangle([box_l, box_t, box_r, box_b], fill=GREEN, outline=BG_COLOR, width=1)
+
+# 各ブロックの境界線（縦線）を等間隔で引く
+draw.line([(180, 240), (180, 270)], fill=BG_COLOR, width=1)
+draw.line([(320, 240), (320, 270)], fill=BG_COLOR, width=1)
+draw.line([(460, 240), (460, 270)], fill=BG_COLOR, width=1)
+
+# ★文字情報を「Data A」「Data B」「Data C」とシンプルにして、
+# 各ボックスの中央に完璧に配置 (余白をたっぷりとることで境界線との衝突を防ぐ)
+blocks_info = [
+    (40, 180, "Data A"),
+    (180, 320, "Data B"),
+    (320, 460, "Data C"),
+    (460, 610, "連続メモリ")
+]
+
+for left, right, text in blocks_info:
+    # テキストの長さ（幅）を取得して中央寄せ座標を計算
+    try:
+        w = draw.textlength(text, font=font_medium)
+    except AttributeError:
+        w = len(text.encode('utf-8')) * 7.5
+    
+    text_x = left + ((right - left) - w) / 2
+    text_y = box_t + ((box_b - box_t) - 15) / 2
+    
+    draw.text((text_x, text_y), text, fill=BG_COLOR, font=font_medium)
+
 img.save(os.path.join(output_dir, "slide_dod.png"))
 
 # ----------------------------------------------------
