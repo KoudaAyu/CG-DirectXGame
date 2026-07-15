@@ -11,7 +11,8 @@ C++ および DirectX 12 を用いてスクラッチから構築した、自作3
 ## 🎨 ポートフォリオ技術発表スライド
 本エンジンで実装している「動的物理とメモリ最適化」に関する詳細な技術解説・設計図面をまとめた提出用スライド資料を公開しています。
 
-* **📄 [技術発表スライド資料 (PDF)](sega_portfolio_slides.pdf)** （※クリックしてダウンロード・閲覧できます）
+* **📄 [コウダ_アユ_Baziru3_Engineについて (PDF)](%E3%82%B3%E3%82%A6%E3%83%80_%E3%82%A2%E3%83%A6_Baziru3_Engine%E3%81%AB%E3%81%A4%E3%81%84%E3%81%A6.pdf)** （※提出用・日本語ファイル名）
+* **📄 [技術発表スライド資料 (PDF)](sega_portfolio_slides.pdf)** （※英数字ファイル名リンク）
   * スライドのMarkdownソースはこちら：[sega_portfolio_slides.md](sega_portfolio_slides.md)
 
 ---
