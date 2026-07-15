@@ -14,6 +14,9 @@
 #include"StringUtil.h"
 
 #include"ImGuiManager.h"
+#include "Baziru3_Engine/Base/Allocator/ConstantBufferAllocator.h"
+#include "Baziru3_Engine/Base/Allocator/StackAllocator.h"
+#include "Baziru3_Engine/Graphics/GpuProfiler.h"
 
 using namespace Microsoft::WRL;
 
@@ -80,10 +83,24 @@ void DirectXCom::Initialize()
 	CerateScissorRect();
 	CreateDxcCompiler();
 	InitializeImGui();
+
+	// 定数バッファアロケーターの生成・初期化
+	cbAllocator_ = std::make_unique<ConstantBufferAllocator>(this);
+	cbAllocator_->Initialize();
+
+	// スタックアロケーターの生成・初期化
+	stackAllocator_ = std::make_unique<StackAllocator>();
+	stackAllocator_->Initialize(16 * 1024 * 1024); // 16MB
+
+	// GPUプロファイラーの初期化
+	GpuProfiler::GetInstance()->Initialize(device.Get(), commandQueue.Get());
 }
 
 void DirectXCom::Finalize()
 {
+	// GPUプロファイラーの解放
+	GpuProfiler::GetInstance()->Finalize();
+
 	// GPUが処理を終えるのを待つ
 	if (commandQueue)
 	{
@@ -107,9 +124,9 @@ void DirectXCom::Finalize()
 	// スワップチェーンのリソースを解放する前に、コマンドリストとコマンドアロケーターをリセットしておく
 	for (auto& res : swapChainResources) res.Reset();
 
-	rtvDescriptorHeap.Reset();
-	srvDescriptorHeap.Reset();
-	dsvDescriptorHeap.Reset();
+	rtvDescriptorHeap_.Finalize();
+	srvDescriptorHeap_.Finalize();
+	dsvDescriptorHeap_.Finalize();
 	descriptorHeap.Reset();
 	depthStencilResource.Reset();
 	commandList.Reset();
@@ -132,9 +149,19 @@ void DirectXCom::Finalize()
 	device.Reset();
 	dxgiFactory.Reset();
 
-	// 生のポインタをクリア
-	infoQueue = nullptr;
+	infoQueue.Reset();
+	debugController.Reset();
 
+	if (cbAllocator_)
+	{
+		cbAllocator_->Finalize();
+		cbAllocator_.reset();
+	}
+
+	if (stackAllocator_)
+	{
+		stackAllocator_.reset();
+	}
 }
 
 void DirectXCom::DebugLayer()
@@ -239,7 +266,8 @@ void DirectXCom::SetupD3D12InfoQueue()
 		//抑制するメッセージのID
 		D3D12_MESSAGE_ID denyIds[] =
 		{
-			D3D12_MESSAGE_ID_RESOURCE_BARRIER_MISMATCHING_COMMAND_LIST_TYPE
+			D3D12_MESSAGE_ID_RESOURCE_BARRIER_MISMATCHING_COMMAND_LIST_TYPE,
+			D3D12_MESSAGE_ID_LOADPIPELINE_NAMENOTFOUND
 		};
 
 		D3D12_MESSAGE_SEVERITY serverities[] = { D3D12_MESSAGE_SEVERITY_INFO };
@@ -250,9 +278,6 @@ void DirectXCom::SetupD3D12InfoQueue()
 		filter.DenyList.pSeverityList = serverities; //抑制するメッセージの重要度
 
 		infoQueue->PushStorageFilter(&filter); //フィルターを適用する
-
-		//解放
-		infoQueue->Release();
 	}
 #endif
 }
@@ -262,6 +287,14 @@ void DirectXCom::InitializeCommandList()
 	CreateCommandAllocator();
 	CreateCommandList();
 	CreateCommandQueue();
+
+	// ワーカー用の作成
+	hr = device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&workerCommandAllocator_));
+	assert(SUCCEEDED(hr));
+	hr = device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, workerCommandAllocator_.Get(), nullptr, IID_PPV_ARGS(&workerCommandList_));
+	assert(SUCCEEDED(hr));
+	// 初期状態は Close しておく
+	workerCommandList_->Close();
 }
 
 //コマンドアロケーターを生成する
@@ -378,13 +411,9 @@ void DirectXCom::CreateDescriptorHeaps()
 	const uint32_t descriptorSizeDSV = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
 
 
-	//RTV用のヒープでディスクリプタの数は2。RTVはShader内でふれるものではないため、ShaderVisibleはfalse
-	rtvDescriptorHeap = CreateDescriptorHeap(device.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_RTV, 2, false);
-
-	srvDescriptorHeap = CreateDescriptorHeap(device.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, kMacSRVCount, true);
-
-	//DSV用のヒープでディスクリプタの数は1。DSVはShader内で触れるものではないため、ShaderVisibleはfalse
-	dsvDescriptorHeap = CreateDescriptorHeap(device.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_DSV, 1, false);
+	rtvDescriptorHeap_.Initialize(device.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_RTV, 2, false);
+	srvDescriptorHeap_.Initialize(device.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, kMacSRVCount, true);
+	dsvDescriptorHeap_.Initialize(device.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_DSV, 1, false);
 
 }
 
@@ -402,7 +431,7 @@ void DirectXCom::InitializeRenderTargetView()
 	rtvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB; //出力結果をSRGBに変換して書き込む
 	rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D; //2Dテクスチャとして書き込む
 	//ディスクリプタの先頭を取得する
-	D3D12_CPU_DESCRIPTOR_HANDLE rtvStartHandle = rtvDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
+	D3D12_CPU_DESCRIPTOR_HANDLE rtvStartHandle = rtvDescriptorHeap_.GetCPUDescriptorHandle(0);
 
 
 	UINT descriptorSize = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
@@ -437,7 +466,7 @@ void DirectXCom::InitializeDepthStencilView()
 	dsvDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;//Format。基本的にはResourceに合わせる
 	dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;//2dTexture
 	//DSVHeapの先頭にDSVを作る
-	device->CreateDepthStencilView(depthStencilResource.Get(), &dsvDesc, dsvDescriptorHeap->GetCPUDescriptorHandleForHeapStart());
+	device->CreateDepthStencilView(depthStencilResource.Get(), &dsvDesc, dsvDescriptorHeap_.GetCPUDescriptorHandle(0));
 }
 
 void DirectXCom::CreateFence()
@@ -498,6 +527,19 @@ void DirectXCom::InitializeImGui()
 
 void DirectXCom::PreDraw()
 {
+	if (cbAllocator_)
+	{
+		cbAllocator_->BeginFrame();
+	}
+
+	// GPUプロファイラーのフレーム開始
+	GpuProfiler::GetInstance()->BeginFrame(commandList.Get());
+
+	if (stackAllocator_)
+	{
+		stackAllocator_->Reset();
+	}
+
 	//これから書き込むバックバッファのインデックスを取得する
 	backBufferIndex = swapChain->GetCurrentBackBufferIndex();
 
@@ -517,7 +559,7 @@ void DirectXCom::PreDraw()
 	commandList->ResourceBarrier(1, &barrier);
 
 	//描画先のRTVとDSVを設定する
-	D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = dsvDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
+	D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = dsvDescriptorHeap_.GetCPUDescriptorHandle(0);
 	commandList->OMSetRenderTargets(1, &rtvHandles[backBufferIndex], false, &dsvHandle);
 
 	float clearColor[] = { 0.1f,0.25f,0.5f,1.0f };//RGBAの値。青っぽい色
@@ -526,7 +568,7 @@ void DirectXCom::PreDraw()
 	commandList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 
 	//描画用のDescriptorHeapの設定
-	ID3D12DescriptorHeap* descriptorHeaps[] = { srvDescriptorHeap.Get() };
+	ID3D12DescriptorHeap* descriptorHeaps[] = { srvDescriptorHeap_.GetHeap() };
 	commandList->SetDescriptorHeaps(1, descriptorHeaps);
 
 	//コマンドを積む
@@ -549,6 +591,9 @@ void DirectXCom::PostDraw()
 	//TransitionBarrierを張る
 	commandList->ResourceBarrier(1, &barrier);
 
+	// GPUプロファイラーのフレーム終了（Resolveコマンドを積む）
+	GpuProfiler::GetInstance()->EndFrame(commandList.Get());
+
 	//コマンドリストの内容を下記率させる。すべてのコマンドを積んでからCloseする
 	hr = (commandList->Close());
 	if (FAILED(hr))
@@ -565,6 +610,7 @@ void DirectXCom::PostDraw()
 		return;
 	}
 
+	PrintDebugMessages();
 	ID3D12CommandList* commandLists[] = { commandList.Get() };
 	commandQueue->ExecuteCommandLists(1, commandLists);
 
@@ -603,6 +649,13 @@ void DirectXCom::PostDraw()
 	hr = (commandList->Reset(commandAllocator.Get(), nullptr));
 	//コマンドリストのリセットに失敗した場合はエラー
 	assert(SUCCEEDED(hr));
+
+	// ワーカー用の次フレーム準備
+	hr = workerCommandAllocator_->Reset();
+	assert(SUCCEEDED(hr));
+	hr = workerCommandList_->Reset(workerCommandAllocator_.Get(), nullptr);
+	assert(SUCCEEDED(hr));
+	workerCommandList_->Close();
 
 }
 
@@ -814,8 +867,6 @@ Microsoft::WRL::ComPtr<ID3D12Resource> DirectXCom::CreateTextureResource(const D
 	//2. 利用するHeapの設定
 	D3D12_HEAP_PROPERTIES heapProperties{};
 	heapProperties.Type = D3D12_HEAP_TYPE_DEFAULT;//細かい設定を行う
-	//heapProperties.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_WRITE_BACK;//WriteBackポリシーでCPUアクセス可能
-	//heapProperties.MemoryPoolPreference = D3D12_MEMORY_POOL_L0;//プロセッサの近くに配列
 
 	//3. Resourceを生成する
 	Microsoft::WRL::ComPtr<ID3D12Resource> resource = nullptr;
@@ -832,22 +883,12 @@ Microsoft::WRL::ComPtr<ID3D12Resource> DirectXCom::CreateTextureResource(const D
 
 D3D12_CPU_DESCRIPTOR_HANDLE DirectXCom::GetSRVHandleCPU(uint32_t index)
 {
-	// Use the actual SRV descriptor heap
-	D3D12_CPU_DESCRIPTOR_HANDLE handleCPU =
-		srvDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
-	UINT increment = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-	handleCPU.ptr += (static_cast<SIZE_T>(increment) * index);
-	return handleCPU;
+	return srvDescriptorHeap_.GetCPUDescriptorHandle(index);
 }
 
 D3D12_GPU_DESCRIPTOR_HANDLE DirectXCom::GetSRVHandleGPU(uint32_t index)
 {
-	// Use the actual SRV descriptor heap
-	D3D12_GPU_DESCRIPTOR_HANDLE handleGPU =
-		srvDescriptorHeap->GetGPUDescriptorHandleForHeapStart();
-	UINT increment = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-	handleGPU.ptr += (static_cast<UINT64>(increment) * index);
-	return handleGPU;
+	return srvDescriptorHeap_.GetGPUDescriptorHandle(index);
 }
 
 
@@ -864,3 +905,19 @@ const D3D_FEATURE_LEVEL DirectXCom::featureLevels[] = {
 };
 
 const size_t DirectXCom::featureLevelNamesCount = sizeof(DirectXCom::featureLevelNames) / sizeof(DirectXCom::featureLevelNames[0]);
+
+void DirectXCom::PrintDebugMessages()
+{
+	if (!infoQueue) return;
+	UINT64 messageCount = infoQueue->GetNumStoredMessagesAllowedByRetrievalFilter();
+	for (UINT64 i = 0; i < messageCount; i++)
+	{
+		SIZE_T messageLength = 0;
+		infoQueue->GetMessage(i, nullptr, &messageLength);
+		std::vector<byte> messageBytes(messageLength);
+		D3D12_MESSAGE* message = reinterpret_cast<D3D12_MESSAGE*>(messageBytes.data());
+		infoQueue->GetMessage(i, message, &messageLength);
+		Logger::Log(logStream, std::format("[D3D12 ERROR/WARNING] {}\n", message->pDescription));
+	}
+	infoQueue->ClearStoredMessages();
+}

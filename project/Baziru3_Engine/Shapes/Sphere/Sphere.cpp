@@ -6,12 +6,24 @@
 #include "SceneManager.h"
 #include "TextureManager.h"
 
+#include <algorithm>
+
+std::vector<Sphere*> Sphere::instances_;
+
 Sphere::Sphere()
 {
+	instances_.push_back(this);
 }
 
 Sphere::~Sphere()
 {
+	auto it = std::find(instances_.begin(), instances_.end(), this);
+	if (it != instances_.end())
+	{
+		*it = instances_.back();
+		instances_.pop_back();
+	}
+
 	if (transformationMatrixResourceSphere && transformationMatrixDataSphere)
 	{
 		D3D12_RANGE written = { 0, sizeof(TransformationMatrix) };
@@ -161,6 +173,7 @@ void Sphere::Update()
 
 void Sphere::Draw(D3D12_GPU_DESCRIPTOR_HANDLE textureSrvHandle)
 {
+	MarkDrawn();
 
 	if (!directXCom_ || !object3dCom_ || !materialManager_ || !light_)
 	{
@@ -196,9 +209,9 @@ void Sphere::Draw(D3D12_GPU_DESCRIPTOR_HANDLE textureSrvHandle)
 
 	commandList->SetGraphicsRootConstantBufferView(3, light_->GetDirectionalLightResource()->GetGPUVirtualAddress());
 
-	if (camera_ && camera_->GetCameraResource())
+	if (camera_ && camera_->GetCameraGpuAddress() != 0)
 	{
-		commandList->SetGraphicsRootConstantBufferView(4, camera_->GetCameraResource()->GetGPUVirtualAddress());
+		commandList->SetGraphicsRootConstantBufferView(4, camera_->GetCameraGpuAddress());
 	}
 	else
 	{

@@ -79,8 +79,10 @@ private:
     D3D12_DEPTH_STENCIL_DESC depthStencilDesc{};
     Microsoft::WRL::ComPtr<IDxcBlob> vertexShaderBlob;
     Microsoft::WRL::ComPtr<IDxcBlob> pixelShaderBlob;
+    Microsoft::WRL::ComPtr<IDxcBlob> wireframePixelShaderBlob;
     D3D12_GRAPHICS_PIPELINE_STATE_DESC graphicPipelineStateDesc{};
     Microsoft::WRL::ComPtr<ID3D12PipelineState> pipelineState = nullptr;
+    Microsoft::WRL::ComPtr<ID3D12PipelineState> pipelineStateWireframe = nullptr;
 
     // Compute Shader variables
     Microsoft::WRL::ComPtr<IDxcBlob> computeShaderBlob = nullptr;

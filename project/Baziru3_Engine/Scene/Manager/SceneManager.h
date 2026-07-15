@@ -17,10 +17,13 @@ class SpriteCom;
 class AudioManager;
 class SkyBox;
 class SkyboxCom;
-class FadeApplication;
+class Fade;
 struct ID3D12GraphicsCommandList;
 struct SceneRenderRequests;
 
+/**
+ * @brief シーンの遷移とライフサイクル、およびエンジン層サブシステムを管理するクラス
+ */
 class SceneManager
 {
 
@@ -29,20 +32,34 @@ public:
         : dxCommon_(dxCommon), logStream_(logStream) {}
 	~SceneManager();
 
+	/**
+	 * @brief シーンマネージャーの初期化を行います
+	 * @param dxCommon DirectX12共通オブジェクトのポインタ
+	 */
 	void Initialize(DirectXCom* dxCommon);
 
-    // Update the scene manager and engine-level subsystems. deltaTime is in seconds.
+	/**
+	 * @brief アクティブなシーンの更新および各種エンジン側処理を実行します
+	 * @param deltaTime フレーム間の経過時間 (秒)
+	 */
 	void Update(float deltaTime);
 
+	/**
+	 * @brief 現在のシーンを描画します
+	 * @param renderRequests 描画リクエスト情報
+	 */
     void Draw(SceneRenderRequests& renderRequests);
 
-	/// <summary>
-	/// 次のシーン予約
-	/// </summary>
-	/// <param name="sceneName">シーン名</param>
+	/**
+	 * @brief 次に遷移するシーンを名前指定で予約します
+	 * @param sceneName 遷移先シーンの名前
+	 */
 	void ChangeScene(const std::string& sceneName);
 
    
+	/**
+	 * @brief 予約されているシーン遷移を適用します
+	 */
     void ApplyPendingSceneChange();
 
 	void SetDirectXCom(DirectXCom* dxCommon) { dxCommon_ = dxCommon; }
@@ -69,8 +86,8 @@ public:
 	ParticleManager* GetParticleManager() const { return particleManager_; }
 	void SetSpriteCom(SpriteCom* v) { spriteCom_ = v; }
 	SpriteCom* GetSpriteCom() const { return spriteCom_; }
-	void SetFadeApplication(FadeApplication* v) { fadeApplication_ = v; }
-	FadeApplication* GetFadeApplication() const { return fadeApplication_; }
+	void SetFadeApplication(Fade* v) { fadeApplication_ = v; }
+	Fade* GetFadeApplication() const { return fadeApplication_; }
 
 	
 	void SetAudioManager(AudioManager* v) { audioManager_ = v; }
@@ -107,7 +124,7 @@ private:
 	SkyboxCom* skyboxCom_ = nullptr;
 	uint32_t skyboxTextureIndex_ = 0;
 	bool showSkybox_ = true;
-	FadeApplication* fadeApplication_ = nullptr;
+	Fade* fadeApplication_ = nullptr;
 	bool isSceneTransitioning_ = false;
 	bool hasSwitchedSceneDuringFade_ = false;
 

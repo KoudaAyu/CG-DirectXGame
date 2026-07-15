@@ -18,6 +18,9 @@
 #include <assimp/postprocess.h>
 #include <assimp/scene.h>
 
+/**
+ * @brief 3Dモデルデータの管理・描画制御を行うクラス
+ */
 class Model
 {
 public:
@@ -62,12 +65,29 @@ public:
 
 public:
 
+	/**
+	 * @brief 3Dモデルの初期化処理を行います
+	 * @param modelCom 3Dモデル共通設定オブジェクトのポインタ
+	 * @param directorypath モデルファイルが格納されているディレクトリパス
+	 * @param filename モデルファイルのファイル名
+	 */
 	void Initialize(ModelCom* modelCom, const std::string& directorypath, const std::string& filename);
+	void Initialize(ModelCom* modelCom, const std::string& directorypath, const std::string& filename, const ModelData& modelData);
 	
+	/**
+	 * @brief モデルの更新処理を行います
+	 */
 	void Update();
 
+	/**
+	 * @brief 各種描画バッファやテクスチャをコマンドリストにバインドします
+	 * @param commandList コマンドリスト
+	 */
 	void Bind(ID3D12GraphicsCommandList* commandList);
 
+	/**
+	 * @brief モデルの描画コマンドを発行します
+	 */
 	void Draw();
 
 	void SetModelCom(ModelCom* modelCom) { modelCom_ = modelCom; }
@@ -80,8 +100,8 @@ public:
 
 	const ModelData& GetModelData() const { return modelData_; }
 	const D3D12_VERTEX_BUFFER_VIEW& GetVertexBufferView() const { return vertexBufferView_; }
-	ID3D12Resource* GetMaterialResource() const { return materialResource.Get(); }
-	Material* GetMaterialData() const { return materialData_; }
+	const Material* GetMaterialData() const { return &materialData_; }
+	Material* GetMaterialData() { return &materialData_; }
 
 
 
@@ -101,14 +121,15 @@ public:
 	/// <returns></returns>
 	static ModelData LoadObjFile(const std::string& directoryPath, const std::string& filename);
 
-	/// <summary>
-	/// GLTFなどAssimpによるモデル読み込み（スキンウェイト対応）
-	/// </summary>
+	/**
+	 * @brief GLTFやFBXなどのモデルファイルをAssimp経由でロードします（スキンウェイト対応）
+	 * @param directoryPath モデルファイルが格納されているディレクトリパス
+	 * @param filename モデルのファイル名
+	 * @return ロードされたModelDataオブジェクト
+	 */
 	static ModelData LoadModelFile(const std::string& directoryPath, const std::string& filename);
 
 	void VertexResource();
-
-	void MaterialResource();
 
 
 private:
@@ -130,9 +151,8 @@ private:
 	// バッファリソースの使い道を補足するバッファビュー
 	D3D12_VERTEX_BUFFER_VIEW vertexBufferView_{};
 
-	// マテリアル用リソース
-	Microsoft::WRL::ComPtr<ID3D12Resource> materialResource = nullptr;
-	Material* materialData_ = nullptr;
+	// マテリアル用実データ
+	Material materialData_{};
 
 	// インデックスバッファ用リソース
 	Microsoft::WRL::ComPtr<ID3D12Resource> indexResource = nullptr;

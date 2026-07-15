@@ -15,9 +15,15 @@
 
 class Object3dCom;
 class SkinningObject3dCom;
+class RenderContext;
 
 class Object3d
 {
+public:
+	static const std::vector<Object3d*>& GetInstances() { return instances_; }
+private:
+	static std::vector<Object3d*> instances_;
+
 public:
 
     // GPU用の定数バッファ(CB)レイアウトには MaterialManager.h のグローバルな `Material` を使用
@@ -56,7 +62,10 @@ public:
 		float intensity;
 	};
 
-	void Initialize(Object3dCom* object3dCom, const ModelData& modelData);
+	Object3d();
+
+	void Initialize(Object3dCom* object3dCom, const ModelData& modelData, TextureManager* textureManager = nullptr);
+	void InitializeShared(Object3dCom* object3dCom, Object3d* masterObject);
 
 	// アニメーション・スケルトン・スキンクラスターをまとめてセットアップする
 	// アプリ側で読み込んだ Animation と Skeleton、Model::ModelData を渡す
@@ -64,8 +73,8 @@ public:
 
 	void Update();
 
-	void Draw(ID3D12GraphicsCommandList* commandList);
 	void Draw(Object3dCom* object3dCom, SkinningObject3dCom* skinningObject3dCom);
+	void Draw(const RenderContext& ctx);
 
 	/// <summary>
 	/// .mtlファイルの読み込み
@@ -103,10 +112,11 @@ public:
 	Camera* GetCamera() const { return camera_; }
 	void SetObject3dCom(Object3dCom* object3dCom) { object3dCom_ = object3dCom; }
 
-	const Microsoft::WRL::ComPtr<ID3D12Resource>& GetTransformationMatrixResource() const { return transformationMatrixResource; }
-	const Microsoft::WRL::ComPtr<ID3D12Resource>& GetMaterialResource() const { return materialResource; }
-	const Microsoft::WRL::ComPtr<ID3D12Resource>& GetDirectionalLightResource() const { return directionalLightResource; }
+	D3D12_GPU_VIRTUAL_ADDRESS GetTransformationMatrixGPUAddress() const { return transformationMatrixGpuAddress_; }
+	D3D12_GPU_VIRTUAL_ADDRESS GetMaterialGPUAddress() const { return materialGpuAddress_; }
+	D3D12_GPU_VIRTUAL_ADDRESS GetDirectionalLightGPUAddress() const { return directionalLightGpuAddress_; }
 	const Microsoft::WRL::ComPtr<ID3D12Resource>& GetVertexResource() const { return vertexResource; }
+	void PrepareConstantBuffers(DirectXCom* dx);
 
 	const D3D12_VERTEX_BUFFER_VIEW& GetVertexBufferView() const { return vertexBufferView_; }
 	const D3D12_INDEX_BUFFER_VIEW& GetIndexBufferView() const { return indexBufferView_; }
@@ -119,6 +129,15 @@ public:
 	const Vector3& GetTranslate() const { return transform.GetTranslate(); }
 	const Vector3& GetScale() const { return transform.GetScale(); }
 	const ModelData& GetModelData() const { return modelData_; }
+	const Matrix4x4& GetWorldMatrix() const { return transformationMatrixData_.World; }
+
+	void MarkDrawn() { isDrawnThisFrame_ = true; }
+	bool WasDrawnLastFrame() const { return wasDrawnLastFrame_; }
+	bool IsCulled() const { return isCulled_; }
+	void ResetFrameDrawFlags() {
+		wasDrawnLastFrame_ = isDrawnThisFrame_;
+		isDrawnThisFrame_ = false;
+	}
 
 	void SetEnableLighting(bool enable);
 	void SetColor(const Vector4& color);
@@ -131,6 +150,10 @@ public:
 	const Skeleton& GetSkeleton() const { return skeleton_; }
 	Skeleton& GetSkeleton() { return skeleton_; }
 	const SkinCluster& GetSkinCluster() const { return skinCluster_; }
+	bool IsShared() const { return isShared_; }
+
+private:
+	void DrawInternal(const RenderContext& ctx);
 
 private:
 	Transform transform;
@@ -154,20 +177,15 @@ private:
 	Microsoft::WRL::ComPtr<ID3D12Resource> indexResource = nullptr;
 	D3D12_INDEX_BUFFER_VIEW indexBufferView_{};
 
-	//バッファリソース
-	Microsoft::WRL::ComPtr<ID3D12Resource> materialResource = nullptr;
-	//バッファリソース内のデータを指すポインタ
-	Material* materialData_ = nullptr;
+	// 定数データの実体
+	Material materialData_{};
+	TransformationMatrix transformationMatrixData_{};
+	DirectionalLight directionalLightData_{};
 
-	//バッファリソース
-	Microsoft::WRL::ComPtr<ID3D12Resource> transformationMatrixResource = nullptr;
-	//バッファリソース内のデータを指すポインタ
-	TransformationMatrix* transformationMatrixData_ = nullptr;
-
-	// ディレクショナルライト用のバッファリソース
-	Microsoft::WRL::ComPtr<ID3D12Resource> directionalLightResource = nullptr;
-	// バッファリソース内のデータを指すポインタ
-	DirectionalLight* directionalLightData_ = nullptr;
+	// 毎フレーム割り当てられるGPU仮想アドレスのキャッシュ
+	D3D12_GPU_VIRTUAL_ADDRESS materialGpuAddress_ = 0;
+	D3D12_GPU_VIRTUAL_ADDRESS transformationMatrixGpuAddress_ = 0;
+	D3D12_GPU_VIRTUAL_ADDRESS directionalLightGpuAddress_ = 0;
 
 	// アニメーション / スケルトン / スキンクラスター
 	Animator animator_;
@@ -176,4 +194,10 @@ private:
 	SkinClusterLender skinClusterLender_;
 	bool skinClusterInitialized_ = false;
 	float deltaTime_ = 1.0f / 60.0f;
+	TextureManager* textureManager_ = nullptr;
+	bool isDrawnThisFrame_ = false;
+	bool wasDrawnLastFrame_ = false;
+	bool isShared_ = false;
+	bool isCulled_ = false;
+	Object3d* masterObject_ = nullptr;
 };

@@ -1,51 +1,51 @@
-﻿#include "CollisionManager.h"
+#define NOMINMAX
+#include "CollisionManager.h"
 #include "SphereCollider.h"
 #include "BoxCollider.h"
 #include "CapsuleCollider.h"
+#include "MeshCollider.h"
+#include "SkeletonCollider.h"
 #include "Matrix4x4.h"
+#include "DirectXCom.h"
+#include "Baziru3_Engine/Base/Allocator/StackAllocator.h"
+#include "Baziru3_Engine/Scene/Manager/SceneManager.h"
+#include "Baziru3_Engine/Camera/Camera.h"
+#include "Baziru3_Engine/Shapes/Sphere/Sphere.h"
+#include "Baziru3_Engine/3D/Object/Object3d.h"
+#include <imgui.h>
+#include <Windows.h>
 #include <cmath>
 #include <algorithm>
+#include <chrono>
 
 // =========================================================================
-// 繝吶け繝医Ν謨ｰ蟄ｦ縺ｮ繧､繝ｳ繝ｩ繧､繝ｳ繝倥Ν繝代ｼ髢｢謨ｰ
-// 繧ｨ繝ｳ繧ｸ繝ｳ讓呎ｺ悶ｮVector3繧ｯ繝ｩ繧ｹ縺ｫ蟇ｾ縺励※縲∬｡晉ｪ∝愛螳壹↓蠢隕√↑蝓ｺ譛ｬ貍皮ｮ励ｒ謠蝉ｾ帙＠縺ｾ縺吶
+// ベクトル数学のインラインヘルパー関数
 // =========================================================================
 
+inline Vector3 Cross(const Vector3& a, const Vector3& b)
+{
+    return {
+        a.y * b.z - a.z * b.y,
+        a.z * b.x - a.x * b.z,
+        a.x * b.y - a.y * b.x
+    };
+}
 
-
-/// <summary>
-/// 繝吶け繝医Ν縺ｮ蜀遨 (繝峨ャ繝育ｩ)
-/// 2縺､縺ｮ繝吶け繝医Ν縺ｮ鬘樔ｼｼ蠎ｦｼ亥酔縺俶婿蜷代ｒ蜷代＞縺ｦ縺繧九°ｼ峨ｄ縲√吶け繝医Ν謚募ｽｱ縺ｮ險育ｮ励↓菴ｿ逕ｨ縺励∪縺吶
-/// 蠑: a.x * b.x + a.y * b.y + a.z * b.z
-/// </summary>
 inline float Dot(const Vector3& a, const Vector3& b)
 {
     return a.x * b.x + a.y * b.y + a.z * b.z;
 }
 
-/// <summary>
-/// 繝吶け繝医Ν縺ｮ髟ｷ縺輔ｮ莠御ｹ (Length Squared)
-/// 蟷ｳ譁ｹ譬ｹ(sqrt)縺ｮ險育ｮ励ｯ蜃ｦ逅雋闕ｷ縺碁ｫ倥＞縺溘ａ縲∬ｷ晞屬縺ｮ豈碑ｼ縺ｮ縺ｿ繧定｡後≧蝣ｴ蜷医ｯ莠御ｹ励ｮ縺ｾ縺ｾ豈碑ｼ縺励∪縺吶
-/// </summary>
 inline float LengthSq(const Vector3& v)
 {
     return Dot(v, v);
 }
 
-/// <summary>
-/// 繝吶け繝医Ν縺ｮ髟ｷ縺 (霍晞屬)
-/// 螳滄圀縺ｫ繧ｪ繝悶ず繧ｧ繧ｯ繝医ｒ遘ｻ蜍輔ｻ陬懈ｭ｣縺吶ｋ縺溘ａ縺ｮ豁｣遒ｺ縺ｪ霍晞屬繧堤ｮ怜ｺ縺励∪縺吶
-/// </summary>
 inline float Length(const Vector3& v)
 {
     return std::sqrt(LengthSq(v));
 }
 
-/// <summary>
-/// 繝吶け繝医Ν縺ｮ豁｣隕丞喧 (蜊倅ｽ阪吶け繝医Ν蛹)
-/// 繝吶け繝医Ν縺ｮ髟ｷ縺輔ｒ1縺ｫ螟画鋤縺励∫ｴ皮ｲ九↑縲梧婿蜷代肴ュ蝣ｱ縺ｮ縺ｿ繧貞叙繧雁ｺ縺励∪縺吶
-/// 繧ｼ繝ｭ髯､邂励ｒ髦ｲ豁｢縺吶ｋ縺溘ａ縲髟ｷ縺輔′讌ｵ繧√※繧ｼ繝ｭ縺ｫ霑代＞(1e-5f莉･荳)蝣ｴ蜷医ｯ繧ｼ繝ｭ繝吶け繝医Ν繧定ｿ斐＠縺ｾ縺吶
-/// </summary>
 inline Vector3 Normalize(const Vector3& v)
 {
     float len = Length(v);
@@ -56,52 +56,59 @@ inline Vector3 Normalize(const Vector3& v)
     return { 0.0f, 0.0f, 0.0f };
 }
 
-/// <summary>
-/// 繧ｯ繝ｩ繝ｳ繝鈴未謨ｰ
-/// 謖螳壹＠縺溷､繧呈怙蟆丞､(min)縺ｨ譛螟ｧ蛟､(max)縺ｮ遽蝗ｲ蜀縺ｫ蛻ｶ髯舌＠縺ｾ縺吶
-/// 繝懊ャ繧ｯ繧ｹ繧ｳ繝ｩ繧､繝繝ｼ荳翫ｮ譛蟇轤ｹ繧呈爾邏｢縺吶ｋ髫帙↑縺ｩ縺ｫ驥榊ｮ昴＠縺ｾ縺吶
-/// </summary>
 inline float Clamp(float value, float min, float max)
 {
     return (std::max)(min, (std::min)(value, max));
 }
 
 // =========================================================================
-// CollisionManager 繝｡繝ｳ繝舌ｼ髢｢謨ｰ螳溯｣
+// CollisionManager メンバー関数実装
 // =========================================================================
 
-/// <summary>
-/// 繧ｷ繝ｳ繧ｰ繝ｫ繝医Φ繧､繝ｳ繧ｹ繧ｿ繝ｳ繧ｹ縺ｮ蜿門ｾ
-/// 繝励Ο繧ｰ繝ｩ繝蜈ｨ菴薙〒蜚ｯ荳縺ｮ陦晉ｪ∝愛螳壹槭ロ繝ｼ繧ｸ繝｣繧､繝ｳ繧ｹ繧ｿ繝ｳ繧ｹ繧定ｿ斐＠縺ｾ縺吶
-/// </summary>
 CollisionManager* CollisionManager::GetInstance()
 {
     static CollisionManager instance;
     return &instance;
 }
 
-/// <summary>
-/// 繝槭ロ繝ｼ繧ｸ繝｣縺ｮ蛻晄悄蛹
-/// 逋ｻ骭ｲ縺輔ｌ縺ｦ縺繧九さ繝ｩ繧､繝繝ｼ縺ｮ繝ｪ繧ｹ繝医ｒ繧ｯ繝ｪ繧｢縺励∪縺吶
-/// </summary>
 void CollisionManager::Initialize()
 {
     colliders_.clear();
+    previousTriggerPairs_.clear();
+    currentTriggerPairs_.clear();
+
+    // デフォルトの衝突フィルタの設定 (ビットマスクの初期化)
+    collisionMasks_.clear();
+    
+    uint32_t maskPlayer   = (1 << static_cast<uint32_t>(CollisionAttribute::Enemy)) |
+                            (1 << static_cast<uint32_t>(CollisionAttribute::Bullet)) |
+                            (1 << static_cast<uint32_t>(CollisionAttribute::Obstacle));
+    
+    uint32_t maskEnemy    = (1 << static_cast<uint32_t>(CollisionAttribute::Player)) |
+                            (1 << static_cast<uint32_t>(CollisionAttribute::Bullet)) |
+                            (1 << static_cast<uint32_t>(CollisionAttribute::Obstacle));
+    
+    uint32_t maskBullet   = (1 << static_cast<uint32_t>(CollisionAttribute::Player)) |
+                            (1 << static_cast<uint32_t>(CollisionAttribute::Enemy)) |
+                            (1 << static_cast<uint32_t>(CollisionAttribute::Obstacle));
+    
+    uint32_t maskObstacle = (1 << static_cast<uint32_t>(CollisionAttribute::Player)) |
+                            (1 << static_cast<uint32_t>(CollisionAttribute::Enemy)) |
+                            (1 << static_cast<uint32_t>(CollisionAttribute::Bullet));
+
+    collisionMasks_[CollisionAttribute::Player]   = maskPlayer;
+    collisionMasks_[CollisionAttribute::Enemy]    = maskEnemy;
+    collisionMasks_[CollisionAttribute::Bullet]   = maskBullet;
+    collisionMasks_[CollisionAttribute::Obstacle] = maskObstacle;
 }
 
-/// <summary>
-/// 繝槭ロ繝ｼ繧ｸ繝｣縺ｮ邨ゆｺ蜃ｦ逅
-/// 繝ｪ繧ｽ繝ｼ繧ｹ縺ｮ繧ｯ繝ｪ繧｢繧定｡後＞縺ｾ縺吶
-/// </summary>
 void CollisionManager::Finalize()
 {
     colliders_.clear();
+    previousTriggerPairs_.clear();
+    currentTriggerPairs_.clear();
 }
 
-/// <summary>
-/// 繧ｳ繝ｩ繧､繝繝ｼ縺ｮ逋ｻ骭ｲ
-/// 驥崎､逋ｻ骭ｲ繧帝亟縺弱▽縺､縲∝愛螳壼ｯｾ雎｡縺ｨ縺ｪ繧九い繧ｯ繝繧｣繝悶↑繧ｳ繝ｩ繧､繝繝ｼ繧偵Μ繧ｹ繝医↓霑ｽ蜉縺励∪縺吶
-/// </summary>
 void CollisionManager::RegisterCollider(Collider* collider)
 {
     if (collider && std::find(colliders_.begin(), colliders_.end(), collider) == colliders_.end())
@@ -110,10 +117,6 @@ void CollisionManager::RegisterCollider(Collider* collider)
     }
 }
 
-/// <summary>
-/// 繧ｳ繝ｩ繧､繝繝ｼ縺ｮ逋ｻ骭ｲ隗｣髯､
-/// 繧ｪ繝悶ず繧ｧ繧ｯ繝医′遐ｴ譽縺輔ｌ繧矩圀縺ｪ縺ｩ縺ｫ蜻ｼ縺ｳ蜃ｺ縺輔ｌ縲∝愛螳壼ｯｾ雎｡繝ｪ繧ｹ繝医°繧牙炎髯､縺励∪縺吶
-/// </summary>
 void CollisionManager::UnregisterCollider(Collider* collider)
 {
     auto it = std::remove(colliders_.begin(), colliders_.end(), collider);
@@ -123,178 +126,391 @@ void CollisionManager::UnregisterCollider(Collider* collider)
     }
 }
 
-/// <summary>
-/// 陦晉ｪ√ヵ繧｣繝ｫ繧ｿ繝ｪ繝ｳ繧ｰ繝ｫ繝ｼ繝ｫ
-/// 迚ｹ螳壹ｮ繧ｪ繝悶ず繧ｧ繧ｯ繝医ち繧､繝怜酔螢ｫｼ井ｾ具ｼ壽雰縺ｮ蠑ｾ蜷悟｣ｫ縲∬レ譎ｯ縺ｮ驕ｮ阡ｽ迚ｩ蜷悟｣ｫｼ峨ｮ荳崎ｦ√↑蛻､螳壹ｒ繧ｹ繧ｭ繝繝励＠縺ｾ縺吶
-/// </summary>
-bool CollisionManager::ShouldCollide(CollisionAttribute a, CollisionAttribute b) const
+void CollisionManager::SetCollisionFilter(CollisionAttribute a, CollisionAttribute b, bool enable)
 {
-    // 蠑ｾ荳ｸ蜷悟｣ｫ縺ｯ陦晉ｪ√＠縺ｪ縺
-    if (a == CollisionAttribute::Bullet && b == CollisionAttribute::Bullet)
+    uint32_t bitB = 1 << static_cast<uint32_t>(b);
+    uint32_t bitA = 1 << static_cast<uint32_t>(a);
+
+    if (enable)
     {
-        return false;
+        collisionMasks_[a] |= bitB;
+        collisionMasks_[b] |= bitA;
     }
-    // 髫懷ｮｳ迚ｩｼ磯撕逧驕ｮ阡ｽ迚ｩｼ牙酔螢ｫ繧り｡晉ｪ√＠縺ｪ縺
-    if (a == CollisionAttribute::Obstacle && b == CollisionAttribute::Obstacle)
+    else
     {
-        return false;
+        collisionMasks_[a] &= ~bitB;
+        collisionMasks_[b] &= ~bitA;
     }
-    return true;
 }
 
-/// <summary>
-/// 陦晉ｪ∝愛螳壹♀繧医ｳ隗｣豎ｺ蜃ｦ逅縺ｮ繝｡繧､繝ｳ繝ｫ繝ｼ繝
-/// 逋ｻ骭ｲ縺輔ｌ縺溷ｨ繧ｳ繝ｩ繧､繝繝ｼ縺ｫ蟇ｾ縺励※邱丞ｽ薙◆繧(O(N^2))縺ｧ莠､蟾ｮ遒ｺ隱阪ｒ陦後＞縲
-/// 陦晉ｪ∵､懃衍繧､繝吶Φ繝医さ繝ｼ繝ｫ繝舌ャ繧ｯ縺ｮ逋ｺ轣ｫ縲√♀繧医ｳ迚ｩ逅逧縺ｪ謚ｼ縺玲綾縺暦ｼ医ａ繧願ｾｼ縺ｿ陬懈ｭ｣ｼ峨ｒ螳溯｡後＠縺ｾ縺吶
-/// </summary>
+bool CollisionManager::ShouldCollide(CollisionAttribute a, CollisionAttribute b) const
+{
+    auto itA = collisionMasks_.find(a);
+    auto itB = collisionMasks_.find(b);
+    if (itA == collisionMasks_.end() || itB == collisionMasks_.end())
+    {
+        return true;
+    }
+
+    uint32_t bitA = 1 << static_cast<uint32_t>(a);
+    uint32_t bitB = 1 << static_cast<uint32_t>(b);
+
+    return (itA->second & bitB) && (itB->second & bitA);
+}
+
 void CollisionManager::Update()
 {
-    if (colliders_.size() < 2) return;
+    auto startTime = std::chrono::steady_clock::now();
+    frameCount_++;
 
-    // 莠碁阪Ν繝ｼ繝励↓繧医ｋ邱丞ｽ薙◆繧顔ｵ縺ｿ蜷医ｏ縺帛愛螳
-    for (size_t i = 0; i < colliders_.size(); ++i)
+    if (colliders_.size() < 2)
     {
-        Collider* colA = colliders_[i];
-        if (!colA || !colA->IsEnabled()) continue;
+        lastUpdateDurationMs_ = 0.0f;
+        return;
+    }
 
-        for (size_t j = i + 1; j < colliders_.size(); ++j)
+    // 1. 各コライダーから衝突判定に必要なデータのみを抽出した連続配列を構築 (DOD化)
+    std::vector<CollisionData> dataList;
+    dataList.reserve(colliders_.size());
+
+    for (Collider* col : colliders_)
+    {
+        if (!col || !col->IsEnabled()) continue;
+
+        CollisionData data;
+        data.originalCollider = col;
+        data.type = col->GetType();
+        data.attribute = col->GetAttribute();
+        data.worldPosition = col->GetWorldPosition(); // 仮想関数とポインタ逆参照をここで一度だけ評価してフラット化
+        data.isTrigger = col->IsTrigger();
+
+        // 形状ごとの固有データを事前に取得して詰め込む
+        if (data.type == ColliderType::Sphere)
         {
-            Collider* colB = colliders_[j];
-            if (!colB || !colB->IsEnabled()) continue;
+            SphereCollider* sphere = static_cast<SphereCollider*>(col);
+            data.shape.radius = sphere->GetRadius();
+        }
+        else if (data.type == ColliderType::Box)
+        {
+            BoxCollider* box = static_cast<BoxCollider*>(col);
+            data.shape.size = box->GetSize();
+            data.shape.rotation = box->GetWorldRotation();
+        }
+        else if (data.type == ColliderType::Capsule)
+        {
+            CapsuleCollider* capsule = static_cast<CapsuleCollider*>(col);
+            data.shape.radius = capsule->GetRadius();
+            data.shape.height = capsule->GetHeight();
+        }
 
-            // 陦晉ｪ∝ｱ樊ｧ繝輔ぅ繝ｫ繧ｿ繝ｪ繝ｳ繧ｰ繧帝←逕ｨ縺励※荳崎ｦ√↑邨縺ｿ蜷医ｏ縺帙ｒ髯､螟
-            if (!ShouldCollide(colA->GetAttribute(), colB->GetAttribute()))
+        dataList.push_back(data);
+    }
+
+    if (dataList.size() < 2)
+    {
+        lastUpdateDurationMs_ = 0.0f;
+        return;
+    }
+
+    // 2. 空間ハッシュテーブルの取得と初期化 (StackAllocator を使用して動的ヒープ確保を回避)
+    DirectXCom* dxCommon = SceneManager::GetInstance()->GetDirectXCom();
+    if (!dxCommon)
+    {
+        lastUpdateDurationMs_ = 0.0f;
+        return;
+    }
+    StackAllocator* stackAllocator = dxCommon->GetStackAllocator();
+    
+    SpatialHashCell* gridTable = static_cast<SpatialHashCell*>(stackAllocator->Allocate(
+        sizeof(SpatialHashCell) * kGridTableSize, alignof(SpatialHashCell)));
+    std::memset(gridTable, 0, sizeof(SpatialHashCell) * kGridTableSize);
+
+    // 各コライダーを該当するグリッドセルに登録
+    for (uint32_t i = 0; i < static_cast<uint32_t>(dataList.size()); ++i)
+    {
+        const CollisionData& col = dataList[i];
+        
+        // 簡易AABB（境界箱）の算出
+        Vector3 minPos = col.worldPosition;
+        Vector3 maxPos = col.worldPosition;
+        
+        if (col.type == ColliderType::Sphere)
+        {
+            float r = col.shape.radius;
+            minPos = minPos - Vector3{ r, r, r };
+            maxPos = maxPos + Vector3{ r, r, r };
+        }
+        else if (col.type == ColliderType::Box)
+        {
+            // ボックスの各辺サイズからAABBを作成
+            Vector3 size = col.shape.size;
+            Vector3 halfSize = { size.x * 0.5f, size.y * 0.5f, size.z * 0.5f };
+            minPos = minPos - halfSize;
+            maxPos = maxPos + halfSize;
+        }
+        else if (col.type == ColliderType::Capsule)
+        {
+            float r = col.shape.radius;
+            float halfH = col.shape.height * 0.5f;
+            minPos = minPos - Vector3{ r, halfH + r, r };
+            maxPos = maxPos + Vector3{ r, halfH + r, r };
+        }
+
+        // 重なるセル範囲のグリッドインデックスを計算
+        int32_t minX = CalculateGridIndex(minPos.x);
+        int32_t minY = CalculateGridIndex(minPos.y);
+        int32_t minZ = CalculateGridIndex(minPos.z);
+        
+        int32_t maxX = CalculateGridIndex(maxPos.x);
+        int32_t maxY = CalculateGridIndex(maxPos.y);
+        int32_t maxZ = CalculateGridIndex(maxPos.z);
+
+        // 巨大なオブジェクトが異常に広いセル範囲を覆って処理が遅延するのを防ぐクランプ処理
+        if (maxX - minX > 2) maxX = minX + 2;
+        if (maxY - minY > 2) maxY = minY + 2;
+        if (maxZ - minZ > 2) maxZ = minZ + 2;
+
+        // 全ての関連セルにインデックスを登録
+        for (int32_t x = minX; x <= maxX; ++x)
+        {
+            for (int32_t y = minY; y <= maxY; ++y)
             {
-                continue;
-            }
-
-            Vector3 pushDir = { 0.0f, 0.0f, 0.0f }; // 陦晉ｪ∵凾縺ｮ謚ｼ縺怜ｺ縺玲婿蜷 (A縺九ｉB繧呈款縺怜ｺ縺吶吶け繝医Ν)
-            float pushLen = 0.0f;                   // 陦晉ｪ∵凾縺ｮ繧√ｊ霎ｼ縺ｿ驥 (謚ｼ縺怜ｺ縺励↓蠢隕√↑霍晞屬)
-
-            // 2縺､縺ｮ繧ｳ繝ｩ繧､繝繝ｼ髢薙〒隧ｳ邏ｰ縺ｪ莠､蟾ｮ蛻､螳壹ｒ螳溯｡
-            if (CheckCollision(colA, colB, pushDir, pushLen))
-            {
-                // 陦晉ｪ√さ繝ｼ繝ｫ繝舌ャ繧ｯ髢｢謨ｰ繧堤嶌莠偵↓繝医Μ繧ｬ繝ｼ
-                colA->OnCollision(colB);
-                colB->OnCollision(colA);
-
-                // 迚ｩ逅陦晉ｪｼ域款縺怜ｺ縺暦ｼ峨ｮ隗｣豎ｺ
-                // 荳｡閠縺ｨ繧ゅ↓縲後ヨ繝ｪ繧ｬ繝ｼ蛻､螳壼ｰら畑(讀懃衍縺ｮ縺ｿ)縲阪〒縺ｯ縺ｪ縺蝣ｴ蜷医ｮ縺ｿ縲∵款縺怜ｺ縺苓｣懈ｭ｣繧帝←逕ｨ縺励∪縺吶
-                if (!colA->IsTrigger() && !colB->IsTrigger())
+                for (int32_t z = minZ; z <= maxZ; ++z)
                 {
-                    // 髫懷ｮｳ迚ｩ(Obstacle)縺ｯ蝗ｺ螳壼｣√ｄ蝨ｰ蠖｢縺ｨ縺励※謇ｱ縺縲∽ｽ咲ｽｮ陬懈ｭ｣縺ｫ繧医▲縺ｦ蜍輔°縺ｪ縺繧ゅｮ縺ｨ縺励∪縺吶
-                    bool isAFixed = (colA->GetAttribute() == CollisionAttribute::Obstacle);
-                    bool isBFixed = (colB->GetAttribute() == CollisionAttribute::Obstacle);
-
-                    if (isAFixed && !isBFixed)
+                    size_t hashKey = GetHashKey(x, y, z);
+                    SpatialHashCell& cell = gridTable[hashKey];
+                    if (cell.count < SpatialHashCell::kMaxColliders)
                     {
-                        // A縺悟崋螳壹が繝悶ず繧ｧ繧ｯ繝医〒縲。縺檎ｧｻ蜍輔が繝悶ず繧ｧ繧ｯ繝医ｮ蝣ｴ蜷:
-                        // B縺ｮ縺ｿ繧偵窟縺九ｉ髮｢繧後ｋ譁ｹ蜷(pushDir)縲阪∈縲後ａ繧願ｾｼ縺ｿ驥(pushLen)縲榊縺縺醍ｧｻ蜍輔＆縺帙※隗｣豎ｺ縺励∪縺吶
-                        Vector3 newPos = colB->GetWorldPosition() + pushDir * pushLen;
-                        colB->SetWorldPosition(newPos);
-                    }
-                    else if (!isAFixed && isBFixed)
-                    {
-                        // A縺檎ｧｻ蜍輔が繝悶ず繧ｧ繧ｯ繝医〒縲。縺悟崋螳壹が繝悶ず繧ｧ繧ｯ繝医ｮ蝣ｴ蜷:
-                        // A縺ｮ縺ｿ繧偵沓縺九ｉ髮｢繧後ｋ譁ｹ蜷(-pushDir)縲阪∈縲後ａ繧願ｾｼ縺ｿ驥(pushLen)縲榊縺縺醍ｧｻ蜍輔＆縺帙※隗｣豎ｺ縺励∪縺吶
-                        Vector3 newPos = colA->GetWorldPosition() - pushDir * pushLen;
-                        colA->SetWorldPosition(newPos);
-                    }
-                    else if (!isAFixed && !isBFixed)
-                    {
-                        // 荳｡閠縺ｨ繧らｧｻ蜍募庄閭ｽ縺ｪ蜍慕噪繧ｪ繝悶ず繧ｧ繧ｯ繝亥酔螢ｫ縺ｮ蝣ｴ蜷:
-                        // 蜈ｬ蟷ｳ縺ｫ蜊翫 (pushLen * 0.5f) 縺壹▽騾譁ｹ蜷代↓謚ｼ縺怜ｺ縺励※蟷ｲ貂峨ｒ隗｣豎ｺ縺励∪縺吶
-                        Vector3 newPosA = colA->GetWorldPosition() - pushDir * (pushLen * 0.5f);
-                        Vector3 newPosB = colB->GetWorldPosition() + pushDir * (pushLen * 0.5f);
-                        colA->SetWorldPosition(newPosA);
-                        colB->SetWorldPosition(newPosB);
+                        cell.colliderIndices[cell.count] = i;
+                        cell.count++;
                     }
                 }
             }
         }
     }
+
+    // 3. 重複テスト防止用のフラグテーブルをアロケート (StackAllocator を利用)
+    size_t numColliders = dataList.size();
+    size_t flagTableSize = numColliders * numColliders;
+    uint8_t* testedFlags = static_cast<uint8_t*>(stackAllocator->Allocate(
+        flagTableSize, 1));
+    std::memset(testedFlags, 0, flagTableSize);
+
+    // 4. 各グリッドセル内の登録コライダーペアに対して交差判定を実行 (計算量は平均 O(N) に激減)
+    for (size_t cellIdx = 0; cellIdx < kGridTableSize; ++cellIdx)
+    {
+        const SpatialHashCell& cell = gridTable[cellIdx];
+        if (cell.count < 2) continue;
+
+        for (uint32_t i = 0; i < cell.count; ++i)
+        {
+            uint32_t idxA = cell.colliderIndices[i];
+            CollisionData& colA = dataList[idxA];
+
+            for (uint32_t j = i + 1; j < cell.count; ++j)
+            {
+                uint32_t idxB = cell.colliderIndices[j];
+                CollisionData& colB = dataList[idxB];
+
+                // 重複排除のためにインデックスの小さい順にソートして判定キーを生成
+                uint32_t lowIdx = idxA;
+                uint32_t highIdx = idxB;
+                if (lowIdx > highIdx) std::swap(lowIdx, highIdx);
+
+                // すでに同フレーム内で判定済みのペアならスキップ
+                size_t flagIdx = static_cast<size_t>(lowIdx) * numColliders + highIdx;
+                if (testedFlags[flagIdx] != 0) continue;
+                testedFlags[flagIdx] = 1;
+
+                if (!ShouldCollide(colA.attribute, colB.attribute))
+                {
+                    continue;
+                }
+
+                Vector3 pushDir = { 0.0f, 0.0f, 0.0f };
+                float pushLen = 0.0f;
+
+                if (CheckCollision(colA, colB, pushDir, pushLen))
+                {
+                    if (colA.isTrigger || colB.isTrigger)
+                    {
+                        // トリガーイベント登録 (物理的押し出しは行わない)
+                        TriggerPair pair{ colA.originalCollider, colB.originalCollider };
+                        currentTriggerPairs_.push_back(pair);
+                    }
+                    else
+                    {
+                        // 物理的衝突（押し出し処理）
+                        bool isAFixed = (colA.attribute == CollisionAttribute::Obstacle);
+                        bool isBFixed = (colB.attribute == CollisionAttribute::Obstacle);
+
+                        if (isAFixed && !isBFixed)
+                        {
+                            Vector3 newPos = colB.worldPosition + pushDir * pushLen;
+                            colB.originalCollider->SetWorldPosition(newPos);
+                            colB.worldPosition = newPos;
+                        }
+                        else if (!isAFixed && isBFixed)
+                        {
+                            Vector3 newPos = colA.worldPosition - pushDir * pushLen;
+                            colA.originalCollider->SetWorldPosition(newPos);
+                            colA.worldPosition = newPos;
+                        }
+                        else if (!isAFixed && !isBFixed)
+                        {
+                            Vector3 newPosA = colA.worldPosition - pushDir * (pushLen * 0.5f);
+                            Vector3 newPosB = colB.worldPosition + pushDir * (pushLen * 0.5f);
+                            colA.originalCollider->SetWorldPosition(newPosA);
+                            colB.originalCollider->SetWorldPosition(newPosB);
+                            colA.worldPosition = newPosA;
+                            colB.worldPosition = newPosB;
+                        }
+
+                        // 物理的衝突のコールバックを発行 (OnCollision)
+                        Vector3 contactPoint = (colA.worldPosition + colB.worldPosition) * 0.5f;
+
+                        CollisionInfo infoToA;
+                        infoToA.other = colB.originalCollider;
+                        infoToA.contactPoint = contactPoint;
+                        infoToA.normal = pushDir; // 相手から自分への方向
+                        infoToA.depth = pushLen;
+                        colA.originalCollider->OnCollision(infoToA);
+
+                        CollisionInfo infoToB;
+                        infoToB.other = colA.originalCollider;
+                        infoToB.contactPoint = contactPoint;
+                        infoToB.normal = pushDir * -1.0f; // 自分から相手への方向
+                        infoToB.depth = pushLen;
+                        colB.originalCollider->OnCollision(infoToB);
+                    }
+                }
+            }
+        }
+    }
+
+    // --- トリガーライフサイクルイベントの発行 ---
+    for (const auto& current : currentTriggerPairs_)
+    {
+        auto it = std::find_if(previousTriggerPairs_.begin(), previousTriggerPairs_.end(), [&](const TriggerPair& p) {
+            return (p.a == current.a && p.b == current.b) || (p.a == current.b && p.b == current.a);
+        });
+
+        if (it != previousTriggerPairs_.end())
+        {
+            // 前フレームにも存在した => Stay
+            current.a->OnTriggerStay(current.b);
+            current.b->OnTriggerStay(current.a);
+        }
+        else
+        {
+            // 新規衝突 => Enter
+            current.a->OnTriggerEnter(current.b);
+            current.b->OnTriggerEnter(current.a);
+        }
+    }
+
+    // 前フレームにあったが、現フレームで衝突しなくなったペア => Exit
+    for (const auto& prev : previousTriggerPairs_)
+    {
+        auto it = std::find_if(currentTriggerPairs_.begin(), currentTriggerPairs_.end(), [&](const TriggerPair& p) {
+            return (p.a == prev.a && p.b == prev.b) || (p.a == prev.b && p.b == prev.a);
+        });
+
+        if (it == currentTriggerPairs_.end())
+        {
+            prev.a->OnTriggerExit(prev.b);
+            prev.b->OnTriggerExit(prev.a);
+        }
+    }
+
+    // トリガー履歴の更新
+    previousTriggerPairs_ = std::move(currentTriggerPairs_);
+    currentTriggerPairs_.clear();
+
+    auto endTime = std::chrono::steady_clock::now();
+    lastUpdateDurationMs_ = std::chrono::duration<float, std::milli>(endTime - startTime).count();
 }
 
-/// <summary>
-/// 2縺､縺ｮ繧ｳ繝ｩ繧､繝繝ｼ髢薙ｮ蠖｢迥ｶ蛻･蛻､螳壽険繧雁縺
-/// 繧ｳ繝ｩ繧､繝繝ｼ縺ｮ蠖｢迥ｶ繧ｿ繧､繝(Sphere, Box, Capsule)縺ｮ邨縺ｿ蜷医ｏ縺帙↓蠢懊§縺ｦ驕ｩ蛻縺ｪ謨ｰ蟄ｦ蛻､螳夐未謨ｰ縺ｸ繝悶Μ繝繧ｸ縺励∪縺吶
-/// </summary>
-bool CollisionManager::CheckCollision(const Collider* a, const Collider* b, Vector3& outPushDir, float& outPushLen)
+bool CollisionManager::CheckCollision(const CollisionData& a, const CollisionData& b, Vector3& outPushDir, float& outPushLen)
 {
-    ColliderType typeA = a->GetType();
-    ColliderType typeB = b->GetType();
+    ColliderType typeA = a.type;
+    ColliderType typeB = b.type;
 
-    // 1. 逅 vs 逅 (Sphere - Sphere)
+    // 1. 球 vs 球 (Sphere - Sphere)
     if (typeA == ColliderType::Sphere && typeB == ColliderType::Sphere)
     {
         return CheckSphereSphere(a, b, outPushDir, outPushLen);
     }
-    // 2. 逅 vs 繝懊ャ繧ｯ繧ｹ (Sphere - Box)
+    // 2. 球 vs ボックス (Sphere - Box)
     if (typeA == ColliderType::Sphere && typeB == ColliderType::Box)
     {
         return CheckSphereBox(a, b, outPushDir, outPushLen);
     }
     if (typeA == ColliderType::Box && typeB == ColliderType::Sphere)
     {
-        // 蠑墓焚縺ｮ鬆蠎上ｒ蜈･繧梧崛縺医※蛻､螳壹ｒ陦後＞縺ｾ縺吶
-        // 謚ｼ縺怜ｺ縺玲婿蜷代吶け繝医Ν(outPushDir)縺ｯ縲窟縺九ｉB縺ｸ縺ｮ譁ｹ蜷代阪→縺励※邂怜ｺ縺輔ｌ繧九◆繧√
-        // 蛻､螳壼ｾ後↓邨先棡縺ｮ譁ｹ蜷代ｒ蜿崎ｻ｢ (-1.0f) 縺輔○縺ｾ縺吶
+        // 押し出し方向ベクトル(outPushDir)は「aからbへの方向」として算出されるため、判定後に反転します。
         bool hit = CheckSphereBox(b, a, outPushDir, outPushLen);
         outPushDir = outPushDir * -1.0f;
         return hit;
     }
-    // 3. 逅 vs 繧ｫ繝励そ繝ｫ (Sphere - Capsule)
+    // 3. 球 vs カプセル (Sphere - Capsule)
     if (typeA == ColliderType::Sphere && typeB == ColliderType::Capsule)
     {
         return CheckSphereCapsule(a, b, outPushDir, outPushLen);
     }
     if (typeA == ColliderType::Capsule && typeB == ColliderType::Sphere)
     {
-        // 逅 vs 繧ｫ繝励そ繝ｫ縺ｨ蜷梧ｧ倥↓縲鬆蠎上ｒ蜈･繧梧崛縺医※蛻､螳壹＠縲∵款縺怜ｺ縺玲婿蜷代ｒ蜿崎ｻ｢縺励∪縺吶
         bool hit = CheckSphereCapsule(b, a, outPushDir, outPushLen);
         outPushDir = outPushDir * -1.0f;
         return hit;
     }
+    // 4. ボックス vs ボックス (Box - Box)
+    if (typeA == ColliderType::Box && typeB == ColliderType::Box)
+    {
+        return CheckBoxBox(a, b, outPushDir, outPushLen);
+    }
+    // 5. ボックス vs カプセル (Box - Capsule)
+    if (typeA == ColliderType::Box && typeB == ColliderType::Capsule)
+    {
+        return CheckBoxCapsule(a, b, outPushDir, outPushLen);
+    }
+    if (typeA == ColliderType::Capsule && typeB == ColliderType::Box)
+    {
+        bool hit = CheckBoxCapsule(b, a, outPushDir, outPushLen);
+        outPushDir = outPushDir * -1.0f;
+        return hit;
+    }
+    // 6. カプセル vs カプセル (Capsule - Capsule)
+    if (typeA == ColliderType::Capsule && typeB == ColliderType::Capsule)
+    {
+        return CheckCapsuleCapsule(a, b, outPushDir, outPushLen);
+    }
 
-    // 蟆譚･逧縺ｫ Box-Box, Box-Capsule 縺ｪ縺ｩ縺ｮ蛻､螳壹Ο繧ｸ繝繧ｯ縺瑚ｿｽ蜉縺輔ｌ縺溘ｉ縺薙％縺ｫ蛻蟯舌ｒ霑ｽ蜉縺励∪縺吶
     return false;
 }
 
 // =========================================================================
-// 蜷繧ｳ繝ｩ繧､繝繝ｼ邨縺ｿ蜷医ｏ縺帙↓蟇ｾ縺吶ｋ隧ｳ邏ｰ縺ｪ莠､蟾ｮ蛻､螳壹い繝ｫ繧ｴ繝ｪ繧ｺ繝
+// 各コライダー組み合わせに対する詳細な交差判定アルゴリズム
 // =========================================================================
 
-/// <summary>
-/// 縲千帥 vs 逅縲代ｮ陦晉ｪ∝愛螳
-/// 蜴溽炊: 2縺､縺ｮ逅縺ｮ荳ｭ蠢轤ｹ髢薙ｮ霍晞屬縺後√◎繧後◇繧後ｮ蜊雁ｾ縺ｮ蜥梧悴貅縺ｧ縺ゅｌ縺ｰ陦晉ｪ√＠縺ｦ縺繧九→蛻､螳壹＠縺ｾ縺吶
-/// 險育ｮ怜ｼ: |posB - posA| < radiusA + radiusB
-/// </summary>
-bool CollisionManager::CheckSphereSphere(const Collider* a, const Collider* b, Vector3& outPushDir, float& outPushLen)
+bool CollisionManager::CheckSphereSphere(const CollisionData& a, const CollisionData& b, Vector3& outPushDir, float& outPushLen)
 {
-    const SphereCollider* sA = dynamic_cast<const SphereCollider*>(a);
-    const SphereCollider* sB = dynamic_cast<const SphereCollider*>(b);
-    if (!sA || !sB) return false;
+    Vector3 posA = a.worldPosition;
+    Vector3 posB = b.worldPosition;
 
-    Vector3 posA = sA->GetWorldPosition();
-    Vector3 posB = sB->GetWorldPosition();
-
-    // 2轤ｹ髢薙ｮ逶ｸ蟇ｾ繝吶け繝医Ν繧堤ｮ怜ｺ
     Vector3 dir = posB - posA;
-    float dist = Length(dir); // 荳ｭ蠢轤ｹ髢薙ｮ霍晞屬
-    float minDist = sA->GetRadius() + sB->GetRadius(); // 陦晉ｪ髯千阜霍晞屬ｼ亥濠蠕縺ｮ蜥鯉ｼ
+    float dist = Length(dir);
+    float minDist = a.shape.radius + b.shape.radius;
 
     if (dist < minDist)
     {
-        // 繧√ｊ霎ｼ縺ｿ驥 = 髯千阜霍晞屬 - 螳滄圀縺ｮ霍晞屬
         outPushLen = minDist - dist;
         if (dist > 1e-4f)
         {
-            // 謚ｼ縺怜ｺ縺玲婿蜷代ｯA縺九ｉB縺ｸ縺ｮ譁ｹ蜷代吶け繝医Ν
             outPushDir = Normalize(dir);
         }
         else
         {
-            // 荳ｭ蠢蠎ｧ讓吶′螳悟ｨ縺ｫ荳閾ｴ縺励※縺励∪縺｣縺ｦ縺繧句ｴ蜷医ｮ繝輔か繝ｼ繝ｫ繝舌ャ繧ｯｼ医ョ繝輔か繝ｫ繝医〒Z霆ｸ譁ｹ蜷代↓謚ｼ縺怜ｺ縺呻ｼ
             outPushDir = { 0.0f, 0.0f, 1.0f };
         }
         return true;
@@ -302,31 +518,21 @@ bool CollisionManager::CheckSphereSphere(const Collider* a, const Collider* b, V
     return false;
 }
 
-/// <summary>
-/// 縲千帥 vs 繝懊ャ繧ｯ繧ｹ (AABB諠ｳ螳)縲代ｮ陦晉ｪ∝愛螳
-/// 蜴溽炊: 繝懊ャ繧ｯ繧ｹ縺ｮ繝ｭ繝ｼ繧ｫ繝ｫ遨ｺ髢難ｼ井ｸｭ蠢繧貞次轤ｹ縺ｨ縺吶ｋ遨ｺ髢難ｼ峨↓縺翫＞縺ｦ縲∫帥縺ｮ荳ｭ蠢縺ｫ譛繧りｿ代＞繝懊ャ繧ｯ繧ｹ荳翫ｮ轤ｹｼ域怙蟇轤ｹｼ峨ｒ豎ゅａ縲
-///       縺昴ｮ譛蟇轤ｹ縺ｨ逅縺ｮ荳ｭ蠢縺ｨ縺ｮ霍晞屬縺檎帥縺ｮ蜊雁ｾ譛ｪ貅縺ｧ縺ゅｋ縺九ｒ蛻､螳壹＠縺ｾ縺吶
-/// </summary>
-bool CollisionManager::CheckSphereBox(const Collider* sphere, const Collider* box, Vector3& outPushDir, float& outPushLen)
+bool CollisionManager::CheckSphereBox(const CollisionData& sphere, const CollisionData& box, Vector3& outPushDir, float& outPushLen)
 {
-    const SphereCollider* s = dynamic_cast<const SphereCollider*>(sphere);
-    const BoxCollider* b = dynamic_cast<const BoxCollider*>(box);
-    if (!s || !b) return false;
-
-    Vector3 sPos = s->GetWorldPosition();
-    Vector3 bPos = b->GetWorldPosition();
-    Vector3 extents = b->GetExtents(); // ボックスの各辺の半サイズ
+    Vector3 sPos = sphere.worldPosition;
+    Vector3 bPos = box.worldPosition;
+    Vector3 size = box.shape.size;
+    Vector3 extents = { size.x * 0.5f, size.y * 0.5f, size.z * 0.5f };
 
     // 1. ボックスの回転行列 R を計算する
-    Vector3 bRot = b->GetWorldRotation();
+    Vector3 bRot = box.shape.rotation;
     Matrix4x4 R = Multiply(MakeRotateXMatrix(bRot.x), Multiply(MakeRotateYMatrix(bRot.y), MakeRotateZMatrix(bRot.z)));
 
-    // ボックスのワールド空間でのローカル軸（X, Y, Z）を行列 R の行から取得する
     Vector3 axisX = { R.m[0][0], R.m[0][1], R.m[0][2] };
     Vector3 axisY = { R.m[1][0], R.m[1][1], R.m[1][2] };
     Vector3 axisZ = { R.m[2][0], R.m[2][1], R.m[2][2] };
 
-    // 2. 球体のワールド座標系オフセットを、ボックスのローカル空間に変換する
     Vector3 offset = sPos - bPos;
     Vector3 localSphPos = {
         Dot(offset, axisX),
@@ -334,28 +540,24 @@ bool CollisionManager::CheckSphereBox(const Collider* sphere, const Collider* bo
         Dot(offset, axisZ)
     };
 
-    // 3. ローカル空間上で、ボックスに最も近い点をクランプして求める
     Vector3 closestPointOnBox;
     closestPointOnBox.x = Clamp(localSphPos.x, -extents.x, extents.x);
     closestPointOnBox.y = Clamp(localSphPos.y, -extents.y, extents.y);
     closestPointOnBox.z = Clamp(localSphPos.z, -extents.z, extents.z);
 
-    // 3.5. 球体の中心が完全にボックスの内部にある場合の処理
     if (std::abs(localSphPos.x) <= extents.x &&
         std::abs(localSphPos.y) <= extents.y &&
         std::abs(localSphPos.z) <= extents.z)
     {
-        // 6つの面（左右・上下・前後）のうち、最も近い面を見つける
-        float distL = extents.x + localSphPos.x; // -X面への距離
-        float distR = extents.x - localSphPos.x; // +X面への距離
-        float distB = extents.y + localSphPos.y; // -Y面への距離
-        float distT = extents.y - localSphPos.y; // +Y面への距離
-        float distF = extents.z + localSphPos.z; // -Z面への距離
-        float distN = extents.z - localSphPos.z; // +Z面への距離
+        float distL = extents.x + localSphPos.x; 
+        float distR = extents.x - localSphPos.x; 
+        float distB = extents.y + localSphPos.y; 
+        float distT = extents.y - localSphPos.y; 
+        float distF = extents.z + localSphPos.z; 
+        float distN = extents.z - localSphPos.z; 
 
         float minDist = distL;
-        // AからBへの方向（球からボックスへの方向）を設定するため、押し出し方向とは逆にする
-        Vector3 localPushDir = { 1.0f, 0.0f, 0.0f }; // -X面が一番近い場合、ボックス内部方向は +X
+        Vector3 localPushDir = { 1.0f, 0.0f, 0.0f }; 
 
         if (distR < minDist) { minDist = distR; localPushDir = { -1.0f, 0.0f, 0.0f }; }
         if (distB < minDist) { minDist = distB; localPushDir = { 0.0f, 1.0f, 0.0f }; }
@@ -363,29 +565,24 @@ bool CollisionManager::CheckSphereBox(const Collider* sphere, const Collider* bo
         if (distF < minDist) { minDist = distF; localPushDir = { 0.0f, 0.0f, 1.0f }; }
         if (distN < minDist) { minDist = distN; localPushDir = { 0.0f, 0.0f, -1.0f }; }
 
-        outPushLen = s->GetRadius() + minDist;
+        outPushLen = sphere.shape.radius + minDist;
         outPushDir = axisX * localPushDir.x + axisY * localPushDir.y + axisZ * localPushDir.z;
         return true;
     }
 
-    // 4. ローカル空間での押し出し方向と距離を計算する
-    // AからBへの方向にするため、closestPointOnBox - localSphPos にする
     Vector3 localDir = closestPointOnBox - localSphPos;
-    float dist = Length(localDir); // 距離
+    float dist = Length(localDir);
 
-    if (dist < s->GetRadius())
+    if (dist < sphere.shape.radius)
     {
-        // 押し込み量 = 半径 - 最も近い点との距離
-        outPushLen = s->GetRadius() - dist;
+        outPushLen = sphere.shape.radius - dist;
         if (dist > 1e-4f)
         {
             Vector3 localPushDir = Normalize(localDir);
-            // ローカル空間の方向をワールド空間に変換する
             outPushDir = axisX * localPushDir.x + axisY * localPushDir.y + axisZ * localPushDir.z;
         }
         else
         {
-            // 球体の中心が完全にボックスの中心と重なっている場合のフォールバック（AからB＝-Z方向）
             outPushDir = axisZ * -1.0f;
         }
         return true;
@@ -394,35 +591,18 @@ bool CollisionManager::CheckSphereBox(const Collider* sphere, const Collider* bo
     return false;
 }
 
-/// <summary>
-/// 縲千帥 vs 繧ｫ繝励そ繝ｫ縲代ｮ陦晉ｪ∝愛螳
-/// 蜴溽炊: 繧ｫ繝励そ繝ｫ繧偵御ｸｭ蠢繧帝壹ｋ邱壼ｼ医す繝ｪ繝ｳ繝繝ｼ驛ｨ縺ｮ闃ｯｼ峨阪→縲悟濠蠕縲阪→縺励※螳夂ｾｩ縺励∪縺吶
-///       繧ｫ繝励そ繝ｫ縺ｮ邱壼荳翫〒縲∫帥縺ｮ荳ｭ蠢縺ｫ譛繧りｿ代＞轤ｹｼ域怙蟇轤ｹｼ峨ｒ繝吶け繝医Ν謚募ｽｱ繧堤畑縺縺ｦ蜑ｲ繧雁ｺ縺励
-///       縺昴ｮ轤ｹ縺ｨ逅縺ｮ荳ｭ蠢縺ｨ縺ｮ霍晞屬縺後檎帥縺ｮ蜊雁ｾ ｼ 繧ｫ繝励そ繝ｫ縺ｮ蜊雁ｾ縲肴悴貅縺ｧ縺ゅｋ縺九ｒ蛻､螳壹＠縺ｾ縺吶
-/// </summary>
-bool CollisionManager::CheckSphereCapsule(const Collider* sphere, const Collider* capsule, Vector3& outPushDir, float& outPushLen)
+bool CollisionManager::CheckSphereCapsule(const CollisionData& sphere, const CollisionData& capsule, Vector3& outPushDir, float& outPushLen)
 {
-    const SphereCollider* s = dynamic_cast<const SphereCollider*>(sphere);
-    const CapsuleCollider* c = dynamic_cast<const CapsuleCollider*>(capsule);
-    if (!s || !c) return false;
+    Vector3 sPos = sphere.worldPosition;
+    Vector3 cPos = capsule.worldPosition;
 
-    Vector3 sPos = s->GetWorldPosition();
-    Vector3 cPos = c->GetWorldPosition();
-
-    // 繧ｫ繝励そ繝ｫ縺ｮ荳ｭ蠢霆ｸ縺ｨ縺ｪ繧狗ｷ壼縺ｮ荳｡遶ｯ轤ｹｼ井ｸ狗ｫｯsegA, 荳顔ｫｯsegBｼ峨ｒ邂怜ｺ
-    // 窶ｻ縺薙％縺ｧ縺ｯ邁｡譏鍋噪縺ｫY霆ｸ譁ｹ蜷托ｼ井ｸ頑婿蜷托ｼ峨ｒ繧ｫ繝励そ繝ｫ縺ｮ鬮倥＆譁ｹ蜷代→縺励※謇ｱ縺縺ｾ縺吶
-    float halfH = c->GetHeight() * 0.5f;
+    float halfH = capsule.shape.height * 0.5f;
     Vector3 segA = cPos - Vector3{ 0.0f, halfH, 0.0f };
     Vector3 segB = cPos + Vector3{ 0.0f, halfH, 0.0f };
 
-    // 邱壼AB縺ｮ繝吶け繝医Ν
     Vector3 ab = segB - segA;
-    // 邱壼縺ｮ蟋狗せ縺九ｉ逅縺ｮ荳ｭ蠢縺ｸ縺ｮ繝吶け繝医Ν
     Vector3 as = sPos - segA;
 
-    // 蟆蠖ｱ豈皮紫 t 縺ｮ險育ｮ (蜀遨阪ｒ蛻ｩ逕ｨ縺励※縲∫せS繧堤峩邱哂B縺ｸ荳九ｍ縺励◆蝙らｷ壹ｮ雜ｳ繧呈ｱゅａ繧)
-    // t = (as繝ｻab) / |ab|^2
-    // 蛻豈阪′繧ｼ繝ｭ縺ｫ縺ｪ繧九％縺ｨ繧帝亟縺仙ｮ牙ｨ遲悶ｒ霑ｽ蜉縺励※縺縺ｾ縺
     float abLenSq = Dot(ab, ab);
     float t = 0.0f;
     if (abLenSq > 1e-5f)
@@ -430,21 +610,16 @@ bool CollisionManager::CheckSphereCapsule(const Collider* sphere, const Collider
         t = Dot(as, ab) / abLenSq;
     }
     
-    // 邱壼縺ｮ蜀蛛ｴ縺ｫ蜿弱ａ繧九◆繧√》繧 0.0 縺九ｉ 1.0 縺ｮ遽蝗ｲ縺ｫ繧ｯ繝ｩ繝ｳ繝励＠縺ｾ縺吶
-    // t = 0.0 縺ｮ蝣ｴ蜷医ｯ荳狗ｫｯ轤ｹ縲》 = 1.0 縺ｮ蝣ｴ蜷医ｯ荳顔ｫｯ轤ｹ縲√◎縺ｮ髢薙ｯ邱壼荳翫ｮ轤ｹ縺ｨ縺ｪ繧翫∪縺吶
     t = Clamp(t, 0.0f, 1.0f);
     
-    // 繧ｫ繝励そ繝ｫ闃ｯ縺ｮ邱壼荳翫ｮ譛蟇轤ｹ
     Vector3 closestPointOnSegment = segA + ab * t;
 
-    // 繧ｫ繝励そ繝ｫ闃ｯ荳翫ｮ譛蟇轤ｹ縺九ｉ縲∫帥縺ｮ荳ｭ蠢縺ｸ蜷代°縺繝吶け繝医Ν
     Vector3 dir = sPos - closestPointOnSegment;
-    float dist = Length(dir); // 螳滄圀縺ｮ霍晞屬
-    float minDist = s->GetRadius() + c->GetRadius(); // 陦晉ｪ髯千阜霍晞屬 (荳｡蠖｢迥ｶ縺ｮ蜊雁ｾ縺ｮ蜷郁ｨ)
+    float dist = Length(dir);
+    float minDist = sphere.shape.radius + capsule.shape.radius;
 
     if (dist < minDist)
     {
-        // 繧√ｊ霎ｼ縺ｿ驥 = 陦晉ｪ髯千阜霍晞屬 - 螳滄圀縺ｮ霍晞屬
         outPushLen = minDist - dist;
         if (dist > 1e-4f)
         {
@@ -452,7 +627,6 @@ bool CollisionManager::CheckSphereCapsule(const Collider* sphere, const Collider
         }
         else
         {
-            // 逅縺後き繝励そ繝ｫ縺ｮ荳ｭ蠢邱壹→螳悟ｨ縺ｫ驥阪↑縺｣縺ｦ縺繧句ｴ蜷医ｮ繝輔か繝ｼ繝ｫ繝舌ャ繧ｯ譁ｹ蜷
             outPushDir = { 0.0f, 0.0f, 1.0f };
         }
         return true;
@@ -461,26 +635,271 @@ bool CollisionManager::CheckSphereCapsule(const Collider* sphere, const Collider
     return false;
 }
 
-// =========================================================================
-// 莉･荳九∝ｰ譚･諡｡蠑ｵ縺ｮ縺溘ａ縺ｮ蛻､螳壹せ繧ｿ繝夜未謨ｰ鄒､ｼBox-Box, Box-Capsule, Capsule-Capsuleｼ
-// 繧｢繝励Μ繧ｱ繝ｼ繧ｷ繝ｧ繝ｳ蛛ｴ縺ｮ隕∵ｱゅ↓蠢懊§縺ｦ縲∽ｻ雁ｾ後い繝ｫ繧ｴ繝ｪ繧ｺ繝繧定ｿｽ蜉繝ｻ螳溯｣蜿ｯ閭ｽ縺ｧ縺吶
-// =========================================================================
-
-bool CollisionManager::CheckBoxBox(const Collider* a, const Collider* b, Vector3& outPushDir, float& outPushLen)
+bool CollisionManager::CheckBoxBox(const CollisionData& a, const CollisionData& b, Vector3& outPushDir, float& outPushLen)
 {
-    return false;
+    // OBB同士の交差判定 (分離軸定理: SAT)
+    Vector3 rotA = a.shape.rotation;
+    Matrix4x4 RA = Multiply(MakeRotateXMatrix(rotA.x), Multiply(MakeRotateYMatrix(rotA.y), MakeRotateZMatrix(rotA.z)));
+    Vector3 uA[3] = {
+        { RA.m[0][0], RA.m[0][1], RA.m[0][2] },
+        { RA.m[1][0], RA.m[1][1], RA.m[1][2] },
+        { RA.m[2][0], RA.m[2][1], RA.m[2][2] }
+    };
+
+    Vector3 rotB = b.shape.rotation;
+    Matrix4x4 RB = Multiply(MakeRotateXMatrix(rotB.x), Multiply(MakeRotateYMatrix(rotB.y), MakeRotateZMatrix(rotB.z)));
+    Vector3 uB[3] = {
+        { RB.m[0][0], RB.m[0][1], RB.m[0][2] },
+        { RB.m[1][0], RB.m[1][1], RB.m[1][2] },
+        { RB.m[2][0], RB.m[2][1], RB.m[2][2] }
+    };
+
+    Vector3 T = b.worldPosition - a.worldPosition;
+    Vector3 hA = a.shape.size * 0.5f;
+    Vector3 hB = b.shape.size * 0.5f;
+
+    Vector3 axes[15];
+    int axisCount = 0;
+
+    // Aのローカル軸
+    for (int i = 0; i < 3; ++i) axes[axisCount++] = uA[i];
+    // Bのローカル軸
+    for (int i = 0; i < 3; ++i) axes[axisCount++] = uB[i];
+
+    // 外積軸
+    for (int i = 0; i < 3; ++i)
+    {
+        for (int j = 0; j < 3; ++j)
+        {
+            Vector3 crossAxis = Cross(uA[i], uB[j]);
+            if (LengthSq(crossAxis) > 1e-5f)
+            {
+                axes[axisCount++] = Normalize(crossAxis);
+            }
+        }
+    }
+
+    float minOverlap = 1e30f;
+    Vector3 bestAxis = { 0.0f, 0.0f, 0.0f };
+
+    for (int i = 0; i < axisCount; ++i)
+    {
+        Vector3 L = axes[i];
+        if (LengthSq(L) < 1e-5f) continue;
+        L = Normalize(L);
+
+        // 投影半径の計算
+        float rA = hA.x * std::abs(Dot(uA[0], L)) + hA.y * std::abs(Dot(uA[1], L)) + hA.z * std::abs(Dot(uA[2], L));
+        float rB = hB.x * std::abs(Dot(uB[0], L)) + hB.y * std::abs(Dot(uB[1], L)) + hB.z * std::abs(Dot(uB[2], L));
+
+        // 中心間距離の投影
+        float distance = std::abs(Dot(T, L));
+
+        // 重なり幅
+        float overlap = (rA + rB) - distance;
+
+        if (overlap < 0.0f)
+        {
+            return false; // 分離軸が見つかった
+        }
+
+        if (overlap < minOverlap)
+        {
+            minOverlap = overlap;
+            bestAxis = L;
+        }
+    }
+
+    outPushLen = minOverlap;
+    if (Dot(T, bestAxis) < 0.0f)
+    {
+        outPushDir = bestAxis * -1.0f;
+    }
+    else
+    {
+        outPushDir = bestAxis;
+    }
+
+    return true;
 }
 
-bool CollisionManager::CheckBoxCapsule(const Collider* box, const Collider* capsule, Vector3& outPushDir, float& outPushLen)
+bool CollisionManager::CheckBoxCapsule(const CollisionData& box, const CollisionData& capsule, Vector3& outPushDir, float& outPushLen)
 {
-    return false;
+    Vector3 bPos = box.worldPosition;
+    Vector3 rot = box.shape.rotation;
+    Matrix4x4 R = Multiply(MakeRotateXMatrix(rot.x), Multiply(MakeRotateYMatrix(rot.y), MakeRotateZMatrix(rot.z)));
+    Vector3 uA[3] = {
+        { R.m[0][0], R.m[0][1], R.m[0][2] },
+        { R.m[1][0], R.m[1][1], R.m[1][2] },
+        { R.m[2][0], R.m[2][1], R.m[2][2] }
+    };
+
+    Vector3 extents = box.shape.size * 0.5f;
+
+    float halfH = capsule.shape.height * 0.5f;
+    Vector3 P0 = capsule.worldPosition - Vector3{ 0.0f, halfH, 0.0f };
+    Vector3 P1 = capsule.worldPosition + Vector3{ 0.0f, halfH, 0.0f };
+
+    // 1. カプセル線分をBoxのローカル空間に変換
+    Vector3 offset0 = P0 - bPos;
+    Vector3 localP0 = { Dot(offset0, uA[0]), Dot(offset0, uA[1]), Dot(offset0, uA[2]) };
+    Vector3 offset1 = P1 - bPos;
+    Vector3 localP1 = { Dot(offset1, uA[0]), Dot(offset1, uA[1]), Dot(offset1, uA[2]) };
+
+    // 2. AABBと線分の最短点を見つけるためのパラメータ t 候補
+    std::vector<float> tCandidates;
+    tCandidates.push_back(0.0f);
+    tCandidates.push_back(1.0f);
+
+    Vector3 segmentDir = localP1 - localP0;
+
+    auto checkPlaneIntersection = [&](float value, float p0Val, float dirVal) {
+        if (std::abs(dirVal) > 1e-5f)
+        {
+            float t = (value - p0Val) / dirVal;
+            if (t >= 0.0f && t <= 1.0f)
+            {
+                tCandidates.push_back(t);
+            }
+        }
+    };
+
+    // AABB の各境界プレーンとの交点
+    checkPlaneIntersection(extents.x, localP0.x, segmentDir.x);
+    checkPlaneIntersection(-extents.x, localP0.x, segmentDir.x);
+    checkPlaneIntersection(extents.y, localP0.y, segmentDir.y);
+    checkPlaneIntersection(-extents.y, localP0.y, segmentDir.y);
+    checkPlaneIntersection(extents.z, localP0.z, segmentDir.z);
+    checkPlaneIntersection(-extents.z, localP0.z, segmentDir.z);
+
+    float bestT = 0.0f;
+    float minSqDist = 1e30f;
+
+    for (float t : tCandidates)
+    {
+        Vector3 pt = localP0 + segmentDir * t;
+        Vector3 closest = {
+            Clamp(pt.x, -extents.x, extents.x),
+            Clamp(pt.y, -extents.y, extents.y),
+            Clamp(pt.z, -extents.z, extents.z)
+        };
+        float sqDist = LengthSq(pt - closest);
+        if (sqDist < minSqDist)
+        {
+            minSqDist = sqDist;
+            bestT = t;
+        }
+    }
+
+    // 3. 特定した最短接近点 Q (ワールド座標)
+    Vector3 Q = P0 + (P1 - P0) * bestT;
+
+    // 4. Qを中心とする球とBoxの衝突判定へ帰着
+    CollisionData sphereData;
+    sphereData.originalCollider = capsule.originalCollider; // 押し戻し処理用にコライダーへの参照を保持
+    sphereData.type = ColliderType::Sphere;
+    sphereData.attribute = capsule.attribute;
+    sphereData.worldPosition = Q;
+    sphereData.shape.radius = capsule.shape.radius;
+
+    // 球 vs Box 判定を呼び出す (押し戻し方向と量はそのまま使える)
+    return CheckSphereBox(sphereData, box, outPushDir, outPushLen);
 }
 
-bool CollisionManager::CheckCapsuleCapsule(const Collider* a, const Collider* b, Vector3& outPushDir, float& outPushLen)
+bool CollisionManager::CheckCapsuleCapsule(const CollisionData& a, const CollisionData& b, Vector3& outPushDir, float& outPushLen)
 {
+    float halfHA = a.shape.height * 0.5f;
+    Vector3 P0 = a.worldPosition - Vector3{ 0.0f, halfHA, 0.0f };
+    Vector3 P1 = a.worldPosition + Vector3{ 0.0f, halfHA, 0.0f };
+
+    float halfHB = b.shape.height * 0.5f;
+    Vector3 Q0 = b.worldPosition - Vector3{ 0.0f, halfHB, 0.0f };
+    Vector3 Q1 = b.worldPosition + Vector3{ 0.0f, halfHB, 0.0f };
+
+    Vector3 u = P1 - P0;
+    Vector3 v = Q1 - Q0;
+    Vector3 w = P0 - Q0;
+    float a_val = Dot(u, u);
+    float b_val = Dot(u, v);
+    float c_val = Dot(v, v);
+    float d_val = Dot(u, w);
+    float e_val = Dot(v, w);
+    float D = a_val * c_val - b_val * b_val;
+    float sc, sN, sD = D;
+    float tc, tN, tD = D;
+
+    if (D < 1e-5f)
+    {
+        sN = 0.0f;
+        sD = 1.0f;
+        tN = e_val;
+        tD = c_val;
+    }
+    else
+    {
+        sN = (b_val * e_val - c_val * d_val);
+        tN = (a_val * e_val - b_val * d_val);
+        if (sN < 0.0f)
+        {
+            sN = 0.0f;
+            tN = e_val;
+            tD = c_val;
+        }
+        else if (sN > sD)
+        {
+            sN = sD;
+            tN = e_val + b_val;
+            tD = c_val;
+        }
+    }
+
+    if (tN < 0.0f)
+    {
+        tN = 0.0f;
+        if (-d_val < 0.0f)
+            sN = 0.0f;
+        else if (-d_val > a_val)
+            sN = sD;
+        else {
+            sN = -d_val;
+            sD = a_val;
+        }
+    }
+    else if (tN > tD)
+    {
+        tN = tD;
+        if ((-d_val + b_val) < 0.0f)
+            sN = 0.0f;
+        else if ((-d_val + b_val) > a_val)
+            sN = sD;
+        else {
+            sN = (-d_val + b_val);
+            sD = a_val;
+        }
+    }
+
+    sc = (std::abs(sN) < 1e-5f ? 0.0f : sN / sD);
+    tc = (std::abs(tN) < 1e-5f ? 0.0f : tN / tD);
+
+    Vector3 dP = w + (u * sc) - (v * tc);
+    float dist = Length(dP);
+    float minDist = a.shape.radius + b.shape.radius;
+
+    if (dist < minDist)
+    {
+        outPushLen = minDist - dist;
+        if (dist > 1e-4f)
+        {
+            outPushDir = Normalize(dP);
+        }
+        else
+        {
+            outPushDir = { 0.0f, 0.0f, 1.0f };
+        }
+        return true;
+    }
     return false;
 }
-
 
 bool CollisionManager::Raycast(const Vector3& rayStart, const Vector3& rayDir, float maxDist, Collider*& outHitCollider, float& outHitDist)
 {
@@ -488,15 +907,39 @@ bool CollisionManager::Raycast(const Vector3& rayStart, const Vector3& rayDir, f
     float closestDist = maxDist;
     bool hit = false;
 
+    std::vector<CollisionData> dataList;
+    dataList.reserve(colliders_.size());
     for (Collider* col : colliders_)
     {
         if (!col || !col->IsEnabled()) continue;
+        CollisionData data;
+        data.originalCollider = col;
+        data.type = col->GetType();
+        data.attribute = col->GetAttribute();
+        data.worldPosition = col->GetWorldPosition();
+        data.isTrigger = col->IsTrigger();
 
+        if (data.type == ColliderType::Sphere)
+        {
+            SphereCollider* sphere = static_cast<SphereCollider*>(col);
+            data.shape.radius = sphere->GetRadius();
+        }
+        else if (data.type == ColliderType::Box)
+        {
+            BoxCollider* box = static_cast<BoxCollider*>(col);
+            data.shape.size = box->GetSize();
+            data.shape.rotation = box->GetWorldRotation();
+        }
+        dataList.push_back(data);
+    }
+
+    for (const auto& data : dataList)
+    {
         float dist = 0.0f;
-        if (CheckRayCollider(rayStart, rayDir, closestDist, col, dist))
+        if (CheckRayCollider(rayStart, rayDir, closestDist, data, dist))
         {
             closestDist = dist;
-            closestCollider = col;
+            closestCollider = data.originalCollider;
             hit = true;
         }
     }
@@ -506,13 +949,27 @@ bool CollisionManager::Raycast(const Vector3& rayStart, const Vector3& rayDir, f
         outHitCollider = closestCollider;
         outHitDist = closestDist;
     }
+
+    // Save debug raycast coordinates
+    lastRaycast_.exists = true;
+    lastRaycast_.start = rayStart;
+    lastRaycast_.end = rayStart + rayDir * maxDist;
+    lastRaycast_.hit = hit;
+    if (hit)
+    {
+        lastRaycast_.hitPoint = rayStart + rayDir * closestDist;
+    }
+    else
+    {
+        lastRaycast_.hitMesh = false;
+    }
+
     return hit;
 }
 
-bool CollisionManager::CheckRayCollider(const Vector3& rayStart, const Vector3& rayDir, float maxDist, const Collider* collider, float& outDist)
+bool CollisionManager::CheckRayCollider(const Vector3& rayStart, const Vector3& rayDir, float maxDist, const CollisionData& collider, float& outDist)
 {
-    if (!collider) return false;
-    ColliderType type = collider->GetType();
+    ColliderType type = collider.type;
 
     if (type == ColliderType::Sphere)
     {
@@ -522,22 +979,26 @@ bool CollisionManager::CheckRayCollider(const Vector3& rayStart, const Vector3& 
     {
         return CheckRayBox(rayStart, rayDir, maxDist, collider, outDist);
     }
+    else if (type == ColliderType::Mesh)
+    {
+        return CheckRayMesh(rayStart, rayDir, maxDist, collider, outDist);
+    }
+    else if (type == ColliderType::Skeleton)
+    {
+        return CheckRaySkeleton(rayStart, rayDir, maxDist, collider, outDist);
+    }
     return false;
 }
 
-bool CollisionManager::CheckRaySphere(const Vector3& rayStart, const Vector3& rayDir, float maxDist, const Collider* sphere, float& outDist)
+bool CollisionManager::CheckRaySphere(const Vector3& rayStart, const Vector3& rayDir, float maxDist, const CollisionData& sphere, float& outDist)
 {
-    const SphereCollider* s = dynamic_cast<const SphereCollider*>(sphere);
-    if (!s) return false;
-
-    Vector3 sPos = s->GetWorldPosition();
-    float radius = s->GetRadius();
+    Vector3 sPos = sphere.worldPosition;
+    float radius = sphere.shape.radius;
 
     Vector3 m = rayStart - sPos;
     float b = Dot(m, rayDir);
     float c = Dot(m, m) - radius * radius;
 
-    // レイの始点と向きが交差していない場合
     if (c > 0.0f && b > 0.0f) return false;
 
     float discr = b * b - c;
@@ -552,16 +1013,14 @@ bool CollisionManager::CheckRaySphere(const Vector3& rayStart, const Vector3& ra
     return true;
 }
 
-bool CollisionManager::CheckRayBox(const Vector3& rayStart, const Vector3& rayDir, float maxDist, const Collider* box, float& outDist)
+bool CollisionManager::CheckRayBox(const Vector3& rayStart, const Vector3& rayDir, float maxDist, const CollisionData& box, float& outDist)
 {
-    const BoxCollider* b = dynamic_cast<const BoxCollider*>(box);
-    if (!b) return false;
-
-    Vector3 bPos = b->GetWorldPosition();
-    Vector3 extents = b->GetExtents();
+    Vector3 bPos = box.worldPosition;
+    Vector3 size = box.shape.size;
+    Vector3 extents = { size.x * 0.5f, size.y * 0.5f, size.z * 0.5f };
 
     // 回転行列 R を計算する
-    Vector3 bRot = b->GetWorldRotation();
+    Vector3 bRot = box.shape.rotation;
     Matrix4x4 R = Multiply(MakeRotateXMatrix(bRot.x), Multiply(MakeRotateYMatrix(bRot.y), MakeRotateZMatrix(bRot.z)));
 
     // ボックスのローカル軸（X, Y, Z）
@@ -585,7 +1044,6 @@ bool CollisionManager::CheckRayBox(const Vector3& rayStart, const Vector3& rayDi
     float tmin = 0.0f;
     float tmax = maxDist;
 
-    // X軸スラブ判定
     if (std::abs(localDir.x) < 1e-6f)
     {
         if (localStart.x < -extents.x || localStart.x > extents.x) return false;
@@ -601,7 +1059,6 @@ bool CollisionManager::CheckRayBox(const Vector3& rayStart, const Vector3& rayDi
         if (tmin > tmax) return false;
     }
 
-    // Y軸スラブ判定
     if (std::abs(localDir.y) < 1e-6f)
     {
         if (localStart.y < -extents.y || localStart.y > extents.y) return false;
@@ -617,7 +1074,6 @@ bool CollisionManager::CheckRayBox(const Vector3& rayStart, const Vector3& rayDi
         if (tmin > tmax) return false;
     }
 
-    // Z軸スラブ判定
     if (std::abs(localDir.z) < 1e-6f)
     {
         if (localStart.z < -extents.z || localStart.z > extents.z) return false;
@@ -635,4 +1091,753 @@ bool CollisionManager::CheckRayBox(const Vector3& rayStart, const Vector3& rayDi
 
     outDist = tmin;
     return true;
+}
+
+bool CollisionManager::CheckRayMesh(const Vector3& rayStart, const Vector3& rayDir, float maxDist, const CollisionData& meshData, float& outDist)
+{
+    MeshCollider* meshCollider = static_cast<MeshCollider*>(meshData.originalCollider);
+    if (!meshCollider || !meshCollider->GetObject3d()) return false;
+
+    // CPU skinning update if animated
+    meshCollider->Update();
+
+    Object3d* obj = meshCollider->GetObject3d();
+    const auto& aabbTree = meshCollider->GetAABBTree();
+
+    Matrix4x4 world = obj->GetWorldMatrix();
+    Matrix4x4 invWorld = Inverse(world);
+
+    // Transform Ray start to local space
+    Vector3 localStart = {
+        rayStart.x * invWorld.m[0][0] + rayStart.y * invWorld.m[1][0] + rayStart.z * invWorld.m[2][0] + invWorld.m[3][0],
+        rayStart.x * invWorld.m[0][1] + rayStart.y * invWorld.m[1][1] + rayStart.z * invWorld.m[2][1] + invWorld.m[3][1],
+        rayStart.x * invWorld.m[0][2] + rayStart.y * invWorld.m[1][2] + rayStart.z * invWorld.m[2][2] + invWorld.m[3][2]
+    };
+
+    // Transform Ray direction to local space
+    Vector3 localDir = {
+        rayDir.x * invWorld.m[0][0] + rayDir.y * invWorld.m[1][0] + rayDir.z * invWorld.m[2][0],
+        rayDir.x * invWorld.m[0][1] + rayDir.y * invWorld.m[1][1] + rayDir.z * invWorld.m[2][1],
+        rayDir.x * invWorld.m[0][2] + rayDir.y * invWorld.m[1][2] + rayDir.z * invWorld.m[2][2]
+    };
+
+    float localDirLen = std::sqrt(localDir.x * localDir.x + localDir.y * localDir.y + localDir.z * localDir.z);
+    if (localDirLen < 1e-6f) return false;
+
+    Vector3 localDirNorm = { localDir.x / localDirLen, localDir.y / localDirLen, localDir.z / localDirLen };
+    float localMaxDist = maxDist * localDirLen;
+
+    float localHitDist = 0.0f;
+    Vector3 localHitNormal = { 0, 1, 0 };
+    Vector3 localV0, localV1, localV2;
+    if (aabbTree.Raycast(localStart, localDirNorm, localMaxDist, localHitDist, localHitNormal, localV0, localV1, localV2))
+    {
+        outDist = localHitDist / localDirLen;
+
+        auto transformPt = [&](const Vector3& pt) -> Vector3 {
+            return {
+                pt.x * world.m[0][0] + pt.y * world.m[1][0] + pt.z * world.m[2][0] + world.m[3][0],
+                pt.x * world.m[0][1] + pt.y * world.m[1][1] + pt.z * world.m[2][1] + world.m[3][1],
+                pt.x * world.m[0][2] + pt.y * world.m[1][2] + pt.z * world.m[2][2] + world.m[3][2]
+            };
+        };
+
+        GetInstance()->lastRaycast_.hitMesh = true;
+        GetInstance()->lastRaycast_.hitTriV0 = transformPt(localV0);
+        GetInstance()->lastRaycast_.hitTriV1 = transformPt(localV1);
+        GetInstance()->lastRaycast_.hitTriV2 = transformPt(localV2);
+
+        return true;
+    }
+    return false;
+}
+
+bool CollisionManager::CheckRaySkeleton(const Vector3& rayStart, const Vector3& rayDir, float maxDist, const CollisionData& skeletonData, float& outDist)
+{
+    SkeletonCollider* skelCollider = static_cast<SkeletonCollider*>(skeletonData.originalCollider);
+    if (!skelCollider || !skelCollider->GetObject3d()) return false;
+
+    Object3d* obj = skelCollider->GetObject3d();
+    const auto& skeleton = obj->GetSkeleton();
+    if (skeleton.joints.empty()) return false;
+
+    Matrix4x4 modelWorldMatrix = MakeAffineMatrix(obj->GetScale(), obj->GetRotate(), obj->GetTranslate());
+
+    bool hit = false;
+    float closestDist = maxDist;
+
+    for (size_t i = 0; i < skeleton.joints.size(); ++i)
+    {
+        Vector3 jointPos = skeleton.GetJointWorldPosition(i, modelWorldMatrix);
+        float radius = skelCollider->GetJointRadius(skeleton.joints[i].name);
+
+        Vector3 m = rayStart - jointPos;
+        float b = Dot(m, rayDir);
+        float c = Dot(m, m) - radius * radius;
+
+        if (c > 0.0f && b > 0.0f) continue;
+
+        float discr = b * b - c;
+        if (discr < 0.0f) continue;
+
+        float t = -b - std::sqrt(discr);
+        if (t < 0.0f) t = 0.0f;
+
+        if (t < closestDist)
+        {
+            closestDist = t;
+            hit = true;
+        }
+    }
+
+    if (hit)
+    {
+        outDist = closestDist;
+        return true;
+    }
+    return false;
+}
+
+void CollisionManager::DrawDebug(Camera* camera)
+{
+#ifdef USE_IMGUI
+	static bool prevF1 = false;
+	bool curF1 = (GetAsyncKeyState(VK_F1) & 0x8000) != 0;
+	if (curF1 && !prevF1)
+	{
+		showDebugColliders_ = !showDebugColliders_;
+	}
+	prevF1 = curF1;
+
+	// ImGui Debug Window to verify execution and states
+	ImGui::Begin("Collision Debug Overlay Settings");
+	ImGui::Checkbox("Show Debug Wireframes (F1 Toggle)", &showDebugColliders_);
+	ImGui::Checkbox("Show Precise Mesh Wireframe", &showMeshWireframe_);
+	ImGui::Text("Active Spheres: %zu", Sphere::GetInstances().size());
+	ImGui::Text("Active Object3ds: %zu", Object3d::GetInstances().size());
+	ImGui::Text("Camera: %s", camera ? "Valid" : "Null");
+	ImGui::End();
+
+	if (!showDebugColliders_ || !camera) return;
+
+	ImGuiIO& io = ImGui::GetIO();
+	float width = io.DisplaySize.x;
+	float height = io.DisplaySize.y;
+
+	if (width <= 0.0f || height <= 0.0f) return;
+
+	const Matrix4x4& vp = camera->GetViewProjectionMatrix();
+	ImDrawList* drawList = ImGui::GetForegroundDrawList();
+
+	auto project3DTo2D = [&](const Vector3& pos3D, ImVec2& outPos) -> bool {
+		float w = pos3D.x * vp.m[0][3] + pos3D.y * vp.m[1][3] + pos3D.z * vp.m[2][3] + vp.m[3][3];
+		if (w <= 0.0f) return false;
+		float x = (pos3D.x * vp.m[0][0] + pos3D.y * vp.m[1][0] + pos3D.z * vp.m[2][0] + vp.m[3][0]) / w;
+		float y = (pos3D.x * vp.m[0][1] + pos3D.y * vp.m[1][1] + pos3D.z * vp.m[2][1] + vp.m[3][1]) / w;
+		outPos.x = (x + 1.0f) * 0.5f * width;
+		outPos.y = (1.0f - y) * 0.5f * height;
+		return true;
+	};
+
+	for (Collider* col : colliders_)
+	{
+		if (!col || !col->IsEnabled()) continue;
+
+		Vector3 worldPos = col->GetWorldPosition();
+
+		// Apply distance culling to avoid drawing tens of thousands of lines on the CPU for distant objects
+		if (camera && col->GetAttribute() != CollisionAttribute::Player)
+		{
+			Vector3 camPos = camera->GetTranslate();
+			float dx = worldPos.x - camPos.x;
+			float dy = worldPos.y - camPos.y;
+			float dz = worldPos.z - camPos.z;
+			float distSq = dx * dx + dy * dy + dz * dz;
+			if (distSq > 40.0f * 40.0f)
+			{
+				continue;
+			}
+		}
+
+		// Determine color by attribute
+		ImU32 colColor = ImGui::ColorConvertFloat4ToU32({ 1.0f, 1.0f, 1.0f, 0.7f }); // default white
+		if (col->GetAttribute() == CollisionAttribute::Player)
+		{
+			colColor = ImGui::ColorConvertFloat4ToU32({ 0.0f, 1.0f, 0.5f, 0.8f }); // Neon green
+		}
+		else if (col->GetAttribute() == CollisionAttribute::Enemy)
+		{
+			colColor = ImGui::ColorConvertFloat4ToU32({ 1.0f, 0.2f, 0.2f, 0.8f }); // Red
+		}
+		else if (col->GetAttribute() == CollisionAttribute::Obstacle)
+		{
+			colColor = ImGui::ColorConvertFloat4ToU32({ 0.3f, 0.7f, 1.0f, 0.7f }); // Light blue
+		}
+		else if (col->GetAttribute() == CollisionAttribute::Bullet)
+		{
+			colColor = ImGui::ColorConvertFloat4ToU32({ 1.0f, 0.8f, 0.0f, 0.8f }); // Yellow
+		}
+
+		if (col->GetType() == ColliderType::Sphere)
+		{
+			SphereCollider* sphere = static_cast<SphereCollider*>(col);
+			float radius = sphere->GetRadius();
+
+			// Draw horizontal circle
+			const int numSegments = 16;
+			std::vector<ImVec2> pts2D;
+			for (int i = 0; i <= numSegments; ++i)
+			{
+				float angle = i * (6.2831853f / numSegments);
+				Vector3 p3D = {
+					worldPos.x + std::cos(angle) * radius,
+					worldPos.y,
+					worldPos.z + std::sin(angle) * radius
+				};
+				ImVec2 p2D;
+				if (project3DTo2D(p3D, p2D))
+				{
+					pts2D.push_back(p2D);
+				}
+			}
+			if (pts2D.size() > 1)
+			{
+				drawList->AddPolyline(pts2D.data(), (int)pts2D.size(), colColor, false, 2.0f);
+			}
+
+			// Draw vertical circle
+			pts2D.clear();
+			for (int i = 0; i <= numSegments; ++i)
+			{
+				float angle = i * (6.2831853f / numSegments);
+				Vector3 p3D = {
+					worldPos.x + std::cos(angle) * radius,
+					worldPos.y + std::sin(angle) * radius,
+					worldPos.z
+				};
+				ImVec2 p2D;
+				if (project3DTo2D(p3D, p2D))
+				{
+					pts2D.push_back(p2D);
+				}
+			}
+			if (pts2D.size() > 1)
+			{
+				drawList->AddPolyline(pts2D.data(), (int)pts2D.size(), colColor, false, 2.0f);
+			}
+		}
+		else if (col->GetType() == ColliderType::Box)
+		{
+			BoxCollider* box = static_cast<BoxCollider*>(col);
+			Vector3 ext = box->GetExtents();
+			Vector3 rot = box->GetWorldRotation();
+
+			// 8 local corners
+			Vector3 localCorners[8] = {
+				{ -ext.x, -ext.y, -ext.z },
+				{  ext.x, -ext.y, -ext.z },
+				{  ext.x, -ext.y,  ext.z },
+				{ -ext.x, -ext.y,  ext.z },
+				{ -ext.x,  ext.y, -ext.z },
+				{  ext.x,  ext.y, -ext.z },
+				{  ext.x,  ext.y,  ext.z },
+				{ -ext.x,  ext.y,  ext.z }
+			};
+
+			// Rotate and translate to world space
+			Vector3 worldCorners[8];
+			for (int i = 0; i < 8; ++i)
+			{
+				// Rotate Euler Yaw-Pitch-Roll
+				// Pitch (X)
+				float cosX = std::cos(rot.x);
+				float sinX = std::sin(rot.x);
+				Vector3 pt1 = {
+					localCorners[i].x,
+					localCorners[i].y * cosX - localCorners[i].z * sinX,
+					localCorners[i].y * sinX + localCorners[i].z * cosX
+				};
+
+				// Yaw (Y)
+				float cosY = std::cos(rot.y);
+				float sinY = std::sin(rot.y);
+				Vector3 pt2 = {
+					pt1.x * cosY + pt1.z * sinY,
+					pt1.y,
+					-pt1.x * sinY + pt1.z * cosY
+				};
+
+				// Roll (Z)
+				float cosZ = std::cos(rot.z);
+				float sinZ = std::sin(rot.z);
+				Vector3 pt3 = {
+					pt2.x * cosZ - pt2.y * sinZ,
+					pt2.x * sinZ + pt2.y * cosZ,
+					pt2.z
+				};
+
+				worldCorners[i] = pt3 + worldPos;
+			}
+
+			// Project to 2D
+			ImVec2 screenCorners[8];
+			bool projected[8];
+			for (int i = 0; i < 8; ++i)
+			{
+				projected[i] = project3DTo2D(worldCorners[i], screenCorners[i]);
+			}
+
+			// Draw bottom face
+			if (projected[0] && projected[1] && projected[2] && projected[3])
+			{
+				ImVec2 pts[5] = { screenCorners[0], screenCorners[1], screenCorners[2], screenCorners[3], screenCorners[0] };
+				drawList->AddPolyline(pts, 5, colColor, false, 2.0f);
+			}
+			// Draw top face
+			if (projected[4] && projected[5] && projected[6] && projected[7])
+			{
+				ImVec2 pts[5] = { screenCorners[4], screenCorners[5], screenCorners[6], screenCorners[7], screenCorners[4] };
+				drawList->AddPolyline(pts, 5, colColor, false, 2.0f);
+			}
+			// Draw vertical edges
+			for (int i = 0; i < 4; ++i)
+			{
+				if (projected[i] && projected[i + 4])
+				{
+					drawList->AddLine(screenCorners[i], screenCorners[i + 4], colColor, 2.0f);
+				}
+			}
+		}
+		else if (col->GetType() == ColliderType::Capsule)
+		{
+			CapsuleCollider* capsule = static_cast<CapsuleCollider*>(col);
+			float radius = capsule->GetRadius();
+			float halfH = capsule->GetHeight() * 0.5f;
+
+			Vector3 bottomCenter = worldPos - Vector3{ 0.0f, halfH, 0.0f };
+			Vector3 topCenter = worldPos + Vector3{ 0.0f, halfH, 0.0f };
+
+			// Draw bottom circle
+			const int numSegments = 16;
+			std::vector<ImVec2> ptsBottom;
+			std::vector<ImVec2> ptsTop;
+			for (int i = 0; i <= numSegments; ++i)
+			{
+				float angle = i * (6.2831853f / numSegments);
+				Vector3 pBottom = {
+					bottomCenter.x + std::cos(angle) * radius,
+					bottomCenter.y,
+					bottomCenter.z + std::sin(angle) * radius
+				};
+				Vector3 pTop = {
+					topCenter.x + std::cos(angle) * radius,
+					topCenter.y,
+					topCenter.z + std::sin(angle) * radius
+				};
+
+				ImVec2 pB2D, pT2D;
+				if (project3DTo2D(pBottom, pB2D)) ptsBottom.push_back(pB2D);
+				if (project3DTo2D(pTop, pT2D)) ptsTop.push_back(pT2D);
+			}
+			if (ptsBottom.size() > 1) drawList->AddPolyline(ptsBottom.data(), (int)ptsBottom.size(), colColor, false, 2.0f);
+			if (ptsTop.size() > 1) drawList->AddPolyline(ptsTop.data(), (int)ptsTop.size(), colColor, false, 2.0f);
+
+			// Draw vertical side lines
+			Vector3 sides[4] = {
+				{  radius, 0.0f, 0.0f },
+				{ -radius, 0.0f, 0.0f },
+				{ 0.0f, 0.0f,  radius },
+				{ 0.0f, 0.0f, -radius }
+			};
+			for (int i = 0; i < 4; ++i)
+			{
+				ImVec2 pB2D, pT2D;
+				if (project3DTo2D(bottomCenter + sides[i], pB2D) && project3DTo2D(topCenter + sides[i], pT2D))
+				{
+					drawList->AddLine(pB2D, pT2D, colColor, 2.0f);
+				}
+			}
+		}
+		else if (col->GetType() == ColliderType::Mesh)
+		{
+			MeshCollider* meshCollider = static_cast<MeshCollider*>(col);
+			if (meshCollider && meshCollider->GetObject3d())
+			{
+				// Ensure skinned positions and AABBTree are updated (cached once per frame)
+				meshCollider->Update();
+
+				Object3d* obj = meshCollider->GetObject3d();
+				Matrix4x4 world = obj->GetWorldMatrix();
+
+				// 2. Draw hierarchical AABB tree bounds (Depth 3)
+				std::vector<std::pair<Vector3, Vector3>> boundsList;
+				meshCollider->GetAABBTree().GetNodesAtDepth(3, boundsList);
+
+				for (const auto& bounds : boundsList)
+				{
+					Vector3 minB = bounds.first;
+					Vector3 maxB = bounds.second;
+
+					// 8 local corners
+					Vector3 localCorners[8] = {
+						{ minB.x, minB.y, minB.z },
+						{ maxB.x, minB.y, minB.z },
+						{ maxB.x, minB.y, maxB.z },
+						{ minB.x, minB.y, maxB.z },
+						{ minB.x, maxB.y, minB.z },
+						{ maxB.x, maxB.y, minB.z },
+						{ maxB.x, maxB.y, maxB.z },
+						{ minB.x, maxB.y, maxB.z }
+					};
+
+					Vector3 worldCorners[8];
+					for (int i = 0; i < 8; ++i)
+					{
+						worldCorners[i] = {
+							localCorners[i].x * world.m[0][0] + localCorners[i].y * world.m[1][0] + localCorners[i].z * world.m[2][0] + world.m[3][0],
+							localCorners[i].x * world.m[0][1] + localCorners[i].y * world.m[1][1] + localCorners[i].z * world.m[2][1] + world.m[3][1],
+							localCorners[i].x * world.m[0][2] + localCorners[i].y * world.m[1][2] + localCorners[i].z * world.m[2][2] + world.m[3][2]
+						};
+					}
+
+					ImVec2 screenCorners[8];
+					bool projected[8];
+					for (int i = 0; i < 8; ++i)
+					{
+						projected[i] = project3DTo2D(worldCorners[i], screenCorners[i]);
+					}
+
+					ImU32 hierarchyColor = ImGui::ColorConvertFloat4ToU32({ 0.0f, 1.0f, 0.5f, 0.25f }); // Semi-transparent green for boxes
+					if (projected[0] && projected[1] && projected[2] && projected[3])
+					{
+						ImVec2 pts[5] = { screenCorners[0], screenCorners[1], screenCorners[2], screenCorners[3], screenCorners[0] };
+						drawList->AddPolyline(pts, 5, hierarchyColor, false, 1.0f);
+					}
+					if (projected[4] && projected[5] && projected[6] && projected[7])
+					{
+						ImVec2 pts[5] = { screenCorners[4], screenCorners[5], screenCorners[6], screenCorners[7], screenCorners[4] };
+						drawList->AddPolyline(pts, 5, hierarchyColor, false, 1.0f);
+					}
+					for (int i = 0; i < 4; ++i)
+					{
+						if (projected[i] && projected[i + 4])
+						{
+							drawList->AddLine(screenCorners[i], screenCorners[i + 4], hierarchyColor, 1.0f);
+						}
+					}
+				}
+			}
+		}
+		else if (col->GetType() == ColliderType::Skeleton)
+		{
+			SkeletonCollider* skelCollider = static_cast<SkeletonCollider*>(col);
+			if (skelCollider && skelCollider->GetObject3d())
+			{
+				Object3d* obj = skelCollider->GetObject3d();
+				const auto& skeleton = obj->GetSkeleton();
+				if (!skeleton.joints.empty())
+				{
+					Matrix4x4 modelWorldMatrix = MakeAffineMatrix(obj->GetScale(), obj->GetRotate(), obj->GetTranslate());
+					for (size_t i = 0; i < skeleton.joints.size(); ++i)
+					{
+						Vector3 jointPos = skeleton.GetJointWorldPosition(i, modelWorldMatrix);
+						float radius = skelCollider->GetJointRadius(skeleton.joints[i].name);
+
+						const int numSegments = 8;
+						std::vector<ImVec2> pts2D;
+						for (int j = 0; j <= numSegments; ++j)
+						{
+							float angle = j * (6.2831853f / numSegments);
+							Vector3 p3D = {
+								jointPos.x + std::cos(angle) * radius,
+								jointPos.y,
+								jointPos.z + std::sin(angle) * radius
+							};
+							ImVec2 p2D;
+							if (project3DTo2D(p3D, p2D)) pts2D.push_back(p2D);
+						}
+						if (pts2D.size() > 1) drawList->AddPolyline(pts2D.data(), (int)pts2D.size(), colColor, false, 1.5f);
+
+						pts2D.clear();
+						for (int j = 0; j <= numSegments; ++j)
+						{
+							float angle = j * (6.2831853f / numSegments);
+							Vector3 p3D = {
+								jointPos.x + std::cos(angle) * radius,
+								jointPos.y + std::sin(angle) * radius,
+								jointPos.z
+							};
+							ImVec2 p2D;
+							if (project3DTo2D(p3D, p2D)) pts2D.push_back(p2D);
+						}
+						if (pts2D.size() > 1) drawList->AddPolyline(pts2D.data(), (int)pts2D.size(), colColor, false, 1.5f);
+					}
+				}
+			}
+		}
+	}
+
+	// --- Draw Sphere Instances (Visual only) ---
+	ImU32 sphereVisualColor = ImGui::ColorConvertFloat4ToU32({ 1.0f, 0.4f, 0.7f, 0.7f }); // Pink
+	for (Sphere* s : Sphere::GetInstances())
+	{
+		if (!s || s->IsOverlayDraw() || !s->WasDrawnLastFrame()) continue;
+		Vector3 worldPos = s->GetTransform().translate;
+		float radius = 1.0f * s->GetTransform().scale.x;
+
+		// Draw horizontal circle
+		const int numSegments = 16;
+		std::vector<ImVec2> pts2D;
+		for (int i = 0; i <= numSegments; ++i)
+		{
+			float angle = i * (6.2831853f / numSegments);
+			Vector3 p3D = {
+				worldPos.x + std::cos(angle) * radius,
+				worldPos.y,
+				worldPos.z + std::sin(angle) * radius
+			};
+			ImVec2 p2D;
+			if (project3DTo2D(p3D, p2D))
+			{
+				pts2D.push_back(p2D);
+			}
+		}
+		if (pts2D.size() > 1)
+		{
+			drawList->AddPolyline(pts2D.data(), (int)pts2D.size(), sphereVisualColor, false, 2.0f);
+		}
+
+		// Draw vertical circle
+		pts2D.clear();
+		for (int i = 0; i <= numSegments; ++i)
+		{
+			float angle = i * (6.2831853f / numSegments);
+			Vector3 p3D = {
+				worldPos.x + std::cos(angle) * radius,
+				worldPos.y + std::sin(angle) * radius,
+				worldPos.z
+			};
+			ImVec2 p2D;
+			if (project3DTo2D(p3D, p2D))
+			{
+				pts2D.push_back(p2D);
+			}
+		}
+		if (pts2D.size() > 1)
+		{
+			drawList->AddPolyline(pts2D.data(), (int)pts2D.size(), sphereVisualColor, false, 2.0f);
+		}
+	}
+
+	// --- Draw Object3d Instances (Visual only) ---
+	ImU32 objVisualColor = ImGui::ColorConvertFloat4ToU32({ 0.0f, 1.0f, 0.5f, 0.7f }); // Neon Green
+	for (Object3d* obj : Object3d::GetInstances())
+	{
+		if (!obj || !obj->WasDrawnLastFrame()) continue;
+		Vector3 worldPos = obj->GetTranslate();
+
+		// If skeleton joints are present, draw as a Box wrapping all joint world coordinates!
+		if (!obj->GetSkeleton().joints.empty())
+		{
+			const auto& skeleton = obj->GetSkeleton();
+			Matrix4x4 modelWorldMatrix = MakeAffineMatrix(obj->GetScale(), obj->GetRotate(), obj->GetTranslate());
+
+			float minX = 1e9f, maxX = -1e9f;
+			float minY = 1e9f, maxY = -1e9f;
+			float minZ = 1e9f, maxZ = -1e9f;
+
+			for (size_t jointIndex = 0; jointIndex < skeleton.joints.size(); ++jointIndex)
+			{
+				Vector3 pt = skeleton.GetJointWorldPosition(jointIndex, modelWorldMatrix);
+				if (pt.x < minX) minX = pt.x;
+				if (pt.x > maxX) maxX = pt.x;
+				if (pt.y < minY) minY = pt.y;
+				if (pt.y > maxY) maxY = pt.y;
+				if (pt.z < minZ) minZ = pt.z;
+				if (pt.z > maxZ) maxZ = pt.z;
+			}
+
+			if (minX < maxX && minY < maxY && minZ < maxZ)
+			{
+				// 8 world corner coordinates
+				Vector3 worldCorners[8] = {
+					{ minX, minY, minZ },
+					{ maxX, minY, minZ },
+					{ maxX, minY, maxZ },
+					{ minX, minY, maxZ },
+					{ minX, maxY, minZ },
+					{ maxX, maxY, minZ },
+					{ maxX, maxY, maxZ },
+					{ minX, maxY, maxZ }
+				};
+
+				// Project to 2D
+				ImVec2 screenCorners[8];
+				bool projected[8];
+				for (int i = 0; i < 8; ++i)
+				{
+					projected[i] = project3DTo2D(worldCorners[i], screenCorners[i]);
+				}
+
+				// Draw bottom face
+				if (projected[0] && projected[1] && projected[2] && projected[3])
+				{
+					ImVec2 pts[5] = { screenCorners[0], screenCorners[1], screenCorners[2], screenCorners[3], screenCorners[0] };
+					drawList->AddPolyline(pts, 5, objVisualColor, false, 2.0f);
+				}
+				// Draw top face
+				if (projected[4] && projected[5] && projected[6] && projected[7])
+				{
+					ImVec2 pts[5] = { screenCorners[4], screenCorners[5], screenCorners[6], screenCorners[7], screenCorners[4] };
+					drawList->AddPolyline(pts, 5, objVisualColor, false, 2.0f);
+				}
+				// Draw vertical edges
+				for (int i = 0; i < 4; ++i)
+				{
+					if (projected[i] && projected[i + 4])
+					{
+						drawList->AddLine(screenCorners[i], screenCorners[i + 4], objVisualColor, 2.0f);
+					}
+				}
+			}
+		}
+		else
+		{
+			// Box representation based on mesh vertices local bounding box
+			const auto& modelData = obj->GetModelData();
+			if (!modelData.vertices.empty())
+			{
+				float minX = 1e9f, maxX = -1e9f;
+				float minY = 1e9f, maxY = -1e9f;
+				float minZ = 1e9f, maxZ = -1e9f;
+				for (const auto& v : modelData.vertices)
+				{
+					if (v.position.x < minX) minX = v.position.x;
+					if (v.position.x > maxX) maxX = v.position.x;
+					if (v.position.y < minY) minY = v.position.y;
+					if (v.position.y > maxY) maxY = v.position.y;
+					if (v.position.z < minZ) minZ = v.position.z;
+					if (v.position.z > maxZ) maxZ = v.position.z;
+				}
+
+				if (minX < maxX && minY < maxY && minZ < maxZ)
+				{
+					Vector3 rot = obj->GetRotate();
+					Vector3 scale = obj->GetScale();
+
+					// 8 local corner coordinates
+					Vector3 localCorners[8] = {
+						{ minX * scale.x, minY * scale.y, minZ * scale.z },
+						{ maxX * scale.x, minY * scale.y, minZ * scale.z },
+						{ maxX * scale.x, minY * scale.y, maxZ * scale.z },
+						{ minX * scale.x, minY * scale.y, maxZ * scale.z },
+						{ minX * scale.x, maxY * scale.y, minZ * scale.z },
+						{ maxX * scale.x, maxY * scale.y, minZ * scale.z },
+						{ maxX * scale.x, maxY * scale.y, maxZ * scale.z },
+						{ minX * scale.x, maxY * scale.y, maxZ * scale.z }
+					};
+
+					// Rotate and translate to world space
+					Vector3 worldCorners[8];
+					for (int i = 0; i < 8; ++i)
+					{
+						// Rotate Euler Yaw-Pitch-Roll
+						// Pitch (X)
+						float cosX = std::cos(rot.x);
+						float sinX = std::sin(rot.x);
+						Vector3 pt1 = {
+							localCorners[i].x,
+							localCorners[i].y * cosX - localCorners[i].z * sinX,
+							localCorners[i].y * sinX + localCorners[i].z * cosX
+						};
+
+						// Yaw (Y)
+						float cosY = std::cos(rot.y);
+						float sinY = std::sin(rot.y);
+						Vector3 pt2 = {
+							pt1.x * cosY + pt1.z * sinY,
+							pt1.y,
+							-pt1.x * sinY + pt1.z * cosY
+						};
+
+						// Roll (Z)
+						float cosZ = std::cos(rot.z);
+						float sinZ = std::sin(rot.z);
+						Vector3 pt3 = {
+							pt2.x * cosZ - pt2.y * sinZ,
+							pt2.x * sinZ + pt2.y * cosZ,
+							pt2.z
+						};
+
+						worldCorners[i] = pt3 + worldPos;
+					}
+
+					// Project to 2D
+					ImVec2 screenCorners[8];
+					bool projected[8];
+					for (int i = 0; i < 8; ++i)
+					{
+						projected[i] = project3DTo2D(worldCorners[i], screenCorners[i]);
+					}
+
+					// Draw bottom face
+					if (projected[0] && projected[1] && projected[2] && projected[3])
+					{
+						ImVec2 pts[5] = { screenCorners[0], screenCorners[1], screenCorners[2], screenCorners[3], screenCorners[0] };
+						drawList->AddPolyline(pts, 5, objVisualColor, false, 2.0f);
+					}
+					// Draw top face
+					if (projected[4] && projected[5] && projected[6] && projected[7])
+					{
+						ImVec2 pts[5] = { screenCorners[4], screenCorners[5], screenCorners[6], screenCorners[7], screenCorners[4] };
+						drawList->AddPolyline(pts, 5, objVisualColor, false, 2.0f);
+					}
+					// Draw vertical edges
+					for (int i = 0; i < 4; ++i)
+					{
+						if (projected[i] && projected[i + 4])
+						{
+							drawList->AddLine(screenCorners[i], screenCorners[i + 4], objVisualColor, 2.0f);
+						}
+					}
+				}
+			}
+		}
+	}
+
+	// Draw last raycast line for debugging
+	if (lastRaycast_.exists)
+	{
+		ImVec2 s2D, e2D;
+		if (project3DTo2D(lastRaycast_.start, s2D) && project3DTo2D(lastRaycast_.end, e2D))
+		{
+			ImU32 rayColor = lastRaycast_.hit ? ImGui::ColorConvertFloat4ToU32({ 1.0f, 0.0f, 0.0f, 0.9f })  // Red if hit
+			                                  : ImGui::ColorConvertFloat4ToU32({ 1.0f, 0.8f, 0.0f, 0.6f }); // Gold if miss
+			drawList->AddLine(s2D, e2D, rayColor, 3.0f);
+		}
+
+		if (lastRaycast_.hit)
+		{
+			ImVec2 h2D;
+			if (project3DTo2D(lastRaycast_.hitPoint, h2D))
+			{
+				drawList->AddCircleFilled(h2D, 5.0f, ImGui::ColorConvertFloat4ToU32({ 0.0f, 1.0f, 1.0f, 1.0f }), 8); // Cyan point
+			}
+
+			if (lastRaycast_.hitMesh)
+			{
+				ImVec2 p0, p1, p2;
+				if (project3DTo2D(lastRaycast_.hitTriV0, p0) &&
+					project3DTo2D(lastRaycast_.hitTriV1, p1) &&
+					project3DTo2D(lastRaycast_.hitTriV2, p2))
+				{
+					// Draw filled red triangle
+					drawList->AddTriangleFilled(p0, p1, p2, ImGui::ColorConvertFloat4ToU32({ 1.0f, 0.0f, 0.0f, 0.5f }));
+					// Draw bright yellow outline
+					drawList->AddTriangle(p0, p1, p2, ImGui::ColorConvertFloat4ToU32({ 1.0f, 1.0f, 0.0f, 0.9f }), 2.0f);
+				}
+			}
+		}
+	}
+#endif
 }

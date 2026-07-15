@@ -1,5 +1,7 @@
 #include"Game.h"
 #include "DebugUI.h"
+#include "Baziru3_Engine/Base/Pipeline/PipelineStateManager.h"
+#include <future>
 
 #include <combaseapi.h>
 
@@ -10,7 +12,7 @@
 #include "Baziru3_Engine\Graphics\SceneRenderRequests.h"
 #include"RenderContext.h"
 #include"RootParam.h"
-#include"SubsystemFactory.h"
+#include"Baziru3_Engine/Base/SubsystemFactory.h"
 
 #ifdef USE_IMGUI
 #include <imgui.h>
@@ -75,7 +77,7 @@ void Game::Initialize()
 	debugUI = std::make_unique<DebugUI>(materialManager_.get(), uiSpriteManager, camera_.get(), &transformObject, &useMonsterBall, &drawObject, &drawSprite);
 	debugUI->Initialize();
 
-	fadeApplication_ = std::make_unique<FadeApplication>();
+	fadeApplication_ = std::make_unique<Fade>();
 	fadeApplication_->Initialize(spriteCom, window);
 	SceneManager::GetInstance()->SetFadeApplication(fadeApplication_.get());
 
@@ -213,9 +215,7 @@ void Game::Finalize()
 		offScreenRendering_.reset();
 	}
 
-	// 7) Ensure TextureManager releases GPU resources before engine teardown
-	try { TextureManager::GetInstance()->Finalize(); }
-	catch (...) { Logger::Log(logStream, "TextureManager finalize failed\n"); }
+	// 7) Ensure TextureManager releases GPU resources (delegated to engine_->Finalize())
 
 	// 8) Engine teardown
 	if (engine_)
@@ -234,6 +234,11 @@ void Game::Finalize()
 void Game::Update()
 {
 	Framework::Update();
+
+	if (engine_)
+	{
+		PipelineStateManager::GetInstance()->Update(engine_->GetDirectXCom());
+	}
 
 	if (audioManager_)
 	{
@@ -305,24 +310,69 @@ void Game::Draw()
 		offScreenRendering_->Begin(dx->GetCommandList().Get());
 	}
 
-	if (offScreenRendering_)
-	{
-		offScreenRendering_->Begin(dx->GetCommandList().Get());
-	}
-
 	if (object3dCom) object3dCom->PreDraw();
 
 	RenderContext ctx = PrepareRenderContext();
 	SceneRenderRequests renderRequests{};
 
-	if (camera_ && camera_->GetCameraResource())
+	if (camera_ && camera_->GetCameraGpuAddress() != 0)
 	{
-		dx->GetCommandList()->SetGraphicsRootConstantBufferView(4, camera_->GetCameraResource()->GetGPUVirtualAddress());
+		dx->GetCommandList()->SetGraphicsRootConstantBufferView(4, camera_->GetCameraGpuAddress());
 	}
 	else
 	{
 		Logger::Log(logStream, "Warning: camera GPU resource not available before SceneManager draw.\n");
 	}
+
+	// スプライトの更新処理を一括でメインスレッドで行う（サブスレッドでのGPUメモリ書き込み競合を回避するため）
+	SpriteManager* sm = engine_ ? engine_->GetSpriteManager() : nullptr;
+	if (sm)
+	{
+		sm->Update();
+	}
+	for (auto& sp : sprites)
+	{
+		if (sp) sp->Update();
+	}
+
+	// === [サブスレッド] Sprite 描画コマンドの並列記録を開始 ===
+	RenderContext workerCtx = ctx;
+	workerCtx.commandList = dx->GetWorkerCommandList().Get();
+
+	auto spriteFuture = std::async(std::launch::async, [this, workerCtx, dx]() {
+		dx->GetWorkerCommandAllocator()->Reset();
+		dx->GetWorkerCommandList()->Reset(dx->GetWorkerCommandAllocator().Get(), nullptr);
+
+		// パイプラインステート、RTV/DSV、ビューポート、記述子ヒープの設定
+		D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle{};
+		D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle{};
+		if (offScreenRendering_)
+		{
+			dsvHandle = offScreenRendering_->GetDsvHandle();
+			rtvHandle = offScreenRendering_->GetRtvHandle();
+		}
+		else
+		{
+			UINT backBufferIndex = dx->GetSwapChain()->GetCurrentBackBufferIndex();
+			dsvHandle = dx->GetDsvHeap().GetCPUDescriptorHandle(0);
+			rtvHandle = dx->GetRtvHandle(backBufferIndex);
+		}
+		workerCtx.commandList->OMSetRenderTargets(1, &rtvHandle, false, &dsvHandle);
+
+		ID3D12DescriptorHeap* descriptorHeaps[] = { dx->GetSrvDescriptorHeap().Get() };
+		workerCtx.commandList->SetDescriptorHeaps(1, descriptorHeaps);
+
+		workerCtx.commandList->RSSetViewports(1, &dx->GetViewport());
+		workerCtx.commandList->RSSetScissorRects(1, &dx->GetScissorRect());
+
+		GpuProfiler::GetInstance()->BeginProfile(workerCtx.commandList, "Sprite Draw");
+		DrawSprites(workerCtx);
+		GpuProfiler::GetInstance()->EndProfile(workerCtx.commandList, "Sprite Draw");
+
+		dx->GetWorkerCommandList()->Close();
+	});
+
+	// === [メインスレッド] 3Dオブジェクト等の描画コマンド記録 ===
 
 	// 1. Scene Drawの計測
 	GpuProfiler::GetInstance()->BeginProfile(dx->GetCommandList().Get(), "Scene Draw");
@@ -351,11 +401,6 @@ void Game::Draw()
 	}
 	GpuProfiler::GetInstance()->EndProfile(dx->GetCommandList().Get(), "Scene Draw");
 
-	// 2. Sprite Drawの計測
-	GpuProfiler::GetInstance()->BeginProfile(dx->GetCommandList().Get(), "Sprite Draw");
-	DrawSprites(ctx);
-	GpuProfiler::GetInstance()->EndProfile(dx->GetCommandList().Get(), "Sprite Draw");
-
 	// 3. Particle Drawの計測 (通常のパーティクル描画)
 	GpuProfiler::GetInstance()->BeginProfile(dx->GetCommandList().Get(), "Particle Draw");
 	if (renderRequests.sceneDrawn)
@@ -363,6 +408,26 @@ void Game::Draw()
 		DrawParticles(ctx);
 	}
 	GpuProfiler::GetInstance()->EndProfile(dx->GetCommandList().Get(), "Particle Draw");
+
+	// === 前半のコマンドリスト記録を終了し、GPUに即時提出（オフスクリーン3D描画の確定） ===
+	dx->GetCommandList()->Close();
+	ID3D12CommandList* mainLists1[] = { dx->GetCommandList().Get() };
+	dx->GetCommandQueue()->ExecuteCommandLists(1, mainLists1);
+
+	// === [サブスレッド] Sprite 描画コマンド記録完了を同期的に待機し、提出 ===
+	spriteFuture.get();
+	ID3D12CommandList* workerLists[] = { dx->GetWorkerCommandList().Get() };
+	dx->GetCommandQueue()->ExecuteCommandLists(1, workerLists);
+
+	// === 後半のコマンド記録（ポストプロセス以降）の開始 ===
+	// アロケーターはリセットせず、コマンドリストのみをリセットして記録を再開
+	dx->GetCommandList()->Reset(dx->GetCommandAllocator().Get(), nullptr);
+
+	// ビューポート、記述子ヒープ、ターゲットの再設定（リセットによりクリアされるため）
+	ID3D12DescriptorHeap* descriptorHeaps[] = { dx->GetSrvDescriptorHeap().Get() };
+	dx->GetCommandList()->SetDescriptorHeaps(1, descriptorHeaps);
+	dx->GetCommandList()->RSSetViewports(1, &dx->GetViewport());
+	dx->GetCommandList()->RSSetScissorRects(1, &dx->GetScissorRect());
 
 	if (fadeApplication_)
 	{
@@ -564,9 +629,9 @@ void Game::DrawObjects(const RenderContext& ctx)
 		ctx.commandList->SetGraphicsRootConstantBufferView(3, 0);
 	}
 
-	if (ctx.camera && ctx.camera->GetCameraResource())
+	if (ctx.camera && ctx.camera->GetCameraGpuAddress() != 0)
 	{
-		ctx.commandList->SetGraphicsRootConstantBufferView(4, ctx.camera->GetCameraResource()->GetGPUVirtualAddress());
+		ctx.commandList->SetGraphicsRootConstantBufferView(4, ctx.camera->GetCameraGpuAddress());
 	}
 	else
 	{
@@ -574,7 +639,7 @@ void Game::DrawObjects(const RenderContext& ctx)
 		return;
 	}
 
-	object3d_->Draw(ctx.commandList);
+	object3d_->Draw(ctx);
 
 	if (drawObject)
 	{

@@ -27,9 +27,10 @@ ParticleManager::~ParticleManager()
 	}
 }
 
-void ParticleManager::Initialize(Camera* camera)
+void ParticleManager::Initialize(Camera* camera, TextureManager* textureManager)
 {
 	camera_ = camera;
+	textureManager_ = textureManager ? textureManager : TextureManager::GetInstance();
 	SetupDraw(dxCommon->GetCommandList().Get());
 
     Random::SeedEngine();
@@ -67,7 +68,7 @@ void ParticleManager::Initialize(Camera* camera)
 	}
 
 	// インスタンシング用 StructuredBuffer の SRV を SRVManager 経由で作成する
-	SRVManager* srvManager = TextureManager::GetInstance()->GetSRVManager();
+	SRVManager* srvManager = textureManager_->GetSRVManager();
 	assert(srvManager);
 
 	instancingSrvIndex_ = srvManager->Allocate();
@@ -175,7 +176,7 @@ void ParticleManager::Finalize()
     
     try
     {
-        SRVManager* srvManager = TextureManager::GetInstance()->GetSRVManager();
+        SRVManager* srvManager = textureManager_->GetSRVManager();
         if (srvManager)
         {
             if (instancingSrvIndex_ >= 3 && instancingSrvIndex_ < SRVManager::kMaxSRVCount)
@@ -314,22 +315,8 @@ void ParticleManager::Update(float deltaTime)
 				continue;
 			}
 
-			Vector3 rot = it->transform.GetRotate();
-			Matrix4x4 rotZ = MakeRotateZMatrix(rot.z);
-			Matrix4x4 finalRotation = Multiply(rotZ, billboardMatrix);
-			Matrix4x4 worldMatrix = MakeAffineMatrix(
-				it->transform.GetScale(), finalRotation, it->transform.GetTranslate());
-			Matrix4x4 wvpMatrix = Multiply(
-				worldMatrix, Multiply(camera_->GetViewMatrix(), camera_->GetProjectionMatrix()));
-
-			if (writeIndex < kNumMaxInstances)
+			if (writeIndex < kMaxGPUParticles)
 			{
-				instanceData[writeIndex].WVP = wvpMatrix;
-				instanceData[writeIndex].World = worldMatrix;
-				instanceData[writeIndex].color = it->color;
-				float alpha = 1.0f - (it->currentTime / it->lifeTime);
-				instanceData[writeIndex].color.w = alpha;
-				instanceData[writeIndex].textureIndex = it->textureIndex;
 				++writeIndex;
 			}
 
@@ -340,68 +327,14 @@ void ParticleManager::Update(float deltaTime)
 		}
 	};
 
-  const uint32_t normalStart = writeIndex;
+	const uint32_t normalStart = writeIndex;
 	updateParticleList(particles);
-    normalInstanceCount_ = writeIndex - normalStart;
+	normalInstanceCount_ = writeIndex - normalStart;
 
 	const uint32_t effectStart = writeIndex;
 	updateParticleList(effectParticles);
-   effectInstanceCount_ = writeIndex - effectStart;
+	effectInstanceCount_ = writeIndex - effectStart;
 	numInstance = writeIndex;
-
-   auto buildInstanceGroups = [&](uint32_t start, uint32_t count, std::vector<InstanceGroup>& outGroups)
-	{
-		outGroups.clear();
-		if (count == 0)
-		{
-			return;
-		}
-
-		uint32_t curStart = start;
-		uint32_t curTex = instanceData[start].textureIndex;
-		for (uint32_t i = start + 1; i < start + count; ++i)
-		{
-			if (instanceData[i].textureIndex != curTex)
-			{
-				InstanceGroup g;
-				g.textureIndex = curTex;
-				g.start = curStart;
-				g.count = i - curStart;
-				if (curTex == TextureManager::kInvalidTextureIndex)
-				{
-					g.srvHandle = {};
-				}
-				else
-				{
-					g.srvHandle = TextureManager::GetInstance()->GetSrvHandleGPU(curTex);
-				}
-				outGroups.push_back(g);
-
-				curStart = i;
-				curTex = instanceData[i].textureIndex;
-			}
-		}
-
-		InstanceGroup g;
-		g.textureIndex = curTex;
-		g.start = curStart;
-		g.count = start + count - curStart;
-		if (curTex == TextureManager::kInvalidTextureIndex)
-		{
-			g.srvHandle = {};
-		}
-		else
-		{
-			g.srvHandle = TextureManager::GetInstance()->GetSrvHandleGPU(curTex);
-		}
-		outGroups.push_back(g);
-	};
-
-	buildInstanceGroups(normalStart, normalInstanceCount_, normalInstanceGroups_);
-	buildInstanceGroups(effectStart, effectInstanceCount_, effectInstanceGroups_);
-	instanceGroups.clear();
-	instanceGroups.insert(instanceGroups.end(), normalInstanceGroups_.begin(), normalInstanceGroups_.end());
-	instanceGroups.insert(instanceGroups.end(), effectInstanceGroups_.begin(), effectInstanceGroups_.end());
 
 	// Update CSの実行
 	ID3D12GraphicsCommandList* commandList = dxCommon->GetCommandList().Get();
@@ -415,7 +348,7 @@ void ParticleManager::Update(float deltaTime)
 	barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
 	commandList->ResourceBarrier(1, &barrier);
 
-	SRVManager* srvManager = TextureManager::GetInstance()->GetSRVManager();
+	SRVManager* srvManager = textureManager_->GetSRVManager();
 	if (srvManager)
 	{
 		srvManager->PreDraw();
@@ -459,9 +392,9 @@ void ParticleManager::Draw(ID3D12GraphicsCommandList* commandList, const RenderC
 	}
 	
 	// Camera
-	if (ctx.camera && ctx.camera->GetCameraResource())
+	if (ctx.camera && ctx.camera->GetCameraGpuAddress() != 0)
 	{
-		commandList->SetGraphicsRootConstantBufferView(RootParam::Particle::kCamera, ctx.camera->GetCameraResource()->GetGPUVirtualAddress());
+		commandList->SetGraphicsRootConstantBufferView(RootParam::Particle::kCamera, ctx.camera->GetCameraGpuAddress());
 	}
 	
 	// PerView
@@ -707,34 +640,10 @@ void ParticleManager::InitializeBlend()
 	blendDesc.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
 	blendDesc.RenderTarget[0].BlendEnable = TRUE;
 
-	//--ノーマルブレンド------------------------------
-	/*blendDesc.RenderTarget[0].SrcBlend = D3D12_BLEND_SRC_ALPHA;
-	blendDesc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
-	blendDesc.RenderTarget[0].DestBlend = D3D12_BLEND_INV_SRC_ALPHA;*/
-	//--------------------------------------------
-
 	//--加算ブレンド------------------------------
 	blendDesc.RenderTarget[0].SrcBlend = D3D12_BLEND_ONE;
 	blendDesc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
 	blendDesc.RenderTarget[0].DestBlend = D3D12_BLEND_ONE;
-	//--------------------------------------------
-
-	//--減算ブレンド------------------------------
-	/*blendDesc.RenderTarget[0].SrcBlend = D3D12_BLEND_ONE;
-	blendDesc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_REV_SUBTRACT;
-	blendDesc.RenderTarget[0].DestBlend = D3D12_BLEND_ONE;*/
-	//--------------------------------------------
-
-	//--乗算ブレンド------------------------------
-	/*blendDesc.RenderTarget[0].SrcBlend = D3D12_BLEND_DEST_COLOR;
-	blendDesc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
-	blendDesc.RenderTarget[0].DestBlend = D3D12_BLEND_ZERO;*/
-	//--------------------------------------------
-
-	//--スクリーン合成------------------------------
-	/*blendDesc.RenderTarget[0].SrcBlend = D3D12_BLEND_INV_DEST_COLOR;
-	blendDesc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
-	blendDesc.RenderTarget[0].DestBlend = D3D12_BLEND_ONE;*/
 	//--------------------------------------------
 
 

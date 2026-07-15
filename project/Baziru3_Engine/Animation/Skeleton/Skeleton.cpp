@@ -1,6 +1,7 @@
 #include "Skeleton.h"
 
 #include "Skeleton.h"
+#include "BinaryAssetUtil.h"
 
 #include "../AnimationData.h"
 #include "../AnimationUtils.h"
@@ -96,10 +97,45 @@ Skeleton SkeletonLoader::CreateSkeleton(const AnimNode& rootNode)
 	return skeleton;
 }
 
+#include <unordered_map>
+#include <mutex>
+
+static std::unordered_map<std::string, Skeleton> s_skeletonCache;
+static std::mutex s_skeletonCacheMutex;
+
 Skeleton SkeletonLoader::LoadSkeletonFile(const std::string& directoryPath, const std::string& filename)
 {
-	Assimp::Importer importer;
 	const std::string fullPath = directoryPath + "/" + filename;
+
+	// メモリキャッシュ確認
+	{
+		std::lock_guard<std::mutex> lock(s_skeletonCacheMutex);
+		auto it = s_skeletonCache.find(fullPath);
+		if (it != s_skeletonCache.end())
+		{
+			return it->second;
+		}
+	}
+
+	Skeleton skeleton;
+	const std::string cachePath = BinaryAssetUtil::GetCachePath(fullPath, ".bskel");
+
+	// キャッシュが有効な場合はバイナリからロード
+	if (BinaryAssetUtil::IsCacheValid(fullPath, cachePath))
+	{
+		if (BinaryAssetUtil::LoadBSkel(cachePath, skeleton))
+		{
+			OutputDebugStringA(("[Binary Cache] Loaded skeleton from cache: " + cachePath + "\n").c_str());
+			// メモリキャッシュに登録
+			{
+				std::lock_guard<std::mutex> lock(s_skeletonCacheMutex);
+				s_skeletonCache[fullPath] = skeleton;
+			}
+			return skeleton;
+		}
+	}
+
+	Assimp::Importer importer;
 	const aiScene* scene = importer.ReadFile(fullPath, aiProcess_Triangulate | aiProcess_FlipUVs | aiProcess_GenNormals);
 	if (!scene || !scene->mRootNode)
 	{
@@ -113,7 +149,21 @@ Skeleton SkeletonLoader::LoadSkeletonFile(const std::string& directoryPath, cons
 		return {};
 	}
 
-	return CreateSkeleton(rootNode);
+	skeleton = CreateSkeleton(rootNode);
+
+	// キャッシュとして保存
+	if (BinaryAssetUtil::SaveBSkel(cachePath, skeleton))
+	{
+		OutputDebugStringA(("[Binary Cache] Saved skeleton cache: " + cachePath + "\n").c_str());
+	}
+
+	// メモリキャッシュに登録
+	{
+		std::lock_guard<std::mutex> lock(s_skeletonCacheMutex);
+		s_skeletonCache[fullPath] = skeleton;
+	}
+
+	return skeleton;
 }
 
 void Skeleton::ApplyAnimation(const Animation& animation, float animationTime)

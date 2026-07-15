@@ -10,7 +10,7 @@ public:
 	void Initialize(DirectXCom* directXCom);
 
 
-	static constexpr uint32_t kMaxSRVCount = 512;
+	static constexpr uint32_t kMaxSRVCount = 8192;
 
 	//SRV作成
 	void CreateSRVForTexture2D(uint32_t srvIndex, ID3D12Resource* pResource, DXGI_FORMAT Format, UINT MipLeveles);
@@ -27,6 +27,7 @@ public:
 	uint32_t AllocateAt(uint32_t index);
 
 	void Free(uint32_t index);
+	DirectXCom* GetDirectXCom() const { return directXCom_; }
 
 public:
 	void SeTGraphicsRootDescriptorTable(UINT RootParameterIndex, uint32_t srvIndex)
@@ -38,19 +39,7 @@ public:
 	D3D12_GPU_DESCRIPTOR_HANDLE GetGPUDescriptorHandle(uint32_t index);
 
 private:
-
 	SRVManager(const SRVManager&) = delete;
 	SRVManager& operator=(const SRVManager&) = delete;
 	DirectXCom* directXCom_ = nullptr;
-
-	//SRV用のデスクリプタサイズ
-	uint32_t descriptorSize_;
-	//SRV用のデスクリプタヒープ
-	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> descriptorHeap;
-
-	//次に使用するSRVインデックス
-	uint32_t useIndex = 2;
-
-	std::vector<uint32_t> freeIndices_;
-	std::vector<char> allocatedFlags_; // インデックスの使用状況を管理するマップ
 };

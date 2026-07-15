@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 #include <unordered_map>
+#include <mutex>
 
 /// <summary>
 /// GPUタイムスタンプクエリを用いたレンダリングパスの負荷計測プロファイラクラス。
@@ -110,4 +111,5 @@ private:
     std::vector<ProfileResult> results_;                    // CPUで回収・変換済みの最終計測データ
 
     bool isFrameActive_ = false; // フレーム計測が現在進行中かどうかのフラグ
+    std::mutex mutex_;           // 排他制御用ミューテックス
 };

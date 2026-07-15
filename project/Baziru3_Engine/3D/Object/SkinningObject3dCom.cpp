@@ -2,6 +2,7 @@
 #include "Light.h"
 #include "SceneManager.h"
 #include "TextureManager.h"
+#include "Baziru3_Engine/Collision/CollisionManager.h"
 
 // 参照メンバー logStream を初期化するコンストラクタ定義
 SkinningObject3dCom::SkinningObject3dCom(std::ostream& logStream)
@@ -49,6 +50,15 @@ void SkinningObject3dCom::CreateGraphicsPipelineState()
             dxCommon->SetHr(dxCommon->GetDevice()->CreateGraphicsPipelineState(&desc, IID_PPV_ARGS(&pipelineState)));
             assert(SUCCEEDED(dxCommon->GetHr()));
         }
+        if (pipelineStateWireframe == nullptr)
+        {
+            auto descWire = desc;
+            descWire.RasterizerState.FillMode = D3D12_FILL_MODE_WIREFRAME;
+            descWire.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO; // 防止Z-fighting
+            descWire.PS = { wireframePixelShaderBlob->GetBufferPointer(), wireframePixelShaderBlob->GetBufferSize() };
+            dxCommon->SetHr(dxCommon->GetDevice()->CreateGraphicsPipelineState(&descWire, IID_PPV_ARGS(&pipelineStateWireframe)));
+            assert(SUCCEEDED(dxCommon->GetHr()));
+        }
     }
 }
 
@@ -80,18 +90,22 @@ void SkinningObject3dCom::Draw(Object3d* object, const ::RenderContext& ctx, con
     barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
     barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
     barrier.Transition.pResource = skinCluster.uavResource.Get();
-    barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COMMON;
-    barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
     barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-    ctx.commandList->ResourceBarrier(1, &barrier);
 
-    // 2. スキンニング実行
-    Skinning(object, ctx.commandList);
+    if (!object->IsShared())
+    {
+        barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COMMON;
+        barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+        ctx.commandList->ResourceBarrier(1, &barrier);
 
-    // 3. 頂点バッファとして読み込むためのバリア
-    barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
-    barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER;
-    ctx.commandList->ResourceBarrier(1, &barrier);
+        // 2. スキンニング実行
+        Skinning(object, ctx.commandList);
+
+        // 3. 頂点バッファとして読み込むためのバリア
+        barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+        barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER;
+        ctx.commandList->ResourceBarrier(1, &barrier);
+    }
 
     if (rootSignature)
     {
@@ -102,17 +116,14 @@ void SkinningObject3dCom::Draw(Object3d* object, const ::RenderContext& ctx, con
         ctx.commandList->SetPipelineState(pipelineState.Get());
     }
 
+    // 描画用の定数バッファをアロケート・転送
+    object->PrepareConstantBuffers(dxCommon);
+
     // Material (CBV at b0, Pixel Shader) -> Index 0
-    if (object->GetMaterialResource())
-    {
-        ctx.commandList->SetGraphicsRootConstantBufferView(0, object->GetMaterialResource()->GetGPUVirtualAddress());
-    }
+    ctx.commandList->SetGraphicsRootConstantBufferView(0, object->GetMaterialGPUAddress());
 
     // Transformation Matrix (CBV at b0, Vertex Shader) -> Index 1
-    if (object->GetTransformationMatrixResource())
-    {
-        ctx.commandList->SetGraphicsRootConstantBufferView(1, object->GetTransformationMatrixResource()->GetGPUVirtualAddress());
-    }
+    ctx.commandList->SetGraphicsRootConstantBufferView(1, object->GetTransformationMatrixGPUAddress());
 
     // Texture Descriptor Table (t3, Pixel Shader) -> Index 2
     if (ctx.textureHandle.ptr != 0)
@@ -131,9 +142,9 @@ void SkinningObject3dCom::Draw(Object3d* object, const ::RenderContext& ctx, con
     }
 
     // Camera (CBV at b2, Pixel Shader) -> Index 4
-    if (ctx.camera->GetCameraResource())
+    if (ctx.camera->GetCameraGpuAddress() != 0)
     {
-        ctx.commandList->SetGraphicsRootConstantBufferView(4, ctx.camera->GetCameraResource()->GetGPUVirtualAddress());
+        ctx.commandList->SetGraphicsRootConstantBufferView(4, ctx.camera->GetCameraGpuAddress());
     }
     else
     {
@@ -175,6 +186,38 @@ void SkinningObject3dCom::Draw(Object3d* object, const ::RenderContext& ctx, con
     else
     {
         ctx.commandList->DrawInstanced(static_cast<UINT>(modelData.vertices.size()), 1, 0, 0);
+    }
+
+    // GPU-accelerated wireframe overlay draw (if enabled in Collision Debug panel)
+    if (CollisionManager::GetInstance()->IsShowDebugColliders() && CollisionManager::GetInstance()->IsShowMeshWireframe())
+    {
+        bool drawWireframe = true;
+        if (ctx.camera)
+        {
+            Vector3 camPos = ctx.camera->GetTranslate();
+            Vector3 objPos = object->GetTranslate();
+            float dx = objPos.x - camPos.x;
+            float dy = objPos.y - camPos.y;
+            float dz = objPos.z - camPos.z;
+            float distSq = dx * dx + dy * dy + dz * dz;
+            if (distSq > 40.0f * 40.0f) // Skip wireframe if further than 40 units
+            {
+                drawWireframe = false;
+            }
+        }
+
+        if (drawWireframe && pipelineStateWireframe)
+        {
+            ctx.commandList->SetPipelineState(pipelineStateWireframe.Get());
+            if (object->HasIndexBuffer())
+            {
+                ctx.commandList->DrawIndexedInstanced(static_cast<UINT>(modelData.indices.size()), 1, 0, 0, 0);
+            }
+            else
+            {
+                ctx.commandList->DrawInstanced(static_cast<UINT>(modelData.vertices.size()), 1, 0, 0);
+            }
+        }
     }
 
     // 4. 描画終了後にCOMMON状態に戻す
@@ -378,6 +421,10 @@ void SkinningObject3dCom::ShaderCompile()
     pixelShaderBlob = dxCommon->CompileShader(L"Resources/shaders/Object3d.PS.hlsl",
         L"ps_6_0", dxCommon->GetDxcUtils().Get(), dxCommon->GetDxcCompiler(), dxCommon->GetIncludeHandler(), logStream);
     assert(pixelShaderBlob != nullptr);
+
+    wireframePixelShaderBlob = dxCommon->CompileShader(L"Resources/shaders/DebugWireframe.PS.hlsl",
+        L"ps_6_0", dxCommon->GetDxcUtils().Get(), dxCommon->GetDxcCompiler(), dxCommon->GetIncludeHandler(), logStream);
+    assert(wireframePixelShaderBlob != nullptr);
 }
 
 void SkinningObject3dCom::InitializeGraphicPipeline()

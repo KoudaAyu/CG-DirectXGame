@@ -10,7 +10,9 @@ enum class ColliderType
 {
     Sphere,  // 球
     Box,     // 直方体 (OBB/AABB)
-    Capsule  // カプセル
+    Capsule, // カプセル
+    Mesh,    // メッシュ (ポリゴン精密判定)
+    Skeleton // スケルトン (関節ごとの球体コライダー)
 };
 
 /// <summary>
@@ -25,27 +27,29 @@ enum class CollisionAttribute
     Obstacle   // 障害物（カバー等）
 };
 
-/// <summary>
-/// コライダーの基底クラス
-/// すべての当たり判定形状クラス（Sphere, Box, Capsule）のベースとなります。
-/// </summary>
+struct CollisionInfo
+{
+    class Collider* other = nullptr; // 衝突相手
+    Vector3 contactPoint{};          // 衝突点（ワールド座標）
+    Vector3 normal{};                // 衝突法線（相手から自分への方向）
+    float depth = 0.0f;              // めり込み深さ
+};
+
+/**
+ * @brief コライダーの基底クラス
+ * @details すべての当たり判定形状クラス（Sphere, Box, Capsule）のベースとなります。
+ */
 class Collider
 {
 public:
-    /// <summary>
-    /// コンストラクタ
-    /// </summary>
-    /// <param name="type">コライダーの形状タイプ</param>
-    /// <param name="attribute">衝突グループ属性</param>
-    Collider(ColliderType type, CollisionAttribute attribute)
-        : type_(type)
-        , attribute_(attribute)
-        , positionOffset_({ 0.0f, 0.0f, 0.0f })
-        , isTrigger_(false)
-        , isEnabled_(true)
-    {}
+	/**
+	 * @brief コンストラクタ
+	 * @param type コライダーの形状タイプ
+	 * @param attribute 衝突グループ属性
+	 */
+    Collider(ColliderType type, CollisionAttribute attribute);
 
-    virtual ~Collider() = default;
+    virtual ~Collider();
 
     // --- ゲッター / セッター ---
     
@@ -55,15 +59,17 @@ public:
     void SetPositionOffset(const Vector3& offset) { positionOffset_ = offset; }
     const Vector3& GetPositionOffset() const { return positionOffset_; }
 
-    /// <summary>
-    /// コライダーの現在の世界座標を取得（オフセット含む）
-    /// 派生クラス側でターゲットの本体座標とオフセットを合成して返します。
-    /// </summary>
+	/**
+	 * @brief コライダーの現在の世界座標を取得（オフセット含む）
+	 * @details 派生クラス側でターゲットの本体座標とオフセットを合成して返します。
+	 * @return コライダーのグローバル座標
+	 */
     virtual Vector3 GetWorldPosition() const = 0;
 
-    /// <summary>
-    /// コライダーの現在の世界座標を設定（親オブジェクトの座標を補正）
-    /// </summary>
+	/**
+	 * @brief コライダーの現在の世界座標を設定（親オブジェクトの座標を補正）
+	 * @param pos 設定する世界座標
+	 */
     virtual void SetWorldPosition(const Vector3& pos) = 0;
 
     /// <summary>
@@ -80,21 +86,39 @@ public:
 
     // --- 衝突イベントコールバック ---
     
-    /// <summary>
-    /// 他のコライダーと衝突した際に呼び出されるコールバックを設定します。
-    /// </summary>
+	/**
+	 * @brief 他のコライダーと衝突した際に呼び出されるコールバックを設定します。
+	 * @param callback 衝突時コールバック関数ポインタ
+	 */
     void SetOnCollision(std::function<void(Collider* other)> callback) { onCollision_ = callback; }
+    void SetOnCollision(std::function<void(const CollisionInfo& info)> callback) { onCollisionInfo_ = callback; }
+
+    // --- トリガーイベントコールバック ---
+    void SetOnTriggerEnter(std::function<void(Collider* other)> callback) { onTriggerEnter_ = callback; }
+    void SetOnTriggerStay(std::function<void(Collider* other)> callback) { onTriggerStay_ = callback; }
+    void SetOnTriggerExit(std::function<void(Collider* other)> callback) { onTriggerExit_ = callback; }
     
     /// <summary>
     /// 衝突イベントをトリガーします。
     /// </summary>
-    void OnCollision(Collider* other)
+    void OnCollision(const CollisionInfo& info)
     {
+        if (onCollisionInfo_)
+        {
+            onCollisionInfo_(info);
+        }
         if (onCollision_)
         {
-            onCollision_(other);
+            onCollision_(info.other);
         }
     }
+
+    /// <summary>
+    /// トリガーイベントを呼び出します。
+    /// </summary>
+    void OnTriggerEnter(Collider* other) { if (onTriggerEnter_) onTriggerEnter_(other); }
+    void OnTriggerStay(Collider* other)  { if (onTriggerStay_)  onTriggerStay_(other); }
+    void OnTriggerExit(Collider* other)  { if (onTriggerExit_)  onTriggerExit_(other); }
 
 private:
     ColliderType type_;                                     // 形状タイプ
@@ -103,4 +127,10 @@ private:
     bool isTrigger_;                                        // トリガー設定 (trueなら押し出し補正をスキップ)
     bool isEnabled_;                                        // 有効状態フラグ
     std::function<void(Collider* other)> onCollision_;      // 衝突時コールバック関数
+    std::function<void(const CollisionInfo& info)> onCollisionInfo_; // 詳細衝突コールバック
+
+    // トリガー用コールバック
+    std::function<void(Collider* other)> onTriggerEnter_;
+    std::function<void(Collider* other)> onTriggerStay_;
+    std::function<void(Collider* other)> onTriggerExit_;
 };
