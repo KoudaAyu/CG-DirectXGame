@@ -201,41 +201,58 @@ draw_arrow(draw, (450, 165), (365, 165), GREEN, width=2)
 img.save(os.path.join(output_dir, "slide_bt_bb.png"))
 
 # ----------------------------------------------------
-# 7. BVH / AABB Tree (slide_bvh.png) - ★色の視認性を高め、右箱の覆い隠しを完全に排除
+# 7. BVH / AABB Tree (slide_bvh.png) - ★三角形の色を見やすくし、文字のセンタリング（中央寄せ）を完全自動計算に修正
 # ----------------------------------------------------
 img = Image.new("RGB", (650, 280), BG_COLOR)
 draw = ImageDraw.Draw(img)
-# 1) 青い大きな箱 (Root AABB) - 視認性の高い太さ3pxの青い枠
+# 1) 青い大きな箱 (Root AABB)
 draw.rectangle([30, 30, 570, 200], fill=None, outline=BLUE, width=3)
 draw.text((45, 38), "◆ Root AABB (モデル全体を包む箱)", fill=BLUE, font=font_medium)
 
-# 2) 左の緑の箱 (Left AABB) - はっきりした緑
+# 2) 左の緑の箱 (Left AABB)
 draw.rectangle([50, 65, 275, 185], fill=None, outline=GREEN, width=2)
 draw.text((65, 73), "Left AABB (左側)", fill=GREEN, font=font_medium)
 
-# 3) 右の橙の箱 (Right AABB) - 明るいオレンジ
+# 3) 右の橙の箱 (Right AABB)
 draw.rectangle([305, 65, 550, 185], fill=None, outline=ORANGE, width=2)
 draw.text((320, 73), "Right AABB (右側)", fill=ORANGE, font=font_medium)
 
-# 4) 左箱の中の三角形ポリゴン (明るめの青グレーで塗りつぶし、白枠で形をクッキリ浮き出させる)
-POLY_FILL = (70, 78, 90)
+# 4) 左箱の中の三角形ポリゴン (★背景と同化しないよう「明るいライトグレー(170, 180, 195)」に変更し、白枠で境界を際立たせる)
+POLY_FILL = (170, 180, 195)
 draw.polygon([(80, 165), (120, 95), (160, 155)], fill=POLY_FILL, outline=WHITE)
 draw.polygon([(180, 175), (210, 110), (250, 165)], fill=POLY_FILL, outline=WHITE)
 
-# 5) 右箱の中の三角形ポリゴン (赤い吹き出しを完全に外に出したため、中身がハッキリ見える状態)
+# 5) 右箱の中の三角形ポリゴン (★同じく明るい色に変更)
 draw.polygon([(340, 155), (380, 95), (420, 165)], fill=POLY_FILL, outline=WHITE)
 draw.polygon([(450, 175), (480, 110), (520, 160)], fill=POLY_FILL, outline=WHITE)
 
-# 6) レーザー光線 - 鮮やかな赤に変更
+# 6) レーザー光線 (明るく鮮やかな赤)
 draw.line([10, 130, 140, 130], fill=RED, width=3)
 draw_arrow(draw, (140, 130), (200, 130), RED, width=3)
 draw.text((10, 105), "レーザー光線", fill=RED, font=font_medium)
 
-# 7) 右箱のスキップ説明の赤い吹き出しを、右箱の真下(X=310, Y=210)の枠外に移動！(被りゼロ)
-draw.rounded_rectangle([310, 210, 545, 265], radius=4, fill=(180, 50, 50))
-# テキストサイズを小にして、赤い箱の内側で綺麗にセンタリング
-draw.text((325, 218), "【右箱は非衝突】➔ 中身の計算を全スキップ！", fill=WHITE, font=font_small)
+# 7) 右箱のスキップ説明の赤い箱 (★横幅を310pxに大幅に広げ、位置をX=250へ変更し、はみ出しを完全防止)
+box_left, box_top, box_right, box_bottom = 250, 210, 560, 260
+draw.rounded_rectangle([box_left, box_top, box_right, box_bottom], radius=4, fill=(180, 50, 50))
+
+# ★文字の位置を「赤い箱のド真ん中」に配置するための自動センタリング計算
+text_content = "【右箱は非衝突】 ➔ 中身の計算を全スキップ！"
+# テキストの長さ（ピクセル幅）を取得
+try:
+    text_width = draw.textlength(text_content, font=font_small)
+except AttributeError:
+    # 古いPILバージョン対策用の代替計算 (1文字あたり約8〜13ピクセル)
+    text_width = len(text_content.encode('utf-8')) * 7.5
+
+box_width = box_right - box_left
+box_height = box_bottom - box_top
+# 横方向のセンタリング開始位置
+text_x = box_left + (box_width - text_width) / 2
+# 縦方向のセンタリング開始位置
+text_y = box_top + (box_height - 13) / 2
+
+draw.text((text_x, text_y), text_content, fill=WHITE, font=font_small)
 
 img.save(os.path.join(output_dir, "slide_bvh.png"))
 
-print("すべての画像から文字被りを解消し、色の視認性を高めて再生成しました！")
+print("すべての画像から文字被りを解消し、中央寄せを自動計算にして再生成しました！")
