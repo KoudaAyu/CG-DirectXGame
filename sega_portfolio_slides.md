@@ -62,7 +62,7 @@ style: |
   * コライダー、AI、メモリを低レイヤで疎結合化。
   * コンソール開発で重要となる「動的確保の抑制」と「計算量削減」を実証。
 
-![System Architecture](file:///c:/Users/k024g/OneDrive/デスクトップ/Engine_ver2026/project/Resources/slides/slide_system.png)
+![System Architecture](project/Resources/slides/slide_system.png)
 
 ---
 
@@ -87,7 +87,7 @@ style: |
   * 256バイト境界アラインを自動調整し、ポインタ前進のみで高速切出。
   * GPUが読み込み中のバッファへのCPU上書きを防ぐフェンス同期。
 
-![Allocator](file:///c:/Users/k024g/OneDrive/デスクトップ/Engine_ver2026/project/Resources/slides/slide_allocator.png)
+![Allocator](project/Resources/slides/slide_allocator.png)
 
 ---
 
@@ -99,7 +99,7 @@ style: |
   * **確保 ($O(1)$)**：内部オフセットポインタをサイズ分進めるだけの高速処理。
   * **解放 ($O(1)$)**：フレーム終了時にポインタを「0」に戻すだけの一括リセット。
 
-![Stack](file:///c:/Users/k024g/OneDrive/デスクトップ/Engine_ver2026/project/Resources/slides/slide_stack.png)
+![Stack](project/Resources/slides/slide_stack.png)
 
 ---
 
@@ -110,7 +110,7 @@ style: |
   * 3D空間を `10.0f` ごとの3Dグリッドセルに分割。
   * 座標からハッシュキーを算出し、近隣セル内のオブジェクト同士のみを判定。
 
-![Spatial Hash](file:///c:/Users/k024g/OneDrive/デスクトップ/Engine_ver2026/project/Resources/slides/slide_spatial_hash.png)
+![Spatial Hash](project/Resources/slides/slide_spatial_hash.png)
 
 ---
 
@@ -121,7 +121,7 @@ style: |
   * 判定に必要なパラメータ（座標、半径等）のみを連続配列に抽出。
   * メモリ上で隣接した配列に対して、単純ループで一括判定処理。
 
-![DOD](file:///c:/Users/k024g/OneDrive/デスクトップ/Engine_ver2026/project/Resources/slides/slide_dod.png)
+![DOD](project/Resources/slides/slide_dod.png)
 
 ---
 
@@ -146,7 +146,7 @@ style: |
   * **Blackboard**: 個体用メモリを保持し、状態パラメータをノード間で共有。
   * **GUIエディタ**: `imgui-node-editor` でAI構造をリアルタイム編集しJSON出力。
 
-![Behavior Tree](file:///c:/Users/k024g/OneDrive/デスクトップ/Engine_ver2026/project/Resources/slides/slide_bt_bb.png)
+![Behavior Tree](project/Resources/slides/slide_bt_bb.png)
 
 ---
 
@@ -172,7 +172,7 @@ style: |
   * コライダー群を階層的にAABB（境界箱）でグループ化。
   * 親AABBと非衝突なら、内包される子オブジェクトの判定計算を早期スキップ。
 
-![BVH](file:///c:/Users/k024g/OneDrive/デスクトップ/Engine_ver2026/project/Resources/slides/slide_bvh.png)
+![BVH](project/Resources/slides/slide_bvh.png)
 
 ---
 
