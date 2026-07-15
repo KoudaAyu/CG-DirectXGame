@@ -142,11 +142,11 @@ draw.text((345, 60), "ワールド座標 / セルサイズ\n➔ セル所属判�
 img.save(os.path.join(output_dir, "slide_spatial_hash.png"))
 
 # ----------------------------------------------------
-# 5. DOD vs OOP Diagram (slide_dod.png) - ★タイトルの文字色を高輝度に変更して視認性を確保
+# 5. DOD vs OOP Diagram (slide_dod.png) - ★一本の連続した緑色のバーに改善
 # ----------------------------------------------------
 img = Image.new("RGB", (650, 280), BG_COLOR)
 draw = ImageDraw.Draw(img)
-# OOP (暗いグレーから、白に変更してハッキリ読めるようにする)
+# OOP
 draw.text((40, 20), "従来の設計 (OOP: オブジェクト指向)", fill=TEXT_COLOR, font=font_large)
 draw.rounded_rectangle([30, 60, 150, 95], radius=4, fill=GRAY)
 draw.text((42, 70), "Obj A (ポインタ)", fill=TEXT_COLOR, font=font_small)
@@ -158,17 +158,19 @@ draw.text((42, 170), "Obj C (ポインタ)", fill=TEXT_COLOR, font=font_small)
 draw_arrow(draw, (150, 77), (190, 118), RED)
 draw_arrow(draw, (190, 137), (150, 177), RED)
 draw.text((330, 118), "➔ メモリが散在しキャッシュミス多発", fill=RED, font=font_medium)
-# DOD (暗い緑から、明るいライムグリーンに変更してハッキリ読めるようにする)
+# DOD
 draw.text((40, 210), "最適化設計 (DOD: データ指向設計)", fill=GREEN, font=font_large)
-# 連続メモリ
-draw.rectangle([40, 240, 610, 270], fill=GRAY, outline=GREEN, width=1)
-draw.rectangle([41, 241, 200, 269], fill=GREEN)
+# 連続メモリ (★全体をGREENで塗りつぶし、黒枠線で一本のバーにする)
+draw.rectangle([40, 240, 610, 270], fill=GREEN, outline=BG_COLOR, width=1)
+# Data A, B, C の間に黒の縦線を引いてデータを視覚的に区切る
+draw.line([(200, 240), (200, 270)], fill=BG_COLOR, width=1)
+draw.line([(360, 240), (360, 270)], fill=BG_COLOR, width=1)
+draw.line([(520, 240), (520, 270)], fill=BG_COLOR, width=1)
+# テキスト描画 (★文字色をすべて黒「BG_COLOR」にして、緑のバーの上に綺麗に表示)
 draw.text((50, 247), "Data A (位置/コライダー)", fill=BG_COLOR, font=font_small)
-draw.rectangle([201, 241, 360, 269], fill=GREEN)
 draw.text((210, 247), "Data B (位置/コライダー)", fill=BG_COLOR, font=font_small)
-draw.rectangle([361, 241, 520, 269], fill=GREEN)
 draw.text((370, 247), "Data C (位置/コライダー)", fill=BG_COLOR, font=font_small)
-draw.text((530, 247), "連続メモリ", fill=TEXT_COLOR, font=font_small)
+draw.text((532, 247), "連続メモリ", fill=BG_COLOR, font=font_small)
 img.save(os.path.join(output_dir, "slide_dod.png"))
 
 # ----------------------------------------------------
@@ -195,7 +197,7 @@ draw.rounded_rectangle([450, 60, 630, 200], radius=8, fill=BLUE)
 draw.text((465, 75), "Blackboard\n(共有メモリ)", fill=BG_COLOR, font=font_large)
 # テキスト描画位置を矢印接続部分より上(Y=125)にずらして被りを完全排除
 draw.text((465, 125), "・Target: Player\n・MoveSpeed: 5.0", fill=BG_COLOR, font=font_medium)
-# 接続矢印：Action of 右端(365)からBlackboardの左端(450)を正確に接続 (箱の内部に侵入させない)
+# 接続矢印：Actionの右端(365)からBlackboardの左端(450)を正確に接続 (箱の内部に侵入させない)
 draw_arrow(draw, (365, 185), (450, 185), RED, width=2)
 draw_arrow(draw, (450, 165), (365, 165), GREEN, width=2)
 img.save(os.path.join(output_dir, "slide_bt_bb.png"))
