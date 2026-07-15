@@ -719,6 +719,10 @@ Microsoft::WRL::ComPtr<IDxcBlob> DirectXCom::CompileShader(const std::wstring& f
 	// argStrings.push_back(L"-Od");
 	argStrings.push_back(L"-O3");
 	argStrings.push_back(L"-Zpr");
+	// カレントディレクトリ（プロジェクトルート）もインクルード検索パスに追加
+	argStrings.push_back(L"-I");
+	argStrings.push_back(L".");
+
 	if (!shaderDir.empty())
 	{
 		argStrings.push_back(L"-I");
