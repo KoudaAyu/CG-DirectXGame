@@ -130,10 +130,10 @@ for i in range(5):
 # グリッドセルラベル (グリッド枠に被らないよう配置)
 draw.text((start_x + 8, start_y + 8), "Cell A", fill=LIGHT_GRAY, font=font_small)
 draw.text((start_x + 58, start_y + 8), "Cell B", fill=LIGHT_GRAY, font=font_small)
-# オブジェクト
-draw.ellipse([start_x + 15, start_y + 15, start_x + 35, start_y + 35], fill=BLUE)  # Obj1 in Cell A
-draw.ellipse([start_x + 20, start_y + 70, start_x + 40, start_y + 90], fill=BLUE)  # Obj2 in Cell A (下)
-draw.ellipse([start_x + 165, start_y + 115, start_x + 185, start_y + 135], fill=GREEN) # Obj3 in Cell
+# オブジェクト (明るくハッキリした色に変更)
+draw.ellipse([start_x + 15, start_y + 15, start_x + 35, start_y + 35], fill=BLUE, outline=WHITE)  # Obj1 in Cell A
+draw.ellipse([start_x + 20, start_y + 70, start_x + 40, start_y + 90], fill=BLUE, outline=WHITE)  # Obj2 in Cell A (下)
+draw.ellipse([start_x + 165, start_y + 115, start_x + 185, start_y + 135], fill=GREEN, outline=WHITE) # Obj3 in Cell
 # 衝突判定ライン
 draw.line([start_x + 25, start_y + 35, start_x + 30, start_y + 70], fill=RED, width=2)
 # フローテキスト (矢印の始点をX=270から離す)
@@ -172,7 +172,7 @@ draw.text((530, 248), "連続メモリ", fill=TEXT_COLOR, font=font_small)
 img.save(os.path.join(output_dir, "slide_dod.png"))
 
 # ----------------------------------------------------
-# 6. Behavior Tree ＆ Blackboard Diagram (slide_bt_bb.png) - ★文字被りを完全に修正
+# 6. Behavior Tree ＆ Blackboard Diagram (slide_bt_bb.png)
 # ----------------------------------------------------
 img = Image.new("RGB", (650, 280), BG_COLOR)
 draw = ImageDraw.Draw(img)
@@ -183,7 +183,7 @@ draw.rounded_rectangle([180, 85, 290, 125], radius=4, fill=GRAY)
 draw.text((205, 95), "Selector", fill=TEXT_COLOR, font=font_medium)
 draw.rounded_rectangle([90, 160, 200, 200], radius=4, fill=GRAY)
 draw.text((108, 170), "Sequence", fill=TEXT_COLOR, font=font_medium)
-# Action(攻撃)の幅を120ピクセル(240➔360)に拡張して、文字『撃』が枠からはみ出さないように配置
+# Action(攻撃)の幅を125ピクセルに拡張して、文字『撃』が枠からはみ出さないように配置
 draw.rounded_rectangle([240, 160, 365, 200], radius=4, fill=ORANGE)
 draw.text((255, 170), "Action (攻撃)", fill=BG_COLOR, font=font_medium)
 # 接続線 (X座標をジャストに設定して枠と枠を直接繋ぐ)
@@ -201,32 +201,41 @@ draw_arrow(draw, (450, 165), (365, 165), GREEN, width=2)
 img.save(os.path.join(output_dir, "slide_bt_bb.png"))
 
 # ----------------------------------------------------
-# 7. BVH / AABB Tree (slide_bvh.png) - ★文字被りを修正
+# 7. BVH / AABB Tree (slide_bvh.png) - ★色の視認性を高め、右箱の覆い隠しを完全に排除
 # ----------------------------------------------------
 img = Image.new("RGB", (650, 280), BG_COLOR)
 draw = ImageDraw.Draw(img)
-# 1) 青い大きな箱 (Root AABB)
-draw.rectangle([30, 40, 570, 240], fill=None, outline=BLUE, width=3)
-draw.text((45, 48), "◆ Root AABB (モデル全体を包む箱)", fill=BLUE, font=font_medium)
-# 2) 左の緑の箱 (Left AABB)
-draw.rectangle([50, 75, 275, 220], fill=None, outline=GREEN, width=2)
-draw.text((65, 83), "Left AABB (左側)", fill=GREEN, font=font_medium)
-# 3) 右の橙の箱 (Right AABB)
-draw.rectangle([305, 75, 550, 220], fill=None, outline=ORANGE, width=2)
-draw.text((320, 83), "Right AABB (右側)", fill=ORANGE, font=font_medium)
-# 4) 左箱の中の三角形ポリゴン
-draw.polygon([(80, 190), (120, 110), (160, 180)], fill=GRAY, outline=LIGHT_GRAY)
-draw.polygon([(180, 200), (210, 130), (250, 190)], fill=GRAY, outline=LIGHT_GRAY)
-# 5) 右箱の中の三角形ポリゴン
-draw.polygon([(340, 180), (380, 110), (420, 190)], fill=GRAY, outline=LIGHT_GRAY)
-draw.polygon([(450, 200), (480, 120), (520, 185)], fill=GRAY, outline=LIGHT_GRAY)
-# 6) レーザー光線 (テキストと線をスライド中央に配置)
-draw.line([10, 140, 140, 140], fill=RED, width=3)
-draw_arrow(draw, (140, 140), (200, 140), RED, width=3)
-draw.text((10, 115), "レーザー光線", fill=RED, font=font_medium)
-# 7) 右箱のスキップ説明 (箱の内側で文字がはみ出さないようにサイズ調整)
-draw.rounded_rectangle([325, 115, 530, 185], radius=4, fill=(180, 50, 50))
-draw.text((335, 125), "【右箱は非衝突】\n中身の計算を完全に\nスキップ (サボる) !", fill=WHITE, font=font_medium)
+# 1) 青い大きな箱 (Root AABB) - 視認性の高い太さ3pxの青い枠
+draw.rectangle([30, 30, 570, 200], fill=None, outline=BLUE, width=3)
+draw.text((45, 38), "◆ Root AABB (モデル全体を包む箱)", fill=BLUE, font=font_medium)
+
+# 2) 左の緑の箱 (Left AABB) - はっきりした緑
+draw.rectangle([50, 65, 275, 185], fill=None, outline=GREEN, width=2)
+draw.text((65, 73), "Left AABB (左側)", fill=GREEN, font=font_medium)
+
+# 3) 右の橙の箱 (Right AABB) - 明るいオレンジ
+draw.rectangle([305, 65, 550, 185], fill=None, outline=ORANGE, width=2)
+draw.text((320, 73), "Right AABB (右側)", fill=ORANGE, font=font_medium)
+
+# 4) 左箱の中の三角形ポリゴン (明るめの青グレーで塗りつぶし、白枠で形をクッキリ浮き出させる)
+POLY_FILL = (70, 78, 90)
+draw.polygon([(80, 165), (120, 95), (160, 155)], fill=POLY_FILL, outline=WHITE)
+draw.polygon([(180, 175), (210, 110), (250, 165)], fill=POLY_FILL, outline=WHITE)
+
+# 5) 右箱の中の三角形ポリゴン (赤い吹き出しを完全に外に出したため、中身がハッキリ見える状態)
+draw.polygon([(340, 155), (380, 95), (420, 165)], fill=POLY_FILL, outline=WHITE)
+draw.polygon([(450, 175), (480, 110), (520, 160)], fill=POLY_FILL, outline=WHITE)
+
+# 6) レーザー光線 - 鮮やかな赤に変更
+draw.line([10, 130, 140, 130], fill=RED, width=3)
+draw_arrow(draw, (140, 130), (200, 130), RED, width=3)
+draw.text((10, 105), "レーザー光線", fill=RED, font=font_medium)
+
+# 7) 右箱のスキップ説明の赤い吹き出しを、右箱の真下(X=310, Y=210)の枠外に移動！(被りゼロ)
+draw.rounded_rectangle([310, 210, 545, 265], radius=4, fill=(180, 50, 50))
+# テキストサイズを小にして、赤い箱の内側で綺麗にセンタリング
+draw.text((325, 218), "【右箱は非衝突】➔ 中身の計算を全スキップ！", fill=WHITE, font=font_small)
+
 img.save(os.path.join(output_dir, "slide_bvh.png"))
 
-print("すべての画像から文字被りを解消して再生成しました！")
+print("すべての画像から文字被りを解消し、色の視認性を高めて再生成しました！")
