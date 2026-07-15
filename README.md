@@ -31,7 +31,7 @@ C++ および DirectX 12 を用いてスクラッチから構築した、自作3
 * **言語**: C++ (C++20 / ISO C++ 最新規格)
 * **グラフィックス API**: DirectX 12 (Direct3D 12)
 * **シェーダー言語**: HLSL (Shader Model 6.x)
-* **開発環境**: Visual Studio 2022 (MSBuild, Platform Toolset v143 / v145)
+* **開発環境**: Visual Studio 2026 (MSBuild, Platform Toolset v143 / v145)
 * **主要外部ライブラリ**:
   * **ImGui**: デバッグインターフェース用
   * **imgui-node-editor**: Behavior Tree 等のノード編集ツール用
@@ -211,7 +211,7 @@ CollisionManager::GetInstance()->RegisterCollider(collider.get());
 
 ### 前提要件
 * **OS**: Windows 10 / 11
-* **開発ツール**: Visual Studio 2022
+* **開発ツール**: Visual Studio 2026
 * **SDK**: Windows SDK 10.0.x 以上
 
 ### ビルド・実行手順
@@ -219,6 +219,6 @@ CollisionManager::GetInstance()->RegisterCollider(collider.get());
    ```bash
    git clone https://github.com/KoudaAyu/CG-DirectXGame.git
    ```
-2. `project/DirectXGame.sln` を Visual Studio 2022 で開きます。
+2. `project/DirectXGame.sln` を Visual Studio 2026 で開きます。
 3. 構成（Debug/Development/Release）を選択し、ビルド（F7）を行い、**F5キー**を押してデバッグ実行します。
 
