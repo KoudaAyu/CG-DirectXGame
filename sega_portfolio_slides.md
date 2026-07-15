@@ -62,7 +62,7 @@ style: |
   * コライダー、AI、メモリを低レイヤで疎結合化。
   * コンソール開発で重要となる「動的確保の抑制」と「計算量削減」を実証。
 
-![System Architecture](https://raw.githubusercontent.com/KoudaAyu/CG-DirectXGame/master/project/Resources/slides/slide_system.png)
+![System Architecture](https://raw.githubusercontent.com/KoudaAyu/CG-DirectXGame/master/project/Resources/slides/slide_system.png?v=3)
 
 ---
 
@@ -87,7 +87,7 @@ style: |
   * 256バイト境界アラインを自動調整し、ポインタ前進のみで高速切出。
   * GPUが読み込み中のバッファへのCPU上書きを防ぐフェンス同期。
 
-![Allocator](https://raw.githubusercontent.com/KoudaAyu/CG-DirectXGame/master/project/Resources/slides/slide_allocator.png)
+![Allocator](https://raw.githubusercontent.com/KoudaAyu/CG-DirectXGame/master/project/Resources/slides/slide_allocator.png?v=3)
 
 ---
 
@@ -99,7 +99,7 @@ style: |
   * **確保 ($O(1)$)**：内部オフセットポインタをサイズ分進めるだけの高速処理。
   * **解放 ($O(1)$)**：フレーム終了時にポインタを「0」に戻すだけの一括リセット。
 
-![Stack](https://raw.githubusercontent.com/KoudaAyu/CG-DirectXGame/master/project/Resources/slides/slide_stack.png)
+![Stack](https://raw.githubusercontent.com/KoudaAyu/CG-DirectXGame/master/project/Resources/slides/slide_stack.png?v=3)
 
 ---
 
@@ -110,7 +110,7 @@ style: |
   * 3D空間を `10.0f` ごとの3Dグリッドセルに分割。
   * 座標からハッシュキーを算出し、近隣セル内のオブジェクト同士のみを判定。
 
-![Spatial Hash](https://raw.githubusercontent.com/KoudaAyu/CG-DirectXGame/master/project/Resources/slides/slide_spatial_hash.png)
+![Spatial Hash](https://raw.githubusercontent.com/KoudaAyu/CG-DirectXGame/master/project/Resources/slides/slide_spatial_hash.png?v=3)
 
 ---
 
@@ -118,10 +118,10 @@ style: |
 
 * **課題：オブジェクト指向によるメモリ散らばりとキャッシュミス**
 * **対策：`CollisionData` 配列のメモリ連続配置**
-  * 判定に必要なパラメータ（座標、半径等）のみを連続配列に抽出。
+  * 判定に必要なパラメータ（座標、半径等）のみを連続配列に抽出.
   * メモリ上で隣接した配列に対して、単純ループで一括判定処理。
 
-![DOD](https://raw.githubusercontent.com/KoudaAyu/CG-DirectXGame/master/project/Resources/slides/slide_dod.png)
+![DOD](https://raw.githubusercontent.com/KoudaAyu/CG-DirectXGame/master/project/Resources/slides/slide_dod.png?v=3)
 
 ---
 
@@ -146,7 +146,7 @@ style: |
   * **Blackboard**: 個体用メモリを保持し、状態パラメータをノード間で共有。
   * **GUIエディタ**: `imgui-node-editor` でAI構造をリアルタイム編集しJSON出力。
 
-![Behavior Tree](https://raw.githubusercontent.com/KoudaAyu/CG-DirectXGame/master/project/Resources/slides/slide_bt_bb.png)
+![Behavior Tree](https://raw.githubusercontent.com/KoudaAyu/CG-DirectXGame/master/project/Resources/slides/slide_bt_bb.png?v=3)
 
 ---
 
@@ -172,7 +172,7 @@ style: |
   * コライダー群を階層的にAABB（境界箱）でグループ化。
   * 親AABBと非衝突なら、内包される子オブジェクトの判定計算を早期スキップ。
 
-![BVH](https://raw.githubusercontent.com/KoudaAyu/CG-DirectXGame/master/project/Resources/slides/slide_bvh.png)
+![BVH](https://raw.githubusercontent.com/KoudaAyu/CG-DirectXGame/master/project/Resources/slides/slide_bvh.png?v=3)
 
 ---
 

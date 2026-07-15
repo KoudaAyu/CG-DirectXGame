@@ -1,13 +1,20 @@
 # Baziru3 Engine (自作3Dゲームエンジン)
 
-[![DebugBuild](https://github.com/KoudaAyu/CG-DirectXGame/actions/workflows/DebugBuild.yml/badge.svg)](https://github.com/KoudaAyu/CG-DirectXGame/actions/workflows/DebugBuild.yml)
+[![DebugBuild](https://github.com/KoudaAyu/CG-DirectXGame.actions/workflows/DebugBuild.yml/badge.svg)](https://github.com/KoudaAyu/CG-DirectXGame/actions/workflows/DebugBuild.yml)
 [![DevelopmentBuild](https://github.com/KoudaAyu/CG-DirectXGame/actions/workflows/Development.yml/badge.svg)](https://github.com/KoudaAyu/CG-DirectXGame/actions/workflows/Development.yml)
 [![ReleaseBuild](https://github.com/KoudaAyu/CG-DirectXGame/actions/workflows/Release.yml/badge.svg)](https://github.com/KoudaAyu/CG-DirectXGame/actions/workflows/Release.yml)
 
 C++ および DirectX 12 を用いてスクラッチから構築した、自作3Dゲームエンジンプロジェクトです。
 商用コンソールゲーム開発におけるパフォーマンス要求（ロード時間の極小化、動的メモリ確保の抑制、空間分割による物理演算最適化など）をクリアするための、低レイヤでの最適化アーキテクチャ設計を実証することを目的としています。
 
+## 🎨 ポートフォリオ技術発表スライド
+本エンジンで実装している「動的物理とメモリ最適化」に関する詳細な技術解説・設計図面をまとめた提出用スライド資料を公開しています。
+
+* **📄 [技術発表スライド資料 (PDF)](sega_portfolio_slides.pdf)** （※クリックしてダウンロード・閲覧できます）
+  * スライドのMarkdownソースはこちら：[sega_portfolio_slides.md](sega_portfolio_slides.md)
+
 ---
+
 
 ## 🛠️ 技術スタック
 
@@ -28,7 +35,7 @@ C++ および DirectX 12 を用いてスクラッチから構築した、自作3
 ### 1. メモリ管理システム (Memory Management System) - 動的確保の抑制
 
 #### 【背景と課題】
-ゲーム実行中の頻繁な動的メモリ確保（`new`/`delete`）は、**メモリ断片化（フラグメンテーション）**の原因となり、最悪の場合メモリアロケーションオーバーヘッドによる処理落ち（ヒッチング）を引き起こします。特に DirectX 12 における定数バッファの都度生成は非常に大きな負荷となります。
+ゲーム実行中の頻繁な動的メモリ確保（`new`/`delete`）は、**メモリ断片化（フラグメンテーション）**の原因となり、最悪の場合メモリアロケータのボトルネックによるフレームレート低下（ヒッチング）を引き起こします。特に DirectX 12 における定数バッファの都度生成は非常に大きな負荷となります。
 
 #### 【解決手法】
 * **定数バッファ用リングバッファアロケータ (`ConstantBufferAllocator`)**
@@ -39,8 +46,25 @@ C++ および DirectX 12 を用いてスクラッチから構築した、自作3
 #### 【効果】
 * 実行中の動的アロケーションを完全に排除し、メモリ断片化およびアロケーション負荷を防止。
 
-#### 【定数バッファアロケータのトリプルバッファリング同期構造】
-![Allocator](project/Resources/slides/slide_allocator.png)
+#### 【図面：定数バッファアロケータのトリプルバッファリング同期構造】
+```mermaid
+graph TD
+    subgraph CPU ["CPU 側 (データ書き込み)"]
+        Alloc[ConstantBufferAllocator] -->|Allocate| Frame0[Frame Buffer 0]
+        Alloc -->|Allocate| Frame1[Frame Buffer 1]
+        Alloc -->|Allocate| Frame2[Frame Buffer 2]
+    end
+    subgraph GPU ["GPU 側 (レンダリング実行)"]
+        Frame0 -->|GPUが読み出し中| Draw[描画コマンド実行]
+    end
+    subgraph Sync ["同期制御"]
+        Fence[Fence Value 同期] -.->|GPU読み出し完了まで| Frame0
+        Fence -.->|安全になったらCPU書き込み許可| Alloc
+    end
+    style Frame0 fill:#2b6cb0,stroke:#3182ce,stroke-width:2px,color:#fff
+    style Frame1 fill:#2d3748,stroke:#4a5568,stroke-width:1px,color:#a0aec0
+    style Frame2 fill:#2d3748,stroke:#4a5568,stroke-width:1px,color:#a0aec0
+```
 
 ---
 
@@ -58,8 +82,16 @@ C++ および DirectX 12 を用いてスクラッチから構築した、自作3
 #### 【効果】
 * 判定の計算量を $O(N)$ に削減し、メモリアクセスのキャッシュミス（Cache Miss）によるCPUボトルネックを極小化。
 
-#### 【空間ハッシュによる衝突判定高速化アルゴリズムフロー】
-![Spatial Hash](project/Resources/slides/slide_spatial_hash.png)
+#### 【図面：空間ハッシュによる衝突判定高速化アルゴリズムフロー】
+```mermaid
+graph TD
+    Pos[オブジェクトのワールド座標] -->|セルサイズ 10.0f で除算| Grid[グリッド座標を算出]
+    Grid -->|ビット演算子による合成| Hash[ユニークなハッシュキーを生成]
+    Hash -->|ハッシュテーブルへ登録| Table[SpatialHashCells テーブル]
+    Table -->|同一 & 隣接セル内のみ抽出| Filter[衝突判定ペアを構築]
+    Filter -->|総当たり回数を大幅削減| Compare[精密衝突判定実行]
+    Compare -->|めり込みあり| Push["押し出し解決 & コールバック起動"]
+```
 
 ---
 
@@ -76,8 +108,20 @@ AI（Behavior Tree）の挙動調整のたびにソースコードの再コン�
 #### 【効果】
 * プログラマー以外のプランナー等でも、ゲームを実行したままAIの挙動調整が可能になり、イテレーション効率を向上。
 
-#### 【Behavior Tree と Blackboard メモリの連携構成】
-![Behavior Tree](project/Resources/slides/slide_bt_bb.png)
+#### 【図面：Behavior Tree と Blackboard メモリの連携構成】
+```mermaid
+graph TD
+    subgraph Decision ["意思決定部 (BehaviorTree)"]
+        Root[Root Node] -->|Tick| Selector[Selector Node]
+        Selector -->|失敗なら次へ| Sequence[Sequence Node]
+        Sequence -->|成功なら次へ| Cond[Condition Node]
+        Cond -->|True| Action["Action Node (移動/攻撃等)"]
+    end
+    subgraph Data ["データ部 (Blackboard)"]
+        BB[Blackboard Memory] <-->|標的・速度等のパラメータ読み書き| Action
+        BB <-->|状態チェック| Cond
+    end
+```
 
 ---
 
