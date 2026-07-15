@@ -19,7 +19,7 @@ GRAY = (48, 54, 61)           # #30363d
 LIGHT_GRAY = (190, 200, 210)  # 明るいプラチナグレー (視認性大幅アップ)
 WHITE = (255, 255, 255)
 
-# フォントの読み込み (Windows of 標準フォント)
+# フォントの読み込み (Windowsの標準フォント)
 font_path = "C:\\Windows\\Fonts\\msgothic.ttc"
 try:
     font_large = ImageFont.truetype(font_path, 20)
@@ -117,32 +117,47 @@ draw.text((50, 20), "起動時に一括でプール確保 ➔ フレーム終了
 img.save(os.path.join(output_dir, "slide_stack.png"))
 
 # ----------------------------------------------------
-# 4. Spatial Hash Diagram (slide_spatial_hash.png)
+# 4. Spatial Hash Diagram (slide_spatial_hash.png) - ★文字被りとセルの同化を完全に解決
 # ----------------------------------------------------
 img = Image.new("RGB", (650, 280), BG_COLOR)
 draw = ImageDraw.Draw(img)
-# グリッドの描画
-grid_size = 50
-start_x, start_y = 50, 30
-for i in range(5):
-    draw.line([(start_x + i * grid_size, start_y), (start_x + i * grid_size, start_y + 4 * grid_size)], fill=GRAY)
-    draw.line([(start_x, start_y + i * grid_size), (start_x + 4 * grid_size, start_y + i * grid_size)], fill=GRAY)
-# グリッドセルラベル (グリッド枠に被らないよう配置)
-draw.text((start_x + 8, start_y + 8), "Cell A", fill=LIGHT_GRAY, font=font_small)
-draw.text((start_x + 58, start_y + 8), "Cell B", fill=LIGHT_GRAY, font=font_small)
-# オブジェクト (明るくハッキリした色に変更)
-draw.ellipse([start_x + 15, start_y + 15, start_x + 35, start_y + 35], fill=BLUE, outline=WHITE)  # Obj1 in Cell A
-draw.ellipse([start_x + 20, start_y + 70, start_x + 40, start_y + 90], fill=BLUE, outline=WHITE)  # Obj2 in Cell A (下)
-draw.ellipse([start_x + 165, start_y + 115, start_x + 185, start_y + 135], fill=GREEN, outline=WHITE) # Obj3 in Cell
-# 衝突判定ライン (明るい赤)
-draw.line([start_x + 25, start_y + 35, start_x + 30, start_y + 70], fill=RED, width=2)
-# フローテキスト (矢印の始点をX=270から離す)
-draw_arrow(draw, (275, 125), (330, 125), BLUE)
-draw.text((345, 60), "ワールド座標 / セルサイズ\n➔ セル所属判定\n➔ 同一・近隣セル内のみ判定\n➔ 計算量を O(N^2) から O(N) へ", fill=TEXT_COLOR, font=font_medium)
+
+# グリッドの描画 (セル幅を50px➔60pxに拡大し余白を確保、線の明るさを少しアップ)
+grid_size = 60
+start_x, start_y = 40, 25
+cols, rows = 4, 4
+
+# セルA (列0, 行0) の背景を「薄い半透明の青」でハイライト！
+# (これにより、同じセル内にいるキャラクター同士が判定される仕組みが直感的に伝わります)
+draw.rectangle([start_x, start_y, start_x + grid_size, start_y + grid_size], fill=(30, 60, 95))
+
+# グリッド枠線を描画
+GRID_LINE_COLOR = (70, 80, 90) # 背景に溶け込まない明るさに修正
+for i in range(cols + 1):
+    draw.line([(start_x + i * grid_size, start_y), (start_x + i * grid_size, start_y + rows * grid_size)], fill=GRID_LINE_COLOR, width=1)
+for i in range(rows + 1):
+    draw.line([(start_x, start_y + i * grid_size), (start_x + cols * grid_size, start_y + i * grid_size)], fill=GRID_LINE_COLOR, width=1)
+
+# セルラベル (日本語「セルA」「セルB」にし、境界線に被らないようパディング+5ピクセルを徹底)
+draw.text((start_x + 5, start_y + 5), "セルA", fill=BLUE, font=font_small)
+draw.text((start_x + grid_size + 5, start_y + 5), "セルB", fill=LIGHT_GRAY, font=font_small)
+
+# オブジェクト (明るい色＋白枠、位置を文字と被らないよう微調整)
+draw.ellipse([start_x + 18, start_y + 22, start_x + 38, start_y + 42], fill=BLUE, outline=WHITE)  # Obj1 in セルA 上
+draw.ellipse([start_x + 20, start_y + 80, start_x + 40, start_y + 100], fill=BLUE, outline=WHITE) # Obj2 in セルA 下
+draw.ellipse([start_x + 195, start_y + 135, start_x + 215, start_y + 155], fill=GREEN, outline=WHITE) # Obj3 (遠く離れた別のセル)
+
+# 衝突判定ライン (セルA内の2つの青オブジェクトを結ぶ赤い判定線)
+draw.line([start_x + 28, start_y + 42, start_x + 30, start_y + 80], fill=RED, width=2)
+
+# フロー矢印と説明テキスト (図形との間隔を空け、見やすく整頓)
+draw_arrow(draw, (300, 125), (345, 125), BLUE)
+draw.text((360, 60), "ワールド座標 / セルサイズ\n➔ セル所属判定\n➔ 同一・近隣セル内のみ判定\n➔ 計算量を O(N^2) から O(N) へ", fill=TEXT_COLOR, font=font_medium)
+
 img.save(os.path.join(output_dir, "slide_spatial_hash.png"))
 
 # ----------------------------------------------------
-# 5. DOD vs OOP Diagram (slide_dod.png) - ★文字と境界の「ぶつかり」を完全排除
+# 5. DOD vs OOP Diagram (slide_dod.png)
 # ----------------------------------------------------
 img = Image.new("RGB", (650, 280), BG_COLOR)
 draw = ImageDraw.Draw(img)
@@ -170,8 +185,8 @@ draw.line([(180, 240), (180, 270)], fill=BG_COLOR, width=1)
 draw.line([(320, 240), (320, 270)], fill=BG_COLOR, width=1)
 draw.line([(460, 240), (460, 270)], fill=BG_COLOR, width=1)
 
-# ★文字情報を「Data A」「Data B」「Data C」とシンプルにして、
-# 各ボックスの中央に完璧に配置 (余白をたっぷりとることで境界線との衝突を防ぐ)
+# 文字情報を「Data A」「Data B」「Data C」とシンプルにして、
+# 各ボックスの中央に配置
 blocks_info = [
     (40, 180, "Data A"),
     (180, 320, "Data B"),
@@ -180,7 +195,6 @@ blocks_info = [
 ]
 
 for left, right, text in blocks_info:
-    # テキストの長さ（幅）を取得して中央寄せ座標を計算
     try:
         w = draw.textlength(text, font=font_medium)
     except AttributeError:
@@ -231,7 +245,7 @@ draw = ImageDraw.Draw(img)
 draw.rectangle([30, 30, 570, 200], fill=None, outline=BLUE, width=3)
 draw.text((45, 38), "◆ Root AABB (モデル全体を包む箱)", fill=BLUE, font=font_medium)
 
-# 2) 左の緑の箱 (Left AABB)
+# 2) 左の緑 of 箱 (Left AABB)
 draw.rectangle([50, 65, 275, 185], fill=None, outline=GREEN, width=2)
 draw.text((65, 73), "Left AABB (左側)", fill=GREEN, font=font_medium)
 
