@@ -214,10 +214,11 @@ CollisionManager::GetInstance()->RegisterCollider(collider.get());
 * **開発ツール**: Visual Studio 2022
 * **SDK**: Windows SDK 10.0.x 以上
 
-### ビルド手順
+### ビルド・実行手順
 1. このリポジトリをクローンします。
    ```bash
    git clone https://github.com/KoudaAyu/CG-DirectXGame.git
    ```
 2. `project/DirectXGame.sln` を Visual Studio 2022 で開きます。
-3. 構成（Debug/Development/Release）を選択し、ビルド（F7）を実行します。
+3. 構成（Debug/Development/Release）を選択し、ビルド（F7）を行い、**F5キー**を押してデバッグ実行します。
+
