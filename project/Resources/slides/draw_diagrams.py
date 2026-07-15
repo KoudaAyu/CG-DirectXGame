@@ -117,7 +117,7 @@ draw.text((50, 20), "起動時に一括でプール確保 ➔ フレーム終了
 img.save(os.path.join(output_dir, "slide_stack.png"))
 
 # ----------------------------------------------------
-# 4. Spatial Hash Diagram (slide_spatial_hash.png) - ★SFレーダー風のプロクオリティデザイン
+# 4. Spatial Hash Diagram (slide_spatial_hash.png) - ★中心の白いコアを削除しシンプル化
 # ----------------------------------------------------
 img = Image.new("RGB", (650, 280), BG_COLOR)
 draw = ImageDraw.Draw(img)
@@ -127,8 +127,7 @@ grid_size = 60
 start_x, start_y = 40, 25
 cols, rows = 4, 4
 
-# ★セルA (列0, 行0) の背景を「スキャン中の近未来SF調ライトグリーン(35, 55, 45)」に！
-# さらに、この区画の枠線だけ「太めのネオングリーン(100, 255, 150)」で囲ってレーダースキャン感を演出
+# セルA (列0, 行0) の背景を「スキャン中の近未来SF調ライトグリーン(35, 55, 45)」に
 NEON_GREEN = (100, 255, 150)
 draw.rectangle([start_x, start_y, start_x + grid_size, start_y + grid_size], fill=(35, 55, 45))
 
@@ -142,25 +141,22 @@ for i in range(rows + 1):
 # セルAの枠だけネオングリーンで上書き強調
 draw.rectangle([start_x, start_y, start_x + grid_size, start_y + grid_size], fill=None, outline=NEON_GREEN, width=2)
 
-# セルラベル (セルAはネオングリーンでハイライト、セルBは薄いグレー)
+# セルラベル
 draw.text((start_x + 6, start_y + 5), "セルA", fill=NEON_GREEN, font=font_small)
 draw.text((start_x + grid_size + 6, start_y + 5), "セルB", fill=LIGHT_GRAY, font=font_small)
 
-# ★オブジェクトの光る粒子化 (白枠の中にスカイブルーを塗り、中心に白いコア「核」を描く)
-def draw_glow_particle(draw, center_x, center_y, color):
+# ★オブジェクトのシンプルな描画 (白枠の付いたフラットな円)
+def draw_simple_particle(draw, center_x, center_y, color):
     r = 10
-    # 外枠
     draw.ellipse([center_x - r, center_y - r, center_x + r, center_y + r], fill=color, outline=WHITE, width=1)
-    # 中心コア
-    draw.ellipse([center_x - 3, center_y - 3, center_x + 3, center_y + 3], fill=WHITE)
 
 # セルA内の二つの青オブジェクト
-draw_glow_particle(draw, start_x + 28, start_y + 32, BLUE)   # Obj1
-draw_glow_particle(draw, start_x + 30, start_y + 90, BLUE)   # Obj2
+draw_simple_particle(draw, start_x + 28, start_y + 32, BLUE)   # Obj1
+draw_simple_particle(draw, start_x + 30, start_y + 90, BLUE)   # Obj2
 # 遠隔セル内の緑オブジェクト
-draw_glow_particle(draw, start_x + 205, start_y + 145, GREEN) # Obj3
+draw_simple_particle(draw, start_x + 205, start_y + 145, GREEN) # Obj3
 
-# 衝突判定ライン (セルA内の2つの青オブジェクトを結ぶ赤いレーザー光線)
+# 衝突判定ライン (セルA内の2つの青オブジェクトを結ぶ赤い判定線)
 draw.line([start_x + 28, start_y + 32, start_x + 30, start_y + 90], fill=RED, width=2)
 
 # フロー矢印と説明テキスト
@@ -225,7 +221,6 @@ img.save(os.path.join(output_dir, "slide_dod.png"))
 # ----------------------------------------------------
 img = Image.new("RGB", (650, 280), BG_COLOR)
 draw = ImageDraw.Draw(img)
-# ... [bt_bb のコードはそのまま維持]
 draw.rounded_rectangle([180, 20, 290, 60], radius=4, fill=GRAY)
 draw.text((198, 30), "Root Node", fill=TEXT_COLOR, font=font_medium)
 draw.rounded_rectangle([180, 85, 290, 125], radius=4, fill=GRAY)
@@ -249,7 +244,6 @@ img.save(os.path.join(output_dir, "slide_bt_bb.png"))
 # ----------------------------------------------------
 img = Image.new("RGB", (650, 280), BG_COLOR)
 draw = ImageDraw.Draw(img)
-# ... [bvh のコードはそのまま維持]
 draw.rectangle([30, 30, 570, 200], fill=None, outline=BLUE, width=3)
 draw.text((45, 38), "◆ Root AABB (モデル全体を包む箱)", fill=BLUE, font=font_medium)
 draw.rectangle([50, 65, 275, 185], fill=None, outline=GREEN, width=2)
