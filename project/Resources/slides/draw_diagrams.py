@@ -117,40 +117,54 @@ draw.text((50, 20), "起動時に一括でプール確保 ➔ フレーム終了
 img.save(os.path.join(output_dir, "slide_stack.png"))
 
 # ----------------------------------------------------
-# 4. Spatial Hash Diagram (slide_spatial_hash.png) - ★色のチョイスをさらに見やすくプロ仕様に調整
+# 4. Spatial Hash Diagram (slide_spatial_hash.png) - ★SFレーダー風のプロクオリティデザイン
 # ----------------------------------------------------
 img = Image.new("RGB", (650, 280), BG_COLOR)
 draw = ImageDraw.Draw(img)
 
-# グリッドの描画 (セル幅を60px、開始座標を設定)
+# グリッドのサイズ定義 (セル幅60px)
 grid_size = 60
 start_x, start_y = 40, 25
 cols, rows = 4, 4
 
-# ★セルA (列0, 行0) の背景を、青オブジェクトが最も綺麗に映える「落ち着いたオリーブゴールド(65, 58, 40)」に改善！
-draw.rectangle([start_x, start_y, start_x + grid_size, start_y + grid_size], fill=(65, 58, 40))
+# ★セルA (列0, 行0) の背景を「スキャン中の近未来SF調ライトグリーン(35, 55, 45)」に！
+# さらに、この区画の枠線だけ「太めのネオングリーン(100, 255, 150)」で囲ってレーダースキャン感を演出
+NEON_GREEN = (100, 255, 150)
+draw.rectangle([start_x, start_y, start_x + grid_size, start_y + grid_size], fill=(35, 55, 45))
 
-# グリッド枠線を描画 (背景と上品に調和する青暗いグレー(55, 62, 72)に修正)
-GRID_LINE_COLOR = (55, 62, 72)
+# グリッドの一般枠線を描画 (控えめで美しい青暗いグレー)
+GRID_LINE_COLOR = (45, 52, 62)
 for i in range(cols + 1):
     draw.line([(start_x + i * grid_size, start_y), (start_x + i * grid_size, start_y + rows * grid_size)], fill=GRID_LINE_COLOR, width=1)
 for i in range(rows + 1):
     draw.line([(start_x, start_y + i * grid_size), (start_x + cols * grid_size, start_y + i * grid_size)], fill=GRID_LINE_COLOR, width=1)
 
-# セルラベル (セルAの文字を完全な白(WHITE)にして、オリーブ背景の上でもクッキリ浮かび上がらせる)
-draw.text((start_x + 6, start_y + 5), "セルA", fill=WHITE, font=font_small)
+# セルAの枠だけネオングリーンで上書き強調
+draw.rectangle([start_x, start_y, start_x + grid_size, start_y + grid_size], fill=None, outline=NEON_GREEN, width=2)
+
+# セルラベル (セルAはネオングリーンでハイライト、セルBは薄いグレー)
+draw.text((start_x + 6, start_y + 5), "セルA", fill=NEON_GREEN, font=font_small)
 draw.text((start_x + grid_size + 6, start_y + 5), "セルB", fill=LIGHT_GRAY, font=font_small)
 
-# オブジェクト (明るいスカイブルー＋白枠)
-draw.ellipse([start_x + 18, start_y + 22, start_x + 38, start_y + 42], fill=BLUE, outline=WHITE)  # Obj1 in セルA 上
-draw.ellipse([start_x + 20, start_y + 80, start_x + 40, start_y + 100], fill=BLUE, outline=WHITE) # Obj2 in セルA 下
-draw.ellipse([start_x + 195, start_y + 135, start_x + 215, start_y + 155], fill=GREEN, outline=WHITE) # Obj3 (遠隔)
+# ★オブジェクトの光る粒子化 (白枠の中にスカイブルーを塗り、中心に白いコア「核」を描く)
+def draw_glow_particle(draw, center_x, center_y, color):
+    r = 10
+    # 外枠
+    draw.ellipse([center_x - r, center_y - r, center_x + r, center_y + r], fill=color, outline=WHITE, width=1)
+    # 中心コア
+    draw.ellipse([center_x - 3, center_y - 3, center_x + 3, center_y + 3], fill=WHITE)
 
-# 衝突判定ライン (セルA内の2つの青オブジェクトを結ぶ赤い判定線)
-draw.line([start_x + 28, start_y + 42, start_x + 30, start_y + 80], fill=RED, width=2)
+# セルA内の二つの青オブジェクト
+draw_glow_particle(draw, start_x + 28, start_y + 32, BLUE)   # Obj1
+draw_glow_particle(draw, start_x + 30, start_y + 90, BLUE)   # Obj2
+# 遠隔セル内の緑オブジェクト
+draw_glow_particle(draw, start_x + 205, start_y + 145, GREEN) # Obj3
 
-# フロー矢印と説明テキスト (図形との間隔を空け、見やすく整頓)
-draw_arrow(draw, (300, 125), (345, 125), BLUE)
+# 衝突判定ライン (セルA内の2つの青オブジェクトを結ぶ赤いレーザー光線)
+draw.line([start_x + 28, start_y + 32, start_x + 30, start_y + 90], fill=RED, width=2)
+
+# フロー矢印と説明テキスト
+draw_arrow(draw, (300, 125), (345, 125), BLUE, width=3, head_size=9)
 draw.text((360, 60), "ワールド座標 / セルサイズ\n➔ セル所属判定\n➔ 同一・近隣セル内のみ判定\n➔ 計算量を O(N^2) から O(N) へ", fill=TEXT_COLOR, font=font_medium)
 
 img.save(os.path.join(output_dir, "slide_spatial_hash.png"))
@@ -211,26 +225,21 @@ img.save(os.path.join(output_dir, "slide_dod.png"))
 # ----------------------------------------------------
 img = Image.new("RGB", (650, 280), BG_COLOR)
 draw = ImageDraw.Draw(img)
-# ノード配置
+# ... [bt_bb のコードはそのまま維持]
 draw.rounded_rectangle([180, 20, 290, 60], radius=4, fill=GRAY)
 draw.text((198, 30), "Root Node", fill=TEXT_COLOR, font=font_medium)
 draw.rounded_rectangle([180, 85, 290, 125], radius=4, fill=GRAY)
 draw.text((205, 95), "Selector", fill=TEXT_COLOR, font=font_medium)
 draw.rounded_rectangle([90, 160, 200, 200], radius=4, fill=GRAY)
 draw.text((108, 170), "Sequence", fill=TEXT_COLOR, font=font_medium)
-# Action(攻撃)の幅を125ピクセルに拡張して、文字『撃』が枠からはみ出さないように配置
 draw.rounded_rectangle([240, 160, 365, 200], radius=4, fill=ORANGE)
 draw.text((255, 170), "Action (攻撃)", fill=BG_COLOR, font=font_medium)
-# 接続線 (X座標をジャストに設定して枠と枠を直接繋ぐ)
 draw_arrow(draw, (235, 60), (235, 85), LIGHT_GRAY)
 draw_arrow(draw, (210, 125), (160, 160), LIGHT_GRAY)
 draw_arrow(draw, (260, 125), (290, 160), LIGHT_GRAY)
-# Blackboard (箱を幅広180pxにしてパディング確保、X=440➔450に右シフトして余白確保)
 draw.rounded_rectangle([450, 60, 630, 200], radius=8, fill=BLUE)
 draw.text((465, 75), "Blackboard\n(共有メモリ)", fill=BG_COLOR, font=font_large)
-# テキスト描画位置を矢印接続部分より上(Y=125)にずらして被りを完全排除
 draw.text((465, 125), "・Target: Player\n・MoveSpeed: 5.0", fill=BG_COLOR, font=font_medium)
-# 接続矢印：Actionの右端(365)からBlackboardの左端(450)を正確に接続 (箱の内部に侵入させない)
 draw_arrow(draw, (365, 185), (450, 185), RED, width=2)
 draw_arrow(draw, (450, 165), (365, 165), GREEN, width=2)
 img.save(os.path.join(output_dir, "slide_bt_bb.png"))
@@ -240,50 +249,33 @@ img.save(os.path.join(output_dir, "slide_bt_bb.png"))
 # ----------------------------------------------------
 img = Image.new("RGB", (650, 280), BG_COLOR)
 draw = ImageDraw.Draw(img)
-# 1) 青い大きな箱 (Root AABB)
+# ... [bvh のコードはそのまま維持]
 draw.rectangle([30, 30, 570, 200], fill=None, outline=BLUE, width=3)
 draw.text((45, 38), "◆ Root AABB (モデル全体を包む箱)", fill=BLUE, font=font_medium)
-
-# 2) 左の緑の箱 (Left AABB)
 draw.rectangle([50, 65, 275, 185], fill=None, outline=GREEN, width=2)
 draw.text((65, 73), "Left AABB (左側)", fill=GREEN, font=font_medium)
-
-# 3) 右の橙の箱 (Right AABB)
 draw.rectangle([305, 65, 550, 185], fill=None, outline=ORANGE, width=2)
 draw.text((320, 73), "Right AABB (右側)", fill=ORANGE, font=font_medium)
-
-# 4) 左箱の中の三角形ポリゴン (明るいプラチナグレーに変更し、白枠で際立たせる)
 POLY_FILL = (210, 220, 235)
 draw.polygon([(80, 165), (120, 95), (160, 155)], fill=POLY_FILL, outline=WHITE)
 draw.polygon([(180, 175), (210, 110), (250, 165)], fill=POLY_FILL, outline=WHITE)
-
-# 5) 右箱の中の三角形ポリゴン
 draw.polygon([(340, 155), (380, 95), (420, 165)], fill=POLY_FILL, outline=WHITE)
 draw.polygon([(450, 175), (480, 110), (520, 160)], fill=POLY_FILL, outline=WHITE)
-
-# 6) レーザー光線 (明るい赤)
 draw.line([10, 130, 140, 130], fill=RED, width=3)
 draw_arrow(draw, (140, 130), (200, 130), RED, width=3)
 draw.text((10, 105), "レーザー光線", fill=RED, font=font_medium)
-
-# 7) 右箱のスキップ説明の赤い箱 (横幅310pxに広げ、センタリング配置)
 box_left, box_top, box_right, box_bottom = 250, 210, 560, 260
 draw.rounded_rectangle([box_left, box_top, box_right, box_bottom], radius=4, fill=(180, 50, 50))
-
-# センタリングの自動計算
 text_content = "【右箱は非衝突】 ➔ 中身の計算を全スキップ！"
 try:
     text_width = draw.textlength(text_content, font=font_small)
 except AttributeError:
     text_width = len(text_content.encode('utf-8')) * 7.5
-
 box_width = box_right - box_left
 box_height = box_bottom - box_top
 text_x = box_left + (box_width - text_width) / 2
 text_y = box_top + (box_height - 13) / 2
-
 draw.text((text_x, text_y), text_content, fill=WHITE, font=font_small)
-
 img.save(os.path.join(output_dir, "slide_bvh.png"))
 
 print("すべての画像の色とレイアウトを完璧に再生成しました！")
