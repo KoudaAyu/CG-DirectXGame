@@ -497,16 +497,48 @@ void PipelineStateManager::LoadPipelineLibrary(ID3D12Device* device)
 	std::wstring cachePath = L"Resources/shaders/PsoCache.bin";
 	std::vector<uint8_t> cacheData;
 
+	bool cacheIsValid = true;
 	if (std::filesystem::exists(cachePath))
 	{
-		std::ifstream file(cachePath, std::ios::binary | std::ios::ate);
-		if (file.is_open())
+		try {
+			auto cacheWriteTime = std::filesystem::last_write_time(cachePath);
+			std::wstring shaderDir = L"Resources/shaders";
+			if (std::filesystem::exists(shaderDir))
+			{
+				for (const auto& entry : std::filesystem::recursive_directory_iterator(shaderDir))
+				{
+					if (entry.is_regular_file() && (entry.path().extension() == L".hlsl" || entry.path().extension() == L".hlsli"))
+					{
+						if (entry.last_write_time() > cacheWriteTime)
+						{
+							cacheIsValid = false;
+							OutputDebugStringA("PipelineStateManager: Shaders have been modified since cache was saved. Invalidating PSO cache.\n");
+							break;
+						}
+					}
+				}
+			}
+		}
+		catch (...) {
+			cacheIsValid = false;
+		}
+
+		if (!cacheIsValid)
 		{
-			size_t size = file.tellg();
-			cacheData.resize(size);
-			file.seekg(0, std::ios::beg);
-			file.read(reinterpret_cast<char*>(cacheData.data()), size);
-			file.close();
+			std::error_code ec;
+			std::filesystem::remove(cachePath, ec);
+		}
+		else
+		{
+			std::ifstream file(cachePath, std::ios::binary | std::ios::ate);
+			if (file.is_open())
+			{
+				size_t size = file.tellg();
+				cacheData.resize(size);
+				file.seekg(0, std::ios::beg);
+				file.read(reinterpret_cast<char*>(cacheData.data()), size);
+				file.close();
+			}
 		}
 	}
 
