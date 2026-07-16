@@ -333,3 +333,7 @@ imgui.ini
 # DirectXTex Compiled Shaders
 **/DirectXTex/Shaders/Compiled/
 /project/externals/DirectXTex/Bin/
+
+# D3D12 PSO Cache (Driver/hardware-specific)
+**/PsoCache.bin
+
