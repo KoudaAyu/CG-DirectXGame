@@ -16,6 +16,7 @@
 #include <cmath>
 #include <Windows.h>
 #include <fstream>
+#include <nlohmann/json.hpp>
 #include "Baziru3_Engine/AI/NavMesh.h"
 
 #include "GamePlayScene.h"
@@ -1587,34 +1588,81 @@ void GamePlayScene::InitializeObstacles()
 {
 	obstacles_.clear();
 
-	// 障害物を6つ配置 (左部グループ、右部グループ、奥ゴール前グループの3つの束に分けて配置)
+	bool success = false;
+	std::string filepath = "Resources/stage_layout.json";
+	std::ifstream file(filepath);
 	
-	// --- 左側グループ (X = -5.0f 付近の配置) ---
-	auto obs1 = std::make_unique<Obstacle>();
-	obs1->Initialize(object3dCom, camera_, { -5.0f, 0.0f, 8.0f }, 1.0f);
-	obstacles_.push_back(std::move(obs1));
+	if (file.is_open())
+	{
+		try
+		{
+			nlohmann::json j;
+			file >> j;
+			file.close();
 
-	auto obs2 = std::make_unique<Obstacle>();
-	obs2->Initialize(object3dCom, camera_, { -5.0f, 0.0f, 18.0f }, 1.0f);
-	obstacles_.push_back(std::move(obs2));
+			for (const auto& obj : j)
+			{
+				std::string name = obj["name"];
+				// オブジェクト名が "Obstacle" で始まる場合のみ配置
+				if (name.find("Obstacle") == 0)
+				{
+					Vector3 pos = {
+						obj["position"]["x"].get<float>(),
+						obj["position"]["y"].get<float>(),
+						obj["position"]["z"].get<float>()
+					};
+					// スケールのXを半径（radius）として使用します
+					float radius = obj["scale"]["x"].get<float>();
+					
+					auto obs = std::make_unique<Obstacle>();
+					obs->Initialize(object3dCom, camera_, pos, radius);
+					obstacles_.push_back(std::move(obs));
+				}
+			}
+			success = true;
+			OutputDebugStringA("GamePlayScene: Successfully loaded obstacles from JSON.\n");
+		}
+		catch (const std::exception& e)
+		{
+			char errorMsg[256];
+			sprintf_s(errorMsg, "GamePlayScene: Failed to parse stage_layout.json: %s\n", e.what());
+			OutputDebugStringA(errorMsg);
+		}
+	}
 
-	// --- 右側グループ (X = 5.0f 付近の配置) ---
-	auto obs3 = std::make_unique<Obstacle>();
-	obs3->Initialize(object3dCom, camera_, { 5.0f, 0.0f, 8.0f }, 1.0f);
-	obstacles_.push_back(std::move(obs3));
+	// 読み込みに失敗した、またはデータが空だった場合はデフォルトの配置を使用（フォールバック）
+	if (!success || obstacles_.empty())
+	{
+		obstacles_.clear();
+		OutputDebugStringA("GamePlayScene: Using default obstacle placement (fallback).\n");
 
-	auto obs4 = std::make_unique<Obstacle>();
-	obs4->Initialize(object3dCom, camera_, { 5.0f, 0.0f, 18.0f }, 1.0f);
-	obstacles_.push_back(std::move(obs4));
+		// --- 左側グループ (X = -5.0f 付近の配置) ---
+		auto obs1 = std::make_unique<Obstacle>();
+		obs1->Initialize(object3dCom, camera_, { -5.0f, 0.0f, 8.0f }, 1.0f);
+		obstacles_.push_back(std::move(obs1));
 
-	// --- 奥・ゴール前グループ (脱出リング手前のカバー用の配置) ---
-	auto obs5 = std::make_unique<Obstacle>();
-	obs5->Initialize(object3dCom, camera_, { -2.0f, 0.0f, 29.0f }, 1.0f);
-	obstacles_.push_back(std::move(obs5));
+		auto obs2 = std::make_unique<Obstacle>();
+		obs2->Initialize(object3dCom, camera_, { -5.0f, 0.0f, 18.0f }, 1.0f);
+		obstacles_.push_back(std::move(obs2));
 
-	auto obs6 = std::make_unique<Obstacle>();
-	obs6->Initialize(object3dCom, camera_, { 2.0f, 0.0f, 29.0f }, 1.0f);
-	obstacles_.push_back(std::move(obs6));
+		// --- 右側グループ (X = 5.0f 付近の配置) ---
+		auto obs3 = std::make_unique<Obstacle>();
+		obs3->Initialize(object3dCom, camera_, { 5.0f, 0.0f, 8.0f }, 1.0f);
+		obstacles_.push_back(std::move(obs3));
+
+		auto obs4 = std::make_unique<Obstacle>();
+		obs4->Initialize(object3dCom, camera_, { 5.0f, 0.0f, 18.0f }, 1.0f);
+		obstacles_.push_back(std::move(obs4));
+
+		// --- 奥・ゴール前グループ (脱出リング手前のカバー用の配置) ---
+		auto obs5 = std::make_unique<Obstacle>();
+		obs5->Initialize(object3dCom, camera_, { -2.0f, 0.0f, 29.0f }, 1.0f);
+		obstacles_.push_back(std::move(obs5));
+
+		auto obs6 = std::make_unique<Obstacle>();
+		obs6->Initialize(object3dCom, camera_, { 2.0f, 0.0f, 29.0f }, 1.0f);
+		obstacles_.push_back(std::move(obs6));
+	}
 }
 
 void GamePlayScene::UpdateObstacles()
