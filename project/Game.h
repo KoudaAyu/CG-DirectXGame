@@ -6,7 +6,7 @@
 #include"Camera.h"
 #include"CrashDump.h"
 #include"DirectXCom.h"
-#include"Baziru3_Engine/Base/EngineContext.h"
+#include"Baziru3_Engine/Core/Base/EngineContext.h"
 #include"Framework.h"
 #include"ImGuiManager.h"
 #include"Light.h"
@@ -18,9 +18,9 @@
 #include"SkinningObject3dCom.h"
 #include"ParticleEmitter.h"
 #include"ParticleManager.h"
-#include"Baziru3_Engine\Base\OffScreenRendering\OffScreenRendering.h"
-#include"Baziru3_Engine\Graphics\Particle\ParticleRenderer.h"
-#include"Baziru3_Engine\Graphics\Sphere\SphereRenderer.h"
+#include"Baziru3_Engine\Core\Base\OffScreenRendering\OffScreenRendering.h"
+#include"Baziru3_Engine\Graphics\Graphics\Particle\ParticleRenderer.h"
+#include"Baziru3_Engine\Graphics\Graphics\Sphere\SphereRenderer.h"
 #include"SceneManager.h"
 #include"SceneRegistration.h"
 #include"SkyBox.h"
@@ -33,9 +33,9 @@
 #include"ResourceLeakCheck.h"
 #include"TextureManager.h"
 #include"WindowsAPI.h"
-#include "Baziru3_Engine/IO/Mouse/MouseInput.h"
+#include "Baziru3_Engine/Core/IO/Mouse/MouseInput.h"
 #include "DebugUI.h"
-#include "Baziru3_Engine/Scene/Fade.h"
+#include "Baziru3_Engine/Framework/Scene/Fade.h"
 
 #include <vector>
 #include <random>

@@ -8,10 +8,10 @@
 #include "Sprite.h"
 #include "Bullet.h"
 #include "Obstacle.h"
-#include "Baziru3_Engine/Collision/CollisionManager.h"
-#include "Baziru3_Engine/Collision/SphereCollider.h"
-#include "Baziru3_Engine/Collision/BoxCollider.h"
-#include "Baziru3_Engine/Collision/CapsuleCollider.h"
+#include "Baziru3_Engine/Framework/Collision/CollisionManager.h"
+#include "Baziru3_Engine/Framework/Collision/SphereCollider.h"
+#include "Baziru3_Engine/Framework/Collision/BoxCollider.h"
+#include "Baziru3_Engine/Framework/Collision/CapsuleCollider.h"
 #include <cmath>
 #include <random>
 

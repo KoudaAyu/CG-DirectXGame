@@ -4,8 +4,8 @@
 #include "Object3dCom.h"
 #include "Camera.h"
 #include "RenderContext.h"
-#include "Baziru3_Engine/Collision/BoxCollider.h"
-#include "Baziru3_Engine/Collision/MeshCollider.h"
+#include "Baziru3_Engine/Framework/Collision/BoxCollider.h"
+#include "Baziru3_Engine/Framework/Collision/MeshCollider.h"
 
 class Obstacle
 {

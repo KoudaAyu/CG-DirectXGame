@@ -5,7 +5,7 @@
 #include <string>
 
 #include "BaseScene.h"
-#include "Baziru3_Engine\Effect\HitEffect.h"
+#include "Baziru3_Engine\Framework\Effect\HitEffect.h"
 #include "DirectXCom.h"
 #include "ParticleEmitter.h"
 #include "Object3dCom.h"
@@ -22,8 +22,8 @@
 #include "Sprite.h"
 #include "SpriteManager.h"
 #include "DebugCamera.h"
-#include "Baziru3_Engine/IO/Mouse/MouseInput.h"
-#include "Baziru3_Engine/Particle/Ring.h"
+#include "Baziru3_Engine/Core/IO/Mouse/MouseInput.h"
+#include "Baziru3_Engine/Framework/Particle/Ring.h"
 #include "../../Player/Player.h"
 #include "../../Enemy/Enemy.h"
 #include "../../Enemy/MovingEnemy.h"

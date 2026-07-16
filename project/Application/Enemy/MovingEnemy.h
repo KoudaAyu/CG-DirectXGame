@@ -4,14 +4,14 @@
 #include "Object3dCom.h"
 #include "Camera.h"
 #include "RenderContext.h"
-#include "Baziru3_Engine/Collision/SphereCollider.h"
-#include "Baziru3_Engine/Collision/CollisionManager.h"
+#include "Baziru3_Engine/Framework/Collision/SphereCollider.h"
+#include "Baziru3_Engine/Framework/Collision/CollisionManager.h"
 
 class Bullet;
 class Sprite;
 class WindowAPI;
 class Obstacle;
-#include "Baziru3_Engine/AI/BehaviorTree.h"
+#include "Baziru3_Engine/Framework/AI/BehaviorTree.h"
 
 class MovingEnemy
 {

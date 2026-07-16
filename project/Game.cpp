@@ -1,6 +1,6 @@
 #include"Game.h"
 #include "DebugUI.h"
-#include "Baziru3_Engine/Base/Pipeline/PipelineStateManager.h"
+#include "Baziru3_Engine/Core/Base/Pipeline/PipelineStateManager.h"
 #include <future>
 #include "Application/Scene/GameScene/GamePlayScene.h"
 
@@ -10,10 +10,10 @@
 #include <sstream>
 #include <iomanip>
 
-#include "Baziru3_Engine\Graphics\SceneRenderRequests.h"
+#include "Baziru3_Engine\Graphics\Graphics\SceneRenderRequests.h"
 #include"RenderContext.h"
 #include"RootParam.h"
-#include"Baziru3_Engine/Base/SubsystemFactory.h"
+#include"Baziru3_Engine/Core/Base/SubsystemFactory.h"
 
 
 #ifdef USE_IMGUI
@@ -21,7 +21,7 @@
 #include <imgui_impl_win32.h>
 #include <imgui_impl_dx12.h>
 #endif
-#include "Baziru3_Engine/Graphics/GpuProfiler.h"
+#include "Baziru3_Engine/Graphics/Graphics/GpuProfiler.h"
 
 void Game::Initialize()
 {

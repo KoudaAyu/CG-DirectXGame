@@ -5,7 +5,7 @@
 #include "ParticleManager.h"
 #include "RootParam.h"
 #include "RenderContext.h"
-#include "Baziru3_Engine\Graphics\SceneRenderRequests.h"
+#include "Baziru3_Engine\Graphics\Graphics\SceneRenderRequests.h"
 #include "SpriteManager.h"
 #include "TextureManager.h"
 #include "AudioManager.h"
@@ -17,7 +17,7 @@
 #include <Windows.h>
 #include <fstream>
 #include <nlohmann/json.hpp>
-#include "Baziru3_Engine/AI/NavMesh.h"
+#include "Baziru3_Engine/Framework/AI/NavMesh.h"
 
 #include "GamePlayScene.h"
 
@@ -25,10 +25,10 @@
 #include "CombatSystem.h"
 #include "Bullet.h"
 #include "CollisionSystem.h"
-#include "Baziru3_Engine/Collision/CollisionManager.h"
-#include "Baziru3_Engine/Collision/SphereCollider.h"
-#include "Baziru3_Engine/Collision/BoxCollider.h"
-#include "Baziru3_Engine/Collision/CapsuleCollider.h"
+#include "Baziru3_Engine/Framework/Collision/CollisionManager.h"
+#include "Baziru3_Engine/Framework/Collision/SphereCollider.h"
+#include "Baziru3_Engine/Framework/Collision/BoxCollider.h"
+#include "Baziru3_Engine/Framework/Collision/CapsuleCollider.h"
 
 GamePlayScene::GamePlayScene()
 {

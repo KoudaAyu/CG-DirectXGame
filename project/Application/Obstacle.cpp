@@ -1,7 +1,7 @@
 #include "Obstacle.h"
 #include "TextureManager.h"
 
-#include "Baziru3_Engine/Collision/CollisionManager.h"
+#include "Baziru3_Engine/Framework/Collision/CollisionManager.h"
 
 void Obstacle::Initialize(Object3dCom* object3dCom, Camera* camera, const Vector3& position, float radius)
 {

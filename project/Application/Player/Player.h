@@ -5,8 +5,8 @@
 #include "Object3dCom.h"
 #include "Camera.h"
 #include "RenderContext.h"
-#include "Baziru3_Engine/Collision/SphereCollider.h"
-#include "Baziru3_Engine/Collision/CollisionManager.h"
+#include "Baziru3_Engine/Framework/Collision/SphereCollider.h"
+#include "Baziru3_Engine/Framework/Collision/CollisionManager.h"
 
 class Bullet;
 class MouseInput;

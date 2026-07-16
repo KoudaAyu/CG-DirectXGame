@@ -1,6 +1,6 @@
 #include "MovingEnemy.h"
-#include "Baziru3_Engine/AI/BehaviorTree.h"
-#include "Baziru3_Engine/AI/NavMesh.h"
+#include "Baziru3_Engine/Framework/AI/BehaviorTree.h"
+#include "Baziru3_Engine/Framework/AI/NavMesh.h"
 #include "Object3d.h"
 #include "Object3dCom.h"
 #include "TextureManager.h"
@@ -10,10 +10,10 @@
 #include "Sprite.h"
 #include "Bullet.h"
 #include "Obstacle.h"
-#include "Baziru3_Engine/Collision/CollisionManager.h"
-#include "Baziru3_Engine/Collision/SphereCollider.h"
-#include "Baziru3_Engine/Collision/BoxCollider.h"
-#include "Baziru3_Engine/Collision/CapsuleCollider.h"
+#include "Baziru3_Engine/Framework/Collision/CollisionManager.h"
+#include "Baziru3_Engine/Framework/Collision/SphereCollider.h"
+#include "Baziru3_Engine/Framework/Collision/BoxCollider.h"
+#include "Baziru3_Engine/Framework/Collision/CapsuleCollider.h"
 #include <cmath>
 #include <random>
 

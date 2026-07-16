@@ -6,11 +6,11 @@
 #include "../../Obstacle.h"
 #include "Application/Particle/AppParticleManager.h"
 #include "ParticleManager.h"
-#include "Baziru3_Engine/Effect/HitEffect.h"
-#include "Baziru3_Engine/Collision/CollisionManager.h"
-#include "Baziru3_Engine/Collision/SphereCollider.h"
-#include "Baziru3_Engine/Collision/BoxCollider.h"
-#include "Baziru3_Engine/Collision/CapsuleCollider.h"
+#include "Baziru3_Engine/Framework/Effect/HitEffect.h"
+#include "Baziru3_Engine/Framework/Collision/CollisionManager.h"
+#include "Baziru3_Engine/Framework/Collision/SphereCollider.h"
+#include "Baziru3_Engine/Framework/Collision/BoxCollider.h"
+#include "Baziru3_Engine/Framework/Collision/CapsuleCollider.h"
 #include "CombatSystem.h"
 #include <cmath>
 #include <algorithm>
