@@ -769,10 +769,14 @@ DirectX::ScratchImage DirectXCom::LoadTexture(const std::string& filePath)
     std::wstring filePathW = StringUtil::ConvertString(filePath);
     HRESULT hr = S_OK;
 
-    // ファイル拡張子で読み込み方法を選択する (.dds は DirectXTex の DDS ローダーを使う)
+    // ファイル拡張子で読み込み方法を選択する
     if (filePathW.ends_with(L".dds") || filePathW.ends_with(L".DDS"))
     {
         hr = DirectX::LoadFromDDSFile(filePathW.c_str(), DirectX::DDS_FLAGS_NONE, nullptr, image);
+    }
+    else if (filePathW.ends_with(L".tga") || filePathW.ends_with(L".TGA"))
+    {
+        hr = DirectX::LoadFromTGAFile(filePathW.c_str(), nullptr, image);
     }
     else
     {

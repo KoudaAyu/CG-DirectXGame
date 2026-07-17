@@ -1,0 +1,266 @@
+[
+    {
+        "name": "ProceduralTree",
+        "type": "Tree",
+        "position": {
+            "x": 0.3445,
+            "y": 0.0,
+            "z": 0.1663
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 3.9401,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0403,
+            "y": 1.0403,
+            "z": 1.0403
+        },
+        "parameters": {
+            "seed": 94469,
+            "iterations": 2,
+            "branchLength": 0.14,
+            "branchRadius": 0.012,
+            "taperRate": 0.8,
+            "angle": 25.8
+        }
+    },
+    {
+        "name": "ProceduralTree",
+        "type": "Tree",
+        "position": {
+            "x": 2.2709,
+            "y": 0.0,
+            "z": 0.9473
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 2.892,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.1174,
+            "y": 1.1174,
+            "z": 1.1174
+        },
+        "parameters": {
+            "seed": 30742,
+            "iterations": 2,
+            "branchLength": 0.16,
+            "branchRadius": 0.013,
+            "taperRate": 0.8,
+            "angle": 22.9
+        }
+    },
+    {
+        "name": "ProceduralTree",
+        "type": "Tree",
+        "position": {
+            "x": -0.0775,
+            "y": 0.0,
+            "z": -0.6389
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 0.1572,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0124,
+            "y": 1.0124,
+            "z": 1.0124
+        },
+        "parameters": {
+            "seed": 9714,
+            "iterations": 2,
+            "branchLength": 0.13,
+            "branchRadius": 0.018,
+            "taperRate": 0.8,
+            "angle": 23.2
+        }
+    },
+    {
+        "name": "ProceduralRock",
+        "type": "Rock",
+        "position": {
+            "x": -0.3992,
+            "y": 0.0,
+            "z": -3.3264
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 2.6863,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0842,
+            "y": 1.0842,
+            "z": 1.0842
+        },
+        "parameters": {
+            "seed": 8841,
+            "subdivisions": 3,
+            "noiseStrength": 0.29,
+            "voronoiStrength": 0.15,
+            "crackStrength": 0.45
+        }
+    },
+    {
+        "name": "ProceduralRock",
+        "type": "Rock",
+        "position": {
+            "x": 2.4124,
+            "y": 0.0,
+            "z": -2.7723
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 4.5485,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 0.8091,
+            "y": 0.8091,
+            "z": 0.8091
+        },
+        "parameters": {
+            "seed": 52878,
+            "subdivisions": 3,
+            "noiseStrength": 0.26,
+            "voronoiStrength": 0.26,
+            "crackStrength": 0.33
+        }
+    },
+    {
+        "name": "ProceduralRock",
+        "type": "Rock",
+        "position": {
+            "x": -2.4474,
+            "y": 0.0,
+            "z": 0.2322
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 4.3661,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 0.8766,
+            "y": 0.8766,
+            "z": 0.8766
+        },
+        "parameters": {
+            "seed": 28469,
+            "subdivisions": 3,
+            "noiseStrength": 0.3,
+            "voronoiStrength": 0.11,
+            "crackStrength": 0.33
+        }
+    },
+    {
+        "name": "ProceduralRock",
+        "type": "Rock",
+        "position": {
+            "x": -1.7267,
+            "y": 0.0,
+            "z": 2.5091
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 5.3162,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 0.8009,
+            "y": 0.8009,
+            "z": 0.8009
+        },
+        "parameters": {
+            "seed": 17533,
+            "subdivisions": 3,
+            "noiseStrength": 0.31,
+            "voronoiStrength": 0.25,
+            "crackStrength": 0.37
+        }
+    },
+    {
+        "name": "ProceduralTree",
+        "type": "Tree",
+        "position": {
+            "x": 1.5073,
+            "y": 0.0,
+            "z": 0.0776
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 1.1708,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.1656,
+            "y": 1.1656,
+            "z": 1.1656
+        },
+        "parameters": {
+            "seed": 19690,
+            "iterations": 2,
+            "branchLength": 0.13,
+            "branchRadius": 0.013,
+            "taperRate": 0.8,
+            "angle": 26.1
+        }
+    },
+    {
+        "name": "ProceduralRock",
+        "type": "Rock",
+        "position": {
+            "x": -0.5837,
+            "y": 0.0,
+            "z": 1.4941
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 0.5366,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 0.8146,
+            "y": 0.8146,
+            "z": 0.8146
+        },
+        "parameters": {
+            "seed": 51719,
+            "subdivisions": 3,
+            "noiseStrength": 0.31,
+            "voronoiStrength": 0.19,
+            "crackStrength": 0.41
+        }
+    },
+    {
+        "name": "ProceduralRock",
+        "type": "Rock",
+        "position": {
+            "x": -0.8405,
+            "y": 0.0,
+            "z": 2.9288
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 6.0726,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 0.9151,
+            "y": 0.9151,
+            "z": 0.9151
+        },
+        "parameters": {
+            "seed": 35109,
+            "subdivisions": 3,
+            "noiseStrength": 0.3,
+            "voronoiStrength": 0.27,
+            "crackStrength": 0.46
+        }
+    }
+]

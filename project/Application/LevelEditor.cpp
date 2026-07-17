@@ -7,6 +7,11 @@
 #include "MaterialManager.h"
 #include "Light.h"
 #include <Windows.h>
+#include "externals/nlohmann/json.hpp"
+#include "Baziru3_Engine/3D/Procedural/BioProceduralGenerator.h"
+#include "Baziru3_Engine/Collision/CollisionManager.h"
+#include "Baziru3_Engine/Collision/BoxCollider.h"
+#include "Baziru3_Engine/Collision/CapsuleCollider.h"
 
 namespace {
     bool FileExists(const std::string& path) {
@@ -23,6 +28,22 @@ namespace {
         }
         return tokens;
     }
+} // namespace
+
+LevelEditor::~LevelEditor()
+{
+    CollisionManager* colManager = CollisionManager::GetInstance();
+    if (colManager)
+    {
+        for (auto& collider : colliders_)
+        {
+            if (collider)
+            {
+                colManager->UnregisterCollider(collider.get());
+            }
+        }
+    }
+    colliders_.clear();
 }
 
 void LevelEditor::Initialize(DirectXCom* dxCommon, Object3dCom* object3dCom)
@@ -73,9 +94,11 @@ void LevelEditor::Initialize(DirectXCom* dxCommon, Object3dCom* object3dCom)
     // 初期化時にサンプルデータを読み込み試行、なければデフォルト配置
     if (!LoadFromFile(currentFilepath_))
     {
-        // デフォルトのプレーンオブジェクトを追加
-        AddObject("GroundPlane", "Resources", "plane.obj", true);
-        SaveToFile(currentFilepath_);
+        // ファイル自体が存在しない場合のみ、デフォルトの GroundPlane をメモリ上に追加（勝手に上書きセーブはしない）
+        if (!std::filesystem::exists(currentFilepath_))
+        {
+            AddObject("GroundPlane", "Resources", "plane.obj", true);
+        }
     }
 }
 
@@ -127,6 +150,40 @@ void LevelEditor::Update(float deltaTime)
         Sprite::Transform tZ = { {1.0f, 1.0f, 1.0f}, {1.5707963f, 0.0f, 0.0f}, center };
         axisCylinders_[2]->SetTransform(tZ);
         axisCylinders_[2]->Update();
+    }
+
+    // 自動リロード（ホットリロード）処理
+    if (autoReloadEnabled_ && !currentFilepath_.empty())
+    {
+        static int reloadCheckCooldown = 0;
+        // 毎フレームのIO負荷を下げるため、約30フレームに1回チェック
+        if (++reloadCheckCooldown >= 30)
+        {
+            reloadCheckCooldown = 0;
+            try
+            {
+                if (std::filesystem::exists(currentFilepath_))
+                {
+                    auto lastWrite = std::filesystem::last_write_time(currentFilepath_);
+                    if (lastWrite > lastLoadedTime_)
+                    {
+                        if (currentFilepath_.rfind(".json") != std::string::npos)
+                        {
+                            LoadFromJson(currentFilepath_);
+                        }
+                        else
+                        {
+                            LoadFromFile(currentFilepath_);
+                        }
+                        lastLoadedTime_ = lastWrite;
+                    }
+                }
+            }
+            catch (...)
+            {
+                // ファイル書き込み中のロック競合などによるエラーの防止
+            }
+        }
     }
 }
 
@@ -230,8 +287,8 @@ void LevelEditor::DrawImGui()
         // ファイル操作
         ImGui::TextColored(ImVec4(0.7f, 0.6f, 0.9f, 1.0f), "[ File IO ]");
         ImGui::Text("Current File: %s", currentFilepath_.c_str());
-        static char filepathBuf[256] = "Resources/level_data.csv";
-        ImGui::InputText("CSV Path", filepathBuf, sizeof(filepathBuf));
+        static char filepathBuf[256] = "Resources/stage_layout.json";
+        ImGui::InputText("File Path", filepathBuf, sizeof(filepathBuf));
         if (ImGui::Button("Save Level"))
         {
             if (SaveToFile(filepathBuf))
@@ -247,6 +304,8 @@ void LevelEditor::DrawImGui()
                 currentFilepath_ = filepathBuf;
             }
         }
+        ImGui::SameLine();
+        ImGui::Checkbox("Auto Reload", &autoReloadEnabled_);
 
         ImGui::Separator();
 
@@ -386,6 +445,11 @@ void LevelEditor::DrawImGui()
 
 bool LevelEditor::SaveToFile(const std::string& filepath)
 {
+    if (filepath.rfind(".json") != std::string::npos)
+    {
+        return SaveToJson(filepath);
+    }
+
     std::ofstream file(filepath);
     if (!file.is_open()) return false;
 
@@ -406,8 +470,54 @@ bool LevelEditor::SaveToFile(const std::string& filepath)
     return true;
 }
 
+bool LevelEditor::SaveToJson(const std::string& filepath)
+{
+    nlohmann::json j = nlohmann::json::array();
+
+    for (const auto& obj : objectDatas_)
+    {
+        nlohmann::json item;
+        item["name"] = obj.name;
+        item["type"] = obj.type;
+
+        item["position"] = { {"x", obj.position.x}, {"y", obj.position.y}, {"z", obj.position.z} };
+        item["rotation"] = { {"x", obj.rotation.x}, {"y", obj.rotation.y}, {"z", obj.rotation.z} };
+        item["scale"] = { {"x", obj.scale.x}, {"y", obj.scale.y}, {"z", obj.scale.z} };
+        item["isStatic"] = obj.isStatic;
+
+        if (obj.type == "Tree" || obj.type == "Rock")
+        {
+            nlohmann::json params;
+            params["seed"] = obj.seed;
+            params["iterations"] = obj.iterations;
+            params["branchLength"] = obj.branchLength;
+            params["branchRadius"] = obj.branchRadius;
+            params["taperRate"] = obj.taperRate;
+            params["angle"] = obj.angle;
+            params["subdivisions"] = obj.subdivisions;
+            params["noiseStrength"] = obj.noiseStrength;
+            params["voronoiStrength"] = obj.voronoiStrength;
+            params["crackStrength"] = obj.crackStrength;
+            item["parameters"] = params;
+        }
+
+        j.push_back(item);
+    }
+
+    std::ofstream file(filepath);
+    if (!file.is_open()) return false;
+
+    file << j.dump(4);
+    return true;
+}
+
 bool LevelEditor::LoadFromFile(const std::string& filepath)
 {
+    if (filepath.rfind(".json") != std::string::npos)
+    {
+        return LoadFromJson(filepath);
+    }
+
     std::ifstream file(filepath);
     if (!file.is_open()) return false;
 
@@ -443,38 +553,228 @@ bool LevelEditor::LoadFromFile(const std::string& filepath)
     {
         selectedIndex_ = -1;
     }
+
+    if (std::filesystem::exists(filepath))
+    {
+        lastLoadedTime_ = std::filesystem::last_write_time(filepath);
+    }
+    return true;
+}
+
+bool LevelEditor::LoadFromJson(const std::string& filepath)
+{
+    std::ifstream file(filepath);
+    if (!file.is_open()) return false;
+
+    nlohmann::json j;
+    try
+    {
+        file >> j;
+    }
+    catch (...)
+    {
+        return false;
+    }
+
+    std::vector<LevelObjectData> tempDatas;
+
+    for (const auto& item : j)
+    {
+        LevelObjectData obj;
+        obj.name = item.value("name", "Unnamed");
+        obj.type = item.value("type", "");
+
+        // CSV互換のためにデフォルトを設定
+        obj.modelDirectory = "Resources";
+        if (obj.type == "Tree" || obj.type == "Rock")
+        {
+            obj.modelFilename = "Outputs/ProceduralAsset_LOD0.obj"; // ダミー
+        }
+        else
+        {
+            obj.modelFilename = "plane.obj";
+        }
+
+        // position
+        if (item.contains("position"))
+        {
+            const auto& pos = item["position"];
+            obj.position = { pos.value("x", 0.0f), pos.value("y", 0.0f), pos.value("z", 0.0f) };
+        }
+        // rotation
+        if (item.contains("rotation"))
+        {
+            const auto& rot = item["rotation"];
+            obj.rotation = { rot.value("x", 0.0f), rot.value("y", 0.0f), rot.value("z", 0.0f) };
+        }
+        // scale
+        if (item.contains("scale"))
+        {
+            const auto& scl = item["scale"];
+            obj.scale = { scl.value("x", 1.0f), scl.value("y", 1.0f), scl.value("z", 1.0f) };
+        }
+
+        obj.isStatic = item.value("isStatic", true);
+
+        // parameters
+        if (item.contains("parameters"))
+        {
+            const auto& params = item["parameters"];
+            obj.seed = params.value("seed", 0);
+            obj.iterations = params.value("iterations", 3);
+            obj.branchLength = params.value("branchLength", 1.0f);
+            obj.branchRadius = params.value("branchRadius", 0.1f);
+            obj.taperRate = params.value("taperRate", 0.8f);
+            obj.angle = params.value("angle", 25.0f);
+            obj.subdivisions = params.value("subdivisions", 3);
+            obj.noiseStrength = params.value("noiseStrength", 0.3f);
+            obj.voronoiStrength = params.value("voronoiStrength", 0.2f);
+            obj.crackStrength = params.value("crackStrength", 0.4f);
+        }
+
+        tempDatas.push_back(obj);
+    }
+
+    objectDatas_ = std::move(tempDatas);
+    RefreshRuntimeObjects();
+
+    if (!objectDatas_.empty())
+    {
+        selectedIndex_ = 0;
+    }
+    else
+    {
+        selectedIndex_ = -1;
+    }
+
+    if (std::filesystem::exists(filepath))
+    {
+        lastLoadedTime_ = std::filesystem::last_write_time(filepath);
+    }
     return true;
 }
 
 void LevelEditor::RefreshRuntimeObjects()
 {
+    // 古いコライダーの登録解除とクリア
+    CollisionManager* colManager = CollisionManager::GetInstance();
+    if (colManager)
+    {
+        for (auto& collider : colliders_)
+        {
+            if (collider)
+            {
+                colManager->UnregisterCollider(collider.get());
+            }
+        }
+    }
+    colliders_.clear();
+
     runtimeObjects_.clear();
 
-    for (const auto& objData : objectDatas_)
+    for (size_t idx = 0; idx < objectDatas_.size(); ++idx)
     {
-        std::string fullPath = objData.modelDirectory + "/" + objData.modelFilename;
-        if (!FileExists(fullPath))
-        {
-            // ファイルが存在しない場合はnullptrを入れてプレースホルダーまたはスキップ扱いにする
-            runtimeObjects_.push_back(nullptr);
-            continue;
-        }
+        const auto& objData = objectDatas_[idx];
+        std::string cacheKey;
+        bool isProcedural = (objData.type == "Tree" || objData.type == "Rock");
 
-        // キャッシュからロード、存在しなければ新しくロードして追加
-        auto it = modelCache_.find(fullPath);
-        if (it == modelCache_.end())
+        if (isProcedural)
         {
-            Object3d::ModelData modelData;
-            if (objData.modelFilename.rfind(".obj") != std::string::npos)
+            if (objData.type == "Tree")
             {
-                modelData = Object3d::LoadObjFile(objData.modelDirectory, objData.modelFilename);
+                std::ostringstream oss;
+                oss << "ProcTree_" << objData.seed << "_" << objData.iterations << "_"
+                    << objData.branchLength << "_" << objData.branchRadius << "_"
+                    << objData.taperRate << "_" << objData.angle;
+                cacheKey = oss.str();
             }
             else
             {
-                modelData = Object3d::LoadModelFile(objData.modelDirectory, objData.modelFilename);
+                std::ostringstream oss;
+                oss << "ProcRock_" << objData.seed << "_" << objData.subdivisions << "_"
+                    << objData.noiseStrength << "_" << objData.voronoiStrength << "_"
+                    << objData.crackStrength;
+                cacheKey = oss.str();
             }
-            modelCache_[fullPath] = modelData;
-            it = modelCache_.find(fullPath);
+        }
+        else
+        {
+            cacheKey = objData.modelDirectory + "/" + objData.modelFilename;
+        }
+
+        // キャッシュからロード、存在しなければ新規作成
+        auto it = modelCache_.find(cacheKey);
+        if (it == modelCache_.end())
+        {
+            Object3d::ModelData modelData;
+
+            if (isProcedural)
+            {
+                BioProcedural::MeshData procMesh;
+                if (objData.type == "Tree")
+                {
+                    BioProcedural::TreeParameters params;
+                    params.seed = objData.seed;
+                    params.iterations = objData.iterations;
+                    params.branchLength = objData.branchLength;
+                    params.branchRadius = objData.branchRadius;
+                    params.taperRate = objData.taperRate;
+                    params.angle = objData.angle;
+                    params.radialSegments = 8;
+                    
+                    procMesh = BioProcedural::BioProceduralGenerator::GenerateTree(params);
+                }
+                else
+                {
+                    BioProcedural::RockParameters params;
+                    params.seed = objData.seed;
+                    params.subdivisions = objData.subdivisions;
+                    params.noiseStrength = objData.noiseStrength;
+                    params.voronoiStrength = objData.voronoiStrength;
+                    params.crackStrength = objData.crackStrength;
+                    
+                    procMesh = BioProcedural::BioProceduralGenerator::GenerateRock(params);
+                }
+
+                modelData.vertices.resize(procMesh.vertices.size());
+                for (size_t i = 0; i < procMesh.vertices.size(); ++i)
+                {
+                    modelData.vertices[i].position = { procMesh.vertices[i].position.x, procMesh.vertices[i].position.y, procMesh.vertices[i].position.z, 1.0f };
+                    modelData.vertices[i].normal = { procMesh.vertices[i].normal.x, procMesh.vertices[i].normal.y, procMesh.vertices[i].normal.z };
+                    modelData.vertices[i].texcoord = { procMesh.vertices[i].texcoord.u, procMesh.vertices[i].texcoord.v };
+                }
+                modelData.indices = procMesh.indices;
+
+                // アトラス用テクスチャの読み込み
+                std::string texturePath = "Resources/Outputs/ProceduralAsset_LOD0_atlas.tga";
+                if (!FileExists(texturePath))
+                {
+                    // アトラス画像が存在しない場合はダミーのテクスチャで代用し、アサートを防ぎます
+                    texturePath = "Resources/uvChecker.png";
+                }
+                modelData.material.textureFilePath = texturePath;
+                modelData.material.textureIndex = TextureManager::GetInstance()->Load(texturePath);
+            }
+            else
+            {
+                std::string fullPath = objData.modelDirectory + "/" + objData.modelFilename;
+                if (!FileExists(fullPath))
+                {
+                    runtimeObjects_.push_back(nullptr);
+                    continue;
+                }
+                if (objData.modelFilename.rfind(".obj") != std::string::npos)
+                {
+                    modelData = Object3d::LoadObjFile(objData.modelDirectory, objData.modelFilename);
+                }
+                else
+                {
+                    modelData = Object3d::LoadModelFile(objData.modelDirectory, objData.modelFilename);
+                }
+            }
+
+            modelCache_[cacheKey] = modelData;
+            it = modelCache_.find(cacheKey);
         }
 
         auto runtimeObj = std::make_unique<Object3d>();
@@ -483,9 +783,33 @@ void LevelEditor::RefreshRuntimeObjects()
         runtimeObj->SetRotate(objData.rotation);
         runtimeObj->SetScale(objData.scale);
         runtimeObj->SetEnableLighting(true);
-        runtimeObj->Update(); // 最初の描画前に正しい座標変換行列を適用する
+        runtimeObj->Update();
 
         runtimeObjects_.push_back(std::move(runtimeObj));
+
+        // プロシージャルオブジェクトならコライダーも生成して登録する
+        if (isProcedural && colManager)
+        {
+            std::unique_ptr<Collider> collider;
+            if (objData.type == "Tree")
+            {
+                float radius = objData.branchRadius * objData.scale.x;
+                float height = objData.branchLength * objData.scale.y * 3.0f; // 樹木の高さに比例
+                // vectorがリサイズされたり再配置されても安全なよう、&objData.position のアドレスは、RefreshRuntimeObjects が終わるまでは有効
+                collider = std::make_unique<CapsuleCollider>(radius, height, &const_cast<Vector3&>(objData.position), CollisionAttribute::Obstacle);
+            }
+            else // Rock
+            {
+                Vector3 size = { objData.scale.x * 2.0f, objData.scale.y * 2.0f, objData.scale.z * 2.0f };
+                collider = std::make_unique<BoxCollider>(size, &const_cast<Vector3&>(objData.position), nullptr, CollisionAttribute::Obstacle);
+            }
+
+            if (collider)
+            {
+                colManager->RegisterCollider(collider.get());
+                colliders_.push_back(std::move(collider));
+            }
+        }
     }
 }
 
