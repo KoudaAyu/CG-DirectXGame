@@ -435,6 +435,7 @@ void ParticleManager::Update(float deltaTime)
 
 void ParticleManager::Draw(ID3D12GraphicsCommandList* commandList, const RenderContext& ctx, UINT vertexCount)
 {
+	return; // デバッグ用パーティクル描画を無効化
 	if (!commandList) return;
 
 	// PSOとルートシグネチャをセット

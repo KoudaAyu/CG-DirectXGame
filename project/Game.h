@@ -109,8 +109,6 @@ public:
 		static const std::vector<std::unique_ptr<Sprite>> empty;
 		return empty;
 	}
-	Object3d* GetObject3d() { return object3d_.get(); }
-	const Object3d* GetObject3d() const { return object3d_.get(); }
 	Object3dCom* GetObject3dCom() { return object3dCom.get(); }
 	const Object3dCom* GetObject3dCom() const { return object3dCom.get(); }
 	ParticleManager* GetParticleManager() { return particleManager.get(); }
@@ -132,8 +130,7 @@ private:
 	std::unique_ptr<ImGuiManager> imguiManager;
 	std::unique_ptr<Light> light;
 	std::unique_ptr<Model> model_;
-	std::unique_ptr<ModelCom>modelCom_;
-	std::unique_ptr<Object3d> object3d_;
+	std::unique_ptr<ModelCom> modelCom_;
 	std::unique_ptr<Object3dCom> object3dCom;
 	std::unique_ptr<SkinningObject3dCom> skinningObject3dCom;
    std::unique_ptr<OffScreenRendering> offScreenRendering_;

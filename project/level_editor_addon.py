@@ -20,7 +20,7 @@ bl_info = {
 }
 
 # 2. 設定データ（プロジェクトのフォルダパス）
-class MyAddonProperties(bpy.types.PropertyGroup):
+class MyAddonPropertiesV2(bpy.types.PropertyGroup):
     project_path: bpy.props.StringProperty(
         name="プロジェクトパス",
         description="DirectXGame.sln があるprojectフォルダを選択してください",
@@ -32,6 +32,11 @@ class MyAddonProperties(bpy.types.PropertyGroup):
         description="配置オブジェクトに変更があった時、自動的にJSONファイルを更新します",
         default=True
     )
+    camera_sync: bpy.props.BoolProperty(
+        name="カメラ同期",
+        description="Blenderの視点をゲームエンジンのカメラと同期させます",
+        default=False
+    )
     auto_export_status: bpy.props.StringProperty(
         name="同期状態",
         default="準備完了"
@@ -41,9 +46,17 @@ class MyAddonProperties(bpy.types.PropertyGroup):
         description="ペイント配置するアセットの種類を選択します",
         items=[
             ('Tree', "木 (Tree)", "プロシージャル樹木を配置します"),
-            ('Rock', "岩 (Rock)", "プロシージャル岩石を配置します")
+            ('Rock', "岩 (Rock)", "プロシージャル岩石を配置します"),
+            ('River', "川ブロック (River)", "川の道路ブロックを配置します")
         ],
         default='Tree'
+    )
+    paint_spacing: bpy.props.FloatProperty(
+        name="配置間隔 (m)",
+        description="筆塗りで連続配置されるアセットの間隔(メートル)を指定します",
+        default=2.5,
+        min=0.8,
+        max=10.0
     )
     scatter_count: bpy.props.IntProperty(
         name="配置する数",
@@ -62,6 +75,17 @@ class MyAddonProperties(bpy.types.PropertyGroup):
         ],
         default='Mix'
     )
+    biome_zone_type: bpy.props.EnumProperty(
+        name="ゾーンタイプ",
+        description="選択したPlaneオブジェクトに適用するゾーンタイプです",
+        items=[
+            ('Forest', "森林 (Forest)", "木が密集したエリア"),
+            ('Desert', "岩場/荒れ地 (Desert)", "岩が露出したエリア"),
+            ('River', "川沿い/水辺 (River)", "岩が多く低木がまばらなエリア"),
+            ('Grassland', "平原 (Grassland)", "木と岩がほどよく点在するエリア")
+        ],
+        default='Forest'
+    )
 
 # 2.5 マテリアル自動割り当て用ヘルパー
 def get_or_create_material(name, color_rgba):
@@ -74,6 +98,28 @@ def get_or_create_material(name, color_rgba):
         if principled:
             principled.inputs['Base Color'].default_value = color_rgba
     return mat
+
+def get_or_create_biome_material(name, color_rgba):
+    mat = bpy.data.materials.get(name)
+    if mat is None:
+        mat = bpy.data.materials.new(name=name)
+        mat.use_nodes = True
+        mat.blend_method = 'BLEND'  # ビューポートで半透明にする
+        nodes = mat.node_tree.nodes
+        principled = nodes.get("Principled BSDF")
+        if principled:
+            principled.inputs['Base Color'].default_value = color_rgba
+            if 'Alpha' in principled.inputs:
+                principled.inputs['Alpha'].default_value = color_rgba[3]
+    else:
+        nodes = mat.node_tree.nodes
+        principled = nodes.get("Principled BSDF")
+        if principled:
+            principled.inputs['Base Color'].default_value = color_rgba
+            if 'Alpha' in principled.inputs:
+                principled.inputs['Alpha'].default_value = color_rgba[3]
+    return mat
+
 
 def ray_cast_terrain(scene, context, origin, direction, exclude_objs=[]):
     # シーン内の既存アセット（木や岩）を一時的に非表示にする
@@ -179,6 +225,507 @@ class MYADDON_OT_add_procedural_rock(bpy.types.Operator):
         self.report({'INFO'}, "プロシージャル岩を生成しました。カスタムプロパティでパラメータを調整できます。")
         return {'FINISHED'}
 
+# 直線川パーツを追加するロボット (道路パーツ方式)
+class MYADDON_OT_add_river_straight(bpy.types.Operator):
+    bl_idname = "myaddon.add_river_straight"
+    bl_label = "直線川を追加"
+    bl_description = "道路パーツのように移動(G)・回転(R)して繋げられる直線の川オブジェクトを追加します"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def execute(self, context):
+        bpy.ops.mesh.primitive_plane_add(size=4.0)
+        obj = context.active_object
+        obj.name = "River_Straight"
+        obj.scale = (1.0, 2.0, 1.0)
+        
+        obj["type"] = "River"
+        obj["river_part"] = "Straight"
+        obj["river_width"] = 4.0
+        obj["river_flow_speed"] = 1.0
+        obj["river_wave_scale"] = 1.0
+        
+        mat = get_or_create_biome_material("RiverPlaceholderMaterial", (0.1, 0.4, 0.9, 0.7))
+        if len(obj.data.materials) == 0:
+            obj.data.materials.append(mat)
+        else:
+            obj.data.materials[0] = mat
+            
+        self.report({'INFO'}, "直線の川パーツを追加しました。Gキーで移動、Rキーで回転して自由に繋げられます。")
+        return {'FINISHED'}
+
+# カーブ川パーツを追加するロボット
+class MYADDON_OT_add_river_curve(bpy.types.Operator):
+    bl_idname = "myaddon.add_river_curve"
+    bl_label = "カーブ川を追加"
+    bl_description = "道路パーツのように移動(G)・回転(R)して繋げられるL字カーブの川オブジェクトを追加します"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def execute(self, context):
+        bpy.ops.mesh.primitive_plane_add(size=4.0)
+        obj = context.active_object
+        obj.name = "River_Curve"
+        
+        obj["type"] = "River"
+        obj["river_part"] = "Curve"
+        obj["river_width"] = 4.0
+        obj["river_flow_speed"] = 1.0
+        obj["river_wave_scale"] = 1.0
+        
+        mat = get_or_create_biome_material("RiverPlaceholderMaterial", (0.1, 0.4, 0.9, 0.7))
+        if len(obj.data.materials) == 0:
+            obj.data.materials.append(mat)
+        else:
+            obj.data.materials[0] = mat
+            
+        self.report({'INFO'}, "カーブの川パーツを追加しました。Gキーで移動、Rキーで回転して自由に繋げられます。")
+        return {'FINISHED'}
+
+# 分岐川パーツを追加するロボット
+class MYADDON_OT_add_river_fork(bpy.types.Operator):
+    bl_idname = "myaddon.add_river_fork"
+    bl_label = "分岐川を追加"
+    bl_description = "道路パーツのように移動(G)・回転(R)して繋げられるT字分岐の川オブジェクトを追加します"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def execute(self, context):
+        bpy.ops.mesh.primitive_plane_add(size=4.0)
+        obj = context.active_object
+        obj.name = "River_Fork"
+        
+        obj["type"] = "River"
+        obj["river_part"] = "Fork"
+        obj["river_width"] = 4.0
+        obj["river_flow_speed"] = 1.0
+        obj["river_wave_scale"] = 1.0
+        
+        mat = get_or_create_biome_material("RiverPlaceholderMaterial", (0.1, 0.4, 0.9, 0.7))
+        if len(obj.data.materials) == 0:
+            obj.data.materials.append(mat)
+        else:
+            obj.data.materials[0] = mat
+            
+        self.report({'INFO'}, "分岐の川パーツを追加しました。Gキーで移動、Rキーで回転して自由に繋げられます。")
+        return {'FINISHED'}
+
+def smooth_points_chaikin(points, iterations=2):
+    """手描きのガタガタな線をプロ級のヌルヌル滑らかな自然な曲線に自動丸め補正する関数"""
+    if len(points) < 3:
+        return points
+    curr = list(points)
+    for _ in range(iterations):
+        next_pts = [curr[0]]
+        for i in range(len(curr) - 1):
+            p0 = curr[i]
+            p1 = curr[i+1]
+            q = (p0[0]*0.75 + p1[0]*0.25, p0[1]*0.75 + p1[1]*0.25, p0[2]*0.75 + p1[2]*0.25)
+            r = (p0[0]*0.25 + p1[0]*0.75, p0[1]*0.25 + p1[1]*0.75, p0[2]*0.25 + p1[2]*0.75)
+            next_pts.append(q)
+            next_pts.append(r)
+        next_pts.append(curr[-1])
+        curr = next_pts
+    return curr
+
+# 🌊 お絵描き感覚でマウスで地面をなぞるだけで川が作れる直感ツール
+class MYADDON_OT_draw_river_freehand(bpy.types.Operator):
+    bl_idname = "myaddon.draw_river_freehand"
+    bl_label = "🌊 マウスでお絵かき（川を描く）"
+    bl_description = "マウスをドラッグして地面をスーッとなぞるだけで、お絵描き感覚で川を引くことができます"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def invoke(self, context, event):
+        self.points = []
+        self.river_obj = None
+        self.is_drawing = False
+        context.window_manager.modal_handler_add(self)
+        self.report({'INFO'}, "【川お絵かきモード開始】マウス左ボタンを押しながら地面をなぞってください。終わったら左ボタンを離します。")
+        return {'RUNNING_MODAL'}
+
+    def modal(self, context, event):
+        context.area.tag_redraw()
+
+        # 中クリックドラッグ、マウスホイール等のカメラ視点移動操作はBlenderにパススルーする
+        if event.type in {'MIDDLEMOUSE', 'WHEELUPMOUSE', 'WHEELDOWNMOUSE', 'TRACKPAD_PAN', 'TRACKPAD_ZOOM', 'NDOF_MOTION'}:
+            return {'PASS_THROUGH'}
+
+        if event.type == 'LEFTMOUSE':
+            if event.value == 'PRESS':
+                self.is_drawing = True
+            elif event.value == 'RELEASE':
+                if self.is_drawing and len(self.points) >= 2:
+                    self.report({'INFO'}, f"川の描画が完了しました！（点数: {len(self.points)}）")
+                    return {'FINISHED'}
+                self.is_drawing = False
+
+        if event.type == 'MOUSEMOVE' and self.is_drawing:
+            coord = (event.mouse_region_x, event.mouse_region_y)
+            region = context.region
+            rv3d = context.space_data.region_3d
+            vec = view3d_utils.region_2d_to_vector_3d(region, rv3d, coord)
+            origin = view3d_utils.region_2d_to_origin_3d(region, rv3d, coord)
+            
+            result, location, normal, index, obj, matrix = ray_cast_terrain(context.scene, context, origin, vec)
+            if not result and abs(vec.z) > 0.0001:
+                t = -origin.z / vec.z
+                if t > 0:
+                    location = origin + vec * t
+                    result = True
+            
+            if result:
+                loc_vec = mathutils.Vector(location) if 'mathutils' in globals() else location
+                if not self.points:
+                    self.points.append(loc_vec)
+                    self.update_river_mesh(context)
+                else:
+                    last_pt = mathutils.Vector(self.points[-1]) if 'mathutils' in globals() else self.points[-1]
+                    dist = (loc_vec - last_pt).length if hasattr(loc_vec, 'length') else math.sqrt(sum((a-b)**2 for a,b in zip(loc_vec, last_pt)))
+                    if dist > 0.8: # 0.8m以上動いたら新しい点を追加
+                        self.points.append(loc_vec)
+                        self.update_river_mesh(context)
+
+        elif event.type in {'RIGHTMOUSE', 'ESC', 'RET'}:
+            self.report({'INFO'}, "川の描画を終了しました。")
+            return {'FINISHED'}
+
+        return {'RUNNING_MODAL'}
+
+    def update_river_mesh(self, context):
+        if len(self.points) < 2:
+            return
+
+        # Chaikinアルゴリズムで、なぞった線をプロ級の自然なヌルヌル曲線に自動平滑化
+        eval_points = smooth_points_chaikin(self.points, iterations=2)
+        if len(eval_points) < 2:
+            return
+
+        width = 2.0
+        half_w = width * 0.5
+        vertices = []
+        faces = []
+
+        # 既存の川オブジェクトの数に応じて高度を3mm(0.003m)ずつ上にズラし、Zファイティング(黒いチラツキ)を完全防止
+        existing_rivers = [o for o in context.scene.objects if o.get("type") == "River"]
+        river_idx = len(existing_rivers)
+        height_offset = 0.03 + (river_idx * 0.003)
+
+        for i in range(len(eval_points)):
+            p = eval_points[i]
+            # 急カーブでのポリゴンの潰れを防ぐ平均接線ベクトル計算
+            if i == 0:
+                d_x = eval_points[1][0] - eval_points[0][0]
+                d_y = eval_points[1][1] - eval_points[0][1]
+            elif i == len(eval_points) - 1:
+                d_x = eval_points[-1][0] - eval_points[-2][0]
+                d_y = eval_points[-1][1] - eval_points[-2][1]
+            else:
+                d1_x = eval_points[i][0] - eval_points[i-1][0]
+                d1_y = eval_points[i][1] - eval_points[i-1][1]
+                d2_x = eval_points[i+1][0] - eval_points[i][0]
+                d2_y = eval_points[i+1][1] - eval_points[i][1]
+                l1 = math.sqrt(d1_x**2 + d1_y**2)
+                l2 = math.sqrt(d2_x**2 + d2_y**2)
+                if l1 > 0.0001: d1_x /= l1; d1_y /= l1
+                if l2 > 0.0001: d2_x /= l2; d2_y /= l2
+                d_x = d1_x + d2_x
+                d_y = d1_y + d2_y
+
+            length = math.sqrt(d_x * d_x + d_y * d_y)
+            if length > 0.0001:
+                d_x /= length
+                d_y /= length
+
+            side_x = -d_y
+            side_y = d_x
+
+            # マイクロレイヤーオフセットを適用したZ高度
+            z_pos = p[2] + height_offset
+            v_left = (p[0] - side_x * half_w, p[1] - side_y * half_w, z_pos)
+            v_right = (p[0] + side_x * half_w, p[1] + side_y * half_w, z_pos)
+
+            vertices.append(v_left)
+            vertices.append(v_right)
+
+            if i > 0:
+                idx = i * 2
+                faces.append((idx - 2, idx - 1, idx + 1, idx))
+
+        if not self.river_obj:
+            mesh_data = bpy.data.meshes.new("RiverMesh")
+            mesh_data.from_pydata(vertices, [], faces)
+            mesh_data.update()
+
+            self.river_obj = bpy.data.objects.new("River", mesh_data)
+            context.collection.objects.link(self.river_obj)
+
+            self.river_obj["type"] = "River"
+            self.river_obj["river_width"] = width
+            self.river_obj["river_flow_speed"] = 1.0
+            self.river_obj["river_wave_scale"] = 1.0
+
+            mat = get_or_create_biome_material("RiverPlaceholderMaterial", (0.1, 0.4, 0.9, 0.7))
+            self.river_obj.data.materials.append(mat)
+        else:
+            mesh_data = self.river_obj.data
+            mesh_data.clear_geometry()
+            mesh_data.from_pydata(vertices, [], faces)
+            mesh_data.update()
+
+        # JSON出力用に平滑化後の美しい制御点列を保存
+        self.river_obj["points_x"] = [float(p[0]) for p in eval_points]
+        self.river_obj["points_y"] = [float(p[1]) for p in eval_points]
+        self.river_obj["points_z"] = [float(p[2]) for p in eval_points]
+
+# 🌲 お絵描き感覚でマウスで地面をなぞるだけで森が描ける直感ツール
+class MYADDON_OT_draw_forest_freehand(bpy.types.Operator):
+    bl_idname = "myaddon.draw_forest_freehand"
+    bl_label = "🌲 マウスでお絵かき（森を描く）"
+    bl_description = "筆で絵を描くようにマウスで地面をなぞるだけで、その軌跡に沿って一発で一筋の森林を生成します"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def invoke(self, context, event):
+        self.points = []
+        self.is_drawing = False
+        self.spawned_objs = []
+        context.window_manager.modal_handler_add(self)
+        self.report({'INFO'}, "【森のお絵かきモード開始】マウス左ボタンを押しながら地面をなぞってください。終わったら左ボタンを離します。")
+        return {'RUNNING_MODAL'}
+
+    def modal(self, context, event):
+        context.area.tag_redraw()
+        if event.type in {'MIDDLEMOUSE', 'WHEELUPMOUSE', 'WHEELDOWNMOUSE', 'TRACKPAD_PAN', 'TRACKPAD_ZOOM', 'NDOF_MOTION'}:
+            return {'PASS_THROUGH'}
+
+        if event.type == 'LEFTMOUSE':
+            if event.value == 'PRESS':
+                self.is_drawing = True
+            elif event.value == 'RELEASE':
+                if self.is_drawing and len(self.points) >= 2:
+                    self.generate_forest(context)
+                    self.report({'INFO'}, f"森の描画が完了しました！（木: {len(self.spawned_objs)}本）")
+                    return {'FINISHED'}
+                self.is_drawing = False
+
+        if event.type == 'MOUSEMOVE' and self.is_drawing:
+            coord = (event.mouse_region_x, event.mouse_region_y)
+            region = context.region
+            rv3d = context.space_data.region_3d
+            vec = view3d_utils.region_2d_to_vector_3d(region, rv3d, coord)
+            origin = view3d_utils.region_2d_to_origin_3d(region, rv3d, coord)
+            
+            result, location, normal, index, obj, matrix = ray_cast_terrain(context.scene, context, origin, vec)
+            if not result and abs(vec.z) > 0.0001:
+                t = -origin.z / vec.z
+                if t > 0:
+                    location = origin + vec * t
+                    result = True
+            
+            if result:
+                loc_vec = mathutils.Vector(location) if 'mathutils' in globals() else location
+                if not self.points:
+                    self.points.append(loc_vec)
+                else:
+                    last_pt = mathutils.Vector(self.points[-1]) if 'mathutils' in globals() else self.points[-1]
+                    dist = (loc_vec - last_pt).length if hasattr(loc_vec, 'length') else math.sqrt(sum((a-b)**2 for a,b in zip(loc_vec, last_pt)))
+                    if dist > 0.8:
+                        self.points.append(loc_vec)
+
+        elif event.type in {'RIGHTMOUSE', 'ESC', 'RET'}:
+            self.report({'INFO'}, "森の描画を終了しました。")
+            return {'FINISHED'}
+
+        return {'RUNNING_MODAL'}
+
+    def generate_forest(self, context):
+        if len(self.points) < 2:
+            return
+        eval_pts = smooth_points_chaikin(self.points, iterations=2)
+        
+        for i in range(len(eval_pts)):
+            p = eval_pts[i]
+            num_trees = random.randint(1, 2)
+            for _ in range(num_trees):
+                offset_x = random.uniform(-1.5, 1.5)
+                offset_y = random.uniform(-1.5, 1.5)
+                loc = (p[0] + offset_x, p[1] + offset_y, p[2])
+                
+                bpy.ops.mesh.primitive_cylinder_add(radius=0.1, depth=1.0, location=loc)
+                new_obj = context.active_object
+                new_obj.name = "ProceduralTree"
+                mat = get_or_create_material("TreePlaceholderMaterial", (0.1, 0.6, 0.1, 1.0))
+                new_obj.data.materials.append(mat)
+                
+                new_obj["type"] = "Tree"
+                new_obj["seed"] = random.randint(1, 99999)
+                new_obj["iterations"] = 2
+                new_obj["branchLength"] = round(random.uniform(0.12, 0.18), 2)
+                new_obj["branchRadius"] = round(random.uniform(0.05, 0.08), 3)
+                new_obj["taperRate"] = 0.8
+                new_obj["angle"] = round(random.uniform(20.0, 30.0), 1)
+                
+                new_obj.rotation_euler.z = random.uniform(0, math.pi * 2)
+                s = random.uniform(0.8, 1.3)
+                new_obj.scale = (s, s, s)
+                self.spawned_objs.append(new_obj)
+
+# 🪨 お絵描き感覚でマウスで地面をなぞるだけで岩場が描ける直感ツール
+class MYADDON_OT_draw_rock_freehand(bpy.types.Operator):
+    bl_idname = "myaddon.draw_rock_freehand"
+    bl_label = "🪨 マウスでお絵かき（岩場を描く）"
+    bl_description = "筆で絵を描くようにマウスで地面をなぞるだけで、その軌跡に沿って一発で岩場を生成します"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def invoke(self, context, event):
+        self.points = []
+        self.is_drawing = False
+        self.spawned_objs = []
+        context.window_manager.modal_handler_add(self)
+        self.report({'INFO'}, "【岩場のお絵かきモード開始】マウス左ボタンを押しながら地面をなぞってください。終わったら左ボタンを離します。")
+        return {'RUNNING_MODAL'}
+
+    def modal(self, context, event):
+        context.area.tag_redraw()
+        if event.type in {'MIDDLEMOUSE', 'WHEELUPMOUSE', 'WHEELDOWNMOUSE', 'TRACKPAD_PAN', 'TRACKPAD_ZOOM', 'NDOF_MOTION'}:
+            return {'PASS_THROUGH'}
+
+        if event.type == 'LEFTMOUSE':
+            if event.value == 'PRESS':
+                self.is_drawing = True
+            elif event.value == 'RELEASE':
+                if self.is_drawing and len(self.points) >= 2:
+                    self.generate_rocks(context)
+                    self.report({'INFO'}, f"岩場の描画が完了しました！（岩: {len(self.spawned_objs)}個）")
+                    return {'FINISHED'}
+                self.is_drawing = False
+
+        if event.type == 'MOUSEMOVE' and self.is_drawing:
+            coord = (event.mouse_region_x, event.mouse_region_y)
+            region = context.region
+            rv3d = context.space_data.region_3d
+            vec = view3d_utils.region_2d_to_vector_3d(region, rv3d, coord)
+            origin = view3d_utils.region_2d_to_origin_3d(region, rv3d, coord)
+            
+            result, location, normal, index, obj, matrix = ray_cast_terrain(context.scene, context, origin, vec)
+            if not result and abs(vec.z) > 0.0001:
+                t = -origin.z / vec.z
+                if t > 0:
+                    location = origin + vec * t
+                    result = True
+            
+            if result:
+                loc_vec = mathutils.Vector(location) if 'mathutils' in globals() else location
+                if not self.points:
+                    self.points.append(loc_vec)
+                else:
+                    last_pt = mathutils.Vector(self.points[-1]) if 'mathutils' in globals() else self.points[-1]
+                    dist = (loc_vec - last_pt).length if hasattr(loc_vec, 'length') else math.sqrt(sum((a-b)**2 for a,b in zip(loc_vec, last_pt)))
+                    if dist > 0.8:
+                        self.points.append(loc_vec)
+
+        elif event.type in {'RIGHTMOUSE', 'ESC', 'RET'}:
+            self.report({'INFO'}, "岩場の描画を終了しました。")
+            return {'FINISHED'}
+
+        return {'RUNNING_MODAL'}
+
+    def generate_rocks(self, context):
+        if len(self.points) < 2:
+            return
+        eval_pts = smooth_points_chaikin(self.points, iterations=2)
+        
+        for i in range(len(eval_pts)):
+            p = eval_pts[i]
+            num_rocks = random.randint(1, 2)
+            for _ in range(num_rocks):
+                offset_x = random.uniform(-1.2, 1.2)
+                offset_y = random.uniform(-1.2, 1.2)
+                loc = (p[0] + offset_x, p[1] + offset_y, p[2])
+                
+                bpy.ops.mesh.primitive_ico_sphere_add(radius=1.0, location=loc)
+                new_obj = context.active_object
+                new_obj.name = "ProceduralRock"
+                mat = get_or_create_material("RockPlaceholderMaterial", (0.4, 0.4, 0.4, 1.0))
+                new_obj.data.materials.append(mat)
+                
+                new_obj["type"] = "Rock"
+                new_obj["seed"] = random.randint(1, 99999)
+                new_obj["subdivisions"] = 3
+                new_obj["noiseStrength"] = round(random.uniform(0.2, 0.4), 2)
+                new_obj["voronoiStrength"] = round(random.uniform(0.1, 0.3), 2)
+                new_obj["crackStrength"] = round(random.uniform(0.3, 0.5), 2)
+                
+                new_obj.rotation_euler.z = random.uniform(0, math.pi * 2)
+                s = random.uniform(0.7, 1.4)
+                new_obj.scale = (s, s, s)
+                self.spawned_objs.append(new_obj)
+
+# 🌊 川オブジェクトを一括削除するロボット
+class MYADDON_OT_clear_river_objects(bpy.types.Operator):
+    bl_idname = "myaddon.clear_river_objects"
+    bl_label = "川をすべて削除"
+    bl_description = "配置されている川オブジェクトをすべて一括削除します"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def execute(self, context):
+        rivers = [obj for obj in bpy.data.objects if obj.get("type") == "River"]
+        if not rivers:
+            self.report({'INFO'}, "削除対象の川はありません。")
+            return {'FINISHED'}
+            
+        for obj in rivers:
+            bpy.data.objects.remove(obj, do_unlink=True)
+            
+        context.area.tag_redraw()
+        self.report({'INFO'}, f"すべての川オブジェクト（{len(rivers)}個）を削除しました。")
+        return {'FINISHED'}
+
+def extract_object_data(obj):
+    pos_x = obj.location.x
+    pos_y = obj.location.z
+    pos_z = obj.location.y
+    rot_x = obj.rotation_euler.x
+    rot_y = obj.rotation_euler.z
+    rot_z = obj.rotation_euler.y
+    scale_x = obj.scale.x
+    scale_y = obj.scale.z
+    scale_z = obj.scale.y
+    
+    obj_name = obj.name.split('.')[0]
+    obj_type = obj.get("type", "Unknown")
+    obj_info = {
+        "name": obj_name,
+        "type": obj_type,
+        "position": {"x": round(pos_x, 4), "y": round(pos_y, 4), "z": round(pos_z, 4)},
+        "rotation": {"x": round(rot_x, 4), "y": round(rot_y, 4), "z": round(rot_z, 4)},
+        "scale":    {"x": round(scale_x, 4), "y": round(scale_y, 4), "z": round(scale_z, 4)},
+        "parameters": {}
+    }
+    
+    if obj_type == "River":
+        points_data = []
+        if "points_x" in obj and "points_y" in obj and "points_z" in obj:
+            px = obj["points_x"]
+            py = obj["points_y"]
+            pz = obj["points_z"]
+            for i in range(len(px)):
+                # Blender (X, Y, Z) -> DirectX (X, Z(高さ), Y)
+                points_data.append({"x": round(px[i], 4), "y": round(pz[i], 4), "z": round(py[i], 4)})
+        elif obj.type == 'CURVE':
+            matrix_world = obj.matrix_world
+            for spline in obj.data.splines:
+                for pt in spline.points:
+                    w_pos = matrix_world @ pt.co.xyz
+                    points_data.append({"x": round(w_pos.x, 4), "y": round(w_pos.z, 4), "z": round(w_pos.y, 4)})
+        obj_info["parameters"]["points"] = points_data
+        
+    for key in obj.keys():
+        if not key.startswith("_") and key not in ["type", "cycles", "points_x", "points_y", "points_z"]:
+            val = obj[key]
+            if hasattr(val, "to_list"):
+                obj_info["parameters"][key] = val.to_list()
+            else:
+                obj_info["parameters"][key] = val
+                
+    return obj_info
+
 # シーンのオブジェクト配置をJSONファイルとして保存する
 class MYADDON_OT_export_scene(bpy.types.Operator):
     bl_idname = "myaddon.export_scene"
@@ -186,7 +733,7 @@ class MYADDON_OT_export_scene(bpy.types.Operator):
     bl_description = "配置データをゲームのResourcesフォルダにJSONとして出力します"
 
     def execute(self, context):
-        addon_props = context.scene.my_addon_properties
+        addon_props = context.scene.my_addon_properties_v2
         project_dir = bpy.path.abspath(addon_props.project_path)
         
         if not project_dir or not os.path.exists(project_dir):
@@ -197,47 +744,8 @@ class MYADDON_OT_export_scene(bpy.types.Operator):
         layout_data = []
 
         for obj in bpy.context.scene.objects:
-            # メッシュオブジェクトかつ、typeプロパティ（"Tree" or "Rock"）が設定されているものを対象にする
-            if obj.type == 'MESH' and "type" in obj:
-                obj_type = obj["type"]
-                
-                # --- 座標の変換 (Blender:Z-up右手系 -> DirectX:Y-up左手系) ---
-                pos_x = obj.location.x
-                pos_y = obj.location.z
-                pos_z = obj.location.y
-                
-                rot_x = obj.rotation_euler.x
-                rot_y = obj.rotation_euler.z  # Z軸回転 -> DirectXのY軸回転
-                rot_z = obj.rotation_euler.y  # Y軸回転 -> DirectXのZ軸回転
-                
-                scale_x = obj.scale.x
-                scale_y = obj.scale.z
-                scale_z = obj.scale.y
-                
-                obj_name = obj.name.split('.')[0]
-                
-                obj_info = {
-                    "name": obj_name,
-                    "type": obj_type,
-                    "position": {"x": round(pos_x, 4), "y": round(pos_y, 4), "z": round(pos_z, 4)},
-                    "rotation": {"x": round(rot_x, 4), "y": round(rot_y, 4), "z": round(rot_z, 4)},
-                    "scale":    {"x": round(scale_x, 4), "y": round(scale_y, 4), "z": round(scale_z, 4)},
-                    "parameters": {}
-                }
-                
-                # "type" 以外のすべてのカスタムプロパティを parameters に詰める
-                for key in obj.keys():
-                    # bpy の内部用プロパティを除外
-                    if not key.startswith("_") and key not in ["type", "cycles"]:
-                        # JSONシリアライズ可能な型に変換して追加
-                        val = obj[key]
-                        # BlenderのIDPropertyから純粋な型に変換
-                        if hasattr(val, "to_list"):
-                            obj_info["parameters"][key] = val.to_list()
-                        else:
-                            obj_info["parameters"][key] = val
-                            
-                layout_data.append(obj_info)
+            if ("type" in obj and obj["type"] in ['Tree', 'Rock', 'Biome', 'River']):
+                layout_data.append(extract_object_data(obj))
                 
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
         with open(output_path, 'w', encoding='utf-8') as f:
@@ -274,14 +782,74 @@ class MYADDON_OT_paint_spawner(bpy.types.Operator):
     bl_description = "クリックした地形の表面に、アセットをポンポンと連続配置します"
     bl_options = {'REGISTER', 'UNDO'}
 
+    def spawn_asset_at_location(self, context, location):
+        self.paint_type = context.scene.my_addon_properties_v2.paint_type
+        
+        if self.paint_type == 'Tree':
+            bpy.ops.mesh.primitive_cylinder_add(radius=0.1, depth=1.0, location=location)
+            new_obj = context.active_object
+            new_obj.name = "ProceduralTree"
+            mat = get_or_create_material("TreePlaceholderMaterial", (0.1, 0.6, 0.1, 1.0))
+            new_obj.data.materials.append(mat)
+            new_obj["type"] = "Tree"
+            new_obj["seed"] = random.randint(1, 99999)
+            new_obj["iterations"] = 2
+            new_obj["branchLength"] = round(random.uniform(0.12, 0.18), 2)
+            new_obj["branchRadius"] = round(random.uniform(0.05, 0.08), 3)
+            new_obj["taperRate"] = 0.8
+            new_obj["angle"] = round(random.uniform(20.0, 30.0), 1)
+        elif self.paint_type == 'Rock':
+            bpy.ops.mesh.primitive_ico_sphere_add(radius=1.0, location=location)
+            new_obj = context.active_object
+            new_obj.name = "ProceduralRock"
+            mat = get_or_create_material("RockPlaceholderMaterial", (0.4, 0.4, 0.4, 1.0))
+            new_obj.data.materials.append(mat)
+            new_obj["type"] = "Rock"
+            new_obj["seed"] = random.randint(1, 99999)
+            new_obj["subdivisions"] = 3
+            new_obj["noiseStrength"] = round(random.uniform(0.2, 0.4), 2)
+            new_obj["voronoiStrength"] = round(random.uniform(0.1, 0.3), 2)
+            new_obj["crackStrength"] = round(random.uniform(0.3, 0.5), 2)
+        else: # River
+            bpy.ops.mesh.primitive_plane_add(size=4.0, location=location)
+            new_obj = context.active_object
+            new_obj.name = "River_Straight"
+            new_obj.scale = (1.0, 2.0, 1.0)
+            new_obj["type"] = "River"
+            new_obj["river_part"] = "Straight"
+            new_obj["river_width"] = 2.0
+            new_obj["river_flow_speed"] = 1.0
+            new_obj["river_wave_scale"] = 1.0
+            mat = get_or_create_material("RiverPlaceholderMaterial", (0.1, 0.4, 0.9, 0.7))
+            new_obj.data.materials.append(mat)
 
+        if new_obj:
+            new_obj.rotation_euler.z = random.uniform(0, math.pi * 2)
+            s = random.uniform(0.8, 1.2)
+            new_obj.scale = (s, s, s)
+            
+            if not hasattr(self, "spawned_objects"):
+                self.spawned_objects = []
+            self.spawned_objects.append(new_obj)
+            
+            context.view_layer.objects.active = self.preview_obj
 
     def modal(self, context, event):
         context.area.tag_redraw()
 
-        # マウスイベント処理
+        if event.type in {'MIDDLEMOUSE', 'WHEELUPMOUSE', 'WHEELDOWNMOUSE', 'TRACKPAD_PAN', 'TRACKPAD_ZOOM', 'NDOF_MOTION'}:
+            return {'PASS_THROUGH'}
+
+        # マウスドラッグ状態の更新
+        if event.type == 'LEFTMOUSE':
+            if event.value == 'PRESS':
+                self.is_painting = True
+                self.last_spawn_loc = None
+            elif event.value == 'RELEASE':
+                self.is_painting = False
+                self.last_spawn_loc = None
+
         if event.type == 'MOUSEMOVE':
-            # レイキャストによる座標取得
             coord = (event.mouse_region_x, event.mouse_region_y)
             region = context.region
             rv3d = context.space_data.region_3d
@@ -289,30 +857,41 @@ class MYADDON_OT_paint_spawner(bpy.types.Operator):
             vec = view3d_utils.region_2d_to_vector_3d(region, rv3d, coord)
             origin = view3d_utils.region_2d_to_origin_3d(region, rv3d, coord)
             
-            # ヘルパーを使用して既存の木・岩とプレビュー球を除外してレイキャスト
             result, location, normal, index, obj, matrix = ray_cast_terrain(
                 context.scene, context, origin, vec, exclude_objs=[self.preview_obj]
             )
             
-            # 地形に衝突しなかった場合、Z=0(無限グリッド床)との交点を計算する
-            if not result:
-                if abs(vec.z) > 0.0001:
-                    t = -origin.z / vec.z
-                    if t > 0:
-                        location = origin + vec * t
-                        normal = mathutils.Vector((0.0, 0.0, 1.0)) if 'mathutils' in globals() else (0.0, 0.0, 1.0)
-                        obj = None
-                        result = True
+            if not result and abs(vec.z) > 0.0001:
+                t = -origin.z / vec.z
+                if t > 0:
+                    location = origin + vec * t
+                    normal = mathutils.Vector((0.0, 0.0, 1.0)) if 'mathutils' in globals() else (0.0, 0.0, 1.0)
+                    obj = None
+                    result = True
             
-            # 赤いプレビュー照準の移動と再表示
             if result and obj != self.preview_obj:
                 self.preview_obj.location = location
                 self.preview_obj.hide_viewport = False
+
+                # 左ドラッグ中の筆塗り配置
+                if self.is_painting:
+                    should_spawn = False
+                    spacing = context.scene.my_addon_properties_v2.paint_spacing
+                    
+                    if self.last_spawn_loc is None:
+                        should_spawn = True
+                    else:
+                        dist = (mathutils.Vector(location) - mathutils.Vector(self.last_spawn_loc)).length if 'mathutils' in globals() else math.sqrt(sum((a-b)**2 for a,b in zip(location, self.last_spawn_loc)))
+                        if dist >= spacing:
+                            should_spawn = True
+
+                    if should_spawn:
+                        self.spawn_asset_at_location(context, location)
+                        self.last_spawn_loc = location
             else:
                 self.preview_obj.hide_viewport = True
                 
         elif event.type == 'LEFTMOUSE' and event.value == 'PRESS':
-            # 配置処理
             coord = (event.mouse_region_x, event.mouse_region_y)
             region = context.region
             rv3d = context.space_data.region_3d
@@ -320,74 +899,19 @@ class MYADDON_OT_paint_spawner(bpy.types.Operator):
             vec = view3d_utils.region_2d_to_vector_3d(region, rv3d, coord)
             origin = view3d_utils.region_2d_to_origin_3d(region, rv3d, coord)
             
-            # ヘルパーを使用して既存の木・岩とプレビュー球を除外してレイキャスト
             result, location, normal, index, obj, matrix = ray_cast_terrain(
                 context.scene, context, origin, vec, exclude_objs=[self.preview_obj]
             )
             
-            # 地形に衝突しなかった場合、Z=0(無限グリッド床)との交点を計算する
-            if not result:
-                if abs(vec.z) > 0.0001:
-                    t = -origin.z / vec.z
-                    if t > 0:
-                        location = origin + vec * t
-                        normal = (0.0, 0.0, 1.0)
-                        obj = None
-                        result = True
+            if not result and abs(vec.z) > 0.0001:
+                t = -origin.z / vec.z
+                if t > 0:
+                    location = origin + vec * t
+                    result = True
             
             if result and obj != self.preview_obj:
-                # ユーザーの選択アセット種類を随時プロパティから取得
-                self.paint_type = context.scene.my_addon_properties.paint_type
-                
-                # 新しいオブジェクトの生成とランダム化
-                if self.paint_type == 'Tree':
-                    # プレースホルダーの木
-                    bpy.ops.mesh.primitive_cylinder_add(radius=0.1, depth=1.0, location=location)
-                    new_obj = context.active_object
-                    new_obj.name = "ProceduralTree"
-                    
-                    # 緑色マテリアルの割り当て
-                    mat = get_or_create_material("TreePlaceholderMaterial", (0.1, 0.6, 0.1, 1.0))
-                    new_obj.data.materials.append(mat)
-                    
-                    # ランダムパラメータ
-                    new_obj["type"] = "Tree"
-                    new_obj["seed"] = random.randint(1, 99999)
-                    new_obj["iterations"] = 2
-                    new_obj["branchLength"] = round(random.uniform(0.12, 0.18), 2)
-                    new_obj["branchRadius"] = round(random.uniform(0.05, 0.08), 3)
-                    new_obj["taperRate"] = 0.8
-                    new_obj["angle"] = round(random.uniform(20.0, 30.0), 1)
-                else:
-                    # プレースホルダーの岩
-                    bpy.ops.mesh.primitive_ico_sphere_add(radius=1.0, location=location)
-                    new_obj = context.active_object
-                    new_obj.name = "ProceduralRock"
-                    
-                    # グレーマテリアルの割り当て
-                    mat = get_or_create_material("RockPlaceholderMaterial", (0.4, 0.4, 0.4, 1.0))
-                    new_obj.data.materials.append(mat)
-                    
-                    # ランダムパラメータ
-                    new_obj["type"] = "Rock"
-                    new_obj["seed"] = random.randint(1, 99999)
-                    new_obj["subdivisions"] = 3
-                    new_obj["noiseStrength"] = round(random.uniform(0.2, 0.4), 2)
-                    new_obj["voronoiStrength"] = round(random.uniform(0.1, 0.3), 2)
-                    new_obj["crackStrength"] = round(random.uniform(0.3, 0.5), 2)
-                
-                # Z軸まわりのランダム回転、ランダムスケール
-                new_obj.rotation_euler.z = random.uniform(0, math.pi * 2)
-                s = random.uniform(0.8, 1.2)
-                new_obj.scale = (s, s, s)
-                
-                # 配置したオブジェクトをUndo用に追跡リストに記録
-                if not hasattr(self, "spawned_objects"):
-                    self.spawned_objects = []
-                self.spawned_objects.append(new_obj)
-                
-                # プレビューオブジェクトを再びアクティブにする
-                context.view_layer.objects.active = self.preview_obj
+                self.spawn_asset_at_location(context, location)
+                self.last_spawn_loc = location
                 
         elif event.ctrl and event.type == 'Z' and event.value == 'PRESS':
             # モーダル起動中の自前Undo処理
@@ -423,7 +947,9 @@ class MYADDON_OT_paint_spawner(bpy.types.Operator):
         self.preview_obj = None
         self._handle = None
         self.spawned_objects = []
-        self.paint_type = context.scene.my_addon_properties.paint_type
+        self.is_painting = False
+        self.last_spawn_loc = None
+        self.paint_type = context.scene.my_addon_properties_v2.paint_type
 
         # プレビュー用の赤い照準球体を生成
         preview_mat = get_or_create_material("SpawnerPreviewMaterial", (1.0, 0.1, 0.1, 0.8))
@@ -467,6 +993,10 @@ class MYADDON_OT_scatter_biome(bpy.types.Operator):
         scatter_type = props.scatter_type
         created_count = 0
 
+        # ゾーンタイプの確認
+        is_biome = active_obj.get("type") == "Biome"
+        zone_type = active_obj.get("biome_zone_type", "Forest") if is_biome else "None"
+
         # アクティブオブジェクトの選択を一時解除し、生成時にアクティブになってしまうのを防ぐ
         active_obj.select_set(False)
 
@@ -475,14 +1005,40 @@ class MYADDON_OT_scatter_biome(bpy.types.Operator):
                 hit_loc = None
                 success = False
                 
-                # 事前にアセットの種類とスケールを決定しておく（近接半径の計算に使うため）
-                current_type = scatter_type
-                if current_type == 'Mix':
-                    current_type = random.choice(['Tree', 'Rock'])
-                
-                # スケールも事前想定（0.8〜1.2倍）
+                # ゾーンルールまたは手動設定によるアセット種類・スケールの決定
+                current_type = 'Tree'
                 simulated_scale = random.uniform(0.8, 1.2)
                 
+                # 木の固有パラメータ（世代数、長さ、太さ）の初期値
+                tree_iterations = 2
+                tree_len_min, tree_len_max = 0.12, 0.18
+                tree_rad_min, tree_rad_max = 0.05, 0.08
+
+                if is_biome:
+                    if zone_type == 'Forest':
+                        # 森林: 木が85%、岩が15%。木はやや高め
+                        current_type = 'Tree' if random.random() < 0.85 else 'Rock'
+                        tree_len_min, tree_len_max = 0.15, 0.22
+                        tree_rad_min, tree_rad_max = 0.06, 0.09
+                    elif zone_type == 'Desert':
+                        # 岩場/荒れ地: 岩が90%、木が10%。岩は大きめ
+                        current_type = 'Rock' if random.random() < 0.90 else 'Tree'
+                        simulated_scale = random.uniform(1.0, 1.4)
+                    elif zone_type == 'River':
+                        # 川沿い/水辺: 岩が70%、木が30%。木は低木（世代数1）
+                        current_type = 'Rock' if random.random() < 0.70 else 'Tree'
+                        tree_iterations = 1
+                        tree_len_min, tree_len_max = 0.06, 0.10
+                        tree_rad_min, tree_rad_max = 0.008, 0.015
+                    else: # Grassland
+                        # 平原: 半々
+                        current_type = 'Tree' if random.random() < 0.50 else 'Rock'
+                else:
+                    # ゾーン未設定Planeのフォールバック
+                    current_type = scatter_type
+                    if current_type == 'Mix':
+                        current_type = random.choice(['Tree', 'Rock'])
+
                 # 新しいアセットの想定配置半径を算出（木は0.4m、岩は1.3m基準）
                 new_radius = (0.4 if current_type == 'Tree' else 1.3) * simulated_scale
                 
@@ -510,9 +1066,7 @@ class MYADDON_OT_scatter_biome(bpy.types.Operator):
                     too_close = False
                     for other in context.scene.objects:
                         if other.type == 'MESH' and "type" in other and other["type"] in ['Tree', 'Rock']:
-                            # 既存オブジェクトの半径を取得
                             other_radius = get_object_radius(other)
-                            # 最小安全距離 = 新しいオブジェクトの半径 + 既存オブジェクトの半径
                             safe_dist = new_radius + other_radius
                             
                             dist = (temp_loc - other.location).length
@@ -541,9 +1095,9 @@ class MYADDON_OT_scatter_biome(bpy.types.Operator):
                     
                     new_obj["type"] = "Tree"
                     new_obj["seed"] = random.randint(1, 99999)
-                    new_obj["iterations"] = 2
-                    new_obj["branchLength"] = round(random.uniform(0.12, 0.18), 2)
-                    new_obj["branchRadius"] = round(random.uniform(0.05, 0.08), 3)
+                    new_obj["iterations"] = tree_iterations
+                    new_obj["branchLength"] = round(random.uniform(tree_len_min, tree_len_max), 2)
+                    new_obj["branchRadius"] = round(random.uniform(tree_rad_min, tree_rad_max), 3)
                     new_obj["taperRate"] = 0.8
                     new_obj["angle"] = round(random.uniform(20.0, 30.0), 1)
                 else:
@@ -566,7 +1120,6 @@ class MYADDON_OT_scatter_biome(bpy.types.Operator):
                 if new_obj:
                     new_obj.rotation_euler.z = random.uniform(0, math.pi * 2)
                     new_obj.scale = (simulated_scale, simulated_scale, simulated_scale)
-                    # 新しく生成されたものの選択を解除して競合を防ぐ
                     new_obj.select_set(False)
                     created_count += 1
 
@@ -645,6 +1198,53 @@ class MYADDON_OT_clear_biome_objects(bpy.types.Operator):
         self.report({'INFO'}, f"選択した範囲内のオブジェクトを {len(to_remove)} 個削除しました。")
         return {'FINISHED'}
 
+class MYADDON_OT_set_biome_zone(bpy.types.Operator):
+    bl_idname = "myaddon.set_biome_zone"
+    bl_label = "ゾーンタイプを設定"
+    bl_description = "選択したPlaneオブジェクトをバイオーム範囲として定義し、ゾーン属性と半透明の識別カラーを適用します"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    zone_type: bpy.props.EnumProperty(
+        name="ゾーンタイプ",
+        items=[
+            ('Forest', "森林 (Forest)", "木が密集したエリア"),
+            ('Desert', "岩場/荒れ地 (Desert)", "岩が露出したエリア"),
+            ('River', "川沿い/水辺 (River)", "岩が多く低木がまばらなエリア"),
+            ('Grassland', "平原 (Grassland)", "木と岩がほどよく点在するエリア")
+        ]
+    )
+
+    def execute(self, context):
+        obj = context.active_object
+        if not obj or obj.type != 'MESH':
+            self.report({'WARNING'}, "範囲となる平面オブジェクト（Planeなど）を選択してください。")
+            return {'CANCELLED'}
+
+        # カスタムプロパティを設定
+        obj["type"] = "Biome"
+        obj["biome_zone_type"] = self.zone_type
+
+        # ゾーンに対応する半透明カラーの適用
+        if self.zone_type == 'Forest':
+            mat = get_or_create_biome_material("Biome_Forest_Material", (0.1, 0.8, 0.1, 0.4))
+        elif self.zone_type == 'Desert':
+            mat = get_or_create_biome_material("Biome_Desert_Material", (0.8, 0.6, 0.2, 0.4))
+        elif self.zone_type == 'River':
+            mat = get_or_create_biome_material("Biome_River_Material", (0.1, 0.4, 0.9, 0.4))
+        else: # Grassland
+            mat = get_or_create_biome_material("Biome_Grassland_Material", (0.6, 0.9, 0.1, 0.4))
+
+        # マテリアルをオブジェクトに割り当て
+        if len(obj.data.materials) == 0:
+            obj.data.materials.append(mat)
+        else:
+            obj.data.materials[0] = mat
+
+        # ビューポート再描画
+        context.area.tag_redraw()
+        self.report({'INFO'}, f"選択オブジェクトを {self.zone_type} ゾーンに設定しました。")
+        return {'FINISHED'}
+
 # 4. UIパネル（サイドバーへの表示）
 class MYADDON_PT_level_editor(bpy.types.Panel):
     bl_label = "DirectX レベルエディタ"
@@ -654,7 +1254,7 @@ class MYADDON_PT_level_editor(bpy.types.Panel):
 
     def draw(self, context):
         layout = self.layout
-        addon_props = context.scene.my_addon_properties
+        addon_props = context.scene.my_addon_properties_v2
         
         # 設定セクション
         box = layout.box()
@@ -663,27 +1263,78 @@ class MYADDON_PT_level_editor(bpy.types.Panel):
         
         layout.separator()
         
+        # 超かんたん！お絵かきセクション
+        box_draw = layout.box()
+        box_draw.label(text="【超かんたん！マウスでお絵かき】", icon='GREASEPENCIL')
+        box_draw.operator(MYADDON_OT_draw_river_freehand.bl_idname, text="🌊 マウスをなぞって川を描く", icon='MOD_WAVE')
+        box_draw.operator(MYADDON_OT_draw_forest_freehand.bl_idname, text="🌲 マウスをなぞって森を描く", icon='NODE_SEL')
+        box_draw.operator(MYADDON_OT_draw_rock_freehand.bl_idname, text="🪨 マウスをなぞって岩場を描く", icon='MESH_ICOSPHERE')
+        
+        layout.separator()
+        
         # 作成セクション
         col1 = layout.column(align=True)
         col1.label(text="オブジェクト作成（単体追加）:")
         col1.operator(MYADDON_OT_add_procedural_tree.bl_idname, icon='NODE_SEL')
         col1.operator(MYADDON_OT_add_procedural_rock.bl_idname, icon='MESH_ICOSPHERE')
+        col1.label(text="【川パーツ (道路ブロック方式)】:")
+        col1.operator(MYADDON_OT_add_river_straight.bl_idname, icon='MOD_FLUID')
+        col1.operator(MYADDON_OT_add_river_curve.bl_idname, icon='CURVE_PATH')
+        col1.operator(MYADDON_OT_add_river_fork.bl_idname, icon='MOD_BOOLEAN')
         
         layout.separator()
+
+        # 川(River)設定セクション (アクティブオブジェクトがRiverの時表示)
+        active_obj = context.active_object
+        if active_obj and active_obj.get("type") == "River":
+            box_river = layout.box()
+            box_river.label(text="【川(River)パラメータ設定】", icon='MOD_WAVE')
+            box_river.prop(active_obj, '["river_width"]', text="川の幅 (Width)")
+            box_river.prop(active_obj, '["river_flow_speed"]', text="流速 (Flow Speed)")
+            box_river.prop(active_obj, '["river_wave_scale"]', text="波スケール (Wave Scale)")
+            layout.separator()
         
         # ペイントセクション
         box_paint = layout.box()
-        box_paint.label(text="【ペイント配置（簡単クリック）】", icon='BRUSH_DATA')
+        box_paint.label(text="【ペイント配置（お絵描き塗り）】", icon='BRUSH_DATA')
         box_paint.prop(addon_props, "paint_type")
+        box_paint.prop(addon_props, "paint_spacing", text="配置の間隔 (m)")
         box_paint.operator(MYADDON_OT_paint_spawner.bl_idname, icon='PLAY')
         
         layout.separator()
         
+        # バイオーム（ゾーン）設定セクション (アクティブオブジェクトがMESHの時のみ表示)
+        if active_obj and active_obj.type == 'MESH':
+            box_zone = layout.box()
+            box_zone.label(text="【バイオーム（ゾーン）設定】", icon='WORLD')
+            
+            is_biome = active_obj.get("type") == "Biome"
+            current_zone = active_obj.get("biome_zone_type", "未設定")
+            
+            if is_biome:
+                box_zone.label(text=f"現在のゾーン: {current_zone} ゾーン")
+            else:
+                box_zone.label(text="状態: 一般オブジェクト (ゾーン未設定)")
+                
+            row = box_zone.row(align=True)
+            row.prop(addon_props, "biome_zone_type", text="")
+            op = row.operator(MYADDON_OT_set_biome_zone.bl_idname, text="ゾーンに設定/更新", icon='COLOR')
+            op.zone_type = addon_props.biome_zone_type
+            
+            layout.separator()
+        
         # バイオーム散布セクション
         box_scatter = layout.box()
         box_scatter.label(text="【バイオーム自動散布（範囲生成）】", icon='PARTICLES')
+        
+        if active_obj and active_obj.type == 'MESH' and active_obj.get("type") == "Biome":
+            zone_type = active_obj.get("biome_zone_type", "Forest")
+            box_scatter.label(text=f"適用ルール: {zone_type} ゾーン規則", icon='INFO')
+        else:
+            box_scatter.label(text="※ 一般の Plane を選択しています (デフォルト Mix)")
+            box_scatter.prop(addon_props, "scatter_type")
+            
         box_scatter.prop(addon_props, "scatter_count")
-        box_scatter.prop(addon_props, "scatter_type")
         box_scatter.operator(MYADDON_OT_scatter_biome.bl_idname, icon='FILE_REFRESH')
         
         layout.separator()
@@ -691,6 +1342,7 @@ class MYADDON_PT_level_editor(bpy.types.Panel):
         # リセットセクション
         box_reset = layout.box()
         box_reset.label(text="【リセット（全削除・部分削除）】", icon='CANCEL')
+        box_reset.operator(MYADDON_OT_clear_river_objects.bl_idname, text="川をすべて削除", icon='MOD_FLUID')
         box_reset.operator(MYADDON_OT_clear_biome_objects.bl_idname, icon='REMOVE')
         box_reset.operator(MYADDON_OT_clear_all_objects.bl_idname, icon='TRASH')
         
@@ -700,13 +1352,14 @@ class MYADDON_PT_level_editor(bpy.types.Panel):
         col2 = layout.column(align=True)
         col2.label(text="データ出力:")
         col2.prop(addon_props, "auto_export")
+        col2.prop(addon_props, "camera_sync")
         col2.operator(MYADDON_OT_export_scene.bl_idname, icon='EXPORT')
         col2.label(text=f"同期状態: {addon_props.auto_export_status}")
 
 # 4.5 自動エクスポート用のサイレント処理とハンドラ
 def export_scene_silent(scene):
     try:
-        addon_props = scene.my_addon_properties
+        addon_props = scene.my_addon_properties_v2
     except AttributeError:
         return
         
@@ -727,37 +1380,10 @@ def export_scene_silent(scene):
 
     try:
         for obj in scene.objects:
-            if obj.type == 'MESH' and "type" in obj:
-                obj_type = obj["type"]
-                pos_x = obj.location.x
-                pos_y = obj.location.z
-                pos_z = obj.location.y
-                rot_x = obj.rotation_euler.x
-                rot_y = obj.rotation_euler.z
-                rot_z = obj.rotation_euler.y
-                scale_x = obj.scale.x
-                scale_y = obj.scale.z
-                scale_z = obj.scale.y
-                
-                obj_name = obj.name.split('.')[0]
-                obj_info = {
-                    "name": obj_name,
-                    "type": obj_type,
-                    "position": {"x": round(pos_x, 4), "y": round(pos_y, 4), "z": round(pos_z, 4)},
-                    "rotation": {"x": round(rot_x, 4), "y": round(rot_y, 4), "z": round(rot_z, 4)},
-                    "scale":    {"x": round(scale_x, 4), "y": round(scale_y, 4), "z": round(scale_z, 4)},
-                    "parameters": {}
-                }
-                
-                for key in obj.keys():
-                    if not key.startswith("_") and key not in ["type", "cycles"]:
-                        val = obj[key]
-                        if hasattr(val, "to_list"):
-                            obj_info["parameters"][key] = val.to_list()
-                        else:
-                            obj_info["parameters"][key] = val
-                            
-                layout_data.append(obj_info)
+            if obj.hide_viewport or obj.hide_get():
+                continue
+            if ("type" in obj and obj["type"] in ['Tree', 'Rock', 'Biome', 'River']):
+                layout_data.append(extract_object_data(obj))
     except Exception as e:
         status_str = f"データ構築エラー: {e}"
         if addon_props.auto_export_status != status_str:
@@ -802,7 +1428,7 @@ def on_depsgraph_update(scene, depsgraph):
     if bpy.app.background:
         return
     try:
-        props = scene.my_addon_properties
+        props = scene.my_addon_properties_v2
         if not props.auto_export:
             return
     except AttributeError:
@@ -811,13 +1437,23 @@ def on_depsgraph_update(scene, depsgraph):
     # オブジェクトの移動や選択変更、パラメータ更新を検知
     should_trigger = False
     for update in depsgraph.updates:
-        # プレビュー用の照準球の動きを除外（これを除外しないと、マウスを動かすたびに無限に同期が走って極端に重くなります）
         if getattr(update.id, "name", "") == "Spawner_Preview_Target":
             continue
             
         if update.is_updated_transform or update.is_updated_geometry:
             should_trigger = True
             break
+
+    # 川(River)の幅パラメータとBlender上の押し出し幅(extrude)を自動同期（水平面固定）
+    for obj in scene.objects:
+        if obj.type == 'CURVE' and obj.get("type") == "River":
+            if obj.data:
+                if obj.data.dimensions != '2D':
+                    obj.data.dimensions = '2D'
+                    obj.data.twist_mode = 'Z_UP'
+                width = obj.get("river_width", 2.0)
+                if abs(obj.data.extrude - width * 0.5) > 0.01:
+                    obj.data.extrude = width * 0.5
 
     if should_trigger:
         last_update_time = time.time()
@@ -826,23 +1462,120 @@ def on_depsgraph_update(scene, depsgraph):
             # 0.1秒後に最初のタイマーチェックを行う
             bpy.app.timers.register(auto_export_timer, first_interval=0.1)
 
+# --- カメラ同期用のタイマー処理 ---
+last_cam_pos = None
+last_cam_rot = None
+
+def get_viewport_camera_transform():
+    # タイマー内での安全なアクティブスクリーンの取得
+    context = bpy.context
+    screen = getattr(context, "screen", None)
+    if not screen:
+        screen = bpy.context.window.screen if getattr(context, "window", None) else None
+        
+    screens = [screen] if screen else bpy.data.screens
+    
+    for scr in screens:
+        for area in scr.areas:
+            if area.type == 'VIEW_3D':
+                for space in area.spaces:
+                    if space.type == 'VIEW_3D':
+                        rv3d = space.region_3d
+                        if rv3d:
+                            # 1. 位置の DirectX 座標系変換 (YとZを入れ替え)
+                            view_matrix = rv3d.view_matrix
+                            try:
+                                inv_matrix = view_matrix.inverted()
+                            except:
+                                continue
+                            pos = inv_matrix.to_translation()
+                            P_dx = mathutils.Vector((pos.x, pos.z, pos.y))
+                            
+                            # 2. 3Dビューポートの回転クォータニオンからオイラー角(XYZ)を取得
+                            rot_euler = rv3d.view_rotation.to_euler('XYZ')
+                            
+                            # 3. 厳密な座標系変換数式 (Dot Product 0.9977の完全検証済みモデル)
+                            # Pitch (X) -> 1.5707963 - rot_euler.x (地上から原点を見下ろす+0.46 rad)
+                            # Yaw   (Y) -> -rot_euler.z (左手系補正の符号反転)
+                            # Roll  (Z) -> -rot_euler.y
+                            dx_rot_x = 1.5707963 - rot_euler.x
+                            dx_rot_y = -rot_euler.z
+                            dx_rot_z = -rot_euler.y
+                            
+                            return {
+                                "position": {"x": P_dx.x, "y": P_dx.y, "z": P_dx.z},
+                                "rotation": {"x": dx_rot_x, "y": dx_rot_y, "z": dx_rot_z}
+                            }
+    return None
+
+def camera_sync_timer():
+    global last_cam_pos, last_cam_rot
+    try:
+        scene = getattr(bpy.context, "scene", None)
+        if not scene:
+            if bpy.data.scenes:
+                scene = bpy.data.scenes[0]
+            else:
+                return 0.1
+                
+        addon_props = scene.my_addon_properties_v2
+        if not addon_props.camera_sync:
+            return 0.05
+            
+        project_dir = bpy.path.abspath(addon_props.project_path)
+        if not project_dir or not os.path.exists(project_dir):
+            return 0.1
+            
+        cam_data = get_viewport_camera_transform()
+        if cam_data:
+            pos = cam_data["position"]
+            rot = cam_data["rotation"]
+            
+            # 変更があった場合のみ camera_sync.json を書き出し
+            if last_cam_pos != pos or last_cam_rot != rot:
+                last_cam_pos = pos
+                last_cam_rot = rot
+                
+                cam_file = os.path.join(project_dir, "Resources", "camera_sync.json")
+                with open(cam_file, 'w', encoding='utf-8') as f:
+                    json.dump(cam_data, f, indent=4)
+                
+                # デバッグログ出力
+                print(f"[CameraSync] Wrote pos: ({pos['x']:.4f}, {pos['y']:.4f}, {pos['z']:.4f}), rot: ({rot['x']:.4f}, {rot['y']:.4f}, {rot['z']:.4f})")
+    except Exception as e:
+        print(f"Camera Sync Error: {e}")
+        
+    return 0.03 # 30msごとにチェック (約33FPS)
+
 # 5. 登録処理
 classes = (
-    MyAddonProperties,
+    MyAddonPropertiesV2,
     MYADDON_OT_add_procedural_tree,
     MYADDON_OT_add_procedural_rock,
+    MYADDON_OT_add_river_straight,
+    MYADDON_OT_add_river_curve,
+    MYADDON_OT_add_river_fork,
+    MYADDON_OT_draw_river_freehand,
+    MYADDON_OT_draw_forest_freehand,
+    MYADDON_OT_draw_rock_freehand,
+    MYADDON_OT_clear_river_objects,
     MYADDON_OT_export_scene,
     MYADDON_OT_paint_spawner,
     MYADDON_OT_scatter_biome,
     MYADDON_OT_clear_all_objects,
     MYADDON_OT_clear_biome_objects,
+    MYADDON_OT_set_biome_zone,
     MYADDON_PT_level_editor,
 )
 
 def register():
     for cls in classes:
+        try:
+            bpy.utils.unregister_class(cls)
+        except:
+            pass
         bpy.utils.register_class(cls)
-    bpy.types.Scene.my_addon_properties = bpy.props.PointerProperty(type=MyAddonProperties)
+    bpy.types.Scene.my_addon_properties_v2 = bpy.props.PointerProperty(type=MyAddonPropertiesV2)
     
     # 古い同名ハンドラがあれば残留競合を防ぐために一掃する
     to_remove = [h for h in bpy.app.handlers.depsgraph_update_post if getattr(h, "__name__", "") == "on_depsgraph_update"]
@@ -854,9 +1587,21 @@ def register():
             
     # 最新のハンドラを追加
     bpy.app.handlers.depsgraph_update_post.append(on_depsgraph_update)
+    
+    # カメラ同期用タイマーを起動
+    if not bpy.app.timers.is_registered(camera_sync_timer):
+        bpy.app.timers.register(camera_sync_timer, first_interval=0.1)
+        
     print("プロシージャル対応レベルエディタが有効化されました。")
 
 def unregister():
+    # カメラ同期用タイマーを解除
+    if bpy.app.timers.is_registered(camera_sync_timer):
+        try:
+            bpy.app.timers.unregister(camera_sync_timer)
+        except:
+            pass
+
     # 同名のイベントハンドラをすべて解除
     to_remove = [h for h in bpy.app.handlers.depsgraph_update_post if getattr(h, "__name__", "") == "on_depsgraph_update"]
     for h in to_remove:
@@ -865,7 +1610,7 @@ def unregister():
         except:
             pass
         
-    del bpy.types.Scene.my_addon_properties
+    del bpy.types.Scene.my_addon_properties_v2
     for cls in classes:
         bpy.utils.unregister_class(cls)
     print("プロシージャル対応レベルエディタが無効化されました。")

@@ -131,6 +131,12 @@ void LevelEditor::Update(float deltaTime)
         runtimeObjects_[i]->Update();
     }
 
+    // 川オブジェクトの更新
+    for (auto& river : rivers_)
+    {
+        if (river) river->Update(deltaTime);
+    }
+
     // 軸ヘルパーシリンダーの座標・回転・スケールを更新
     if (selectedIndex_ >= 0 && selectedIndex_ < static_cast<int>(objectDatas_.size()))
     {
@@ -207,10 +213,22 @@ void LevelEditor::Draw(const RenderContext& ctx)
         }
         else
         {
-            localCtx.textureHandle = {};
+            // D3D12の未初期化デスクリプタアクセスエラーを防ぐため、デフォルトのテクスチャをバインド
+            uint32_t dummyTex = TextureManager::GetInstance()->Load("Resources/uvChecker.png");
+            localCtx.textureHandle = TextureManager::GetInstance()->GetSrvHandleGPU(dummyTex);
         }
 
         object3dCom_->Draw(obj.get(), localCtx, modelData, true);
+    }
+
+    // 川(River)の描画
+    for (auto& river : rivers_)
+    {
+        if (river)
+        {
+            uint32_t texIndex = TextureManager::GetInstance()->Load("Resources/uvChecker.png");
+            river->Draw(TextureManager::GetInstance()->GetSrvHandleGPU(texIndex));
+        }
     }
 
     // 選択オブジェクトがあれば3D軸ヘルパー（赤、緑、青のシリンダー）を描画
@@ -577,12 +595,42 @@ bool LevelEditor::LoadFromJson(const std::string& filepath)
     }
 
     std::vector<LevelObjectData> tempDatas;
+    std::vector<std::unique_ptr<River>> tempRivers;
 
     for (const auto& item : j)
     {
         LevelObjectData obj;
         obj.name = item.value("name", "Unnamed");
         obj.type = item.value("type", "");
+
+        if (obj.type == "River" && item.contains("parameters") && item["parameters"].contains("points"))
+        {
+            // 旧カーブ形式の川オブジェクトのパースと生成
+            std::vector<Vector3> points;
+            float width = 2.0f;
+            float flowSpeed = 1.0f;
+            float waveScale = 1.0f;
+            Vector4 color = { 0.1f, 0.4f, 0.9f, 0.8f };
+
+            const auto& params = item["parameters"];
+            width = params.value("river_width", 2.0f);
+            flowSpeed = params.value("river_flow_speed", 1.0f);
+            waveScale = params.value("river_wave_scale", 1.0f);
+
+            for (const auto& pt : params["points"])
+            {
+                points.push_back({ pt.value("x", 0.0f), pt.value("y", 0.0f), pt.value("z", 0.0f) });
+            }
+
+            auto river = std::make_unique<River>();
+            Camera* camera = object3dCom_ ? object3dCom_->GetDefaultCamera() : nullptr;
+            MaterialManager* matManager = SceneManager::GetInstance()->GetMaterialManager();
+            Light* light = SceneManager::GetInstance()->GetLight();
+
+            river->Initialize(dxCommon_, object3dCom_, matManager, light, camera, points, width, flowSpeed, waveScale, color);
+            tempRivers.push_back(std::move(river));
+            continue;
+        }
 
         // CSV互換のためにデフォルトを設定
         obj.modelDirectory = "Resources";
@@ -630,12 +678,14 @@ bool LevelEditor::LoadFromJson(const std::string& filepath)
             obj.noiseStrength = params.value("noiseStrength", 0.3f);
             obj.voronoiStrength = params.value("voronoiStrength", 0.2f);
             obj.crackStrength = params.value("crackStrength", 0.4f);
+            obj.biomeZoneType = params.value("biome_zone_type", "");
         }
 
         tempDatas.push_back(obj);
     }
 
     objectDatas_ = std::move(tempDatas);
+    rivers_ = std::move(tempRivers);
     RefreshRuntimeObjects();
 
     if (!objectDatas_.empty())
@@ -677,6 +727,7 @@ void LevelEditor::RefreshRuntimeObjects()
         const auto& objData = objectDatas_[idx];
         std::string cacheKey;
         bool isProcedural = (objData.type == "Tree" || objData.type == "Rock");
+        bool isBiome = (objData.type == "Biome");
 
         if (isProcedural)
         {
@@ -696,6 +747,10 @@ void LevelEditor::RefreshRuntimeObjects()
                     << objData.crackStrength;
                 cacheKey = oss.str();
             }
+        }
+        else if (isBiome)
+        {
+            cacheKey = "Biome_" + objData.biomeZoneType;
         }
         else
         {
@@ -755,6 +810,18 @@ void LevelEditor::RefreshRuntimeObjects()
                 modelData.material.textureFilePath = texturePath;
                 modelData.material.textureIndex = TextureManager::GetInstance()->Load(texturePath);
             }
+            else if (isBiome)
+            {
+                // バイオーム境界板は無地のplane.objを使用する
+                std::string fullPath = "Resources/plane.obj";
+                if (FileExists(fullPath))
+                {
+                    modelData = Object3d::LoadObjFile("Resources", "plane.obj");
+                    // 単色表示にするためにテクスチャインデックスを無効化
+                    modelData.material.textureIndex = TextureManager::kInvalidTextureIndex;
+                    modelData.material.textureFilePath = "";
+                }
+            }
             else
             {
                 std::string fullPath = objData.modelDirectory + "/" + objData.modelFilename;
@@ -780,9 +847,33 @@ void LevelEditor::RefreshRuntimeObjects()
         auto runtimeObj = std::make_unique<Object3d>();
         runtimeObj->Initialize(object3dCom_, it->second);
         runtimeObj->SetTranslate(objData.position);
-        runtimeObj->SetRotate(objData.rotation);
+
+        if (isBiome)
+        {
+            // Blenderの水平面(Z-upのXY平面)をDirectXの水平面(Y-upのXZ平面)に合わせるため、X軸で90度(1.57079ラジアン)回転させる
+            Vector3 rotated = objData.rotation;
+            rotated.x += 1.57079f;
+            runtimeObj->SetRotate(rotated);
+        }
+        else
+        {
+            runtimeObj->SetRotate(objData.rotation);
+        }
+
         runtimeObj->SetScale(objData.scale);
         runtimeObj->SetEnableLighting(true);
+
+        if (isBiome)
+        {
+            Vector4 color = { 0.5f, 0.5f, 0.5f, 0.4f }; // デフォルト (グレー半透明)
+            if (objData.biomeZoneType == "Forest")          { color = { 0.1f, 0.7f, 0.1f, 0.4f }; }
+            else if (objData.biomeZoneType == "Desert")     { color = { 0.7f, 0.6f, 0.2f, 0.4f }; }
+            else if (objData.biomeZoneType == "River")      { color = { 0.1f, 0.4f, 0.8f, 0.4f }; }
+            else if (objData.biomeZoneType == "Grassland")  { color = { 0.5f, 0.8f, 0.1f, 0.4f }; }
+            runtimeObj->SetColor(color);
+            runtimeObj->SetEnableLighting(false); // ライトを無効にしてゾーンカラーをクリアに描画
+        }
+
         runtimeObj->Update();
 
         runtimeObjects_.push_back(std::move(runtimeObj));

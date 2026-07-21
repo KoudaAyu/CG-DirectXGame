@@ -1,266 +1,213 @@
 [
     {
-        "name": "ProceduralTree",
-        "type": "Tree",
+        "name": "平面",
+        "type": "Biome",
         "position": {
-            "x": 0.3445,
+            "x": 0.0,
             "y": 0.0,
-            "z": 0.1663
+            "z": 0.0
         },
         "rotation": {
             "x": 0.0,
-            "y": 3.9401,
+            "y": 0.0,
             "z": 0.0
         },
         "scale": {
-            "x": 1.0403,
-            "y": 1.0403,
-            "z": 1.0403
+            "x": 2.1176,
+            "y": 2.1176,
+            "z": 2.1176
         },
         "parameters": {
-            "seed": 94469,
+            "biome_zone_type": "Desert"
+        }
+    },
+    {
+        "name": "ProceduralTree",
+        "type": "Tree",
+        "position": {
+            "x": -104.6585,
+            "y": 0.0,
+            "z": -31.7047
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 5.8651,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 0.9088,
+            "y": 0.9088,
+            "z": 0.9088
+        },
+        "parameters": {
+            "seed": 63901,
+            "iterations": 2,
+            "branchLength": 0.18,
+            "branchRadius": 0.056,
+            "taperRate": 0.8,
+            "angle": 22.1
+        }
+    },
+    {
+        "name": "ProceduralTree",
+        "type": "Tree",
+        "position": {
+            "x": -38.5068,
+            "y": 0.0,
+            "z": -17.8528
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 3.4818,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 0.9579,
+            "y": 0.9579,
+            "z": 0.9579
+        },
+        "parameters": {
+            "seed": 24887,
+            "iterations": 2,
+            "branchLength": 0.15,
+            "branchRadius": 0.053,
+            "taperRate": 0.8,
+            "angle": 28.9
+        }
+    },
+    {
+        "name": "ProceduralTree",
+        "type": "Tree",
+        "position": {
+            "x": -79.811,
+            "y": 0.0,
+            "z": -32.9354
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 5.866,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 0.9369,
+            "y": 0.9369,
+            "z": 0.9369
+        },
+        "parameters": {
+            "seed": 39323,
             "iterations": 2,
             "branchLength": 0.14,
-            "branchRadius": 0.012,
+            "branchRadius": 0.055,
             "taperRate": 0.8,
-            "angle": 25.8
+            "angle": 29.6
         }
     },
     {
         "name": "ProceduralTree",
         "type": "Tree",
         "position": {
-            "x": 2.2709,
+            "x": -82.8822,
             "y": 0.0,
-            "z": 0.9473
+            "z": -35.3587
         },
         "rotation": {
             "x": 0.0,
-            "y": 2.892,
+            "y": 2.5138,
             "z": 0.0
         },
         "scale": {
-            "x": 1.1174,
-            "y": 1.1174,
-            "z": 1.1174
+            "x": 1.0259,
+            "y": 1.0259,
+            "z": 1.0259
         },
         "parameters": {
-            "seed": 30742,
+            "seed": 43661,
             "iterations": 2,
             "branchLength": 0.16,
-            "branchRadius": 0.013,
+            "branchRadius": 0.05,
             "taperRate": 0.8,
-            "angle": 22.9
+            "angle": 27.2
         }
     },
     {
         "name": "ProceduralTree",
         "type": "Tree",
         "position": {
-            "x": -0.0775,
+            "x": -48.043,
             "y": 0.0,
-            "z": -0.6389
+            "z": -20.1494
         },
         "rotation": {
             "x": 0.0,
-            "y": 0.1572,
+            "y": 5.7755,
             "z": 0.0
         },
         "scale": {
-            "x": 1.0124,
-            "y": 1.0124,
-            "z": 1.0124
+            "x": 1.0963,
+            "y": 1.0963,
+            "z": 1.0963
         },
         "parameters": {
-            "seed": 9714,
+            "seed": 58529,
             "iterations": 2,
-            "branchLength": 0.13,
-            "branchRadius": 0.018,
+            "branchLength": 0.17,
+            "branchRadius": 0.062,
             "taperRate": 0.8,
-            "angle": 23.2
-        }
-    },
-    {
-        "name": "ProceduralRock",
-        "type": "Rock",
-        "position": {
-            "x": -0.3992,
-            "y": 0.0,
-            "z": -3.3264
-        },
-        "rotation": {
-            "x": 0.0,
-            "y": 2.6863,
-            "z": 0.0
-        },
-        "scale": {
-            "x": 1.0842,
-            "y": 1.0842,
-            "z": 1.0842
-        },
-        "parameters": {
-            "seed": 8841,
-            "subdivisions": 3,
-            "noiseStrength": 0.29,
-            "voronoiStrength": 0.15,
-            "crackStrength": 0.45
-        }
-    },
-    {
-        "name": "ProceduralRock",
-        "type": "Rock",
-        "position": {
-            "x": 2.4124,
-            "y": 0.0,
-            "z": -2.7723
-        },
-        "rotation": {
-            "x": 0.0,
-            "y": 4.5485,
-            "z": 0.0
-        },
-        "scale": {
-            "x": 0.8091,
-            "y": 0.8091,
-            "z": 0.8091
-        },
-        "parameters": {
-            "seed": 52878,
-            "subdivisions": 3,
-            "noiseStrength": 0.26,
-            "voronoiStrength": 0.26,
-            "crackStrength": 0.33
-        }
-    },
-    {
-        "name": "ProceduralRock",
-        "type": "Rock",
-        "position": {
-            "x": -2.4474,
-            "y": 0.0,
-            "z": 0.2322
-        },
-        "rotation": {
-            "x": 0.0,
-            "y": 4.3661,
-            "z": 0.0
-        },
-        "scale": {
-            "x": 0.8766,
-            "y": 0.8766,
-            "z": 0.8766
-        },
-        "parameters": {
-            "seed": 28469,
-            "subdivisions": 3,
-            "noiseStrength": 0.3,
-            "voronoiStrength": 0.11,
-            "crackStrength": 0.33
-        }
-    },
-    {
-        "name": "ProceduralRock",
-        "type": "Rock",
-        "position": {
-            "x": -1.7267,
-            "y": 0.0,
-            "z": 2.5091
-        },
-        "rotation": {
-            "x": 0.0,
-            "y": 5.3162,
-            "z": 0.0
-        },
-        "scale": {
-            "x": 0.8009,
-            "y": 0.8009,
-            "z": 0.8009
-        },
-        "parameters": {
-            "seed": 17533,
-            "subdivisions": 3,
-            "noiseStrength": 0.31,
-            "voronoiStrength": 0.25,
-            "crackStrength": 0.37
+            "angle": 22.5
         }
     },
     {
         "name": "ProceduralTree",
         "type": "Tree",
         "position": {
-            "x": 1.5073,
+            "x": -83.4342,
             "y": 0.0,
-            "z": 0.0776
+            "z": -35.6158
         },
         "rotation": {
             "x": 0.0,
-            "y": 1.1708,
+            "y": 5.3816,
             "z": 0.0
         },
         "scale": {
-            "x": 1.1656,
-            "y": 1.1656,
-            "z": 1.1656
+            "x": 0.8443,
+            "y": 0.8443,
+            "z": 0.8443
         },
         "parameters": {
-            "seed": 19690,
+            "seed": 65514,
             "iterations": 2,
-            "branchLength": 0.13,
-            "branchRadius": 0.013,
+            "branchLength": 0.18,
+            "branchRadius": 0.055,
             "taperRate": 0.8,
-            "angle": 26.1
+            "angle": 25.9
         }
     },
     {
-        "name": "ProceduralRock",
-        "type": "Rock",
+        "name": "ProceduralTree",
+        "type": "Tree",
         "position": {
-            "x": -0.5837,
+            "x": -82.428,
             "y": 0.0,
-            "z": 1.4941
+            "z": -35.0803
         },
         "rotation": {
             "x": 0.0,
-            "y": 0.5366,
+            "y": 4.5274,
             "z": 0.0
         },
         "scale": {
-            "x": 0.8146,
-            "y": 0.8146,
-            "z": 0.8146
+            "x": 1.0822,
+            "y": 1.0822,
+            "z": 1.0822
         },
         "parameters": {
-            "seed": 51719,
-            "subdivisions": 3,
-            "noiseStrength": 0.31,
-            "voronoiStrength": 0.19,
-            "crackStrength": 0.41
-        }
-    },
-    {
-        "name": "ProceduralRock",
-        "type": "Rock",
-        "position": {
-            "x": -0.8405,
-            "y": 0.0,
-            "z": 2.9288
-        },
-        "rotation": {
-            "x": 0.0,
-            "y": 6.0726,
-            "z": 0.0
-        },
-        "scale": {
-            "x": 0.9151,
-            "y": 0.9151,
-            "z": 0.9151
-        },
-        "parameters": {
-            "seed": 35109,
-            "subdivisions": 3,
-            "noiseStrength": 0.3,
-            "voronoiStrength": 0.27,
-            "crackStrength": 0.46
+            "seed": 72660,
+            "iterations": 2,
+            "branchLength": 0.16,
+            "branchRadius": 0.063,
+            "taperRate": 0.8,
+            "angle": 27.6
         }
     }
 ]

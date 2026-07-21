@@ -65,6 +65,7 @@ void SkinningObject3dCom::PreDraw()
 
 void SkinningObject3dCom::Draw(Object3d* object, const ::RenderContext& ctx, const Object3d::ModelData& modelData, bool drawObject)
 {
+    return; // デバッグ用アニメーションモデル描画を無効化
     if (!ctx.commandList) return;
     if (!object) return;
     if (!ctx.camera)

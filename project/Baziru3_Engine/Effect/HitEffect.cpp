@@ -224,6 +224,7 @@ void HitEffect::SpawnPlaneParticles(const Vector3& translate)
 
 void HitEffect::Draw() const
 {
+    return; // デバッグ用ヒットエフェクト描画を無効化
     if (!initialized_ || textureIndex_ == TextureManager::kInvalidTextureIndex)
     {
         return;

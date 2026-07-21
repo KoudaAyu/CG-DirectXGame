@@ -72,7 +72,7 @@ void Game::Initialize()
 
 
 	SpriteManager* uiSpriteManager = engine_ ? engine_->GetSpriteManager() : nullptr;
-	debugUI = std::make_unique<DebugUI>(materialManager_.get(), uiSpriteManager, camera_.get(), &transformObject, &useMonsterBall, &drawObject, &drawSprite, object3d_.get());
+	debugUI = std::make_unique<DebugUI>(materialManager_.get(), uiSpriteManager, camera_.get(), &transformObject, &useMonsterBall, &drawObject, &drawSprite, nullptr);
 	debugUI->Initialize();
 
 	fadeApplication_ = std::make_unique<FadeApplication>();
@@ -193,7 +193,6 @@ void Game::Finalize()
 	if (skybox_) { skybox_.reset(); }
 	if (skyboxCom_) { skyboxCom_.reset(); }
 
-	if (object3d_) { object3d_.reset(); }
 	if (object3dCom) { object3dCom.reset(); }
 	if (skinningObject3dCom) { skinningObject3dCom.reset(); }
 
@@ -270,9 +269,6 @@ void Game::Update()
 	{
 		skybox_->Update();
 	}
-
-	object3d_->SetRotate(transformObject.rotate);
-	object3d_->Update();
 
 
 
@@ -351,16 +347,6 @@ void Game::Draw()
 
 	sphereRenderer_.Draw(ctx, renderRequests);
 
-	if (drawObject)
-	{
-		if (object3dCom && object3d_)
-		{
-			// スキニング対応かどうかを判定（今後拡張）
-			// 現在は通常の object3dCom を使用
-			object3dCom->PreDraw();
-			object3dCom->Draw(object3d_.get(), ctx, modelData, drawObject);
-		}
-	}
 	GpuProfiler::GetInstance()->EndProfile(dx->GetCommandList().Get(), "Scene Draw");
 
 	// 2. Sprite Drawの計測
@@ -493,14 +479,11 @@ void Game::InitializeModelResources()
 {
 	auto* dx = engine_->GetDirectXCom();
 
-	object3d_ = std::make_unique<Object3d>();
-	object3d_->Initialize(object3dCom.get(), object3d_->LoadObjFile("Resources", "plane.obj"));
-
 	//パイプラインステートの生成に失敗した場合はエラー
 	assert(SUCCEEDED(dx->GetHr()));
 
 	//モデル読み込み
-	modelData = object3d_->LoadObjFile("Resources", "plane.obj");
+	modelData = Object3d::LoadObjFile("Resources", "plane.obj");
 
 	// Model を作成して初期化（Model が自分で頂点リソースを作る）
 	modelCom_ = std::make_unique<ModelCom>();
@@ -584,13 +567,6 @@ void Game::DrawObjects(const RenderContext& ctx)
 	{
 		Logger::Log(logStream, "Warning: camera GPU resource not available when drawing object.\n");
 		return;
-	}
-
-	object3d_->Draw(ctx.commandList);
-
-	if (drawObject)
-	{
-		ctx.commandList->DrawInstanced(UINT(modelData.vertices.size()), 1, 0, 0);
 	}
 }
 

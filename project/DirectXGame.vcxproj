@@ -81,6 +81,7 @@
     <ClCompile Include="Baziru3_Engine\3D\Procedural\BioProceduralGenerator.cpp" />
     <ClCompile Include="Baziru3_Engine\3D\Procedural\ProceduralGPUGenerator.cpp" />
     <ClCompile Include="Baziru3_Engine\3D\Procedural\ProceduralTreeGPUGenerator.cpp" />
+    <ClCompile Include="Baziru3_Engine\3D\Water\River.cpp" />
     <ClCompile Include="Baziru3_Engine\Collision\CollisionManager.cpp" />
     <ClCompile Include="Baziru3_Engine\Graphics\GpuProfiler.cpp" />
   </ItemGroup>
@@ -260,6 +261,7 @@
     <ClInclude Include="Baziru3_Engine\3D\Procedural\BioProceduralGenerator.h" />
     <ClInclude Include="Baziru3_Engine\3D\Procedural\ProceduralGPUGenerator.h" />
     <ClInclude Include="Baziru3_Engine\3D\Procedural\ProceduralTreeGPUGenerator.h" />
+    <ClInclude Include="Baziru3_Engine\3D\Water\River.h" />
     <ClInclude Include="Baziru3_Engine\Collision\Collider.h" />
     <ClInclude Include="Baziru3_Engine\Collision\SphereCollider.h" />
     <ClInclude Include="Baziru3_Engine\Collision\BoxCollider.h" />
@@ -289,20 +291,20 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v145</PlatformToolset>
+    <PlatformToolset>v143</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v145</PlatformToolset>
+    <PlatformToolset>v143</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Development|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v145</PlatformToolset>
+    <PlatformToolset>v143</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>

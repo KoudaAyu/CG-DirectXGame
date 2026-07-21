@@ -140,6 +140,7 @@ void SkeletonDebug::Sync(const Skeleton& skeleton, const Matrix4x4& skeletonRoot
 
 void SkeletonDebug::Draw(SceneRenderRequests& renderRequests, D3D12_GPU_DESCRIPTOR_HANDLE textureHandle) const
 {
+    return; // デバッグ用ボーン表示を無効化
     if (textureHandle.ptr != 0)
     {
         for (size_t jointIndex = 0; jointIndex < jointCylinders_.size(); ++jointIndex)

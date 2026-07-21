@@ -1,6 +1,11 @@
 #include"Camera.h"
 #include"DirectXCom.h"
 #include"WindowsAPI.h"
+#include <fstream>
+#include <filesystem>
+#include <string>
+#include <Windows.h>
+#include "externals/nlohmann/json.hpp"
 
 Camera::Camera()
 	: transform_({ {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, -10.0f} }),
@@ -49,6 +54,50 @@ void Camera::Finalize()
 
 void Camera::Update()
 {
+	// --- Blenderのカメラ同期処理 ---
+	static std::filesystem::file_time_type lastCameraSyncTime;
+	static bool isFirstCameraSync = true;
+	std::string syncPath = "Resources/camera_sync.json";
+	try
+	{
+		if (std::filesystem::exists(syncPath))
+		{
+			auto currentWriteTime = std::filesystem::last_write_time(syncPath);
+			if (isFirstCameraSync || currentWriteTime > lastCameraSyncTime)
+			{
+				lastCameraSyncTime = currentWriteTime;
+				isFirstCameraSync = false;
+
+				std::ifstream file(syncPath);
+				if (file.is_open())
+				{
+					nlohmann::json j;
+					file >> j;
+					if (j.contains("position") && j.contains("rotation"))
+					{
+						const auto& pos = j["position"];
+						const auto& rot = j["rotation"];
+
+						Vector3 position = { pos.value("x", 0.0f), pos.value("y", 0.0f), pos.value("z", 0.0f) };
+						Vector3 rotation = { rot.value("x", 0.0f), rot.value("y", 0.0f), rot.value("z", 0.0f) };
+
+						// デバッグログ出力
+						std::string logMsg = "[CameraSync] Read pos: (" + std::to_string(position.x) + ", " + std::to_string(position.y) + ", " + std::to_string(position.z) + 
+											 "), rot: (" + std::to_string(rotation.x) + ", " + std::to_string(rotation.y) + ", " + std::to_string(rotation.z) + ")\n";
+						OutputDebugStringA(logMsg.c_str());
+
+						transform_.SetTranslate(position);
+						transform_.SetRotate(rotation);
+					}
+				}
+			}
+		}
+	}
+	catch (...)
+	{
+		// ファイルアクセス競合の防止
+	}
+
 	worldMatrix_ = MakeAffineMatrix(transform_.GetScale(), transform_.GetRotate(), transform_.GetTranslate());
 	viewMatrix_ = Inverse(worldMatrix_);
 

@@ -10,6 +10,7 @@
 #include "RenderContext.h"
 #include "Cylinder.h"
 #include "Baziru3_Engine/Collision/Collider.h"
+#include "Baziru3_Engine/3D/Water/River.h"
 
 struct LevelObjectData
 {
@@ -22,7 +23,8 @@ struct LevelObjectData
     bool isStatic = true;
 
     // --- プロシージャル用拡張 ---
-    std::string type = ""; // "Tree" or "Rock"
+    std::string type = ""; // "Tree" or "Rock" or "Biome"
+    std::string biomeZoneType = ""; // "Forest", "Desert", "River", "Grassland"
     unsigned int seed = 0;
     int iterations = 3;
     float branchLength = 1.0f;
@@ -67,6 +69,7 @@ private:
 
     std::vector<LevelObjectData> objectDatas_;
     std::vector<std::unique_ptr<Object3d>> runtimeObjects_;
+    std::vector<std::unique_ptr<River>> rivers_;
     std::vector<std::unique_ptr<Collider>> colliders_;
     std::map<std::string, Object3d::ModelData> modelCache_;
 
