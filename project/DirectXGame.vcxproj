@@ -63,6 +63,7 @@
     <ClCompile Include="Baziru3_Engine\2D\Sprite\Sprite.cpp" />
     <ClCompile Include="Baziru3_Engine\2D\Sprite\SpriteCom.cpp" />
     <ClCompile Include="Baziru3_Engine\Particle\ParticleManager.cpp" />
+    <ClCompile Include="Baziru3_Engine\Particle\ParticleEmitter.cpp" />
     <ClCompile Include="Baziru3_Engine\Graphics\Material\MaterialManager.cpp" />
     <ClCompile Include="Baziru3_Engine\Math\Random.cpp" />
     <ClCompile Include="Baziru3_Engine\3D\Model\Model.cpp" />
@@ -95,11 +96,6 @@
       <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4.0</ShaderModel>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Development|x64'">Compute</ShaderType>
       <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Development|x64'">4.0</ShaderModel>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
-    </FxCompile>
-    <FxCompile Include="Resources\shaders\SkinningObject3d.VS.hlsl">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>

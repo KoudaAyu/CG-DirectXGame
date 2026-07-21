@@ -31,6 +31,7 @@ public:
 	~ParticleEmitter() = default;
 
 	void Initialize(DirectXCom* dxCommon);
+	void Update(float deltaTime);
 
 	std::list<ParticleManager::Particle> Emit(const Emitter& emitter, std::mt19937& randomEngine, ParticleManager& particleManager);
 

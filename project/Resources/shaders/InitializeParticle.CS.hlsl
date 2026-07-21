@@ -10,6 +10,7 @@ struct Particle {
 static const uint32_t kMaxParticles = 1024;
 
 RWStructuredBuffer<Particle> gParticles : register(u0);
+RWStructuredBuffer<int32_t> gFreeCounter : register(u1);
 
 float rand(float3 co) {
     return frac(sin(dot(co, float3(12.9898, 78.233, 45.164))) * 43758.5453);
@@ -37,5 +38,11 @@ void main(uint3 DTid : SV_DispatchThreadID)
         gParticles[particleIndex].currentTime = 0.0f;
         gParticles[particleIndex].scale = float32_t3(0.5f, 0.5f, 0.5f);
         gParticles[particleIndex].color = float32_t4(1.0f, 1.0f, 1.0f, 1.0f);
+    }
+    
+    // スレッド 0 でカウンタを 0 に初期化 (スライド1枚目)
+    if (particleIndex == 0)
+    {
+        gFreeCounter[0] = 0;
     }
 }

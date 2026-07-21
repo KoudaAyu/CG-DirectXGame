@@ -14,6 +14,24 @@ void ParticleEmitter::Initialize(DirectXCom* dxCommon)
 	emitterSphere_->emit = 0;
 }
 
+void ParticleEmitter::Update(float deltaTime)
+{
+	if (!emitterSphere_) return;
+
+	emitterSphere_->frequencyTime += deltaTime; // δタイムを加算
+	// 射出間隔を上回ったら射出許可を出して時間を調整
+	if (emitterSphere_->frequency <= emitterSphere_->frequencyTime)
+	{
+		emitterSphere_->frequencyTime -= emitterSphere_->frequency;
+		emitterSphere_->emit = 1;
+	}
+	else
+	{
+		// 射出間隔を上回っていないので、射出許可は出せない
+		emitterSphere_->emit = 0;
+	}
+}
+
 std::list<ParticleManager::Particle> ParticleEmitter::Emit(const Emitter& emitter, std::mt19937& randomEngine, ParticleManager& particleManager)
 {
 	std::list<ParticleManager::Particle> particles;

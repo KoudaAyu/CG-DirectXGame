@@ -1,4 +1,6 @@
 #include "DebugUI.h"
+#include "ParticleManager.h"
+#include "ParticleEmitter.h"
 #include "MaterialManager.h"
 #include "SpriteManager.h"
 #include "Camera.h"
@@ -203,6 +205,37 @@ void DebugUI::Update()
             ImGui::ColorEdit4("Color", &materialManager_->GetMaterialDataColor().x);
         }
     }
+
+    ImGui::Begin("GPU Particle Emitter");
+    ParticleManager* pm = ParticleManager::GetInstance();
+    if (pm)
+    {
+        ParticleEmitter* emitter = pm->GetGPUEmitter();
+        if (emitter)
+        {
+            EmitterSphere* data = emitter->GetEmitterData();
+            if (data)
+            {
+                ImGui::DragFloat3("Translate", &data->translate.x, 0.1f);
+                ImGui::DragFloat("Radius", &data->radius, 0.1f, 0.0f, 100.0f);
+                
+                int countVal = static_cast<int>(data->count);
+                if (ImGui::SliderInt("Count", &countVal, 1, 100))
+                {
+                    data->count = static_cast<uint32_t>(countVal);
+                }
+                
+                ImGui::SliderFloat("Frequency", &data->frequency, 0.01f, 2.0f, "%.2fs");
+                
+                bool emitBool = (data->emit != 0);
+                if (ImGui::Checkbox("Emit", &emitBool))
+                {
+                    data->emit = emitBool ? 1 : 0;
+                }
+            }
+        }
+    }
+    ImGui::End();
 
     ImGui::End();
 #endif
