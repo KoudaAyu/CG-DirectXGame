@@ -98,6 +98,9 @@
     <ClCompile Include="Baziru3_Engine\Graphics\3D\Object\SkinningObject3dCom.cpp" />
     <ClCompile Include="Baziru3_Engine\Core\Base\SubsystemFactory.cpp" />
     <ClCompile Include="Baziru3_Engine\Framework\Collision\Collider.cpp" />
+    <ClCompile Include="Application\LevelEditor.cpp" />
+    <ClCompile Include="Baziru3_Engine\3D\Water\River.cpp" />
+    <ClCompile Include="Baziru3_Engine\3D\Procedural\BioProceduralGenerator.cpp" />
     <ClCompile Include="Baziru3_Engine\Graphics\Graphics\GpuProfiler.cpp" />
     <ClCompile Include="Baziru3_Engine\Core\Base\AsyncLoader.cpp" />
     <ClCompile Include="Baziru3_Engine\Core\Base\BinaryAssetUtil.cpp" />
@@ -303,6 +306,9 @@
     <ClInclude Include="Application\Obstacle.h" />
     <ClInclude Include="Application\Scene\GameScene\Target.h" />
     <ClInclude Include="Application\Scene\GameScene\TutorialSign.h" />
+    <ClInclude Include="Application\LevelEditor.h" />
+    <ClInclude Include="Baziru3_Engine\3D\Water\River.h" />
+    <ClInclude Include="Baziru3_Engine\3D\Procedural\BioProceduralGenerator.h" />
     <ClInclude Include="Baziru3_Engine\Graphics\3D\Object\SkinningObject3dCom.h" />
     <ClInclude Include="Baziru3_Engine\Core\Base\SubsystemFactory.h" />
 

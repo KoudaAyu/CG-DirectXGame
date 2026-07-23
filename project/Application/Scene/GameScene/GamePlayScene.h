@@ -31,6 +31,7 @@
 #include "../../Obstacle.h"
 #include "Target.h"
 #include "TutorialSign.h"
+#include "../../LevelEditor.h"
 
 class Camera;
 class SpriteCom;
@@ -249,5 +250,8 @@ private:
     float playerSoundMaxRadius_ = 0.0f;
     float playerSoundTimer_ = 0.0f;
     bool showDebugGizmos_ = true; // デバッグコーンと音波リングの表示フラグ (F1でトグル)
+
+    // --- ✨ アプリケーション層で一発読み込みされるレベルエディタ ---
+    std::unique_ptr<LevelEditor> levelEditor_;
 };
 

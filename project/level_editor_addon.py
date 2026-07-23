@@ -14,7 +14,7 @@ import bpy_extras.view3d_utils as view3d_utils
 bl_info = {
     "name": "DirectX レベルエディタ (プロシージャル対応版)",
     "author": "Kouda Ayu",
-    "version": (1, 5),
+    "version": (1, 6),
     "blender": (3, 3, 0),
     "location": "3Dビューポート > サイドバー(Nキー) > レベルエディタ",
     "description": "Blenderの配置データをDirectX用のY-up・左手系（ラジアン）座標に変換し、プロシージャル用のパラメータを含めてJSONに保存します",
@@ -459,7 +459,6 @@ def smooth_points_chaikin(points, iterations=2):
     if len(points) < 2:
         return points
         
-    # 近接重複点を自動除去（0.05m未満をクラスタリング）
     cleaned = [points[0]]
     for i in range(1, len(points)):
         p0 = cleaned[-1]
@@ -485,7 +484,6 @@ def smooth_points_chaikin(points, iterations=2):
         curr = next_pts
     return curr
 
-# 🌊3D画面を連続クリックしてスプラインパスを描き、川(凹んだ川底+透明水面)＋両岸小石環境を一発生成
 class MYADDON_OT_draw_spline_river_path(bpy.types.Operator):
     bl_idname = "myaddon.draw_spline_river_path"
     bl_label = "🌊 クリックで川を描く（両岸小石セット）"
@@ -707,9 +705,9 @@ class MYADDON_OT_draw_spline_river_path(bpy.types.Operator):
             
             for side in [-1.0, 1.0]:
                 if random.random() < 0.65:
-                    offset_dist = half_w + random.uniform(0.3, 1.1)
-                    rx = p[0] + side * side_x * offset_dist + random.uniform(-0.3, 0.3)
-                    ry = p[1] + side * side_y * offset_dist + random.uniform(-0.3, 0.3)
+                    offset_dist = half_w + random.uniform(0.5, 1.3)
+                    rx = p[0] + side * side_x * offset_dist + random.uniform(-0.2, 0.2)
+                    ry = p[1] + side * side_y * offset_dist + random.uniform(-0.2, 0.2)
                     rz = p[2]
                     
                     loc = (rx, ry, rz)
@@ -757,7 +755,6 @@ class MYADDON_OT_draw_spline_river_path(bpy.types.Operator):
         except Exception:
             pass
 
-# 🌊 フリーハンド川描画
 class MYADDON_OT_draw_river_freehand(bpy.types.Operator):
     bl_idname = "myaddon.draw_river_freehand"
     bl_label = "🌊 マウスでお絵かき（川を描く）"
@@ -939,7 +936,6 @@ class MYADDON_OT_draw_river_freehand(bpy.types.Operator):
         self.river_obj["points_y"] = [float(p[1]) for p in eval_points]
         self.river_obj["points_z"] = [float(p[2]) for p in eval_points]
 
-# 🌲 森お絵かき
 class MYADDON_OT_draw_forest_freehand(bpy.types.Operator):
     bl_idname = "myaddon.draw_forest_freehand"
     bl_label = "🌲 マウスでお絵かき（森を描く）"
@@ -1028,7 +1024,6 @@ class MYADDON_OT_draw_forest_freehand(bpy.types.Operator):
             self.spawned_objs.append(new_obj)
             scene_objs.append(new_obj)
 
-# 🪨 岩場お絵かき
 class MYADDON_OT_draw_rock_freehand(bpy.types.Operator):
     bl_idname = "myaddon.draw_rock_freehand"
     bl_label = "🪨 マウスでお絵かき（岩場を描く）"
@@ -1121,23 +1116,31 @@ class MYADDON_OT_draw_rock_freehand(bpy.types.Operator):
             self.spawned_objs.append(new_obj)
             scene_objs.append(new_obj)
 
-# 🌊 川削除
+# 🌊 川オブジェクトの完全削除
 class MYADDON_OT_clear_river_objects(bpy.types.Operator):
     bl_idname = "myaddon.clear_river_objects"
     bl_label = "川をすべて削除"
-    bl_description = "配置されている川オブジェクトをすべて一括削除します"
+    bl_description = "配置されている川、川底、沿岸の小石オブジェクトを100%一括削除します"
     bl_options = {'REGISTER', 'UNDO'}
 
     def execute(self, context):
-        rivers = [obj for obj in bpy.data.objects if obj.get("type") == "River" or obj.name.startswith("RiverBed")]
+        rivers = [
+            obj for obj in context.scene.objects 
+            if obj.type == 'MESH' and (
+                obj.get("type") == "River" or 
+                "River" in obj.name or 
+                "RiverBed" in obj.name or 
+                "Shore" in obj.name
+            )
+        ]
         if not rivers:
-            self.report({'INFO'}, "削除対象の川はありません。")
+            self.report({'INFO'}, "削除対象の川オブジェクトはありません。")
             return {'FINISHED'}
             
         for obj in rivers:
             bpy.data.objects.remove(obj, do_unlink=True)
             
-        self.report({'INFO'}, f"{len(rivers)} 個の川オブジェクトを削除しました。")
+        self.report({'INFO'}, f"{len(rivers)} 個の川関連オブジェクトを完全に削除しました。")
         return {'FINISHED'}
 
 # 🎲 全自動サバイバルマップ生成
@@ -1148,7 +1151,16 @@ class MYADDON_OT_generate_auto_survival_map(bpy.types.Operator):
     bl_options = {'REGISTER', 'UNDO'}
 
     def execute(self, context):
-        to_remove = [o for o in context.scene.objects if o.type == 'MESH' and "type" in o and o["type"] in ['Tree', 'Rock', 'PlayerSpawn', 'EnemySpawn', 'LootBox', 'River']]
+        to_remove = [
+            o for o in context.scene.objects 
+            if o.type == 'MESH' and (
+                ("type" in o and o["type"] in ['Tree', 'Rock', 'PlayerSpawn', 'EnemySpawn', 'LootBox', 'River', 'Biome']) or
+                o.name.startswith("River") or 
+                o.name.startswith("Shore") or 
+                "RiverBed" in o.name or 
+                "RiverWater" in o.name
+            )
+        ]
         for o in to_remove:
             bpy.data.objects.remove(o, do_unlink=True)
 
@@ -1220,8 +1232,8 @@ class MYADDON_OT_generate_auto_survival_map(bpy.types.Operator):
             bv4 = (p[0] + nx * half_w,       p[1] + ny * half_w,       p[2] + 0.01)
             bed_verts.extend([bv0, bv1, bv2, bv3, bv4])
 
-            wv0 = (p[0] - nx * half_w * 0.95, p[1] - ny * half_w * 0.95, p[2] - 0.08)
-            wv1 = (p[0] + nx * half_w * 0.95, p[1] + ny * half_w * 0.95, p[2] - 0.08)
+            wv0 = (p[0] - nx * half_w * 0.95, p[1] - nx * half_w * 0.95, p[2] - 0.08)
+            wv1 = (p[0] + nx * half_w * 0.95, p[1] + nx * half_w * 0.95, p[2] - 0.08)
             water_verts.extend([wv0, wv1])
 
             if i > 0:
@@ -1509,15 +1521,24 @@ class MYADDON_OT_scatter_biome(bpy.types.Operator):
 class MYADDON_OT_clear_all_objects(bpy.types.Operator):
     bl_idname = "myaddon.clear_all_objects"
     bl_label = "全アセットを一括クリア"
-    bl_description = "配置されている木・岩・拠点・ルート箱・川を一括削除します"
+    bl_description = "配置されているすべての木・岩・拠点・ルート箱・川・川底を一括削除します"
     bl_options = {'REGISTER', 'UNDO'}
 
     def execute(self, context):
-        to_remove = [o for o in context.scene.objects if o.type == 'MESH' and "type" in o and o["type"] in ['Tree', 'Rock', 'PlayerSpawn', 'EnemySpawn', 'LootBox', 'River']]
+        to_remove = [
+            o for o in context.scene.objects 
+            if o.type == 'MESH' and (
+                ("type" in o and o["type"] in ['Tree', 'Rock', 'PlayerSpawn', 'EnemySpawn', 'LootBox', 'River', 'Biome']) or
+                o.name.startswith("River") or 
+                o.name.startswith("Shore") or 
+                "RiverBed" in o.name or 
+                "RiverWater" in o.name
+            )
+        ]
         for o in to_remove:
             bpy.data.objects.remove(o, do_unlink=True)
             
-        self.report({'INFO'}, f"{len(to_remove)} 個のアセットを一括削除しました。")
+        self.report({'INFO'}, f"{len(to_remove)} 個のアセットを完全一括削除しました。")
         return {'FINISHED'}
 
 class MYADDON_OT_clear_biome_objects(bpy.types.Operator):
@@ -1874,7 +1895,7 @@ def register():
     
     def draw_popup(self, context):
         self.layout.label(text="🎉 レベルエディタアドオンの最新版をロードしました！", icon='CHECKMARK')
-        self.layout.label(text="画面右側(Nキー)の「レベルエディタ」タブから操作できます。")
+        self.layout.label(text="全アセットクリア・川削除ボタンを100%全消去対応に修復しました。")
     try:
         bpy.context.window_manager.popup_menu(draw_popup, title="ロード完了通知", icon='INFO')
     except Exception:

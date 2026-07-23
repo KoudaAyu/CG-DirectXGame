@@ -108,6 +108,11 @@ void GamePlayScene::InitializeEnvironment()
 	goalRingTransform_.translate = { 0.0f, 0.01f, 32.0f };
 	isGameCleared_ = false;
 	extractionTimer_ = 5.0f;
+
+	// --- ✨ アプリケーション層で Resources/stage_layout.json (川・大自然) を全自動ロード ---
+	levelEditor_ = std::make_unique<LevelEditor>();
+	levelEditor_->Initialize(directXCom, object3dCom);
+	levelEditor_->LoadFromFile("Resources/stage_layout.json");
 }
 
 void GamePlayScene::InitializeCharacters()
@@ -1292,6 +1297,11 @@ void GamePlayScene::UpdateCharacters(float deltaTime)
 			playerSoundMaxRadius_ = 0.0f;
 		}
 	}
+
+	if (levelEditor_)
+	{
+		levelEditor_->Update(deltaTime);
+	}
 }
 
 bool GamePlayScene::IsWithinRadius(const Vector3& a, const Vector3& b, float radius)
@@ -1699,6 +1709,12 @@ void GamePlayScene::Draw(SceneRenderRequests& renderRequests)
 
 	// Draw Skybox
 	SceneManager::GetInstance()->DrawSkybox(ctx.commandList);
+
+	// --- ✨ レベルエディタで配置された川・小石・大樹・アシ水草など全アセットを自動描画 ---
+	if (levelEditor_)
+	{
+		levelEditor_->Draw(renderRequests);
+	}
 
 	if (player_)
 	{

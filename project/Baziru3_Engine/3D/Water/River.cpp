@@ -388,7 +388,10 @@ void River::Draw(D3D12_GPU_DESCRIPTOR_HANDLE textureSrvHandle)
     }
 
     // b2 (PS): Camera
-    commandList->SetGraphicsRootConstantBufferView(3, camera_->GetCameraResource()->GetGPUVirtualAddress());
+    if (camera_ && camera_->GetCameraGpuAddress() != 0)
+    {
+        commandList->SetGraphicsRootConstantBufferView(3, camera_->GetCameraGpuAddress());
+    }
 
     // b3 (VS/PS): WaterParams
     commandList->SetGraphicsRootConstantBufferView(4, waterParamsResource_->GetGPUVirtualAddress());

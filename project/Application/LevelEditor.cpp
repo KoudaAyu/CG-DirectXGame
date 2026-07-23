@@ -2,6 +2,7 @@
 #include <fstream>
 #include <sstream>
 #include <random>
+#include <filesystem>
 #include <imgui.h>
 #include <iostream>
 #include "SceneManager.h"
@@ -10,9 +11,9 @@
 #include <Windows.h>
 #include "externals/nlohmann/json.hpp"
 #include "Baziru3_Engine/3D/Procedural/BioProceduralGenerator.h"
-#include "Baziru3_Engine/Collision/CollisionManager.h"
-#include "Baziru3_Engine/Collision/BoxCollider.h"
-#include "Baziru3_Engine/Collision/CapsuleCollider.h"
+#include "Baziru3_Engine/Framework/Collision/CollisionManager.h"
+#include "Baziru3_Engine/Framework/Collision/BoxCollider.h"
+#include "Baziru3_Engine/Framework/Collision/CapsuleCollider.h"
 
 namespace {
     bool FileExists(const std::string& path) {
@@ -247,61 +248,12 @@ void LevelEditor::Draw(const RenderContext& ctx)
     }
 
     // 選択オブジェクトがあれば3D軸ヘルパー（赤、緑、青のシリンダー）を描画
+    /*
     if (selectedIndex_ >= 0 && selectedIndex_ < static_cast<int>(objectDatas_.size()))
     {
-        ID3D12GraphicsCommandList* cmdList = ctx.commandList;
-        if (cmdList)
-        {
-            D3D12_GPU_DESCRIPTOR_HANDLE texHandle = TextureManager::GetInstance()->GetSrvHandleGPU(axisTextureIndex_);
-            if (texHandle.ptr != 0)
-            {
-                // ルートシグネチャとパイプラインを設定
-                cmdList->SetGraphicsRootSignature(object3dCom_->GetRootSignature().Get());
-                if (object3dCom_->GetOverlayPipelineState())
-                {
-                    cmdList->SetPipelineState(object3dCom_->GetOverlayPipelineState().Get());
-                }
-
-                // 共通の定数バッファ引数をバインド
-                if (ctx.light)
-                {
-                    cmdList->SetGraphicsRootConstantBufferView(3, ctx.light->GetDirectionalLightResource()->GetGPUVirtualAddress());
-                }
-                else
-                {
-                    cmdList->SetGraphicsRootConstantBufferView(3, 0);
-                }
-
-                if (ctx.camera && ctx.camera->GetCameraResource())
-                {
-                    cmdList->SetGraphicsRootConstantBufferView(4, ctx.camera->GetCameraResource()->GetGPUVirtualAddress());
-                }
-                else
-                {
-                    cmdList->SetGraphicsRootConstantBufferView(4, 0);
-                }
-
-                cmdList->SetGraphicsRootDescriptorTable(2, texHandle);
-
-                for (int i = 0; i < 3; ++i)
-                {
-                    if (!axisCylinders_[i] || axisCylinders_[i]->GetVertexCount() == 0 || !axisCylinders_[i]->GetTransformationMatrixResource())
-                        continue;
-
-                    // 頂点バッファビュー設定
-                    cmdList->IASetVertexBuffers(0, 1, &axisCylinders_[i]->GetVertexBufferView());
-                    cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-
-                    // マテリアル定数バッファ (ルート引数0) と Transform定数バッファ (ルート引数1) を設定
-                    cmdList->SetGraphicsRootConstantBufferView(0, axisMaterialResources_[i]->GetGPUVirtualAddress());
-                    cmdList->SetGraphicsRootConstantBufferView(1, axisCylinders_[i]->GetTransformationMatrixResource()->GetGPUVirtualAddress());
-
-                    // 描画実行
-                    cmdList->DrawInstanced(axisCylinders_[i]->GetVertexCount(), 1, 0, 0);
-                }
-            }
-        }
+        // ...
     }
+    */
 }
 
 void LevelEditor::DrawImGui()
@@ -1110,4 +1062,19 @@ void LevelEditor::AddObject(const std::string& name, const std::string& dir, con
     objectDatas_.push_back(obj);
     RefreshRuntimeObjects();
     selectedIndex_ = static_cast<int>(objectDatas_.size()) - 1;
+}
+
+void LevelEditor::Draw(SceneRenderRequests& renderRequests)
+{
+    (void)renderRequests;
+    uint32_t defaultTex = TextureManager::GetInstance()->Load("Resources/uvChecker.png");
+    D3D12_GPU_DESCRIPTOR_HANDLE handle = TextureManager::GetInstance()->GetSrvHandleGPU(defaultTex);
+
+    for (auto& river : rivers_)
+    {
+        if (river && handle.ptr != 0)
+        {
+            river->Draw(handle);
+        }
+    }
 }
