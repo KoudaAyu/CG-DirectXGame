@@ -5,7 +5,7 @@
 [![ReleaseBuild](https://github.com/KoudaAyu/CG-DirectXGame/actions/workflows/Release.yml/badge.svg)](https://github.com/KoudaAyu/CG-DirectXGame/actions/workflows/Release.yml)
 
 C++ および DirectX 12 を用いてスクラッチから構築した、ゲームデベロッパー向け技術アピール用自作3Dゲームエンジンプロジェクトです。
-商用コンソールゲーム開発におけるパフォーマンス要求（ロード時間の極小化、動的メモリ確保の抑制、空間分割による物理演算最適化など）をクリアするための低レイヤでの最適化アーキテクチャ設計を実証することを目的としています。
+商用コンソールゲーム開発におけるパフォーマンス要求（ロード時間の極小化、動的メモリ確保の抑制、空間分割による物理演算最適化など）をクリアするための、低レイヤでの最適化アーキテクチャ設計を実証することを目的としています。
 
 ---
 
@@ -27,22 +27,122 @@ C++ および DirectX 12 を用いてスクラッチから構築した、ゲー�
 
 ### 1. メモリ管理システム (Memory Management System) - 動的確保の抑制
 
-**【背景と課題】**
-ゲーム実行中の頻繁な動的メモリ確保（`new` / `delete`）は、**メモリ断片化（フラグメンテーション）**の原因となり、最悪の場合メモリアロケータのボトルネックによるフレームレート低下（ヒッチング）を引き起こします。特に DirectX 12 における定数バッファの都度生成は非常に大きな負荷となります。
+#### 【背景と課題】
+ゲーム実行中の頻繁な動的メモリ確保（`new`/`delete`）は、**メモリ断片化（フラグメンテーション）**の原因となり、最悪の場合メモリアロケーションオーバーヘッドによる処理落ち（ヒッチング）を引き起こします。特に DirectX 12 における定数バッファの都度生成は非常に大きな負荷となります。
 
-**【解決手法】**
-* **定数バッファ用リングバッファアロケータ (ConstantBufferAllocator)**: 毎フレームのバッファ生成を廃止し、起動時に一括確保したアップロードバッファをCPU-GPU同期フェンスを用いてリング状に使い回す仕組み。
-* **スタックアロケータ / プールアロケータ**: 短寿命オブジェクトや同一サイズオブジェクト（コライダー等）の超高速な切り出し・一括リセットを $O(1)$ で実現。
+#### 【解決手法】
+* **定数バッファ用リングバッファアロケータ (`ConstantBufferAllocator`)**
+  * トリプルバッファリング構成（3フレーム分の領域を事前に一括確保）を採用し、CPUとGPUのアクセス非同期競合を回避しつつ、256バイトの境界アラインメントを自動調整して高速にメモリを切り出します。
+* **短寿命オブジェクト用スタックアロケータ (`StackAllocator`)**
+  * 1フレームで使い捨てる一時オブジェクト用に起動時に一括でメモリプールを確保。ポインタを前進させるだけ（計算量 $O(1)$）でアロケートし、フレーム終了時にポインタを先頭に戻すだけで一括論理解放する仕組みを構築しました。
 
-### 2. 衝突判定の高速化 (Collision Optimization)
-* **八分木 (Octree) 空間分割**: ワールド空間を再帰的に分割し、総当たり判定回数を削減。
-* **データ指向設計 (DOD)**: キャッシュミスを極小化するため、判定に必要なデータ（AABB、Sphere等）のみをメモリ上に連続して並べるデータ構造設計を適用。
+#### 【効果】
+* 実行中の動的アロケーションを完全に排除し、メモリ断片化およびアロケーション負荷を防止。
 
-### 3. DirectX 12 メガヒープ管理
+#### 【定数バッファアロケータのトリプルバッファリング同期構造】
+![Allocator](project/Resources/slides/slide_allocator.png)
+
+---
+
+### 2. 衝突判定の最適化 (Collision Optimization) - 空間分割とデータ指向
+
+#### 【背景と課題】
+オブジェクト数が数百〜数千規模に増大した際、総当たり判定（計算量 $O(N^2)$）を行うとCPU負荷が跳ね上がり、ゲームの処理落ちを引き起こします。
+
+#### 【解決手法】
+* **グリッドベース空間ハッシュ分割 (`SpatialHashCell`)**
+  * 3D空間をグリッドセル（サイズ 10.0f）に区切り、各オブジェクトをハッシュ値に変換して登録。隣接セル内のオブジェクト同士のみを判定対象とします。
+* **データ指向設計 (Data-Oriented Design)**
+  * クラス階層を巡るポインタ参照を廃止し、判定に必要なパラメータ（座標、サイズ、回転等）のみをメモリ上で連続する配列に並べて一括イテレート処理します。
+
+#### 【効果】
+* 判定の計算量を $O(N)$ に削減し、メモリアクセスのキャッシュミス（Cache Miss）によるCPUボトルネックを極小化。
+
+#### 【空間ハッシュによる衝突判定高速化アルゴリズムフロー】
+![Spatial Hash](project/Resources/slides/slide_spatial_hash.png)
+
+---
+
+### 3. データ駆動AIシステム (Data-Driven AI System) - イテレーション効率化
+
+#### 【背景と課題】
+AI（Behavior Tree）の挙動調整のたびにソースコードの再コンパイル・ビルドを行うと、イテレーション速度が低下しゲームのゲームプレイ調整の妨げになります。
+
+#### 【解決手法】
+* **ビジュアルノードエディタ (`imgui-node-editor` の統合)**
+  * ゲーム実行中にImGui上でノード（Selector, Sequence, Action）を接続してAIの思考木をリアルタイムに構築可能に。
+  * 編集結果は瞬時にJSONアセットとしてファイル出力され、それをエンジン側が動的に読み込み・再構成（Blackboardの変数共有も対応）します。
+
+#### 【効果】
+* プログラマー以外のプランナー等でも、ゲームを実行したままAIの挙動調整が可能になり、イテレーション効率を向上。
+
+#### 【Behavior Tree と Blackboard メモリの連携構成】
+![Behavior Tree](project/Resources/slides/slide_bt_bb.png)
+
+---
+
+### 4. DirectX 12 メガヒープ管理
 * **ディスクリプタヒープマネージャ**: SRV/UAV 用に大きなメガヒープを起動時に1つだけ確保し、描画ごとのヒープ切り替えオーバーヘッドを削減。
 
-### 4. ツール・エディタ基盤の構築
-* **BehaviorTree エディタ**: `imgui-node-editor` を統合し、AIロジックをGUIノードベースでビジュアル編集・デバッグできる仕組みをエンジン層に構築。
+---
+
+## 📖 API取扱説明書 (API Usage)
+
+### 1. エンジンの初期化とサブシステム取得
+
+#### [main.cpp](file:///c:/Users/k024g/OneDrive/デスクトップ/Engine_ver2026/project/main.cpp) の実装例
+```cpp
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
+{    
+    std::unique_ptr<Framework> game = std::make_unique<Game>();
+    game->Run();
+    return 0;
+}
+```
+
+#### サブシステム取得例 ([Game.cpp](file:///c:/Users/k024g/OneDrive/デスクトップ/Engine_ver2026/project/Game.cpp))
+```cpp
+auto* dx = engine_->GetDirectXCom();       // DirectX 12 描画デバイス
+auto* window = engine_->GetWindowAPI();     // Window管理
+auto* spriteCom = engine_->GetSpriteCom(); // スプライト共通コンポーネント
+```
+
+### 2. 定数バッファの割り当て例
+
+```cpp
+auto cbAllocator = engine_->GetConstantBufferAllocator();
+
+// 256バイトアラインメント調整されたメモリの切り出し
+auto allocation = cbAllocator->Allocate(sizeof(MyConstBufferData));
+
+// CPU書き込み
+MyConstBufferData* cbData = static_cast<MyConstBufferData*>(allocation.cpuAddress);
+cbData->worldMatrix = worldMatrix;
+
+// GPUコマンドへセット
+commandList->SetGraphicsRootConstantBufferView(rootParamIndex, allocation.gpuAddress);
+```
+
+### 3. コライダーの登録と衝突イベントコールバック
+
+```cpp
+#include "CollisionManager.h"
+#include "SphereCollider.h"
+
+// 衝突形状とカテゴリの決定
+auto collider = std::make_unique<SphereCollider>(CollisionAttribute::Player);
+collider->SetRadius(2.5f);
+
+// 衝突時イベントのバインド
+collider->SetOnCollision([](const CollisionInfo& info) {
+    if (info.other->GetAttribute() == CollisionAttribute::Bullet) {
+        TakeDamage();
+    }
+});
+
+// マネージャへの登録
+CollisionManager::GetInstance()->RegisterCollider(collider.get());
+```
 
 ---
 
