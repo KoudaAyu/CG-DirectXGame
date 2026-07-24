@@ -225,6 +225,11 @@ private:
 	uint32_t freeCounterUavIndex_ = 0;
 	std::pair<D3D12_CPU_DESCRIPTOR_HANDLE, D3D12_GPU_DESCRIPTOR_HANDLE> freeCounterUavHandle_;
 
+	// GPU Particle FreeListリソースとディスクリプタ用インデックス
+	Microsoft::WRL::ComPtr<ID3D12Resource> freeListResource_ = nullptr;
+	uint32_t freeListUavIndex_ = 0;
+	std::pair<D3D12_CPU_DESCRIPTOR_HANDLE, D3D12_GPU_DESCRIPTOR_HANDLE> freeListUavHandle_;
+
 	// PerView 用のバッファ
 	Microsoft::WRL::ComPtr<ID3D12Resource> perViewResource_ = nullptr;
 	PerView* perViewData_ = nullptr;

@@ -26,7 +26,8 @@ static const uint32_t kMaxParticles = 1024;
 ConstantBuffer<EmitterSphere> gEmitter : register(b0);
 ConstantBuffer<PerFrame> gPerFrame : register(b1);
 RWStructuredBuffer<Particle> gParticles : register(u0);
-RWStructuredBuffer<int32_t> gFreeCounter : register(u1);
+RWStructuredBuffer<int32_t> gFreeListIndex : register(u1);
+RWStructuredBuffer<uint32_t> gFreeList : register(u2);
 
 // 乱数生成用関数
 float32_t3 rand3dTo3d(float32_t3 value) {
@@ -64,12 +65,14 @@ void main(uint3 DTid : SV_DispatchThreadID) {
         generator.seed = (DTid + gPerFrame.time) * gPerFrame.time;
 
         for (uint32_t countIndex = 0; countIndex < gEmitter.count; ++countIndex) {
-            int32_t particleIndex;
-            // アトミックに加算して空きスロットインデックスを取得 (スライド2枚目)
-            InterlockedAdd(gFreeCounter[0], 1, particleIndex);
+            int32_t freeListIndex;
+            // FreeListのIndexを1つ前に設定し、現在のIndexを取得する
+            InterlockedAdd(gFreeListIndex[0], -1, freeListIndex);
 
             // 最大数よりも少なければ射出可能
-            if (particleIndex < kMaxParticles) {
+            if (0 <= freeListIndex && freeListIndex < kMaxParticles) {
+                uint32_t particleIndex = gFreeList[freeListIndex];
+
                 // 1. スケール
                 float32_t3 randScale = generator.Generate3d();
                 gParticles[particleIndex].scale = 0.1f + randScale * 0.2f;
@@ -92,6 +95,10 @@ void main(uint3 DTid : SV_DispatchThreadID) {
                 float32_t3 randVel = generator.Generate3d();
                 float32_t3 velDir = normalize(float32_t3(randVel.x * 2.0f - 1.0f, 1.0f + randVel.y * 2.0f, randVel.z * 2.0f - 1.0f));
                 gParticles[particleIndex].velocity = velDir * (1.0f + generator.Generate1d() * 2.0f); // 速度 1.0〜3.0
+            } else {
+                // 発生させられなかったので、減らしてしまった分をもとに戻す
+                InterlockedAdd(gFreeListIndex[0], 1);
+                break;
             }
         }
     }

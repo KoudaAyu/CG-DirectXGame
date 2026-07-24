@@ -10,11 +10,8 @@ struct Particle {
 static const uint32_t kMaxParticles = 1024;
 
 RWStructuredBuffer<Particle> gParticles : register(u0);
-RWStructuredBuffer<int32_t> gFreeCounter : register(u1);
-
-float rand(float3 co) {
-    return frac(sin(dot(co, float3(12.9898, 78.233, 45.164))) * 43758.5453);
-}
+RWStructuredBuffer<int32_t> gFreeListIndex : register(u1);
+RWStructuredBuffer<uint32_t> gFreeList : register(u2);
 
 [numthreads(1024, 1, 1)]
 void main(uint3 DTid : SV_DispatchThreadID)
@@ -23,26 +20,12 @@ void main(uint3 DTid : SV_DispatchThreadID)
     if(particleIndex < kMaxParticles)
     {
         gParticles[particleIndex] = (Particle)0;
-        
-        float seed = float(particleIndex);
-        float r1 = rand(float3(seed, 1.0f, 2.0f));
-        float r2 = rand(float3(seed, 3.0f, 4.0f));
-        float r3 = rand(float3(seed, 5.0f, 6.0f));
-        float r4 = rand(float3(seed, 7.0f, 8.0f));
-        
-        // Random velocity between -1.0 and 1.0
-        gParticles[particleIndex].velocity = float32_t3(r1 * 2.0f - 1.0f, r2 * 2.0f - 1.0f, r3 * 2.0f - 1.0f);
-        
-        // Random lifetime between 1.0 and 3.0 seconds
-        gParticles[particleIndex].lifeTime = 1.0f + r4 * 2.0f;
-        gParticles[particleIndex].currentTime = 0.0f;
-        gParticles[particleIndex].scale = float32_t3(0.5f, 0.5f, 0.5f);
-        gParticles[particleIndex].color = float32_t4(1.0f, 1.0f, 1.0f, 1.0f);
+        gFreeList[particleIndex] = particleIndex;
     }
     
-    // スレッド 0 でカウンタを 0 に初期化 (スライド1枚目)
+    // スレッド 0 で Index が末尾 (kMaxParticles - 1) を指すように初期化
     if (particleIndex == 0)
     {
-        gFreeCounter[0] = 0;
+        gFreeListIndex[0] = kMaxParticles - 1;
     }
 }
