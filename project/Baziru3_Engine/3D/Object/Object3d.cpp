@@ -5,6 +5,9 @@
 #include "TextureManager.h"
 #include "Skeleton.h"
 #include "SkinCluster.h"
+#ifdef USE_IMGUI
+#include <imgui.h>
+#endif
 #include <assimp/Importer.hpp>
 #include <assimp/postprocess.h>
 #include <assimp/scene.h>
@@ -201,7 +204,15 @@ void Object3d::Update()
 		skinClusterLender_.Update(skinCluster_, skeleton_);
 	}
 
-	Matrix4x4 worldMatrix = MakeAffineMatrix(transform.GetScale(), transform.GetRotate(), transform.GetTranslate());
+	Matrix4x4 worldMatrix;
+	if (customWorldMatrix_.has_value())
+	{
+		worldMatrix = customWorldMatrix_.value();
+	}
+	else
+	{
+		worldMatrix = MakeAffineMatrix(transform.GetScale(), transform.GetRotate(), transform.GetTranslate());
+	}
 
 	Matrix4x4 viewMatrix;
 	Matrix4x4 projectionMatrix;
@@ -227,18 +238,156 @@ void Object3d::Update()
 	transformationMatrixData_->WorldInverseTranspose = Transpose(Inverse(worldMatrix));
 }
 
+void Object3d::ApplyHeadLookAt(const Vector3& targetWorldPos, float weight)
+{
+	if (skeleton_.joints.empty()) return;
+	Matrix4x4 worldMatrix;
+	if (customWorldMatrix_.has_value())
+	{
+		worldMatrix = customWorldMatrix_.value();
+	}
+	else
+	{
+		worldMatrix = MakeAffineMatrix(transform.GetScale(), transform.GetRotate(), transform.GetTranslate());
+	}
+	skeleton_.ApplyHeadLookAt(targetWorldPos, worldMatrix, weight);
+	skeleton_.Update();
+}
+
+void Object3d::AttachToJoint(const Object3d& parentObject, int32_t jointIndex, const Vector3& offsetScale, const Vector3& offsetRotate, const Vector3& offsetTranslate)
+{
+	const Skeleton& skeleton = parentObject.GetSkeleton();
+	if (skeleton.joints.empty() || jointIndex < 0 || jointIndex >= static_cast<int32_t>(skeleton.joints.size()))
+	{
+		ClearCustomWorldMatrix();
+		return;
+	}
+
+	Matrix4x4 parentWorldMatrix = MakeAffineMatrix(
+		parentObject.GetScale(),
+		parentObject.GetRotate(),
+		parentObject.GetTranslate());
+
+	Matrix4x4 jointWorldMatrix = skeleton.GetJointWorldMatrix(jointIndex, parentWorldMatrix);
+
+	// ボーン行列のスケール除去（回転と平行移動成分の正規化抽出）
+	Vector3 col0 = { jointWorldMatrix.m[0][0], jointWorldMatrix.m[0][1], jointWorldMatrix.m[0][2] };
+	Vector3 col1 = { jointWorldMatrix.m[1][0], jointWorldMatrix.m[1][1], jointWorldMatrix.m[1][2] };
+	Vector3 col2 = { jointWorldMatrix.m[2][0], jointWorldMatrix.m[2][1], jointWorldMatrix.m[2][2] };
+
+	float len0 = std::sqrt(col0.x * col0.x + col0.y * col0.y + col0.z * col0.z);
+	float len1 = std::sqrt(col1.x * col1.x + col1.y * col1.y + col1.z * col1.z);
+	float len2 = std::sqrt(col2.x * col2.x + col2.y * col2.y + col2.z * col2.z);
+
+	Matrix4x4 normJointMatrix = jointWorldMatrix;
+	if (len0 > 0.00001f) { normJointMatrix.m[0][0] /= len0; normJointMatrix.m[0][1] /= len0; normJointMatrix.m[0][2] /= len0; }
+	if (len1 > 0.00001f) { normJointMatrix.m[1][0] /= len1; normJointMatrix.m[1][1] /= len1; normJointMatrix.m[1][2] /= len1; }
+	if (len2 > 0.00001f) { normJointMatrix.m[2][0] /= len2; normJointMatrix.m[2][1] /= len2; normJointMatrix.m[2][2] /= len2; }
+
+	Matrix4x4 offsetMatrix = MakeAffineMatrix(offsetScale, offsetRotate, offsetTranslate);
+	SetCustomWorldMatrix(Multiply(offsetMatrix, normJointMatrix));
+}
+
+void Object3d::DrawAnimationUI(const std::string& windowTitle)
+{
+#ifdef USE_IMGUI
+	if (!ImGui::GetCurrentContext()) return;
+
+	ImGui::Begin(windowTitle.c_str());
+	if (HasAnimation())
+	{
+		float currentTime = GetAnimationTime();
+		float duration = GetAnimationDuration();
+		float speed = GetAnimationSpeed();
+		bool isPaused = IsAnimationPaused();
+
+		if (ImGui::Button(isPaused ? "  Play  " : " Pause "))
+		{
+			SetAnimationPaused(!isPaused);
+		}
+		ImGui::SameLine();
+		if (ImGui::Button(" |< Start "))
+		{
+			SetAnimationTime(0.0f);
+		}
+		ImGui::SameLine();
+		if (ImGui::Button(" <- Step "))
+		{
+			SetAnimationPaused(true);
+			StepAnimationFrame(-1.0f / 60.0f);
+		}
+		ImGui::SameLine();
+		if (ImGui::Button(" Step -> "))
+		{
+			SetAnimationPaused(true);
+			StepAnimationFrame(1.0f / 60.0f);
+		}
+
+		ImGui::Separator();
+		ImGui::Text("再生速度 (Playback Speed): %.2fx", speed);
+		if (ImGui::SliderFloat("Speed Slider", &speed, -2.0f, 3.0f, "%.2fx"))
+		{
+			SetAnimationSpeed(speed);
+		}
+
+		if (ImGui::Button("0.5x スロー")) { SetAnimationSpeed(0.5f); }
+		ImGui::SameLine();
+		if (ImGui::Button("1.0x 標準")) { SetAnimationSpeed(1.0f); }
+		ImGui::SameLine();
+		if (ImGui::Button("2.0x 倍速")) { SetAnimationSpeed(2.0f); }
+		ImGui::SameLine();
+		if (ImGui::Button("-1.0x 逆再生")) { SetAnimationSpeed(-1.0f); }
+
+		ImGui::Separator();
+		ImGui::Text("タイムライン シーク (Timeline Seek Bar):");
+		int currentFrame = static_cast<int>(currentTime * 60.0f);
+		int totalFrames = static_cast<int>(duration * 60.0f);
+		ImGui::Text("Frame: %d / %d (%.2f s / %.2f s)", currentFrame, totalFrames, currentTime, duration);
+
+		if (duration > 0.0f)
+		{
+			float seekTime = currentTime;
+			if (ImGui::SliderFloat("Timeline (sec)", &seekTime, 0.0f, duration, "%.3f s"))
+			{
+				SetAnimationTime(seekTime);
+			}
+		}
+	}
+	else
+	{
+		ImGui::Text("アニメーションが設定されていません。");
+	}
+	ImGui::End();
+#endif
+}
+
 void Object3d::Draw(ID3D12GraphicsCommandList* commandList)
 {
 	commandList->IASetVertexBuffers(0, 1, &vertexBufferView_);
 	commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-   if (indexResource && !modelData_.indices.empty())
+	if (indexResource && !modelData_.indices.empty())
 	{
 		commandList->IASetIndexBuffer(&indexBufferView_);
 	}
 	commandList->SetGraphicsRootConstantBufferView(RootParam::Object3D::kMaterial, materialResource->GetGPUVirtualAddress());
 	commandList->SetGraphicsRootConstantBufferView(RootParam::Object3D::kTransform, transformationMatrixResource->GetGPUVirtualAddress());
 	commandList->SetGraphicsRootConstantBufferView(RootParam::Object3D::kLight, directionalLightResource->GetGPUVirtualAddress());
-   if (indexResource && !modelData_.indices.empty())
+
+	if (!modelData_.meshes.empty())
+	{
+		for (const auto& meshPart : modelData_.meshes)
+		{
+			if (indexResource && meshPart.indexCount > 0)
+			{
+				commandList->DrawIndexedInstanced(meshPart.indexCount, 1, meshPart.indexOffset, 0, 0);
+			}
+			else if (meshPart.vertexCount > 0)
+			{
+				commandList->DrawInstanced(meshPart.vertexCount, 1, meshPart.vertexOffset, 0);
+			}
+		}
+	}
+	else if (indexResource && !modelData_.indices.empty())
 	{
 		commandList->DrawIndexedInstanced(static_cast<UINT>(modelData_.indices.size()), 1, 0, 0, 0);
 	}

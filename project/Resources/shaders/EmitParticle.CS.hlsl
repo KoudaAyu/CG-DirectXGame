@@ -7,13 +7,20 @@ struct Particle {
     float32_t4 color;
 };
 
-struct EmitterSphere {
-    float32_t3 translate; //位置
-    float32_t radius; //射出範囲
-    uint32_t count; //射出数
-    float32_t frequency; //発生頻度
-    float32_t frequencyTime; //使用頻度
-    uint32_t emit; //許可
+struct EmitterData {
+    float32_t3 translate;    // 位置
+    float32_t radius;        // 発生半径
+    uint32_t count;          // 射出数
+    float32_t frequency;     // 発生頻度
+    float32_t frequencyTime; // 使用頻度
+    uint32_t emit;           // 射出許可
+    uint32_t emitterType;    // 0: Point, 1: Box, 2: Sphere, 3: Cone
+    float32_t initialSpeed;  // 初速
+    float32_t3 boxSize;      // Box領域サイズ
+    float32_t coneAngle;     // Cone照射角度 (ラジアン)
+    float32_t3 direction;    // Direction / Cone向き
+    float32_t particleLifeTime; // パーティクル寿命
+    float32_t4 particleColor;   // パーティクルカラー
 };
 
 struct PerFrame {
@@ -23,7 +30,7 @@ struct PerFrame {
 
 static const uint32_t kMaxParticles = 1024;
 
-ConstantBuffer<EmitterSphere> gEmitter : register(b0);
+ConstantBuffer<EmitterData> gEmitter : register(b0);
 ConstantBuffer<PerFrame> gPerFrame : register(b1);
 RWStructuredBuffer<Particle> gParticles : register(u0);
 RWStructuredBuffer<int32_t> gFreeListIndex : register(u1);
@@ -57,49 +64,77 @@ class RandomGenerator
     }
 };
 
-[numthreads(1, 1, 1)]
+[numthreads(32, 1, 1)]
 void main(uint3 DTid : SV_DispatchThreadID) {
-    if (gEmitter.emit != 0) { // 射出許可が出たので射出
+    if (gEmitter.emit != 0 && DTid.x < gEmitter.count) {
         RandomGenerator generator;
-        // シードの初期化
-        generator.seed = (DTid + gPerFrame.time) * gPerFrame.time;
+        generator.seed = float32_t3(DTid.x, gPerFrame.time, DTid.x * 0.137f + gPerFrame.time * 12.9898f);
 
-        for (uint32_t countIndex = 0; countIndex < gEmitter.count; ++countIndex) {
-            int32_t freeListIndex;
-            // FreeListのIndexを1つ前に設定し、現在のIndexを取得する
-            InterlockedAdd(gFreeListIndex[0], -1, freeListIndex);
+        int32_t freeListIndex;
+        InterlockedAdd(gFreeListIndex[0], -1, freeListIndex);
 
-            // 最大数よりも少なければ射出可能
-            if (0 <= freeListIndex && freeListIndex < kMaxParticles) {
-                uint32_t particleIndex = gFreeList[freeListIndex];
+        if (0 <= freeListIndex && freeListIndex < (int32_t)kMaxParticles) {
+            uint32_t particleIndex = gFreeList[freeListIndex];
 
-                // 1. スケール
-                float32_t3 randScale = generator.Generate3d();
-                gParticles[particleIndex].scale = 0.1f + randScale * 0.2f;
+            // 1. スケール
+            float32_t3 randScale = generator.Generate3d();
+            gParticles[particleIndex].scale = 0.05f + randScale * 0.08f;
 
-                // 2. 座標 (Emitter の位置 + 半径以内のランダムな球状オフセット)
-                float32_t3 randPos = generator.Generate3d();
-                float32_t3 dir = normalize(randPos * 2.0f - 1.0f);
-                float32_t dist = generator.Generate1d() * gEmitter.radius;
-                gParticles[particleIndex].translate = gEmitter.translate + dir * dist;
+            // 2. 座標と速度の計算 (Emitter 形状タイプに応じた幾何計算)
+            float32_t3 emitPos = gEmitter.translate;
+            float32_t3 emitVel = float32_t3(0.0f, 1.0f, 0.0f);
+            float32_t speed = gEmitter.initialSpeed > 0.0f ? gEmitter.initialSpeed : 1.0f;
 
-                // 3. 色
-                gParticles[particleIndex].color.rgb = generator.Generate3d();
-                gParticles[particleIndex].color.a = 1.0f;
-
-                // 4. その他のパラメータ
-                gParticles[particleIndex].currentTime = 0.0f;
-                gParticles[particleIndex].lifeTime = 1.0f + generator.Generate1d() * 2.0f; // 寿命を 1.0〜3.0 秒に設定
-
-                // 速度ベクトルもランダム（上方向をベースに周囲へ拡散）
-                float32_t3 randVel = generator.Generate3d();
-                float32_t3 velDir = normalize(float32_t3(randVel.x * 2.0f - 1.0f, 1.0f + randVel.y * 2.0f, randVel.z * 2.0f - 1.0f));
-                gParticles[particleIndex].velocity = velDir * (1.0f + generator.Generate1d() * 2.0f); // 速度 1.0〜3.0
-            } else {
-                // 発生させられなかったので、減らしてしまった分をもとに戻す
-                InterlockedAdd(gFreeListIndex[0], 1);
-                break;
+            if (gEmitter.emitterType == 0) // Point (点発生)
+            {
+                emitPos = gEmitter.translate;
+                float32_t3 randVel = generator.Generate3d() * 2.0f - 1.0f;
+                emitVel = normalize(randVel);
             }
+            else if (gEmitter.emitterType == 1) // Box (直方体発生)
+            {
+                float32_t3 randBox = generator.Generate3d() - 0.5f;
+                emitPos = gEmitter.translate + randBox * gEmitter.boxSize;
+                emitVel = float32_t3(0.0f, 1.0f, 0.0f);
+            }
+            else if (gEmitter.emitterType == 2) // Sphere (球状発生)
+            {
+                float32_t3 randDir = generator.Generate3d() * 2.0f - 1.0f;
+                float32_t3 dir = normalize(length(randDir) > 0.001f ? randDir : float32_t3(0, 1, 0));
+                float32_t dist = generator.Generate1d() * gEmitter.radius;
+                emitPos = gEmitter.translate + dir * dist;
+                emitVel = dir;
+            }
+            else if (gEmitter.emitterType == 3) // Cone (円錐射出)
+            {
+                emitPos = gEmitter.translate;
+                float32_t3 baseDir = length(gEmitter.direction) > 0.001f ? normalize(gEmitter.direction) : float32_t3(0, 1, 0);
+                float32_t randAngle = generator.Generate1d() * gEmitter.coneAngle;
+                float32_t randRot = generator.Generate1d() * 6.2831853f;
+
+                float32_t3 perp = abs(baseDir.y) < 0.99f ? float32_t3(0, 1, 0) : float32_t3(1, 0, 0);
+                float32_t3 right = normalize(cross(perp, baseDir));
+                float32_t3 up = cross(baseDir, right);
+
+                emitVel = normalize(baseDir * cos(randAngle) + (right * cos(randRot) + up * sin(randRot)) * sin(randAngle));
+            }
+
+            gParticles[particleIndex].translate = emitPos;
+            gParticles[particleIndex].velocity = emitVel * speed;
+
+            // 3. 色
+            if (gEmitter.particleColor.a > 0.0f) {
+                gParticles[particleIndex].color = gEmitter.particleColor;
+            } else {
+                float32_t randG = generator.Generate1d();
+                gParticles[particleIndex].color = float32_t4(1.0f, 0.5f + randG * 0.4f, 0.15f, 1.0f);
+            }
+
+            // 4. 寿命
+            gParticles[particleIndex].currentTime = 0.0f;
+            gParticles[particleIndex].lifeTime = gEmitter.particleLifeTime > 0.0f ? gEmitter.particleLifeTime : (0.5f + generator.Generate1d() * 1.0f);
+        } else {
+            InterlockedAdd(gFreeListIndex[0], 1);
         }
     }
 }

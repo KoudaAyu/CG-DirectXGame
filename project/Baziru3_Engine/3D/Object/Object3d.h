@@ -2,6 +2,7 @@
 
 #include <string>
 #include <vector>
+#include <optional>
 #include "Camera.h"
 #include "NodeAnimation.h"
 #include "TextureManager.h"
@@ -32,6 +33,8 @@ public:
 		std::vector<Sprite::VertexData> vertices; // 頂点データ
 		std::vector<uint32_t> indices; // インデックスデータ
 		MaterialData material; // マテリアルデータ
+		std::vector<Model::MeshPart> meshes; // 複数メッシュ情報
+		std::vector<MaterialData> materials; // 複数マテリアル情報
 		NodeAnimation rootNode; // 階層構造のルートノード
 	};
 
@@ -124,9 +127,28 @@ public:
 	// デルタタイム設定 (Animator の時間進行に使用)
 	void SetDeltaTime(float dt) { deltaTime_ = dt; }
 	bool HasAnimation() const { return animator_.HasAnimation(); }
+	void PlayAnimation(const Animation* animation, float transitionTime = 0.0f) { animator_.PlayAnimation(animation, transitionTime); }
+	Animator& GetAnimator() { return animator_; }
+	const Animator& GetAnimator() const { return animator_; }
+	void SetAnimationSpeed(float speed) { animator_.SetPlaybackSpeed(speed); }
+	float GetAnimationSpeed() const { return animator_.GetPlaybackSpeed(); }
+	void SetAnimationPaused(bool paused) { animator_.SetPaused(paused); }
+	bool IsAnimationPaused() const { return animator_.IsPaused(); }
+	void SetAnimationTime(float time) { animator_.SetTime(time); }
+	float GetAnimationTime() const { return animator_.GetTime(); }
+	float GetAnimationDuration() const { return animator_.GetDuration(); }
+	void StepAnimationFrame(float frameTime = 1.0f / 60.0f) { animator_.StepFrame(frameTime); }
+	void ApplyHeadLookAt(const Vector3& targetWorldPos, float weight = 1.0f);
+	void AttachToJoint(const Object3d& parentObject, int32_t jointIndex, const Vector3& offsetScale = { 1.0f, 1.0f, 1.0f }, const Vector3& offsetRotate = { 0.0f, 0.0f, 0.0f }, const Vector3& offsetTranslate = { 0.0f, 0.0f, 0.0f });
+	void DrawAnimationUI(const std::string& windowTitle = "Animation & LookAt Studio");
+
 	const Skeleton& GetSkeleton() const { return skeleton_; }
 	Skeleton& GetSkeleton() { return skeleton_; }
 	const SkinCluster& GetSkinCluster() const { return skinCluster_; }
+
+	void SetCustomWorldMatrix(const std::optional<Matrix4x4>& worldMatrix) { customWorldMatrix_ = worldMatrix; }
+	void ClearCustomWorldMatrix() { customWorldMatrix_.reset(); }
+	const std::optional<Matrix4x4>& GetCustomWorldMatrix() const { return customWorldMatrix_; }
 
 private:
 	Transform transform;
@@ -137,6 +159,7 @@ private:
 	Camera* camera_ = nullptr;
 	Object3dCom* object3dCom_ = nullptr;
 	Transform transform_;
+	std::optional<Matrix4x4> customWorldMatrix_;
 
     ModelData modelData_; // モデルデータを保持
 

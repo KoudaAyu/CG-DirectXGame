@@ -341,6 +341,32 @@ Model::ModelData Model::LoadModelFile(const std::string& directoryPath, const st
 	// メッシュごとの頂点ベースオフセットを記録
 	std::vector<uint32_t> meshBaseIndices(scene->mNumMeshes, 0);
 
+	// 複数マテリアル（テクスチャパス）読み込み
+	if (scene->mNumMaterials > 0)
+	{
+		modelData.materials.resize(scene->mNumMaterials);
+		for (unsigned int m = 0; m < scene->mNumMaterials; ++m)
+		{
+			const aiMaterial* material = scene->mMaterials[m];
+			aiString texturePath;
+			if (material->GetTexture(aiTextureType_BASE_COLOR, 0, &texturePath) == aiReturn_SUCCESS ||
+				material->GetTexture(aiTextureType_DIFFUSE, 0, &texturePath) == aiReturn_SUCCESS)
+			{
+				modelData.materials[m].textureFilePath = directoryPath + "/" + texturePath.C_Str();
+				modelData.materials[m].textureIndex = TextureManager::GetInstance()->Load(modelData.materials[m].textureFilePath);
+			}
+			else
+			{
+				modelData.materials[m].textureFilePath = "";
+				modelData.materials[m].textureIndex = TextureManager::kInvalidTextureIndex;
+			}
+		}
+		if (!modelData.materials.empty())
+		{
+			modelData.material = modelData.materials[0];
+		}
+	}
+
 	// ノードを再帰的にたどってメッシュを結合
 	auto AppendNodeMeshes = [&](auto& self, const aiNode* node) -> void {
 		if (!node) return;
@@ -350,9 +376,10 @@ Model::ModelData Model::LoadModelFile(const std::string& directoryPath, const st
 			const aiMesh* mesh = scene->mMeshes[meshIndex];
 			if (!mesh) continue;
 
-			uint32_t baseIndex = static_cast<uint32_t>(modelData.vertices.size());
-			meshBaseIndices[meshIndex] = baseIndex;
-			modelData.vertices.resize(baseIndex + mesh->mNumVertices);
+			uint32_t baseVertexIndex = static_cast<uint32_t>(modelData.vertices.size());
+			uint32_t baseIndexOffset = static_cast<uint32_t>(modelData.indices.size());
+			meshBaseIndices[meshIndex] = baseVertexIndex;
+			modelData.vertices.resize(baseVertexIndex + mesh->mNumVertices);
 
 			for (uint32_t v = 0; v < mesh->mNumVertices; ++v)
 			{
@@ -372,42 +399,44 @@ Model::ModelData Model::LoadModelFile(const std::string& directoryPath, const st
 					const aiVector3D& n = mesh->mNormals[v];
 					vertex.normal = { n.x, n.y, n.z };
 				}
-				modelData.vertices[baseIndex + v] = vertex;
+				modelData.vertices[baseVertexIndex + v] = vertex;
 			}
 
+			uint32_t numIndicesPushed = 0;
 			for (uint32_t fi = 0; fi < mesh->mNumFaces; ++fi)
 			{
 				const aiFace& face = mesh->mFaces[fi];
 				if (face.mNumIndices == 3)
 				{
-					modelData.indices.push_back(baseIndex + face.mIndices[0]);
-					modelData.indices.push_back(baseIndex + face.mIndices[1]);
-					modelData.indices.push_back(baseIndex + face.mIndices[2]);
+					modelData.indices.push_back(baseVertexIndex + face.mIndices[0]);
+					modelData.indices.push_back(baseVertexIndex + face.mIndices[1]);
+					modelData.indices.push_back(baseVertexIndex + face.mIndices[2]);
+					numIndicesPushed += 3;
 				}
 				else
 				{
 					for (uint32_t k = 0; k < face.mNumIndices; ++k)
-						modelData.indices.push_back(baseIndex + face.mIndices[k]);
+					{
+						modelData.indices.push_back(baseVertexIndex + face.mIndices[k]);
+						numIndicesPushed++;
+					}
 				}
 			}
+
+			MeshPart meshPart{};
+			meshPart.name = mesh->mName.C_Str();
+			meshPart.vertexOffset = baseVertexIndex;
+			meshPart.vertexCount = mesh->mNumVertices;
+			meshPart.indexOffset = baseIndexOffset;
+			meshPart.indexCount = numIndicesPushed;
+			meshPart.materialIndex = mesh->mMaterialIndex;
+			modelData.meshes.push_back(meshPart);
 		}
 		for (uint32_t i = 0; i < node->mNumChildren; ++i)
 			self(self, node->mChildren[i]);
 	};
 
 	AppendNodeMeshes(AppendNodeMeshes, scene->mRootNode);
-
-	// マテリアル（テクスチャパス）読み込み
-	if (scene->mNumMaterials > 0)
-	{
-		const aiMaterial* material = scene->mMaterials[0];
-		aiString texturePath;
-		if (material->GetTexture(aiTextureType_BASE_COLOR, 0, &texturePath) == aiReturn_SUCCESS ||
-			material->GetTexture(aiTextureType_DIFFUSE, 0, &texturePath) == aiReturn_SUCCESS)
-		{
-			modelData.material.textureFilePath = directoryPath + "/" + texturePath.C_Str();
-		}
-	}
 
 	// ボーン（スキン）ウェイト読み込み
 	for (unsigned int meshIndex = 0; meshIndex < scene->mNumMeshes; ++meshIndex)

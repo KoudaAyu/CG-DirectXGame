@@ -37,6 +37,7 @@ public:
     void Update() override;
 
    void Draw(SceneRenderRequests& renderRequests) override;
+   void DrawUI() override;
 
     void SetSpriteCom(SpriteCom* spriteCom) { this->spriteCom = spriteCom; }
 
@@ -54,9 +55,12 @@ private:
     ParticleManager* particleManager = nullptr;
     std::unique_ptr<HitEffect> hitEffect_;
     std::unique_ptr<Object3d> animatedCube_;
+    std::unique_ptr<Object3d> multiMeshObject_;
+    std::unique_ptr<Object3d> weaponObject_;
     std::unique_ptr<Sphere> sphere_;
     Skeleton skeleton_{};
     Animation animation_{};
+    Animation sneakWalkAnimation_{};
     Animator animator_{};
     SkeletonDebug skeletonDebug_{};
     DebugCamera debugCamera_;
@@ -68,7 +72,22 @@ private:
     bool sphereInitialized = false;
     bool hitEffectInitialized = false;
     bool animatedCubeInitialized_ = false;
+    bool multiMeshObjectInitialized_ = false;
+    bool weaponObjectInitialized_ = false;
+    bool isWeaponAttached_ = false;
+    int32_t selectedJointIndex_ = 0;
+    Vector3 weaponOffsetTranslate_ = { 0.0f, 0.0f, 0.0f };
+    Vector3 weaponOffsetRotate_ = { 0.0f, 0.0f, 0.0f };
+    Vector3 weaponOffsetScale_ = { 1.0f, 1.0f, 1.0f };
+
+    // Head LookAt 視線追従用
+    bool isHeadLookAtEnabled_ = true;
+    int headLookAtMode_ = 1; // 0: Off, 1: LookAt Camera, 2: Custom Target
+    float headLookAtWeight_ = 0.75f;
+    Vector3 headLookAtTargetPos_ = { 0.0f, 2.0f, 5.0f };
     bool showSkeletonDebug_ = true;
+    bool isHandParticleEmitting_ = true;
+    Emitter handEmitter_{};
 
 	// テクスチャインデックスは TextureManager で管理されるため、ここではインデックスを保持するだけにする
     uint32_t cylinderTextureIndex_ = TextureManager::kInvalidTextureIndex;

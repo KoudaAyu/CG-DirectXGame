@@ -35,6 +35,7 @@ public:
 	void Update(float deltaTime);
 
     void Draw(SceneRenderRequests& renderRequests);
+    void DrawUI();
 
 	/// <summary>
 	/// 次のシーン予約

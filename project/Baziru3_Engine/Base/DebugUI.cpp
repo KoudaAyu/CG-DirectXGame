@@ -20,6 +20,11 @@ void DebugUI::Initialize()
 void DebugUI::Update()
 {
 #ifdef USE_IMGUI
+    if (SceneManager::GetInstance())
+    {
+        SceneManager::GetInstance()->DrawUI();
+    }
+
     ImGui::ShowDemoWindow();
 
     ImGui::Begin("Windows");

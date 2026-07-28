@@ -18,8 +18,10 @@ struct Skeleton
 	std::vector<Joint> joints;
     
   void ApplyAnimation(const Animation& animation, float animationTime);
+  void ApplyAnimationBlend(const Animation& animA, float timeA, const Animation& animB, float timeB, float factor);
 	void Update();
-  Matrix4x4 GetJointWorldMatrix(size_t jointIndex, const Matrix4x4& skeletonRootWorldMatrix) const;
+	void ApplyHeadLookAt(const Vector3& targetWorldPos, const Matrix4x4& skeletonRootWorldMatrix, float weight = 1.0f);
+	Matrix4x4 GetJointWorldMatrix(size_t jointIndex, const Matrix4x4& skeletonRootWorldMatrix) const;
 	Vector3 GetJointWorldPosition(size_t jointIndex, const Matrix4x4& skeletonRootWorldMatrix) const;
 };
 

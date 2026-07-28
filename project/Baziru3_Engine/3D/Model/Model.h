@@ -47,12 +47,24 @@ public:
 		std::vector<VertexWeightData> vertexWeights; // このジョイントが影響する頂点とウェイト
 	};
 
+	struct MeshPart
+	{
+		std::string name;
+		uint32_t indexOffset = 0;
+		uint32_t indexCount = 0;
+		uint32_t vertexOffset = 0;
+		uint32_t vertexCount = 0;
+		uint32_t materialIndex = 0;
+	};
+
 	//objファイル関係
 	struct ModelData
 	{
 		std::vector<Sprite::VertexData> vertices; // 頂点データ
 		std::vector<uint32_t> indices; // インデックスデータ
 		MaterialData material; // マテリアルデータ
+		std::vector<MeshPart> meshes; // 複数メッシュ情報
+		std::vector<MaterialData> materials; // 複数マテリアル情報
 		NodeAnimation rootNode; // 階層構造のルートノード
 		// ジョイント名 -> ウェイトデータ
 		std::map<std::string, JointWeightData> skinClusterData;

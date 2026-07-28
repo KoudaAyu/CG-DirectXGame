@@ -295,15 +295,6 @@ void Game::Draw()
 	RenderContext ctx = PrepareRenderContext();
     SceneRenderRequests renderRequests{};
 
-	if (camera_ && camera_->GetCameraResource() && dx)
-	{
-		dx->GetCommandList()->SetGraphicsRootConstantBufferView(4, camera_->GetCameraResource()->GetGPUVirtualAddress());
-	}
-	else
-	{
-		Logger::Log(logStream, "Warning: camera GPU resource not available before SceneManager draw.\n");
-	}
-
 	if (SceneManager::GetInstance())
 	{
 		SceneManager::GetInstance()->DrawSkybox(ctx.commandList);
@@ -331,10 +322,7 @@ void Game::Draw()
     DrawSprites(ctx);
 
 
-	if (renderRequests.sceneDrawn)
-	{
-		DrawParticles(ctx);
-	}
+	DrawParticles(ctx);
 	if (fadeApplication_)
 	{
 		fadeApplication_->Draw();

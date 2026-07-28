@@ -2,16 +2,20 @@
 
 void ParticleEmitter::Initialize(DirectXCom* dxCommon)
 {
-	emitterResource_ = dxCommon->CreateBufferResource(dxCommon->GetDevice().Get(), sizeof(EmitterSphere));
+	size_t cbSize = (sizeof(GPUEmitterData) + 255) & ~255;
+	emitterResource_ = dxCommon->CreateBufferResource(dxCommon->GetDevice().Get(), cbSize);
 	emitterResource_->Map(0, nullptr, reinterpret_cast<void**>(&emitterSphere_));
 
-	// 初期値設定
-	emitterSphere_->count = 10;
-	emitterSphere_->frequency = 0.5f;
-	emitterSphere_->frequencyTime = 0.0f;
-	emitterSphere_->translate = Vector3(0.0f, 0.0f, 0.0f);
-	emitterSphere_->radius = 1.0f;
-	emitterSphere_->emit = 0;
+	if (emitterSphere_)
+	{
+		*emitterSphere_ = GPUEmitterData{};
+		emitterSphere_->count = 10;
+		emitterSphere_->frequency = 0.5f;
+		emitterSphere_->frequencyTime = 0.0f;
+		emitterSphere_->translate = Vector3(0.0f, 0.0f, 0.0f);
+		emitterSphere_->radius = 0.08f;
+		emitterSphere_->emit = 0;
+	}
 }
 
 void ParticleEmitter::Update(float deltaTime)
