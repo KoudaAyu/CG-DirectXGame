@@ -4,7 +4,8 @@
 #include "Object3dCom.h"
 #include "Camera.h"
 #include "RenderContext.h"
-#include "Baziru3_Engine/Collision/BoxCollider.h"
+#include "Baziru3_Engine/Framework/Collision/BoxCollider.h"
+#include "Baziru3_Engine/Framework/Collision/MeshCollider.h"
 
 class Obstacle
 {
@@ -18,6 +19,7 @@ public:
     float GetRadius() const { return radius_; }
     BoxCollider* GetCollider() const { return collider_.get(); }
     BoxCollider* GetCollider2() const { return collider2_.get(); }
+    MeshCollider* GetMeshCollider() const { return meshCollider_.get(); }
 
 private:
     std::unique_ptr<Object3d> object3d_;
@@ -25,6 +27,7 @@ private:
     float radius_;
     std::unique_ptr<BoxCollider> collider_;
     std::unique_ptr<BoxCollider> collider2_;
+    std::unique_ptr<MeshCollider> meshCollider_;
     Vector3 rot1_;
     Vector3 rot2_;
     Object3dCom* object3dCom_ = nullptr;

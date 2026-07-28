@@ -32,7 +32,7 @@ class AppParticleManager
 {
 public:
 	AppParticleManager() = default;
-	~AppParticleManager() = default;
+	~AppParticleManager();
 
 	void Initialize(ParticleManager* enginePM);
 	void Update(float deltaTime, const Vector3& playerPos = { 0.0f, 0.0f, 0.0f });
@@ -55,10 +55,6 @@ private:
 	ParticleManager* enginePM_ = nullptr;
 	std::list<AppParticle> particles_;
 
-	// CPUパーティクル用の自前 PSO とルートシグネチャ
-	Microsoft::WRL::ComPtr<ID3D12RootSignature> rootSignature_ = nullptr;
-	Microsoft::WRL::ComPtr<ID3D12PipelineState> pipelineState_ = nullptr;
-
 public:
-	void Draw(const RenderContext& ctx, Model* model, UINT externalVertexCount);
+	void Draw();
 };

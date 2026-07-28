@@ -4,8 +4,8 @@
 #include "Object3dCom.h"
 #include "Camera.h"
 #include "RenderContext.h"
-#include "Baziru3_Engine/Collision/SphereCollider.h"
-#include "Baziru3_Engine/Collision/CollisionManager.h"
+#include "Baziru3_Engine/Framework/Collision/SphereCollider.h"
+#include "Baziru3_Engine/Framework/Collision/CollisionManager.h"
 
 class Bullet;
 class Sprite;
@@ -53,6 +53,7 @@ public:
 
     // 音源検知のトリガー
     void HearNoise(const Vector3& noisePosition);
+    void AlertEnemy(const Vector3& targetPos);
 
 private:
     bool FaceTarget(const Vector3& targetPosition, float deltaTime = 0.016f);

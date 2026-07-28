@@ -1,5 +1,6 @@
 #include "MovingEnemy.h"
-#include "Baziru3_Engine/AI/BehaviorTree.h"
+#include "Baziru3_Engine/Framework/AI/BehaviorTree.h"
+#include "Baziru3_Engine/Framework/AI/NavMesh.h"
 #include "Object3d.h"
 #include "Object3dCom.h"
 #include "TextureManager.h"
@@ -9,12 +10,56 @@
 #include "Sprite.h"
 #include "Bullet.h"
 #include "Obstacle.h"
-#include "Baziru3_Engine/Collision/CollisionManager.h"
-#include "Baziru3_Engine/Collision/SphereCollider.h"
-#include "Baziru3_Engine/Collision/BoxCollider.h"
-#include "Baziru3_Engine/Collision/CapsuleCollider.h"
+#include "Baziru3_Engine/Framework/Collision/CollisionManager.h"
+#include "Baziru3_Engine/Framework/Collision/SphereCollider.h"
+#include "Baziru3_Engine/Framework/Collision/BoxCollider.h"
+#include "Baziru3_Engine/Framework/Collision/CapsuleCollider.h"
 #include <cmath>
 #include <random>
+
+namespace {
+Vector3 GetNearestWalkablePosition(const Vector3& pos, float agentRadius, float searchRadiusMax = 6.0f)
+{
+    if (BaziruEngine::AI::NavMesh::GetInstance()->IsWalkable(pos, agentRadius))
+    {
+        return pos;
+    }
+
+    float step = 0.5f; // グリッド解像度
+    float minDist = 999999.0f;
+    Vector3 bestPos = pos;
+    bool found = false;
+
+    for (float r = step; r <= searchRadiusMax; r += step)
+    {
+        for (float dx = -r; dx <= r; dx += step)
+        {
+            for (float dz = -r; dz <= r; dz += step)
+            {
+                if (std::abs(dx) < r && std::abs(dz) < r) continue;
+
+                Vector3 testPos = { pos.x + dx, pos.y, pos.z + dz };
+                if (BaziruEngine::AI::NavMesh::GetInstance()->IsWalkable(testPos, agentRadius))
+                {
+                    float dist = std::sqrt(dx * dx + dz * dz);
+                    if (dist < minDist)
+                    {
+                        minDist = dist;
+                        bestPos = testPos;
+                        found = true;
+                    }
+                }
+            }
+        }
+        if (found)
+        {
+            break;
+        }
+    }
+
+    return bestPos;
+}
+}
 
 void MovingEnemy::Initialize(Object3dCom* object3dCom, Camera* camera)
 {
@@ -168,6 +213,15 @@ void MovingEnemy::Update(WindowAPI* windowAPI, const Vector3* targetPosition, co
     const Vector3& currentPos = position_;
     const float frameScale = deltaTime * 60.0f;
 
+    if (coverIgnoreTimer_ > 0.0f)
+    {
+        coverIgnoreTimer_ -= deltaTime;
+        if (coverIgnoreTimer_ < 0.0f)
+        {
+            coverIgnoreTimer_ = 0.0f;
+        }
+    }
+
     // --- 索敵 ＆ 視界チェック ---
     bool canSeePlayer = false;
     if (targetPosition)
@@ -301,27 +355,303 @@ void MovingEnemy::Update(WindowAPI* windowAPI, const Vector3* targetPosition, co
             // 驚きフリーズ中（!マーク表示中）は移動しない
             if (alertTimer_ <= 0.0f)
             {
+                // グリッドを事前にビルドして、正しい進入判定が行えるようにする
+                BaziruEngine::AI::NavMesh::GetInstance()->BuildGrid(-20.0f, 20.0f, -5.0f, 45.0f, 0.5f, 0.85f);
+
+                // NavMeshクランプ：敵が障害物の通行不可領域に入り込んでいる場合、最も近い安全な場所へ押し戻す
+                if (!BaziruEngine::AI::NavMesh::GetInstance()->IsWalkable(position_, 0.85f))
+                {
+                    position_ = GetNearestWalkablePosition(position_, 0.85f);
+                    object3d_->SetTranslate(position_);
+                }
+
                 if (behaviorTree_ && useBehaviorTree_)
                 {
                     // Blackboard状態の同期
                     auto blackboard = behaviorTree_->GetBlackboard();
-                    blackboard->Set<Vector3>("AgentPosition", position_);
-                    blackboard->Set<Vector3>("ThreatPosition", *targetPosition);
 
-                    // ツリーを更新
-                    behaviorTree_->Update();
+                    if (coverIgnoreTimer_ > 0.0f)
+                    {
+                        blackboard->Clear("CoverPosition");
+                        blackboard->Clear("CoverPath");
 
-                    // 新しい座標を反映
-                    position_ = blackboard->Get<Vector3>("AgentPosition");
-                    object3d_->SetTranslate(position_);
+                        // A* 経路探索で障害物を賢く迂回しながらプレイヤーを追尾（フォールバック）
+                        BaziruEngine::AI::NavMesh::GetInstance()->BuildGrid(-20.0f, 20.0f, -5.0f, 45.0f, 0.5f, 0.85f);
+                        
+                        Vector3 walkableStart = GetNearestWalkablePosition(position_, 0.85f);
+                        Vector3 walkableTarget = GetNearestWalkablePosition(*targetPosition, 0.85f);
+                        std::vector<Vector3> path = BaziruEngine::AI::NavMesh::GetInstance()->FindPath(walkableStart, walkableTarget);
+
+                        if (!path.empty() && !(path.front().x == position_.x && path.front().y == position_.y && path.front().z == position_.z))
+                        {
+                            path.insert(path.begin(), position_);
+                        }
+
+                        float dxToPlayer = targetPosition->x - position_.x;
+                        float dzToPlayer = targetPosition->z - position_.z;
+                        float distToPlayer = std::sqrt(dxToPlayer * dxToPlayer + dzToPlayer * dzToPlayer);
+
+                        // プレイヤーと一定距離（3.5m）を保つように移動（視界が通らない場合はさらに接近）
+                        if ((distToPlayer > 3.5f || !HasLineOfSight(*targetPosition, obstacles)) && !path.empty())
+                        {
+                            Vector3 nextPt = path.front();
+                            if (path.size() > 1)
+                            {
+                                Vector3 diff = nextPt - position_;
+                                if (std::sqrt(diff.x * diff.x + diff.z * diff.z) < 0.4f)
+                                {
+                                    nextPt = path[1];
+                                }
+                            }
+
+                            float dx = nextPt.x - position_.x;
+                            float dz = nextPt.z - position_.z;
+                            float dist = std::sqrt(dx * dx + dz * dz);
+                            if (dist > 0.02f)
+                            {
+                                float vx = (dx / dist) * moveSpeed_ * 0.9f * frameScale;
+                                float vz = (dz / dist) * moveSpeed_ * 0.9f * frameScale;
+                                position_.x += vx;
+                                position_.z += vz;
+                                object3d_->SetTranslate(position_);
+                            }
+                        }
+                    }
+                    else
+                    {
+                        // 1. カバー地点への到達判定
+                    bool reachedCover = false;
+                    Vector3 coverPos = { 0.0f, 0.0f, 0.0f };
+                    if (blackboard->Has("CoverPosition"))
+                    {
+                        coverPos = blackboard->Get<Vector3>("CoverPosition");
+                        Vector3 diff = coverPos - position_;
+                        float dist = std::sqrt(diff.x * diff.x + diff.y * diff.y + diff.z * diff.z);
+                        if (isPeeking_)
+                        {
+                            diff = coverPos - actualCoverPos_;
+                            dist = std::sqrt(diff.x * diff.x + diff.y * diff.y + diff.z * diff.z);
+                        }
+                        if (dist < 0.4f)
+                        {
+                            reachedCover = true;
+                        }
+                    }
+
+                    // 2. ピーク＆射撃ステートマシンの更新
+                    if (reachedCover)
+                    {
+                        if (!isPeeking_ && shotCooldownTimer_ <= 0.0f)
+                        {
+                            // 左右のピークポイントを計算
+                            Vector3 toPlayer = *targetPosition - coverPos;
+                            float len = std::sqrt(toPlayer.x * toPlayer.x + toPlayer.z * toPlayer.z);
+                            if (len > 0.01f)
+                            {
+                                Vector3 dirToPlayer = { toPlayer.x / len, 0.0f, toPlayer.z / len };
+                                // 垂直方向のベクトル
+                                Vector3 peekLeft = { -dirToPlayer.z, 0.0f, dirToPlayer.x };
+                                Vector3 peekRight = { dirToPlayer.z, 0.0f, -dirToPlayer.x };
+                                
+                                Vector3 testLeft = coverPos + peekLeft * 1.5f;
+                                Vector3 testRight = coverPos + peekRight * 1.5f;
+                                
+                                Vector3 chosenPeekOffset = { 0.0f, 0.0f, 0.0f };
+                                bool hasPeekOffset = false;
+                                
+                                bool leftWalkable = BaziruEngine::AI::NavMesh::GetInstance()->IsWalkable(testLeft, 0.85f);
+                                bool rightWalkable = BaziruEngine::AI::NavMesh::GetInstance()->IsWalkable(testRight, 0.85f);
+
+                                if (HasLineOfSight(testLeft, obstacles) && leftWalkable)
+                                {
+                                    chosenPeekOffset = peekLeft * 1.5f;
+                                    hasPeekOffset = true;
+                                }
+                                else if (HasLineOfSight(testRight, obstacles) && rightWalkable)
+                                {
+                                    chosenPeekOffset = peekRight * 1.5f;
+                                    hasPeekOffset = true;
+                                }
+                                
+                                if (hasPeekOffset)
+                                {
+                                    activePeekPos_ = coverPos + chosenPeekOffset;
+                                    actualCoverPos_ = coverPos;
+                                    isPeeking_ = true;
+                                    peekTimer_ = 0.8f; // ピーク動作継続時間
+                                }
+                                else
+                                {
+                                    // 左右どちらのピークも障害物に遮られるか侵入不可の場合、このカバー地点を放棄してプレイヤーを一定時間追いかける
+                                    coverIgnoreTimer_ = 4.0f;
+                                    blackboard->Clear("CoverPosition");
+                                    blackboard->Clear("CoverPath");
+                                }
+                            }
+                        }
+                    }
+
+                    if (isPeeking_)
+                    {
+                        // ピーク中の移動と反転戻り処理
+                        peekTimer_ -= deltaTime;
+                        Vector3 targetPeekPos = (peekTimer_ > 0.4f) ? activePeekPos_ : actualCoverPos_;
+                        
+                        Vector3 toTargetPeek = targetPeekPos - position_;
+                        float distToTargetPeek = std::sqrt(toTargetPeek.x * toTargetPeek.x + toTargetPeek.z * toTargetPeek.z);
+                        
+                        if (distToTargetPeek > 0.05f)
+                        {
+                            float moveStep = 6.0f * deltaTime;
+                            if (moveStep >= distToTargetPeek) position_ = targetPeekPos;
+                            else
+                            {
+                                Vector3 dirToTargetPeek = { toTargetPeek.x / distToTargetPeek, 0.0f, toTargetPeek.z / distToTargetPeek };
+                                position_.x += dirToTargetPeek.x * moveStep;
+                                position_.z += dirToTargetPeek.z * moveStep;
+                            }
+                        }
+                        else if (peekTimer_ <= 0.4f)
+                        {
+                            // カバー位置に戻り終わったらピーク終了
+                            isPeeking_ = false;
+                            position_ = actualCoverPos_;
+                        }
+                        
+                        FaceTarget(*targetPosition, deltaTime);
+                        object3d_->SetTranslate(position_);
+                        // 黒板の位置も同期
+                        blackboard->Set<Vector3>("AgentPosition", position_);
+                        
+                        if (peekTimer_ <= 0.0f)
+                        {
+                            isPeeking_ = false;
+                            position_ = actualCoverPos_;
+                            blackboard->Set<Vector3>("AgentPosition", position_);
+                        }
+                    }
+                    else
+                    {
+                        // 通常のビヘイビアツリー更新
+                        bool hasPath = false;
+                        if (blackboard->Has("CoverPath"))
+                        {
+                            auto path = blackboard->Get<std::vector<Vector3>>("CoverPath");
+                            if (!path.empty())
+                            {
+                                hasPath = true;
+                            }
+                        }
+
+                        if (!hasPath)
+                        {
+                            // 経路がないときは、スタート位置を最も近い歩行可能な安全位置にしてパスを計算させる
+                            Vector3 walkableStart = GetNearestWalkablePosition(position_, 0.85f);
+                            blackboard->Set<Vector3>("AgentPosition", walkableStart);
+                        }
+                        else
+                        {
+                            // 経路がある（FollowPathNode移動中）ときは、現在の実際の位置を同期
+                            blackboard->Set<Vector3>("AgentPosition", position_);
+                        }
+
+                        blackboard->Set<Vector3>("ThreatPosition", *targetPosition);
+
+                        BaziruEngine::AI::BehaviorStatus status = behaviorTree_->Update();
+
+                        // エンジン側の自動リセットがオミットされているため、ツリーが完了ステータスを返した場合はアプリケーション側で明示的にルートノードをリセットする
+                        if (status == BaziruEngine::AI::BehaviorStatus::Success || status == BaziruEngine::AI::BehaviorStatus::Failure)
+                        {
+                            if (behaviorTree_->GetRoot())
+                            {
+                                behaviorTree_->GetRoot()->Reset();
+                            }
+                        }
+
+                        // 新たにパスが生成された直後のフレームで、実際の現在地（障害物にめり込んでいる可能性がある座標）をパスの先頭に差し込み、そこから移動を開始させる
+                        if (blackboard->Has("CoverPath"))
+                        {
+                            auto path = blackboard->Get<std::vector<Vector3>>("CoverPath");
+                            if (!path.empty() && !(path.front().x == position_.x && path.front().y == position_.y && path.front().z == position_.z))
+                            {
+                                path.insert(path.begin(), position_);
+                                blackboard->Set<std::vector<Vector3>>("CoverPath", path);
+                            }
+                        }
+
+                        // 計算されたカバー位置が進入可能（Walkability）か検証
+                        if (status == BaziruEngine::AI::BehaviorStatus::Success)
+                        {
+                            if (blackboard->Has("CoverPosition"))
+                            {
+                                Vector3 coverPos = blackboard->Get<Vector3>("CoverPosition");
+                                if (!BaziruEngine::AI::NavMesh::GetInstance()->IsWalkable(coverPos, 0.85f))
+                                {
+                                    // 計算されたカバー位置が障害物と重なっている場合は、無効（Failure）として扱いフォールバック追従へ移行させる
+                                    status = BaziruEngine::AI::BehaviorStatus::Failure;
+                                }
+                            }
+                        }
+
+                        if (status == BaziruEngine::AI::BehaviorStatus::Failure)
+                        {
+                            // A* 経路探索で障害物を賢く迂回しながらプレイヤーを追尾（フォールバック）
+                            BaziruEngine::AI::NavMesh::GetInstance()->BuildGrid(-20.0f, 20.0f, -5.0f, 45.0f, 0.5f, 0.85f);
+                            
+                            Vector3 walkableStart = GetNearestWalkablePosition(position_, 0.85f);
+                            Vector3 walkableTarget = GetNearestWalkablePosition(*targetPosition, 0.85f);
+                            std::vector<Vector3> path = BaziruEngine::AI::NavMesh::GetInstance()->FindPath(walkableStart, walkableTarget);
+
+                            if (!path.empty() && !(path.front().x == position_.x && path.front().y == position_.y && path.front().z == position_.z))
+                            {
+                                path.insert(path.begin(), position_);
+                            }
+
+                            float dxToPlayer = targetPosition->x - position_.x;
+                            float dzToPlayer = targetPosition->z - position_.z;
+                            float distToPlayer = std::sqrt(dxToPlayer * dxToPlayer + dzToPlayer * dzToPlayer);
+
+                            // プレイヤーと一定距離（3.5m）を保つように移動（視界が通らない場合はさらに接近）
+                            if ((distToPlayer > 3.5f || !HasLineOfSight(*targetPosition, obstacles)) && !path.empty())
+                            {
+                                Vector3 nextPt = path.front();
+                                if (path.size() > 1)
+                                {
+                                    Vector3 diff = nextPt - position_;
+                                    if (std::sqrt(diff.x * diff.x + diff.z * diff.z) < 0.4f)
+                                    {
+                                        nextPt = path[1];
+                                    }
+                                }
+
+                                float dx = nextPt.x - position_.x;
+                                float dz = nextPt.z - position_.z;
+                                float dist = std::sqrt(dx * dx + dz * dz);
+                                if (dist > 0.02f)
+                                {
+                                    float vx = (dx / dist) * moveSpeed_ * 0.9f * frameScale;
+                                    float vz = (dz / dist) * moveSpeed_ * 0.9f * frameScale;
+                                    position_.x += vx;
+                                    position_.z += vz;
+                                    object3d_->SetTranslate(position_);
+                                }
+                            }
+                        }
+                        else
+                        {
+                            position_ = blackboard->Get<Vector3>("AgentPosition");
+                            object3d_->SetTranslate(position_);
+                        }
+                    }
+                    } // カバー無視タイマー用 else の閉じカッコ
                 }
                 else
                 {
                     float dx = targetPosition->x - currentPos.x;
                     float dz = targetPosition->z - currentPos.z;
                     float distToPlayer = std::sqrt(dx * dx + dz * dz);
-                    // プレイヤーと一定距離を保ちながら追跡
-                    if (distToPlayer > 4.5f)
+                    // プレイヤーと一定距離を保ちながら追跡（視界が通らない場合はさらに接近）
+                    if (distToPlayer > 3.5f || !HasLineOfSight(*targetPosition, obstacles))
                     {
                         float vx = (dx / distToPlayer) * moveSpeed_ * 0.9f * frameScale; // プレイヤーが逃げ切れるように追跡速度を少し落とす (0.9f)
                         float vz = (dz / distToPlayer) * moveSpeed_ * 0.9f * frameScale;
@@ -491,6 +821,22 @@ std::unique_ptr<Bullet> MovingEnemy::TryShoot(const Vector3& targetPosition)
         return nullptr;
     }
 
+    // カバー中かつピークしていない間は射撃しない
+    if (behaviorTree_ && useBehaviorTree_)
+    {
+        auto blackboard = behaviorTree_->GetBlackboard();
+        if (blackboard->Has("CoverPosition"))
+        {
+            Vector3 coverPos = blackboard->Get<Vector3>("CoverPosition");
+            Vector3 diff = coverPos - position_;
+            float dist = std::sqrt(diff.x * diff.x + diff.y * diff.y + diff.z * diff.z);
+            if (dist < 0.4f && !isPeeking_)
+            {
+                return nullptr;
+            }
+        }
+    }
+
     if (!FaceTarget(targetPosition))
     {
         return nullptr;
@@ -600,40 +946,44 @@ bool MovingEnemy::HasLineOfSight(const Vector3& playerPos, const std::vector<std
 
     Vector3 rayDir = { toPlayer.x / distToPlayer, toPlayer.y / distToPlayer, toPlayer.z / distToPlayer };
 
-    for (const auto& obs : obstacles)
+    Collider* hitCollider = nullptr;
+    float hitDist = 0.0f;
+
+    // 障害物の簡易Boxコライダーを一時的に無効化（レイキャストが精密なMeshコライダーに当たるようにするため）
+    for (auto& obs : obstacles)
     {
-        if (!obs || !obs->GetCollider()) continue;
-        float hitDist = 0.0f;
-        
-        Collider* col = obs->GetCollider();
-        CollisionData data;
-        data.originalCollider = col;
-        data.type = col->GetType();
-        data.attribute = col->GetAttribute();
-        data.worldPosition = col->GetWorldPosition();
-        data.isTrigger = col->IsTrigger();
+        if (obs)
+        {
+            if (obs->GetCollider()) obs->GetCollider()->SetIsEnabled(false);
+            if (obs->GetCollider2()) obs->GetCollider2()->SetIsEnabled(false);
+        }
+    }
 
-        if (data.type == ColliderType::Sphere)
+    // 高さ0.5fの胴体付近からレイを飛ばし、プレイヤーとの間にある遮蔽物のMeshColliderを精密に検出します
+    if (CollisionManager::GetInstance()->Raycast(enemyPos + Vector3{ 0.0f, 0.5f, 0.0f }, rayDir, distToPlayer, hitCollider, hitDist))
+    {
+        if (hitCollider && hitCollider->GetAttribute() == CollisionAttribute::Obstacle)
         {
-            SphereCollider* sphere = static_cast<SphereCollider*>(col);
-            data.shape.radius = sphere->GetRadius();
-        }
-        else if (data.type == ColliderType::Box)
-        {
-            BoxCollider* box = static_cast<BoxCollider*>(col);
-            data.shape.size = box->GetSize();
-            data.shape.rotation = box->GetWorldRotation();
-        }
-        else if (data.type == ColliderType::Capsule)
-        {
-            CapsuleCollider* capsule = static_cast<CapsuleCollider*>(col);
-            data.shape.radius = capsule->GetRadius();
-            data.shape.height = capsule->GetHeight();
-        }
-
-        if (CollisionManager::CheckRayCollider(enemyPos, rayDir, distToPlayer, data, hitDist))
-        {
+            // コライダーを再有効化
+            for (auto& obs : obstacles)
+            {
+                if (obs)
+                {
+                    if (obs->GetCollider()) obs->GetCollider()->SetIsEnabled(true);
+                    if (obs->GetCollider2()) obs->GetCollider2()->SetIsEnabled(true);
+                }
+            }
             return false; // 障害物に遮蔽されている
+        }
+    }
+
+    // コライダーを再有効化
+    for (auto& obs : obstacles)
+    {
+        if (obs)
+        {
+            if (obs->GetCollider()) obs->GetCollider()->SetIsEnabled(true);
+            if (obs->GetCollider2()) obs->GetCollider2()->SetIsEnabled(true);
         }
     }
     return true; // 視線が通っている
@@ -648,4 +998,20 @@ void MovingEnemy::HearNoise(const Vector3& noisePosition)
     searchTimer_ = 4.0f; // 4秒間捜索
     alertTimer_ = 1.0f;  // 「？」マーク表示タイマー
     object3d_->SetColor({ 0.9f, 0.9f, 0.7f, 1.0f }); // 捜索用カラーに変更
+}
+
+void MovingEnemy::AlertEnemy(const Vector3& targetPos)
+{
+    if (isDead_) return;
+    if (state_ != AIState::Chase)
+    {
+        state_ = AIState::Chase;
+        alertTimer_ = 1.0f; // 「！」マーク表示タイマー
+        detectionMeter_ = 1.0f;
+        lastSeenPlayerPosition_ = targetPos;
+        if (object3d_)
+        {
+            object3d_->SetColor({ 1.0f, 0.9f, 0.6f, 1.0f });
+        }
+    }
 }

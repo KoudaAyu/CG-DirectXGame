@@ -8,10 +8,10 @@
 #include "Sprite.h"
 #include "Bullet.h"
 #include "Obstacle.h"
-#include "Baziru3_Engine/Collision/CollisionManager.h"
-#include "Baziru3_Engine/Collision/SphereCollider.h"
-#include "Baziru3_Engine/Collision/BoxCollider.h"
-#include "Baziru3_Engine/Collision/CapsuleCollider.h"
+#include "Baziru3_Engine/Framework/Collision/CollisionManager.h"
+#include "Baziru3_Engine/Framework/Collision/SphereCollider.h"
+#include "Baziru3_Engine/Framework/Collision/BoxCollider.h"
+#include "Baziru3_Engine/Framework/Collision/CapsuleCollider.h"
 #include <cmath>
 #include <random>
 
@@ -352,40 +352,44 @@ bool Enemy::HasLineOfSight(const Vector3& playerPos, const std::vector<std::uniq
 
     Vector3 rayDir = { toPlayer.x / distToPlayer, toPlayer.y / distToPlayer, toPlayer.z / distToPlayer };
 
-    for (const auto& obs : obstacles)
+    Collider* hitCollider = nullptr;
+    float hitDist = 0.0f;
+
+    // 障害物の簡易Boxコライダーを一時的に無効化（レイキャストが精密なMeshコライダーに当たるようにするため）
+    for (auto& obs : obstacles)
     {
-        if (!obs || !obs->GetCollider()) continue;
-        float hitDist = 0.0f;
-        
-        Collider* col = obs->GetCollider();
-        CollisionData data;
-        data.originalCollider = col;
-        data.type = col->GetType();
-        data.attribute = col->GetAttribute();
-        data.worldPosition = col->GetWorldPosition();
-        data.isTrigger = col->IsTrigger();
+        if (obs)
+        {
+            if (obs->GetCollider()) obs->GetCollider()->SetIsEnabled(false);
+            if (obs->GetCollider2()) obs->GetCollider2()->SetIsEnabled(false);
+        }
+    }
 
-        if (data.type == ColliderType::Sphere)
+    // 高さ0.5fの胴体付近からレイを飛ばし、プレイヤーとの間にある遮蔽物のMeshColliderを精密に検出します
+    if (CollisionManager::GetInstance()->Raycast(enemyPos + Vector3{ 0.0f, 0.5f, 0.0f }, rayDir, distToPlayer, hitCollider, hitDist))
+    {
+        if (hitCollider && hitCollider->GetAttribute() == CollisionAttribute::Obstacle)
         {
-            SphereCollider* sphere = static_cast<SphereCollider*>(col);
-            data.shape.radius = sphere->GetRadius();
-        }
-        else if (data.type == ColliderType::Box)
-        {
-            BoxCollider* box = static_cast<BoxCollider*>(col);
-            data.shape.size = box->GetSize();
-            data.shape.rotation = box->GetWorldRotation();
-        }
-        else if (data.type == ColliderType::Capsule)
-        {
-            CapsuleCollider* capsule = static_cast<CapsuleCollider*>(col);
-            data.shape.radius = capsule->GetRadius();
-            data.shape.height = capsule->GetHeight();
-        }
-
-        if (CollisionManager::CheckRayCollider(enemyPos, rayDir, distToPlayer, data, hitDist))
-        {
+            // コライダーを再有効化
+            for (auto& obs : obstacles)
+            {
+                if (obs)
+                {
+                    if (obs->GetCollider()) obs->GetCollider()->SetIsEnabled(true);
+                    if (obs->GetCollider2()) obs->GetCollider2()->SetIsEnabled(true);
+                }
+            }
             return false; // 障害物に遮蔽されている
+        }
+    }
+
+    // コライダーを再有効化
+    for (auto& obs : obstacles)
+    {
+        if (obs)
+        {
+            if (obs->GetCollider()) obs->GetCollider()->SetIsEnabled(true);
+            if (obs->GetCollider2()) obs->GetCollider2()->SetIsEnabled(true);
         }
     }
     return true; // 視線が通っている
@@ -399,6 +403,22 @@ void Enemy::HearNoise(const Vector3& noisePosition)
     investigateTarget_ = noisePosition;
     searchTimer_ = 3.0f; // 3秒間捜索
     alertTimer_ = 1.0f;  // 「？」マーク表示タイマー
+}
+
+void Enemy::AlertEnemy(const Vector3& targetPos)
+{
+    if (isDead_) return;
+    if (state_ != AIState::Chase)
+    {
+        state_ = AIState::Chase;
+        alertTimer_ = 1.0f; // 「！」マーク表示タイマー
+        detectionMeter_ = 1.0f;
+        lastSeenPlayerPosition_ = targetPos;
+        if (object3d_)
+        {
+            object3d_->SetColor({ 1.0f, 0.9f, 0.6f, 1.0f });
+        }
+    }
 }
 
 std::unique_ptr<Bullet> Enemy::TryShoot(const Vector3& targetPosition)

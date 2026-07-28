@@ -4,14 +4,14 @@
 #include "Object3dCom.h"
 #include "Camera.h"
 #include "RenderContext.h"
-#include "Baziru3_Engine/Collision/SphereCollider.h"
-#include "Baziru3_Engine/Collision/CollisionManager.h"
+#include "Baziru3_Engine/Framework/Collision/SphereCollider.h"
+#include "Baziru3_Engine/Framework/Collision/CollisionManager.h"
 
 class Bullet;
 class Sprite;
 class WindowAPI;
 class Obstacle;
-#include "Baziru3_Engine/AI/BehaviorTree.h"
+#include "Baziru3_Engine/Framework/AI/BehaviorTree.h"
 
 class MovingEnemy
 {
@@ -34,6 +34,7 @@ public:
 
     Vector3 GetPosition() const { return object3d_ ? object3d_->GetTranslate() : Vector3{ 0.0f, 0.0f, 0.0f }; }
     void SetPosition(const Vector3& pos) { if (object3d_) object3d_->SetTranslate(pos); }
+    SphereCollider* GetCollider() const { return collider_.get(); }
 
     int GetHP() const { return hp_; }
     int GetMaxHP() const { return maxHp_; }
@@ -55,6 +56,7 @@ public:
 
     // 音源検知のトリガー
     void HearNoise(const Vector3& noisePosition);
+    void AlertEnemy(const Vector3& targetPos);
 
 private:
     bool FaceTarget(const Vector3& targetPosition, float deltaTime = 0.016f);
@@ -106,4 +108,11 @@ private:
 
     std::unique_ptr<BaziruEngine::AI::BehaviorTree> behaviorTree_;
     bool useBehaviorTree_ = true;
+
+    // --- カバー＆ピーク射撃用追加パラメータ ---
+    bool isPeeking_ = false;
+    float peekTimer_ = 0.0f;
+    Vector3 activePeekPos_ = { 0.0f, 0.0f, 0.0f };
+    Vector3 actualCoverPos_ = { 0.0f, 0.0f, 0.0f };
+    float coverIgnoreTimer_ = 0.0f;
 };
