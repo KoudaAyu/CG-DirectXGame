@@ -5,7 +5,7 @@
 #include <string>
 
 #include "BaseScene.h"
-#include "Baziru3_Engine\Effect\HitEffect.h"
+#include "Baziru3_Engine\Framework\Effect\HitEffect.h"
 #include "DirectXCom.h"
 #include "ParticleEmitter.h"
 #include "Object3dCom.h"
@@ -22,8 +22,8 @@
 #include "Sprite.h"
 #include "SpriteManager.h"
 #include "DebugCamera.h"
-#include "Baziru3_Engine/IO/Mouse/MouseInput.h"
-#include "Baziru3_Engine/Particle/Ring.h"
+#include "Baziru3_Engine/Core/IO/Mouse/MouseInput.h"
+#include "Baziru3_Engine/Framework/Particle/Ring.h"
 #include "../../Player/Player.h"
 #include "../../Enemy/Enemy.h"
 #include "../../Enemy/MovingEnemy.h"
@@ -31,6 +31,7 @@
 #include "../../Obstacle.h"
 #include "Target.h"
 #include "TutorialSign.h"
+#include "../../LevelEditor.h"
 
 class Camera;
 class SpriteCom;
@@ -249,5 +250,8 @@ private:
     float playerSoundMaxRadius_ = 0.0f;
     float playerSoundTimer_ = 0.0f;
     bool showDebugGizmos_ = true; // デバッグコーンと音波リングの表示フラグ (F1でトグル)
+
+    // --- ✨ アプリケーション層で一発読み込みされるレベルエディタ ---
+    std::unique_ptr<LevelEditor> levelEditor_;
 };
 

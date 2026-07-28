@@ -5,7 +5,7 @@
 #include "ParticleManager.h"
 #include "RootParam.h"
 #include "RenderContext.h"
-#include "Baziru3_Engine\Graphics\SceneRenderRequests.h"
+#include "Baziru3_Engine\Graphics\Graphics\SceneRenderRequests.h"
 #include "SpriteManager.h"
 #include "TextureManager.h"
 #include "AudioManager.h"
@@ -15,16 +15,20 @@
 #include <cassert>
 #include <cmath>
 #include <Windows.h>
+#include <fstream>
+#include <nlohmann/json.hpp>
+#include "Baziru3_Engine/Framework/AI/NavMesh.h"
 
 #include "GamePlayScene.h"
 
 #include "imgui.h"
 #include "CombatSystem.h"
+#include "Bullet.h"
 #include "CollisionSystem.h"
-#include "Baziru3_Engine/Collision/CollisionManager.h"
-#include "Baziru3_Engine/Collision/SphereCollider.h"
-#include "Baziru3_Engine/Collision/BoxCollider.h"
-#include "Baziru3_Engine/Collision/CapsuleCollider.h"
+#include "Baziru3_Engine/Framework/Collision/CollisionManager.h"
+#include "Baziru3_Engine/Framework/Collision/SphereCollider.h"
+#include "Baziru3_Engine/Framework/Collision/BoxCollider.h"
+#include "Baziru3_Engine/Framework/Collision/CapsuleCollider.h"
 
 GamePlayScene::GamePlayScene()
 {
@@ -104,6 +108,11 @@ void GamePlayScene::InitializeEnvironment()
 	goalRingTransform_.translate = { 0.0f, 0.01f, 32.0f };
 	isGameCleared_ = false;
 	extractionTimer_ = 5.0f;
+
+	// --- ✨ アプリケーション層で Resources/stage_layout.json (川・大自然) を全自動ロード ---
+	levelEditor_ = std::make_unique<LevelEditor>();
+	levelEditor_->Initialize(directXCom, object3dCom);
+	levelEditor_->LoadFromFile("Resources/stage_layout.json");
 }
 
 void GamePlayScene::InitializeCharacters()
@@ -1043,7 +1052,7 @@ void GamePlayScene::UpdateCharacters(float deltaTime)
 						float dist = std::sqrt(dx * dx + dz * dz);
 						if (dist <= maxRad)
 						{
-							// enemy_->HearNoise(playerPos); // 将来音に反応する敵用に残す
+							enemy_->HearNoise(playerPos);
 						}
 					}
 					if (movingEnemy_ && !movingEnemy_->IsDead())
@@ -1053,7 +1062,7 @@ void GamePlayScene::UpdateCharacters(float deltaTime)
 						float dist = std::sqrt(dx * dx + dz * dz);
 						if (dist <= maxRad)
 						{
-							// movingEnemy_->HearNoise(playerPos); // 将来音に反応する敵用に残す
+							movingEnemy_->HearNoise(playerPos);
 						}
 					}
 					
@@ -1144,7 +1153,7 @@ void GamePlayScene::UpdateCharacters(float deltaTime)
 							float dist = std::sqrt(dx * dx + dz * dz);
 							if (dist <= maxRad)
 							{
-								// enemy_->HearNoise(playerPos); // 将来音に反応する敵用に残す
+								enemy_->HearNoise(playerPos);
 							}
 						}
 						if (movingEnemy_ && !movingEnemy_->IsDead())
@@ -1154,7 +1163,7 @@ void GamePlayScene::UpdateCharacters(float deltaTime)
 							float dist = std::sqrt(dx * dx + dz * dz);
 							if (dist <= maxRad)
 							{
-								// movingEnemy_->HearNoise(playerPos); // 将来音に反応する敵用に残す
+								movingEnemy_->HearNoise(playerPos);
 							}
 						}
 					}
@@ -1186,6 +1195,19 @@ void GamePlayScene::UpdateCharacters(float deltaTime)
 	if (movingEnemy_)
 	{
 		movingEnemy_->Update(windowAPI, target, obstacles_, deltaTime);
+	}
+
+	// 1体が発見したら周囲の仲間に無線で位置を伝達（グループ連携無線）
+	if (enemy_ && movingEnemy_ && player_ && !player_->IsDead())
+	{
+		if (enemy_->GetAIState() == Enemy::AIState::Chase && !enemy_->IsDead())
+		{
+			movingEnemy_->AlertEnemy(player_->GetPosition());
+		}
+		if (movingEnemy_->GetAIState() == MovingEnemy::AIState::Chase && !movingEnemy_->IsDead())
+		{
+			enemy_->AlertEnemy(player_->GetPosition());
+		}
 	}
 
 	// 敵の復活時演出 (Enemy Respawn Effects - 光の召喚ピラー)
@@ -1274,6 +1296,11 @@ void GamePlayScene::UpdateCharacters(float deltaTime)
 			playerSoundRadius_ = 0.0f;
 			playerSoundMaxRadius_ = 0.0f;
 		}
+	}
+
+	if (levelEditor_)
+	{
+		levelEditor_->Update(deltaTime);
 	}
 }
 
@@ -1571,34 +1598,81 @@ void GamePlayScene::InitializeObstacles()
 {
 	obstacles_.clear();
 
-	// 障害物を6つ配置 (左部グループ、右部グループ、奥ゴール前グループの3つの束に分けて配置)
+	bool success = false;
+	std::string filepath = "Resources/stage_layout.json";
+	std::ifstream file(filepath);
 	
-	// --- 左側グループ (X = -5.0f 付近の配置) ---
-	auto obs1 = std::make_unique<Obstacle>();
-	obs1->Initialize(object3dCom, camera_, { -5.0f, 0.0f, 8.0f }, 1.0f);
-	obstacles_.push_back(std::move(obs1));
+	if (file.is_open())
+	{
+		try
+		{
+			nlohmann::json j;
+			file >> j;
+			file.close();
 
-	auto obs2 = std::make_unique<Obstacle>();
-	obs2->Initialize(object3dCom, camera_, { -5.0f, 0.0f, 18.0f }, 1.0f);
-	obstacles_.push_back(std::move(obs2));
+			for (const auto& obj : j)
+			{
+				std::string name = obj["name"];
+				// オブジェクト名が "Obstacle" で始まる場合のみ配置
+				if (name.find("Obstacle") == 0)
+				{
+					Vector3 pos = {
+						obj["position"]["x"].get<float>(),
+						obj["position"]["y"].get<float>(),
+						obj["position"]["z"].get<float>()
+					};
+					// スケールのXを半径（radius）として使用します
+					float radius = obj["scale"]["x"].get<float>();
+					
+					auto obs = std::make_unique<Obstacle>();
+					obs->Initialize(object3dCom, camera_, pos, radius);
+					obstacles_.push_back(std::move(obs));
+				}
+			}
+			success = true;
+			OutputDebugStringA("GamePlayScene: Successfully loaded obstacles from JSON.\n");
+		}
+		catch (const std::exception& e)
+		{
+			char errorMsg[256];
+			sprintf_s(errorMsg, "GamePlayScene: Failed to parse stage_layout.json: %s\n", e.what());
+			OutputDebugStringA(errorMsg);
+		}
+	}
 
-	// --- 右側グループ (X = 5.0f 付近の配置) ---
-	auto obs3 = std::make_unique<Obstacle>();
-	obs3->Initialize(object3dCom, camera_, { 5.0f, 0.0f, 8.0f }, 1.0f);
-	obstacles_.push_back(std::move(obs3));
+	// 読み込みに失敗した、またはデータが空だった場合はデフォルトの配置を使用（フォールバック）
+	if (!success || obstacles_.empty())
+	{
+		obstacles_.clear();
+		OutputDebugStringA("GamePlayScene: Using default obstacle placement (fallback).\n");
 
-	auto obs4 = std::make_unique<Obstacle>();
-	obs4->Initialize(object3dCom, camera_, { 5.0f, 0.0f, 18.0f }, 1.0f);
-	obstacles_.push_back(std::move(obs4));
+		// --- 左側グループ (X = -5.0f 付近の配置) ---
+		auto obs1 = std::make_unique<Obstacle>();
+		obs1->Initialize(object3dCom, camera_, { -5.0f, 0.0f, 8.0f }, 1.0f);
+		obstacles_.push_back(std::move(obs1));
 
-	// --- 奥・ゴール前グループ (脱出リング手前のカバー用の配置) ---
-	auto obs5 = std::make_unique<Obstacle>();
-	obs5->Initialize(object3dCom, camera_, { -2.0f, 0.0f, 29.0f }, 1.0f);
-	obstacles_.push_back(std::move(obs5));
+		auto obs2 = std::make_unique<Obstacle>();
+		obs2->Initialize(object3dCom, camera_, { -5.0f, 0.0f, 18.0f }, 1.0f);
+		obstacles_.push_back(std::move(obs2));
 
-	auto obs6 = std::make_unique<Obstacle>();
-	obs6->Initialize(object3dCom, camera_, { 2.0f, 0.0f, 29.0f }, 1.0f);
-	obstacles_.push_back(std::move(obs6));
+		// --- 右側グループ (X = 5.0f 付近の配置) ---
+		auto obs3 = std::make_unique<Obstacle>();
+		obs3->Initialize(object3dCom, camera_, { 5.0f, 0.0f, 8.0f }, 1.0f);
+		obstacles_.push_back(std::move(obs3));
+
+		auto obs4 = std::make_unique<Obstacle>();
+		obs4->Initialize(object3dCom, camera_, { 5.0f, 0.0f, 18.0f }, 1.0f);
+		obstacles_.push_back(std::move(obs4));
+
+		// --- 奥・ゴール前グループ (脱出リング手前のカバー用の配置) ---
+		auto obs5 = std::make_unique<Obstacle>();
+		obs5->Initialize(object3dCom, camera_, { -2.0f, 0.0f, 29.0f }, 1.0f);
+		obstacles_.push_back(std::move(obs5));
+
+		auto obs6 = std::make_unique<Obstacle>();
+		obs6->Initialize(object3dCom, camera_, { 2.0f, 0.0f, 29.0f }, 1.0f);
+		obstacles_.push_back(std::move(obs6));
+	}
 }
 
 void GamePlayScene::UpdateObstacles()
@@ -1635,6 +1709,12 @@ void GamePlayScene::Draw(SceneRenderRequests& renderRequests)
 
 	// Draw Skybox
 	SceneManager::GetInstance()->DrawSkybox(ctx.commandList);
+
+	// --- ✨ レベルエディタで配置された川・小石・大樹・アシ水草など全アセットを自動描画 ---
+	if (levelEditor_)
+	{
+		levelEditor_->Draw(renderRequests);
+	}
 
 	if (player_)
 	{
@@ -1766,113 +1846,67 @@ void GamePlayScene::Draw(SceneRenderRequests& renderRequests)
 				return true;
 			};
 
-			Vector3 gunPos = player_->GetPosition() + Vector3{ 0.0f, 0.25f, 0.0f }; // 少し浮かせた位置から射出
 			float rotY = player_->GetRotation().y;
 			Vector3 dir = { std::sin(rotY), 0.0f, std::cos(rotY) };
+			// 実際の弾丸のスポーン位置計算 (前方 0.5f、高さ 0.2f) と完全に同期させる
+			Vector3 gunPos = Bullet::ComputeSpawnPosition(player_->GetPosition(), dir, Vector3{ 0.0f, 0.2f, 0.5f });
 
-			// レイキャストで障害物衝突距離を測定 (自前で回転を考慮したRay-OBB判定を行うことで、弾丸の判定と100%同期)
+			// レイキャストで障害物のみ(Obstacle)との衝突距離を測定 (自キャラのコライダーへの即時衝突を防ぐため)
 			float laserRange = 25.0f; // 最大長
-			for (const auto& obs : obstacles_)
+			bool hitObstacle = false;
+			float closestDist = laserRange;
+			
+			auto& colliders = CollisionManager::GetInstance()->GetColliders();
+			for (Collider* col : colliders)
 			{
-				if (!obs) continue;
-				
-				BoxCollider* colliders[2] = { obs->GetCollider(), obs->GetCollider2() };
-				for (int c = 0; c < 2; ++c)
+				if (!col || !col->IsEnabled() || col->GetAttribute() != CollisionAttribute::Obstacle)
 				{
-					BoxCollider* col = colliders[c];
-					if (!col) continue;
-
-					Vector3 size = col->GetSize();
-					Vector3 oPos = obs->GetPosition();
-					float rotY = col->GetWorldRotation().y;
-
-					// 1. レイの始点と方向をフェンスのローカル空間に変換 (逆回転 -rotY)
-					float rx = gunPos.x - oPos.x;
-					float ry = gunPos.y - oPos.y;
-					float rz = gunPos.z - oPos.z;
-
-					float cosR = std::cos(-rotY);
-					float sinR = std::sin(-rotY);
-					
-					Vector3 lxStart = {
-						rx * cosR - rz * sinR,
-						ry,
-						rx * sinR + rz * cosR
-					};
-
-					Vector3 lxDir = {
-						dir.x * cosR - dir.z * sinR,
-						dir.y,
-						dir.x * sinR + dir.z * cosR
-					};
-
-					// 2. ローカル空間でのRay-AABB交差判定
-					float hx = size.x * 0.5f;
-					float hy = size.y * 0.5f;
-					float hz = size.z * 0.5f;
-
-					float tmin = 0.0f;
-					float tmax = laserRange;
-					bool intersect = true;
-
-					// X軸スラブ判定
-					if (std::abs(lxDir.x) < 1e-6f)
-					{
-						if (lxStart.x < -hx || lxStart.x > hx) intersect = false;
-					}
-					else
-					{
-						float ood = 1.0f / lxDir.x;
-						float t1 = (-hx - lxStart.x) * ood;
-						float t2 = (hx - lxStart.x) * ood;
-						if (t1 > t2) std::swap(t1, t2);
-						if (t1 > tmin) tmin = t1;
-						if (t2 < tmax) tmax = t2;
-						if (tmin > tmax) intersect = false;
-					}
-
-					// Y軸スラブ判定
-					if (intersect && std::abs(lxDir.y) < 1e-6f)
-					{
-						if (lxStart.y < -hy || lxStart.y > hy) intersect = false;
-					}
-					else if (intersect)
-					{
-						float ood = 1.0f / lxDir.y;
-						float t1 = (-hy - lxStart.y) * ood;
-						float t2 = (hy - lxStart.y) * ood;
-						if (t1 > t2) std::swap(t1, t2);
-						if (t1 > tmin) tmin = t1;
-						if (t2 < tmax) tmax = t2;
-						if (tmin > tmax) intersect = false;
-					}
-
-					// Z軸スラブ判定
-					if (intersect && std::abs(lxDir.z) < 1e-6f)
-					{
-						if (lxStart.z < -hz || lxStart.z > hz) intersect = false;
-					}
-					else if (intersect)
-					{
-						float ood = 1.0f / lxDir.z;
-						float t1 = (-hz - lxStart.z) * ood;
-						float t2 = (hz - lxStart.z) * ood;
-						if (t1 > t2) std::swap(t1, t2);
-						if (t1 > tmin) tmin = t1;
-						if (t2 < tmax) tmax = t2;
-						if (tmin > tmax) intersect = false;
-					}
-
-					if (intersect && tmax >= 0.0f)
-					{
-						float hitDist = tmin;
-						if (hitDist < 0.0f) hitDist = 0.0f;
-						if (hitDist < laserRange)
-						{
-							laserRange = hitDist;
-						}
-					}
+					continue;
 				}
+
+				CollisionData data;
+				data.originalCollider = col;
+				data.type = col->GetType();
+				data.attribute = col->GetAttribute();
+				data.worldPosition = col->GetWorldPosition();
+				data.isTrigger = col->IsTrigger();
+
+				if (data.type == ColliderType::Sphere)
+				{
+					SphereCollider* sphere = static_cast<SphereCollider*>(col);
+					data.shape.radius = sphere->GetRadius();
+				}
+				else if (data.type == ColliderType::Box)
+				{
+					// レーザーサイトはフェンスの隙間をすり抜けられるよう、簡易BoxではなくMeshColliderで判定を行います
+					continue;
+					
+					BoxCollider* box = static_cast<BoxCollider*>(col);
+					data.shape.size = box->GetSize();
+					data.shape.rotation = box->GetWorldRotation();
+				}
+				else if (data.type == ColliderType::Capsule)
+				{
+					CapsuleCollider* capsule = static_cast<CapsuleCollider*>(col);
+					data.shape.radius = capsule->GetRadius();
+					data.shape.height = capsule->GetHeight();
+				}
+				else if (data.type == ColliderType::Mesh)
+				{
+					// メッシュコライダーは追加の形状パラメータ設定不要
+				}
+
+				float dist = 0.0f;
+				if (CollisionManager::CheckRayCollider(gunPos, dir, closestDist, data, dist))
+				{
+					closestDist = dist;
+					hitObstacle = true;
+				}
+			}
+
+			if (hitObstacle)
+			{
+				laserRange = closestDist;
 			}
 
 			Vector3 endPos = gunPos + dir * laserRange;
