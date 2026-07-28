@@ -15,14 +15,14 @@ public:
 	}
 
 	void Initialize();
-	void Initialize(const Vector3& scale, const Vector3& rotate, const Vector3& translate);
+	void Initialize(const Vector3& scale, const Vector3 rotate, const Vector3 translate);
 
 
 	void SetScale(const Vector3& scale);
-	void SetRotate(const Vector3& rotate);
-	void SetTranslate(const Vector3& translate);
+	void SetRotate(const Vector3 rotate);
+	void SetTranslate(const Vector3 translate);
 
-	void SetTransform(const Vector3& scale, const Vector3& rotate, const Vector3& translate);
+	void SetTransform(const Vector3& scale, const Vector3 rotate, const Vector3 translate);
 
 	const Vector3& GetScale() const { return scale_; }
 	const Vector3& GetRotate() const { return rotation_; }

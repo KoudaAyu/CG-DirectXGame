@@ -47,8 +47,6 @@ public:
 
 	Microsoft::WRL::ComPtr<ID3D12Resource> GetMaterialResource() { return materialResource; }
 
-	void Update();
-
 private:
 	Microsoft::WRL::ComPtr<ID3D12Resource> materialResource;
     Material hostMaterial_{};

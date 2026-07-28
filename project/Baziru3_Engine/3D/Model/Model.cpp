@@ -1,11 +1,9 @@
 #include"Model.h"
-#include "BufferUtil.h"
 #include<cassert>
 #include<fstream>
 #include<sstream>
 #include<cstring>
 #include "TextureManager.h"
-#include "BinaryAssetUtil.h"
 
 
 
@@ -16,25 +14,6 @@ void Model::Initialize(ModelCom* modelCom, const std::string& directoryPath, con
 
     //Modelの読み込み
     modelData_ = LoadObjFile(directoryPath, filename);
-
-    //頂点データとマテリアルの初期化
-    VertexResource();
-    MaterialResource();
-
-    // テクスチャロードはパスが有効なときのみ実行
-    if (!modelData_.material.textureFilePath.empty())
-    {
-        // TextureManagerにDirectXコンテキストが渡っていることを前提にする
-        TextureManager::GetInstance()->LoadTexture(modelData_.material.textureFilePath);
-        modelData_.material.textureIndex =
-            TextureManager::GetInstance()->GetTextureIndexByFilePath(modelData_.material.textureFilePath);
-    }
-}
-
-void Model::Initialize(ModelCom* modelCom, const std::string& directoryPath, const std::string& filename, const ModelData& modelData)
-{
-    modelCom_ = modelCom;
-    modelData_ = modelData;
 
     //頂点データとマテリアルの初期化
     VertexResource();
@@ -273,27 +252,61 @@ Model::MaterialData Model::LoadMaterialTemplateFile(const std::string& direcroty
 
 void Model::VertexResource()
 {
+    //VertexResourceの生成
     if (modelCom_ && modelCom_->GetDirectXCom())
     {
         DirectXCom* dxCommon = modelCom_->GetDirectXCom();
+        // 現在保持している頂点数に応じたサイズで確保（未設定の場合は最小1頂点分）
+        size_t vertexCount = modelData_.vertices.size();
+        if (vertexCount == 0) { vertexCount = 1; }
+        size_t bufferSize = sizeof(Sprite::VertexData) * vertexCount;
 
+
+        //頂点リソースを作る
+        vertexResourceModel = dxCommon->CreateBufferResource(dxCommon->GetDevice().Get(), sizeof(Sprite::VertexData) * modelData_.vertices.size());
+
+        //頂点リソースにデータを書き込む
+        Sprite::VertexData* vertexDataModel = nullptr;
+        vertexResourceModel->Map(0, nullptr, reinterpret_cast<void**>(&vertexDataModel));
+        std::memcpy(vertexDataModel, modelData_.vertices.data(), sizeof(Sprite::VertexData) * modelData_.vertices.size());//頂点データをリソースにコピー
+
+
+        //頂点バッファービューを作成末う
+        vertexBufferView.BufferLocation = vertexResourceModel->GetGPUVirtualAddress();//リソースの先頭のアドレスから使う
+        vertexBufferView.SizeInBytes = UINT(sizeof(Sprite::VertexData) * modelData_.vertices.size()); //使用するリソースのサイズは頂点のサイズ
+        vertexBufferView.StrideInBytes = sizeof(Sprite::VertexData); //1頂点当たりのサイズ
+
+        vertexResource = dxCommon->CreateBufferResource(dxCommon->GetDevice().Get(), bufferSize);
+
+        // VertexBufferView を設定（値の設定のみ）
+        vertexBufferView_.BufferLocation = vertexResource->GetGPUVirtualAddress();
+        vertexBufferView_.SizeInBytes = static_cast<UINT>(bufferSize);
+        vertexBufferView_.StrideInBytes = sizeof(Sprite::VertexData);
+
+        // 書き込み用アドレスを取得してメンバーに保持
+        vertexResource->Map(0, nullptr, reinterpret_cast<void**>(&vertexData_));
+
+        // 可能なら読み込んだモデル頂点をアップロード
         if (!modelData_.vertices.empty())
         {
-            vertexResource = BufferUtil::CreateVertexBuffer(dxCommon, modelData_.vertices, vertexBufferView_);
-        }
-        else
-        {
-            size_t bufferSize = sizeof(Sprite::VertexData);
-            vertexResource = dxCommon->CreateBufferResource(dxCommon->GetDevice().Get(), bufferSize);
-            vertexBufferView_.BufferLocation = vertexResource->GetGPUVirtualAddress();
-            vertexBufferView_.SizeInBytes = static_cast<UINT>(bufferSize);
-            vertexBufferView_.StrideInBytes = sizeof(Sprite::VertexData);
+            std::memcpy(vertexData_, modelData_.vertices.data(), sizeof(Sprite::VertexData) * modelData_.vertices.size());
         }
 
+        vertexResource->Unmap(0, nullptr);
         // --- インデックスバッファの作成とアップロード ---
         if (!modelData_.indices.empty())
         {
-            indexResource = BufferUtil::CreateIndexBuffer(dxCommon, modelData_.indices, indexBufferView);
+            size_t indexCount = modelData_.indices.size();
+            size_t indexBufferSize = sizeof(uint32_t) * indexCount;
+            indexResource = dxCommon->CreateBufferResource(dxCommon->GetDevice().Get(), indexBufferSize);
+            uint32_t* mappedIndex = nullptr;
+            indexResource->Map(0, nullptr, reinterpret_cast<void**>(&mappedIndex));
+            std::memcpy(mappedIndex, modelData_.indices.data(), indexBufferSize);
+            indexResource->Unmap(0, nullptr);
+
+            indexBufferView.BufferLocation = indexResource->GetGPUVirtualAddress();
+            indexBufferView.SizeInBytes = static_cast<UINT>(indexBufferSize);
+            indexBufferView.Format = DXGI_FORMAT_R32_UINT;
         }
     }
 }
@@ -318,26 +331,41 @@ void Model::MaterialResource()
 Model::ModelData Model::LoadModelFile(const std::string& directoryPath, const std::string& filename)
 {
 	Model::ModelData modelData;
-	const std::string fullPath = directoryPath + "/" + filename;
-	const std::string cachePath = BinaryAssetUtil::GetCachePath(fullPath, ".bmodel");
-
-	// キャッシュが有効な場合はバイナリからロード
-	if (BinaryAssetUtil::IsCacheValid(fullPath, cachePath))
-	{
-		if (BinaryAssetUtil::LoadBModel(cachePath, modelData))
-		{
-			OutputDebugStringA(("[Binary Cache] Loaded model from cache: " + cachePath + "\n").c_str());
-			return modelData;
-		}
-	}
-
 	Assimp::Importer importer;
+
+	const std::string fullPath = directoryPath + "/" + filename;
 	const aiScene* scene = importer.ReadFile(fullPath, aiProcess_Triangulate | aiProcess_FlipUVs | aiProcess_GenNormals);
 	assert(scene != nullptr);
 	assert(scene->mRootNode != nullptr);
 
 	// メッシュごとの頂点ベースオフセットを記録
 	std::vector<uint32_t> meshBaseIndices(scene->mNumMeshes, 0);
+
+	// 複数マテリアル（テクスチャパス）読み込み
+	if (scene->mNumMaterials > 0)
+	{
+		modelData.materials.resize(scene->mNumMaterials);
+		for (unsigned int m = 0; m < scene->mNumMaterials; ++m)
+		{
+			const aiMaterial* material = scene->mMaterials[m];
+			aiString texturePath;
+			if (material->GetTexture(aiTextureType_BASE_COLOR, 0, &texturePath) == aiReturn_SUCCESS ||
+				material->GetTexture(aiTextureType_DIFFUSE, 0, &texturePath) == aiReturn_SUCCESS)
+			{
+				modelData.materials[m].textureFilePath = directoryPath + "/" + texturePath.C_Str();
+				modelData.materials[m].textureIndex = TextureManager::GetInstance()->Load(modelData.materials[m].textureFilePath);
+			}
+			else
+			{
+				modelData.materials[m].textureFilePath = "";
+				modelData.materials[m].textureIndex = TextureManager::kInvalidTextureIndex;
+			}
+		}
+		if (!modelData.materials.empty())
+		{
+			modelData.material = modelData.materials[0];
+		}
+	}
 
 	// ノードを再帰的にたどってメッシュを結合
 	auto AppendNodeMeshes = [&](auto& self, const aiNode* node) -> void {
@@ -348,9 +376,10 @@ Model::ModelData Model::LoadModelFile(const std::string& directoryPath, const st
 			const aiMesh* mesh = scene->mMeshes[meshIndex];
 			if (!mesh) continue;
 
-			uint32_t baseIndex = static_cast<uint32_t>(modelData.vertices.size());
-			meshBaseIndices[meshIndex] = baseIndex;
-			modelData.vertices.resize(baseIndex + mesh->mNumVertices);
+			uint32_t baseVertexIndex = static_cast<uint32_t>(modelData.vertices.size());
+			uint32_t baseIndexOffset = static_cast<uint32_t>(modelData.indices.size());
+			meshBaseIndices[meshIndex] = baseVertexIndex;
+			modelData.vertices.resize(baseVertexIndex + mesh->mNumVertices);
 
 			for (uint32_t v = 0; v < mesh->mNumVertices; ++v)
 			{
@@ -370,42 +399,44 @@ Model::ModelData Model::LoadModelFile(const std::string& directoryPath, const st
 					const aiVector3D& n = mesh->mNormals[v];
 					vertex.normal = { n.x, n.y, n.z };
 				}
-				modelData.vertices[baseIndex + v] = vertex;
+				modelData.vertices[baseVertexIndex + v] = vertex;
 			}
 
+			uint32_t numIndicesPushed = 0;
 			for (uint32_t fi = 0; fi < mesh->mNumFaces; ++fi)
 			{
 				const aiFace& face = mesh->mFaces[fi];
 				if (face.mNumIndices == 3)
 				{
-					modelData.indices.push_back(baseIndex + face.mIndices[0]);
-					modelData.indices.push_back(baseIndex + face.mIndices[1]);
-					modelData.indices.push_back(baseIndex + face.mIndices[2]);
+					modelData.indices.push_back(baseVertexIndex + face.mIndices[0]);
+					modelData.indices.push_back(baseVertexIndex + face.mIndices[1]);
+					modelData.indices.push_back(baseVertexIndex + face.mIndices[2]);
+					numIndicesPushed += 3;
 				}
 				else
 				{
 					for (uint32_t k = 0; k < face.mNumIndices; ++k)
-						modelData.indices.push_back(baseIndex + face.mIndices[k]);
+					{
+						modelData.indices.push_back(baseVertexIndex + face.mIndices[k]);
+						numIndicesPushed++;
+					}
 				}
 			}
+
+			MeshPart meshPart{};
+			meshPart.name = mesh->mName.C_Str();
+			meshPart.vertexOffset = baseVertexIndex;
+			meshPart.vertexCount = mesh->mNumVertices;
+			meshPart.indexOffset = baseIndexOffset;
+			meshPart.indexCount = numIndicesPushed;
+			meshPart.materialIndex = mesh->mMaterialIndex;
+			modelData.meshes.push_back(meshPart);
 		}
 		for (uint32_t i = 0; i < node->mNumChildren; ++i)
 			self(self, node->mChildren[i]);
 	};
 
 	AppendNodeMeshes(AppendNodeMeshes, scene->mRootNode);
-
-	// マテリアル（テクスチャパス）読み込み
-	if (scene->mNumMaterials > 0)
-	{
-		const aiMaterial* material = scene->mMaterials[0];
-		aiString texturePath;
-		if (material->GetTexture(aiTextureType_BASE_COLOR, 0, &texturePath) == aiReturn_SUCCESS ||
-			material->GetTexture(aiTextureType_DIFFUSE, 0, &texturePath) == aiReturn_SUCCESS)
-		{
-			modelData.material.textureFilePath = directoryPath + "/" + texturePath.C_Str();
-		}
-	}
 
 	// ボーン（スキン）ウェイト読み込み
 	for (unsigned int meshIndex = 0; meshIndex < scene->mNumMeshes; ++meshIndex)
@@ -444,12 +475,6 @@ Model::ModelData Model::LoadModelFile(const std::string& directoryPath, const st
 				});
 			}
 		}
-	}
-
-	// キャッシュとして保存
-	if (BinaryAssetUtil::SaveBModel(cachePath, modelData))
-	{
-		OutputDebugStringA(("[Binary Cache] Saved model cache: " + cachePath + "\n").c_str());
 	}
 
 	return modelData;

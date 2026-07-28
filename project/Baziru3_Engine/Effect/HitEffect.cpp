@@ -3,26 +3,6 @@
 #include <sstream>
 #include <Windows.h>
 
-std::unique_ptr<HitEffect> HitEffect::Create(const Desc& desc)
-{
-    auto effect = std::make_unique<HitEffect>();
-    effect->Initialize(
-        desc.dxCommon, desc.object3dCom, desc.materialManager, desc.light, desc.camera,
-        desc.ringDivide, desc.outerRadius, desc.innerRadius,
-        desc.cylinderDivide, desc.topRadius, desc.bottomRadius, desc.height
-    );
-    if (desc.particleManager)
-    {
-        effect->SetParticleManager(desc.particleManager);
-    }
-    effect->SetRingEnabled(desc.ringEnabled);
-    effect->SetCylinderEnabled(desc.cylinderEnabled);
-    effect->SetEffectDuration(desc.effectDuration);
-    effect->GetCylinderTransform().scale = desc.cylinderScale;
-    effect->Update(1.0f / 60.0f); // 初期アップデート
-    return effect;
-}
-
 void HitEffect::Initialize(DirectXCom* dxCommon, Object3dCom* object3dCom, MaterialManager* materialManager, Light* light, Camera* camera,
     uint32_t ringDivide, float outerRadius, float innerRadius,
     uint32_t cylinderDivide, float topRadius, float bottomRadius, float height)

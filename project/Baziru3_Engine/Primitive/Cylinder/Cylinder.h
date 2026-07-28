@@ -44,6 +44,7 @@ public:
 
 private:
     std::vector<Vertex> CreateMesh(uint32_t divide, float topRadius, float bottomRadius, float height) const;
+    void CreateVertexBuffer(const std::vector<Vertex>& verts);
 
 private:
     DirectXCom* dxCommon_ = nullptr;

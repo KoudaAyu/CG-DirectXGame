@@ -13,6 +13,9 @@ void ParticleRenderer::Draw(const RenderContext& ctx, ParticleManager* particleM
         return;
     }
 
+    // パーティクル用ルートシグネチャとPSOを先に設定する
+    particleManager->SetupDraw(ctx.commandList);
+
     if (ctx.light)
     {
         ctx.commandList->SetGraphicsRootConstantBufferView(

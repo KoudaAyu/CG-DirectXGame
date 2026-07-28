@@ -102,14 +102,17 @@ void SkinningObject3dCom::Draw(Object3d* object, const ::RenderContext& ctx, con
         ctx.commandList->SetPipelineState(pipelineState.Get());
     }
 
-    // 描画用の定数バッファをアロケート・転送
-    object->PrepareConstantBuffers(dxCommon);
-
     // Material (CBV at b0, Pixel Shader) -> Index 0
-    ctx.commandList->SetGraphicsRootConstantBufferView(0, object->GetMaterialGPUAddress());
+    if (object->GetMaterialResource())
+    {
+        ctx.commandList->SetGraphicsRootConstantBufferView(0, object->GetMaterialResource()->GetGPUVirtualAddress());
+    }
 
     // Transformation Matrix (CBV at b0, Vertex Shader) -> Index 1
-    ctx.commandList->SetGraphicsRootConstantBufferView(1, object->GetTransformationMatrixGPUAddress());
+    if (object->GetTransformationMatrixResource())
+    {
+        ctx.commandList->SetGraphicsRootConstantBufferView(1, object->GetTransformationMatrixResource()->GetGPUVirtualAddress());
+    }
 
     // Texture Descriptor Table (t3, Pixel Shader) -> Index 2
     if (ctx.textureHandle.ptr != 0)
@@ -163,15 +166,51 @@ void SkinningObject3dCom::Draw(Object3d* object, const ::RenderContext& ctx, con
     ctx.commandList->IASetVertexBuffers(0, 1, &vbv);
     ctx.commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-    // インデックスバッファ設定と描画
-    if (object->HasIndexBuffer())
+    // インデックスバッファ設定と描画（MultiMesh & MultiMaterial 対応）
+    if (!modelData.meshes.empty())
     {
-        ctx.commandList->IASetIndexBuffer(&object->GetIndexBufferView());
-        ctx.commandList->DrawIndexedInstanced(static_cast<UINT>(modelData.indices.size()), 1, 0, 0, 0);
+        if (object->HasIndexBuffer())
+        {
+            ctx.commandList->IASetIndexBuffer(&object->GetIndexBufferView());
+        }
+        for (const auto& meshPart : modelData.meshes)
+        {
+            // メッシュ個別のマテリアル/テクスチャ切り替え
+            if (meshPart.materialIndex < modelData.materials.size())
+            {
+                const auto& mat = modelData.materials[meshPart.materialIndex];
+                if (mat.textureIndex != TextureManager::kInvalidTextureIndex)
+                {
+                    D3D12_GPU_DESCRIPTOR_HANDLE texHandle = TextureManager::GetInstance()->GetSrvHandleGPU(mat.textureIndex);
+                    if (texHandle.ptr != 0)
+                    {
+                        ctx.commandList->SetGraphicsRootDescriptorTable(2, texHandle);
+                    }
+                }
+            }
+
+            if (object->HasIndexBuffer() && meshPart.indexCount > 0)
+            {
+                ctx.commandList->DrawIndexedInstanced(meshPart.indexCount, 1, meshPart.indexOffset, 0, 0);
+            }
+            else if (meshPart.vertexCount > 0)
+            {
+                ctx.commandList->DrawInstanced(meshPart.vertexCount, 1, meshPart.vertexOffset, 0);
+            }
+        }
     }
     else
     {
-        ctx.commandList->DrawInstanced(static_cast<UINT>(modelData.vertices.size()), 1, 0, 0);
+        // 単一メッシュ描画フォールバック
+        if (object->HasIndexBuffer())
+        {
+            ctx.commandList->IASetIndexBuffer(&object->GetIndexBufferView());
+            ctx.commandList->DrawIndexedInstanced(static_cast<UINT>(modelData.indices.size()), 1, 0, 0, 0);
+        }
+        else
+        {
+            ctx.commandList->DrawInstanced(static_cast<UINT>(modelData.vertices.size()), 1, 0, 0);
+        }
     }
 
     // 4. 描画終了後にCOMMON状態に戻す
@@ -263,16 +302,6 @@ void SkinningObject3dCom::StaticSamplers()
     staticSamplers[0].MaxLOD = D3D12_FLOAT32_MAX;
     staticSamplers[0].ShaderRegister = 0;
     staticSamplers[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
-
-    staticSamplers[1].Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
-    staticSamplers[1].AddressU = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
-    staticSamplers[1].AddressV = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
-    staticSamplers[1].AddressW = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
-    staticSamplers[1].ComparisonFunc = D3D12_COMPARISON_FUNC_NEVER;
-    staticSamplers[1].MaxLOD = D3D12_FLOAT32_MAX;
-    staticSamplers[1].ShaderRegister = 1;
-    staticSamplers[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
-
     descriptionRootSignature.pStaticSamplers = staticSamplers;
     descriptionRootSignature.NumStaticSamplers = _countof(staticSamplers);
 }

@@ -1,5 +1,4 @@
 #include "Cylinder.h"
-#include "BufferUtil.h"
 #include "Camera.h"
 #include "Light.h"
 #include "MaterialManager.h"
@@ -32,7 +31,7 @@ void Cylinder::Initialize(DirectXCom* dxCommon, uint32_t divide, float topRadius
     }
 
     auto verts = CreateMesh(divide, topRadius, bottomRadius, height);
-    vertexBuffer_ = BufferUtil::CreateVertexBuffer(dxCommon_, verts, vertexBufferView_);
+    CreateVertexBuffer(verts);
     vertexCount_ = static_cast<uint32_t>(verts.size());
 }
 
@@ -190,3 +189,22 @@ std::vector<Cylinder::Vertex> Cylinder::CreateMesh(uint32_t divide, float topRad
     return verts;
 }
 
+void Cylinder::CreateVertexBuffer(const std::vector<Vertex>& verts)
+{
+    if (!dxCommon_ || verts.empty())
+    {
+        return;
+    }
+
+    size_t sizeInBytes = verts.size() * sizeof(Vertex);
+    vertexBuffer_ = dxCommon_->CreateBufferResource(dxCommon_->GetDevice(), sizeInBytes);
+
+    void* mapped = nullptr;
+    vertexBuffer_->Map(0, nullptr, &mapped);
+    std::memcpy(mapped, verts.data(), sizeInBytes);
+    vertexBuffer_->Unmap(0, nullptr);
+
+    vertexBufferView_.BufferLocation = vertexBuffer_->GetGPUVirtualAddress();
+    vertexBufferView_.SizeInBytes = static_cast<UINT>(sizeInBytes);
+    vertexBufferView_.StrideInBytes = static_cast<UINT>(sizeof(Vertex));
+}

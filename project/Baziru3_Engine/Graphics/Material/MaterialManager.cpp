@@ -27,18 +27,6 @@ void  MaterialManager::Initialize(DirectXCom* directXCom)
     }
 }
 
-void MaterialManager::Update()
-{
-    if (!materialResource) return;
-    Material* gpuPtr = nullptr;
-    materialResource->Map(0, nullptr, reinterpret_cast<void**>(&gpuPtr));
-    if (gpuPtr)
-    {
-        *gpuPtr = hostMaterial_;
-        materialResource->Unmap(0, nullptr);
-    }
-}
-
 void MaterialManager::Finalize()
 {
     // materialData は Initialize() 内で Unmap() したなら nullptr にしておくべき

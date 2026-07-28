@@ -2,11 +2,10 @@
 
 struct Particle {
     float32_t3 translate;
-    float32_t lifeTime;
     float32_t3 scale;
-    float32_t currentTime;
+    float32_t lifeTime;
     float32_t3 velocity;
-    float32_t padding;
+    float32_t currentTime;
     float32_t4 color;
 };
 
@@ -15,8 +14,7 @@ struct PerView {
     float32_t4x4 billboardMatrix;
     float32_t deltaTime;
     float32_t time;
-    uint32_t maxParticles;
-    float32_t padding;
+    float32_t2 padding;
 };
 
 StructuredBuffer<Particle> gParticles : register(t0);

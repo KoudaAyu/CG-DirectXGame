@@ -1,12 +1,10 @@
 #include "DebugUI.h"
+#include "ParticleManager.h"
+#include "ParticleEmitter.h"
 #include "MaterialManager.h"
 #include "SpriteManager.h"
 #include "Camera.h"
 #include "SceneManager.h"
-#include "OffScreenRendering.h"
-#include "ParticleManager.h"
-#include "Application/Scene/GameScene/GamePlayScene.h"
-#include "BehaviorTreeEditor.h"
 #include <imgui.h>
 
 DebugUI::DebugUI(MaterialManager* materialManager, SpriteManager* spriteManager, Camera* camera,
@@ -15,20 +13,18 @@ DebugUI::DebugUI(MaterialManager* materialManager, SpriteManager* spriteManager,
 {
 }
 
-DebugUI::~DebugUI()
-{
-}
-
 void DebugUI::Initialize()
 {
-#ifdef USE_IMGUI
-    btEditor_ = std::make_unique<BaziruEngine::AI::BehaviorTreeEditor>();
-#endif
 }
 
 void DebugUI::Update()
 {
 #ifdef USE_IMGUI
+    if (SceneManager::GetInstance())
+    {
+        SceneManager::GetInstance()->DrawUI();
+    }
+
     ImGui::ShowDemoWindow();
 
     ImGui::Begin("Windows");
@@ -189,80 +185,10 @@ void DebugUI::Update()
 
     ImGui::Begin("Settings");
 
-    if (offScreenRendering_)
-    {
-        if (ImGui::CollapsingHeader("Post Effect"))
-        {
-            int currentEffect = static_cast<int>(offScreenRendering_->GetPostEffect());
-            const char* effectNames[] = {
-                "Normal",
-                "DepthBasedOutline",
-                "LuminanceBaseOutline",
-                "RadialBlur",
-                "GaussianFilter",
-                "BoxFilter"
-            };
-            if (ImGui::Combo("Effect Type", &currentEffect, effectNames, IM_ARRAYSIZE(effectNames)))
-            {
-                offScreenRendering_->SetPostEffect(static_cast<OffScreenRendering::PostEffect>(currentEffect));
-            }
-
-            if (offScreenRendering_->GetPostEffect() == OffScreenRendering::PostEffect::RadialBlur)
-            {
-                Vector2 center = offScreenRendering_->GetRadialBlurCenter();
-                float centerArr[2] = { center.x, center.y };
-                if (ImGui::SliderFloat2("Blur Center", centerArr, 0.0f, 1.0f))
-                {
-                    offScreenRendering_->SetRadialBlurCenter({ centerArr[0], centerArr[1] });
-                }
-
-                float blurWidth = offScreenRendering_->GetRadialBlurWidth();
-                if (ImGui::SliderFloat("Blur Width", &blurWidth, 0.0f, 0.1f, "%.4f"))
-                {
-                    offScreenRendering_->SetRadialBlurWidth(blurWidth);
-                }
-            }
-        }
-    }
-
     if (useMonsterBall_)
         ImGui::Checkbox("Use Monster Ball", useMonsterBall_);
 
     ImGui::Checkbox("Draw Skybox", SceneManager::GetInstance()->GetShowSkyboxPtr());
-
-    if (ImGui::CollapsingHeader("GPU Particle System"))
-    {
-        ParticleManager* pm = ParticleManager::GetInstance();
-        if (pm)
-        {
-            ImGui::Text("Shader Layer: GPU Compute Shader");
-            ImGui::Text("Max Capacity: %u particles", 10240);
-            uint32_t activeCount = pm->GetNumInstance();
-            ImGui::Text("Active Count: %u particles", activeCount);
-            ImGui::ProgressBar(static_cast<float>(activeCount) / 10240.0f, ImVec2(0.0f, 0.0f), "Spawn Load");
-
-            BaseScene* currentScene = SceneManager::GetInstance()->GetCurrentScene();
-            GamePlayScene* gps = dynamic_cast<GamePlayScene*>(currentScene);
-            if (gps)
-            {
-                ImGui::Separator();
-                ImGui::Text("Emitter Settings:");
-                Emitter& emitter = gps->GetEmitter();
-
-                int countVal = static_cast<int>(emitter.count);
-                if (ImGui::SliderInt("Spawn Count", &countVal, 1, 1000))
-                {
-                    emitter.count = static_cast<uint32_t>(countVal);
-                }
-
-                ImGui::SliderFloat("Spawn Frequency (sec)", &emitter.frequency, 0.01f, 2.0f, "%.2fs");
-            }
-        }
-        else
-        {
-            ImGui::Text("GPU Particle System not initialized.");
-        }
-    }
 
     ImGui::Separator();
 
@@ -285,49 +211,41 @@ void DebugUI::Update()
         }
     }
 
-    if (materialManager_)
+    ImGui::Begin("GPU Particle Emitter");
+    ParticleManager* pm = ParticleManager::GetInstance();
+    if (pm)
     {
-        materialManager_->Update();
-    }
-
-    ImGui::End();
-
-    ImGui::Begin("Performance Tracker");
-    {
-        float currentFps = ImGui::GetIO().Framerate;
-        ImGui::Text("Current FPS: %.1f", currentFps);
-        ImGui::Text("Frame Time: %.3f ms/frame", 1000.0f / currentFps);
-
-        static float fpsHistory[120] = {};
-        static int fpsHistoryOffset = 0;
-        fpsHistory[fpsHistoryOffset] = currentFps;
-        fpsHistoryOffset = (fpsHistoryOffset + 1) % 120;
-
-        float minFps = fpsHistory[0];
-        float maxFps = fpsHistory[0];
-        for (int i = 1; i < 120; ++i)
+        ParticleEmitter* emitter = pm->GetGPUEmitter();
+        if (emitter)
         {
-            if (fpsHistory[i] < minFps) minFps = fpsHistory[i];
-            if (fpsHistory[i] > maxFps) maxFps = fpsHistory[i];
+            EmitterSphere* data = emitter->GetEmitterData();
+            if (data)
+            {
+                ImGui::DragFloat3("Translate", &data->translate.x, 0.1f);
+                ImGui::DragFloat("Radius", &data->radius, 0.1f, 0.0f, 100.0f);
+                
+                int countVal = static_cast<int>(data->count);
+                if (ImGui::SliderInt("Count", &countVal, 1, 100))
+                {
+                    data->count = static_cast<uint32_t>(countVal);
+                }
+                
+                ImGui::SliderFloat("Frequency", &data->frequency, 0.01f, 2.0f, "%.2fs");
+                
+                bool emitBool = (data->emit != 0);
+                if (ImGui::Checkbox("Emit", &emitBool))
+                {
+                    data->emit = emitBool ? 1 : 0;
+                }
+            }
         }
-
-        char label[64];
-        std::snprintf(label, sizeof(label), "Min: %.1f | Max: %.1f", minFps, maxFps);
-        ImGui::PlotLines("##FPSGraph", fpsHistory, 120, fpsHistoryOffset, label, 0.0f, 120.0f, ImVec2(0, 80.0f));
     }
     ImGui::End();
-    if (btEditor_)
-    {
-        btEditor_->Draw();
-    }
+
+    ImGui::End();
 #endif
 }
 
 void DebugUI::Finalize()
 {
-#ifdef USE_IMGUI
-    if (btEditor_) {
-        btEditor_.reset();
-    }
-#endif
 }

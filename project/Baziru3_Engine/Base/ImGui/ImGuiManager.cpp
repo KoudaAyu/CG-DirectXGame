@@ -9,7 +9,6 @@
 
 #ifdef USE_IMGUI
 #include <imgui.h>
-#include <imgui_internal.h>
 #include <imgui_impl_win32.h>
 #include <imgui_impl_dx12.h>
 #endif
@@ -141,42 +140,8 @@ void ImGuiManager::Update()
 {
 #ifdef USE_IMGUI
     if(!initialized) return;
-
     ImGui_ImplWin32_NewFrame();
     ImGui_ImplDX12_NewFrame();
-
-    // Scale mouse position events in the queue from actual window size to virtual 1280x720 size before ImGui::NewFrame processes them
-    ImGuiIO& io = ImGui::GetIO();
-    if (windowAPI)
-    {
-        HWND hwnd = windowAPI->GetHwnd();
-        RECT rect;
-        if (GetClientRect(hwnd, &rect))
-        {
-            float width = static_cast<float>(rect.right - rect.left);
-            float height = static_cast<float>(rect.bottom - rect.top);
-            if (width > 0.0f && height > 0.0f)
-            {
-                float targetWidth = static_cast<float>(WindowAPI::GetClientWidth());
-                float targetHeight = static_cast<float>(WindowAPI::GetClientHeight());
-                
-                ImGuiContext& g = *GImGui;
-                for (int n = 0; n < g.InputEventsQueue.Size; n++)
-                {
-                    ImGuiInputEvent& e = g.InputEventsQueue[n];
-                    if (e.Type == ImGuiInputEventType_MousePos)
-                    {
-                        e.MousePos.PosX = (e.MousePos.PosX / width) * targetWidth;
-                        e.MousePos.PosY = (e.MousePos.PosY / height) * targetHeight;
-                    }
-                }
-            }
-        }
-    }
-
-    // Set display size before NewFrame
-    io.DisplaySize = ImVec2(static_cast<float>(WindowAPI::GetClientWidth()), static_cast<float>(WindowAPI::GetClientHeight()));
-
     ImGui::NewFrame();
 #endif
 }
