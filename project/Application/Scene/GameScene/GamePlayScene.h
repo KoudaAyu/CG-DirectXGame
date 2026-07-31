@@ -254,5 +254,13 @@ private:
 
     // --- ✨ アプリケーション層で一発読み込みされるレベルエディタ ---
     std::unique_ptr<LevelEditor> levelEditor_;
+
+    // --- 🎮 高性能・最適化実証用 ImGui パフォーマンス・トラッカー / ベンチマーク ---
+    bool showPerformanceTracker_ = true;
+    bool isStressTestActive_ = false;
+    std::vector<std::unique_ptr<Obstacle>> stressTestObstacles_;
+    void DrawPerformanceTrackerUI(float deltaTime);
+    void UpdateStressTestMode();
 };
+
 
