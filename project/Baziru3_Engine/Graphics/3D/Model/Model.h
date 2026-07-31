@@ -59,7 +59,9 @@ public:
 		NodeAnimation rootNode; // 階層構造のルートノード
 		// ジョイント名 -> ウェイトデータ
 		std::map<std::string, JointWeightData> skinClusterData;
+		float boundingRadius = 2.0f; // バウンディングスフィア半径（視錐台カリング用）
 	};
+
 
 	
 

@@ -545,7 +545,16 @@ void ParticleManager::Draw(ID3D12GraphicsCommandList* commandList, const RenderC
 {
 	if (!commandList) return;
 
+	// アーリーアウト: アクティブなパーティクルが存在しない場合は描画処理（PSOバインド等）を完全スキップ
+	bool isGpuEmitting = (gpuEmitter_ && gpuEmitter_->GetEmitterData() && gpuEmitter_->GetEmitterData()->emit != 0);
+	if (GetNumInstance() == 0 && particles.empty() && effectParticles.empty() && !isGpuEmitting)
+	{
+		return;
+	}
+
+
 	// PSOとルートシグネチャをセット
+
 	SetupDraw(commandList);
 
 	// マテリアルCBVとインスタンシング用SRVをセット

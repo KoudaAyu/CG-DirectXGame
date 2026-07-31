@@ -68,6 +68,8 @@
     <ClCompile Include="Baziru3_Engine\Core\Base\EngineAssert.cpp" />
     <ClCompile Include="Baziru3_Engine\Core\Base\EngineContext.cpp" />
     <ClCompile Include="Baziru3_Engine\Core\Base\RenderContext.cpp" />
+    <ClCompile Include="Baziru3_Engine\Core\Base\ConstantBufferRingAllocator.cpp" />
+
     <ClCompile Include="Game.cpp" />
     <ClCompile Include="Application\Scene\GameScene\GamePlayScene.cpp" />
     <ClCompile Include="Application\Scene\GameScene\CollisionSystem.cpp" />
@@ -75,6 +77,8 @@
     <ClCompile Include="Application\Particle\AppParticleManager.cpp" />
     <ClCompile Include="Application\Scene\ClearScene\ClearScene.cpp" />
     <ClCompile Include="Baziru3_Engine\Graphics\Light\Light.cpp" />
+    <ClCompile Include="Baziru3_Engine\Graphics\Light\CascadingShadowMap.cpp" />
+
     <ClCompile Include="main.cpp" />
     <ClCompile Include="Baziru3_Engine\Graphics\2D\Sprite\Sprite.cpp" />
     <ClCompile Include="Baziru3_Engine\Graphics\2D\Sprite\SpriteCom.cpp" />
@@ -323,6 +327,10 @@
     <ClInclude Include="Baziru3_Engine\Core\Base\SubsystemFactory.h" />
 
     <ClInclude Include="Baziru3_Engine\Graphics\Graphics\GpuProfiler.h" />
+    <ClInclude Include="Baziru3_Engine\Core\Base\ConstantBufferRingAllocator.h" />
+    <ClInclude Include="Baziru3_Engine\Graphics\Light\CascadingShadowMap.h" />
+
+
     <ClInclude Include="Baziru3_Engine\Core\Base\AsyncLoader.h" />
     <ClInclude Include="Baziru3_Engine\Core\Base\BinaryAssetUtil.h" />
     <ClInclude Include="Baziru3_Engine\Framework\AI\Blackboard.h" />

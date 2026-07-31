@@ -11,7 +11,11 @@
 #include "BehaviorTreeEditor.h"
 #include "Baziru3_Engine/Graphics/Graphics/GpuProfiler.h"
 #include "Baziru3_Engine/Framework/Collision/CollisionManager.h"
+#include "Baziru3_Engine/Core/Base/Allocator/ConstantBufferAllocator.h"
+#include "Baziru3_Engine/Core/Base/Allocator/StackAllocator.h"
+#include "DirectXCom.h"
 #include <imgui.h>
+
 
 DebugUI::DebugUI(MaterialManager* materialManager, SpriteManager* spriteManager, Camera* camera,
     Sprite::Transform* transformObject, bool* useMonsterBall, bool* drawObject, bool* drawSprite)
@@ -341,8 +345,48 @@ void DebugUI::Update()
             ImGui::Separator();
         }
 
-        // --- 3. GPU / CPU Stage Profiler ---
+        // --- 3. Custom Memory Allocators (CB Ring Allocator & Stack Allocator) ---
+        DirectXCom* dxCom = (pm ? pm->GetDxCommon() : nullptr);
+        if (dxCom)
+        {
+            ConstantBufferAllocator* cbAlloc = dxCom->GetCBAllocator();
+            StackAllocator* stackAlloc = dxCom->GetStackAllocator();
+
+            if (cbAlloc)
+            {
+                size_t allocated = cbAlloc->GetAllocatedThisFrame();
+                size_t frameCapacity = cbAlloc->GetFrameSize();
+                float ratio = cbAlloc->GetUsageRatio();
+
+                ImGui::Text("CB Ring Allocator:");
+                ImGui::SameLine(180.0f);
+                ImGui::Text("%.1f KB / %.1f MB", allocated / 1024.0f, frameCapacity / (1024.0f * 1024.0f));
+
+                char cbLabel[32];
+                std::snprintf(cbLabel, sizeof(cbLabel), "%.2f%% Frame Usage", ratio * 100.0f);
+                ImGui::ProgressBar(ratio, ImVec2(-1.0f, 0.0f), cbLabel);
+            }
+
+            if (stackAlloc)
+            {
+                size_t used = stackAlloc->GetUsedBytes();
+                size_t total = stackAlloc->GetTotalBytes();
+                float ratio = total > 0 ? static_cast<float>(used) / static_cast<float>(total) : 0.0f;
+
+                ImGui::Text("Stack Allocator:");
+                ImGui::SameLine(180.0f);
+                ImGui::Text("%.1f KB / %.1f MB", used / 1024.0f, total / (1024.0f * 1024.0f));
+
+                char stackLabel[32];
+                std::snprintf(stackLabel, sizeof(stackLabel), "%.2f%% Usage", ratio * 100.0f);
+                ImGui::ProgressBar(ratio, ImVec2(-1.0f, 0.0f), stackLabel);
+            }
+            ImGui::Separator();
+        }
+
+        // --- 4. GPU / CPU Stage Profiler ---
         ImGui::TextColored(ImVec4(0.4f, 0.8f, 1.0f, 1.0f), "--- GPU / CPU Stage Profiler ---");
+
 
         // 全ステージの active フラグをリセット
         for (int i = 0; i < kMaxStages; ++i)

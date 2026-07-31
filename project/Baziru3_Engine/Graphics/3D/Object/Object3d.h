@@ -40,7 +40,9 @@ public:
 		std::vector<uint32_t> indices; // インデックスデータ
 		MaterialData material; // マテリアルデータ
 		NodeAnimation rootNode; // 階層構造のルートノード
+		float boundingRadius = 2.0f; // バウンディングスフィア半径
 	};
+
 
 	struct VertexData
 	{

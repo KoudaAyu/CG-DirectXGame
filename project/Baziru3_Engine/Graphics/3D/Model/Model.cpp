@@ -461,8 +461,23 @@ Model::ModelData Model::LoadModelFile(const std::string& directoryPath, const st
 		}
 	}
 
+
+	// バウンディングスフィア半径の動的計算
+
+	float maxDistSq = 0.0f;
+	for (const auto& v : modelData.vertices)
+	{
+		float distSq = v.position.x * v.position.x + v.position.y * v.position.y + v.position.z * v.position.z;
+		if (distSq > maxDistSq)
+		{
+			maxDistSq = distSq;
+		}
+	}
+	modelData.boundingRadius = (maxDistSq > 0.0001f) ? std::sqrt(maxDistSq) : 2.0f;
+
 	// キャッシュとして保存
 	if (BinaryAssetUtil::SaveBModel(cachePath, modelData))
+
 	{
 		OutputDebugStringA(("[Binary Cache] Saved model cache: " + cachePath + "\n").c_str());
 	}

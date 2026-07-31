@@ -228,11 +228,13 @@ void Object3d::Update()
 
 	// View Frustum Culling inside Update to bypass animation, skeletal updates, and matrix math for off-screen objects
 	isCulled_ = false;
-	if (camera_ && scale.x <= 10.0f && scale.y <= 10.0f && scale.z <= 10.0f)
+	if (camera_)
 	{
 		const Matrix4x4& vp = camera_->GetViewProjectionMatrix();
 		const Vector3& pos = transform.GetTranslate();
-		float radius = 8.0f;
+		float baseRadius = (modelData_.boundingRadius > 0.1f) ? modelData_.boundingRadius : 3.0f;
+		float maxScale = (std::max)({ std::abs(scale.x), std::abs(scale.y), std::abs(scale.z) });
+		float radius = baseRadius * maxScale;
 
 		float x = pos.x * vp.m[0][0] + pos.y * vp.m[1][0] + pos.z * vp.m[2][0] + vp.m[3][0];
 		float y = pos.x * vp.m[0][1] + pos.y * vp.m[1][1] + pos.z * vp.m[2][1] + vp.m[3][1];
@@ -255,9 +257,13 @@ void Object3d::Update()
 		}
 		else
 		{
-			isCulled_ = true;
+			if (w < -radius)
+			{
+				isCulled_ = true;
+			}
 		}
 	}
+
 
 
 	if (isCulled_)
