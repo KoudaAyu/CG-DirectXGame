@@ -27,8 +27,9 @@
 #include "../../Player/Player.h"
 #include "../../Enemy/Enemy.h"
 #include "../../Enemy/MovingEnemy.h"
-#include "../../../Bullet.h"
-#include "../../Obstacle.h"
+#include "Bullet.h"
+#include "Obstacle.h"
+
 #include "Target.h"
 #include "TutorialSign.h"
 #include "../../LevelEditor.h"

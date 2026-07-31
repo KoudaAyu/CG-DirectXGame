@@ -3,7 +3,8 @@
 #include "../../Player/Player.h"
 #include "../../Enemy/Enemy.h"
 #include "../../Enemy/MovingEnemy.h"
-#include "../../Obstacle.h"
+#include "Obstacle.h"
+
 #include "Application/Particle/AppParticleManager.h"
 #include "ParticleManager.h"
 #include "Baziru3_Engine/Framework/Effect/HitEffect.h"
