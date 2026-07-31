@@ -24,7 +24,7 @@ C++ および DirectX 12 を用いてスクラッチから構築した、自作3
   * スライドのMarkdownソースはこちら：[sega_gameplay_interaction_slides.md](sega_gameplay_interaction_slides.md)
 
 ### 3. アジャイル開発スプリント評価・進捗報告（7月度 週間報告まとめ）
-> **【要約】7月度の3回にわたるスプリント開発（敵AI基本機能、MeshCollider & NavMesh/A*経路探索、CSベースGPUパーティクル & FreeListメモリ最適化）における、アジャイル・スプリントメンターからの評価・スコア推移と技術的成果の記録です。**
+> **【要約】7月度の4回にわたるスプリント開発（敵AI基本機能、MeshCollider & NavMesh/A*経路探索、CSベースGPUパーティクル & FreeListメモリ最適化、および3D射撃・視野コーン・アプリ層軽量パーティクル描画完全復元）における、アジャイル・スプリントメンターからの評価・スコア推移と技術的成果の記録です。**
 
 #### 📊 7月度 スプリント評価スコア推移
 | スプリント (日付) | 計画の質 | 実行の質 | 総合評価 | 主なマイルストーン・達成項目 | 原本レポート |
@@ -32,6 +32,7 @@ C++ および DirectX 12 を用いてスクラッチから構築した、自作3
 | [`07/12 スプリント`](#sprint-0712) | 85点 | 70点 | **60点** | 敵AI基本ステート（Patrol/Investigate/Chase）およびデバッグ表示の統合 | [📄 閲覧](docs/sprints/LE3B_09_コウダ_アユ_週間進捗07_12.md) |
 | [`07/17 スプリント`](#sprint-0717) | 95点 | 90点 | **86点** | 当たり判定バグ完全修正（MeshCollider & Push）、NavMesh / A* 経路探索の実装 | [📄 閲覧](docs/sprints/LE3B_09_コウダ_アユ_週間報告07_17.md) |
 | [`07/24 スプリント`](#sprint-0724) | 90点 | 95点 | **86点** | CSベースGPUパーティクル統合、`FreeList` による動的メモリ最適化 | [📄 閲覧](docs/sprints/LE3B_09_コウダ_アユ_週間報告07_24.md) |
+| [`07/31 スプリント`](#sprint-0731) | 95点 | 95点 | **90点** | 3Dエネルギー弾丸（左クリック限定）、視野領域（Vision Cone）半透明グラデーション＆AIステータスUI常時化、アプリ層超軽量1-DrawCallパーティクル基盤の完成 | [📄 閲覧](docs/sprints/LE3B_09_コウダ_アユ_週間報告07_31.md) |
 
 ---
 
@@ -54,10 +55,49 @@ C++ および DirectX 12 を用いてスクラッチから構築した、自作3
   - **DebugUI統合**: パラメータのリアルタイム調整・検証環境を整備。
 - 🔗 **評価資料原本**: [LE3B_09_コウダ_アユ_週間報告07_24.md](docs/sprints/LE3B_09_コウダ_アユ_週間報告07_24.md)
 
+#### <a id="sprint-0731"></a>🔹 4. [07/31 スプリント](docs/sprints/LE3B_09_コウダ_アユ_週間報告07_31.md)：3D射撃ビジュアル・敵視界オーバーレイ・アプリ層超軽量パーティクルパイプライン
+- **主な成果**:
+  - **3D射撃＆操作限定**: 弾丸を3Dカプセルエネルギーモデル（`sphere.obj`）に更新し旋回制御を実装。射撃キーを左クリック（`VK_LBUTTON`）のみに限定し誤爆を解消。
+  - **敵視界＆AIステータスUI**: 地面に広がるパトロール/警戒/追跡に応じた3色グラデーションの視野領域（Vision Cone）と頭上 `INVESTIGATE (Alert: 100%)` 等のUIをデフォルト常時表示化。
+  - **アプリ層完結型1-DrawCallパーティクル基盤**: エンジン層不変の制約を遵守しながら、全パーティクルを1024粒まとめて1回の `DrawInstanced` で超高速描画（`0.03ms`, 60FPS維持）する自前バッファ＆`PerView`バインド処理を `AppParticleManager` に完全構築。
+- 🔗 **評価資料原本**: [LE3B_09_コウダ_アユ_週間報告07_31.md](docs/sprints/LE3B_09_コウダ_アユ_週間報告07_31.md)
+
 ---
 
 
+
+## 📂 プロジェクト・ディレクトリ構造（レイヤー分離設計）
+
+初見のコードレビューアーや開発者が直感的に全体像を理解できるよう、本リポジトリは **「エンジン層（Engine）」** と **「アプリケーション層（Application）」** に完全分離されています。
+
+```text
+Engine/
+ ├── project/
+ │    ├── Baziru3_Engine/           [🎮 エンジンコア・レイヤー]
+ │    │    ├── Core/                - 基盤コンテキスト、Window, DirectXCom, Allocators (CBV/Stack)
+ │    │    ├── Graphics/            - 3Dモデル、スプライト、シェーダー、照明 (CSM), GpuProfiler
+ │    │    └── Framework/           - 衝突判定 (BVH/AABBTree/Mesh), GPUパーティクル, AIノード
+ │    ├── Application/              [🚀 ゲームアプリケーション・レイヤー]
+ │    │    ├── Scene/               - ゲームプレイ/タイトル/クリア各シーン
+ │    │    ├── Player/              - プレイヤー移動・回転・入力処理
+ │    │    ├── Enemy/               - 敵AI行動・ステートマシン
+ │    │    ├── GameObject/          - 弾 (Bullet)、障害物 (Obstacle) 等のゲームオブジェクト
+ │    │    └── Subsystem/           - サブシステム群
+ │    ├── Resources/                [🎨 アセットデータ]
+ │    │    ├── shaders/             - HLSL シェーダー群 (VS/PS/CS)
+ │    │    ├── textures/ & models/  - 3Dモデル・テクスチャ
+ │    │    └── ai_trees/            - AI Behavior Tree JSON定義ファイル
+ │    ├── externals/                [📦 サードパーティライブラリ]
+ │    │    └── ImGui, imgui-node-editor, Assimp, DirectXTex, nlohmann
+ │    ├── DirectXGame.sln           [🔧 Visual Studio 2026 ソリューション]
+ │    └── DirectXGame.vcxproj       [🔧 プロジェクト定義ファイル]
+ └── README.md                      [📖 アーキテクチャ解説ドキュメント]
+```
+
+---
+
 ## 🛠️ 技術スタック
+
 
 * **言語**: C++ (C++20 / ISO C++ 最新規格)
 * **グラフィックス API**: DirectX 12 (Direct3D 12)
@@ -232,12 +272,13 @@ CollisionManager::GetInstance()->RegisterCollider(collider.get());
 ## 🚀 開発ロードマップ & 進捗
 
 - [x] **DirectX 12 描画基礎**: パイプライン、シェーダバインド、定数バッファ管理
-- [x] **アニメーション**: スケルトン、ジョイント、スキンクアスタ対応（Assimp統合）
+- [x] **アニメーション**: スケルトン、ジョイント、スキンクラスタ対応（Assimp統合）
 - [x] **デバッグ環境**: ImGui 統合、および GUI Behavior Tree エディタ
-- [ ] **メモリ最適化**: CBV用リングバッファ、スタック/プールアロケータのフル統合
-- [ ] **衝突最適化**: 八分木空間分割およびデータ指向設計 (DOD)
-- [ ] **グラフィックス強化**: カスケードシャドウマップ (CSM) の実装
-- [ ] **Assetバイナリ化**: パースを伴わない高速ロードとマルチスレッド非同期読み込み
+- [x] **メモリ最適化**: CBV用リングバッファ、スタック/プールアロケータ (`ConstantBufferAllocator`, `StackAllocator`, `FreeList`) & パフォーマンスプロファイラUI
+- [x] **衝突最適化**: 八分木/BVH空間分割 (AABBTree)、空間ハッシュ、データ指向設計 (DOD)
+- [x] **グラフィックス強化**: カスケードシャドウマップ (CSM) & 全3Dモデル動的視錐台カリング
+- [x] **Assetバイナリ化**: `.bmodel` / `.bskel` / `.banim` 高速バイナリシリアライザ
+
 
 ---
 
