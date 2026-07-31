@@ -474,8 +474,14 @@ Object3d::MaterialData Object3d::LoadMaterialTemplateFile(const std::string& dir
 	//中で必要になる変数の宣言
 	Object3d::MaterialData materlialData;//構築するデータ
 	std::string line;//ファイルから読み込んだ1行を格納するもの
-	std::ifstream file(directoryPath + "/" + filename);//ファイルを開く
-	assert(file.is_open());//ファイルが開けなかったら停止
+	std::string fullPath = directoryPath + "/" + filename;
+	std::ifstream file(fullPath);//ファイルを開く
+	if (!file.is_open())
+	{
+		std::string msg = "[Object3d::LoadMaterialTemplateFile Warning] Failed to open .mtl file: " + fullPath + "\n";
+		OutputDebugStringA(msg.c_str());
+		return materlialData;
+	}
 
 	//MaterialDataを構築
 	while (std::getline(file, line))
@@ -509,8 +515,20 @@ Object3d::ModelData Object3d::LoadObjFile(const std::string& directoryPath, cons
 	std::string line;//ファイルから読み込んだ1行を格納するもの
 
 	//ファイルを開く
-	std::ifstream file(directoryPath + "/" + filename);//ファイルを開く
-	assert(file.is_open());//ファイルが開けなかったら停止
+	std::string fullPath = directoryPath + "/" + filename;
+	std::ifstream file(fullPath);//ファイルを開く
+	if (!file.is_open())
+	{
+		std::string errMsg = "[Object3d::LoadObjFile ERROR] Failed to open .obj file: " + fullPath + "\n";
+		OutputDebugStringA(errMsg.c_str());
+		if (filename != "plane.obj")
+		{
+			OutputDebugStringA("[Object3d::LoadObjFile Info] Falling back to plane.obj...\n");
+			return LoadObjFile("Resources", "plane.obj");
+		}
+	}
+	assert(file.is_open() && "Object3d::LoadObjFile - Could not open .obj file!");
+
 
 	//実際にファイルを読み込む。その後modelDataを構築する
 	while (std::getline(file, line))
