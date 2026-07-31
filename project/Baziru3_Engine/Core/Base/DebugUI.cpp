@@ -286,43 +286,74 @@ void DebugUI::Update()
 
     ImGui::End();
 
+    ImGui::SetNextWindowSize(ImVec2(440.0f, 540.0f), ImGuiCond_Once);
     ImGui::Begin("Performance Tracker");
     {
         float currentFps = ImGui::GetIO().Framerate;
-        ImGui::Text("Current FPS: %.1f", currentFps);
-        ImGui::Text("Frame Time: %.3f ms/frame", 1000.0f / currentFps);
+        float frameTimeMs = 1000.0f / (currentFps > 0.1f ? currentFps : 60.0f);
+
+        // --- 1. FPS & Frame Time Badge Header ---
+        ImVec4 fpsColor = (currentFps >= 55.0f) ? ImVec4(0.2f, 0.9f, 0.3f, 1.0f)
+                       : (currentFps >= 30.0f) ? ImVec4(0.9f, 0.8f, 0.2f, 1.0f)
+                       :                         ImVec4(0.9f, 0.2f, 0.2f, 1.0f);
+
+        ImGui::TextColored(fpsColor, "FPS: %.1f", currentFps);
+        ImGui::SameLine(140.0f);
+        ImGui::Text("Frame Time: %.2f ms", frameTimeMs);
+        ImGui::SameLine(310.0f);
+        ImGui::TextColored(ImVec4(0.6f, 0.6f, 0.6f, 1.0f), "Target: 16.67 ms");
 
         static float fpsHistory[120] = {};
         static int fpsHistoryOffset = 0;
         fpsHistory[fpsHistoryOffset] = currentFps;
         fpsHistoryOffset = (fpsHistoryOffset + 1) % 120;
 
-        float minFps = fpsHistory[0];
-        float maxFps = fpsHistory[0];
-        for (int i = 1; i < 120; ++i)
+        float minFps = fpsHistory[0], maxFps = fpsHistory[0], avgFps = 0.0f;
+        for (int i = 0; i < 120; ++i)
         {
             if (fpsHistory[i] < minFps) minFps = fpsHistory[i];
             if (fpsHistory[i] > maxFps) maxFps = fpsHistory[i];
+            avgFps += fpsHistory[i];
         }
+        avgFps /= 120.0f;
 
-        char label[64];
-        std::snprintf(label, sizeof(label), "Min: %.1f | Max: %.1f", minFps, maxFps);
-        ImGui::PlotLines("##FPSGraph", fpsHistory, 120, fpsHistoryOffset, label, 0.0f, 120.0f, ImVec2(0, 50.0f));
+        char fpsLabel[64];
+        std::snprintf(fpsLabel, sizeof(fpsLabel), "Min: %.1f | Avg: %.1f | Max: %.1f", minFps, avgFps, maxFps);
+        ImGui::PlotLines("##FPSGraph", fpsHistory, 120, fpsHistoryOffset, fpsLabel, 0.0f, 120.0f, ImVec2(0, 45.0f));
 
         ImGui::Separator();
-        ImGui::Text("--- CPU/GPU Stage Profiler ---");
 
-        // 1. 全ステージの active フラグをリセット
+        // --- 2. GPU Particle Load Metric ---
+        ParticleManager* pm = ParticleManager::GetInstance();
+        if (pm)
+        {
+            uint32_t activeParticles = pm->GetNumInstance();
+            uint32_t maxParticles = 10240; // GPU Particle Capacity
+            float particleLoadRatio = static_cast<float>(activeParticles) / static_cast<float>(maxParticles);
+
+            ImGui::Text("GPU Particles:");
+            ImGui::SameLine(140.0f);
+            ImGui::Text("%u / %u", activeParticles, maxParticles);
+
+            char loadLabel[32];
+            std::snprintf(loadLabel, sizeof(loadLabel), "%.1f%% Load", particleLoadRatio * 100.0f);
+            ImGui::ProgressBar(particleLoadRatio, ImVec2(-1.0f, 0.0f), loadLabel);
+            ImGui::Separator();
+        }
+
+        // --- 3. GPU / CPU Stage Profiler ---
+        ImGui::TextColored(ImVec4(0.4f, 0.8f, 1.0f, 1.0f), "--- GPU / CPU Stage Profiler ---");
+
+        // 全ステージの active フラグをリセット
         for (int i = 0; i < kMaxStages; ++i)
         {
             stages_[i].active = false;
         }
 
-        // Helper: 名前からステージのインデックスを取得、無ければ新規登録
         auto getStageIndex = [&](const std::string& name) -> int {
             for (int i = 0; i < kMaxStages; ++i)
             {
-                if (stages_[i].name[0] == '\0') // 空きスロット
+                if (stages_[i].name[0] == '\0')
                 {
                     strcpy_s(stages_[i].name, sizeof(stages_[i].name), name.c_str());
                     return i;
@@ -332,11 +363,12 @@ void DebugUI::Update()
                     return i;
                 }
             }
-            return -1; // 満杯
+            return -1;
         };
 
-        // GPU プロファイル結果の回収と履歴の更新
+        // GPU プロファイル結果の回収
         const auto& gpuResults = GpuProfiler::GetInstance()->GetResults();
+        float totalGpuTimeMs = 0.0f;
         for (const auto& res : gpuResults)
         {
             int idx = getStageIndex(res.name);
@@ -344,10 +376,11 @@ void DebugUI::Update()
             {
                 stages_[idx].active = true;
                 stages_[idx].history[historyOffset_] = res.timeMs;
+                totalGpuTimeMs += res.timeMs;
             }
         }
 
-        // CPU 衝突判定（Collision）の所要時間を追加
+        // CPU 衝突判定の時間
         float collisionTime = CollisionManager::GetInstance()->GetLastUpdateDurationMs();
         int colIdx = getStageIndex("Collision (CPU)");
         if (colIdx >= 0)
@@ -356,40 +389,138 @@ void DebugUI::Update()
             stages_[colIdx].history[historyOffset_] = collisionTime;
         }
 
-        // オフセットを進める
         historyOffset_ = (historyOffset_ + 1) % kMaxHistoryFrames;
 
-        // 各ステージの時間数値表示と個別の折れ線グラフ描画
-        for (int i = 0; i < kMaxStages; ++i)
+        // --- 4. GPU Pass Share Visual Breakdown Bar ---
+        ImGui::Text("Total GPU Render Time: %.3f ms", totalGpuTimeMs);
+
+        // 各パスの色定義
+        struct PassColor { const char* prefix; ImVec4 color; const char* label; };
+        PassColor passColors[] = {
+            { "Scene",       ImVec4(0.2f, 0.6f, 1.0f, 1.0f), "Scene (3D)" },
+            { "Sprite",      ImVec4(0.2f, 0.9f, 0.4f, 1.0f), "Sprite" },
+            { "Particle",    ImVec4(1.0f, 0.6f, 0.2f, 1.0f), "Particle" },
+            { "PostProcess", ImVec4(0.8f, 0.3f, 0.9f, 1.0f), "PostProcess" },
+            { "Collision",   ImVec4(0.9f, 0.9f, 0.2f, 1.0f), "Collision" }
+        };
+
+        // 突破バーを描画（ImDrawList）
+        ImDrawList* drawList = ImGui::GetWindowDrawList();
+        ImVec2 barPos = ImGui::GetCursorScreenPos();
+        float barWidth = ImGui::GetContentRegionAvail().x;
+        float barHeight = 16.0f;
+
+        // 背景
+        drawList->AddRectFilled(barPos, ImVec2(barPos.x + barWidth, barPos.y + barHeight), IM_COL32(40, 40, 45, 255), 3.0f);
+
+        if (totalGpuTimeMs > 0.001f)
         {
-            if (stages_[i].name[0] == '\0') continue; // 未使用
-
-            float lastVal = stages_[i].history[historyOffset_ == 0 ? kMaxHistoryFrames - 1 : historyOffset_ - 1];
-
-            ImGui::Text("%s: %.3f ms", stages_[i].name, lastVal);
-            
-            // グラフ用に最大値を動的計算してスケールを合わせる
-            float maxVal = 0.1f;
-            for (int j = 0; j < kMaxHistoryFrames; ++j)
+            float currentX = barPos.x;
+            for (const auto& pc : passColors)
             {
-                if (stages_[i].history[j] > maxVal) maxVal = stages_[i].history[j];
-            }
-            maxVal *= 1.2f;
+                int idx = getStageIndex(pc.prefix);
+                if (idx < 0) continue;
+                int prevOffset = (historyOffset_ == 0) ? kMaxHistoryFrames - 1 : historyOffset_ - 1;
+                float passMs = stages_[idx].history[prevOffset];
+                float segWidth = (passMs / totalGpuTimeMs) * barWidth;
 
-            char graphLabel[64];
-            std::snprintf(graphLabel, sizeof(graphLabel), "Max: %.2f ms", maxVal);
-            
-            std::string imguiId = "##" + std::string(stages_[i].name);
-            ImGui::PlotLines(imguiId.c_str(), stages_[i].history, kMaxHistoryFrames, historyOffset_, graphLabel, 0.0f, maxVal, ImVec2(0, 35.0f));
+                if (segWidth > 1.0f)
+                {
+                    ImU32 col = ImGui::ColorConvertFloat4ToU32(pc.color);
+                    drawList->AddRectFilled(ImVec2(currentX, barPos.y), ImVec2(currentX + segWidth - 1.0f, barPos.y + barHeight), col, 2.0f);
+                    currentX += segWidth;
+                }
+            }
+        }
+        ImGui::Dummy(ImVec2(barWidth, barHeight + 4.0f));
+
+        // 色凡例
+        for (const auto& pc : passColors)
+        {
+            ImGui::ColorButton("##col", pc.color, ImGuiColorEditFlags_NoTooltip, ImVec2(10, 10));
+            ImGui::SameLine();
+            ImGui::TextColored(pc.color, "%s", pc.label);
+            ImGui::SameLine(0, 12);
+        }
+        ImGui::NewLine();
+
+        ImGui::Separator();
+
+        // --- 5. Detailed Pass Table ---
+        if (ImGui::BeginTable("ProfilerTable", 4, ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_RowBg))
+        {
+            ImGui::TableSetupColumn("Pass Name", ImGuiTableColumnFlags_WidthStretch, 150.0f);
+            ImGui::TableSetupColumn("Last (ms)", ImGuiTableColumnFlags_WidthFixed, 75.0f);
+            ImGui::TableSetupColumn("Share (%)", ImGuiTableColumnFlags_WidthFixed, 70.0f);
+            ImGui::TableSetupColumn("Max (ms)",  ImGuiTableColumnFlags_WidthFixed, 70.0f);
+            ImGui::TableHeadersRow();
+
+            for (int i = 0; i < kMaxStages; ++i)
+            {
+                if (stages_[i].name[0] == '\0') continue;
+
+                int prevOffset = (historyOffset_ == 0) ? kMaxHistoryFrames - 1 : historyOffset_ - 1;
+                float lastVal = stages_[i].history[prevOffset];
+
+                float maxVal = 0.001f;
+                for (int j = 0; j < kMaxHistoryFrames; ++j)
+                {
+                    if (stages_[i].history[j] > maxVal) maxVal = stages_[i].history[j];
+                }
+
+                float share = (totalGpuTimeMs > 0.001f) ? (lastVal / totalGpuTimeMs) * 100.0f : 0.0f;
+
+                ImGui::TableNextRow();
+                ImGui::TableSetColumnIndex(0);
+                ImGui::Text("%s", stages_[i].name);
+
+                ImGui::TableSetColumnIndex(1);
+                ImGui::Text("%.3f", lastVal);
+
+                ImGui::TableSetColumnIndex(2);
+                ImGui::Text("%.1f%%", share);
+
+                ImGui::TableSetColumnIndex(3);
+                ImGui::Text("%.2f", maxVal);
+            }
+            ImGui::EndTable();
+        }
+
+        // --- 6. Individual Pass Sparklines ---
+        if (ImGui::CollapsingHeader("Individual Pass Graphs"))
+        {
+            for (int i = 0; i < kMaxStages; ++i)
+            {
+                if (stages_[i].name[0] == '\0') continue;
+
+                int prevOffset = (historyOffset_ == 0) ? kMaxHistoryFrames - 1 : historyOffset_ - 1;
+                float lastVal = stages_[i].history[prevOffset];
+
+                float maxVal = 0.1f;
+                for (int j = 0; j < kMaxHistoryFrames; ++j)
+                {
+                    if (stages_[i].history[j] > maxVal) maxVal = stages_[i].history[j];
+                }
+                maxVal *= 1.2f;
+
+                char graphLabel[64];
+                std::snprintf(graphLabel, sizeof(graphLabel), "%.3f ms (Max: %.2f)", lastVal, maxVal);
+
+                std::string imguiId = "##" + std::string(stages_[i].name);
+                ImGui::Text("%s", stages_[i].name);
+                ImGui::PlotLines(imguiId.c_str(), stages_[i].history, kMaxHistoryFrames, historyOffset_, graphLabel, 0.0f, maxVal, ImVec2(0, 30.0f));
+            }
         }
     }
     ImGui::End();
+
     if (btEditor_)
     {
         btEditor_->Draw();
     }
 #endif
 }
+
 
 void DebugUI::Finalize()
 {
