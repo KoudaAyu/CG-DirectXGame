@@ -21,6 +21,9 @@ class Fade;
 struct ID3D12GraphicsCommandList;
 struct SceneRenderRequests;
 
+/**
+ * @brief シーンの遷移とライフサイクル、およびエンジン層サブシステムを管理するクラス
+ */
 class SceneManager
 {
 
@@ -29,25 +32,40 @@ public:
         : dxCommon_(dxCommon), logStream_(logStream) {}
 	~SceneManager();
 
+	/**
+	 * @brief シーンマネージャーの初期化を行います
+	 * @param dxCommon DirectX12共通オブジェクトのポインタ
+	 */
 	void Initialize(DirectXCom* dxCommon);
 
-    // Update the scene manager and engine-level subsystems. deltaTime is in seconds.
+	/**
+	 * @brief アクティブなシーンの更新および各種エンジン側処理を実行します
+	 * @param deltaTime フレーム間の経過時間 (秒)
+	 */
 	void Update(float deltaTime);
 
+	/**
+	 * @brief 現在のシーンを描画します
+	 * @param renderRequests 描画リクエスト情報
+	 */
     void Draw(SceneRenderRequests& renderRequests);
-    void DrawUI();
 
-	/// <summary>
-	/// 次のシーン予約
-	/// </summary>
-	/// <param name="sceneName">シーン名</param>
+	/**
+	 * @brief 次に遷移するシーンを名前指定で予約します
+	 * @param sceneName 遷移先シーンの名前
+	 */
 	void ChangeScene(const std::string& sceneName);
 
    
+	/**
+	 * @brief 予約されているシーン遷移を適用します
+	 */
     void ApplyPendingSceneChange();
 
 	void SetDirectXCom(DirectXCom* dxCommon) { dxCommon_ = dxCommon; }
+	DirectXCom* GetDirectXCom() const { return dxCommon_; }
 	void SetCamera(Camera* camera) { camera_ = camera; }
+	Camera* GetCamera() const { return camera_; }
 
 	void SetSceneFactory(std::unique_ptr<AbstractSceneFactory> sceneFactory) { sceneFactory_ = std::move(sceneFactory); }
 	BaseScene* GetCurrentScene() const { return scene_.get(); }

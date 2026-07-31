@@ -31,22 +31,16 @@ void main( uint3 DTid : SV_DispatchThreadID )
 {
     uint32_t vertexIndex = DTid.x;
 
-    
-    if(vertexIndex < gSkinningInformation.numVertices)
+    if (vertexIndex < gSkinningInformation.numVertices)
     {
-        //Skinningの計算
-
-        //必要なデータをStructuredBufferから取得
-        //SkinningObject3D.VSでは入力頂点として受け取っていた
+        // 必要なデータをStructuredBufferから取得
         Vertex input = gInputVertices[vertexIndex];
         VertexInfluence influence = gVertexInfluences[vertexIndex];
 
-        //Skinning後の頂点を計算
+        // Skinning後の頂点を計算
         Vertex skinned;
         skinned.texcoord = input.texcoord;
         
-        //計算の方法はSkinningObject3d.VSと同じ
-        //データの取得方法が変わるだけで、原理は同じ
         float32_t4 skinnedPosition = float32_t4(0.0f, 0.0f, 0.0f, 0.0f);
         float32_t3 skinnedNormal = float32_t3(0.0f, 0.0f, 0.0f);
         
@@ -56,6 +50,7 @@ void main( uint3 DTid : SV_DispatchThreadID )
             int32_t index = influence.index[i];
             if (weight > 0.0f)
             {
+                // 行列パレットの適用とウェイトの加算
                 skinnedPosition += mul(input.position, gMatrixPalette[index].skeletonSpaceMatrix) * weight;
                 skinnedNormal += mul(input.normal, (float32_t3x3)gMatrixPalette[index].skeletonSpaceInverseTransposeMatrix) * weight;
             }
@@ -65,7 +60,7 @@ void main( uint3 DTid : SV_DispatchThreadID )
         skinned.position = skinnedPosition;
         skinned.normal = normalize(skinnedNormal);
 
-        //Skinning後の頂点データを格納、つまり書き込む
+        // Skinning後の頂点データをUAVに書き込む
         gOutputVertices[vertexIndex] = skinned;
     }
 }

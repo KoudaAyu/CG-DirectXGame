@@ -433,8 +433,38 @@ void CollisionManager::Update()
 
 bool CollisionManager::CheckCollision(const CollisionData& a, const CollisionData& b, Vector3& outPushDir, float& outPushLen)
 {
-    ColliderType typeA = a.type;
-    ColliderType typeB = b.type;
+	// アーリーアウト: 境界球の距離比較による超高速カット
+	float maxRadiusA = a.shape.radius;
+	if (a.type == ColliderType::Box)
+	{
+		maxRadiusA = Length({ a.shape.size.x * 0.5f, a.shape.size.y * 0.5f, a.shape.size.z * 0.5f });
+	}
+	else if (a.type == ColliderType::Capsule)
+	{
+		maxRadiusA = a.shape.radius + a.shape.height * 0.5f;
+	}
+
+	float maxRadiusB = b.shape.radius;
+	if (b.type == ColliderType::Box)
+	{
+		maxRadiusB = Length({ b.shape.size.x * 0.5f, b.shape.size.y * 0.5f, b.shape.size.z * 0.5f });
+	}
+	else if (b.type == ColliderType::Capsule)
+	{
+		maxRadiusB = b.shape.radius + b.shape.height * 0.5f;
+	}
+
+	Vector3 delta = b.worldPosition - a.worldPosition;
+	float distSq = LengthSq(delta);
+	float maxCombined = maxRadiusA + maxRadiusB;
+	if (distSq > maxCombined * maxCombined)
+	{
+		return false;
+	}
+
+	ColliderType typeA = a.type;
+	ColliderType typeB = b.type;
+
 
     // 1. 球 vs 球 (Sphere - Sphere)
     if (typeA == ColliderType::Sphere && typeB == ColliderType::Sphere)

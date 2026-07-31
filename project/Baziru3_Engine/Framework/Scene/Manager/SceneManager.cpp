@@ -12,6 +12,11 @@
 #include <cassert>
 #include<memory>
 #include <Log.h>
+#include "ModelManager.h"
+#include "AsyncLoader.h"
+#include "Baziru3_Engine/Framework/Collision/CollisionManager.h"
+#include "Baziru3_Engine/Graphics/3D/Object/Object3d.h"
+#include "Baziru3_Engine/Graphics/Shapes/Sphere/Sphere.h"
 
 namespace {
     static std::unique_ptr<SceneManager>& SceneManagerStorage()
@@ -28,6 +33,9 @@ SceneManager::~SceneManager()
 		scene_->Finalize();
 		scene_.reset();
 	}
+	AsyncLoader::GetInstance()->Finalize();
+	AsyncLoader::Destroy();
+	ModelManager::Destroy();
 }
 
 void SceneManager::ChangeScene(const std::string& sceneName)
@@ -35,7 +43,7 @@ void SceneManager::ChangeScene(const std::string& sceneName)
 
 	if (!sceneFactory_)
 	{
-		sceneFactory_.reset(new SceneFactory());
+		sceneFactory_ = std::make_unique<SceneFactory>();
 	}
 
   if (nextScene_ || isSceneTransitioning_)
@@ -73,6 +81,8 @@ void SceneManager::Destroy()
 void SceneManager::Initialize(DirectXCom* dxCommon)
 {
 	dxCommon_ = dxCommon;
+	ModelManager::GetInstance()->Initialize(dxCommon);
+	AsyncLoader::GetInstance()->Initialize(ModelManager::GetInstance()->modelCom_.get());
 }
 
 void SceneManager::Update(float deltaTime)
@@ -92,6 +102,7 @@ void SceneManager::Update(float deltaTime)
 		return;
 	}
 
+	AsyncLoader::GetInstance()->Update();
 
     ApplyPendingSceneChange();
 
@@ -189,14 +200,6 @@ void SceneManager::Draw(SceneRenderRequests& renderRequests)
         }
     }
 
-}
-
-void SceneManager::DrawUI()
-{
-    if (scene_)
-    {
-        scene_->DrawUI();
-    }
 }
 
 void SceneManager::DrawSkybox(ID3D12GraphicsCommandList* commandList) const

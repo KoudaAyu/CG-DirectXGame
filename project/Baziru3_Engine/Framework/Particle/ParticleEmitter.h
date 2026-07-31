@@ -14,23 +14,15 @@ struct Emitter
 	float frequencyTime; //使用頻度
 };
 
-struct GPUEmitterData
+struct EmitterSphere
 {
-	Vector3 translate = { 0.0f, 0.0f, 0.0f };    // 位置
-	float radius = 0.5f;                         // 発生半径
-	uint32_t count = 8;                          // 射出数
-	float frequency = 0.016f;                    // 発生頻度
-	float frequencyTime = 0.0f;                  // 使用頻度
-	uint32_t emit = 1;                           // 射出許可
-	uint32_t emitterType = 0;                    // 0: Point, 1: Box, 2: Sphere, 3: Cone
-	float initialSpeed = 1.0f;                   // 初速
-	Vector3 boxSize = { 1.0f, 1.0f, 1.0f };       // Box領域サイズ
-	float coneAngle = 0.523598f;                 // Cone照射角度
-	Vector3 direction = { 0.0f, 1.0f, 0.0f };    // Direction / Cone向き
-	float particleLifeTime = 1.0f;               // パーティクル寿命
-	Vector4 particleColor = { 1.0f, 0.6f, 0.15f, 1.0f }; // パーティクルカラー
+	Vector3 translate; //位置
+	float radius; //射出範囲
+	uint32_t count; //射出数
+	float frequency; //発生頻度
+	float frequencyTime; //使用頻度
+	uint32_t emit; //許可
 };
-typedef GPUEmitterData EmitterSphere;
 
 class ParticleEmitter
 {

@@ -26,31 +26,6 @@ struct Quaternion
         return Quaternion(a.x * s, a.y * s, a.z * s, std::cos(angleRad * 0.5f));
     }
 
-    static Quaternion FromToRotation(Vector3 from, Vector3 to)
-    {
-        float fromLen = std::sqrt(from.x * from.x + from.y * from.y + from.z * from.z);
-        float toLen = std::sqrt(to.x * to.x + to.y * to.y + to.z * to.z);
-        if (fromLen < 0.0001f || toLen < 0.0001f) return Quaternion(0, 0, 0, 1);
-        from.x /= fromLen; from.y /= fromLen; from.z /= fromLen;
-        to.x /= toLen; to.y /= toLen; to.z /= toLen;
-
-        float dot = from.x * to.x + from.y * to.y + from.z * to.z;
-        if (dot >= 0.9999f) return Quaternion(0, 0, 0, 1);
-        if (dot <= -0.9999f)
-        {
-            Vector3 axis = { 0, 1, 0 };
-            if (std::abs(from.y) > 0.9f) axis = { 1, 0, 0 };
-            Vector3 c = { from.y * axis.z - from.z * axis.y, from.z * axis.x - from.x * axis.z, from.x * axis.y - from.y * axis.x };
-            return FromAxisAngle(c, 3.14159265f);
-        }
-
-        Vector3 c = { from.y * to.z - from.z * to.y, from.z * to.x - from.x * to.z, from.x * to.y - from.y * to.x };
-        float w = 1.0f + dot;
-        Quaternion q(c.x, c.y, c.z, w);
-        q.Normalize();
-        return q;
-    }
-
     void Normalize()
     {
         float n = std::sqrt(x * x + y * y + z * z + w * w);

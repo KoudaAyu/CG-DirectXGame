@@ -5,7 +5,11 @@
 
 #include<unordered_map>
 #include <memory>
+#include <vector>
 
+/**
+ * @brief テクスチャの読み込みとSRVディスクリプタ管理を行うクラス
+ */
 class TextureManager
 {
 public:
@@ -14,11 +18,20 @@ public:
 	static void Destroy();
 
 	~TextureManager() = default;
-	//終了
+
+	/**
+	 * @brief テクスチャマネージャー終了処理を行い、リソースを解放します
+	 */
 	void Finalize();
 
 
+	/**
+	 * @brief テクスチャマネージャー初期化処理を行います
+	 */
 	void Initialize();
+
+	// アップロード用中間バッファの一括解放と同期
+	void ReleaseUploadBuffers();
 
 	void LoadTexture(const std::string& filePath);
 
@@ -28,7 +41,11 @@ public:
 	// SRVManager へのアクセサ（SRV インデックス管理を一元化するため）
 	SRVManager* GetSRVManager() const { return srvManager_.get(); }
 
-	// ファイルパスからSRVインデックスを取得（見つからなければ -1）
+	/**
+	 * @brief ファイルパスからSRVインデックスを取得します
+	 * @param filePath 検索対象のテクスチャファイルパス
+	 * @return SRVインデックス
+	 */
 	uint32_t GetTextureIndexByFilePath(const std::string& filePath) const;
 
 	//メタデータ取得 (オーバーロード: ファイルパスまたはインデックスで取得可能)
@@ -48,6 +65,11 @@ public:
 	}
 	D3D12_GPU_DESCRIPTOR_HANDLE GetSrvHandleGPU(uint32_t index) const;
 
+	/**
+	 * @brief テクスチャを読み込み、SRVを作成します
+	 * @param filePath 読み込むテクスチャのパス
+	 * @return 登録されたSRVディスクリプタのインデックス
+	 */
 	uint32_t Load(const std::string& filePath);
 
 	// 便利ヘルパー: 作業ディレクトリ基準の単純ロード
@@ -90,6 +112,9 @@ private:
 
 	//SRVインデックスの開始番号
 	uint32_t kSRVIndexTop = 1;
+
+	// コピー用中間リソースの一時保持リスト
+	std::vector<Microsoft::WRL::ComPtr<ID3D12Resource>> uploadBuffers_;
 
 	
 };

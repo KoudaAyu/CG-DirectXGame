@@ -23,32 +23,7 @@ namespace {
     }
 }
 
-//void Sound::Initialize()
-//{
-//	HRESULT result = XAudio2Create(&xAudio2, 0, XAUDIO2_DEFAULT_PROCESSOR);
-//	assert(SUCCEEDED(result));
-//
-//	result = xAudio2->CreateMasteringVoice(&masterVoice);
-//	assert(SUCCEEDED(result));
-//
-//	result = MFStartup(MF_VERSION, MFSTARTUP_NOSOCKET);
-//	assert(SUCCEEDED(result));
-//}
 
-//void Sound::Finalize()
-//{
-//	// 実行中に明示的に呼ぶ終了処理用。ここで安全に後片付けを行う
-//	SoundUnload();
-//
-//	if (masterVoice)
-//	{
-//		masterVoice->DestroyVoice();
-//		masterVoice = nullptr;
-//	}
-//
-//	xAudio2.Reset();
-//	MFShutdown();
-//}
 
 bool Sound::LoadFileToSoundData(const std::string& filename, SoundData& out)
 {
@@ -140,14 +115,17 @@ bool Sound::LoadFileToSoundData(const std::string& filename, SoundData& out)
 			BYTE* pData = nullptr;
 			DWORD currentLength = 0;
 			pBuffer->Lock(&pData, nullptr, &currentLength);
-			size_t oldSize = out.buffer.size();
-			out.buffer.resize(oldSize + currentLength);
-			memcpy(&out.buffer[oldSize], pData, currentLength);
+			if (currentLength > 0)
+			{
+				size_t oldSize = out.buffer.size();
+				out.buffer.resize(oldSize + currentLength);
+				std::memcpy(&out.buffer[oldSize], pData, currentLength);
+			}
 			pBuffer->Unlock();
 		}
 	}
 
-	return false;
+	return true;
 }
 
 void Sound::SoundUnload()
@@ -162,31 +140,4 @@ void Sound::SoundUnload()
 
 	soundData.buffer.clear();
 	soundData.wfex = {};
-}
-
-//void Sound::SoundPlayWave()
-//{
-//	if (soundData.buffer.empty()) return;
-//
-//	// 前回のボイスが残っていれば一度停止してから破棄
-//	if (pSourceVoice)
-//	{
-//		pSourceVoice->Stop();
-//		pSourceVoice->DestroyVoice();
-//		pSourceVoice = nullptr;
-//	}
-//
-//	HRESULT result = xAudio2->CreateSourceVoice(&pSourceVoice, &soundData.wfex);
-//	assert(SUCCEEDED(result));
-//
-//	XAUDIO2_BUFFER buf = {};
-//	buf.pAudioData = soundData.buffer.data();
-//	buf.AudioBytes = (UINT32)soundData.buffer.size();
-//	buf.Flags = XAUDIO2_END_OF_STREAM;
-//
-//	result = pSourceVoice->SubmitSourceBuffer(&buf);
-//	assert(SUCCEEDED(result));
-//
-//	result = pSourceVoice->Start(0);
-//	assert(SUCCEEDED(result));
-//}
+}

@@ -17,6 +17,7 @@ class ParticleEmitter;
 
 class Camera;
 class Ring;
+class TextureManager;
 
 class ParticleManager
 {
@@ -27,10 +28,11 @@ public:
 	struct ParticleCS
 	{
 		Vector3 translate;
-		Vector3 scale;
 		float lifeTime;
-		Vector3 velocity;
+		Vector3 scale;
 		float currentTime;
+		Vector3 velocity;
+		float padding;
 		Vector4 color;
 	};
 
@@ -41,7 +43,7 @@ public:
 		float deltaTime;
 		float time;
 		uint32_t maxParticles;
-		float padding; // 16バイトアライメントのためのパディング
+		float padding;
 	};
 
 	struct PerFrame
@@ -50,15 +52,7 @@ public:
 		float deltaTime;
 	};
 
-	struct GPUFieldData
-	{
-		Vector3 translate = { 0.0f, 0.0f, 0.0f }; // 力場の中心座標
-		float radius = 5.0f;                      // 影響領域の半径
-		uint32_t fieldType = 0;                   // 0: None, 1: Attractor(引き寄せ), 2: Vortex(渦), 3: Wind(風), 4: Drag(抵抗)
-		float strength = 2.0f;                    // 強度
-		Vector3 direction = { 1.0f, 0.0f, 0.0f }; // Windの方向
-		float padding[2] = { 0.0f, 0.0f };
-	};
+
 
 	struct Particle
 	{
@@ -70,7 +64,7 @@ public:
 		uint32_t textureIndex = 0;
 	};
 
-	struct ParticleForGPU
+	struct alignas(16) ParticleForGPU
 	{
 		Matrix4x4 WVP;
 		Matrix4x4 World;
@@ -85,7 +79,7 @@ public:
 	ParticleManager(std::ostream& logStream, DirectXCom* dxCommon);
 	~ParticleManager();
 
-	void Initialize(Camera* camera);
+	void Initialize(Camera* camera, TextureManager* textureManager = nullptr);
 	void Finalize();
 	void ClearParticles();
 	void Update(float deltaTime);
@@ -171,8 +165,6 @@ public:
 
 	std::mt19937& GetRandomEngine() { return randomEngine; }
 	ParticleEmitter* GetGPUEmitter() const { return gpuEmitter_.get(); }
-	GPUFieldData* GetGPUFieldData() { return fieldData_; }
-	void DrawUI(const std::string& windowTitle = "GPU Particle Studio / Editor");
 
 	uint32_t GetNumMaxInstances() const { return kNumMaxInstances; }
 
@@ -194,6 +186,7 @@ public:
 
 private:
 	const uint32_t kNumMaxInstances = 256;
+	static const uint32_t kMaxGPUParticles = 10240;
 	uint32_t numInstance = 0;
 	uint32_t writeIndex = 0;
 	uint32_t normalInstanceCount_ = 0;
@@ -250,10 +243,6 @@ private:
 	Microsoft::WRL::ComPtr<ID3D12Resource> perFrameResource_ = nullptr;
 	PerFrame* perFrameData_ = nullptr;
 
-	// GPU Field 用のバッファ
-	Microsoft::WRL::ComPtr<ID3D12Resource> fieldResource_ = nullptr;
-	GPUFieldData* fieldData_ = nullptr;
-
 	// Compute Pipeline
 	Microsoft::WRL::ComPtr<ID3D12RootSignature> computeRootSignature_ = nullptr;
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> computePipelineState_ = nullptr;
@@ -267,11 +256,11 @@ private:
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> emitPipelineState_ = nullptr;
 	Microsoft::WRL::ComPtr<IDxcBlob> emitShaderBlob_ = nullptr;
 	std::unique_ptr<ParticleEmitter> gpuEmitter_;
-
-	static const uint32_t kMaxGPUParticles = 1024;
 	static ParticleManager* instance_;
 
 	std::mt19937 randomEngine{ std::random_device{}() };
+
+
 	std::list<ParticleManager::Particle> particles;
 	std::list<ParticleManager::Particle> effectParticles;
 
@@ -285,6 +274,7 @@ private:
 
 	uint32_t instancingSrvIndex_ = 0;
     bool finalized_ = false;
+	TextureManager* textureManager_ = nullptr;
     enum class DrawMode
 	{
 		None,
@@ -292,3 +282,4 @@ private:
 		External
 	};
 };
+

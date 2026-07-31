@@ -369,7 +369,7 @@ void River::Update(float deltaTime)
 
 void River::Draw(D3D12_GPU_DESCRIPTOR_HANDLE textureSrvHandle)
 {
-    if (indexCount_ == 0 || !dxCommon_ || !camera_ || textureSrvHandle.ptr == 0) return;
+    if (indexCount_ == 0 || !dxCommon_ || !camera_) return;
 
     auto commandList = dxCommon_->GetCommandList().Get();
 
@@ -379,16 +379,7 @@ void River::Draw(D3D12_GPU_DESCRIPTOR_HANDLE textureSrvHandle)
     commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
     // b0 (VS): WVP
-    if (transformationMatrixResource_)
-    {
-        commandList->SetGraphicsRootConstantBufferView(0, transformationMatrixResource_->GetGPUVirtualAddress());
-    }
-
-    // b0 (PS): Material
-    if (materialResource_)
-    {
-        commandList->SetGraphicsRootConstantBufferView(1, materialResource_->GetGPUVirtualAddress());
-    }
+    commandList->SetGraphicsRootConstantBufferView(0, transformationMatrixResource_->GetGPUVirtualAddress());
 
     // b1 (PS): Light
     if (light_)
@@ -403,10 +394,7 @@ void River::Draw(D3D12_GPU_DESCRIPTOR_HANDLE textureSrvHandle)
     }
 
     // b3 (VS/PS): WaterParams
-    if (waterParamsResource_)
-    {
-        commandList->SetGraphicsRootConstantBufferView(4, waterParamsResource_->GetGPUVirtualAddress());
-    }
+    commandList->SetGraphicsRootConstantBufferView(4, waterParamsResource_->GetGPUVirtualAddress());
 
     // t3 (PS): Texture
     commandList->SetGraphicsRootDescriptorTable(5, textureSrvHandle);

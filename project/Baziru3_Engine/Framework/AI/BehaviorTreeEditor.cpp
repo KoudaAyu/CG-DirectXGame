@@ -3,6 +3,7 @@
 #include <sstream>
 #include <algorithm>
 #include <Windows.h>
+#include <cmath>
 
 namespace BaziruEngine::AI {
 
@@ -11,39 +12,42 @@ namespace BaziruEngine::AI {
 // ==========================================
 
 BehaviorTreeEditor::BehaviorTreeEditor() {
-    // Sanitize settings file to prevent infinite grid loop freeze from corrupted zoom
-    std::string settingsPath = "bt_editor_layout.json";
-    std::ifstream checkFile(settingsPath);
-    if (checkFile.is_open())
+    // Sanitize settings files to prevent infinite grid loop freeze from corrupted zoom (< 0.1f or > 10.0f)
+    const std::vector<std::string> pathsToCheck = { "bt_editor_layout.json", "project/bt_editor_layout.json" };
+    for (const auto& settingsPath : pathsToCheck)
     {
-        nlohmann::json settingsJson;
-        bool needReset = false;
-        try {
-            checkFile >> settingsJson;
-            if (settingsJson.contains("view") && settingsJson["view"].contains("zoom"))
-            {
-                float zoom = settingsJson["view"]["zoom"];
-                if (zoom < 0.001f) // Corrupted or extremely tiny zoom causing infinite loop
-                {
-                    needReset = true;
-                }
-            }
-        } catch (...) {
-            // Ignore parse errors
-        }
-        checkFile.close();
-
-        if (needReset)
+        std::ifstream checkFile(settingsPath);
+        if (checkFile.is_open())
         {
-            settingsJson["view"]["zoom"] = 1.0f;
-            if (settingsJson["view"].contains("scroll"))
-            {
-                settingsJson["view"]["scroll"]["x"] = 0.0f;
-                settingsJson["view"]["scroll"]["y"] = 0.0f;
+            nlohmann::json settingsJson;
+            bool needReset = false;
+            try {
+                checkFile >> settingsJson;
+                if (settingsJson.contains("view") && settingsJson["view"].contains("zoom"))
+                {
+                    float zoom = settingsJson["view"]["zoom"];
+                    if (zoom < 0.1f || zoom > 10.0f || std::isnan(zoom))
+                    {
+                        needReset = true;
+                    }
+                }
+            } catch (...) {
+                // Ignore parse errors
             }
-            std::ofstream saveFile(settingsPath);
-            saveFile << settingsJson.dump();
-            saveFile.close();
+            checkFile.close();
+
+            if (needReset)
+            {
+                settingsJson["view"]["zoom"] = 1.0f;
+                if (settingsJson.contains("view"))
+                {
+                    settingsJson["view"]["scroll"]["x"] = 0.0f;
+                    settingsJson["view"]["scroll"]["y"] = 0.0f;
+                }
+                std::ofstream saveFile(settingsPath);
+                saveFile << settingsJson.dump(2);
+                saveFile.close();
+            }
         }
     }
 
@@ -98,7 +102,7 @@ EditorPin* BehaviorTreeEditor::FindPin(ed::PinId id) {
 
 // 接続状態からツリーの木構造を再帰的に巡回し、正規のBehaviorTree用JSONアセットに復元します
 nlohmann::json BehaviorTreeEditor::BuildTreeJSON(EditorNode* currentNode) {
-    if (!currentNode) return nullptr;
+    if (!currentNode) return nlohmann::json::object();
 
     nlohmann::json result;
     result["Type"] = currentNode->name;
@@ -302,7 +306,10 @@ void BehaviorTreeEditor::Draw() {
     if (!showEditor_) return;
 
     ImGui::SetNextWindowSize(ImVec2(1000, 600), ImGuiCond_FirstUseEver);
-    ImGui::Begin("AI Behavior Tree Editor", &showEditor_, ImGuiWindowFlags_MenuBar);
+    if (!ImGui::Begin("AI Behavior Tree Editor", &showEditor_, ImGuiWindowFlags_MenuBar)) {
+        ImGui::End();
+        return;
+    }
 
     // メニューバーでの保存・読込処理
     if (ImGui::BeginMenuBar()) {

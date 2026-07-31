@@ -81,9 +81,13 @@
     <ClCompile Include="Baziru3_Engine\Framework\Particle\ParticleManager.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Framework\Particle\ParticleEmitter.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
     <ClCompile Include="Baziru3_Engine\Core\Math\Random.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
+
     <ClCompile Include="Baziru3_Engine\Core\Base\ImGui\ImGuiManager.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
@@ -274,6 +278,7 @@
     <FxCompile Include="Resources\shaders\Object3d.VS.hlsl" />
     <FxCompile Include="Resources\shaders\SkinningObject3d.VS.hlsl" />
     <FxCompile Include="Resources\shaders\RadialBlur.PS.hlsl" />
+    <FxCompile Include="Resources\shaders\RandomNoise.PS.hlsl" />
     <FxCompile Include="Resources\shaders\BoxFilter.PS.hlsl" />
     <FxCompile Include="Resources\shaders\GaussianFilter.PS.hlsl" />
     <FxCompile Include="Resources\shaders\LuminanceBaseOutline.PS.hlsl" />
@@ -290,6 +295,7 @@
     <FxCompile Include="Resources\shaders\InitializeParticle.CS.hlsl">
       <Filter>リソース ファイル</Filter>
     </FxCompile>
+
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Baziru3_Engine\Framework\Animation\NodeAnimation\Node.h" />
@@ -367,7 +373,7 @@
     <ClInclude Include="Application\Player\Player.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
-    <ClInclude Include="Application\Obstacle.h">
+    <ClInclude Include="Application\GameObject\Obstacle.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
     <ClInclude Include="Baziru3_Engine\Core\IO\Mouse\MouseInput.h">
@@ -379,9 +385,10 @@
     <ClInclude Include="Application\Enemy\MovingEnemy.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
-    <ClInclude Include="Bullet.h">
+    <ClInclude Include="Application\GameObject\Bullet.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
+
     <ClInclude Include="Baziru3_Engine\Core\Base\SubsystemFactory.h" />
     <ClInclude Include="Baziru3_Engine\Core\Base\OffScreenRendering\OffScreenRendering.h" />
     <ClInclude Include="Baziru3_Engine\Graphics\3D\Model\SkinCluster\SkinCluster.h" />

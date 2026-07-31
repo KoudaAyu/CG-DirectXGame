@@ -35,7 +35,7 @@ void TextureManager::Destroy()
 
 void TextureManager::Finalize()
 {
-
+	uploadBuffers_.clear();
 	srvManager_.reset();
 	TextureManagerStorage().reset();
 }
@@ -53,25 +53,23 @@ void TextureManager::LoadTexture(const std::string& filePath)
 
 uint32_t TextureManager::GetTextureIndexByFilePath(const std::string& filePath) const
 {
-	// unordered_map ではキーで検索する
-	auto it = textureDates_.find(filePath);
-	if (it != textureDates_.end())
+	if (textureDates_.contains(filePath))
 	{
-		return it->second.srvIndex_;
+		return textureDates_.at(filePath).srvIndex_;
 	}
 
 	assert(0);
-	return 0;
+	return kInvalidTextureIndex;
 }
 
 const DirectX::TexMetadata& TextureManager::GetMetadata(uint32_t index) const
 {
-	// 逆引きマップでファイルパスを探し、そこからメタデータを取得する
-	auto it = indexToFilePath_.find(index);
-	if (it != indexToFilePath_.end()) {
-		auto it2 = textureDates_.find(it->second);
-		if (it2 != textureDates_.end()) {
-			return it2->second.metadata_;
+	if (indexToFilePath_.contains(index))
+	{
+		const std::string& filePath = indexToFilePath_.at(index);
+		if (textureDates_.contains(filePath))
+		{
+			return textureDates_.at(filePath).metadata_;
 		}
 	}
 
@@ -87,12 +85,12 @@ D3D12_GPU_DESCRIPTOR_HANDLE TextureManager::GetSrvHandleGPU(uint32_t index) cons
 		return directXCom_->GetSRVHandleGPU(index);
 	}
 
-
-	auto it = indexToFilePath_.find(index);
-	if (it != indexToFilePath_.end()) {
-		auto it2 = textureDates_.find(it->second);
-		if (it2 != textureDates_.end()) {
-			return it2->second.srvHandleGPU_;
+	if (indexToFilePath_.contains(index))
+	{
+		const std::string& filePath = indexToFilePath_.at(index);
+		if (textureDates_.contains(filePath))
+		{
+			return textureDates_.at(filePath).srvHandleGPU_;
 		}
 	}
 
@@ -120,6 +118,14 @@ uint32_t TextureManager::Load(const std::string& filePath)
 	if (it != textureDates_.end())
 	{
 		return it->second.srvIndex_;
+	}
+
+	{
+		std::ostringstream oss;
+		oss << "[Debug TM] Load START file=" << filePath 
+		    << " directXCom_=" << std::hex << (uintptr_t)directXCom_
+		    << " srvMgr->dx=" << (uintptr_t)(srvManager_ ? srvManager_->GetDirectXCom() : nullptr) << std::dec << "\n";
+		OutputDebugStringA(oss.str().c_str());
 	}
 
 	//SRVManagerの初期化
@@ -165,9 +171,7 @@ uint32_t TextureManager::Load(const std::string& filePath)
 		auto intermediate = directXCom_->UploadTextureData(
 			textureData.resource_, mipImages, directXCom_->GetDevice(), directXCom_->GetCommandList()
 		);
-
-		
-		directXCom_->ExecuteAndWaitForGPU();
+		uploadBuffers_.push_back(intermediate);
 	}
 
 	//SRVの割り当てと先性
@@ -191,6 +195,14 @@ uint32_t TextureManager::Load(const std::string& filePath)
 		OutputDebugStringA(oss.str().c_str());
 	}
 
+	{
+		std::ostringstream oss;
+		oss << "[Debug TM] Load END file=" << filePath 
+		    << " directXCom_=" << std::hex << (uintptr_t)directXCom_
+		    << " srvMgr->dx=" << (uintptr_t)(srvManager_ ? srvManager_->GetDirectXCom() : nullptr) << std::dec << "\n";
+		OutputDebugStringA(oss.str().c_str());
+	}
+
 	//戻り値を返す
 	return srvIndex;
 }
@@ -206,5 +218,14 @@ void TextureManager::SetDirectXCom(DirectXCom* directXCom)
 	
 	srvManager_ = std::make_unique<SRVManager>();
 	srvManager_->Initialize(directXCom_);
+}
+
+void TextureManager::ReleaseUploadBuffers()
+{
+	if (directXCom_ && !uploadBuffers_.empty())
+	{
+		directXCom_->ExecuteAndWaitForGPU();
+		uploadBuffers_.clear();
+	}
 }
 

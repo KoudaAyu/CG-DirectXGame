@@ -7,9 +7,9 @@
 #include "TextureManager.h"
 #include "Skeleton.h"
 #include "SkinCluster.h"
-#ifdef USE_IMGUI
-#include <imgui.h>
-#endif
+#include "SkinningObject3dCom.h"
+#include "SceneManager.h"
+#include "Baziru3_Engine/Core/Base/Allocator/ConstantBufferAllocator.h"
 #include <assimp/Importer.hpp>
 #include <assimp/postprocess.h>
 #include <assimp/scene.h>
@@ -118,7 +118,7 @@ namespace
 
 
 
-void Object3d::Initialize(Object3dCom* object3dCom, const ModelData& modelData)
+void Object3d::Initialize(Object3dCom* object3dCom, const ModelData& modelData, TextureManager* textureManager)
 {
 	object3dCom_ = object3dCom;
 	modelData_ = modelData;
@@ -126,6 +126,8 @@ void Object3d::Initialize(Object3dCom* object3dCom, const ModelData& modelData)
 	{
 		camera_ = object3dCom_->GetDefaultCamera();
 	}
+
+	textureManager_ = textureManager ? textureManager : TextureManager::GetInstance();
 
 	VertexResource();
 	MaterialResource();
@@ -135,7 +137,7 @@ void Object3d::Initialize(Object3dCom* object3dCom, const ModelData& modelData)
 	// テクスチャロードはパスが有効なときのみ実行
 	if (!modelData_.material.textureFilePath.empty())
 	{
-		uint32_t index = TextureManager::GetInstance()->Load(modelData_.material.textureFilePath);
+		uint32_t index = textureManager_->Load(modelData_.material.textureFilePath);
 		if (index != TextureManager::kInvalidTextureIndex)
 		{
 			modelData_.material.textureIndex = index;
@@ -187,7 +189,13 @@ void Object3d::SetupAnimation(const Animation* animation, const Skeleton& skelet
 	if (!object3dCom_) return;
 	DirectXCom* dx = object3dCom_->GetDirectXCom();
 	if (!dx) return;
-	SRVManager* srvManager = TextureManager::GetInstance()->GetSRVManager();
+
+	if (!textureManager_)
+	{
+		textureManager_ = TextureManager::GetInstance();
+	}
+
+	SRVManager* srvManager = textureManager_->GetSRVManager();
 	if (!srvManager) return;
 
 	animator_.SetAnimation(animation);
@@ -220,11 +228,13 @@ void Object3d::Update()
 
 	// View Frustum Culling inside Update to bypass animation, skeletal updates, and matrix math for off-screen objects
 	isCulled_ = false;
-	if (camera_ && scale.x <= 10.0f && scale.y <= 10.0f && scale.z <= 10.0f)
+	if (camera_)
 	{
 		const Matrix4x4& vp = camera_->GetViewProjectionMatrix();
 		const Vector3& pos = transform.GetTranslate();
-		float radius = 8.0f;
+		float baseRadius = (modelData_.boundingRadius > 0.1f) ? modelData_.boundingRadius : 3.0f;
+		float maxScale = (std::max)({ std::abs(scale.x), std::abs(scale.y), std::abs(scale.z) });
+		float radius = baseRadius * maxScale;
 
 		float x = pos.x * vp.m[0][0] + pos.y * vp.m[1][0] + pos.z * vp.m[2][0] + vp.m[3][0];
 		float y = pos.x * vp.m[0][1] + pos.y * vp.m[1][1] + pos.z * vp.m[2][1] + vp.m[3][1];
@@ -247,9 +257,13 @@ void Object3d::Update()
 		}
 		else
 		{
-			isCulled_ = true;
+			if (w < -radius)
+			{
+				isCulled_ = true;
+			}
 		}
 	}
+
 
 
 	if (isCulled_)
@@ -293,14 +307,14 @@ void Object3d::Update()
 		float sinY = std::sin(y);
 		float cosY = std::cos(y);
 
-	Matrix4x4 worldMatrix;
-	if (customWorldMatrix_.has_value())
-	{
-		worldMatrix = customWorldMatrix_.value();
+		worldMatrix.m[0][0] = cosY;  worldMatrix.m[0][1] = 0.0f; worldMatrix.m[0][2] = -sinY; worldMatrix.m[0][3] = 0.0f;
+		worldMatrix.m[1][0] = 0.0f;  worldMatrix.m[1][1] = 1.0f; worldMatrix.m[1][2] = 0.0f;  worldMatrix.m[1][3] = 0.0f;
+		worldMatrix.m[2][0] = sinY;  worldMatrix.m[2][1] = 0.0f; worldMatrix.m[2][2] = cosY;  worldMatrix.m[2][3] = 0.0f;
+		worldMatrix.m[3][0] = translate.x;   worldMatrix.m[3][1] = translate.y;  worldMatrix.m[3][2] = translate.z;   worldMatrix.m[3][3] = 1.0f;
 	}
 	else
 	{
-		worldMatrix = MakeAffineMatrix(transform.GetScale(), transform.GetRotate(), transform.GetTranslate());
+		worldMatrix = MakeAffineMatrix(scale, rotate, translate);
 	}
 
 	Matrix4x4 viewMatrix;
@@ -321,133 +335,21 @@ void Object3d::Update()
 	}
 
 	// WVP を更新
-	transformationMatrixData_->WVP = Multiply(worldMatrix, Multiply(viewMatrix, projectionMatrix));
-	transformationMatrixData_->World = worldMatrix;
-	// WorldInverseTranspose を計算して格納（法線変換用）
-	transformationMatrixData_->WorldInverseTranspose = Transpose(Inverse(worldMatrix));
-}
+	transformationMatrixData_.WVP = Multiply(worldMatrix, Multiply(viewMatrix, projectionMatrix));
+	transformationMatrixData_.World = worldMatrix;
 
-void Object3d::ApplyHeadLookAt(const Vector3& targetWorldPos, float weight)
-{
-	if (skeleton_.joints.empty()) return;
-	Matrix4x4 worldMatrix;
-	if (customWorldMatrix_.has_value())
+	// Highly optimized WorldInverseTranspose calculation for objects with scale of 1
+	if (scale.x == 1.0f && scale.y == 1.0f && scale.z == 1.0f)
 	{
-		worldMatrix = customWorldMatrix_.value();
+		transformationMatrixData_.WorldInverseTranspose = worldMatrix;
+		transformationMatrixData_.WorldInverseTranspose.m[3][0] = 0.0f;
+		transformationMatrixData_.WorldInverseTranspose.m[3][1] = 0.0f;
+		transformationMatrixData_.WorldInverseTranspose.m[3][2] = 0.0f;
 	}
 	else
 	{
-		worldMatrix = MakeAffineMatrix(transform.GetScale(), transform.GetRotate(), transform.GetTranslate());
+		transformationMatrixData_.WorldInverseTranspose = Transpose(Inverse(worldMatrix));
 	}
-	skeleton_.ApplyHeadLookAt(targetWorldPos, worldMatrix, weight);
-	skeleton_.Update();
-}
-
-void Object3d::AttachToJoint(const Object3d& parentObject, int32_t jointIndex, const Vector3& offsetScale, const Vector3& offsetRotate, const Vector3& offsetTranslate)
-{
-	const Skeleton& skeleton = parentObject.GetSkeleton();
-	if (skeleton.joints.empty() || jointIndex < 0 || jointIndex >= static_cast<int32_t>(skeleton.joints.size()))
-	{
-		ClearCustomWorldMatrix();
-		return;
-	}
-
-	Matrix4x4 parentWorldMatrix = MakeAffineMatrix(
-		parentObject.GetScale(),
-		parentObject.GetRotate(),
-		parentObject.GetTranslate());
-
-	Matrix4x4 jointWorldMatrix = skeleton.GetJointWorldMatrix(jointIndex, parentWorldMatrix);
-
-	// ボーン行列のスケール除去（回転と平行移動成分の正規化抽出）
-	Vector3 col0 = { jointWorldMatrix.m[0][0], jointWorldMatrix.m[0][1], jointWorldMatrix.m[0][2] };
-	Vector3 col1 = { jointWorldMatrix.m[1][0], jointWorldMatrix.m[1][1], jointWorldMatrix.m[1][2] };
-	Vector3 col2 = { jointWorldMatrix.m[2][0], jointWorldMatrix.m[2][1], jointWorldMatrix.m[2][2] };
-
-	float len0 = std::sqrt(col0.x * col0.x + col0.y * col0.y + col0.z * col0.z);
-	float len1 = std::sqrt(col1.x * col1.x + col1.y * col1.y + col1.z * col1.z);
-	float len2 = std::sqrt(col2.x * col2.x + col2.y * col2.y + col2.z * col2.z);
-
-	Matrix4x4 normJointMatrix = jointWorldMatrix;
-	if (len0 > 0.00001f) { normJointMatrix.m[0][0] /= len0; normJointMatrix.m[0][1] /= len0; normJointMatrix.m[0][2] /= len0; }
-	if (len1 > 0.00001f) { normJointMatrix.m[1][0] /= len1; normJointMatrix.m[1][1] /= len1; normJointMatrix.m[1][2] /= len1; }
-	if (len2 > 0.00001f) { normJointMatrix.m[2][0] /= len2; normJointMatrix.m[2][1] /= len2; normJointMatrix.m[2][2] /= len2; }
-
-	Matrix4x4 offsetMatrix = MakeAffineMatrix(offsetScale, offsetRotate, offsetTranslate);
-	SetCustomWorldMatrix(Multiply(offsetMatrix, normJointMatrix));
-}
-
-void Object3d::DrawAnimationUI(const std::string& windowTitle)
-{
-#ifdef USE_IMGUI
-	if (!ImGui::GetCurrentContext()) return;
-
-	ImGui::Begin(windowTitle.c_str());
-	if (HasAnimation())
-	{
-		float currentTime = GetAnimationTime();
-		float duration = GetAnimationDuration();
-		float speed = GetAnimationSpeed();
-		bool isPaused = IsAnimationPaused();
-
-		if (ImGui::Button(isPaused ? "  Play  " : " Pause "))
-		{
-			SetAnimationPaused(!isPaused);
-		}
-		ImGui::SameLine();
-		if (ImGui::Button(" |< Start "))
-		{
-			SetAnimationTime(0.0f);
-		}
-		ImGui::SameLine();
-		if (ImGui::Button(" <- Step "))
-		{
-			SetAnimationPaused(true);
-			StepAnimationFrame(-1.0f / 60.0f);
-		}
-		ImGui::SameLine();
-		if (ImGui::Button(" Step -> "))
-		{
-			SetAnimationPaused(true);
-			StepAnimationFrame(1.0f / 60.0f);
-		}
-
-		ImGui::Separator();
-		ImGui::Text("再生速度 (Playback Speed): %.2fx", speed);
-		if (ImGui::SliderFloat("Speed Slider", &speed, -2.0f, 3.0f, "%.2fx"))
-		{
-			SetAnimationSpeed(speed);
-		}
-
-		if (ImGui::Button("0.5x スロー")) { SetAnimationSpeed(0.5f); }
-		ImGui::SameLine();
-		if (ImGui::Button("1.0x 標準")) { SetAnimationSpeed(1.0f); }
-		ImGui::SameLine();
-		if (ImGui::Button("2.0x 倍速")) { SetAnimationSpeed(2.0f); }
-		ImGui::SameLine();
-		if (ImGui::Button("-1.0x 逆再生")) { SetAnimationSpeed(-1.0f); }
-
-		ImGui::Separator();
-		ImGui::Text("タイムライン シーク (Timeline Seek Bar):");
-		int currentFrame = static_cast<int>(currentTime * 60.0f);
-		int totalFrames = static_cast<int>(duration * 60.0f);
-		ImGui::Text("Frame: %d / %d (%.2f s / %.2f s)", currentFrame, totalFrames, currentTime, duration);
-
-		if (duration > 0.0f)
-		{
-			float seekTime = currentTime;
-			if (ImGui::SliderFloat("Timeline (sec)", &seekTime, 0.0f, duration, "%.3f s"))
-			{
-				SetAnimationTime(seekTime);
-			}
-		}
-	}
-	else
-	{
-		ImGui::Text("アニメーションが設定されていません。");
-	}
-	ImGui::End();
-#endif
 }
 
 static ID3D12GraphicsCommandList* s_lastCommandList = nullptr;
@@ -458,9 +360,17 @@ static D3D12_GPU_VIRTUAL_ADDRESS s_lastLightAddress = 0;
 
 void Object3d::DrawInternal(const RenderContext& ctx)
 {
-	commandList->IASetVertexBuffers(0, 1, &vertexBufferView_);
-	commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-	if (indexResource && !modelData_.indices.empty())
+	if (isCulled_) return;
+
+	MarkDrawn();
+	DirectXCom* dx = object3dCom_ ? object3dCom_->GetDirectXCom() : nullptr;
+	if (dx)
+	{
+		PrepareConstantBuffers(dx);
+	}
+
+	// コマンドリストが切り替わった場合はステートキャッシュを無効化
+	if (s_lastCommandList != ctx.GetRawCommandList())
 	{
 		s_lastCommandList = ctx.GetRawCommandList();
 		s_lastVertexAddress = 0;
@@ -468,25 +378,9 @@ void Object3d::DrawInternal(const RenderContext& ctx)
 		s_lastMaterialAddress = 0;
 		s_lastLightAddress = 0;
 	}
-	commandList->SetGraphicsRootConstantBufferView(RootParam::Object3D::kMaterial, materialResource->GetGPUVirtualAddress());
-	commandList->SetGraphicsRootConstantBufferView(RootParam::Object3D::kTransform, transformationMatrixResource->GetGPUVirtualAddress());
-	commandList->SetGraphicsRootConstantBufferView(RootParam::Object3D::kLight, directionalLightResource->GetGPUVirtualAddress());
 
-	if (!modelData_.meshes.empty())
-	{
-		for (const auto& meshPart : modelData_.meshes)
-		{
-			if (indexResource && meshPart.indexCount > 0)
-			{
-				commandList->DrawIndexedInstanced(meshPart.indexCount, 1, meshPart.indexOffset, 0, 0);
-			}
-			else if (meshPart.vertexCount > 0)
-			{
-				commandList->DrawInstanced(meshPart.vertexCount, 1, meshPart.vertexOffset, 0);
-			}
-		}
-	}
-	else if (indexResource && !modelData_.indices.empty())
+	// 頂点バッファのバインド (前回と同じバッファならスキップ)
+	if (s_lastVertexAddress != vertexBufferView_.BufferLocation)
 	{
 		ctx.IASetVertexBuffers(0, 1, &vertexBufferView_);
 		s_lastVertexAddress = vertexBufferView_.BufferLocation;
@@ -528,6 +422,50 @@ void Object3d::DrawInternal(const RenderContext& ctx)
 	else
 	{
 		ctx.DrawInstanced(static_cast<UINT>(modelData_.vertices.size()), 1, 0, 0);
+	}
+}
+
+void Object3d::Draw(Object3dCom* object3dCom, SkinningObject3dCom* skinningObject3dCom)
+{
+	MarkDrawn();
+	Object3dCom* com = object3dCom ? object3dCom : object3dCom_;
+	if (!com) return;
+	DirectXCom* dx = com->GetDirectXCom();
+	if (!dx) return;
+
+	if (isCulled_) return;
+
+	// RenderContext を内部で解決・構築
+	RenderContext ctx(
+		dx->GetCommandList().Get(),
+		dx->GetWindowAPI(),
+		camera_ ? camera_ : com->GetDefaultCamera(),
+		SceneManager::GetInstance()->GetLight()
+	);
+
+	// テクスチャ解決
+	const auto& modelData = GetModelData();
+	if (modelData.material.textureIndex != TextureManager::kInvalidTextureIndex)
+	{
+		if (!textureManager_)
+		{
+			textureManager_ = TextureManager::GetInstance();
+		}
+		ctx.SetTextureHandle(textureManager_->GetSrvHandleGPU(modelData.material.textureIndex));
+	}
+	else
+	{
+		ctx.SetTextureHandle({});
+	}
+
+	// ジョイント（ボーン）があればスキニングシェーダー、なければ通常シェーダーで描画
+	if (!skeleton_.joints.empty() && skinningObject3dCom)
+	{
+		skinningObject3dCom->Draw(this, ctx, modelData, true);
+	}
+	else if (object3dCom)
+	{
+		object3dCom->Draw(this, ctx, modelData, true);
 	}
 }
 
@@ -740,121 +678,122 @@ Object3d::~Object3d()
 
 	// 持続的にマップされたリソースがある場合は安全にアンマップする
 	// 二重アンマップを避けるため、CPU側のポインタが nullptr でない場合のみ Unmap する
-	if (transformationMatrixResource && transformationMatrixData_ != nullptr)
-	{
-		D3D12_RANGE written = { 0, sizeof(TransformationMatrix) };
-		transformationMatrixResource->Unmap(0, &written);
-		transformationMatrixData_ = nullptr;
-	}
-
 	if (vertexResource && vertexData_ != nullptr)
 	{
 		D3D12_RANGE written = { 0, static_cast<SIZE_T>(vertexBufferView_.SizeInBytes) };
 		vertexResource->Unmap(0, &written);
 		vertexData_ = nullptr;
 	}
-
-	if (materialResource && materialData_ != nullptr)
-	{
-		D3D12_RANGE written = { 0, sizeof(Material) };
-		materialResource->Unmap(0, &written);
-		materialData_ = nullptr;
-	}
-
-	if (directionalLightResource && directionalLightData_ != nullptr)
-	{
-		D3D12_RANGE written = { 0, sizeof(DirectionalLight) };
-		directionalLightResource->Unmap(0, &written);
-		directionalLightData_ = nullptr;
-	}
 }
 
 void Object3d::SetEnableLighting(bool enable)
 {
-	if (!materialResource) return;
-	Material* data = nullptr;
-	materialResource->Map(0, nullptr, reinterpret_cast<void**>(&data));
-	if (data)
-	{
-		data->enableLighting = enable ? 1 : 0;
-		D3D12_RANGE written = { 0, sizeof(Material) };
-		materialResource->Unmap(0, &written);
-	}
+	materialData_.enableLighting = enable ? 1 : 0;
 }
 
 void Object3d::SetColor(const Vector4& color)
 {
-	if (!materialResource) return;
-	Material* data = nullptr;
-	materialResource->Map(0, nullptr, reinterpret_cast<void**>(&data));
-	if (data)
-	{
-		data->color = color;
-		D3D12_RANGE written = { 0, sizeof(Material) };
-		materialResource->Unmap(0, &written);
-	}
+	materialData_.color = color;
+}
+
+void Object3d::SetReflectionFactor(float factor)
+{
+	materialData_.reflectionFactor = factor;
+}
+
+void Object3d::SetFresnelF0(float f0)
+{
+	materialData_.fresnelF0 = f0;
 }
 
 void Object3d::MaterialResource()
 {
-	if (object3dCom_ && object3dCom_->GetDirectXCom())
-	{
-		DirectXCom* dxCommon = object3dCom_->GetDirectXCom();
-		// マテリアル用のリソースを作成（1個分）
-		materialResource = dxCommon->CreateBufferResource(dxCommon->GetDevice().Get(), sizeof(Material));
-		// 書き込み用アドレスを取得してメンバーに保持
-		materialResource->Map(0, nullptr, reinterpret_cast<void**>(&materialData_));
-		// 初期値を設定
-		materialData_->color = { 1.0f,1.0f,1.0f,1.0f };
-		materialData_->enableLighting = false;
-		materialData_->specularModel = 0;
-		materialData_->reflectionFactor = 0.5f;
-		materialData_->fresnelF0 = 0.04f;
-		materialData_->shininess = 16.0f;
-		materialData_->uvTransform = MakeIdentity4x4();
-
-		// マテリアルは初期化時に一度だけ書き込む想定のため、MapしたらすぐにUnmapする
-		// 書き込み範囲を指定してGPUへ変更を通知する
-		D3D12_RANGE writtenRange = { 0, sizeof(Material) };
-		materialResource->Unmap(0, &writtenRange);
-
-		materialData_ = nullptr;
-	}
+	// 初期値を設定
+	materialData_.color = { 1.0f,1.0f,1.0f,1.0f };
+	materialData_.enableLighting = false;
+	materialData_.specularModel = 0;
+	materialData_.reflectionFactor = 0.5f;
+	materialData_.fresnelF0 = 0.04f;
+	materialData_.shininess = 16.0f;
+	materialData_.uvTransform = MakeIdentity4x4();
 }
 
 void Object3d::TransformationMatrixResource()
 {
-	if (object3dCom_ && object3dCom_->GetDirectXCom())
-	{
-		DirectXCom* dxCommon = object3dCom_->GetDirectXCom();
-		// Transformation
-		transformationMatrixResource = dxCommon->CreateBufferResource(dxCommon->GetDevice().Get(), sizeof(TransformationMatrix));
-		// 書き込み用アドレスを取得してメンバーに保持
-		transformationMatrixResource->Map(0, nullptr, reinterpret_cast<void**>(&transformationMatrixData_));
-
-		transformationMatrixData_->WVP = MakeIdentity4x4();
-		transformationMatrixData_->World = MakeIdentity4x4();
-	}
+	transformationMatrixData_.WVP = MakeIdentity4x4();
+	transformationMatrixData_.World = MakeIdentity4x4();
 }
 
 void Object3d::DirectionalLightResource()
 {
-	// マッピング前にバッファを作成し、セーフティチェックを行う
-	if (object3dCom_ && object3dCom_->GetDirectXCom())
+	// 初期値を書き込む
+	directionalLightData_.color = { 1.0f, 1.0f, 1.0f, 1.0f };
+	directionalLightData_.direction = { 0.0f, -1.0f, 0.0f };
+	directionalLightData_.intensity = 1.0f;
+}
+
+void Object3d::PrepareConstantBuffers(DirectXCom* dx)
+{
+	if (!dx) return;
+	auto* cbAllocator = dx->GetCBAllocator();
+	if (!cbAllocator) return;
+
+	// マテリアルバッファの割り当てとコピー (共有オブジェクトならマスタのアドレスを使い回す)
+	if (isShared_ && masterObject_)
 	{
-		DirectXCom* dxCommon = object3dCom_->GetDirectXCom();
-		// ディレクショナルライト用のCBVリソースを作成
-		directionalLightResource = dxCommon->CreateBufferResource(dxCommon->GetDevice().Get(), sizeof(DirectionalLight));
-		// 書き込み用アドレスを取得
-		directionalLightResource->Map(0, nullptr, reinterpret_cast<void**>(&directionalLightData_));
-
-		// 初期値を書き込む
-		directionalLightData_->color = { 1.0f, 1.0f, 1.0f, 1.0f };
-		directionalLightData_->direction = { 0.0f, -1.0f, 0.0f };
-		directionalLightData_->intensity = 1.0f;
-
-		// 必要に応じてアンマップ（頻繁に更新しない場合）
-		directionalLightResource->Unmap(0, nullptr);
-		directionalLightData_ = nullptr;
+		materialGpuAddress_ = masterObject_->materialGpuAddress_;
 	}
+	else
+	{
+		auto matAlloc = cbAllocator->Allocate(sizeof(Material));
+		std::memcpy(matAlloc.cpuAddress, &materialData_, sizeof(Material));
+		materialGpuAddress_ = matAlloc.gpuAddress;
+	}
+
+	// 変換行列バッファの割り当てとコピー (これは個別位置が違うので必須)
+	auto transAlloc = cbAllocator->Allocate(sizeof(TransformationMatrix));
+	std::memcpy(transAlloc.cpuAddress, &transformationMatrixData_, sizeof(TransformationMatrix));
+	transformationMatrixGpuAddress_ = transAlloc.gpuAddress;
+
+	// ライトバッファの割り当てとコピー (共有オブジェクトならマスタのアドレスを使い回す)
+	if (isShared_ && masterObject_)
+	{
+		directionalLightGpuAddress_ = masterObject_->directionalLightGpuAddress_;
+	}
+	else
+	{
+		auto lightAlloc = cbAllocator->Allocate(sizeof(DirectionalLight));
+		std::memcpy(lightAlloc.cpuAddress, &directionalLightData_, sizeof(DirectionalLight));
+		directionalLightGpuAddress_ = lightAlloc.gpuAddress;
+	}
+}
+
+void Object3d::Draw(const RenderContext& ctx)
+{
+	if (!ctx.GetRawCommandList()) return;
+
+	// 1. テクスチャのバインド
+	if (ctx.GetTextureHandle().ptr != 0)
+	{
+		ctx.SetGraphicsRootDescriptorTable(RootParam::Object3D::kTextureTable, ctx.GetTextureHandle());
+	}
+
+	// 2. ライトのバインド
+	if (ctx.GetLight())
+	{
+		ctx.SetGraphicsRootConstantBufferView(RootParam::Object3D::kLight, ctx.GetLight()->GetDirectionalLightResource()->GetGPUVirtualAddress());
+	}
+	else
+	{
+		ctx.SetGraphicsRootConstantBufferView(RootParam::Object3D::kLight, 0);
+	}
+
+	// 3. カメラのバインド
+	if (ctx.GetCamera() && ctx.GetCamera()->GetCameraGpuAddress() != 0)
+	{
+		ctx.SetGraphicsRootConstantBufferView(RootParam::Object3D::kCamera, ctx.GetCamera()->GetCameraGpuAddress());
+	}
+
+	// 4. Object3d 自身の描画処理を実行
+	DrawInternal(ctx);
 }

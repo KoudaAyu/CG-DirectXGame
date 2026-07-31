@@ -25,7 +25,14 @@ public:
     // 定数バッファ用の領域を切り出す
     Allocation Allocate(size_t size);
 
+    // メモリ使用状況プロファイリング用ゲッター
+    size_t GetBufferSize() const { return bufferSize_; }
+    size_t GetFrameSize() const { return frameSize_; }
+    size_t GetAllocatedThisFrame() const { return currentOffset_ >= (currentFrameIndex_ * frameSize_) ? (currentOffset_ - currentFrameIndex_ * frameSize_) : 0; }
+    float GetUsageRatio() const { return frameSize_ > 0 ? static_cast<float>(GetAllocatedThisFrame()) / static_cast<float>(frameSize_) : 0.0f; }
+
 private:
+
     // アドレスアラインメント関数 (D3D12 の定数バッファは 256 バイトアラインが必要)
     static size_t AlignUp(size_t size, size_t alignment) {
         return (size + alignment - 1) & ~(alignment - 1);

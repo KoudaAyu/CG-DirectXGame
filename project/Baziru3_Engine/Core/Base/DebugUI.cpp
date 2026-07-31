@@ -5,7 +5,17 @@
 #include "SpriteManager.h"
 #include "Camera.h"
 #include "SceneManager.h"
+#include "OffScreenRendering.h"
+#include "ParticleManager.h"
+#include "Application/Scene/GameScene/GamePlayScene.h"
+#include "BehaviorTreeEditor.h"
+#include "Baziru3_Engine/Graphics/Graphics/GpuProfiler.h"
+#include "Baziru3_Engine/Framework/Collision/CollisionManager.h"
+#include "Baziru3_Engine/Core/Base/Allocator/ConstantBufferAllocator.h"
+#include "Baziru3_Engine/Core/Base/Allocator/StackAllocator.h"
+#include "DirectXCom.h"
 #include <imgui.h>
+
 
 DebugUI::DebugUI(MaterialManager* materialManager, SpriteManager* spriteManager, Camera* camera,
     Sprite::Transform* transformObject, bool* useMonsterBall, bool* drawObject, bool* drawSprite)
@@ -14,17 +24,22 @@ DebugUI::DebugUI(MaterialManager* materialManager, SpriteManager* spriteManager,
     std::memset(stages_, 0, sizeof(stages_));
 }
 
+DebugUI::~DebugUI()
+{
+}
+
 void DebugUI::Initialize()
 {
+#ifdef USE_IMGUI
+    btEditor_ = std::make_unique<BaziruEngine::AI::BehaviorTreeEditor>();
+#endif
 }
 
 void DebugUI::Update()
 {
 #ifdef USE_IMGUI
-    if (SceneManager::GetInstance())
-    {
-        SceneManager::GetInstance()->DrawUI();
-    }
+    // GPUプロファイル結果を前フレームから回収する
+    GpuProfiler::GetInstance()->ResolveResults();
 
     ImGui::ShowDemoWindow();
 
@@ -186,10 +201,65 @@ void DebugUI::Update()
 
     ImGui::Begin("Settings");
 
+    if (offScreenRendering_)
+    {
+        if (ImGui::CollapsingHeader("Post Effect"))
+        {
+            int currentEffect = static_cast<int>(offScreenRendering_->GetPostEffect());
+            const char* effectNames[] = {
+                "Normal",
+                "DepthBasedOutline",
+                "LuminanceBaseOutline",
+                "RadialBlur",
+                "GaussianFilter",
+                "BoxFilter"
+            };
+            if (ImGui::Combo("Effect Type", &currentEffect, effectNames, IM_ARRAYSIZE(effectNames)))
+            {
+                offScreenRendering_->SetPostEffect(static_cast<OffScreenRendering::PostEffect>(currentEffect));
+            }
+
+            if (offScreenRendering_->GetPostEffect() == OffScreenRendering::PostEffect::RadialBlur)
+            {
+                Vector2 center = offScreenRendering_->GetRadialBlurCenter();
+                float centerArr[2] = { center.x, center.y };
+                if (ImGui::SliderFloat2("Blur Center", centerArr, 0.0f, 1.0f))
+                {
+                    offScreenRendering_->SetRadialBlurCenter({ centerArr[0], centerArr[1] });
+                }
+
+                float blurWidth = offScreenRendering_->GetRadialBlurWidth();
+                if (ImGui::SliderFloat("Blur Width", &blurWidth, 0.0f, 0.1f, "%.4f"))
+                {
+                    offScreenRendering_->SetRadialBlurWidth(blurWidth);
+                }
+            }
+        }
+    }
+
     if (useMonsterBall_)
         ImGui::Checkbox("Use Monster Ball", useMonsterBall_);
 
     ImGui::Checkbox("Draw Skybox", SceneManager::GetInstance()->GetShowSkyboxPtr());
+
+    if (ImGui::CollapsingHeader("GPU Particle System"))
+    {
+        ParticleManager* pm = ParticleManager::GetInstance();
+        if (pm)
+        {
+            ImGui::Text("Shader Layer: GPU Compute Shader");
+            ImGui::Text("Max Capacity: %u particles", 10240);
+            uint32_t activeCount = pm->GetNumInstance();
+            ImGui::Text("Active Count: %u particles", activeCount);
+            ImGui::ProgressBar(static_cast<float>(activeCount) / 10240.0f, ImVec2(0.0f, 0.0f), "Spawn Load");
+
+            // エミッター設定は GamePlayScene 内の ImGui パネルで管理
+        }
+        else
+        {
+            ImGui::Text("GPU Particle System not initialized.");
+        }
+    }
 
     ImGui::Separator();
 
@@ -212,41 +282,295 @@ void DebugUI::Update()
         }
     }
 
-    ImGui::Begin("GPU Particle Emitter");
-    ParticleManager* pm = ParticleManager::GetInstance();
-    if (pm)
+    if (materialManager_)
     {
-        ParticleEmitter* emitter = pm->GetGPUEmitter();
-        if (emitter)
+        materialManager_->Update();
+    }
+
+
+    ImGui::End();
+
+    ImGui::SetNextWindowSize(ImVec2(440.0f, 540.0f), ImGuiCond_Once);
+    ImGui::Begin("Performance Tracker");
+    {
+        float currentFps = ImGui::GetIO().Framerate;
+        float frameTimeMs = 1000.0f / (currentFps > 0.1f ? currentFps : 60.0f);
+
+        // --- 1. FPS & Frame Time Badge Header ---
+        ImVec4 fpsColor = (currentFps >= 55.0f) ? ImVec4(0.2f, 0.9f, 0.3f, 1.0f)
+                       : (currentFps >= 30.0f) ? ImVec4(0.9f, 0.8f, 0.2f, 1.0f)
+                       :                         ImVec4(0.9f, 0.2f, 0.2f, 1.0f);
+
+        ImGui::TextColored(fpsColor, "FPS: %.1f", currentFps);
+        ImGui::SameLine(140.0f);
+        ImGui::Text("Frame Time: %.2f ms", frameTimeMs);
+        ImGui::SameLine(310.0f);
+        ImGui::TextColored(ImVec4(0.6f, 0.6f, 0.6f, 1.0f), "Target: 16.67 ms");
+
+        static float fpsHistory[120] = {};
+        static int fpsHistoryOffset = 0;
+        fpsHistory[fpsHistoryOffset] = currentFps;
+        fpsHistoryOffset = (fpsHistoryOffset + 1) % 120;
+
+        float minFps = fpsHistory[0], maxFps = fpsHistory[0], avgFps = 0.0f;
+        for (int i = 0; i < 120; ++i)
         {
-            EmitterSphere* data = emitter->GetEmitterData();
-            if (data)
+            if (fpsHistory[i] < minFps) minFps = fpsHistory[i];
+            if (fpsHistory[i] > maxFps) maxFps = fpsHistory[i];
+            avgFps += fpsHistory[i];
+        }
+        avgFps /= 120.0f;
+
+        char fpsLabel[64];
+        std::snprintf(fpsLabel, sizeof(fpsLabel), "Min: %.1f | Avg: %.1f | Max: %.1f", minFps, avgFps, maxFps);
+        ImGui::PlotLines("##FPSGraph", fpsHistory, 120, fpsHistoryOffset, fpsLabel, 0.0f, 120.0f, ImVec2(0, 45.0f));
+
+        ImGui::Separator();
+
+        // --- 2. GPU Particle Load Metric ---
+        ParticleManager* pm = ParticleManager::GetInstance();
+        if (pm)
+        {
+            uint32_t activeParticles = pm->GetNumInstance();
+            uint32_t maxParticles = 10240; // GPU Particle Capacity
+            float particleLoadRatio = static_cast<float>(activeParticles) / static_cast<float>(maxParticles);
+
+            ImGui::Text("GPU Particles:");
+            ImGui::SameLine(140.0f);
+            ImGui::Text("%u / %u", activeParticles, maxParticles);
+
+            char loadLabel[32];
+            std::snprintf(loadLabel, sizeof(loadLabel), "%.1f%% Load", particleLoadRatio * 100.0f);
+            ImGui::ProgressBar(particleLoadRatio, ImVec2(-1.0f, 0.0f), loadLabel);
+            ImGui::Separator();
+        }
+
+        // --- 3. Custom Memory Allocators (CB Ring Allocator & Stack Allocator) ---
+        DirectXCom* dxCom = (pm ? pm->GetDxCommon() : nullptr);
+        if (dxCom)
+        {
+            ConstantBufferAllocator* cbAlloc = dxCom->GetCBAllocator();
+            StackAllocator* stackAlloc = dxCom->GetStackAllocator();
+
+            if (cbAlloc)
             {
-                ImGui::DragFloat3("Translate", &data->translate.x, 0.1f);
-                ImGui::DragFloat("Radius", &data->radius, 0.1f, 0.0f, 100.0f);
-                
-                int countVal = static_cast<int>(data->count);
-                if (ImGui::SliderInt("Count", &countVal, 1, 100))
+                size_t allocated = cbAlloc->GetAllocatedThisFrame();
+                size_t frameCapacity = cbAlloc->GetFrameSize();
+                float ratio = cbAlloc->GetUsageRatio();
+
+                ImGui::Text("CB Ring Allocator:");
+                ImGui::SameLine(180.0f);
+                ImGui::Text("%.1f KB / %.1f MB", allocated / 1024.0f, frameCapacity / (1024.0f * 1024.0f));
+
+                char cbLabel[32];
+                std::snprintf(cbLabel, sizeof(cbLabel), "%.2f%% Frame Usage", ratio * 100.0f);
+                ImGui::ProgressBar(ratio, ImVec2(-1.0f, 0.0f), cbLabel);
+            }
+
+            if (stackAlloc)
+            {
+                size_t used = stackAlloc->GetUsedBytes();
+                size_t total = stackAlloc->GetTotalBytes();
+                float ratio = total > 0 ? static_cast<float>(used) / static_cast<float>(total) : 0.0f;
+
+                ImGui::Text("Stack Allocator:");
+                ImGui::SameLine(180.0f);
+                ImGui::Text("%.1f KB / %.1f MB", used / 1024.0f, total / (1024.0f * 1024.0f));
+
+                char stackLabel[32];
+                std::snprintf(stackLabel, sizeof(stackLabel), "%.2f%% Usage", ratio * 100.0f);
+                ImGui::ProgressBar(ratio, ImVec2(-1.0f, 0.0f), stackLabel);
+            }
+            ImGui::Separator();
+        }
+
+        // --- 4. GPU / CPU Stage Profiler ---
+        ImGui::TextColored(ImVec4(0.4f, 0.8f, 1.0f, 1.0f), "--- GPU / CPU Stage Profiler ---");
+
+
+        // 全ステージの active フラグをリセット
+        for (int i = 0; i < kMaxStages; ++i)
+        {
+            stages_[i].active = false;
+        }
+
+        auto getStageIndex = [&](const std::string& name) -> int {
+            for (int i = 0; i < kMaxStages; ++i)
+            {
+                if (stages_[i].name[0] == '\0')
                 {
-                    data->count = static_cast<uint32_t>(countVal);
+                    strcpy_s(stages_[i].name, sizeof(stages_[i].name), name.c_str());
+                    return i;
                 }
-                
-                ImGui::SliderFloat("Frequency", &data->frequency, 0.01f, 2.0f, "%.2fs");
-                
-                bool emitBool = (data->emit != 0);
-                if (ImGui::Checkbox("Emit", &emitBool))
+                if (std::strcmp(stages_[i].name, name.c_str()) == 0)
                 {
-                    data->emit = emitBool ? 1 : 0;
+                    return i;
                 }
+            }
+            return -1;
+        };
+
+        // GPU プロファイル結果の回収
+        const auto& gpuResults = GpuProfiler::GetInstance()->GetResults();
+        float totalGpuTimeMs = 0.0f;
+        for (const auto& res : gpuResults)
+        {
+            int idx = getStageIndex(res.name);
+            if (idx >= 0)
+            {
+                stages_[idx].active = true;
+                stages_[idx].history[historyOffset_] = res.timeMs;
+                totalGpuTimeMs += res.timeMs;
+            }
+        }
+
+        // CPU 衝突判定の時間
+        float collisionTime = CollisionManager::GetInstance()->GetLastUpdateDurationMs();
+        int colIdx = getStageIndex("Collision (CPU)");
+        if (colIdx >= 0)
+        {
+            stages_[colIdx].active = true;
+            stages_[colIdx].history[historyOffset_] = collisionTime;
+        }
+
+        historyOffset_ = (historyOffset_ + 1) % kMaxHistoryFrames;
+
+        // --- 4. GPU Pass Share Visual Breakdown Bar ---
+        ImGui::Text("Total GPU Render Time: %.3f ms", totalGpuTimeMs);
+
+        // 各パスの色定義
+        struct PassColor { const char* prefix; ImVec4 color; const char* label; };
+        PassColor passColors[] = {
+            { "Scene",       ImVec4(0.2f, 0.6f, 1.0f, 1.0f), "Scene (3D)" },
+            { "Sprite",      ImVec4(0.2f, 0.9f, 0.4f, 1.0f), "Sprite" },
+            { "Particle",    ImVec4(1.0f, 0.6f, 0.2f, 1.0f), "Particle" },
+            { "PostProcess", ImVec4(0.8f, 0.3f, 0.9f, 1.0f), "PostProcess" },
+            { "Collision",   ImVec4(0.9f, 0.9f, 0.2f, 1.0f), "Collision" }
+        };
+
+        // 突破バーを描画（ImDrawList）
+        ImDrawList* drawList = ImGui::GetWindowDrawList();
+        ImVec2 barPos = ImGui::GetCursorScreenPos();
+        float barWidth = ImGui::GetContentRegionAvail().x;
+        float barHeight = 16.0f;
+
+        // 背景
+        drawList->AddRectFilled(barPos, ImVec2(barPos.x + barWidth, barPos.y + barHeight), IM_COL32(40, 40, 45, 255), 3.0f);
+
+        if (totalGpuTimeMs > 0.001f)
+        {
+            float currentX = barPos.x;
+            for (const auto& pc : passColors)
+            {
+                int idx = getStageIndex(pc.prefix);
+                if (idx < 0) continue;
+                int prevOffset = (historyOffset_ == 0) ? kMaxHistoryFrames - 1 : historyOffset_ - 1;
+                float passMs = stages_[idx].history[prevOffset];
+                float segWidth = (passMs / totalGpuTimeMs) * barWidth;
+
+                if (segWidth > 1.0f)
+                {
+                    ImU32 col = ImGui::ColorConvertFloat4ToU32(pc.color);
+                    drawList->AddRectFilled(ImVec2(currentX, barPos.y), ImVec2(currentX + segWidth - 1.0f, barPos.y + barHeight), col, 2.0f);
+                    currentX += segWidth;
+                }
+            }
+        }
+        ImGui::Dummy(ImVec2(barWidth, barHeight + 4.0f));
+
+        // 色凡例
+        for (const auto& pc : passColors)
+        {
+            ImGui::ColorButton("##col", pc.color, ImGuiColorEditFlags_NoTooltip, ImVec2(10, 10));
+            ImGui::SameLine();
+            ImGui::TextColored(pc.color, "%s", pc.label);
+            ImGui::SameLine(0, 12);
+        }
+        ImGui::NewLine();
+
+        ImGui::Separator();
+
+        // --- 5. Detailed Pass Table ---
+        if (ImGui::BeginTable("ProfilerTable", 4, ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_RowBg))
+        {
+            ImGui::TableSetupColumn("Pass Name", ImGuiTableColumnFlags_WidthStretch, 150.0f);
+            ImGui::TableSetupColumn("Last (ms)", ImGuiTableColumnFlags_WidthFixed, 75.0f);
+            ImGui::TableSetupColumn("Share (%)", ImGuiTableColumnFlags_WidthFixed, 70.0f);
+            ImGui::TableSetupColumn("Max (ms)",  ImGuiTableColumnFlags_WidthFixed, 70.0f);
+            ImGui::TableHeadersRow();
+
+            for (int i = 0; i < kMaxStages; ++i)
+            {
+                if (stages_[i].name[0] == '\0') continue;
+
+                int prevOffset = (historyOffset_ == 0) ? kMaxHistoryFrames - 1 : historyOffset_ - 1;
+                float lastVal = stages_[i].history[prevOffset];
+
+                float maxVal = 0.001f;
+                for (int j = 0; j < kMaxHistoryFrames; ++j)
+                {
+                    if (stages_[i].history[j] > maxVal) maxVal = stages_[i].history[j];
+                }
+
+                float share = (totalGpuTimeMs > 0.001f) ? (lastVal / totalGpuTimeMs) * 100.0f : 0.0f;
+
+                ImGui::TableNextRow();
+                ImGui::TableSetColumnIndex(0);
+                ImGui::Text("%s", stages_[i].name);
+
+                ImGui::TableSetColumnIndex(1);
+                ImGui::Text("%.3f", lastVal);
+
+                ImGui::TableSetColumnIndex(2);
+                ImGui::Text("%.1f%%", share);
+
+                ImGui::TableSetColumnIndex(3);
+                ImGui::Text("%.2f", maxVal);
+            }
+            ImGui::EndTable();
+        }
+
+        // --- 6. Individual Pass Sparklines ---
+        if (ImGui::CollapsingHeader("Individual Pass Graphs"))
+        {
+            for (int i = 0; i < kMaxStages; ++i)
+            {
+                if (stages_[i].name[0] == '\0') continue;
+
+                int prevOffset = (historyOffset_ == 0) ? kMaxHistoryFrames - 1 : historyOffset_ - 1;
+                float lastVal = stages_[i].history[prevOffset];
+
+                float maxVal = 0.1f;
+                for (int j = 0; j < kMaxHistoryFrames; ++j)
+                {
+                    if (stages_[i].history[j] > maxVal) maxVal = stages_[i].history[j];
+                }
+                maxVal *= 1.2f;
+
+                char graphLabel[64];
+                std::snprintf(graphLabel, sizeof(graphLabel), "%.3f ms (Max: %.2f)", lastVal, maxVal);
+
+                std::string imguiId = "##" + std::string(stages_[i].name);
+                ImGui::Text("%s", stages_[i].name);
+                ImGui::PlotLines(imguiId.c_str(), stages_[i].history, kMaxHistoryFrames, historyOffset_, graphLabel, 0.0f, maxVal, ImVec2(0, 30.0f));
             }
         }
     }
     ImGui::End();
 
-    ImGui::End();
+    if (btEditor_)
+    {
+        btEditor_->Draw();
+    }
 #endif
 }
 
+
 void DebugUI::Finalize()
 {
+#ifdef USE_IMGUI
+    if (btEditor_) {
+        btEditor_.reset();
+    }
+#endif
 }

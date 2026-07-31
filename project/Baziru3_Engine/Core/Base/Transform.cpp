@@ -8,7 +8,7 @@ void Transform::Initialize()
 	translation_ = { 0.0f,0.0f,0.0f };
 }
 
-void Transform::Initialize(const Vector3& scale, const Vector3 rotate, const Vector3 translate)
+void Transform::Initialize(const Vector3& scale, const Vector3& rotate, const Vector3& translate)
 {
 	scale_ = scale;
 	rotation_ = rotate;
@@ -20,17 +20,17 @@ void Transform::SetScale(const Vector3& scale)
 	scale_ = scale;
 }
 
-void Transform::SetRotate(const Vector3 rotate)
+void Transform::SetRotate(const Vector3& rotate)
 {
 	rotation_ = rotate;
 }
 
-void Transform::SetTranslate(const Vector3 translate)
+void Transform::SetTranslate(const Vector3& translate)
 {
 	translation_ = translate;
 }
 
-void Transform::SetTransform(const Vector3& scale, const Vector3 rotate, const Vector3 translate)
+void Transform::SetTransform(const Vector3& scale, const Vector3& rotate, const Vector3& translate)
 {
 	scale_ = scale;
 	rotation_ = rotate;
