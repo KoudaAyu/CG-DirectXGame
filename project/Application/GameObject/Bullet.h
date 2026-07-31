@@ -28,22 +28,19 @@ public:
     Vector3 GetPrevPosition() const { return prevPosition_; }
     Vector3 GetDirection() const { return direction_; }
     bool IsNearMissTriggered() const { return nearMissTriggered_; }
-    void TriggerNearMiss() { nearMissTriggered_ = true; }
+    void MarkNearMissTriggered() { nearMissTriggered_ = true; }
+    void Kill() { isDead_ = true; }
 
 private:
-    std::unique_ptr<Object3d> object3d_;
-    Vector3 prevPosition_ = { 0.0f, 0.0f, 0.0f };
     Object3dCom* object3dCom_ = nullptr;
     Camera* camera_ = nullptr;
-
+    std::unique_ptr<Object3d> object3d_;
     Vector3 direction_ = { 0.0f, 0.0f, 1.0f };
+    Vector3 prevPosition_ = { 0.0f, 0.0f, 0.0f };
     float speed_ = 0.35f;
     float lifeTime_ = 2.0f;
-    float elapsed_ = 0.0f;
+    float age_ = 0.0f;
     bool isDead_ = false;
-    BulletOwner owner_ = BulletOwner::Player;
     bool nearMissTriggered_ = false;
-
-    uint32_t defaultTextureIndex_ = UINT32_MAX;
+    BulletOwner owner_ = BulletOwner::Player;
 };
-

@@ -373,7 +373,7 @@
     <ClInclude Include="Application\Player\Player.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
-    <ClInclude Include="Application\Obstacle.h">
+    <ClInclude Include="Application\GameObject\Obstacle.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
     <ClInclude Include="Baziru3_Engine\Core\IO\Mouse\MouseInput.h">
@@ -385,9 +385,10 @@
     <ClInclude Include="Application\Enemy\MovingEnemy.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
-    <ClInclude Include="Bullet.h">
+    <ClInclude Include="Application\GameObject\Bullet.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
+
     <ClInclude Include="Baziru3_Engine\Core\Base\SubsystemFactory.h" />
     <ClInclude Include="Baziru3_Engine\Core\Base\OffScreenRendering\OffScreenRendering.h" />
     <ClInclude Include="Baziru3_Engine\Graphics\3D\Model\SkinCluster\SkinCluster.h" />

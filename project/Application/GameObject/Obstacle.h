@@ -33,4 +33,3 @@ private:
     Object3dCom* object3dCom_ = nullptr;
     uint32_t defaultTextureIndex_ = UINT32_MAX;
 };
-

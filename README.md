@@ -57,7 +57,38 @@ C++ および DirectX 12 を用いてスクラッチから構築した、自作3
 ---
 
 
+## 📂 プロジェクト・ディレクトリ構造（レイヤー分離設計）
+
+初見のコードレビューアーや開発者が直感的に全体像を理解できるよう、本リポジトリは **「エンジン層（Engine）」** と **「アプリケーション層（Application）」** に完全分離されています。
+
+```text
+Engine/
+ ├── project/
+ │    ├── Baziru3_Engine/           [🎮 エンジンコア・レイヤー]
+ │    │    ├── Core/                - 基盤コンテキスト、Window, DirectXCom, Allocators (CBV/Stack)
+ │    │    ├── Graphics/            - 3Dモデル、スプライト、シェーダー、照明 (CSM), GpuProfiler
+ │    │    └── Framework/           - 衝突判定 (BVH/AABBTree/Mesh), GPUパーティクル, AIノード
+ │    ├── Application/              [🚀 ゲームアプリケーション・レイヤー]
+ │    │    ├── Scene/               - ゲームプレイ/タイトル/クリア各シーン
+ │    │    ├── Player/              - プレイヤー移動・回転・入力処理
+ │    │    ├── Enemy/               - 敵AI行動・ステートマシン
+ │    │    ├── GameObject/          - 弾 (Bullet)、障害物 (Obstacle) 等のゲームオブジェクト
+ │    │    └── Subsystem/           - サブシステム群
+ │    ├── Resources/                [🎨 アセットデータ]
+ │    │    ├── shaders/             - HLSL シェーダー群 (VS/PS/CS)
+ │    │    ├── textures/ & models/  - 3Dモデル・テクスチャ
+ │    │    └── ai_trees/            - AI Behavior Tree JSON定義ファイル
+ │    ├── externals/                [📦 サードパーティライブラリ]
+ │    │    └── ImGui, imgui-node-editor, Assimp, DirectXTex, nlohmann
+ │    ├── DirectXGame.sln           [🔧 Visual Studio 2026 ソリューション]
+ │    └── DirectXGame.vcxproj       [🔧 プロジェクト定義ファイル]
+ └── README.md                      [📖 アーキテクチャ解説ドキュメント]
+```
+
+---
+
 ## 🛠️ 技術スタック
+
 
 * **言語**: C++ (C++20 / ISO C++ 最新規格)
 * **グラフィックス API**: DirectX 12 (Direct3D 12)
@@ -232,12 +263,13 @@ CollisionManager::GetInstance()->RegisterCollider(collider.get());
 ## 🚀 開発ロードマップ & 進捗
 
 - [x] **DirectX 12 描画基礎**: パイプライン、シェーダバインド、定数バッファ管理
-- [x] **アニメーション**: スケルトン、ジョイント、スキンクアスタ対応（Assimp統合）
+- [x] **アニメーション**: スケルトン、ジョイント、スキンクラスタ対応（Assimp統合）
 - [x] **デバッグ環境**: ImGui 統合、および GUI Behavior Tree エディタ
-- [ ] **メモリ最適化**: CBV用リングバッファ、スタック/プールアロケータのフル統合
-- [ ] **衝突最適化**: 八分木空間分割およびデータ指向設計 (DOD)
-- [ ] **グラフィックス強化**: カスケードシャドウマップ (CSM) の実装
-- [ ] **Assetバイナリ化**: パースを伴わない高速ロードとマルチスレッド非同期読み込み
+- [x] **メモリ最適化**: CBV用リングバッファ、スタック/プールアロケータ (`ConstantBufferAllocator`, `StackAllocator`, `FreeList`) & パフォーマンスプロファイラUI
+- [x] **衝突最適化**: 八分木/BVH空間分割 (AABBTree)、空間ハッシュ、データ指向設計 (DOD)
+- [x] **グラフィックス強化**: カスケードシャドウマップ (CSM) & 全3Dモデル動的視錐台カリング
+- [x] **Assetバイナリ化**: `.bmodel` / `.bskel` / `.banim` 高速バイナリシリアライザ
+
 
 ---
 
