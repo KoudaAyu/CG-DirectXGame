@@ -34,8 +34,11 @@ void Bullet::Initialize(Object3dCom* object3dCom, Camera* camera, const Vector3&
     }
 
     object3d_ = std::make_unique<Object3d>();
-    object3d_->Initialize(object3dCom_, "sphere.obj");
+    Object3d::ModelData model = Object3d::LoadObjFile("Resources", "sphere.obj");
+    object3d_->Initialize(object3dCom_, model);
     object3d_->SetCamera(camera_);
+
+
     object3d_->SetTranslate(startPosition);
     object3d_->SetScale({ 0.3f, 0.3f, 0.3f });
 
