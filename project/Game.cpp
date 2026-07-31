@@ -2,7 +2,6 @@
 #include "DebugUI.h"
 #include "Baziru3_Engine/Core/Base/Pipeline/PipelineStateManager.h"
 #include <future>
-#include "Application/Scene/GameScene/GamePlayScene.h"
 
 #include <combaseapi.h>
 
@@ -267,14 +266,14 @@ void Game::Update()
 	}
 
 
+    //ImGuiにここからフレームが始まる趣旨をつたえる
+    // ※ シーンのUpdate()内でImGuiを使えるよう、SceneManager::Update()より前に呼ぶ
+    imguiManager->Update();
+
     // Update scenes and engine subsystems. Use fixed timestep here (same as scenes expect).
-	SceneManager::GetInstance()->Update(1.0f / 60.0f);
+    SceneManager::GetInstance()->Update(1.0f / 60.0f);
 
 
-
-
-	//ImGuiにここからフレームが始まる趣旨をつたえる
-	imguiManager->Update();
 
 	debugCamera_.Update();
 
@@ -709,15 +708,6 @@ void Game::DrawSprites(const RenderContext& ctx)
 
 void Game::DrawParticles(const RenderContext& ctx)
 {
-	BaseScene* currentScene = SceneManager::GetInstance()->GetCurrentScene();
-	if (currentScene)
-	{
-		GamePlayScene* gameplayScene = dynamic_cast<GamePlayScene*>(currentScene);
-		if (gameplayScene && gameplayScene->GetAppParticleManager())
-		{
-			gameplayScene->GetAppParticleManager()->Draw();
-		}
-	}
 	particleRenderer_.Draw(ctx, particleManager.get(), model_.get(), UINT(modelData.vertices.size()));
 }
 

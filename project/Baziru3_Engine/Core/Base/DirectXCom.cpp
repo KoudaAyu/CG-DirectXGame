@@ -167,15 +167,14 @@ void DirectXCom::Finalize()
 void DirectXCom::DebugLayer()
 {
 #ifdef _DEBUG
-
-
+	// 特定のNVIDIA GPU/ドライバ環境でD3D12 Debug Layerが原因のDevice Removal (0x887A0005) が発生するため一時的に無効化
+	/*
 	if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debugController))))
 	{
-		//デバックレイヤーを有効化する
 		debugController->EnableDebugLayer();
-		//更にGPU側でもチェックを行うようにする
-		debugController->SetEnableGPUBasedValidation(TRUE);
+		debugController->SetEnableGPUBasedValidation(FALSE);
 	}
+	*/
 #endif
 }
 

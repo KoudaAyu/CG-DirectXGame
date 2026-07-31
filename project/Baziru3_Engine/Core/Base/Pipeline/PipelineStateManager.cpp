@@ -258,12 +258,26 @@ void PipelineStateManager::CreateSpritePipelines(DirectXCom* dxCommon)
 
 		desc.BlendState.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
 		desc.BlendState.RenderTarget[0].BlendEnable = setup.blendEnable;
-		desc.BlendState.RenderTarget[0].SrcBlend = setup.srcBlend;
-		desc.BlendState.RenderTarget[0].BlendOp = setup.blendOp;
-		desc.BlendState.RenderTarget[0].DestBlend = setup.destBlend;
-		desc.BlendState.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_ONE;
-		desc.BlendState.RenderTarget[0].BlendOpAlpha = D3D12_BLEND_OP_ADD;
-		desc.BlendState.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_ZERO;
+		if (setup.blendEnable)
+		{
+			// BlendEnable=TRUE の場合のみブレンド設定を適用
+			desc.BlendState.RenderTarget[0].SrcBlend = setup.srcBlend;
+			desc.BlendState.RenderTarget[0].BlendOp = setup.blendOp;
+			desc.BlendState.RenderTarget[0].DestBlend = setup.destBlend;
+			desc.BlendState.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_ONE;
+			desc.BlendState.RenderTarget[0].BlendOpAlpha = D3D12_BLEND_OP_ADD;
+			desc.BlendState.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_ZERO;
+		}
+		else
+		{
+			// BlendEnable=FALSE の場合はD3D12デフォルト値を使用（ドライバ互換性のため）
+			desc.BlendState.RenderTarget[0].SrcBlend = D3D12_BLEND_ONE;
+			desc.BlendState.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
+			desc.BlendState.RenderTarget[0].DestBlend = D3D12_BLEND_ZERO;
+			desc.BlendState.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_ONE;
+			desc.BlendState.RenderTarget[0].BlendOpAlpha = D3D12_BLEND_OP_ADD;
+			desc.BlendState.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_ZERO;
+		}
 
 		desc.RasterizerState = rasterizerDesc;
 		desc.NumRenderTargets = 1;
@@ -272,18 +286,37 @@ void PipelineStateManager::CreateSpritePipelines(DirectXCom* dxCommon)
 		desc.SampleDesc.Count = 1;
 		desc.SampleMask = D3D12_DEFAULT_SAMPLE_MASK;
 		desc.DepthStencilState = depthStencilDesc;
-		desc.DSVFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
+		desc.DSVFormat = DXGI_FORMAT_UNKNOWN; // DepthEnable=false のためUNKNOWNを設定（NVIDIAドライバクラッシュ回避）
 
 		Microsoft::WRL::ComPtr<ID3D12PipelineState> pipelineState;
 		std::wstring psoNameW = StringUtil::ConvertString(setup.name);
-		HRESULT hrLoad = pipelineLibrary_->LoadGraphicsPipeline(psoNameW.c_str(), &desc, IID_PPV_ARGS(&pipelineState));
+		HRESULT hrLoad = E_FAIL;
+		if (pipelineLibrary_)
+		{
+			hrLoad = pipelineLibrary_->LoadGraphicsPipeline(psoNameW.c_str(), &desc, IID_PPV_ARGS(&pipelineState));
+		}
 		if (FAILED(hrLoad))
 		{
 			hr = dxCommon->GetDevice()->CreateGraphicsPipelineState(&desc, IID_PPV_ARGS(&pipelineState));
+			if (FAILED(hr))
+			{
+				OutputDebugStringA(std::format("Error: CreateGraphicsPipelineState failed for {} (hr=0x{:08X})\n", setup.name, (uint32_t)hr).c_str());
+			}
 			assert(SUCCEEDED(hr));
-			pipelineLibrary_->StorePipeline(psoNameW.c_str(), pipelineState.Get());
+			// PSO作成後に即座にデバイス削除理由を確認（NVIDIAドライバの遅延エラー検出のため）
+			HRESULT deviceRemovedReason = dxCommon->GetDevice()->GetDeviceRemovedReason();
+			if (FAILED(deviceRemovedReason))
+			{
+				OutputDebugStringA(std::format("Device removed after PSO creation: {} (reason=0x{:08X})\n", setup.name, (uint32_t)deviceRemovedReason).c_str());
+				assert(false && "Device removed during Sprite PSO creation");
+			}
+			if (pipelineLibrary_ && SUCCEEDED(hr))
+			{
+				pipelineLibrary_->StorePipeline(psoNameW.c_str(), pipelineState.Get());
+			}
 		}
 		pipelineStates_[setup.name] = pipelineState;
+		OutputDebugStringA(std::format("OK: Created PSO: {}\n", setup.name).c_str());
 	}
 }
 
@@ -440,53 +473,67 @@ void PipelineStateManager::CreateObject3dPipelines(DirectXCom* dxCommon)
 		desc.DSVFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
 
 		Microsoft::WRL::ComPtr<ID3D12PipelineState> pipelineState;
-		HRESULT hrLoad = pipelineLibrary_->LoadGraphicsPipeline(L"Object3D_Normal", &desc, IID_PPV_ARGS(&pipelineState));
+		HRESULT hrLoad = E_FAIL;
+		if (pipelineLibrary_)
+			hrLoad = pipelineLibrary_->LoadGraphicsPipeline(L"Object3D_Normal", &desc, IID_PPV_ARGS(&pipelineState));
 		if (FAILED(hrLoad))
 		{
 			hr = dxCommon->GetDevice()->CreateGraphicsPipelineState(&desc, IID_PPV_ARGS(&pipelineState));
+			if (FAILED(hr)) OutputDebugStringA(std::format("Error: CreateGraphicsPipelineState failed for Object3D_Normal (hr=0x{:08X})\n", (uint32_t)hr).c_str());
 			assert(SUCCEEDED(hr));
-			pipelineLibrary_->StorePipeline(L"Object3D_Normal", pipelineState.Get());
+			if (pipelineLibrary_ && SUCCEEDED(hr)) pipelineLibrary_->StorePipeline(L"Object3D_Normal", pipelineState.Get());
 		}
 		pipelineStates_["Object3D_Normal"] = pipelineState;
 
-		// エフェクト (デプスライト無効)
+		// エフェクト (デプス書き込み無効)
 		desc.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO;
 		Microsoft::WRL::ComPtr<ID3D12PipelineState> pipelineStateEffect;
-		hrLoad = pipelineLibrary_->LoadGraphicsPipeline(L"Object3D_Effect", &desc, IID_PPV_ARGS(&pipelineStateEffect));
+		hrLoad = E_FAIL;
+		if (pipelineLibrary_)
+			hrLoad = pipelineLibrary_->LoadGraphicsPipeline(L"Object3D_Effect", &desc, IID_PPV_ARGS(&pipelineStateEffect));
 		if (FAILED(hrLoad))
 		{
 			hr = dxCommon->GetDevice()->CreateGraphicsPipelineState(&desc, IID_PPV_ARGS(&pipelineStateEffect));
+			if (FAILED(hr)) OutputDebugStringA(std::format("Error: CreateGraphicsPipelineState failed for Object3D_Effect (hr=0x{:08X})\n", (uint32_t)hr).c_str());
 			assert(SUCCEEDED(hr));
-			pipelineLibrary_->StorePipeline(L"Object3D_Effect", pipelineStateEffect.Get());
+			if (pipelineLibrary_ && SUCCEEDED(hr)) pipelineLibrary_->StorePipeline(L"Object3D_Effect", pipelineStateEffect.Get());
 		}
 		pipelineStates_["Object3D_Effect"] = pipelineStateEffect;
 
 		// オーバーレイ (デプステスト無効)
 		desc.DepthStencilState.DepthEnable = FALSE;
+		desc.DSVFormat = DXGI_FORMAT_UNKNOWN; // DepthEnable=false のためUNKNOWNを設定（NVIDIAドライバクラッシュ回避）
 		Microsoft::WRL::ComPtr<ID3D12PipelineState> pipelineStateOverlay;
-		hrLoad = pipelineLibrary_->LoadGraphicsPipeline(L"Object3D_Overlay", &desc, IID_PPV_ARGS(&pipelineStateOverlay));
+		hrLoad = E_FAIL;
+		if (pipelineLibrary_)
+			hrLoad = pipelineLibrary_->LoadGraphicsPipeline(L"Object3D_Overlay", &desc, IID_PPV_ARGS(&pipelineStateOverlay));
 		if (FAILED(hrLoad))
 		{
 			hr = dxCommon->GetDevice()->CreateGraphicsPipelineState(&desc, IID_PPV_ARGS(&pipelineStateOverlay));
+			if (FAILED(hr)) OutputDebugStringA(std::format("Error: CreateGraphicsPipelineState failed for Object3D_Overlay (hr=0x{:08X})\n", (uint32_t)hr).c_str());
 			assert(SUCCEEDED(hr));
-			pipelineLibrary_->StorePipeline(L"Object3D_Overlay", pipelineStateOverlay.Get());
+			if (pipelineLibrary_ && SUCCEEDED(hr)) pipelineLibrary_->StorePipeline(L"Object3D_Overlay", pipelineStateOverlay.Get());
 		}
 		pipelineStates_["Object3D_Overlay"] = pipelineStateOverlay;
 
 		// ワイヤーフレーム (デプステスト有効、デプス書き込み無効、ワイヤーフレーム描画モード)
 		desc.DepthStencilState.DepthEnable = TRUE;
+		desc.DSVFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
 		desc.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO; // Zファイティング防止
 		desc.DepthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
 		desc.RasterizerState.FillMode = D3D12_FILL_MODE_WIREFRAME;
 		desc.PS = { wireframePixelShaderBlob->GetBufferPointer(), wireframePixelShaderBlob->GetBufferSize() };
-		
+
 		Microsoft::WRL::ComPtr<ID3D12PipelineState> pipelineStateWireframe;
-		hrLoad = pipelineLibrary_->LoadGraphicsPipeline(L"Object3D_Wireframe", &desc, IID_PPV_ARGS(&pipelineStateWireframe));
+		hrLoad = E_FAIL;
+		if (pipelineLibrary_)
+			hrLoad = pipelineLibrary_->LoadGraphicsPipeline(L"Object3D_Wireframe", &desc, IID_PPV_ARGS(&pipelineStateWireframe));
 		if (FAILED(hrLoad))
 		{
 			hr = dxCommon->GetDevice()->CreateGraphicsPipelineState(&desc, IID_PPV_ARGS(&pipelineStateWireframe));
+			if (FAILED(hr)) OutputDebugStringA(std::format("Error: CreateGraphicsPipelineState failed for Object3D_Wireframe (hr=0x{:08X})\n", (uint32_t)hr).c_str());
 			assert(SUCCEEDED(hr));
-			pipelineLibrary_->StorePipeline(L"Object3D_Wireframe", pipelineStateWireframe.Get());
+			if (pipelineLibrary_ && SUCCEEDED(hr)) pipelineLibrary_->StorePipeline(L"Object3D_Wireframe", pipelineStateWireframe.Get());
 		}
 		pipelineStates_["Object3D_Wireframe"] = pipelineStateWireframe;
 	}
@@ -494,72 +541,11 @@ void PipelineStateManager::CreateObject3dPipelines(DirectXCom* dxCommon)
 
 void PipelineStateManager::LoadPipelineLibrary(ID3D12Device* device)
 {
-	std::wstring cachePath = L"Resources/shaders/PsoCache.bin";
-	std::vector<uint8_t> cacheData;
-
-	bool cacheIsValid = true;
-	if (std::filesystem::exists(cachePath))
-	{
-		try {
-			auto cacheWriteTime = std::filesystem::last_write_time(cachePath);
-			std::wstring shaderDir = L"Resources/shaders";
-			if (std::filesystem::exists(shaderDir))
-			{
-				for (const auto& entry : std::filesystem::recursive_directory_iterator(shaderDir))
-				{
-					if (entry.is_regular_file() && (entry.path().extension() == L".hlsl" || entry.path().extension() == L".hlsli"))
-					{
-						if (entry.last_write_time() > cacheWriteTime)
-						{
-							cacheIsValid = false;
-							OutputDebugStringA("PipelineStateManager: Shaders have been modified since cache was saved. Invalidating PSO cache.\n");
-							break;
-						}
-					}
-				}
-			}
-		}
-		catch (...) {
-			cacheIsValid = false;
-		}
-
-		if (!cacheIsValid)
-		{
-			std::error_code ec;
-			std::filesystem::remove(cachePath, ec);
-		}
-		else
-		{
-			std::ifstream file(cachePath, std::ios::binary | std::ios::ate);
-			if (file.is_open())
-			{
-				size_t size = file.tellg();
-				cacheData.resize(size);
-				file.seekg(0, std::ios::beg);
-				file.read(reinterpret_cast<char*>(cacheData.data()), size);
-				file.close();
-			}
-		}
-	}
-
-	Microsoft::WRL::ComPtr<ID3D12Device1> device1;
-	if (SUCCEEDED(device->QueryInterface(IID_PPV_ARGS(&device1))))
-	{
-		HRESULT hr = S_OK;
-		if (!cacheData.empty())
-		{
-			hr = device1->CreatePipelineLibrary(cacheData.data(), cacheData.size(), IID_PPV_ARGS(&pipelineLibrary_));
-			if (FAILED(hr))
-			{
-				cacheData.clear();
-			}
-		}
-
-		if (cacheData.empty())
-		{
-			device1->CreatePipelineLibrary(nullptr, 0, IID_PPV_ARGS(&pipelineLibrary_));
-		}
-	}
+	// 【診断モード】PSOキャッシュを一時的に無効化してデバイス削除の原因を切り分ける
+	// pipelineLibrary_ を null のままにすることで、全PSO作成が CreateGraphicsPipelineState を直接使用する
+	OutputDebugStringA("PipelineStateManager: PSO cache library DISABLED (diagnostic mode).\n");
+	pipelineLibrary_.Reset();
+	(void)device; // 未使用変数警告抑制
 }
 
 void PipelineStateManager::SavePipelineLibrary()

@@ -247,22 +247,7 @@ void DebugUI::Update()
             ImGui::Text("Active Count: %u particles", activeCount);
             ImGui::ProgressBar(static_cast<float>(activeCount) / 10240.0f, ImVec2(0.0f, 0.0f), "Spawn Load");
 
-            BaseScene* currentScene = SceneManager::GetInstance()->GetCurrentScene();
-            GamePlayScene* gps = dynamic_cast<GamePlayScene*>(currentScene);
-            if (gps)
-            {
-                ImGui::Separator();
-                ImGui::Text("Emitter Settings:");
-                Emitter& emitter = gps->GetEmitter();
-
-                int countVal = static_cast<int>(emitter.count);
-                if (ImGui::SliderInt("Spawn Count", &countVal, 1, 1000))
-                {
-                    emitter.count = static_cast<uint32_t>(countVal);
-                }
-
-                ImGui::SliderFloat("Spawn Frequency (sec)", &emitter.frequency, 0.01f, 2.0f, "%.2fs");
-            }
+            // エミッター設定は GamePlayScene 内の ImGui パネルで管理
         }
         else
         {
