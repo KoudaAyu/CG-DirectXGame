@@ -81,9 +81,13 @@
     <ClCompile Include="Baziru3_Engine\Framework\Particle\ParticleManager.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Framework\Particle\ParticleEmitter.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
     <ClCompile Include="Baziru3_Engine\Core\Math\Random.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
+
     <ClCompile Include="Baziru3_Engine\Core\Base\ImGui\ImGuiManager.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
@@ -291,6 +295,7 @@
     <FxCompile Include="Resources\shaders\InitializeParticle.CS.hlsl">
       <Filter>リソース ファイル</Filter>
     </FxCompile>
+
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Baziru3_Engine\Framework\Animation\NodeAnimation\Node.h" />

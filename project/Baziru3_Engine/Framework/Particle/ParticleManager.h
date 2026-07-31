@@ -43,8 +43,16 @@ public:
 		float deltaTime;
 		float time;
 		uint32_t maxParticles;
-		float padding; // 16バイトアライメントのためのパディング
+		float padding;
 	};
+
+	struct PerFrame
+	{
+		float time;
+		float deltaTime;
+	};
+
+
 
 	struct Particle
 	{
@@ -156,6 +164,7 @@ public:
 	DirectXCom* GetDxCommon() { return dxCommon; }
 
 	std::mt19937& GetRandomEngine() { return randomEngine; }
+	ParticleEmitter* GetGPUEmitter() const { return gpuEmitter_.get(); }
 
 	uint32_t GetNumMaxInstances() const { return kNumMaxInstances; }
 
@@ -216,9 +225,23 @@ private:
 	std::pair<D3D12_CPU_DESCRIPTOR_HANDLE, D3D12_GPU_DESCRIPTOR_HANDLE> gpuParticleUavHandle_;
 	std::pair<D3D12_CPU_DESCRIPTOR_HANDLE, D3D12_GPU_DESCRIPTOR_HANDLE> gpuParticleSrvHandle_;
 
+	// GPU Particle カウンタリソースとディスクリプタ用インデックス
+	Microsoft::WRL::ComPtr<ID3D12Resource> freeCounterResource_ = nullptr;
+	uint32_t freeCounterUavIndex_ = 0;
+	std::pair<D3D12_CPU_DESCRIPTOR_HANDLE, D3D12_GPU_DESCRIPTOR_HANDLE> freeCounterUavHandle_;
+
+	// GPU Particle FreeListリソースとディスクリプタ用インデックス
+	Microsoft::WRL::ComPtr<ID3D12Resource> freeListResource_ = nullptr;
+	uint32_t freeListUavIndex_ = 0;
+	std::pair<D3D12_CPU_DESCRIPTOR_HANDLE, D3D12_GPU_DESCRIPTOR_HANDLE> freeListUavHandle_;
+
 	// PerView 用のバッファ
 	Microsoft::WRL::ComPtr<ID3D12Resource> perViewResource_ = nullptr;
 	PerView* perViewData_ = nullptr;
+
+	// PerFrame 用のバッファ
+	Microsoft::WRL::ComPtr<ID3D12Resource> perFrameResource_ = nullptr;
+	PerFrame* perFrameData_ = nullptr;
 
 	// Compute Pipeline
 	Microsoft::WRL::ComPtr<ID3D12RootSignature> computeRootSignature_ = nullptr;
@@ -229,7 +252,15 @@ private:
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> updatePipelineState_ = nullptr;
 	Microsoft::WRL::ComPtr<IDxcBlob> updateShaderBlob_;
 
+	Microsoft::WRL::ComPtr<ID3D12RootSignature> emitRootSignature_ = nullptr;
+	Microsoft::WRL::ComPtr<ID3D12PipelineState> emitPipelineState_ = nullptr;
+	Microsoft::WRL::ComPtr<IDxcBlob> emitShaderBlob_ = nullptr;
+	std::unique_ptr<ParticleEmitter> gpuEmitter_;
+	static ParticleManager* instance_;
+
 	std::mt19937 randomEngine{ std::random_device{}() };
+
+
 	std::list<ParticleManager::Particle> particles;
 	std::list<ParticleManager::Particle> effectParticles;
 
@@ -250,6 +281,5 @@ private:
 		Ring,
 		External
 	};
-private:
-	static ParticleManager* instance_;
 };
+

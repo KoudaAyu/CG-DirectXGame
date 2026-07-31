@@ -1,4 +1,6 @@
 #include "DebugUI.h"
+#include "ParticleManager.h"
+#include "ParticleEmitter.h"
 #include "MaterialManager.h"
 #include "SpriteManager.h"
 #include "Camera.h"
@@ -280,6 +282,7 @@ void DebugUI::Update()
     {
         materialManager_->Update();
     }
+
 
     ImGui::End();
 

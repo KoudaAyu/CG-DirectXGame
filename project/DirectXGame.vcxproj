@@ -79,6 +79,7 @@
     <ClCompile Include="Baziru3_Engine\Graphics\2D\Sprite\Sprite.cpp" />
     <ClCompile Include="Baziru3_Engine\Graphics\2D\Sprite\SpriteCom.cpp" />
     <ClCompile Include="Baziru3_Engine\Framework\Particle\ParticleManager.cpp" />
+    <ClCompile Include="Baziru3_Engine\Framework\Particle\ParticleEmitter.cpp" />
     <ClCompile Include="Baziru3_Engine\Graphics\Graphics\Material\MaterialManager.cpp" />
     <ClCompile Include="Baziru3_Engine\Core\Math\Random.cpp" />
     <ClCompile Include="Baziru3_Engine\Graphics\3D\Model\Model.cpp" />
@@ -117,6 +118,7 @@
     <ClCompile Include="externals\imgui-node-editor\imgui_node_editor_api.cpp" />
     <ClCompile Include="externals\imgui-node-editor\imgui_canvas.cpp" />
     <ClCompile Include="externals\imgui-node-editor\crude_json.cpp" />
+
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="Resources\shaders\InitializeParticle.CS.hlsl">
@@ -161,16 +163,19 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
     </FxCompile>
     <FxCompile Include="Resources\shaders\CopyImage.PS.hlsl">
+
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
     </FxCompile>
+
     <FxCompile Include="Resources\shaders\RadialBlur.PS.hlsl">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
     </FxCompile>
     <FxCompile Include="Resources\shaders\RandomNoise.PS.hlsl">
+
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
