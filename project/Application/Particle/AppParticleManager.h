@@ -52,9 +52,32 @@ public:
 
 
 private:
+	struct Vertex
+	{
+		Vector4 pos;
+		Vector2 uv;
+		Vector3 normal;
+	};
+
 	ParticleManager* enginePM_ = nullptr;
 	std::list<AppParticle> particles_;
 
+	static const uint32_t kNumMaxInstances = 1024;
+	Microsoft::WRL::ComPtr<ID3D12Resource> instancingResource_ = nullptr;
+	ParticleManager::ParticleCS* instanceData_ = nullptr;
+	uint32_t instancingSrvIndex_ = 0;
+	D3D12_GPU_DESCRIPTOR_HANDLE instancingSrvHandleGPU_{};
+
+	Microsoft::WRL::ComPtr<ID3D12Resource> quadVertexBuffer_ = nullptr;
+	D3D12_VERTEX_BUFFER_VIEW quadVertexBufferView_{};
+
+	Microsoft::WRL::ComPtr<ID3D12Resource> perViewResource_ = nullptr;
+	ParticleManager::PerView* perViewData_ = nullptr;
+
 public:
 	void Draw();
+	void Draw(const RenderContext& ctx);
 };
+
+
+

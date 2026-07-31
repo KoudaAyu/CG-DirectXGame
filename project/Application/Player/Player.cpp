@@ -337,13 +337,24 @@ std::vector<std::unique_ptr<Bullet>> Player::TryShoot(const MouseInput* mouseInp
         return bullets;
     }
 
-    bool isLeftClick = mouseInput->PushButton(0);
-    bool isRightClick = mouseInput->PushButton(1);
+    bool isLeftClick = (mouseInput && mouseInput->PushButton(0)) || (GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0;
+    bool isRightClick = (mouseInput && mouseInput->PushButton(1)) || (GetAsyncKeyState(VK_RBUTTON) & 0x8000) != 0;
+
+
+    if (isLeftClick || isRightClick)
+    {
+        char logBuf[256];
+        snprintf(logBuf, sizeof(logBuf), "[Player::TryShoot LOG] Click! cooldown=%.2f, ammo=%d, reload=%d, dead=%d, dodge=%d\n",
+            shotCooldownTimer_, magazineAmmo_, isReloading_ ? 1 : 0, isDead_ ? 1 : 0, isDodging_ ? 1 : 0);
+        OutputDebugStringA(logBuf);
+    }
 
     if (shotCooldownTimer_ > 0.0f || (!isLeftClick && !isRightClick))
     {
         return bullets;
     }
+
+
 
     const float yaw = GetRotation().y;
     

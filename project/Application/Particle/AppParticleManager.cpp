@@ -1,4 +1,5 @@
 #include "AppParticleManager.h"
+#include "ParticleEmitter.h"
 #include <algorithm>
 #include <cmath>
 #include "DirectXCom.h"
@@ -9,15 +10,82 @@
 #include "Camera.h"
 #include <iostream>
 
+
 void AppParticleManager::Initialize(ParticleManager* enginePM)
 {
 	enginePM_ = enginePM;
 	particles_.clear();
+
+	if (enginePM_ && enginePM_->GetDxCommon())
+	{
+		DirectXCom* dxCommon = enginePM_->GetDxCommon();
+		instancingResource_ = dxCommon->CreateBufferResource(dxCommon->GetDevice().Get(), sizeof(ParticleManager::ParticleCS) * kNumMaxInstances);
+		instancingResource_->Map(0, nullptr, reinterpret_cast<void**>(&instanceData_));
+
+		auto* srvManager = TextureManager::GetInstance()->GetSRVManager();
+		if (srvManager)
+		{
+			instancingSrvIndex_ = srvManager->Allocate();
+			srvManager->CreateSRVForStructuredBuffer(
+				instancingSrvIndex_,
+				instancingResource_.Get(),
+				kNumMaxInstances,
+				sizeof(ParticleManager::ParticleCS)
+			);
+			instancingSrvHandleGPU_ = srvManager->GetGPUDescriptorHandle(instancingSrvIndex_);
+		}
+
+		Vertex vertices[6] = {
+			{ { -0.5f, -0.5f, 0.0f, 1.0f }, { 0.0f, 1.0f }, { 0.0f, 0.0f, -1.0f } },
+			{ { -0.5f,  0.5f, 0.0f, 1.0f }, { 0.0f, 0.0f }, { 0.0f, 0.0f, -1.0f } },
+			{ {  0.5f, -0.5f, 0.0f, 1.0f }, { 1.0f, 1.0f }, { 0.0f, 0.0f, -1.0f } },
+			{ { -0.5f,  0.5f, 0.0f, 1.0f }, { 0.0f, 0.0f }, { 0.0f, 0.0f, -1.0f } },
+			{ {  0.5f,  0.5f, 0.0f, 1.0f }, { 1.0f, 0.0f }, { 0.0f, 0.0f, -1.0f } },
+			{ {  0.5f, -0.5f, 0.0f, 1.0f }, { 1.0f, 1.0f }, { 0.0f, 0.0f, -1.0f } },
+		};
+
+		quadVertexBuffer_ = dxCommon->CreateBufferResource(dxCommon->GetDevice().Get(), sizeof(vertices));
+		void* mapped = nullptr;
+		quadVertexBuffer_->Map(0, nullptr, &mapped);
+		std::memcpy(mapped, vertices, sizeof(vertices));
+		quadVertexBuffer_->Unmap(0, nullptr);
+
+		quadVertexBufferView_.BufferLocation = quadVertexBuffer_->GetGPUVirtualAddress();
+		quadVertexBufferView_.SizeInBytes = sizeof(vertices);
+		quadVertexBufferView_.StrideInBytes = sizeof(Vertex);
+
+		perViewResource_ = dxCommon->CreateBufferResource(dxCommon->GetDevice().Get(), sizeof(ParticleManager::PerView));
+		perViewResource_->Map(0, nullptr, reinterpret_cast<void**>(&perViewData_));
+		std::memset(perViewData_, 0, sizeof(ParticleManager::PerView));
+	}
 }
+
 
 AppParticleManager::~AppParticleManager()
 {
+	if (perViewResource_ && perViewData_)
+	{
+		perViewResource_->Unmap(0, nullptr);
+		perViewData_ = nullptr;
+	}
+
+	if (instancingResource_ && instanceData_)
+	{
+		D3D12_RANGE writtenRange = { 0, static_cast<SIZE_T>(sizeof(ParticleManager::ParticleCS) * kNumMaxInstances) };
+		instancingResource_->Unmap(0, &writtenRange);
+		instanceData_ = nullptr;
+	}
+
+	if (instancingSrvIndex_ != 0)
+	{
+		auto* srvManager = TextureManager::GetInstance()->GetSRVManager();
+		if (srvManager)
+		{
+			srvManager->Free(instancingSrvIndex_);
+		}
+	}
 }
+
 
 void AppParticleManager::Update(float deltaTime, const Vector3& playerPos)
 {
@@ -72,15 +140,22 @@ void AppParticleManager::Update(float deltaTime, const Vector3& playerPos)
 
 void AppParticleManager::EmitSpark(std::mt19937& randomEngine, const Vector3& position, const Vector3& baseVelocity, const Vector4& color, float scale, float lifeTime, uint32_t textureIndex)
 {
+	if (enginePM_ && enginePM_->GetGPUEmitter() && enginePM_->GetGPUEmitter()->GetEmitterData())
+	{
+		auto* emitter = enginePM_->GetGPUEmitter()->GetEmitterData();
+		emitter->translate = position;
+		emitter->radius = (scale > 0.1f) ? scale : 0.4f;
+		emitter->count = 6;
+		emitter->emit = 1;
+	}
+
 	AppParticle p;
 	p.transform.Initialize();
 	p.transform.SetTranslate(position);
 
-	// Z rotation: 0.0f to 6.2831853f
 	std::uniform_real_distribution<float> distRotate(0.0f, 6.2831853f);
 	p.transform.SetRotate({ 0.0f, 0.0f, distRotate(randomEngine) });
 
-	// Non-uniform scale: X: 0.02f to 0.06f, Y: 0.15f to 0.45f, adjusted by scale factor
 	std::uniform_real_distribution<float> distScaleX(0.02f, 0.06f);
 	std::uniform_real_distribution<float> distScaleY(0.15f, 0.45f);
 	p.transform.SetScale({ distScaleX(randomEngine) * (scale / 0.12f), distScaleY(randomEngine) * (scale / 0.12f), 1.0f });
@@ -94,7 +169,7 @@ void AppParticleManager::EmitSpark(std::mt19937& randomEngine, const Vector3& po
 	p.currentTime = 0.0f;
 	p.textureIndex = textureIndex;
 
-	p.gravity = 9.8f; // Heavy gravity for sparks
+	p.gravity = 9.8f;
 	p.bounceElasticity = 0.5f;
 
 	std::uniform_real_distribution<float> spinDist(-10.0f, 10.0f);
@@ -105,9 +180,19 @@ void AppParticleManager::EmitSpark(std::mt19937& randomEngine, const Vector3& po
 
 void AppParticleManager::EmitSparkWithVelocity(std::mt19937& randomEngine, const Vector3& position, const Vector3& velocity, const Vector4& color, float scale, float lifeTime, uint32_t textureIndex)
 {
+	if (enginePM_ && enginePM_->GetGPUEmitter() && enginePM_->GetGPUEmitter()->GetEmitterData())
+	{
+		auto* emitter = enginePM_->GetGPUEmitter()->GetEmitterData();
+		emitter->translate = position;
+		emitter->radius = (scale > 0.1f) ? scale : 0.4f;
+		emitter->count = 4;
+		emitter->emit = 1;
+	}
+
 	AppParticle p;
 	p.transform.Initialize();
 	p.transform.SetTranslate(position);
+
 
 	std::uniform_real_distribution<float> distRotate(0.0f, 6.2831853f);
 	p.transform.SetRotate({ 0.0f, 0.0f, distRotate(randomEngine) });
@@ -470,7 +555,6 @@ void AppParticleManager::Draw()
 		p.velocity = ap.velocity;
 		p.color = ap.color;
 
-		// アルファフェードの計算をCPU側で行って色に反映
 		float alpha = 1.0f - (ap.currentTime / ap.lifeTime);
 		p.color.w = (std::clamp)(alpha * ap.color.w, 0.0f, 1.0f);
 
@@ -483,5 +567,91 @@ void AppParticleManager::Draw()
 
 	enginePM_->AddParticles(tempParticles);
 }
+
+void AppParticleManager::Draw(const RenderContext& ctx)
+{
+	if (!ctx.commandList || !enginePM_ || !instanceData_ || particles_.empty() || !ctx.camera || !perViewData_) return;
+
+	uint32_t currentWriteIndex = 0;
+	for (const auto& ap : particles_)
+	{
+		if (currentWriteIndex >= kNumMaxInstances) break;
+
+		ParticleManager::ParticleCS p{};
+		p.translate = ap.transform.GetTranslate();
+		p.scale = ap.transform.GetScale();
+		p.lifeTime = ap.lifeTime;
+		p.currentTime = ap.currentTime;
+		p.velocity = ap.velocity;
+
+		float alpha = 1.0f - (ap.currentTime / ap.lifeTime);
+		p.color = ap.color;
+		p.color.w = (std::clamp)(alpha * ap.color.w, 0.0f, 1.0f);
+
+		instanceData_[currentWriteIndex++] = p;
+	}
+
+	if (currentWriteIndex == 0) return;
+
+	for (uint32_t i = currentWriteIndex; i < kNumMaxInstances; ++i)
+	{
+		instanceData_[i] = {};
+	}
+
+	// 1. PerView CBV の計算と転送
+	Matrix4x4 backToFrontMatrix = MakeRotateYMatrix(0.0f);
+	Matrix4x4 billboardMatrix = Multiply(backToFrontMatrix, ctx.camera->GetWorldMatrix());
+	billboardMatrix.m[3][0] = 0.0f;
+	billboardMatrix.m[3][1] = 0.0f;
+	billboardMatrix.m[3][2] = 0.0f;
+
+	Matrix4x4 viewProjection = Multiply(ctx.camera->GetViewMatrix(), ctx.camera->GetProjectionMatrix());
+
+	perViewData_->viewProjection = viewProjection;
+	perViewData_->billboardMatrix = billboardMatrix;
+	perViewData_->deltaTime = 1.0f / 60.0f;
+	perViewData_->time = 0.0f;
+	perViewData_->maxParticles = kNumMaxInstances;
+
+	// 2. エンジン側の Particle 描画パイプラインをセットアップ
+	enginePM_->SetupDraw(ctx.commandList);
+
+	ctx.commandList->SetGraphicsRootConstantBufferView(RootParam::Particle::kMaterial, ctx.materialGPUAddress);
+	ctx.commandList->SetGraphicsRootDescriptorTable(RootParam::Particle::kInstancing, instancingSrvHandleGPU_);
+
+	if (ctx.textureHandle.ptr != 0)
+	{
+		ctx.commandList->SetGraphicsRootDescriptorTable(RootParam::Particle::kTextureTable, ctx.textureHandle);
+	}
+	else
+	{
+		uint32_t whiteTex = TextureManager::GetInstance()->Load("Resources/CG4/human/white.png");
+		ctx.commandList->SetGraphicsRootDescriptorTable(RootParam::Particle::kTextureTable, TextureManager::GetInstance()->GetSrvHandleGPU(whiteTex));
+	}
+
+	if (ctx.light)
+	{
+		ctx.commandList->SetGraphicsRootConstantBufferView(RootParam::Particle::kLight, ctx.light->GetDirectionalLightResource()->GetGPUVirtualAddress());
+	}
+
+	if (ctx.camera && ctx.camera->GetCameraGpuAddress() != 0)
+	{
+		ctx.commandList->SetGraphicsRootConstantBufferView(RootParam::Particle::kCamera, ctx.camera->GetCameraGpuAddress());
+	}
+
+	// PerView CBV をルートパラメーターkPerViewへバインド
+	ctx.commandList->SetGraphicsRootConstantBufferView(RootParam::Particle::kPerView, perViewResource_->GetGPUVirtualAddress());
+
+	// ユニットビルボードクアッドの頂点バッファをIASetVertexBuffersでバインド
+	if (quadVertexBufferView_.SizeInBytes > 0)
+	{
+		ctx.commandList->IASetVertexBuffers(0, 1, &quadVertexBufferView_);
+	}
+
+	ctx.commandList->DrawInstanced(6, currentWriteIndex, 0, 0);
+}
+
+
+
 
 

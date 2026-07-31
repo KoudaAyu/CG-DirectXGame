@@ -267,16 +267,17 @@ void Game::Update()
 	}
 
 
+	//ImGuiにここからフレームが始まる趣旨をつたえる
+	if (imguiManager)
+	{
+		imguiManager->Update();
+	}
+
     // Update scenes and engine subsystems. Use fixed timestep here (same as scenes expect).
 	SceneManager::GetInstance()->Update(1.0f / 60.0f);
 
-
-
-
-	//ImGuiにここからフレームが始まる趣旨をつたえる
-	imguiManager->Update();
-
 	debugCamera_.Update();
+
 
 	camera_->Update();
 	if (skybox_)
@@ -715,11 +716,12 @@ void Game::DrawParticles(const RenderContext& ctx)
 		GamePlayScene* gameplayScene = dynamic_cast<GamePlayScene*>(currentScene);
 		if (gameplayScene && gameplayScene->GetAppParticleManager())
 		{
-			gameplayScene->GetAppParticleManager()->Draw();
+			gameplayScene->GetAppParticleManager()->Draw(ctx);
 		}
 	}
 	particleRenderer_.Draw(ctx, particleManager.get(), model_.get(), UINT(modelData.vertices.size()));
 }
+
 
 RenderContext Game::PrepareRenderContext()
 {

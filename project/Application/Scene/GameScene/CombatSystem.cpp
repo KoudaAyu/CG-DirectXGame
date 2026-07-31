@@ -41,7 +41,12 @@ void CombatSystem::UpdateCombat(float deltaTime)
 		std::vector<std::unique_ptr<Bullet>> fired = scene_->player_->TryShoot(&scene_->mouseInput, deltaTime);
 		if (!fired.empty())
 		{
+			char buf[256];
+			snprintf(buf, sizeof(buf), "[CombatSystem LOG] Fired %zu bullets! Total in pool: %zu\n", fired.size(), bullets_.size() + fired.size());
+			OutputDebugStringA(buf);
+
 			// ショットガンかどうか（一度に複数弾発射されるか）判定
+
 			bool isShotgun = (fired.size() > 1);
 			float maxRad = isShotgun ? 18.0f : 14.0f;
 			scene_->playerSoundMaxRadius_ = maxRad;

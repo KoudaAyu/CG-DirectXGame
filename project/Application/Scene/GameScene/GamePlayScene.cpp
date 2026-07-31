@@ -22,6 +22,8 @@
 #include "GamePlayScene.h"
 #include "Baziru3_Engine/Core/Base/Allocator/ConstantBufferAllocator.h"
 #include "imgui.h"
+#include "imgui_internal.h"
+
 
 #include "CombatSystem.h"
 #include "Bullet.h"
@@ -64,6 +66,13 @@ void GamePlayScene::InitializeScene()
 
 	combatSystem_ = std::make_unique<CombatSystem>(this);
 	collisionSystem_ = std::make_unique<CollisionSystem>(this);
+
+	// 視野コーン（Vision Cone）半透明領域・AIステータスUI・視界エフェクトをデフォルトで表示
+	showDebugGizmos_ = true;
+	CollisionManager::GetInstance()->SetShowDebugColliders(false);
+	CollisionManager::GetInstance()->SetShowMeshWireframe(false);
+
+
 
 	// --- チュートリアル用の的と看板の初期配置 ---
 	targets_.clear();
@@ -971,8 +980,11 @@ void GamePlayScene::UpdateStressTestMode()
 void GamePlayScene::DrawPerformanceTrackerUI(float deltaTime)
 {
 	if (!showPerformanceTracker_) return;
+	ImGuiContext* g = ImGui::GetCurrentContext();
+	if (!g || !g->WithinFrameScope) return;
 
 	ImGui::SetNextWindowPos(ImVec2(10.0f, 10.0f), ImGuiCond_FirstUseEver);
+
 	ImGui::SetNextWindowSize(ImVec2(440.0f, 400.0f), ImGuiCond_FirstUseEver);
 
 	if (ImGui::Begin("🚀 Engine Optimization & Performance Tracker (Escape from)", &showPerformanceTracker_))
@@ -1826,7 +1838,12 @@ RenderContext GamePlayScene::BuildRenderContext() const
 
 void GamePlayScene::Draw(SceneRenderRequests& renderRequests)
 {
+	renderRequests.sceneDrawn = true;
 	const RenderContext ctx = BuildRenderContext();
+
+
+
+
 
 	// Draw Skybox
 	SceneManager::GetInstance()->DrawSkybox(ctx.commandList);
@@ -2149,10 +2166,11 @@ void GamePlayScene::Draw(SceneRenderRequests& renderRequests)
 
 				if (points2D.size() > 2)
 				{
-					drawList->AddPolyline(points2D.data(), (int)points2D.size(), color, true, 2.0f);
-					ImU32 fillColor = (color & 0x00FFFFFF) | 0x15000000;
+					drawList->AddPolyline(points2D.data(), (int)points2D.size(), color, true, 2.5f);
+					ImU32 fillColor = (color & 0x00FFFFFF) | 0x45000000; // リッチな半透明扇形視野領域
 					drawList->AddConvexPolyFilled(points2D.data(), (int)points2D.size(), fillColor);
 				}
+
 			};
 
 			// 2. Draw Enemy Vision Cone & Stats
