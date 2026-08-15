@@ -1732,79 +1732,93 @@ void GamePlayScene::InitializeObstacles()
 	obstacles_.clear();
 
 	bool success = false;
-	std::string filepath = "Resources/stage_layout.json";
-	std::ifstream file(filepath);
-	
-	if (file.is_open())
-	{
-		try
-		{
-			nlohmann::json j;
-			file >> j;
-			file.close();
+	std::vector<std::string> pathCandidates = {
+		"Resources/stage_layout.json",
+		"project/Resources/stage_layout.json",
+		"../project/Resources/stage_layout.json"
+	};
 
-			for (const auto& obj : j)
-			{
-				std::string name = obj["name"];
-				// オブジェクト名が "Obstacle" で始まる場合のみ配置
-				if (name.find("Obstacle") == 0)
-				{
-					Vector3 pos = {
-						obj["position"]["x"].get<float>(),
-						obj["position"]["y"].get<float>(),
-						obj["position"]["z"].get<float>()
-					};
-					// スケールのXを半径（radius）として使用します
-					float radius = obj["scale"]["x"].get<float>();
-					
-					auto obs = std::make_unique<Obstacle>();
-					obs->Initialize(object3dCom, camera_, pos, radius);
-					obstacles_.push_back(std::move(obs));
-				}
-			}
-			success = true;
-			OutputDebugStringA("GamePlayScene: Successfully loaded obstacles from JSON.\n");
-		}
-		catch (const std::exception& e)
+	for (const auto& filepath : pathCandidates)
+	{
+		std::ifstream file(filepath);
+		if (file.is_open())
 		{
-			char errorMsg[256];
-			sprintf_s(errorMsg, "GamePlayScene: Failed to parse stage_layout.json: %s\n", e.what());
-			OutputDebugStringA(errorMsg);
+			try
+			{
+				nlohmann::json j;
+				file >> j;
+				file.close();
+
+				for (const auto& obj : j)
+				{
+					std::string name = obj.value("name", "");
+					if (name.find("Obstacle") == 0 || name.find("Container") != std::string::npos || name.find("Fence") != std::string::npos)
+					{
+						Vector3 pos = {
+							obj["position"]["x"].get<float>(),
+							obj["position"]["y"].get<float>(),
+							obj["position"]["z"].get<float>()
+						};
+						Vector3 scl = { 1.0f, 1.0f, 1.0f };
+						if (obj.contains("scale"))
+						{
+							scl = {
+								obj["scale"]["x"].get<float>(),
+								obj["scale"]["y"].get<float>(),
+								obj["scale"]["z"].get<float>()
+							};
+						}
+						Vector3 rot = { 0.0f, 0.0f, 0.0f };
+						std::string modelFile = obj.value("modelFilename", "fence.obj");
+						
+						auto obs = std::make_unique<Obstacle>();
+						obs->Initialize(object3dCom, camera_, pos, 1.0f, modelFile, scl, rot);
+						obstacles_.push_back(std::move(obs));
+					}
+				}
+				success = true;
+				OutputDebugStringA("GamePlayScene: Successfully loaded obstacles from JSON.\n");
+				break;
+			}
+			catch (const std::exception& e)
+			{
+				char errorMsg[256];
+				sprintf_s(errorMsg, "GamePlayScene: Failed to parse stage_layout.json: %s\n", e.what());
+				OutputDebugStringA(errorMsg);
+			}
 		}
 	}
 
-	// 読み込みに失敗した、またはデータが空だった場合はデフォルトの配置を使用（フォールバック）
+	// 読み込みに失敗した、またはデータが空だった場合はコンテナ＋直立フェンスの最新デフォルト配置を使用
 	if (!success || obstacles_.empty())
 	{
 		obstacles_.clear();
-		OutputDebugStringA("GamePlayScene: Using default obstacle placement (fallback).\n");
+		OutputDebugStringA("GamePlayScene: Using updated default obstacle placement.\n");
 
-		// --- 左側グループ (X = -5.0f 付近の配置) ---
-		auto obs1 = std::make_unique<Obstacle>();
-		obs1->Initialize(object3dCom, camera_, { -5.0f, 0.0f, 8.0f }, 1.0f);
-		obstacles_.push_back(std::move(obs1));
+		// コンテナ2個
+		auto c1 = std::make_unique<Obstacle>();
+		c1->Initialize(object3dCom, camera_, { -2.5f, 0.0f, 12.0f }, 1.0f, "container.obj", { 1.0f, 1.0f, 1.0f }, { 0.0f, 0.0f, 0.0f });
+		obstacles_.push_back(std::move(c1));
 
-		auto obs2 = std::make_unique<Obstacle>();
-		obs2->Initialize(object3dCom, camera_, { -5.0f, 0.0f, 18.0f }, 1.0f);
-		obstacles_.push_back(std::move(obs2));
+		auto c2 = std::make_unique<Obstacle>();
+		c2->Initialize(object3dCom, camera_, { 2.5f, 0.0f, 12.0f }, 1.0f, "container.obj", { 1.0f, 1.0f, 1.0f }, { 0.0f, 0.0f, 0.0f });
+		obstacles_.push_back(std::move(c2));
 
-		// --- 右側グループ (X = 5.0f 付近の配置) ---
-		auto obs3 = std::make_unique<Obstacle>();
-		obs3->Initialize(object3dCom, camera_, { 5.0f, 0.0f, 8.0f }, 1.0f);
-		obstacles_.push_back(std::move(obs3));
-
-		auto obs4 = std::make_unique<Obstacle>();
-		obs4->Initialize(object3dCom, camera_, { 5.0f, 0.0f, 18.0f }, 1.0f);
-		obstacles_.push_back(std::move(obs4));
-
-		// --- 奥・ゴール前グループ (脱出リング手前のカバー用の配置) ---
-		auto obs5 = std::make_unique<Obstacle>();
-		obs5->Initialize(object3dCom, camera_, { -2.0f, 0.0f, 29.0f }, 1.0f);
-		obstacles_.push_back(std::move(obs5));
-
-		auto obs6 = std::make_unique<Obstacle>();
-		obs6->Initialize(object3dCom, camera_, { 2.0f, 0.0f, 29.0f }, 1.0f);
-		obstacles_.push_back(std::move(obs6));
+		// 直立フェンス
+		std::vector<Vector3> fencePositions = {
+			{ -5.0f, 0.0f, 8.0f },
+			{ 5.0f, 0.0f, 8.0f },
+			{ -5.0f, 0.0f, 18.0f },
+			{ 5.0f, 0.0f, 18.0f },
+			{ -2.0f, 0.0f, 29.0f },
+			{ 2.0f, 0.0f, 29.0f }
+		};
+		for (const auto& fpos : fencePositions)
+		{
+			auto fobs = std::make_unique<Obstacle>();
+			fobs->Initialize(object3dCom, camera_, fpos, 1.0f, "fence.obj", { 1.0f, 1.0f, 1.0f }, { 0.0f, 0.0f, 0.0f });
+			obstacles_.push_back(std::move(fobs));
+		}
 	}
 }
 
@@ -1848,11 +1862,11 @@ void GamePlayScene::Draw(SceneRenderRequests& renderRequests)
 	// Draw Skybox
 	SceneManager::GetInstance()->DrawSkybox(ctx.commandList);
 
-	// --- ✨ レベルエディタで配置された川・小石・大樹・アシ水草など全アセットを自動描画 ---
-	if (levelEditor_)
-	{
-		levelEditor_->Draw(renderRequests);
-	}
+	// --- ✨ レベルエディタの重複描画を防止し、obstacles_側の本物モデル(コンテナ・フェンス)のみを描画 ---
+	// if (levelEditor_)
+	// {
+	// 	levelEditor_->Draw(renderRequests);
+	// }
 
 	if (player_)
 	{

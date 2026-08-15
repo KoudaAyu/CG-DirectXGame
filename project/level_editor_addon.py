@@ -26,7 +26,7 @@ class MyAddonPropertiesV2(bpy.types.PropertyGroup):
     project_path: bpy.props.StringProperty(
         name="プロジェクトパス",
         description="DirectXGame.sln があるprojectフォルダを選択してください",
-        default="C:\\Users\\k024g\\OneDrive\\デスクトップ\\Engine_ver2026\\project",
+        default="C:\\Users\\3329a\\OneDrive\\デスクトップ\\Engine\\project",
         subtype='DIR_PATH'
     )
     auto_export: bpy.props.BoolProperty(
@@ -374,6 +374,167 @@ class MYADDON_OT_add_enemy_spawn(bpy.types.Operator):
         e_obj["enemy_type"] = "Scavenger"
         e_obj["patrol_radius"] = 10.0
         self.report({'INFO'}, "⚠️ 敵巡回/スポーンポイントを追加しました。")
+        return {'FINISHED'}
+
+def create_container_visual_object(location=(0,0,0)):
+    """
+    スクリーンショットを元に、波打つ鋼鉄プレートと角フレームを持つ
+    貨物コンテナ(Cargo Container)と木製ハシゴ(Wooden Ladder)の3DモデルをBlender上に生成
+    """
+    x, y, z = location[0], location[1], location[2]
+    
+    # 1. コンテナ本体 (幅2.2m x 奥行き5.0m x 高さ2.2m)
+    bpy.ops.mesh.primitive_cube_add(size=1.0, location=(x, y, z + 1.1))
+    body = bpy.context.active_object
+    body.scale = (2.2, 5.0, 2.2)
+    body.name = "Container_Body"
+    
+    # コンテナ天板の凹凸波打ち溝ラインを再現 (5本のライン)
+    groove_objs = []
+    for i in range(-2, 3):
+        gy = y + (i * 0.9)
+        bpy.ops.mesh.primitive_cube_add(size=1.0, location=(x, gy, z + 2.22))
+        g = bpy.context.active_object
+        g.scale = (2.25, 0.15, 0.08)
+        groove_objs.append(g)
+        
+    # コンテナ四角フレーム柱
+    for sx in [-1.08, 1.08]:
+        for sy in [-2.48, 2.48]:
+            bpy.ops.mesh.primitive_cube_add(size=1.0, location=(x + sx, y + sy, z + 1.1))
+            pillar = bpy.context.active_object
+            pillar.scale = (0.2, 0.2, 2.25)
+            groove_objs.append(pillar)
+            
+    mat_container = get_or_create_material("ContainerMaterial", (0.55, 0.58, 0.62, 1.0), roughness=0.4)
+    body.data.materials.append(mat_container)
+    for g in groove_objs:
+        g.data.materials.append(mat_container)
+        
+    # 2. 側面に立てかけられた木製ハシゴ (Wooden Ladder)
+    ladder_objs = []
+    # 左右の縦木
+    for lx in [-0.25, 0.25]:
+        bpy.ops.mesh.primitive_cube_add(size=1.0, location=(x - 1.2, y - 1.0 + lx, z + 0.9))
+        side_wood = bpy.context.active_object
+        side_wood.scale = (0.08, 0.08, 2.2)
+        side_wood.rotation_euler = (0, 0.45, 0) # 斜めに立てかける
+        ladder_objs.append(side_wood)
+        
+    # ハシゴの横段 (4本)
+    for step in range(4):
+        sz = z + 0.3 + (step * 0.45)
+        sx = (x - 1.2) + (step * 0.18)
+        bpy.ops.mesh.primitive_cube_add(size=1.0, location=(sx, y - 1.0, sz))
+        step_wood = bpy.context.active_object
+        step_wood.scale = (0.08, 0.52, 0.08)
+        step_wood.rotation_euler = (0, 0.45, 0)
+        ladder_objs.append(step_wood)
+        
+    mat_ladder = get_or_create_material("LadderWoodMaterial", (0.45, 0.28, 0.15, 1.0), roughness=0.8)
+    for l in ladder_objs:
+        l.data.materials.append(mat_ladder)
+        
+    # メッシュをすべて統合
+    ctx = bpy.context.copy()
+    ctx['active_object'] = body
+    ctx['selected_editable_objects'] = [body] + groove_objs + ladder_objs
+    for o in ctx['selected_editable_objects']:
+        o.select_set(True)
+    bpy.context.view_layer.objects.active = body
+    bpy.ops.object.join()
+    
+    container_obj = bpy.context.active_object
+    container_obj.name = "Obstacle_CargoContainer"
+    return container_obj
+
+def export_scene_to_json():
+    """
+    Blenderの全メッシュ（コンテナ、フェンス、地面、木、スポーン等）を
+    project/Resources/stage_layout.json に自動で全書き出し保存する関数
+    """
+    addons_dir = os.path.dirname(os.path.abspath(__file__))
+    output_path = os.path.join(addons_dir, "Resources", "stage_layout.json")
+
+    layout_data = []
+    for obj in bpy.context.scene.objects:
+        if obj.type == 'MESH':
+            pos_x = obj.location.x
+            pos_y = obj.location.z
+            pos_z = obj.location.y
+
+            rot_x = obj.rotation_euler.x
+            rot_y = obj.rotation_euler.z
+            rot_z = obj.rotation_euler.y
+
+            if obj_type == "Fence":
+                rot_x = 0.0
+                rot_z = 0.0
+
+            scale_x = obj.scale.x
+            scale_y = obj.scale.z
+            scale_z = obj.scale.y
+
+            obj_name = obj.name.split('.')[0]
+            obj_type = obj.get("type", "Fence")
+
+            model_dir = "Resources"
+            model_file = "fence.obj"
+            if obj_type == "Container" or "container" in obj_name.lower():
+                model_file = "container.obj"
+            elif "plane" in obj_name.lower() or "ground" in obj_name.lower():
+                model_file = "plane.obj"
+
+            obj_info = {
+                "name": obj_name,
+                "type": obj_type,
+                "modelDirectory": model_dir,
+                "modelFilename": model_file,
+                "position": {"x": round(pos_x, 4), "y": round(pos_y, 4), "z": round(pos_z, 4)},
+                "rotation": {"x": round(rot_x, 4), "y": round(rot_y, 4), "z": round(rot_z, 4)},
+                "scale":    {"x": round(scale_x, 4), "y": round(scale_y, 4), "z": round(scale_z, 4)},
+                "isStatic": True
+            }
+            layout_data.append(obj_info)
+
+    try:
+        with open(output_path, 'w', encoding='utf-8') as f:
+            json.dump(layout_data, f, indent=4, ensure_ascii=False)
+    except Exception:
+        pass
+
+# 🔄 Blender内の「移動・回転・変形・追加・削除」を常時リアルタイム全自動監視するハンドラ
+@bpy.app.handlers.persistent
+def auto_sync_depsgraph_update(scene, depsgraph):
+    """
+    Blender上でユーザーがマウスで動かしたり、追加・削除・編集を行った瞬間、
+    何もボタンを押さなくても「勝手に自動同期」して stage_layout.json を即座に更新保存する
+    """
+    try:
+        if bpy.context.scene and hasattr(bpy.context.scene, "my_addon_properties_v2"):
+            if bpy.context.scene.my_addon_properties_v2.auto_export:
+                export_scene_to_json()
+    except Exception:
+        pass
+
+class MYADDON_OT_add_cargo_container(bpy.types.Operator):
+    bl_idname = "myaddon.add_cargo_container"
+    bl_label = "📦 貨物コンテナ（ハシゴ付き）を追加"
+    bl_description = "画像通りのハシゴが立てかけられたミリタリー貨物コンテナを配置します"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def execute(self, context):
+        c_obj = create_container_visual_object(context.scene.cursor.location)
+        c_obj["type"] = "Container"
+        c_obj["isStatic"] = True
+        
+        # 追加と同時に stage_layout.json へ全自動即時保存
+        try:
+            export_scene_to_json()
+        except Exception:
+            pass
+
+        self.report({'INFO'}, "📦 貨物コンテナ（ハシゴ付き）を配置し、stage_layout.jsonに即時自動保存しました！")
         return {'FINISHED'}
 
 class MYADDON_OT_add_loot_box(bpy.types.Operator):
@@ -1518,6 +1679,125 @@ class MYADDON_OT_scatter_biome(bpy.types.Operator):
         self.report({'INFO'}, f"バイオーム内に {spawned} 個のオブジェクトを自動散布しました。")
         return {'FINISHED'}
 
+def import_real_obj_model(filepath, location=(0,0,0), rotation=(0,0,0), scale=(1.0,1.0,1.0), name="LoadedObject"):
+    if not os.path.exists(filepath):
+        return None
+    for o in bpy.context.scene.objects: o.select_set(False)
+    before_objs = set(bpy.context.scene.objects)
+    try:
+        bpy.ops.wm.obj_import(filepath=filepath)
+    except Exception:
+        try:
+            bpy.ops.import_scene.obj(filepath=filepath)
+        except Exception:
+            return None
+    after_objs = set(bpy.context.scene.objects)
+    new_objs = list(after_objs - before_objs)
+    if not new_objs: return None
+    for o in new_objs: o.select_set(True)
+    active_obj = new_objs[0]
+    bpy.context.view_layer.objects.active = active_obj
+    if len(new_objs) > 1:
+        bpy.ops.object.join()
+        active_obj = bpy.context.active_object
+    active_obj.name = name
+    active_obj.location = location
+    active_obj.rotation_euler = rotation
+    active_obj.scale = scale
+    return active_obj
+
+class MYADDON_OT_import_escape_from_map(bpy.types.Operator):
+    bl_idname = "myaddon.import_escape_from_map"
+    bl_label = "📥【Escape_from】最新マップを読み込む"
+    bl_description = "project/Resources/内にある本物の.objモデルファイル(fence.obj, teapot.obj, plane.obj)を自動的にBlenderへダイレクト読み込みします"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def execute(self, context):
+        objs_to_clear = [o for o in context.scene.objects if o.type in ['MESH', 'CURVE', 'SURFACE']]
+        for o in objs_to_clear:
+            bpy.data.objects.remove(o, do_unlink=True)
+
+        col_name = "Imported_Stage_Layout"
+        if col_name in context.scene.collection.children:
+            collection = context.scene.collection.children[col_name]
+        else:
+            collection = bpy.data.collections.new(col_name)
+            context.scene.collection.children.link(collection)
+
+        addons_dir = os.path.dirname(os.path.abspath(__file__))
+        resources_dir = os.path.join(addons_dir, "Resources")
+
+        fence_path = os.path.join(resources_dir, "fence.obj")
+        plane_path = os.path.join(resources_dir, "plane.obj")
+        teapot_path = os.path.join(resources_dir, "teapot.obj")
+
+        # 1. 地面 (plane.obj)
+        ground_obj = import_real_obj_model(plane_path, location=(0, 16.0, 0), scale=(25.0, 25.0, 1.0), name="GroundPlane")
+        if ground_obj:
+            for col in ground_obj.users_collection: col.objects.unlink(ground_obj)
+            collection.objects.link(ground_obj)
+
+        # 2. 木製バリケードフェンス (fence.obj)
+        fence_configs = [
+            {"name": "Fence_obs1_LeftNear",   "pos": (-5.0, 8.0, 0.0)},
+            {"name": "Fence_obs2_LeftFar",    "pos": (-5.0, 18.0, 0.0)},
+            {"name": "Fence_obs3_RightNear",  "pos": (5.0, 8.0, 0.0)},
+            {"name": "Fence_obs4_RightFar",   "pos": (5.0, 18.0, 0.0)},
+            {"name": "Fence_obs5_GoalLeft",   "pos": (-2.0, 29.0, 0.0)},
+            {"name": "Fence_obs6_GoalRight",  "pos": (2.0, 29.0, 0.0)},
+        ]
+
+        for f in fence_configs:
+            f_obj = import_real_obj_model(fence_path, location=f["pos"], name=f["name"])
+            if f_obj:
+                f_obj["type"] = "Fence"
+                for col in f_obj.users_collection: col.objects.unlink(f_obj)
+                collection.objects.link(f_obj)
+
+        # 3. チュートリアル用の的 (teapot.obj)
+        target_configs = [
+            {"name": "Target_teapot_1", "pos": (-3.0, 16.0, 0.0)},
+            {"name": "Target_teapot_2", "pos": (3.0, 16.0, 0.0)},
+            {"name": "Target_teapot_3", "pos": (0.0, 26.0, 0.0)},
+        ]
+        for t in target_configs:
+            t_obj = import_real_obj_model(teapot_path, location=t["pos"], scale=(0.56, 0.56, 0.56), name=t["name"])
+            if t_obj:
+                t_obj["type"] = "Target"
+                for col in t_obj.users_collection: col.objects.unlink(t_obj)
+                collection.objects.link(t_obj)
+
+        # 4. 直立看板 (plane.obj)
+        sign_obj = import_real_obj_model(plane_path, location=(0.0, 4.0, 0.8), rotation=(1.570796, 0, 0), scale=(0.8, 0.8, 0.8), name="Tutorial_Signboard")
+        if sign_obj:
+            sign_obj["type"] = "TutorialSign"
+            for col in sign_obj.users_collection: col.objects.unlink(sign_obj)
+            collection.objects.link(sign_obj)
+
+        # 5. 脱出ゴールリング (GoalRing)
+        bpy.ops.mesh.primitive_torus_add(major_radius=1.5, minor_radius=0.15, location=(0.0, 32.0, 0.01))
+        ring_obj = context.active_object
+        ring_obj.name = "Goal_Extraction_Ring"
+        ring_obj["type"] = "GoalRing"
+        for col in ring_obj.users_collection: col.objects.unlink(ring_obj)
+        collection.objects.link(ring_obj)
+
+        # 6. スポーン地点 (Player & Enemy)
+        spawns = [
+            {"name": "Player_Spawn_Point", "pos": (0.0, 0.0, 0.0)},
+            {"name": "Enemy_Spawn_Point",  "pos": (0.0, 20.0, 0.0)},
+        ]
+        for s in spawns:
+            bpy.ops.mesh.primitive_cone_add(radius1=0.5, depth=1.2, location=(s["pos"][0], s["pos"][1], s["pos"][2] + 0.6))
+            s_obj = context.active_object
+            s_obj.name = s["name"]
+            s_obj["type"] = "SpawnPoint"
+            for col in s_obj.users_collection: col.objects.unlink(s_obj)
+            collection.objects.link(s_obj)
+
+        self.report({'INFO'}, "🎉 Resources/フォルダ内の本物の.objモデル(fence.obj, teapot.obj, plane.obj)を自動でBlenderへ読み込みました！")
+        return {'FINISHED'}
+
 class MYADDON_OT_clear_all_objects(bpy.types.Operator):
     bl_idname = "myaddon.clear_all_objects"
     bl_label = "全アセットを一括クリア"
@@ -1615,6 +1895,21 @@ class MYADDON_OT_set_biome_zone(bpy.types.Operator):
         self.report({'INFO'}, f"バイオーム範囲を '{self.zone_type}' に設定しました。")
         return {'FINISHED'}
 
+class MYADDON_OT_export_stage_json(bpy.types.Operator):
+    bl_idname = "myaddon.export_stage_json"
+    bl_label = "📤 stage_layout.json に保存"
+    bl_description = "Blender上の配置データを project/Resources/stage_layout.json に自動エクスポートしてDirectX12ゲームへ送ります"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def execute(self, context):
+        try:
+            export_scene_to_json()
+            self.report({'INFO'}, "🎉 stage_layout.json へ保存完了！DirectX12ゲームを起動してご確認ください！")
+            return {'FINISHED'}
+        except Exception as e:
+            self.report({'ERROR'}, f"保存失敗: {e}")
+            return {'CANCELLED'}
+
 # UIパネルクラス
 class MYADDON_PT_level_editor(bpy.types.Panel):
     bl_label = "DirectX レベルエディタ"
@@ -1648,7 +1943,9 @@ class MYADDON_PT_level_editor(bpy.types.Panel):
         layout.separator()
         
         box_auto = layout.box()
-        box_auto.label(text="【一発！全自動マップ生成】", icon='OUTLINER_OB_FORCE_FIELD')
+        box_auto.label(text="【DirectX12ゲームへの連動保存・読み込み】", icon='OUTLINER_OB_FORCE_FIELD')
+        box_auto.operator(MYADDON_OT_export_stage_json.bl_idname, text="📤 stage_layout.json に保存 (DirectX12へ転送)", icon='EXPORT')
+        box_auto.operator(MYADDON_OT_import_escape_from_map.bl_idname, text="📥【Escape_from】最新マップを読み込む", icon='FILE_REFRESH')
         box_auto.operator(MYADDON_OT_generate_auto_survival_map.bl_idname, text="🎲 サバイバルマップを全自動生成", icon='PLAY')
         
         layout.separator()
@@ -1674,6 +1971,7 @@ class MYADDON_PT_level_editor(bpy.types.Panel):
         col1.operator(MYADDON_OT_add_procedural_tree.bl_idname, icon='NODE_SEL')
         col1.operator(MYADDON_OT_add_procedural_rock.bl_idname, icon='MESH_ICOSPHERE')
         col1.label(text="【サバイバル・ギミックポイント】:")
+        col1.operator(MYADDON_OT_add_cargo_container.bl_idname, icon='PACKAGE')
         col1.operator(MYADDON_OT_add_player_spawn.bl_idname, icon='USER')
         col1.operator(MYADDON_OT_add_enemy_spawn.bl_idname, icon='ERROR')
         col1.operator(MYADDON_OT_add_loot_box.bl_idname, icon='PACKAGE')
@@ -1842,6 +2140,7 @@ classes = (
     MyAddonPropertiesV2,
     MYADDON_OT_add_procedural_tree,
     MYADDON_OT_add_procedural_rock,
+    MYADDON_OT_add_cargo_container,
     MYADDON_OT_add_player_spawn,
     MYADDON_OT_add_enemy_spawn,
     MYADDON_OT_add_loot_box,
@@ -1854,6 +2153,8 @@ classes = (
     MYADDON_OT_draw_rock_freehand,
     MYADDON_OT_clear_river_objects,
     MYADDON_OT_generate_auto_survival_map,
+    MYADDON_OT_export_stage_json,
+    MYADDON_OT_import_escape_from_map,
     MYADDON_OT_export_scene,
     MYADDON_OT_paint_spawner,
     MYADDON_OT_scatter_biome,
@@ -1879,7 +2180,7 @@ def register():
     except Exception:
         pass
     
-    to_remove = [h for h in bpy.app.handlers.depsgraph_update_post if getattr(h, "__name__", "") == "on_depsgraph_update"]
+    to_remove = [h for h in bpy.app.handlers.depsgraph_update_post if getattr(h, "__name__", "") in ["on_depsgraph_update", "auto_sync_depsgraph_update"]]
     for h in to_remove:
         try:
             bpy.app.handlers.depsgraph_update_post.remove(h)
@@ -1887,6 +2188,7 @@ def register():
             pass
             
     bpy.app.handlers.depsgraph_update_post.append(on_depsgraph_update)
+    bpy.app.handlers.depsgraph_update_post.append(auto_sync_depsgraph_update)
     
     if not bpy.app.timers.is_registered(camera_sync_timer):
         bpy.app.timers.register(camera_sync_timer, first_interval=0.1)

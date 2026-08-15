@@ -1,4 +1,4 @@
-ChangeScene called with: TITLE
+aaChangeScene called with: TITLE
   successfully created scene, setting nextScene_
 ApplyPendingSceneChange: nextScene_ is set
   scene_: null

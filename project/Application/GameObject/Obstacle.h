@@ -10,7 +10,7 @@
 class Obstacle
 {
 public:
-    void Initialize(Object3dCom* object3dCom, Camera* camera, const Vector3& position, float radius);
+    void Initialize(Object3dCom* object3dCom, Camera* camera, const Vector3& position, float radius, const std::string& modelFilename = "fence.obj", const Vector3& scale = { 1.0f, 1.0f, 1.0f }, const Vector3& rotation = { 0.0f, 0.0f, 0.0f });
     void Update();
     void Draw(const RenderContext& ctx);
     void Finalize();
@@ -24,6 +24,7 @@ public:
 private:
     std::unique_ptr<Object3d> object3d_;
     Vector3 position_;
+    Vector3 rotation_;
     float radius_;
     std::unique_ptr<BoxCollider> collider_;
     std::unique_ptr<BoxCollider> collider2_;
