@@ -57,9 +57,14 @@ void Obstacle::Initialize(Object3dCom* object3dCom, Camera* camera, const Vector
 
 void Obstacle::Update()
 {
-    // 静的オブジェクトのため毎フレームの重い行列再計算をスキップして爆速化
-    // object3d_->Update();
+    // カメラが動いても障害物が追従しないよう、毎フレームWVP行列を更新する
+    // ワールド行列は変化しないため、計算コストは軽微
+    if (object3d_)
+    {
+        object3d_->Update();
+    }
 }
+
 
 void Obstacle::Draw(const RenderContext& ctx)
 {
