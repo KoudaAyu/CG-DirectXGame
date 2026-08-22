@@ -104,20 +104,15 @@ void AppParticleManager::Update(float deltaTime, const Vector3& playerPos)
 		Vector3 pos;
 		if (it->followPlayer)
 		{
-			// Physics update to relative offset
 			it->offsetFromPlayer.y -= it->gravity * deltaTime;
 			it->offsetFromPlayer += it->velocity * deltaTime;
 			pos = playerPos + it->offsetFromPlayer;
 		}
 		else
 		{
-			// Physics update (gravity)
 			it->velocity.y -= it->gravity * deltaTime;
+			pos = it->transform.GetTranslate() + it->velocity * deltaTime;
 
-			pos = it->transform.GetTranslate();
-			pos += it->velocity * deltaTime;
-
-			// Ground bounce (y = 0.0f)
 			float groundY = 0.0f;
 			if (pos.y < groundY && it->velocity.y < 0.0f)
 			{
@@ -129,7 +124,6 @@ void AppParticleManager::Update(float deltaTime, const Vector3& playerPos)
 		}
 		it->transform.SetTranslate(pos);
 
-		// Angular spin rotation on Z axis
 		Vector3 rot = it->transform.GetRotate();
 		rot.z += it->angularVelocity * deltaTime;
 		it->transform.SetRotate(rot);
@@ -363,6 +357,297 @@ void AppParticleManager::EmitFeather(std::mt19937& randomEngine, const Vector3& 
 	p.angularVelocity = spinDist(randomEngine);
 
 	particles_.push_back(p);
+}
+
+void AppParticleManager::EmitBloodDrop(std::mt19937& randomEngine, const Vector3& position, const Vector3& baseVelocity, float speed, uint32_t textureIndex)
+{
+	AppParticle p;
+	p.transform.Initialize();
+
+	// 飛び散る血液ドロップ（微細な位置オフセット）
+	std::uniform_real_distribution<float> distOffset(-0.1f, 0.1f);
+	p.transform.SetTranslate({
+		position.x + distOffset(randomEngine),
+		position.y + distOffset(randomEngine),
+		position.z + distOffset(randomEngine)
+	});
+
+	std::uniform_real_distribution<float> distRotate(0.0f, 6.2831853f);
+	p.transform.SetRotate({ 0.0f, 0.0f, distRotate(randomEngine) });
+
+	// 液滴のサイズ（大小さまざま、引き伸ばされた滴）
+	std::uniform_real_distribution<float> distScaleX(0.04f, 0.14f);
+	std::uniform_real_distribution<float> distScaleY(0.08f, 0.28f);
+	p.transform.SetScale({ distScaleX(randomEngine), distScaleY(randomEngine), 1.0f });
+
+	// ランダムな拡散ベクトル
+	std::uniform_real_distribution<float> spreadXZ(-2.5f, 2.5f);
+	std::uniform_real_distribution<float> spreadY(1.0f, 5.5f);
+	p.velocity = baseVelocity * speed + Vector3{ spreadXZ(randomEngine), spreadY(randomEngine), spreadXZ(randomEngine) };
+
+	// リアルな深紅・クリムゾンレッド〜鮮血のグラデーション
+	std::uniform_real_distribution<float> redTone(0.65f, 0.95f);
+	std::uniform_real_distribution<float> darkTone(0.02f, 0.08f);
+	p.color = { redTone(randomEngine), darkTone(randomEngine), darkTone(randomEngine), 0.95f };
+
+	std::uniform_real_distribution<float> lifeDist(0.8f, 1.8f);
+	p.lifeTime = lifeDist(randomEngine);
+	p.currentTime = 0.0f;
+	p.textureIndex = textureIndex;
+
+	p.gravity = 14.0f; // 強い重力で放物線を描いて地面に落ちる
+	p.bounceElasticity = 0.08f; // 地面にビチャッと落ちて弾まない
+
+	std::uniform_real_distribution<float> spinDist(-8.0f, 8.0f);
+	p.angularVelocity = spinDist(randomEngine);
+
+	particles_.push_back(p);
+}
+
+void AppParticleManager::EmitBloodMist(std::mt19937& randomEngine, const Vector3& position, float scale, uint32_t textureIndex)
+{
+	AppParticle p;
+	p.transform.Initialize();
+
+	std::uniform_real_distribution<float> distOffset(-0.2f, 0.2f);
+	p.transform.SetTranslate({
+		position.x + distOffset(randomEngine),
+		position.y + distOffset(randomEngine),
+		position.z + distOffset(randomEngine)
+	});
+
+	std::uniform_real_distribution<float> distRotate(0.0f, 6.2831853f);
+	p.transform.SetRotate({ 0.0f, 0.0f, distRotate(randomEngine) });
+
+	// 霧状の広がり
+	std::uniform_real_distribution<float> distScale(0.3f, 0.8f);
+	float s = distScale(randomEngine) * scale;
+	p.transform.SetScale({ s, s, 1.0f });
+
+	std::uniform_real_distribution<float> velXZ(-0.8f, 0.8f);
+	std::uniform_real_distribution<float> velY(0.2f, 1.2f);
+	p.velocity = { velXZ(randomEngine), velY(randomEngine), velXZ(randomEngine) };
+
+	// 鮮血色の半透明ミスト
+	p.color = { 0.85f, 0.05f, 0.05f, 0.65f };
+
+	std::uniform_real_distribution<float> lifeDist(0.6f, 1.2f);
+	p.lifeTime = lifeDist(randomEngine);
+	p.currentTime = 0.0f;
+	p.textureIndex = textureIndex;
+
+	p.gravity = 0.8f;
+	p.bounceElasticity = 0.0f;
+	p.angularVelocity = 0.5f;
+
+	particles_.push_back(p);
+}
+
+void AppParticleManager::EmitBloodBurst(std::mt19937& randomEngine, const Vector3& position, const Vector3& hitDirection, uint32_t textureIndex, uint32_t flashTexIndex)
+{
+	// 1. 鮮血の大閃光 (Blood Flash)
+	EmitDeathFlash(randomEngine, position, 5.0f, { 0.95f, 0.05f, 0.05f, 1.0f }, 0.35f, flashTexIndex);
+
+	// 2. 大量の血液ドロップ飛沫 (60個)
+	for (int i = 0; i < 60; ++i)
+	{
+		EmitBloodDrop(randomEngine, position, hitDirection, 2.0f, textureIndex);
+	}
+
+	// 3. 全方位への高圧血しぶきスプラッター (30個)
+	for (int i = 0; i < 30; ++i)
+	{
+		float angle = (static_cast<float>(i) / 30.0f) * 6.2831853f;
+		float speed = 2.5f + (static_cast<float>(rand()) / RAND_MAX) * 3.5f;
+		Vector3 dir = { std::cos(angle) * speed, 1.5f + (static_cast<float>(rand()) / RAND_MAX) * 4.0f, std::sin(angle) * speed };
+		EmitBloodDrop(randomEngine, position, dir, 1.0f, textureIndex);
+	}
+
+	// 4. 血霧・血煙 (25個)
+	for (int i = 0; i < 25; ++i)
+	{
+		EmitBloodMist(randomEngine, position, 1.8f, textureIndex);
+	}
+
+	// 5. 飛び散る羽毛 (40個)
+	for (int i = 0; i < 40; ++i)
+	{
+		// 敵の羽毛＋血染めの羽毛
+		Vector4 featherCol = (i % 2 == 0) ? Vector4{ 0.9f, 0.1f, 0.1f, 1.0f } : Vector4{ 1.0f, 0.85f, 0.2f, 1.0f };
+		EmitFeather(randomEngine, position, featherCol, textureIndex);
+	}
+}
+
+void AppParticleManager::EmitDarkBloodSmoke(std::mt19937& randomEngine, const Vector3& position, float scale, uint32_t smokeTexIndex)
+{
+	AppParticle p;
+	p.transform.Initialize();
+
+	std::uniform_real_distribution<float> distOffset(-0.25f, 0.25f);
+	p.transform.SetTranslate({
+		position.x + distOffset(randomEngine),
+		position.y + distOffset(randomEngine),
+		position.z + distOffset(randomEngine)
+	});
+
+	std::uniform_real_distribution<float> distRotate(0.0f, 6.2831853f);
+	p.transform.SetRotate({ 0.0f, 0.0f, distRotate(randomEngine) });
+
+	std::uniform_real_distribution<float> distScale(0.4f, 0.9f);
+	float s = distScale(randomEngine) * scale;
+	p.transform.SetScale({ s, s, 1.0f });
+
+	std::uniform_real_distribution<float> velXZ(-0.6f, 0.6f);
+	std::uniform_real_distribution<float> velY(0.3f, 1.5f);
+	p.velocity = { velXZ(randomEngine), velY(randomEngine), velXZ(randomEngine) };
+
+	// 暗赤色の硝煙・血煙
+	std::uniform_real_distribution<float> alphaDist(0.4f, 0.75f);
+	p.color = { 0.5f, 0.08f, 0.08f, alphaDist(randomEngine) };
+
+	std::uniform_real_distribution<float> lifeDist(0.7f, 1.4f);
+	p.lifeTime = lifeDist(randomEngine);
+	p.currentTime = 0.0f;
+	p.textureIndex = smokeTexIndex;
+
+	p.gravity = -0.2f; // ふわりと上昇
+	p.bounceElasticity = 0.0f;
+	p.angularVelocity = 0.4f;
+
+	particles_.push_back(p);
+}
+
+void AppParticleManager::EmitViolentBloodSpray(std::mt19937& randomEngine, const Vector3& hitPoint, const Vector3& bulletDir, bool isCritical, uint32_t bloodTexIndex, uint32_t smokeTexIndex)
+{
+	// 弾丸の貫通方向奥へ噴き出す高初速指向性スプラッター
+	int count = isCritical ? 24 : 12;
+	for (int i = 0; i < count; ++i)
+	{
+		AppParticle p;
+		p.transform.Initialize();
+
+		std::uniform_real_distribution<float> offsetDist(-0.08f, 0.08f);
+		p.transform.SetTranslate(hitPoint + Vector3{ offsetDist(randomEngine), offsetDist(randomEngine), offsetDist(randomEngine) });
+
+		std::uniform_real_distribution<float> distRotate(0.0f, 6.2831853f);
+		p.transform.SetRotate({ 0.0f, 0.0f, distRotate(randomEngine) });
+
+		// 不規則な細長い血飛沫
+		std::uniform_real_distribution<float> sx(0.06f, 0.18f);
+		std::uniform_real_distribution<float> sy(0.12f, 0.40f);
+		p.transform.SetScale({ sx(randomEngine), sy(randomEngine), 1.0f });
+
+		// 貫通方向を主軸とした円錐状の鋭い噴出
+		std::uniform_real_distribution<float> coneSpread(-1.2f, 1.2f);
+		std::uniform_real_distribution<float> forwardSpeed(3.0f, isCritical ? 8.0f : 5.5f);
+		std::uniform_real_distribution<float> upSpeed(0.8f, 3.5f);
+
+		Vector3 perp1 = { -bulletDir.z, 0.0f, bulletDir.x };
+		p.velocity = bulletDir * forwardSpeed(randomEngine) + perp1 * coneSpread(randomEngine) + Vector3{ 0.0f, upSpeed(randomEngine), 0.0f };
+
+		std::uniform_real_distribution<float> redTone(0.7f, 1.0f);
+		p.color = { redTone(randomEngine), 0.02f, 0.02f, 0.95f };
+
+		std::uniform_real_distribution<float> lifeDist(0.5f, 1.2f);
+		p.lifeTime = lifeDist(randomEngine);
+		p.currentTime = 0.0f;
+		p.textureIndex = bloodTexIndex;
+
+		p.gravity = 16.0f; // 強力な重力で地面にビシャッと落ちる
+		p.bounceElasticity = 0.05f;
+		p.angularVelocity = 6.0f;
+
+		particles_.push_back(p);
+	}
+
+	// 立ち込める血煙
+	int smokeCount = isCritical ? 4 : 2;
+	for (int i = 0; i < smokeCount; ++i)
+	{
+		EmitDarkBloodSmoke(randomEngine, hitPoint, 0.7f, smokeTexIndex);
+	}
+}
+
+void AppParticleManager::EmitViolentBloodBurst(std::mt19937& randomEngine, const Vector3& enemyPos, const Vector3& hitDir, uint32_t bloodTexIndex, uint32_t smokeTexIndex, uint32_t flashTexIndex)
+{
+	// 1. 鮮血の大閃光フラッシュ
+	EmitDeathFlash(randomEngine, enemyPos, 6.0f, { 0.9f, 0.05f, 0.05f, 1.0f }, 0.40f, flashTexIndex);
+
+	// 2. 貫通方向への超強力な指向性ブラッドバースト (50個)
+	for (int i = 0; i < 50; ++i)
+	{
+		AppParticle p;
+		p.transform.Initialize();
+
+		std::uniform_real_distribution<float> offsetDist(-0.15f, 0.15f);
+		p.transform.SetTranslate(enemyPos + Vector3{ offsetDist(randomEngine), offsetDist(randomEngine) + 0.4f, offsetDist(randomEngine) });
+
+		std::uniform_real_distribution<float> distRotate(0.0f, 6.2831853f);
+		p.transform.SetRotate({ 0.0f, 0.0f, distRotate(randomEngine) });
+
+		std::uniform_real_distribution<float> sx(0.08f, 0.22f);
+		std::uniform_real_distribution<float> sy(0.15f, 0.50f);
+		p.transform.SetScale({ sx(randomEngine), sy(randomEngine), 1.0f });
+
+		std::uniform_real_distribution<float> spreadXZ(-3.5f, 3.5f);
+		std::uniform_real_distribution<float> spreadY(2.0f, 7.0f);
+		std::uniform_real_distribution<float> forwardP(2.0f, 6.5f);
+
+		p.velocity = hitDir * forwardP(randomEngine) + Vector3{ spreadXZ(randomEngine), spreadY(randomEngine), spreadXZ(randomEngine) };
+		p.color = { 0.85f, 0.02f, 0.02f, 1.0f };
+		p.lifeTime = 1.2f;
+		p.currentTime = 0.0f;
+		p.textureIndex = bloodTexIndex;
+
+		p.gravity = 15.0f;
+		p.bounceElasticity = 0.05f;
+		p.angularVelocity = 8.0f;
+
+		particles_.push_back(p);
+	}
+
+	// 3. 360度全方位への激しい肉片・血滴スプラッター (40個)
+	for (int i = 0; i < 40; ++i)
+	{
+		float angle = (static_cast<float>(i) / 40.0f) * 6.2831853f;
+		float speed = 3.0f + (static_cast<float>(rand()) / RAND_MAX) * 4.5f;
+		Vector3 vel = { std::cos(angle) * speed, 1.8f + (static_cast<float>(rand()) / RAND_MAX) * 5.0f, std::sin(angle) * speed };
+
+		AppParticle p;
+		p.transform.Initialize();
+		p.transform.SetTranslate(enemyPos + Vector3{ 0.0f, 0.4f, 0.0f });
+
+		std::uniform_real_distribution<float> distRotate(0.0f, 6.2831853f);
+		p.transform.SetRotate({ 0.0f, 0.0f, distRotate(randomEngine) });
+
+		std::uniform_real_distribution<float> s(0.08f, 0.20f);
+		p.transform.SetScale({ s(randomEngine), s(randomEngine), 1.0f });
+
+		p.velocity = vel;
+		p.color = { 0.75f, 0.02f, 0.02f, 1.0f };
+		p.lifeTime = 1.4f;
+		p.currentTime = 0.0f;
+		p.textureIndex = bloodTexIndex;
+
+		p.gravity = 14.0f;
+		p.bounceElasticity = 0.05f;
+		p.angularVelocity = 10.0f;
+
+		particles_.push_back(p);
+	}
+
+	// 4. 立ち込める血煙・暗赤色の濃霧 (20個)
+	for (int i = 0; i < 20; ++i)
+	{
+		EmitDarkBloodSmoke(randomEngine, enemyPos + Vector3{ 0.0f, 0.5f, 0.0f }, 1.5f, smokeTexIndex);
+	}
+
+	// 5. 吹き飛ぶ血染めの黒羽毛 (35個)
+	for (int i = 0; i < 35; ++i)
+	{
+		Vector4 featherCol = (i % 2 == 0) ? Vector4{ 0.7f, 0.05f, 0.05f, 1.0f } : Vector4{ 0.15f, 0.15f, 0.15f, 1.0f };
+		EmitFeather(randomEngine, enemyPos + Vector3{ 0.0f, 0.5f, 0.0f }, featherCol, bloodTexIndex);
+	}
 }
 
 void AppParticleManager::EmitMuzzleFlash(std::mt19937& randomEngine, const Vector3& position, const Vector3& direction, const Vector3& right, const Vector3& up, const Vector4& color, float speedMultiplier, uint32_t textureIndex)

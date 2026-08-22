@@ -39,7 +39,6 @@ void Bullet::Initialize(Object3dCom* object3dCom, Camera* camera, const Vector3&
     object3d_->SetCamera(camera_);
 
     Vector3 spawnPos = startPosition;
-    spawnPos.y = 0.5f; // プレイヤーの胸の高さ
     object3d_->SetTranslate(spawnPos);
 
     // 飛行方向（進行方向）へ向きを合わせる

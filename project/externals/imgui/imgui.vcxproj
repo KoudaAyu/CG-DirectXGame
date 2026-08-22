@@ -71,12 +71,8 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Platform)'=='x64'">
-    <IntDir>$(MSBuildProjectDirectory)\..\..\..\generated\obj\$(ProjectName)\$(Configuration)\</IntDir>
-    <OutDir>$(MSBuildProjectDirectory)\..\..\..\generated\output\$(Configuration)\</OutDir>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <IntDir>$(SolutionDir)..\generated\obj\$(ProjectName)\$(Configuration)\</IntDir>
-    <OutDir>$(SolutionDir)..\generated\output\$(Configuration)\</OutDir>
+    <IntDir>$(ProjectDir)..\..\generated\obj\$(ProjectName)\$(Configuration)\</IntDir>
+    <OutDir>$(ProjectDir)..\..\generated\output\$(Configuration)\</OutDir>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>

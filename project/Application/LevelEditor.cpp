@@ -722,6 +722,16 @@ bool LevelEditor::LoadFromJson(const std::string& filepath)
             obj.modelFilename = "plane.obj";
         }
 
+        // JSONに modelDirectory / modelFilename フィールドがあれば上書き読み込み
+        if (item.contains("modelDirectory"))
+        {
+            obj.modelDirectory = item["modelDirectory"].get<std::string>();
+        }
+        if (item.contains("modelFilename"))
+        {
+            obj.modelFilename = item["modelFilename"].get<std::string>();
+        }
+
         // position
         if (item.contains("position"))
         {

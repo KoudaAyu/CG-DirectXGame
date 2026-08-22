@@ -193,6 +193,8 @@ private:
     uint32_t cylinderTextureIndex_ = TextureManager::kInvalidTextureIndex;
     uint32_t particleTextureA = TextureManager::kInvalidTextureIndex;
     uint32_t particleTextureB = TextureManager::kInvalidTextureIndex;
+    uint32_t bloodTextureIndex_ = TextureManager::kInvalidTextureIndex;
+    uint32_t smokeTextureIndex_ = TextureManager::kInvalidTextureIndex;
     uint32_t fenceTextureIndex_ = TextureManager::kInvalidTextureIndex;
     uint32_t starburstTextureIndex_ = TextureManager::kInvalidTextureIndex;
 

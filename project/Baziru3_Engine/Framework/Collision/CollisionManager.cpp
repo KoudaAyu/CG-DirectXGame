@@ -242,11 +242,24 @@ void CollisionManager::Update()
         }
         else if (col.type == ColliderType::Box)
         {
-            // ボックスの各辺サイズからAABBを作成
+            // ボックスの回転を考慮した正確なワールドAABB範囲を取得
             Vector3 size = col.shape.size;
             Vector3 halfSize = { size.x * 0.5f, size.y * 0.5f, size.z * 0.5f };
-            minPos = minPos - halfSize;
-            maxPos = maxPos + halfSize;
+            Vector3 bRot = col.shape.rotation;
+            Matrix4x4 R = Multiply(MakeRotateXMatrix(bRot.x), Multiply(MakeRotateYMatrix(bRot.y), MakeRotateZMatrix(bRot.z)));
+
+            Vector3 axisX = { R.m[0][0], R.m[0][1], R.m[0][2] };
+            Vector3 axisY = { R.m[1][0], R.m[1][1], R.m[1][2] };
+            Vector3 axisZ = { R.m[2][0], R.m[2][1], R.m[2][2] };
+
+            Vector3 rotatedExtents = {
+                std::abs(axisX.x * halfSize.x) + std::abs(axisY.x * halfSize.y) + std::abs(axisZ.x * halfSize.z),
+                std::abs(axisX.y * halfSize.x) + std::abs(axisY.y * halfSize.y) + std::abs(axisZ.y * halfSize.z),
+                std::abs(axisX.z * halfSize.x) + std::abs(axisY.z * halfSize.y) + std::abs(axisZ.z * halfSize.z)
+            };
+
+            minPos = minPos - rotatedExtents;
+            maxPos = maxPos + rotatedExtents;
         }
         else if (col.type == ColliderType::Capsule)
         {
@@ -265,10 +278,10 @@ void CollisionManager::Update()
         int32_t maxY = CalculateGridIndex(maxPos.y);
         int32_t maxZ = CalculateGridIndex(maxPos.z);
 
-        // 巨大なオブジェクトが異常に広いセル範囲を覆って処理が遅延するのを防ぐクランプ処理
-        if (maxX - minX > 2) maxX = minX + 2;
-        if (maxY - minY > 2) maxY = minY + 2;
-        if (maxZ - minZ > 2) maxZ = minZ + 2;
+        // 大型オブジェクトが全ての構成セルに確実に登録されるよう十分な判定幅を確保
+        if (maxX - minX > 8) maxX = minX + 8;
+        if (maxY - minY > 8) maxY = minY + 8;
+        if (maxZ - minZ > 8) maxZ = minZ + 8;
 
         // 全ての関連セルにインデックスを登録
         for (int32_t x = minX; x <= maxX; ++x)
@@ -581,8 +594,6 @@ bool CollisionManager::CheckSphereBox(const CollisionData& sphere, const Collisi
     {
         float distL = extents.x + localSphPos.x; 
         float distR = extents.x - localSphPos.x; 
-        float distB = extents.y + localSphPos.y; 
-        float distT = extents.y - localSphPos.y; 
         float distF = extents.z + localSphPos.z; 
         float distN = extents.z - localSphPos.z; 
 
@@ -590,8 +601,6 @@ bool CollisionManager::CheckSphereBox(const CollisionData& sphere, const Collisi
         Vector3 localPushDir = { 1.0f, 0.0f, 0.0f }; 
 
         if (distR < minDist) { minDist = distR; localPushDir = { -1.0f, 0.0f, 0.0f }; }
-        if (distB < minDist) { minDist = distB; localPushDir = { 0.0f, 1.0f, 0.0f }; }
-        if (distT < minDist) { minDist = distT; localPushDir = { 0.0f, -1.0f, 0.0f }; }
         if (distF < minDist) { minDist = distF; localPushDir = { 0.0f, 0.0f, 1.0f }; }
         if (distN < minDist) { minDist = distN; localPushDir = { 0.0f, 0.0f, -1.0f }; }
 
@@ -931,7 +940,7 @@ bool CollisionManager::CheckCapsuleCapsule(const CollisionData& a, const Collisi
     return false;
 }
 
-bool CollisionManager::Raycast(const Vector3& rayStart, const Vector3& rayDir, float maxDist, Collider*& outHitCollider, float& outHitDist)
+bool CollisionManager::Raycast(const Vector3& rayStart, const Vector3& rayDir, float maxDist, Collider*& outHitCollider, float& outHitDist, uint32_t targetAttributeMask)
 {
     Collider* closestCollider = nullptr;
     float closestDist = maxDist;
@@ -942,6 +951,9 @@ bool CollisionManager::Raycast(const Vector3& rayStart, const Vector3& rayDir, f
     for (Collider* col : colliders_)
     {
         if (!col || !col->IsEnabled()) continue;
+        uint32_t attrBit = 1 << static_cast<uint32_t>(col->GetAttribute());
+        if ((targetAttributeMask & attrBit) == 0) continue;
+
         CollisionData data;
         data.originalCollider = col;
         data.type = col->GetType();

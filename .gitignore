@@ -346,3 +346,8 @@ imgui.ini
 !/project/externals/assimp/lib/Release/assimp-vc143-mt.lib
 !/project/externals/assimp/lib/Release/assimp-vc143-md.lib
 
+# Blender backup & temporary files
+*.blend1
+*.lnk
+/project/Untitled.blend
+

@@ -1,7 +1,7 @@
 # Standard MTL Format Cargo Container Material
 newmtl ContainerMaterial
-Ka 0.3 0.35 0.4
-Kd 0.5 0.55 0.6
+Ka 0.2 0.3 0.4
+Kd 0.3 0.5 0.7
 Ks 0.2 0.2 0.2
 Ns 20.0
-map_Kd fence.png
+map_Kd CG4/human/white.png

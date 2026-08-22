@@ -18,7 +18,8 @@ public:
     Vector3 GetPosition() const { return position_; }
     float GetRadius() const { return radius_; }
     BoxCollider* GetCollider() const { return collider_.get(); }
-    BoxCollider* GetCollider2() const { return collider2_.get(); }
+    BoxCollider* GetCollider2() const { return extraColliders_.empty() ? nullptr : extraColliders_[0].get(); }
+    const std::vector<std::unique_ptr<BoxCollider>>& GetExtraColliders() const { return extraColliders_; }
     MeshCollider* GetMeshCollider() const { return meshCollider_.get(); }
 
 private:
@@ -27,10 +28,11 @@ private:
     Vector3 rotation_;
     float radius_;
     std::unique_ptr<BoxCollider> collider_;
-    std::unique_ptr<BoxCollider> collider2_;
+    std::vector<std::unique_ptr<BoxCollider>> extraColliders_;
     std::unique_ptr<MeshCollider> meshCollider_;
     Vector3 rot1_;
     Vector3 rot2_;
+    std::vector<Vector3> extraRotations_;
     Object3dCom* object3dCom_ = nullptr;
     uint32_t defaultTextureIndex_ = UINT32_MAX;
 };

@@ -119,10 +119,10 @@ void GamePlayScene::InitializeEnvironment()
 	isGameCleared_ = false;
 	extractionTimer_ = 5.0f;
 
-	// --- ✨ アプリケーション層で Resources/stage_layout.json (川・大自然) を全自動ロード ---
+	// --- ✨ LevelEditorはImGui編集UI用に初期化のみ（DrawはInitializeObstacles側で一括処理するため二重ロード不要）---
 	levelEditor_ = std::make_unique<LevelEditor>();
 	levelEditor_->Initialize(directXCom, object3dCom);
-	levelEditor_->LoadFromFile("Resources/stage_layout.json");
+	// levelEditor_->LoadFromFile("Resources/stage_layout.json"); // InitializeObstaclesと二重GPUバッファ作成になるため無効化
 }
 
 void GamePlayScene::InitializeCharacters()
@@ -304,6 +304,8 @@ void GamePlayScene::InitializeAudioAndParticles()
 	cylinderTextureIndex_ = TextureManager::GetInstance()->Load("Resources/CG4/gradationLine.png");
 	particleTextureA = TextureManager::GetInstance()->Load("Resources/uvChecker.png");
 	particleTextureB = TextureManager::GetInstance()->Load("Resources/CG4/circle2.png");
+	bloodTextureIndex_ = TextureManager::GetInstance()->Load("Resources/blood_splatter.png");
+	smokeTextureIndex_ = TextureManager::GetInstance()->Load("Resources/smoke_dark.png");
 	fenceTextureIndex_ = TextureManager::GetInstance()->Load("Resources/fence.png");
 	starburstTextureIndex_ = TextureManager::GetInstance()->Load("Resources/starburst.png");
 	if (hitEffect_)
@@ -503,25 +505,13 @@ void GamePlayScene::UpdateEnvironment()
 		Sprite::Transform transformSphere = sphere_->GetTransform();
 		transformSphere.rotate.y += 0.05f; // バリア感を出すために少し速めに回転
 		
-		if (player_ && player_->IsDodging())
-		{
-			// プレイヤーアヒルの位置にスナップ（頭部に合わせるためY軸方向に少しオフセット）
-			transformSphere.translate = player_->GetPosition();
-			transformSphere.translate.y += 0.4f;
-			transformSphere.scale = { 1.3f, 1.3f, 1.3f }; // アヒルを覆うサイズ
-			
-			// ドッジタイマーに基づいてシールドサイズを少し脈動させる
-			float pulse = 1.0f + 0.08f * std::sin(player_->GetDodgeTimer() * 35.0f);
-			transformSphere.scale.x *= pulse;
-			transformSphere.scale.y *= pulse;
-			transformSphere.scale.z *= pulse;
-		}
-		else if (!allTargetsDestroyed_)
+		if (!allTargetsDestroyed_)
 		{
 			// 的が残っている間は脱出ゲートを保護する赤いバリアとして表示
 			transformSphere.translate = goalRingTransform_.translate;
 			transformSphere.translate.y = 0.5f;
 			transformSphere.scale = { 1.8f, 1.8f, 1.8f };
+
 			
 			// バリアの鼓動
 			static float barrierTimer = 0.0f;
@@ -1586,6 +1576,10 @@ void GamePlayScene::Update()
 	{
 		collisionSystem_->Update();
 	}
+	if (player_)
+	{
+		player_->PostCollisionUpdate();
+	}
 	UpdatePlayerHpBar();
 	CheckGameOver();
 
@@ -1752,7 +1746,8 @@ void GamePlayScene::InitializeObstacles()
 				for (const auto& obj : j)
 				{
 					std::string name = obj.value("name", "");
-					if (name.find("Obstacle") == 0 || name.find("Container") != std::string::npos || name.find("Fence") != std::string::npos)
+					std::string type = obj.value("type", "");
+					if (!name.empty() && name != "GroundPlane" && type != "SpawnPoint" && type != "GoalRing" && name != "Player_Spawn_Point" && name != "Enemy_Spawn_Point" && name != "Goal_Extraction_Ring")
 					{
 						Vector3 pos = {
 							obj["position"]["x"].get<float>(),
@@ -1769,16 +1764,44 @@ void GamePlayScene::InitializeObstacles()
 							};
 						}
 						Vector3 rot = { 0.0f, 0.0f, 0.0f };
+						if (obj.contains("rotation"))
+						{
+							rot = {
+								obj["rotation"]["x"].get<float>(),
+								obj["rotation"]["y"].get<float>(),
+								obj["rotation"]["z"].get<float>()
+							};
+						}
 						std::string modelFile = obj.value("modelFilename", "fence.obj");
+						if (type == "River" || name.find("River") != std::string::npos || name.find("river") != std::string::npos || name.find("Water") != std::string::npos || name.find("water") != std::string::npos)
+						{
+							modelFile = "river.obj";
+						}
+						else if (modelFile == "plane.obj" || name.find("Ground") != std::string::npos || name.find("Plane") != std::string::npos)
+						{
+							continue; // 不要な中央巨大板 plane.obj の生成をスキップ
+						}
 						
 						auto obs = std::make_unique<Obstacle>();
 						obs->Initialize(object3dCom, camera_, pos, 1.0f, modelFile, scl, rot);
 						obstacles_.push_back(std::move(obs));
 					}
 				}
+				// ステージ最下層に落ち着いた土・草地カラーの広大な水平地面フロアを敷く（空の青色が筒抜けになるのを完全に防止）
+				auto ground = std::make_unique<Obstacle>();
+				ground->Initialize(object3dCom, camera_, { 0.0f, -0.01f, 15.0f }, 1.0f, "ground.obj", { 1.0f, 1.0f, 1.0f }, { 0.0f, 0.0f, 0.0f });
+				obstacles_.insert(obstacles_.begin(), std::move(ground));
+
+				// 橋の下を東西に横断する美しいクリアブルーの川水面を配置（幅60m x 奥行き5m）
+				auto river = std::make_unique<Obstacle>();
+				river->Initialize(object3dCom, camera_, { 0.0f, 0.02f, 18.75f }, 1.0f, "river.obj", { 60.0f, 1.0f, 5.0f }, { 0.0f, 0.0f, 0.0f });
+				obstacles_.insert(obstacles_.begin() + 1, std::move(river));
+
+
 				success = true;
 				OutputDebugStringA("GamePlayScene: Successfully loaded obstacles from JSON.\n");
 				break;
+
 			}
 			catch (const std::exception& e)
 			{
@@ -1936,27 +1959,14 @@ void GamePlayScene::Draw(SceneRenderRequests& renderRequests)
 		hitEffect_->Draw();
 	}
 
-	if (sphere_ && sphereInitialized)
+	if (sphere_ && sphereInitialized && !allTargetsDestroyed_)
 	{
-		if (player_ && player_->IsDodging())
+		// 的が残っている間は赤い半透明バリアとしてオーバーレイ描画
+		sphere_->SetOverlayDraw(true);
+		D3D12_GPU_DESCRIPTOR_HANDLE handle = TextureManager::GetInstance()->GetSrvHandleGPU(particleTextureB);
+		if (handle.ptr != 0)
 		{
-			// 回避中は青く半透明に光るシールドとしてオーバーレイ描画
-			sphere_->SetOverlayDraw(true);
-			D3D12_GPU_DESCRIPTOR_HANDLE handle = TextureManager::GetInstance()->GetSrvHandleGPU(particleTextureB); // 円形のテクスチャ
-			if (handle.ptr != 0)
-			{
-				sphere_->Draw(handle);
-			}
-		}
-		else if (!allTargetsDestroyed_)
-		{
-			// 的が残っている間は赤い半透明バリアとしてオーバーレイ描画
-			sphere_->SetOverlayDraw(true);
-			D3D12_GPU_DESCRIPTOR_HANDLE handle = TextureManager::GetInstance()->GetSrvHandleGPU(particleTextureB);
-			if (handle.ptr != 0)
-			{
-				sphere_->Draw(handle);
-			}
+			sphere_->Draw(handle);
 		}
 	}
 
@@ -2009,10 +2019,10 @@ void GamePlayScene::Draw(SceneRenderRequests& renderRequests)
 
 			float rotY = player_->GetRotation().y;
 			Vector3 dir = { std::sin(rotY), 0.0f, std::cos(rotY) };
-			// 実際の弾丸のスポーン位置計算 (前方 0.5f、高さ 0.2f) と完全に同期させる
-			Vector3 gunPos = Bullet::ComputeSpawnPosition(player_->GetPosition(), dir, Vector3{ 0.0f, 0.2f, 0.5f });
+			// 実際の弾丸のスポーン位置計算 (くちばしの位置: 高さ 0.70f、前方 0.95f) と同期
+			Vector3 gunPos = Bullet::ComputeSpawnPosition(player_->GetPosition(), dir, Vector3{ 0.0f, 0.70f, 0.95f });
 
-			// レイキャストで障害物のみ(Obstacle)との衝突距離を測定 (自キャラのコライダーへの即時衝突を防ぐため)
+			// レイキャストで障害物・敵・的との衝突距離を測定 (自キャラのコライダーへの即時衝突を防ぐ)
 			float laserRange = 25.0f; // 最大長
 			bool hitObstacle = false;
 			float closestDist = laserRange;
@@ -2020,7 +2030,7 @@ void GamePlayScene::Draw(SceneRenderRequests& renderRequests)
 			auto& colliders = CollisionManager::GetInstance()->GetColliders();
 			for (Collider* col : colliders)
 			{
-				if (!col || !col->IsEnabled() || col->GetAttribute() != CollisionAttribute::Obstacle)
+				if (!col || !col->IsEnabled() || col->GetAttribute() == CollisionAttribute::Player || col->GetAttribute() == CollisionAttribute::Bullet)
 				{
 					continue;
 				}
@@ -2039,9 +2049,6 @@ void GamePlayScene::Draw(SceneRenderRequests& renderRequests)
 				}
 				else if (data.type == ColliderType::Box)
 				{
-					// レーザーサイトはフェンスの隙間をすり抜けられるよう、簡易BoxではなくMeshColliderで判定を行います
-					continue;
-					
 					BoxCollider* box = static_cast<BoxCollider*>(col);
 					data.shape.size = box->GetSize();
 					data.shape.rotation = box->GetWorldRotation();
@@ -2051,10 +2058,6 @@ void GamePlayScene::Draw(SceneRenderRequests& renderRequests)
 					CapsuleCollider* capsule = static_cast<CapsuleCollider*>(col);
 					data.shape.radius = capsule->GetRadius();
 					data.shape.height = capsule->GetHeight();
-				}
-				else if (data.type == ColliderType::Mesh)
-				{
-					// メッシュコライダーは追加の形状パラメータ設定不要
 				}
 
 				float dist = 0.0f;

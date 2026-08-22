@@ -16,14 +16,15 @@ class Player
 public:
     void Initialize(Object3dCom* object3dCom, Camera* camera);
     void Update(float deltaTime, MouseInput* mouseInput = nullptr);
+    void PostCollisionUpdate();
     void Draw(const RenderContext& ctx);
     void Finalize();
 
     std::vector<std::unique_ptr<Bullet>> TryShoot(const MouseInput* mouseInput, float deltaTime);
 
-    Vector3 GetPosition() const { return object3d_ ? object3d_->GetTranslate() : Vector3{ 0.0f, 0.0f, 0.0f }; }
+    Vector3 GetPosition() const { return position_; }
     Vector3 GetRotation() const { return object3d_ ? object3d_->GetRotate() : Vector3{ 0.0f, 0.0f, 0.0f }; }
-    void SetPosition(const Vector3& pos) { if (object3d_) object3d_->SetTranslate(pos); }
+    void SetPosition(const Vector3& pos) { position_ = pos; if (object3d_) object3d_->SetTranslate(pos); }
     SphereCollider* GetCollider() const { return collider_.get(); }
 
     void TakeDamage(float damage);
@@ -51,6 +52,7 @@ public:
 private:
     std::unique_ptr<Object3d> object3d_;
     Vector3 position_ = { 0.0f, 0.0f, 0.0f };
+    Vector3 drawPos_ = { 0.0f, 0.0f, 0.0f };
     std::unique_ptr<SphereCollider> collider_;
     Object3dCom* object3dCom_ = nullptr;
     Camera* camera_ = nullptr;
@@ -64,7 +66,7 @@ private:
     float hitFlashTimer_ = 0.0f;
     const float hitFlashDuration_ = 0.12f;
 
-    Vector3 bulletSpawnOffset_ = { 0.0f, 0.2f, 0.5f };
+    Vector3 bulletSpawnOffset_ = { 0.0f, 0.70f, 0.95f };
     float bulletSpeed_ = 0.45f;
     float bulletLifeTime_ = 2.0f;
     float shotCooldown_ = 0.12f;

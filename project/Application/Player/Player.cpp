@@ -16,24 +16,31 @@ void Player::Initialize(Object3dCom* object3dCom, Camera* camera)
     object3dCom_ = object3dCom;
     camera_ = camera;
 
-    // OBJ を読み込んで Object3d を初期化
-    Object3d::ModelData model = Object3d::LoadObjFile("Resources", "plane.obj");
+    // OBJ を読み込んで Object3d を初期化（可愛いアヒルモデル）
+    Object3d::ModelData model = Object3d::LoadObjFile("Resources", "player.obj");
+    if (model.material.textureFilePath.empty())
+    {
+        model.material.textureFilePath = "Resources/duck.png";
+    }
+
     object3d_ = std::make_unique<Object3d>();
     object3d_->Initialize(object3dCom_, model);
+    object3d_->SetCamera(camera_);
 
     // デフォルトのトランスフォーム
     position_ = { 0.0f, 0.0f, 0.0f };
+    drawPos_ = position_;
     object3d_->SetTranslate(position_);
     object3d_->SetScale({ 1.0f, 1.0f, 1.0f });
-    object3d_->SetColor({ 0.7f, 0.9f, 1.2f, 1.0f });
+    object3d_->SetRotate({ 0.0f, 0.0f, 0.0f });
+    object3d_->SetColor({ 1.0f, 1.0f, 1.0f, 1.0f });
 
-    // コライダーの初期化と登録
-    collider_ = std::make_unique<SphereCollider>(0.6f, &position_, CollisionAttribute::Player);
+    // コライダーの初期化と登録（拡大したアヒルモデルの体型に合わせた0.55m半径）
+    collider_ = std::make_unique<SphereCollider>(0.55f, &position_, CollisionAttribute::Player);
+    collider_->SetPositionOffset({ 0.0f, 0.55f, 0.0f });
     CollisionManager::GetInstance()->RegisterCollider(collider_.get());
 
-    // プレイヤーとして分かりやすくするため、白色の white.png を強制設定
-    defaultTextureIndex_ = TextureManager::GetInstance()->Load("Resources/CG4/human/white.png");
-    model.material.textureIndex = defaultTextureIndex_;
+    defaultTextureIndex_ = TextureManager::GetInstance()->Load("Resources/duck.png");
 
     // プレイヤーのステータス初期化
     hp_ = maxHp_ = 100.0f;
@@ -149,23 +156,40 @@ void Player::Update(float deltaTime, MouseInput* mouseInput)
         // 移動処理
         position_.x += dodgeDirection_.x * dodgeSpeed_ * frameScale;
         position_.z += dodgeDirection_.z * dodgeSpeed_ * frameScale;
-        object3d_->SetTranslate(position_);
-
-        // ビジュアル演出：X軸（前転方向）に1回転
+        
+        // ビジュアル演出：アヒルの形状（くちばし・頭・お尻）を考慮した完璧な宙返りローリング（全角度で埋もれゼロ）
         float ratio = dodgeTimer_ / dodgeDuration_;
         if (ratio < 0.0f) ratio = 0.0f;
+        float progress = 1.0f - ratio;
+        float rollAngle = progress * 6.2831853f;
+
+        // アヒルが前傾・倒立・後傾（90度/180度/270度）のどの瞬間でもくちばしや頭が地面に埋まらない包絡線リフト
+        float rollSin = std::sin(rollAngle);
+        float rollCos = std::cos(rollAngle);
+        float clearanceLift = 1.05f * (1.0f - rollCos) + 0.40f * std::abs(rollSin);
+        float hopOffset = std::sin(progress * 3.14159f) * 0.65f; // ふわりと跳ぶジャンプ放物線
+
+        drawPos_ = position_;
+        drawPos_.y = position_.y + clearanceLift + hopOffset;
+        object3d_->SetTranslate(drawPos_);
+
         Vector3 rot = object3d_->GetRotate();
-        rot.x = (1.0f - ratio) * 6.2831853f;
+        rot.x = rollAngle;
+        rot.z = 0.0f;
         object3d_->SetRotate(rot);
 
         if (dodgeTimer_ <= 0.0f)
         {
             isDodging_ = false;
             dodgeTimer_ = 0.0f;
+            object3d_->SetTranslate(position_);
             Vector3 finalRot = object3d_->GetRotate();
             finalRot.x = 0.0f;
+            finalRot.z = 0.0f;
             object3d_->SetRotate(finalRot);
         }
+
+
     }
     else
     {
@@ -208,6 +232,14 @@ void Player::Update(float deltaTime, MouseInput* mouseInput)
                 float yaw = GetRotation().y;
                 dodgeDirection_ = { std::sin(yaw), 0.0f, std::cos(yaw) };
             }
+
+            // 回避進行方向を向かせて綺麗な前転にする
+            float dodgeYaw = std::atan2(dodgeDirection_.x, dodgeDirection_.z);
+            Vector3 initRot = object3d_->GetRotate();
+            initRot.x = 0.0f;
+            initRot.y = dodgeYaw;
+            initRot.z = 0.0f;
+            object3d_->SetRotate(initRot);
         }
         else
         {
@@ -292,8 +324,11 @@ void Player::Update(float deltaTime, MouseInput* mouseInput)
                         // ヨーの計算。前方が +Z なので atan2(x, z) を使用
                         float yaw = std::atan2(to.x, to.z);
                         Vector3 r = object3d_->GetRotate();
+                        r.x = 0.0f;
                         r.y = yaw;
+                        r.z = 0.0f;
                         object3d_->SetRotate(r);
+
                     }
                 }
             }
@@ -309,8 +344,33 @@ void Player::Update(float deltaTime, MouseInput* mouseInput)
 
     UpdateSpread(deltaTime, isMoving);
     isMoving_ = isMoving;
-    object3d_->SetTranslate(position_);
+    if (isDodging_)
+    {
+        object3d_->SetTranslate(drawPos_);
+    }
+    else
+    {
+        object3d_->SetTranslate(position_);
+    }
     object3d_->Update();
+}
+
+void Player::PostCollisionUpdate()
+{
+    if (object3d_)
+    {
+        if (isDodging_)
+        {
+            drawPos_.x = position_.x;
+            drawPos_.z = position_.z;
+            object3d_->SetTranslate(drawPos_);
+        }
+        else
+        {
+            object3d_->SetTranslate(position_);
+        }
+        object3d_->Update();
+    }
 }
 
 std::vector<std::unique_ptr<Bullet>> Player::TryShoot(const MouseInput* mouseInput, float deltaTime)
@@ -441,7 +501,7 @@ void Player::Draw(const RenderContext& ctx)
     RenderContext playerCtx = ctx;
     const Object3d::ModelData& modelData = object3d_->GetModelData();
     uint32_t texIdx = defaultTextureIndex_;
-    if (playerCtx.textureHandle.ptr == 0 && texIdx != 0 && texIdx != UINT32_MAX)
+    if (playerCtx.textureHandle.ptr == 0 && texIdx != UINT32_MAX)
     {
         playerCtx.textureHandle = TextureManager::GetInstance()->GetSrvHandleGPU(texIdx);
     }

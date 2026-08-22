@@ -45,6 +45,12 @@ public:
 	void EmitDustWithVelocity(std::mt19937& randomEngine, const Vector3& position, float scale, const Vector4& color, const Vector3& velocity, float lifeTime, uint32_t textureIndex);
 	void EmitShellCasing(std::mt19937& randomEngine, const Vector3& position, const Vector3& forward, const Vector4& color, const Vector3& scale, uint32_t textureIndex);
 	void EmitFeather(std::mt19937& randomEngine, const Vector3& position, const Vector4& color, uint32_t textureIndex);
+	void EmitBloodDrop(std::mt19937& randomEngine, const Vector3& position, const Vector3& baseVelocity, float speed, uint32_t textureIndex);
+	void EmitBloodMist(std::mt19937& randomEngine, const Vector3& position, float scale, uint32_t textureIndex);
+	void EmitBloodBurst(std::mt19937& randomEngine, const Vector3& position, const Vector3& hitDirection, uint32_t textureIndex, uint32_t flashTexIndex);
+	void EmitViolentBloodSpray(std::mt19937& randomEngine, const Vector3& hitPoint, const Vector3& bulletDir, bool isCritical, uint32_t bloodTexIndex, uint32_t smokeTexIndex);
+	void EmitViolentBloodBurst(std::mt19937& randomEngine, const Vector3& enemyPos, const Vector3& hitDir, uint32_t bloodTexIndex, uint32_t smokeTexIndex, uint32_t flashTexIndex);
+	void EmitDarkBloodSmoke(std::mt19937& randomEngine, const Vector3& position, float scale, uint32_t smokeTexIndex);
 	void EmitMuzzleFlash(std::mt19937& randomEngine, const Vector3& position, const Vector3& direction, const Vector3& right, const Vector3& up, const Vector4& color, float speedMultiplier, uint32_t textureIndex);
 	void EmitMuzzleFlare(std::mt19937& randomEngine, const Vector3& position, float scale, const Vector4& color, float lifeTime, uint32_t textureIndex);
 	void EmitDeathFlash(std::mt19937& randomEngine, const Vector3& position, float scale, const Vector4& color, float lifeTime, uint32_t textureIndex);

@@ -66,23 +66,29 @@ void MovingEnemy::Initialize(Object3dCom* object3dCom, Camera* camera)
     object3dCom_ = object3dCom;
     camera_ = camera;
 
-    Object3d::ModelData model = Object3d::LoadObjFile("Resources", "plane.obj");
+    Object3d::ModelData model = Object3d::LoadObjFile("Resources", "player.obj");
+    model.material.textureFilePath = "Resources/duck_enemy.png";
+
+    defaultTextureIndex_ = TextureManager::GetInstance()->Load("Resources/duck_enemy.png");
+    model.material.textureIndex = defaultTextureIndex_;
+
     object3d_ = std::make_unique<Object3d>();
     object3d_->Initialize(object3dCom_, model);
+    object3d_->SetCamera(camera_);
 
     // 初期配置 (パトロールA地点)
     position_ = patrolA_;
     object3d_->SetTranslate(position_);
     object3d_->SetScale({ 1.0f, 1.0f, 1.0f });
-    object3d_->SetColor({ 1.2f, 0.4f, 0.4f, 1.0f });
+    object3d_->SetColor({ 1.0f, 1.0f, 1.0f, 1.0f });
 
     // コライダーの初期化と登録
-    collider_ = std::make_unique<SphereCollider>(0.6f, &position_, CollisionAttribute::Enemy);
+    collider_ = std::make_unique<SphereCollider>(0.55f, &position_, CollisionAttribute::Enemy);
+    collider_->SetPositionOffset({ 0.0f, 0.55f, 0.0f });
     CollisionManager::GetInstance()->RegisterCollider(collider_.get());
 
-    // 敵として分かりやすくするため、警告色である monsterBall.png を強制設定
-    defaultTextureIndex_ = TextureManager::GetInstance()->Load("Resources/monsterBall.png");
-    model.material.textureIndex = defaultTextureIndex_;
+    // ナビメッシュグリッドを初期化時に一度だけ構築（毎フレームの全再構築による処理落ちを回避）
+    BaziruEngine::AI::NavMesh::GetInstance()->BuildGrid(-20.0f, 20.0f, -5.0f, 45.0f, 0.5f, 0.85f);
 
     hp_ = maxHp_;
     isDead_ = false;
@@ -355,9 +361,6 @@ void MovingEnemy::Update(WindowAPI* windowAPI, const Vector3* targetPosition, co
             // 驚きフリーズ中（!マーク表示中）は移動しない
             if (alertTimer_ <= 0.0f)
             {
-                // グリッドを事前にビルドして、正しい進入判定が行えるようにする
-                BaziruEngine::AI::NavMesh::GetInstance()->BuildGrid(-20.0f, 20.0f, -5.0f, 45.0f, 0.5f, 0.85f);
-
                 // NavMeshクランプ：敵が障害物の通行不可領域に入り込んでいる場合、最も近い安全な場所へ押し戻す
                 if (!BaziruEngine::AI::NavMesh::GetInstance()->IsWalkable(position_, 0.85f))
                 {
@@ -376,8 +379,6 @@ void MovingEnemy::Update(WindowAPI* windowAPI, const Vector3* targetPosition, co
                         blackboard->Clear("CoverPath");
 
                         // A* 経路探索で障害物を賢く迂回しながらプレイヤーを追尾（フォールバック）
-                        BaziruEngine::AI::NavMesh::GetInstance()->BuildGrid(-20.0f, 20.0f, -5.0f, 45.0f, 0.5f, 0.85f);
-                        
                         Vector3 walkableStart = GetNearestWalkablePosition(position_, 0.85f);
                         Vector3 walkableTarget = GetNearestWalkablePosition(*targetPosition, 0.85f);
                         std::vector<Vector3> path = BaziruEngine::AI::NavMesh::GetInstance()->FindPath(walkableStart, walkableTarget);
@@ -596,8 +597,6 @@ void MovingEnemy::Update(WindowAPI* windowAPI, const Vector3* targetPosition, co
                         if (status == BaziruEngine::AI::BehaviorStatus::Failure)
                         {
                             // A* 経路探索で障害物を賢く迂回しながらプレイヤーを追尾（フォールバック）
-                            BaziruEngine::AI::NavMesh::GetInstance()->BuildGrid(-20.0f, 20.0f, -5.0f, 45.0f, 0.5f, 0.85f);
-                            
                             Vector3 walkableStart = GetNearestWalkablePosition(position_, 0.85f);
                             Vector3 walkableTarget = GetNearestWalkablePosition(*targetPosition, 0.85f);
                             std::vector<Vector3> path = BaziruEngine::AI::NavMesh::GetInstance()->FindPath(walkableStart, walkableTarget);
@@ -863,7 +862,7 @@ void MovingEnemy::Draw(const RenderContext& ctx)
     RenderContext enemyCtx = ctx;
     const Object3d::ModelData& modelData = object3d_->GetModelData();
     uint32_t texIdx = defaultTextureIndex_;
-    if (enemyCtx.textureHandle.ptr == 0 && texIdx != 0 && texIdx != UINT32_MAX)
+    if (enemyCtx.textureHandle.ptr == 0 && texIdx != UINT32_MAX)
     {
         enemyCtx.textureHandle = TextureManager::GetInstance()->GetSrvHandleGPU(texIdx);
     }
@@ -939,6 +938,7 @@ void MovingEnemy::Finalize()
 
 bool MovingEnemy::HasLineOfSight(const Vector3& playerPos, const std::vector<std::unique_ptr<Obstacle>>& obstacles)
 {
+    (void)obstacles;
     Vector3 enemyPos = GetPosition();
     Vector3 toPlayer = { playerPos.x - enemyPos.x, playerPos.y - enemyPos.y, playerPos.z - enemyPos.z };
     float distToPlayer = std::sqrt(toPlayer.x * toPlayer.x + toPlayer.y * toPlayer.y + toPlayer.z * toPlayer.z);
@@ -949,44 +949,15 @@ bool MovingEnemy::HasLineOfSight(const Vector3& playerPos, const std::vector<std
     Collider* hitCollider = nullptr;
     float hitDist = 0.0f;
 
-    // 障害物の簡易Boxコライダーを一時的に無効化（レイキャストが精密なMeshコライダーに当たるようにするため）
-    for (auto& obs : obstacles)
-    {
-        if (obs)
-        {
-            if (obs->GetCollider()) obs->GetCollider()->SetIsEnabled(false);
-            if (obs->GetCollider2()) obs->GetCollider2()->SetIsEnabled(false);
-        }
-    }
-
-    // 高さ0.5fの胴体付近からレイを飛ばし、プレイヤーとの間にある遮蔽物のMeshColliderを精密に検出します
     if (CollisionManager::GetInstance()->Raycast(enemyPos + Vector3{ 0.0f, 0.5f, 0.0f }, rayDir, distToPlayer, hitCollider, hitDist))
     {
         if (hitCollider && hitCollider->GetAttribute() == CollisionAttribute::Obstacle)
         {
-            // コライダーを再有効化
-            for (auto& obs : obstacles)
-            {
-                if (obs)
-                {
-                    if (obs->GetCollider()) obs->GetCollider()->SetIsEnabled(true);
-                    if (obs->GetCollider2()) obs->GetCollider2()->SetIsEnabled(true);
-                }
-            }
-            return false; // 障害物に遮蔽されている
+            return false;
         }
     }
 
-    // コライダーを再有効化
-    for (auto& obs : obstacles)
-    {
-        if (obs)
-        {
-            if (obs->GetCollider()) obs->GetCollider()->SetIsEnabled(true);
-            if (obs->GetCollider2()) obs->GetCollider2()->SetIsEnabled(true);
-        }
-    }
-    return true; // 視線が通っている
+    return true;
 }
 
 void MovingEnemy::HearNoise(const Vector3& noisePosition)
