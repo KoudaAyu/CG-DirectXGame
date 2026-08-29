@@ -1,7 +1,7 @@
-# Standard MTL Format Cargo Container Material
-newmtl ContainerMaterial
-Ka 0.2 0.3 0.4
-Kd 0.3 0.5 0.7
-Ks 0.2 0.2 0.2
-Ns 20.0
-map_Kd CG4/human/white.png
+# Material for container.mtl
+newmtl Material_container.mtl
+Ka 1.0 1.0 1.0
+Kd 1.0 1.0 1.0
+Ks 0.15 0.15 0.15
+Ns 15.0
+map_Kd container_military.png

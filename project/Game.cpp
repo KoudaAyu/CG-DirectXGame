@@ -95,6 +95,11 @@ void Game::Initialize()
 	fadeApplication_ = std::make_unique<Fade>();
 	fadeApplication_->Initialize(spriteCom, window);
 	SceneManager::GetInstance()->SetFadeApplication(fadeApplication_.get());
+	SceneManager::GetInstance()->SetObject3dCom(object3dCom.get());
+	SceneManager::GetInstance()->SetCamera(camera_.get());
+	SceneManager::GetInstance()->SetMaterialManager(materialManager_.get());
+	SceneManager::GetInstance()->SetLight(light.get());
+	SceneManager::GetInstance()->SetSpriteCom(spriteCom);
 
 	SceneRegistration::RegisterScenes();
 	SceneManager::GetInstance()->ChangeScene("TITLE");
@@ -291,9 +296,29 @@ void Game::Update()
 
 
 #ifdef USE_IMGUI
-	if (debugUI)
+	// 通常プレイ時はデバッグメニューを非表示（すっきりとした製品画面にする）
+	static bool showEngineDebugUI = false;
+	if (GetAsyncKeyState(VK_F1) & 0x8000)
 	{
-		debugUI->Update();
+		static bool f1WasPressed = false;
+		if (!f1WasPressed)
+		{
+			showEngineDebugUI = !showEngineDebugUI;
+			f1WasPressed = true;
+		}
+	}
+	else
+	{
+		static bool f1WasPressed = false;
+		f1WasPressed = false;
+	}
+
+	if (showEngineDebugUI)
+	{
+		if (debugUI)
+		{
+			debugUI->Update();
+		}
 	}
 #endif // USE_IMGUI
 
@@ -445,11 +470,11 @@ void Game::Draw()
 		SceneManager::GetInstance()->Draw(renderRequests);
 	}
 
-	sphereRenderer_.Draw(ctx, renderRequests);
-
-	if (!renderRequests.sceneDrawn && drawObject)
+	if (!renderRequests.sceneDrawn)
 	{
-		if (object3dCom && object3d_)
+		sphereRenderer_.Draw(ctx, renderRequests);
+
+		if (drawObject && object3dCom && object3d_)
 		{
 			object3dCom->Draw(object3d_.get(), ctx, modelData, drawObject);
 		}

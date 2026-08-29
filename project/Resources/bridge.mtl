@@ -1,18 +1,28 @@
-# Material Library for Wooden Bridge
-newmtl BridgeWood
-Kd 0.55 0.38 0.22
-Ka 0.2 0.15 0.1
-Ks 0.1 0.1 0.1
-Ns 10.0
-
-newmtl BridgeRailing
-Kd 0.42 0.28 0.16
-Ka 0.2 0.12 0.08
-Ks 0.1 0.1 0.1
-Ns 10.0
-
-newmtl BridgePillar
-Kd 0.35 0.35 0.38
-Ka 0.15 0.15 0.18
+# Material for bridge
+newmtl Material_bridge.mtl
+Ka 1.0 1.0 1.0
+Kd 1.0 1.0 1.0
 Ks 0.2 0.2 0.2
 Ns 20.0
+map_Kd duckov_bridge.png
+
+newmtl BridgeWood
+Ka 1.0 1.0 1.0
+Kd 1.0 1.0 1.0
+Ks 0.2 0.2 0.2
+Ns 20.0
+map_Kd duckov_bridge.png
+
+newmtl BridgePillar
+Ka 0.8 0.8 0.8
+Kd 0.8 0.8 0.8
+Ks 0.1 0.1 0.1
+Ns 10.0
+map_Kd duckov_bridge.png
+
+newmtl BridgeRailing
+Ka 0.9 0.9 0.9
+Kd 0.9 0.9 0.9
+Ks 0.25 0.25 0.25
+Ns 25.0
+map_Kd duckov_bridge.png

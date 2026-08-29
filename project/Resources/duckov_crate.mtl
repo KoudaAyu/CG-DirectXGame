@@ -1,14 +1,7 @@
-# Material for Military Supply Crate
-newmtl CrateWood
-Ka 0.4 0.28 0.12
-Kd 0.55 0.38 0.18
-Ks 0.1 0.1 0.1
-Ns 10.0
-map_Kd CG4/human/white.png
-
-newmtl CrateMetalRim
-Ka 0.3 0.3 0.3
-Kd 0.5 0.5 0.5
-Ks 0.3 0.3 0.3
-Ns 30.0
-map_Kd CG4/human/white.png
+# Material for duckov_crate.mtl
+newmtl Material_duckov_crate.mtl
+Ka 1.0 1.0 1.0
+Kd 1.0 1.0 1.0
+Ks 0.15 0.15 0.15
+Ns 15.0
+map_Kd duckov_crate.png

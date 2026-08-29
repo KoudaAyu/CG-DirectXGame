@@ -91,6 +91,12 @@ void AppParticleManager::Update(float deltaTime, const Vector3& playerPos)
 {
 	if (!enginePM_) return;
 
+	// パーティクル数が上限を超えた場合、古い順に即時回収して処理落ちを完全防止
+	while (particles_.size() > 512)
+	{
+		particles_.pop_front();
+	}
+
 	auto it = particles_.begin();
 	while (it != particles_.end())
 	{
@@ -823,6 +829,241 @@ void AppParticleManager::EmitDeathFlash(std::mt19937& randomEngine, const Vector
 		p.bounceElasticity = 0.0f;
 		p.angularVelocity = 1.2f;
 		particles_.push_back(p);
+	}
+}
+
+void AppParticleManager::EmitEnemyDestroyGPUBurst(std::mt19937& randomEngine, const Vector3& position, const Vector3& hitDirection, uint32_t particleTexIndex, uint32_t flashTexIndex, uint32_t smokeTexIndex)
+{
+	// 1. 巨大スターバースト衝撃閃光
+	EmitDeathFlash(randomEngine, position, 4.8f, { 1.0f, 0.85f, 0.3f, 1.0f }, 0.28f, flashTexIndex);
+
+	// 2. 超高速GPUスパーク火花（全方位＆指向性 80個）
+	std::uniform_real_distribution<float> angleDist(0.0f, 6.2831853f);
+	std::uniform_real_distribution<float> pitchDist(-0.8f, 1.2f);
+	std::uniform_real_distribution<float> speedDist(3.5f, 9.5f);
+	std::uniform_real_distribution<float> scaleDist(0.08f, 0.22f);
+	std::uniform_real_distribution<float> lifeDist(0.5f, 1.4f);
+
+	for (int i = 0; i < 80; ++i)
+	{
+		float a = angleDist(randomEngine);
+		float p = pitchDist(randomEngine);
+		float spd = speedDist(randomEngine);
+
+		Vector3 dir = { std::cos(a) * std::cos(p), std::sin(p), std::sin(a) * std::cos(p) };
+		// 弾丸の直撃方向へバイアスを加算
+		dir.x += hitDirection.x * 0.8f;
+		dir.y += hitDirection.y * 0.8f;
+		dir.z += hitDirection.z * 0.8f;
+
+		Vector3 vel = { dir.x * spd, dir.y * spd + 1.5f, dir.z * spd };
+		Vector4 col = (i % 3 == 0) ? Vector4{ 1.0f, 0.95f, 0.5f, 1.0f } : Vector4{ 1.0f, 0.45f, 0.1f, 1.0f };
+
+		EmitSparkWithVelocity(randomEngine, position, vel, col, scaleDist(randomEngine), lifeDist(randomEngine), particleTexIndex);
+	}
+
+	// 3. 衝撃波ダストスモーク（30個）
+	for (int i = 0; i < 30; ++i)
+	{
+		float a = (static_cast<float>(i) / 30.0f) * 6.2831853f;
+		float s = 1.5f + (static_cast<float>(rand()) / RAND_MAX) * 2.0f;
+		Vector3 sVel = { std::cos(a) * s, 0.3f + (static_cast<float>(rand()) / RAND_MAX) * 0.8f, std::sin(a) * s };
+		Vector4 sCol = { 0.4f, 0.35f, 0.3f, 0.55f };
+		EmitDustWithVelocity(randomEngine, position, 0.9f, sCol, sVel, 0.8f, smokeTexIndex);
+	}
+
+	// 4. アヒル羽毛デブリ飛散（40個）
+	for (int i = 0; i < 40; ++i)
+	{
+		Vector4 featherCol = (i % 2 == 0) ? Vector4{ 1.0f, 0.88f, 0.25f, 1.0f } : Vector4{ 0.95f, 0.2f, 0.1f, 1.0f };
+		EmitFeather(randomEngine, position, featherCol, particleTexIndex);
+	}
+}
+
+void AppParticleManager::EmitTargetDestroyGPUBurst(std::mt19937& randomEngine, const Vector3& position, uint32_t particleTexIndex, uint32_t flashTexIndex, uint32_t smokeTexIndex)
+{
+	// 1. 標的破壊の強烈な閃光
+	EmitDeathFlash(randomEngine, position, 4.2f, { 1.0f, 0.9f, 0.4f, 1.0f }, 0.25f, flashTexIndex);
+
+	// 2. 超高速破砕スパーク・破片（100個）
+	std::uniform_real_distribution<float> angleDist(0.0f, 6.2831853f);
+	std::uniform_real_distribution<float> pitchDist(-0.6f, 1.4f);
+	std::uniform_real_distribution<float> speedDist(4.0f, 11.0f);
+	std::uniform_real_distribution<float> scaleDist(0.06f, 0.20f);
+	std::uniform_real_distribution<float> lifeDist(0.4f, 1.2f);
+
+	for (int i = 0; i < 100; ++i)
+	{
+		float a = angleDist(randomEngine);
+		float p = pitchDist(randomEngine);
+		float spd = speedDist(randomEngine);
+
+		Vector3 dir = { std::cos(a) * std::cos(p), std::sin(p), std::sin(a) * std::cos(p) };
+		Vector3 vel = { dir.x * spd, dir.y * spd + 2.0f, dir.z * spd };
+
+		Vector4 col;
+		if (i % 4 == 0) col = { 1.0f, 0.2f, 0.2f, 1.0f };      // 標的の赤
+		else if (i % 4 == 1) col = { 1.0f, 1.0f, 1.0f, 1.0f }; // 標的の白
+		else col = { 1.0f, 0.7f, 0.15f, 1.0f };                // 破砕スパーク黄金
+
+		EmitSparkWithVelocity(randomEngine, position, vel, col, scaleDist(randomEngine), lifeDist(randomEngine), particleTexIndex);
+	}
+
+	// 3. 破砕ダスト衝撃波リング（35個）
+	for (int i = 0; i < 35; ++i)
+	{
+		float a = (static_cast<float>(i) / 35.0f) * 6.2831853f;
+		float s = 2.0f + (static_cast<float>(rand()) / RAND_MAX) * 2.5f;
+		Vector3 sVel = { std::cos(a) * s, 0.2f + (static_cast<float>(rand()) / RAND_MAX) * 0.6f, std::sin(a) * s };
+		Vector4 sCol = { 0.7f, 0.6f, 0.45f, 0.5f };
+		EmitDustWithVelocity(randomEngine, position, 0.8f, sCol, sVel, 0.7f, smokeTexIndex);
+	}
+}
+
+void AppParticleManager::EmitDodgeRollDust(std::mt19937& randomEngine, const Vector3& position, const Vector3& moveDirection, uint32_t smokeTexIndex)
+{
+	// 回避時に足元から進行方向と逆向きに吹き出す激しい土煙（20個）
+	std::uniform_real_distribution<float> spreadDist(-0.6f, 0.6f);
+	std::uniform_real_distribution<float> speedDist(1.5f, 4.5f);
+	std::uniform_real_distribution<float> scaleDist(0.4f, 0.9f);
+	std::uniform_real_distribution<float> lifeDist(0.4f, 0.8f);
+
+	for (int i = 0; i < 20; ++i)
+	{
+		Vector3 oppDir = { -moveDirection.x + spreadDist(randomEngine), 0.3f + (static_cast<float>(rand()) / RAND_MAX) * 0.5f, -moveDirection.z + spreadDist(randomEngine) };
+		float spd = speedDist(randomEngine);
+		Vector3 vel = { oppDir.x * spd, oppDir.y * spd, oppDir.z * spd };
+		Vector4 col = { 0.65f, 0.60f, 0.52f, 0.55f };
+
+		EmitDustWithVelocity(randomEngine, position + Vector3{ spreadDist(randomEngine) * 0.3f, 0.1f, spreadDist(randomEngine) * 0.3f }, scaleDist(randomEngine), col, vel, lifeDist(randomEngine), smokeTexIndex);
+	}
+}
+
+void AppParticleManager::EmitFootstepDust(std::mt19937& randomEngine, const Vector3& position, uint32_t smokeTexIndex)
+{
+	// よちよち歩き・ダッシュ時の足元土埃（3個）
+	std::uniform_real_distribution<float> spreadDist(-0.25f, 0.25f);
+	for (int i = 0; i < 3; ++i)
+	{
+		Vector3 vel = { spreadDist(randomEngine) * 0.8f, 0.2f + (static_cast<float>(rand()) / RAND_MAX) * 0.4f, spreadDist(randomEngine) * 0.8f };
+		Vector4 col = { 0.6f, 0.55f, 0.48f, 0.4f };
+		EmitDustWithVelocity(randomEngine, position + Vector3{ spreadDist(randomEngine), 0.05f, spreadDist(randomEngine) }, 0.35f, col, vel, 0.4f, smokeTexIndex);
+	}
+}
+
+void AppParticleManager::EmitRicochetSparks(std::mt19937& randomEngine, const Vector3& hitPoint, const Vector3& hitNormal, uint32_t sparkTexIndex, uint32_t smokeTexIndex)
+{
+	// 弾丸着弾時の激しい跳弾火花（35個）＋着弾スモーク（8個）
+	std::uniform_real_distribution<float> spreadDist(-0.8f, 0.8f);
+	std::uniform_real_distribution<float> speedDist(3.0f, 8.5f);
+	std::uniform_real_distribution<float> lifeDist(0.25f, 0.7f);
+
+	for (int i = 0; i < 35; ++i)
+	{
+		Vector3 refl = {
+			hitNormal.x + spreadDist(randomEngine),
+			hitNormal.y + 0.3f + spreadDist(randomEngine) * 0.5f,
+			hitNormal.z + spreadDist(randomEngine)
+		};
+		float spd = speedDist(randomEngine);
+		Vector3 vel = { refl.x * spd, refl.y * spd, refl.z * spd };
+		Vector4 col = (i % 2 == 0) ? Vector4{ 1.0f, 0.85f, 0.3f, 1.0f } : Vector4{ 1.0f, 0.4f, 0.05f, 1.0f };
+
+		EmitSparkWithVelocity(randomEngine, hitPoint, vel, col, 0.08f, lifeDist(randomEngine), sparkTexIndex);
+	}
+
+	for (int i = 0; i < 8; ++i)
+	{
+		Vector3 sVel = { hitNormal.x * 1.5f + spreadDist(randomEngine) * 0.5f, hitNormal.y * 1.5f + 0.3f, hitNormal.z * 1.5f + spreadDist(randomEngine) * 0.5f };
+		Vector4 sCol = { 0.5f, 0.48f, 0.45f, 0.45f };
+		EmitDustWithVelocity(randomEngine, hitPoint, 0.45f, sCol, sVel, 0.5f, smokeTexIndex);
+	}
+}
+
+void AppParticleManager::EmitWaterSplash(std::mt19937& randomEngine, const Vector3& hitPoint, uint32_t waterTexIndex)
+{
+	// 川面着弾時の高圧水飛沫（30個）
+	std::uniform_real_distribution<float> angleDist(0.0f, 6.2831853f);
+	std::uniform_real_distribution<float> speedDist(2.0f, 6.0f);
+
+	for (int i = 0; i < 30; ++i)
+	{
+		float a = angleDist(randomEngine);
+		float spd = speedDist(randomEngine);
+		Vector3 vel = { std::cos(a) * spd, 3.5f + (static_cast<float>(rand()) / RAND_MAX) * 3.5f, std::sin(a) * spd };
+		Vector4 col = { 0.65f, 0.85f, 1.0f, 0.75f };
+
+		EmitDustWithVelocity(randomEngine, hitPoint, 0.3f, col, vel, 0.6f, waterTexIndex);
+	}
+}
+
+void AppParticleManager::EmitHelipadBeaconMotes(std::mt19937& randomEngine, const Vector3& helipadPos, uint32_t particleTexIndex)
+{
+	// 脱出ヘリパッドから天へ舞い上がるエメラルドグリーンの光粒子（毎フレーム数個）
+	std::uniform_real_distribution<float> rDist(0.0f, 2.8f);
+	std::uniform_real_distribution<float> angleDist(0.0f, 6.2831853f);
+
+	for (int i = 0; i < 4; ++i)
+	{
+		float r = rDist(randomEngine);
+		float a = angleDist(randomEngine);
+		Vector3 p = { helipadPos.x + std::cos(a) * r, helipadPos.y + 0.1f, helipadPos.z + std::sin(a) * r };
+		Vector3 vel = { std::cos(a) * 0.2f, 1.5f + (static_cast<float>(rand()) / RAND_MAX) * 2.0f, std::sin(a) * 0.2f };
+		Vector4 col = { 0.2f, 1.0f, 0.6f, 0.8f };
+
+		EmitSparkWithVelocity(randomEngine, p, vel, col, 0.12f, 1.6f, particleTexIndex);
+	}
+}
+
+void AppParticleManager::EmitRiverWaveRipples(std::mt19937& randomEngine, uint32_t waterTexIndex)
+{
+	// 川の上流 (X: +22m) から下流 (X: -22m) へ勢いよく流れる水流リップル＆白泡 (4個)
+	std::uniform_real_distribution<float> zDist(16.6f, 20.9f);
+	std::uniform_real_distribution<float> xDist(-20.0f, 22.0f);
+	std::uniform_real_distribution<float> speedDist(3.2f, 5.5f);
+	std::uniform_real_distribution<float> scaleDist(0.4f, 0.9f);
+	std::uniform_real_distribution<float> lifeDist(1.2f, 2.5f);
+
+	for (int i = 0; i < 4; ++i)
+	{
+		Vector3 spawnPos = { xDist(randomEngine), 0.02f, zDist(randomEngine) };
+		float spd = speedDist(randomEngine);
+		// X軸マイナス方向（左）へ流れる
+		Vector3 vel = { -spd, 0.0f, (static_cast<float>(rand()) / RAND_MAX - 0.5f) * 0.4f };
+
+		// 白波・青白い水流リップル
+		Vector4 col = (i % 2 == 0) ? Vector4{ 0.9f, 0.95f, 1.0f, 0.45f } : Vector4{ 0.4f, 0.75f, 0.95f, 0.35f };
+
+		EmitDustWithVelocity(randomEngine, spawnPos, scaleDist(randomEngine), col, vel, lifeDist(randomEngine), waterTexIndex);
+	}
+
+	// 橋脚 (X: -1.2m, +1.2m) に当たって跳ねる水流ウェーブ (白泡)
+	for (float pillarX : { -1.2f, 1.2f })
+	{
+		if (rand() % 100 < 35)
+		{
+			Vector3 pPos = { pillarX, 0.04f, zDist(randomEngine) };
+			Vector3 pVel = { -2.0f, 0.6f + (static_cast<float>(rand()) / RAND_MAX) * 0.8f, (static_cast<float>(rand()) / RAND_MAX - 0.5f) * 1.2f };
+			Vector4 pCol = { 0.95f, 0.98f, 1.0f, 0.65f };
+			EmitDustWithVelocity(randomEngine, pPos, 0.5f, pCol, pVel, 0.6f, waterTexIndex);
+		}
+	}
+}
+
+void AppParticleManager::EmitRiverSplashDroplet(std::mt19937& randomEngine, const Vector3& position, uint32_t waterTexIndex)
+{
+	// 川面でパシャッと跳ねる水しぶき・微小水滴 (10個)
+	std::uniform_real_distribution<float> angleDist(0.0f, 6.2831853f);
+	std::uniform_real_distribution<float> speedDist(1.0f, 3.2f);
+
+	for (int i = 0; i < 10; ++i)
+	{
+		float a = angleDist(randomEngine);
+		float spd = speedDist(randomEngine);
+		Vector3 vel = { std::cos(a) * spd, 1.5f + (static_cast<float>(rand()) / RAND_MAX) * 2.0f, std::sin(a) * spd };
+		Vector4 col = { 0.8f, 0.92f, 1.0f, 0.7f };
+
+		EmitDustWithVelocity(randomEngine, position + Vector3{ 0.0f, 0.02f, 0.0f }, 0.22f, col, vel, 0.45f, waterTexIndex);
 	}
 }
 

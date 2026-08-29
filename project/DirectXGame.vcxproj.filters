@@ -127,6 +127,12 @@
     <ClCompile Include="Application\Scene\TitleScene\TitleScene.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
+    <ClCompile Include="Application\Scene\ClearScene\ClearScene.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="Application\Scene\GameOverScene\GameOverScene.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
     <ClCompile Include="Baziru3_Engine\Framework\Scene\Factory\SceneRegistration.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
@@ -400,6 +406,7 @@
     <ClInclude Include="Baziru3_Engine\Core\Math\EulerTransform.h" />
     <ClInclude Include="Application\Particle\AppParticleManager.h" />
     <ClInclude Include="Application\Scene\ClearScene\ClearScene.h" />
+    <ClInclude Include="Application\Scene\GameOverScene\GameOverScene.h" />
     <ClInclude Include="Baziru3_Engine\Framework\Particle\ParticleEmitter.h" />
     <ClInclude Include="Baziru3_Engine\Framework\Particle\ParticleManager.h" />
     <ClInclude Include="Baziru3_Engine\Graphics\Light\Light.h" />
