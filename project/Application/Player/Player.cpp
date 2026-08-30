@@ -7,7 +7,7 @@
 
 #include "Bullet.h"
 #include "Matrix4x4.h"
-#include "MouseInput.h"
+#include "Baziru3_Engine/Core/IO/Mouse/MouseInput.h"
 #include "RenderContext.h"
 #include <Windows.h>
 #include <cmath>
