@@ -1,0 +1,118 @@
+#pragma once
+#include <memory>
+#include "Object3d.h"
+#include "Object3dCom.h"
+#include "Camera.h"
+#include "RenderContext.h"
+#include "Baziru3_Engine/Framework/Collision/SphereCollider.h"
+#include "Baziru3_Engine/Framework/Collision/CollisionManager.h"
+
+class Bullet;
+class Sprite;
+class WindowAPI;
+class Obstacle;
+#include "Baziru3_Engine/Framework/AI/BehaviorTree.h"
+
+class MovingEnemy
+{
+public:
+    enum class AIState
+    {
+        Patrol,
+        Investigate,
+        Chase
+    };
+
+public:
+    void Initialize(Object3dCom* object3dCom, Camera* camera);
+    void Update(WindowAPI* windowAPI, const Vector3* targetPosition, const std::vector<std::unique_ptr<Obstacle>>& obstacles, float deltaTime, bool isPlayerInCover = false);
+    void Draw(const RenderContext& ctx);
+    void Finalize();
+    void OnHit(const Vector3& attackerPos);
+
+    std::unique_ptr<Bullet> TryShoot(const Vector3& targetPosition);
+
+    Vector3 GetPosition() const { return object3d_ ? object3d_->GetTranslate() : Vector3{ 0.0f, 0.0f, 0.0f }; }
+    void SetPosition(const Vector3& pos) { if (object3d_) object3d_->SetTranslate(pos); }
+    SphereCollider* GetCollider() const { return collider_.get(); }
+
+    int GetHP() const { return hp_; }
+    int GetMaxHP() const { return maxHp_; }
+    bool IsDead() const { return isDead_; }
+    bool GetJustRespawned() const { return justRespawned_; }
+    void ClearJustRespawned() { justRespawned_ = false; }
+    void SetHPBarSprites(Sprite* bg, Sprite* fg) { hpBarBg_ = bg; hpBarFg_ = fg; }
+    void SetAlertSprites(Sprite* bar, Sprite* dot) { alertBar_ = bar; alertDot_ = dot; }
+
+    // AI索敵ゲッター
+    AIState GetAIState() const { return state_; }
+    float GetDetectionMeter() const { return detectionMeter_; }
+    float GetAlertTimer() const { return alertTimer_; }
+    float GetFieldOfView() const { return fovAngle_; }
+    float GetMaxSightRange() const { return maxSightRange_; }
+
+    // 視覚コーンの向き（回転角）を取得する
+    float GetYaw() const { return object3d_ ? object3d_->GetRotate().y : 0.0f; }
+
+    // 音源検知のトリガー
+    void HearNoise(const Vector3& noisePosition);
+    void AlertEnemy(const Vector3& targetPos);
+
+private:
+    bool FaceTarget(const Vector3& targetPosition, float deltaTime = 0.016f);
+    bool HasLineOfSight(const Vector3& playerPos, const std::vector<std::unique_ptr<Obstacle>>& obstacles);
+
+    std::unique_ptr<Object3d> object3d_;
+    Vector3 position_ = { 0.0f, 0.0f, 0.0f };
+    std::unique_ptr<SphereCollider> collider_;
+    Object3dCom* object3dCom_ = nullptr;
+    Camera* camera_ = nullptr;
+    uint32_t defaultTextureIndex_ = UINT32_MAX;
+    float hitFlashTimer_ = 0.0f;
+    float hitFlashDuration_ = 0.12f;
+
+    int hp_ = 6;
+    int maxHp_ = 6;
+    bool isDead_ = false;
+    bool justRespawned_ = false;
+    float respawnTimer_ = 0.0f;
+    const float respawnDuration_ = 4.0f;
+
+    Sprite* hpBarBg_ = nullptr;
+    Sprite* hpBarFg_ = nullptr;
+    Sprite* alertBar_ = nullptr;
+    Sprite* alertDot_ = nullptr;
+    float alertTimer_ = 0.0f;
+
+    Vector3 bulletSpawnOffset_ = { 0.0f, 0.2f, 0.5f };
+    float bulletSpeed_ = 0.38f; // 少し遅めの弾速
+    float bulletLifeTime_ = 2.0f;
+    float shotCooldown_ = 1.8f; // やや高めの連射
+    float shotCooldownTimer_ = 1.8f;
+
+    // AI Patrol parameters
+    AIState state_ = AIState::Patrol;
+    Vector3 patrolA_ = { -5.0f, 0.0f, 26.0f };
+    Vector3 patrolB_ = { 5.0f, 0.0f, 26.0f };
+    bool movingToB_ = true;
+    float moveSpeed_ = 0.035f; // 歩き速度
+
+    // --- AI索敵追加パラメータ ---
+    float detectionMeter_ = 0.0f; // 0.0f (未感知) 〜 1.0f (発見)
+    float searchTimer_ = 0.0f;    // 捜索中の待機タイマー
+    Vector3 investigateTarget_ = { 0.0f, 0.0f, 0.0f };
+    Vector3 lastSeenPlayerPosition_ = { 0.0f, 0.0f, 0.0f };
+    
+    const float fovAngle_ = 65.0f * (3.14159265f / 180.0f); // 視野角 65度 (ラジアン)
+    const float maxSightRange_ = 12.0f; // 最大視認距離
+
+    std::unique_ptr<BaziruEngine::AI::BehaviorTree> behaviorTree_;
+    bool useBehaviorTree_ = true;
+
+    // --- カバー＆ピーク射撃用追加パラメータ ---
+    bool isPeeking_ = false;
+    float peekTimer_ = 0.0f;
+    Vector3 activePeekPos_ = { 0.0f, 0.0f, 0.0f };
+    Vector3 actualCoverPos_ = { 0.0f, 0.0f, 0.0f };
+    float coverIgnoreTimer_ = 0.0f;
+};

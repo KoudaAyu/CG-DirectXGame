@@ -15,6 +15,8 @@ public:
 	void Update() override;
    void Draw(SceneRenderRequests& renderRequests) override;
 
+	const char* GetSceneType() const { return "TITLE"; }
+
 private:
 	KeyInput* input_ = nullptr;
 };

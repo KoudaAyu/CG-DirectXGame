@@ -18,6 +18,10 @@ mono_crash.*
 
 # Build results
 generated/
+*.lnk
+*.blend1
+scratch_file_list.txt
+submodule_changes.patch
 
 # Visual Studio 2015/2017 cache/options directory
 .vs/
@@ -334,11 +338,6 @@ imgui.ini
 **/DirectXTex/Shaders/Compiled/
 /project/externals/DirectXTex/Bin/
 
-# Assimp precompiled libraries
-!/project/externals/assimp/lib/
-!/project/externals/assimp/lib/Debug/
-!/project/externals/assimp/lib/Debug/assimp-vc143-mtd.lib
-!/project/externals/assimp/lib/Debug/assimp-vc143-mdd.lib
-!/project/externals/assimp/lib/Release/
-!/project/externals/assimp/lib/Release/assimp-vc143-mt.lib
-!/project/externals/assimp/lib/Release/assimp-vc143-md.lib
+# D3D12 PSO Cache (Driver/hardware-specific)
+**/PsoCache.bin
+

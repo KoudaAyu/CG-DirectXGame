@@ -1,88 +1,31 @@
 #pragma once
 
 #include "BaseScene.h"
-#include"Baziru3_Engine\Effect\HitEffect.h"
-#include"DirectXCom.h"
-#include"ParticleEmitter.h"
+#include "Camera.h"
+#include "KeyInput.h"
+#include "Baziru3_Engine/Graphics/Graphics/SceneRenderRequests.h"
 
-#include <vector>
+#include <memory>
 
-#include "Object3dCom.h"
-#include "Object3d.h"
-#include "Light.h"
-#include "MaterialManager.h"
-#include "ParticleManager.h"
-#include "Animation.h"
-#include "Animator.h"
-#include "Skeleton.h"
-#include "SkeletonDebug.h"
-#include "Sphere.h"
-#include "Sprite.h"
-#include "SpriteManager.h" 
-#include "DebugCamera.h"
-#include "Baziru3_Engine/Collision/MeshCollider.h"
-
-class Camera;
-class SpriteCom;
-class SkinningObject3dCom;
-struct SceneRenderRequests;
-
+/**
+ * @brief ゲーム開発スターターシーン (GamePlayScene)
+ * @details このシーンをベースに、プレイヤー、敵、ステージ、ゲームルールを実装します。
+ *          スペースキーでシーン遷移の確認が可能です。
+ */
 class GamePlayScene : public BaseScene
 {
 public:
-    
+    GamePlayScene() = default;
+    ~GamePlayScene() override = default;
+
     void InitializeScene() override;
-
     void Finalize() override;
-
     void Update() override;
+    void Draw(SceneRenderRequests& renderRequests) override;
 
-   void Draw(SceneRenderRequests& renderRequests) override;
-
-    void SetSpriteCom(SpriteCom* spriteCom) { this->spriteCom = spriteCom; }
-    Emitter& GetEmitter() { return emitter; }
+    const char* GetSceneType() const { return "GAMEPLAY"; }
 
 private:
-
-    Camera* camera_ = nullptr;
-    DirectXCom* directXCom = nullptr;
-    Emitter emitter;
-    SpriteCom* spriteCom = nullptr;
-    ParticleEmitter particleEmitter;
-    Light* light = nullptr;
-    MaterialManager* materialManager = nullptr;
-    Object3dCom* object3dCom = nullptr;
-    SkinningObject3dCom* skinningObject3dCom = nullptr;
-    ParticleManager* particleManager = nullptr;
-    std::unique_ptr<HitEffect> hitEffect_;
-    std::unique_ptr<Object3d> animatedCube_;
-    std::unique_ptr<MeshCollider> animatedCubeCollider_;
-    std::vector<std::unique_ptr<Object3d>> crowd_;
-    std::vector<std::unique_ptr<MeshCollider>> crowdColliders_;
-    std::unique_ptr<Sphere> sphere_;
-    Skeleton skeleton_{};
-    Animation animation_{};
-    Animator animator_{};
-    SkeletonDebug skeletonDebug_{};
-    DebugCamera debugCamera_;
-    std::vector<std::unique_ptr<Sprite>> sprites;
-    std::unique_ptr<SpriteManager> spriteManager_;
-    std::list<ParticleManager::Particle> particles;
-    std::list<ParticleManager::Particle> hitEffectParticles;
-
-    bool sphereInitialized = false;
-    bool hitEffectInitialized = false;
-    bool animatedCubeInitialized_ = false;
-    bool showSkeletonDebug_ = true;
-
-	// テクスチャインデックスは TextureManager で管理されるため、ここではインデックスを保持するだけにする
-    uint32_t cylinderTextureIndex_ = TextureManager::kInvalidTextureIndex;
-    uint32_t particleTextureA = TextureManager::kInvalidTextureIndex;
-    uint32_t particleTextureB = TextureManager::kInvalidTextureIndex;
-
-private:
-    Sprite::Transform uvTransformSprite;
-    Vector2 uiSpritePosition = { 100.0f, 100.0f };
-private:
-    const float kDeltaTime = 1.0f / 60.0f;
+    std::unique_ptr<KeyInput> keyInput_;
+    std::unique_ptr<Camera> camera_;
 };
