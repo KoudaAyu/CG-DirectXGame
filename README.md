@@ -244,6 +244,63 @@ CollisionManager::GetInstance()->RegisterCollider(collider.get());
 
 ---
 
+## 🧰 自作開発支援ツール & パイプライン (In-Engine & External Tools)
+
+Baziru3 Engine では、ゲーム開発ベロシティの最大化と直感的なコンテンツ制作を実現するため、エンジン内部および外部ツール連携による**自作開発支援ツール群を完備**しています。
+
+### 1. ノードベース AI ビヘイビアツリーエディタ (`BehaviorTreeEditor`)
+* **実装モジュール**: [`project/Baziru3_Engine/Framework/AI/BehaviorTreeEditor.h`](project/Baziru3_Engine/Framework/AI/BehaviorTreeEditor.h), [`BehaviorTreeEditor.cpp`](project/Baziru3_Engine/Framework/AI/BehaviorTreeEditor.cpp)
+* **概要**: `imgui-node-editor` をベースに独自拡張した、敵AIの思考ロジックを直感的なグラフUIで構築・編集できるノードエディタです。
+* **主要機能**:
+  * **制御ノード & アクションノードの視覚的配線**: `Selector` (優先度選択), `Sequence` (順次実行), `Parallel` (並行実行) などのコンポジットノードと、`Patrol` (巡回), `Investigate` (音源捜索), `Chase` (追従), `Cover` (遮蔽退避), `Shoot` (射撃) ノードをGUI上でドラッグ＆ドロップ接続。
+  * **実行中ノードのリアルタイム・アクティブハイライト**: AIが現在どのノードを評価・実行しているかを色別でリアルタイム表示し、AIのデバッグを劇的に容易化。
+  * **JSON シリアライズ & 動的ホットリロード**: エディタ上で設計したツリー構造を JSON 形式で保存し、ゲーム実行中に即座に再読み込み可能。
+
+```mermaid
+graph TD
+    Root["Root Node"] --> Sel["Selector (優先度分岐)"]
+    Sel --> ChaseSeq["Sequence (交戦・追従)"]
+    Sel --> CoverSeq["Sequence (遮蔽・回復)"]
+    Sel --> PatrolAct["Action: Patrol (巡回)"]
+    ChaseSeq --> InSightCond["Condition: 視界内?"]
+    ChaseSeq --> ShootAct["Action: Shoot (射撃)"]
+    CoverSeq --> LowHPCond["Condition: HP低下?"]
+    CoverSeq --> FindCoverAct["Action: FindCover (遮蔽探索)"]
+    CoverSeq --> MoveToCoverAct["Action: MoveToCover (退避)"]
+    style Root fill:#d69e2e,stroke:#b7791f,stroke-width:2px,color:#fff
+    style Sel fill:#3182ce,stroke:#2b6cb0,stroke-width:2px,color:#fff
+    style ChaseSeq fill:#805ad5,stroke:#6b46c1,stroke-width:2px,color:#fff
+    style CoverSeq fill:#805ad5,stroke:#6b46c1,stroke-width:2px,color:#fff
+    style PatrolAct fill:#38a169,stroke:#2f855a,stroke-width:2px,color:#fff
+    style ShootAct fill:#e53e3e,stroke:#c53030,stroke-width:2px,color:#fff
+    style MoveToCoverAct fill:#38a169,stroke:#2f855a,stroke-width:2px,color:#fff
+```
+
+### 2. Blender レベルデザイン同期パイプライン (`export_blender_layout.py` & `LevelEditor`)
+* **実装モジュール**: [`docs/tools/export_blender_layout.py`](docs/tools/export_blender_layout.py), [`project/Application/LevelEditor.h`](project/Application/LevelEditor.h), [`LevelEditor.cpp`](project/Application/LevelEditor.cpp)
+* **概要**: DCCツール「Blender」をそのまま3Dレベルエディタとして活用し、配置したオブジェクトやギミック情報を自作エンジンへ一括インポートするパイプラインです。
+* **主要機能**:
+  * **座標系の自動変換**: Blender（右手系・Z-Up）から DirectX 12（左手系・Y-Up）への座標・回転変換を自動適用。
+  * **多種多様なエンティティの動的パース**: 障害物（`container.obj`, `fence.obj` 等）、アイテムボックス（`LootBox`）、プレイヤー／敵スポーン位置（`PlayerSpawn`, `EnemySpawn`）、バイオームゾーン（`Forest`, `Desert`, `River`）を一括JSONロード。
+  * **非均等スケール & コライダー自動フィッティング**: 配置された各オブジェクトのスケールに応じて、`BoxCollider` / `CapsuleCollider` を自動生成して `CollisionManager` に即座に登録。
+
+### 3. プロシージャル自然物生成システム (`BioProceduralGenerator`)
+* **実装モジュール**: [`project/Baziru3_Engine/3D/Procedural/BioProceduralGenerator.h`](project/Baziru3_Engine/3D/Procedural/BioProceduralGenerator.h), [`BioProceduralGenerator.cpp`](project/Baziru3_Engine/3D/Procedural/BioProceduralGenerator.cpp)
+* **概要**: L-System（リンデンマイヤーシステム）とフラクタル再帰アルゴリズムを用いて、樹木（Tree）や岩石（Rock）の3Dメッシュをプロシージャル（動的幾何計算）に自動生成するシステムです。
+* **主要機能**:
+  * **フラクタル樹木生成**: シード値、分岐深度（`iterations`）、枝の長さ・半径・テーパー率・分岐角度からリアルな自然樹木メッシュを即座に構築。
+  * **ボロノイノイズ岩石生成**: 球体メッシュに対し、フラクタルノイズ・ボロノイセル・クラック変形を適用し、ゴツゴツとした自然な岩石ジオメトリを生成。
+  * **LOD（Level of Detail）対応 & キャッシュ管理**: 頂点計算結果をメモリ内にキャッシュし、実行時の同一シード再計算をスキップ。
+
+### 4. GPUプロファイラ & リアルタイムエンジンモニター (`GpuProfiler` / `Duckov Profiler`)
+* **実装モジュール**: [`project/Baziru3_Engine/Graphics/Graphics/GpuProfiler.h`](project/Baziru3_Engine/Graphics/Graphics/GpuProfiler.h), [`project/Application/Scene/GameScene/GamePlayHUD.cpp`](project/Application/Scene/GameScene/GamePlayHUD.cpp)
+* **概要**: DirectX 12 のタイムスタンプクエリ（Timestamp Query）を用いて、GPU描画パスごとのマイクロ秒単位処理時間とCPUフレームタイムをリアルタイム計測・可視化するツールです。
+* **主要機能**:
+  * **描画パス別GPUタイム計測**: 3D不透明パス、シャドウマップパス、パーティクル描画パス、ポストプロセスパスそれぞれのGPU負荷をリアルタイムにグラフ描画。
+  * **フレームレート & メモリ監視**: 60.0 FPS（16.6ms）の安定度、`ConstantBufferRingAllocator` のメモリ消費量、アクティブなパーティクル数・コライダー数を常時HUD表示。
+
+---
+
 ## 📁 ディレクトリ構成
 
 ```
