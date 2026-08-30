@@ -350,6 +350,9 @@
     <ProjectReference Include="externals\DirectXTex\DirectXTex_Desktop_2022_Win10.vcxproj">
       <Project>{371b9fa9-4c90-4ac6-a123-aced756d6c77}</Project>
     </ProjectReference>
+    <ProjectReference Include="externals\imgui\imgui.vcxproj">
+      <Project>{24c0d8c4-f20f-401f-9504-cfac18c13858}</Project>
+    </ProjectReference>
   </ItemGroup>
   <ItemGroup>
     <None Include="Resources\shaders\CopyImage.hlsli" />
