@@ -17,13 +17,13 @@ C++ および DirectX 12 を用いてスクラッチから構築した、**低�
 
 ### 1. エンジン最適化スライド（動的物理とメモリ最適化）
 > **【要約】自作エンジン「Baziru3 Engine」の低レイヤにおけるメモリ・衝突判定の最適化（定数バッファ用リングバッファアロケータ、短寿命用スタックアロケータ、空間ハッシュによる衝突判定高速化、データ指向設計）の設計と数学的解説資料です。**
-* **📄 [技術発表スライド資料 (PDF)](sega_portfolio_slides.pdf)**
-  * スライドのMarkdownソース：[sega_portfolio_slides.md](sega_portfolio_slides.md)
+* **📄 [技術発表スライド資料 (PDF)](docs/slides/sega_portfolio_slides.pdf)**
+  * スライドのMarkdownソース：[docs/slides/sega_portfolio_slides.md](docs/slides/sega_portfolio_slides.md)
 
 ### 2. ゲーム・AIシステムスライド（月間進捗報告 / 技術研究発表資料）
 > **【要約】3Dアクションシューティングゲームにおける、ゲームプレイとAIシステム（対角OBBマルチコライダー、トンネル現象を防ぐ連続線分CCD判定、レーザー照準同期、敵AIのカバー・捜索・巡回行動、およびAABBツリー階層構造による計算最適化）の実証資料です。**
-* **📄 [ゲーム・AI技術スライド資料 (PDF)](sega_gameplay_interaction_slides.pdf)**
-  * スライドのMarkdownソース：[sega_gameplay_interaction_slides.md](sega_gameplay_interaction_slides.md)
+* **📄 [ゲーム・AI技術スライド資料 (PDF)](docs/slides/sega_gameplay_interaction_slides.pdf)**
+  * スライドのMarkdownソース：[docs/slides/sega_gameplay_interaction_slides.md](docs/slides/sega_gameplay_interaction_slides.md)
 
 ### 3. アジャイル開発スプリント評価・進捗報告
 > **【要約】4回以上にわたるスプリント開発（敵AI基本機能、MeshCollider & NavMesh/A*経路探索、CSベースGPUパーティクル & FreeListメモリ最適化、およびゲームループ接続）における、アジャイル開発メンターからの評価・スコア推移と技術的成果の記録です。**
