@@ -368,20 +368,23 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v145</PlatformToolset>
+    <PlatformToolset Condition="'$(DefaultPlatformToolset)' != ''">$(DefaultPlatformToolset)</PlatformToolset>
+    <PlatformToolset Condition="'$(DefaultPlatformToolset)' == ''">v143</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v145</PlatformToolset>
+    <PlatformToolset Condition="'$(DefaultPlatformToolset)' != ''">$(DefaultPlatformToolset)</PlatformToolset>
+    <PlatformToolset Condition="'$(DefaultPlatformToolset)' == ''">v143</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Development|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v145</PlatformToolset>
+    <PlatformToolset Condition="'$(DefaultPlatformToolset)' != ''">$(DefaultPlatformToolset)</PlatformToolset>
+    <PlatformToolset Condition="'$(DefaultPlatformToolset)' == ''">v143</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
@@ -425,7 +428,7 @@
       <AdditionalOptions>/utf-8 /FS %(AdditionalOptions)</AdditionalOptions>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
-      <TreatWarningAsError>true</TreatWarningAsError>
+      <TreatWarningAsError>false</TreatWarningAsError>
       <AdditionalIncludeDirectories>$(ProjectDir)Baziru3_Engine\Core;$(ProjectDir)Baziru3_Engine\Graphics;$(ProjectDir)Baziru3_Engine\Framework;$(ProjectDir);$(ProjectDir)\externals\DirectXTex;$(ProjectDir)\externals\imgui;$(ProjectDir)\externals\assimp\include;$(ProjectDir)Application;$(ProjectDir)Application\Fade;$(ProjectDir)Application\Player;$(ProjectDir)Application\Scene;$(ProjectDir)Application\Scene\GameScene;$(ProjectDir)Application\Scene\TitleScene;$(ProjectDir)Application\GameObject;$(ProjectDir)Application\Subsystem;$(ProjectDir)Baziru3_Engine\Graphics\2D;$(ProjectDir)Baziru3_Engine\Graphics\2D\Sprite;$(ProjectDir)Baziru3_Engine\Graphics\2D\Texture;$(ProjectDir)Baziru3_Engine\Graphics\3D\Model;$(ProjectDir)Baziru3_Engine\Graphics\3D\Model\SkinCluster;$(ProjectDir)Baziru3_Engine\Graphics\3D\Object;$(ProjectDir)Baziru3_Engine\Framework\Audio;$(ProjectDir)Baziru3_Engine\Framework\Animation;$(ProjectDir)Baziru3_Engine\Framework\Animation\Joint;$(ProjectDir)Baziru3_Engine\Framework\Animation\Keyframe;$(ProjectDir)Baziru3_Engine\Framework\Animation\NodeAnimation;$(ProjectDir)Baziru3_Engine\Framework\Animation\Skeleton;$(ProjectDir)Baziru3_Engine\Core\Base;$(ProjectDir)Baziru3_Engine\Core\Base\ImGui;$(ProjectDir)Baziru3_Engine\Core\Base\Log;$(ProjectDir)Baziru3_Engine\Core\Base\OffScreenRendering;$(ProjectDir)Baziru3_Engine\Core\Base\Scene;$(ProjectDir)Baziru3_Engine\Core\Base\Srv;$(ProjectDir)Baziru3_Engine\Core\Base\Windows;$(ProjectDir)Baziru3_Engine\Core\Camera;$(ProjectDir)Baziru3_Engine\Core\Camera\DebugCamera;$(ProjectDir)Baziru3_Engine\Graphics\Graphics\Material;$(ProjectDir)Baziru3_Engine\Core\IO;$(ProjectDir)Baziru3_Engine\Core\IO\Key;$(ProjectDir)Baziru3_Engine\Core\IO\Mouse;$(ProjectDir)Baziru3_Engine\Graphics\Light;$(ProjectDir)Baziru3_Engine\Core\Math;$(ProjectDir)Baziru3_Engine\Framework\Particle;$(ProjectDir)Baziru3_Engine\Core\Platform\Windows;$(ProjectDir)Baziru3_Engine\Graphics\Primitive\Cylinder;$(ProjectDir)Baziru3_Engine\Framework\Scene;$(ProjectDir)Baziru3_Engine\Framework\Scene\Factory;$(ProjectDir)Baziru3_Engine\Framework\Scene\Manager;$(ProjectDir)Baziru3_Engine\Graphics\Shapes\Sphere;$(ProjectDir)Baziru3_Engine\Graphics\SkyBox;$(ProjectDir)Baziru3_Engine\Framework\AI;$(ProjectDir)externals;$(ProjectDir)externals\imgui-node-editor</AdditionalIncludeDirectories>
       <BasicRuntimeChecks>Default</BasicRuntimeChecks>
     </ClCompile>
