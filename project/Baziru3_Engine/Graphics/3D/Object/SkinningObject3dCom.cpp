@@ -126,9 +126,15 @@ void SkinningObject3dCom::Draw(Object3d* object, const ::RenderContext& ctx, con
     ctx.commandList->SetGraphicsRootConstantBufferView(1, object->GetTransformationMatrixGPUAddress());
 
     // Texture Descriptor Table (t3, Pixel Shader) -> Index 2
-    if (ctx.textureHandle.ptr != 0)
+    D3D12_GPU_DESCRIPTOR_HANDLE mainTextureHandle = ctx.textureHandle;
+    if (mainTextureHandle.ptr == 0)
     {
-        ctx.commandList->SetGraphicsRootDescriptorTable(2, ctx.textureHandle);
+        mainTextureHandle = TextureManager::GetInstance()->GetSrvHandleGPU(
+            TextureManager::GetInstance()->GetTextureIndexByFilePath("Resources/CG4/human/white.png"));
+    }
+    if (mainTextureHandle.ptr != 0)
+    {
+        ctx.commandList->SetGraphicsRootDescriptorTable(2, mainTextureHandle);
     }
 
     // Directional Light (CBV at b1, Pixel Shader) -> Index 3
@@ -161,7 +167,7 @@ void SkinningObject3dCom::Draw(Object3d* object, const ::RenderContext& ctx, con
     }
     else
     {
-        skyboxHandle = ctx.textureHandle;
+        skyboxHandle = mainTextureHandle;
     }
     if (skyboxHandle.ptr != 0)
     {

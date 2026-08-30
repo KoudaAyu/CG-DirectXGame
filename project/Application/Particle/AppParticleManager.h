@@ -49,9 +49,13 @@ public:
 	void EmitMuzzleFlare(std::mt19937& randomEngine, const Vector3& position, float scale, const Vector4& color, float lifeTime, uint32_t textureIndex);
 	void EmitDeathFlash(std::mt19937& randomEngine, const Vector3& position, float scale, const Vector4& color, float lifeTime, uint32_t textureIndex);
 
-
-
-private:
+	void EmitDodgeRollDust(std::mt19937& randomEngine, const Vector3& position, const Vector3& direction, uint32_t textureIndex);
+	void EmitFootstepDust(std::mt19937& randomEngine, const Vector3& position, uint32_t textureIndex);
+	void EmitHelipadBeaconMotes(std::mt19937& randomEngine, const Vector3& position, uint32_t textureIndex);
+	void EmitRiverWaveRipples(std::mt19937& randomEngine, const Vector3& position, uint32_t textureIndex);
+	void EmitRiverWaveRipples(std::mt19937& randomEngine, uint32_t textureIndex);
+	void EmitRiverSplashDroplet(std::mt19937& randomEngine, const Vector3& position, uint32_t textureIndex);
+	void Draw(const RenderContext& ctx) { Draw(); }
 	ParticleManager* enginePM_ = nullptr;
 	std::list<AppParticle> particles_;
 

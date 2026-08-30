@@ -456,6 +456,124 @@ void AppParticleManager::EmitDeathFlash(std::mt19937& randomEngine, const Vector
 	}
 }
 
+void AppParticleManager::EmitDodgeRollDust(std::mt19937& randomEngine, const Vector3& position, const Vector3& direction, uint32_t textureIndex)
+{
+	std::uniform_real_distribution<float> speedDist(1.0f, 3.0f);
+	std::uniform_real_distribution<float> spreadDist(-0.5f, 0.5f);
+	std::uniform_real_distribution<float> scaleDist(0.4f, 0.8f);
+
+	for (int i = 0; i < 4; ++i)
+	{
+		AppParticle p;
+		p.transform.Initialize();
+		p.transform.SetTranslate({ position.x + spreadDist(randomEngine), 0.1f, position.z + spreadDist(randomEngine) });
+		float sc = scaleDist(randomEngine);
+		p.transform.SetScale({ sc, sc, 1.0f });
+		p.velocity = { -direction.x * speedDist(randomEngine) + spreadDist(randomEngine), 0.8f, -direction.z * speedDist(randomEngine) + spreadDist(randomEngine) };
+		p.color = { 0.8f, 0.75f, 0.7f, 0.6f };
+		p.lifeTime = 0.45f;
+		p.currentTime = 0.0f;
+		p.textureIndex = textureIndex;
+		p.gravity = 0.5f;
+		particles_.push_back(p);
+	}
+}
+
+void AppParticleManager::EmitFootstepDust(std::mt19937& randomEngine, const Vector3& position, uint32_t textureIndex)
+{
+	std::uniform_real_distribution<float> spreadDist(-0.2f, 0.2f);
+	std::uniform_real_distribution<float> scaleDist(0.2f, 0.4f);
+
+	AppParticle p;
+	p.transform.Initialize();
+	p.transform.SetTranslate({ position.x + spreadDist(randomEngine), 0.05f, position.z + spreadDist(randomEngine) });
+	float sc = scaleDist(randomEngine);
+	p.transform.SetScale({ sc, sc, 1.0f });
+	p.velocity = { spreadDist(randomEngine) * 0.5f, 0.3f, spreadDist(randomEngine) * 0.5f };
+	p.color = { 0.85f, 0.8f, 0.75f, 0.4f };
+	p.lifeTime = 0.3f;
+	p.currentTime = 0.0f;
+	p.textureIndex = textureIndex;
+	p.gravity = 0.2f;
+	particles_.push_back(p);
+}
+
+void AppParticleManager::EmitHelipadBeaconMotes(std::mt19937& randomEngine, const Vector3& position, uint32_t textureIndex)
+{
+	std::uniform_real_distribution<float> radDist(0.0f, 2.0f);
+	std::uniform_real_distribution<float> angDist(0.0f, 6.2831853f);
+	std::uniform_real_distribution<float> speedDist(1.5f, 3.5f);
+
+	for (int i = 0; i < 2; ++i)
+	{
+		float r = radDist(randomEngine);
+		float a = angDist(randomEngine);
+		AppParticle p;
+		p.transform.Initialize();
+		p.transform.SetTranslate({ position.x + r * std::cos(a), 0.1f, position.z + r * std::sin(a) });
+		p.transform.SetScale({ 0.15f, 0.15f, 1.0f });
+		p.velocity = { 0.0f, speedDist(randomEngine), 0.0f };
+		p.color = { 0.2f, 1.0f, 0.6f, 0.8f };
+		p.lifeTime = 1.0f;
+		p.currentTime = 0.0f;
+		p.textureIndex = textureIndex;
+		p.gravity = -0.5f; // 上昇
+		particles_.push_back(p);
+	}
+}
+
+void AppParticleManager::EmitRiverWaveRipples(std::mt19937& randomEngine, const Vector3& position, uint32_t textureIndex)
+{
+	std::uniform_real_distribution<float> spreadX(-10.0f, 10.0f);
+	std::uniform_real_distribution<float> spreadZ(-2.0f, 2.0f);
+
+	AppParticle p;
+	p.transform.Initialize();
+	p.transform.SetTranslate({ position.x + spreadX(randomEngine), 0.02f, position.z + spreadZ(randomEngine) });
+	p.transform.SetScale({ 0.8f, 0.8f, 1.0f });
+	p.velocity = { 0.4f, 0.0f, 0.0f }; // 川の流れ
+	p.color = { 0.6f, 0.85f, 1.0f, 0.35f };
+	p.lifeTime = 1.5f;
+	p.currentTime = 0.0f;
+	p.textureIndex = textureIndex;
+	particles_.push_back(p);
+}
+
+void AppParticleManager::EmitRiverWaveRipples(std::mt19937& randomEngine, uint32_t textureIndex)
+{
+	std::uniform_real_distribution<float> spreadX(-16.0f, 16.0f);
+	std::uniform_real_distribution<float> spreadZ(17.0f, 20.5f);
+
+	AppParticle p;
+	p.transform.Initialize();
+	p.transform.SetTranslate({ spreadX(randomEngine), 0.02f, spreadZ(randomEngine) });
+	p.transform.SetScale({ 0.8f, 0.8f, 1.0f });
+	p.velocity = { 0.4f, 0.0f, 0.0f };
+	p.color = { 0.6f, 0.85f, 1.0f, 0.35f };
+	p.lifeTime = 1.5f;
+	p.currentTime = 0.0f;
+	p.textureIndex = textureIndex;
+	particles_.push_back(p);
+}
+
+void AppParticleManager::EmitRiverSplashDroplet(std::mt19937& randomEngine, const Vector3& position, uint32_t textureIndex)
+{
+	std::uniform_real_distribution<float> speedDist(1.0f, 2.5f);
+	std::uniform_real_distribution<float> spreadDist(-0.5f, 0.5f);
+
+	AppParticle p;
+	p.transform.Initialize();
+	p.transform.SetTranslate({ position.x + spreadDist(randomEngine), 0.05f, position.z + spreadDist(randomEngine) });
+	p.transform.SetScale({ 0.15f, 0.15f, 1.0f });
+	p.velocity = { spreadDist(randomEngine), speedDist(randomEngine), spreadDist(randomEngine) };
+	p.color = { 0.8f, 0.95f, 1.0f, 0.7f };
+	p.lifeTime = 0.4f;
+	p.currentTime = 0.0f;
+	p.textureIndex = textureIndex;
+	p.gravity = 9.8f;
+	particles_.push_back(p);
+}
+
 void AppParticleManager::Draw()
 {
 	if (!enginePM_) return;

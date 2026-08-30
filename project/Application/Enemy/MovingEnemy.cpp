@@ -157,7 +157,7 @@ bool MovingEnemy::FaceTarget(const Vector3& targetPosition, float deltaTime)
     return true;
 }
 
-void MovingEnemy::Update(WindowAPI* windowAPI, const Vector3* targetPosition, const std::vector<std::unique_ptr<Obstacle>>& obstacles, float deltaTime)
+void MovingEnemy::Update(WindowAPI* windowAPI, const Vector3* targetPosition, const std::vector<std::unique_ptr<Obstacle>>& obstacles, float deltaTime, bool isPlayerInCover)
 {
     if (isDead_)
     {

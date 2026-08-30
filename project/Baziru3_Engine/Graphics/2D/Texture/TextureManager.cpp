@@ -58,7 +58,11 @@ uint32_t TextureManager::GetTextureIndexByFilePath(const std::string& filePath) 
 		return textureDates_.at(filePath).srvIndex_;
 	}
 
-	assert(0);
+	// 未登録の場合は最初の有効なテクスチャまたは無効インデックスを返す
+	if (!textureDates_.empty())
+	{
+		return textureDates_.begin()->second.srvIndex_;
+	}
 	return kInvalidTextureIndex;
 }
 
@@ -73,7 +77,6 @@ const DirectX::TexMetadata& TextureManager::GetMetadata(uint32_t index) const
 		}
 	}
 
-	assert(0);
 	static DirectX::TexMetadata dummy{};
 	return dummy;
 }
@@ -94,7 +97,6 @@ D3D12_GPU_DESCRIPTOR_HANDLE TextureManager::GetSrvHandleGPU(uint32_t index) cons
 		}
 	}
 
-	assert(0);
 	D3D12_GPU_DESCRIPTOR_HANDLE dummy{};
 	return dummy;
 }

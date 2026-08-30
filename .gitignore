@@ -18,6 +18,10 @@ mono_crash.*
 
 # Build results
 generated/
+*.lnk
+*.blend1
+scratch_file_list.txt
+submodule_changes.patch
 
 # Visual Studio 2015/2017 cache/options directory
 .vs/

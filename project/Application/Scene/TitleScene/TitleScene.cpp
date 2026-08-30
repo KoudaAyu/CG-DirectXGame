@@ -27,28 +27,35 @@ void TitleScene::Update()
 {
     if (input_) input_->Update();
 
-    // Space キーでもデモシーンへ遷移（キーボード派向け）
+    // Space キーでプレイシーンへ遷移
     if (input_ && input_->TriggerKey(DIK_SPACE))
     {
         SceneManager::GetInstance()->ChangeScene("GAMEPLAY");
     }
 
 #ifdef USE_IMGUI
-    ImGui::SetNextWindowPos(ImVec2(320, 240), ImGuiCond_Once);
-    ImGui::SetNextWindowSize(ImVec2(360, 160), ImGuiCond_Once);
-    ImGui::Begin("GE3_Game - Engine Base", nullptr,
-        ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize);
+    // 画面中央に大きく目立つタイトルHUDを表示
+    ImGui::SetNextWindowPos(ImVec2(360, 230), ImGuiCond_Always);
+    ImGui::SetNextWindowSize(ImVec2(560, 240), ImGuiCond_Always);
+    ImGui::Begin("TITLE_HUD", nullptr,
+        ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoTitleBar);
 
-    ImGui::TextColored(ImVec4(0.4f, 1.0f, 0.4f, 1.0f), "Engine Feature Demo");
     ImGui::Spacing();
-    ImGui::Text("This branch is for engine foundation development.");
-    ImGui::Text("Press SPACE or click below to open the demo scene.");
+    ImGui::SetWindowFontScale(1.6f);
+    ImGui::TextColored(ImVec4(0.2f, 0.8f, 1.0f, 1.0f), "=== [ TITLE SCENE ] ===");
+    ImGui::SetWindowFontScale(1.0f);
+
     ImGui::Spacing();
+    ImGui::TextColored(ImVec4(0.9f, 0.9f, 0.9f, 1.0f), "Baziru3 Game Engine - Master Template");
     ImGui::Separator();
     ImGui::Spacing();
 
-    ImGui::SetCursorPosX((ImGui::GetContentRegionAvail().x - 160.0f) * 0.5f + ImGui::GetCursorPosX());
-    if (ImGui::Button("Open Demo Scene", ImVec2(160.0f, 40.0f)))
+    ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.4f, 1.0f), ">> Press SPACE key to START GAMEPLAY <<");
+    ImGui::Spacing();
+    ImGui::Spacing();
+
+    ImGui::SetCursorPosX((ImGui::GetContentRegionAvail().x - 200.0f) * 0.5f + ImGui::GetCursorPosX());
+    if (ImGui::Button("START GAMEPLAY", ImVec2(200.0f, 42.0f)))
     {
         SceneManager::GetInstance()->ChangeScene("GAMEPLAY");
     }
@@ -59,5 +66,9 @@ void TitleScene::Update()
 
 void TitleScene::Draw(SceneRenderRequests& /*renderRequests*/)
 {
-    // タイトルシーンは ImGui のみ描画（3D/スプライトなし）
+    // 背景スカイボックスの描画
+    if (dxCommon_ && dxCommon_->GetCommandList())
+    {
+        SceneManager::GetInstance()->DrawSkybox(dxCommon_->GetCommandList().Get());
+    }
 }

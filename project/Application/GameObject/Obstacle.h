@@ -11,6 +11,7 @@ class Obstacle
 {
 public:
     void Initialize(Object3dCom* object3dCom, Camera* camera, const Vector3& position, float radius);
+    void Initialize(Object3dCom* object3dCom, Camera* camera, const Vector3& position, float radius, const std::string& modelFile, const Vector3& scale, const Vector3& rotate);
     void Update();
     void Draw(const RenderContext& ctx);
     void Finalize();

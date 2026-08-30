@@ -84,6 +84,9 @@ public:
     void SetIsEnabled(bool isEnabled) { isEnabled_ = isEnabled; }
     bool IsEnabled() const { return isEnabled_; }
 
+    void SetLaserPassable(bool passable) { isLaserPassable_ = passable; }
+    bool IsLaserPassable() const { return isLaserPassable_; }
+
     // --- 衝突イベントコールバック ---
     
 	/**
@@ -133,4 +136,5 @@ private:
     std::function<void(Collider* other)> onTriggerEnter_;
     std::function<void(Collider* other)> onTriggerStay_;
     std::function<void(Collider* other)> onTriggerExit_;
+    bool isLaserPassable_ = false;
 };

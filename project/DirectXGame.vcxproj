@@ -15,8 +15,6 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Application\Enemy\Enemy.cpp" />
-    <ClCompile Include="Application\Enemy\MovingEnemy.cpp" />
     <ClCompile Include="Baziru3_Engine\Graphics\3D\Model\SkinCluster\SkinCluster.cpp" />
     <ClCompile Include="Baziru3_Engine\Framework\Animation\Joint\Joint.cpp" />
     <ClCompile Include="Baziru3_Engine\Framework\Animation\NodeAnimation\Node.cpp" />
@@ -63,8 +61,6 @@
     <ClCompile Include="Baziru3_Engine\Graphics\SkyBox\SkyboxCom.cpp" />
     <ClCompile Include="Baziru3_Engine\Core\Platform\Windows\CrashDump.cpp" />
     <ClCompile Include="Baziru3_Engine\Core\Base\DebugUI.cpp" />
-    <ClCompile Include="Application\Framework.cpp" />
-    <ClCompile Include="Application\GameObject\Bullet.cpp" />
 
     <ClCompile Include="Baziru3_Engine\Core\Base\EngineAssert.cpp" />
     <ClCompile Include="Baziru3_Engine\Core\Base\EngineContext.cpp" />
@@ -72,10 +68,15 @@
     <ClCompile Include="Baziru3_Engine\Core\Base\ConstantBufferRingAllocator.cpp" />
 
     <ClCompile Include="Game.cpp" />
-    <ClCompile Include="Application\Scene\GameScene\GamePlayScene.cpp" />
-    <ClCompile Include="Application\Scene\GameScene\CollisionSystem.cpp" />
-    <ClCompile Include="Application\Scene\GameScene\CombatSystem.cpp" />
+    <ClCompile Include="Application\Framework.cpp" />
+    <ClCompile Include="Application\GameObject\Bullet.cpp" />
+    <ClCompile Include="Application\Obstacle.cpp" />
+    <ClCompile Include="Application\LevelEditor.cpp" />
     <ClCompile Include="Application\Particle\AppParticleManager.cpp" />
+    <ClCompile Include="Application\Player\Player.cpp" />
+    <ClCompile Include="Application\Enemy\Enemy.cpp" />
+    <ClCompile Include="Application\Enemy\MovingEnemy.cpp" />
+    <ClCompile Include="Application\Scene\GameScene\GamePlayScene.cpp" />
     <ClCompile Include="Application\Scene\ClearScene\ClearScene.cpp" />
     <ClCompile Include="Baziru3_Engine\Graphics\Light\Light.cpp" />
     <ClCompile Include="Baziru3_Engine\Graphics\Light\CascadingShadowMap.cpp" />
@@ -97,14 +98,9 @@
     <ClCompile Include="Baziru3_Engine\Graphics\Shapes\Sphere\Sphere.cpp" />
     <ClCompile Include="Baziru3_Engine\Graphics\2D\Sprite\SpriteManager.cpp" />
     <ClCompile Include="Baziru3_Engine\Core\Base\Srv\SRVManager.cpp" />
-    <ClCompile Include="Application\Player\Player.cpp" />
-    <ClCompile Include="Application\Obstacle.cpp" />
-    <ClCompile Include="Application\Scene\GameScene\Target.cpp" />
-    <ClCompile Include="Application\Scene\GameScene\TutorialSign.cpp" />
     <ClCompile Include="Baziru3_Engine\Graphics\3D\Object\SkinningObject3dCom.cpp" />
     <ClCompile Include="Baziru3_Engine\Core\Base\SubsystemFactory.cpp" />
     <ClCompile Include="Baziru3_Engine\Framework\Collision\Collider.cpp" />
-    <ClCompile Include="Application\LevelEditor.cpp" />
     <ClCompile Include="Baziru3_Engine\3D\Water\River.cpp" />
     <ClCompile Include="Baziru3_Engine\3D\Procedural\BioProceduralGenerator.cpp" />
     <ClCompile Include="Baziru3_Engine\Graphics\Graphics\GpuProfiler.cpp" />

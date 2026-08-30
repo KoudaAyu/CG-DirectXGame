@@ -99,7 +99,7 @@ bool Enemy::FaceTarget(const Vector3& targetPosition, float deltaTime)
     return true;
 }
 
-void Enemy::Update(WindowAPI* windowAPI, const Vector3* targetPosition, const std::vector<std::unique_ptr<Obstacle>>& obstacles, float deltaTime)
+void Enemy::Update(WindowAPI* windowAPI, const Vector3* targetPosition, const std::vector<std::unique_ptr<Obstacle>>& obstacles, float deltaTime, bool isPlayerInCover)
 {
     if (isDead_)
     {
