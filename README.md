@@ -1,8 +1,8 @@
 # Baziru3 Game Engine (自作3Dゲームエンジン)
 
-[![DebugBuild](https://github.com/KoudaAyu/CG-DirectXGame/actions/workflows/DebugBuild.yml/badge.svg)](https://github.com/KoudaAyu/CG-DirectXGame/actions/workflows/DebugBuild.yml)
-[![DevelopmentBuild](https://github.com/KoudaAyu/CG-DirectXGame/actions/workflows/Development.yml/badge.svg)](https://github.com/KoudaAyu/CG-DirectXGame/actions/workflows/Development.yml)
-[![ReleaseBuild](https://github.com/KoudaAyu/CG-DirectXGame/actions/workflows/Release.yml/badge.svg)](https://github.com/KoudaAyu/CG-DirectXGame/actions/workflows/Release.yml)
+[![DebugBuild](https://github.com/KoudaAyu/CG-DirectXGame/actions/workflows/DebugBuild.yml/badge.svg?branch=master)](https://github.com/KoudaAyu/CG-DirectXGame/actions/workflows/DebugBuild.yml)
+[![DevelopmentBuild](https://github.com/KoudaAyu/CG-DirectXGame/actions/workflows/Development.yml/badge.svg?branch=master)](https://github.com/KoudaAyu/CG-DirectXGame/actions/workflows/Development.yml)
+[![ReleaseBuild](https://github.com/KoudaAyu/CG-DirectXGame/actions/workflows/Release.yml/badge.svg?branch=master)](https://github.com/KoudaAyu/CG-DirectXGame/actions/workflows/Release.yml)
 
 C++ および DirectX 12 を用いてスクラッチから構築した、**低レイヤ最適化と即時ゲーム開発環境を両立した自作3Dゲームエンジン**です。  
 商用コンソールゲーム開発におけるパフォーマンス要求（動的メモリ確保のゼロ化、空間分割による物理演算最適化、GPUコンピュートシェーダー活用、マルチスレッド/リングバッファ同期など）をクリアするためのアーキテクチャ設計を実装しています。
