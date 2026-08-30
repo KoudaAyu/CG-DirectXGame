@@ -88,16 +88,16 @@ git checkout -b feature/my_new_game
 ```mermaid
 graph TD
     subgraph CPU ["CPU 側 (データ書き込み)"]
-        Alloc[ConstantBufferAllocator] -->|Allocate O(1)| Frame0[Frame Buffer 0]
-        Alloc -->|Allocate O(1)| Frame1[Frame Buffer 1]
-        Alloc -->|Allocate O(1)| Frame2[Frame Buffer 2]
+        Alloc["ConstantBufferAllocator"] -->|"Allocate O(1)"| Frame0["Frame Buffer 0"]
+        Alloc -->|"Allocate O(1)"| Frame1["Frame Buffer 1"]
+        Alloc -->|"Allocate O(1)"| Frame2["Frame Buffer 2"]
     end
     subgraph GPU ["GPU 側 (レンダリング実行)"]
-        Frame0 -->|GPUが読み出し中| Draw[DirectX12 描画コマンド実行]
+        Frame0 -->|"GPUが読み出し中"| Draw["DirectX12 描画コマンド実行"]
     end
     subgraph Sync ["同期制御 (Fence)"]
-        Fence[Fence Value 同期] -.->|GPU読み出し完了まで| Frame0
-        Fence -.->|安全になったらCPU書き込み許可| Alloc
+        Fence["Fence Value 同期"] -.->|"GPU読み出し完了まで"| Frame0
+        Fence -.->|"安全になったらCPU書き込み許可"| Alloc
     end
     style Frame0 fill:#2b6cb0,stroke:#3182ce,stroke-width:2px,color:#fff
     style Frame1 fill:#2d3748,stroke:#4a5568,stroke-width:1px,color:#a0aec0
@@ -128,12 +128,12 @@ graph TD
 #### 【図面：空間ハッシュによる衝突判定高速化アルゴリズムフロー】
 ```mermaid
 graph TD
-    Pos[オブジェクトのワールド座標] -->|セルサイズ 10.0f で除算| Grid[グリッド座標を算出]
-    Grid -->|ビット演算子による合成| Hash[ユニークなハッシュキーを生成]
-    Hash -->|ハッシュテーブルへ登録| Table[SpatialHashCells テーブル]
-    Table -->|同一 & 隣接セル内のみ抽出| Filter[衝突判定ペアを構築]
-    Filter -->|総当たり回数を大幅削減| Compare[精密衝突判定実行]
-    Compare -->|めり込みあり| Push["多重押し出し解決 & コールバック起動"]
+    Pos["オブジェクトのワールド座標"] -->|"セルサイズ 10.0f で除算"| Grid["グリッド座標を算出"]
+    Grid -->|"ビット演算子による合成"| Hash["ユニークなハッシュキーを生成"]
+    Hash -->|"ハッシュテーブルへ登録"| Table["SpatialHashCells テーブル"]
+    Table -->|"同一 & 隣接セル内のみ抽出"| Filter["衝突判定ペアを構築"]
+    Filter -->|"総当たり回数を大幅削減"| Compare["精密衝突判定実行"]
+    Compare -->|"めり込みあり"| Push["多重押し出し解決 & コールバック起動"]
 ```
 
 ---
@@ -171,14 +171,14 @@ AI の挙動やステージ配置の調整のたびにソースコードを再�
 ```mermaid
 graph TD
     subgraph Decision ["意思決定部 (BehaviorTree)"]
-        Root[Root Node] -->|Tick| Selector[Selector Node]
-        Selector -->|失敗なら次へ| Sequence[Sequence Node]
-        Sequence -->|成功なら次へ| Cond[Condition Node]
-        Cond -->|True| Action["Action Node (移動/索敵/射撃)"]
+        Root["Root Node"] -->|"Tick"| Selector["Selector Node"]
+        Selector -->|"失敗なら次へ"| Sequence["Sequence Node"]
+        Sequence -->|"成功なら次へ"| Cond["Condition Node"]
+        Cond -->|"True"| Action["Action Node (移動/索敵/射撃)"]
     end
     subgraph Data ["データ部 (Blackboard)"]
-        BB[Blackboard Memory] <-->|標的座標・警戒レベル等の読み書き| Action
-        BB <-->|状態チェック| Cond
+        BB["Blackboard Memory"] <-->|"標的座標・警戒レベル等の読み書き"| Action
+        BB <-->|"状態チェック"| Cond
     end
 ```
 
