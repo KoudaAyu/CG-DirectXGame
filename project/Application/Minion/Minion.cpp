@@ -113,7 +113,8 @@ void Minion::Update(float deltaTime) {
         float dist = std::sqrt(diff.x * diff.x + diff.z * diff.z);
 
         if (dist > 0.05f) {
-            float step = followSpeed_ * deltaTime;
+            float dynamicSpeed = followSpeed_ * (1.0f + dist * 1.5f);
+            float step = dynamicSpeed * deltaTime;
             if (step > dist) step = dist;
             position_.x += (diff.x / dist) * step;
             position_.z += (diff.z / dist) * step;

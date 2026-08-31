@@ -58,8 +58,8 @@ private:
     bool isMergedState_ = false;
     bool isAllMerged_ = false;
 
-    float followSpeed_ = 12.0f;
-    float slotBaseRadius_ = 1.4f;
-    float slotRowSpacing_ = 0.9f;
-    float separationRadius_ = 0.6f;
+    float followSpeed_ = 18.0f;
+    float slotBaseRadius_ = 0.75f;
+    float slotRowSpacing_ = 0.45f;
+    float separationRadius_ = 0.4f;
 };

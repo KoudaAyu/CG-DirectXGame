@@ -48,35 +48,36 @@ int MinionManager::GetActiveCount() const {
 }
 
 void MinionManager::CalculateFormationSlots(const Vector3& playerPos, float playerYaw) {
-    int slotIndex = 0;
-    int ring = 1;
-    int slotsInRing = 4;
-    int ringSlotCounter = 0;
+    // プレイヤーの進行方向（前方）と右方向ベクトル
+    Vector3 forward = { std::sin(playerYaw), 0.0f, std::cos(playerYaw) };
+    Vector3 right   = { forward.z, 0.0f, -forward.x };
+
+    int row = 1;
+    int colsInRow = 3;
+    int colIndex = 0;
 
     for (auto& minion : minions_) {
         if (!minion || !minion->IsActive()) continue;
         if (minion->GetState() != MinionState::Following) continue;
 
-        float ringRadius = slotBaseRadius_ + (ring - 1) * slotRowSpacing_;
-        
-        float angleStep = (kPi * 0.7f) / static_cast<float>(slotsInRing);
-        float baseAngle = (playerYaw + kPi) - (kPi * 0.35f);
-        float angle = baseAngle + angleStep * (ringSlotCounter + 0.5f);
+        float backDist = slotBaseRadius_ + (row - 1) * slotRowSpacing_;
+        float sideSpacing = 0.42f;
+        float sideOffset = (static_cast<float>(colIndex) - static_cast<float>(colsInRow - 1) * 0.5f) * sideSpacing;
 
+        // スロット位置 = プレイヤー位置 - 前方 * 後方距離 + 右方向 * 左右オフセット
         Vector3 slotPos;
-        slotPos.x = playerPos.x + std::sin(angle) * ringRadius;
+        slotPos.x = playerPos.x - forward.x * backDist + right.x * sideOffset;
         slotPos.y = playerPos.y;
-        slotPos.z = playerPos.z + std::cos(angle) * ringRadius;
+        slotPos.z = playerPos.z - forward.z * backDist + right.z * sideOffset;
 
         minion->SetTargetPosition(slotPos);
 
-        ringSlotCounter++;
-        if (ringSlotCounter >= slotsInRing) {
-            ring++;
-            slotsInRing += 3;
-            ringSlotCounter = 0;
+        colIndex++;
+        if (colIndex >= colsInRow) {
+            row++;
+            colsInRow += 2;
+            colIndex = 0;
         }
-        slotIndex++;
     }
 }
 
