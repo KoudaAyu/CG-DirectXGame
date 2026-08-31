@@ -4,6 +4,7 @@
 #include "Matrix4x4.h"
 #include "RenderContext.h"
 #include "Baziru3_Engine/Graphics/3D/Object/Object3d.h"
+#include "Application/Player/PikminPlayer.h" // SlimeParamsCPU
 #include <memory>
 
 class Object3dCom;
@@ -24,7 +25,7 @@ enum class MinionType {
 };
 
 /**
- * @brief 個々のミニオン（ピクミン/ロコロコ小玉）クラス
+ * @brief 個々のミニオン（小スライム）クラス
  */
 class Minion {
 public:
@@ -55,6 +56,12 @@ public:
     // 反発ベクトル加算（重なり防止用）
     void AddRepulsion(const Vector3& pushVector) { position_ += pushVector; }
 
+    // スライムパラメータの公開（共有調整用）
+    SlimeParamsCPU& GetSlimeParams() { return slimeParams_; }
+
+private:
+    void DrawSlime(const RenderContext& ctx);
+
 private:
     Object3dCom* object3dCom_ = nullptr;
     Camera* camera_ = nullptr;
@@ -77,6 +84,9 @@ private:
     float gravity_ = -24.0f;
     float groundY_ = 0.2f;
 
-    // スキッシュ＆ストレッチ（弾む演出用）
+    // スライム固有
+    SlimeParamsCPU slimeParams_;
+    float totalTime_ = 0.0f;
     float bounceTimer_ = 0.0f;
+    Vector3 prevVelocity_{ 0.0f, 0.0f, 0.0f };
 };

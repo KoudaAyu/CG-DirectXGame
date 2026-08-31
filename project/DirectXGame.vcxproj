@@ -122,8 +122,19 @@
     <ClCompile Include="Application\Minion\Minion.cpp" />
     <ClCompile Include="Application\Minion\MinionManager.cpp" />
     <ClCompile Include="Application\Player\PikminPlayer.cpp" />
+    <ClCompile Include="Application\GameObject\SlimeMesh.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <FxCompile Include="Resources\shaders\Slime.VS.hlsl">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </FxCompile>
+    <FxCompile Include="Resources\shaders\Slime.PS.hlsl">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </FxCompile>
     <FxCompile Include="Resources\shaders\InitializeParticle.CS.hlsl">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
@@ -350,6 +361,7 @@
     <ClInclude Include="Application\Minion\Minion.h" />
     <ClInclude Include="Application\Minion\MinionManager.h" />
     <ClInclude Include="Application\Player\PikminPlayer.h" />
+    <ClInclude Include="Application\GameObject\SlimeMesh.h" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="externals\DirectXTex\DirectXTex_Desktop_2022_Win10.vcxproj">
@@ -360,6 +372,7 @@
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
+    <None Include="Resources\shaders\Slime.hlsli" />
     <None Include="Resources\shaders\CopyImage.hlsli" />
     <None Include="Resources\shaders\Skybox.hlsli" />
     <None Include="Resources\shaders\Particle.hlsli" />

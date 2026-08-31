@@ -246,6 +246,29 @@ void GamePlayScene::DrawDebugUI()
         if (ImGui::SliderFloat("Throw Power", &throwPower, 5.0f, 35.0f)) {
             player_->SetThrowPower(throwPower);
         }
+
+        // --- スライム表現パラメータ調整 ---
+        auto& slimeParams = player_->GetSlimeParams();
+        if (ImGui::CollapsingHeader("Slime Jelly & Wobble Params", ImGuiTreeNodeFlags_DefaultOpen))
+        {
+            ImGui::SliderFloat("Wobble Strength", &slimeParams.wobbleStrength, 0.0f, 0.4f, "%.3f");
+            ImGui::SliderFloat("Wobble Frequency", &slimeParams.wobbleFrequency, 1.0f, 12.0f, "%.1f");
+            ImGui::SliderFloat("Fresnel Power", &slimeParams.fresnelPower, 0.5f, 6.0f, "%.1f");
+            ImGui::SliderFloat("Env Reflection", &slimeParams.envReflection, 0.0f, 1.0f, "%.2f");
+            ImGui::SliderFloat("Inner Glow", &slimeParams.innerGlow, 0.0f, 1.0f, "%.2f");
+            ImGui::SliderFloat("Shininess", &slimeParams.specularShininess, 8.0f, 128.0f, "%.0f");
+
+            float color[4] = { slimeParams.baseColor.x, slimeParams.baseColor.y, slimeParams.baseColor.z, slimeParams.baseColor.w };
+            if (ImGui::ColorEdit4("Slime Color", color))
+            {
+                slimeParams.baseColor = { color[0], color[1], color[2], color[3] };
+            }
+
+            if (ImGui::Button("Trigger Impulse Ripple"))
+            {
+                slimeParams.impulseStrength = 0.4f;
+            }
+        }
     }
 
     ImGui::Separator();

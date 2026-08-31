@@ -277,8 +277,17 @@
     <ClCompile Include="Application\Player\PikminPlayer.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
+    <ClCompile Include="Application\GameObject\SlimeMesh.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
+    <FxCompile Include="Resources\shaders\Slime.VS.hlsl">
+      <Filter>リソース ファイル</Filter>
+    </FxCompile>
+    <FxCompile Include="Resources\shaders\Slime.PS.hlsl">
+      <Filter>リソース ファイル</Filter>
+    </FxCompile>
     <FxCompile Include="Resources\shaders\Skybox.PS.hlsl" />
     <FxCompile Include="Resources\shaders\Skybox.VS.hlsl" />
     <FxCompile Include="Resources\shaders\Object3d.PS.hlsl" />
@@ -489,8 +498,14 @@
     <ClInclude Include="Application\Player\PikminPlayer.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
+    <ClInclude Include="Application\GameObject\SlimeMesh.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
+    <None Include="Resources\shaders\Slime.hlsli">
+      <Filter>リソース ファイル</Filter>
+    </None>
     <None Include="Resources\shaders\CopyImage.hlsli" />
     <None Include="Resources\shaders\Skybox.hlsli" />
     <None Include="Resources\shaders\Particle.hlsli" />
