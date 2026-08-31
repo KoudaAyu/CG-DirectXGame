@@ -50,27 +50,21 @@ void TitleScene::InitializeScene()
 		duckModel_ = std::make_unique<Object3d>();
 		duckModel_->Initialize(GetObject3dCom(), model);
 		duckModel_->SetCamera(camera_);
-		duckModel_->SetScale({ 1.25f, 1.25f, 1.25f });
-		duckModel_->SetTranslate({ 1.15f, -0.65f, 0.0f });
-		duckModel_->SetRotate({ 0.0f, -0.45f, 0.0f });
-		duckModel_->Update();
-	}
+		duckModel_->SetScale({ 2.0f, 2.0f, 2.0f }); // 大きく見栄え良く！
+		duckModel_->SetTranslate({ 1.25f, -0.35f, 0.0f });
+		duckModel_->SetRotate({ 0.1f, -0.55f, 0.0f });
+		duckModel_->SetColor({ 1.0f, 1.0f, 1.0f, 1.0f });
 
-	// 2. 奥の敵アヒル兵士 (Enemy Duck - 見張り・警戒ポーズ)
-	if (GetObject3dCom() && camera_)
-	{
-		Object3d::ModelData enemyModel = Object3d::LoadObjFile("Resources", "enemy.obj");
-		if (enemyModel.material.textureFilePath.empty())
-		{
-			enemyModel.material.textureFilePath = "Resources/duck_enemy.png";
-		}
+		// 2. 奥をパトロールする敵アヒル兵士 (Enemy Duck Patrol)
+		Object3d::ModelData enemyModel = Object3d::LoadObjFile("Resources", "player.obj");
+		enemyModel.material.textureFilePath = "Resources/duck_enemy.png";
 		enemyDuckModel_ = std::make_unique<Object3d>();
 		enemyDuckModel_->Initialize(GetObject3dCom(), enemyModel);
 		enemyDuckModel_->SetCamera(camera_);
-		enemyDuckModel_->SetScale({ 0.95f, 0.95f, 0.95f });
-		enemyDuckModel_->SetTranslate({ -1.8f, -0.2f, 2.2f });
-		enemyDuckModel_->SetRotate({ 0.05f, 0.75f, 0.0f });
-		enemyDuckModel_->Update();
+		enemyDuckModel_->SetScale({ 1.3f, 1.3f, 1.3f });
+		enemyDuckModel_->SetTranslate({ -1.2f, 0.35f, 2.4f });
+		enemyDuckModel_->SetRotate({ 0.05f, 1.57f, 0.0f });
+		enemyDuckModel_->SetColor({ 0.95f, 0.95f, 1.0f, 1.0f });
 	}
 }
 
@@ -272,20 +266,6 @@ void TitleScene::Update()
 	{
 		DrawSettingsModal(screenW, screenH);
 	}
-    ImGui::Spacing();
-
-    ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.4f, 1.0f), ">> Press SPACE key to START GAMEPLAY <<");
-    ImGui::Spacing();
-    ImGui::Spacing();
-
-    ImGui::SetCursorPosX((ImGui::GetContentRegionAvail().x - 200.0f) * 0.5f + ImGui::GetCursorPosX());
-    if (ImGui::Button("START GAMEPLAY", ImVec2(200.0f, 42.0f)))
-    {
-        SceneManager::GetInstance()->ChangeScene("GAMEPLAY");
-    }
-
-    ImGui::End();
->>>>>>> master
 #endif
 }
 

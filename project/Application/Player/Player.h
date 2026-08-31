@@ -5,10 +5,10 @@
 #include <algorithm>
 #include "Object3d.h"
 #include "Object3dCom.h"
-#include "RenderContext.h"
 #include "Camera.h"
-#include "Baziru3_Engine/Framework/Collision/CollisionManager.h"
+#include "RenderContext.h"
 #include "Baziru3_Engine/Framework/Collision/SphereCollider.h"
+#include "Baziru3_Engine/Framework/Collision/CollisionManager.h"
 
 class Bullet;
 class MouseInput;
@@ -198,3 +198,5 @@ private:
     std::string causeOfDeath_ = "ENEMY GUNFIRE (7.62x39mm PS)";
     std::string lastAttackerName_ = "HOSTILE PATROL";
 };
+
+

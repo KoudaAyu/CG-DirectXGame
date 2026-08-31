@@ -1,6 +1,7 @@
 #pragma once
 
 #include "BaseScene.h"
+
 class DirectXCom;
 class KeyInput;
 struct SceneRenderRequests;

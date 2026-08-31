@@ -106,12 +106,6 @@ void Game::Initialize() {
       "Resources/CG4/dds/CG4_test.dds"); // Load skybox texture
   SceneManager::GetInstance()->SetSkyboxTextureIndex(textureIndexSkybox_);
 
-	SceneManager::GetInstance()->SetObject3dCom(object3dCom.get());
-	SceneManager::GetInstance()->SetCamera(camera_.get());
-	SceneManager::GetInstance()->SetMaterialManager(materialManager_.get());
-	SceneManager::GetInstance()->SetLight(light.get());
-	SceneManager::GetInstance()->SetSpriteCom(spriteCom);
-
   // OffScreenRendering の初期化
   offScreenRendering_ = std::make_unique<OffScreenRendering>(logStream, dx);
   offScreenRendering_->Initialize(0, 0, DXGI_FORMAT_R8G8B8A8_UNORM_SRGB,
@@ -300,7 +294,8 @@ void Game::Update() {
     imguiManager->Update();
   }
 
-  // Update scenes and engine subsystems. Use fixed timestep here (same as scenes expect).
+  // Update scenes and engine subsystems. Use fixed timestep here (same as
+  // scenes expect).
   SceneManager::GetInstance()->Update(1.0f / 60.0f);
 
   debugCamera_.Update();
@@ -314,23 +309,8 @@ void Game::Update() {
   object3d_->Update();
 
 #ifdef USE_IMGUI
-  // 通常プレイ時はデバッグメニューを非表示（F1キーでトグル）
-  static bool showEngineDebugUI = false;
-  if (GetAsyncKeyState(VK_F1) & 0x8000) {
-    static bool f1WasPressed = false;
-    if (!f1WasPressed) {
-      showEngineDebugUI = !showEngineDebugUI;
-      f1WasPressed = true;
-    }
-  } else {
-    static bool f1WasPressed = false;
-    f1WasPressed = false;
-  }
-
-  if (showEngineDebugUI) {
-    if (debugUI) {
-      debugUI->Update();
-    }
+  if (debugUI) {
+    debugUI->Update();
   }
 #endif // USE_IMGUI
 
@@ -474,16 +454,15 @@ void Game::Draw() {
     SceneManager::GetInstance()->Draw(renderRequests);
   }
 
-	if (!renderRequests.sceneDrawn)
-	{
-		sphereRenderer_.Draw(ctx, renderRequests);
+  sphereRenderer_.Draw(ctx, renderRequests);
 
-		if (drawObject && object3dCom && object3d_)
-		{
-			object3dCom->Draw(object3d_.get(), ctx, modelData, drawObject);
-		}
-	}
-	GpuProfiler::GetInstance()->EndProfile(dx->GetCommandList().Get(), "Scene Draw");
+  if (!renderRequests.sceneDrawn && drawObject) {
+    if (object3dCom && object3d_) {
+      object3dCom->Draw(object3d_.get(), ctx, modelData, drawObject);
+    }
+  }
+  GpuProfiler::GetInstance()->EndProfile(dx->GetCommandList().Get(),
+                                         "Scene Draw");
 
   // 3. Particle Drawの計測 (通常のパーティクル描画)
   GpuProfiler::GetInstance()->BeginProfile(dx->GetCommandList().Get(),
@@ -727,13 +706,6 @@ void Game::DrawSprites(const RenderContext &ctx) {
 }
 
 void Game::DrawParticles(const RenderContext &ctx) {
-  BaseScene *currentScene = SceneManager::GetInstance()->GetCurrentScene();
-  if (currentScene) {
-    GamePlayScene *gameplayScene = dynamic_cast<GamePlayScene *>(currentScene);
-    if (gameplayScene && gameplayScene->GetAppParticleManager()) {
-      gameplayScene->GetAppParticleManager()->Draw(ctx);
-    }
-  }
   particleRenderer_.Draw(ctx, particleManager.get(), model_.get(),
                          UINT(modelData.vertices.size()));
 }

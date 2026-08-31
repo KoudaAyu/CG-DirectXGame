@@ -3,9 +3,8 @@
 #include "Object3dCom.h"
 #include "TextureManager.h"
 #include "SceneManager.h"
-#include "RenderContext.h"
-#include "Bullet.h"
-#include "MouseInput.h"
+#include "Application/GameObject/Bullet.h"
+#include "Baziru3_Engine/Core/IO/Mouse/MouseInput.h"
 #include "Matrix4x4.h"
 #include <Windows.h>
 #include <cmath>

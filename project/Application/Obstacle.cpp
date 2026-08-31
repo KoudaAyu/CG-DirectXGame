@@ -247,32 +247,6 @@ void Obstacle::Initialize(Object3dCom* object3dCom, Camera* camera, const Vector
     object3d_->Update();
 }
 
-void Obstacle::Initialize(Object3dCom* object3dCom, Camera* camera, const Vector3& position, float radius, const std::string& modelFile, const Vector3& scale, const Vector3& rotate)
-{
-    object3dCom_ = object3dCom;
-    position_ = position;
-    radius_ = radius;
-
-    Object3d::ModelData model = Object3d::LoadObjFile("Resources", modelFile);
-    object3d_ = std::make_unique<Object3d>();
-    object3d_->Initialize(object3dCom, model);
-    object3d_->SetCamera(camera);
-
-    object3d_->SetTranslate(position_);
-    object3d_->SetScale(scale);
-    object3d_->SetRotate(rotate);
-
-    rot1_ = rotate;
-    Vector3 boxSize = { 2.0f * scale.x, 2.0f * scale.y, 2.0f * scale.z };
-    collider_ = std::make_unique<BoxCollider>(boxSize, &position_, &rot1_, CollisionAttribute::Obstacle);
-    CollisionManager::GetInstance()->RegisterCollider(collider_.get());
-
-    meshCollider_ = std::make_unique<MeshCollider>(object3d_.get(), CollisionAttribute::Obstacle);
-    CollisionManager::GetInstance()->RegisterCollider(meshCollider_.get());
-
-    object3d_->Update();
-}
-
 void Obstacle::Update()
 {
     // カメラが動いても障害物が追従しないよう、毎フレームWVP行列を更新する

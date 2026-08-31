@@ -4,7 +4,6 @@
 #include "SceneManager.h"
 #include "TextureManager.h"
 #include "../GameScene/RaidStats.h"
-#include "Baziru3_Engine/Graphics/Graphics/SceneRenderRequests.h"
 #include <cmath>
 
 #ifdef USE_IMGUI
@@ -13,22 +12,21 @@
 
 void ClearScene::InitializeScene()
 {
-    if (dxCommon_)
-    {
-        input_ = new KeyInput();
-        input_->Initialize(dxCommon_->GetWindowAPI());
-    }
+	if (dxCommon_)
+	{
+		input_ = new KeyInput();
+		input_->Initialize(dxCommon_->GetWindowAPI());
+	}
 }
 
 void ClearScene::Finalize()
 {
-    delete input_;
-    input_ = nullptr;
+	delete input_;
+	input_ = nullptr;
 }
 
 void ClearScene::Update()
 {
-<<<<<<< HEAD
 	if (input_)
 	{
 		input_->Update();
@@ -203,9 +201,4 @@ void ClearScene::Update()
 
 void ClearScene::Draw(SceneRenderRequests& /*renderRequests*/)
 {
-    // 背景スカイボックスの描画
-    if (dxCommon_ && dxCommon_->GetCommandList())
-    {
-        SceneManager::GetInstance()->DrawSkybox(dxCommon_->GetCommandList().Get());
-    }
 }

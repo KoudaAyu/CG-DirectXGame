@@ -622,16 +622,6 @@ Object3d::ModelData Object3d::LoadObjFile(const std::string &directoryPath,
     }
   }
 
-  // 頂点データから正確なバウンディング半径を算出して視錐台カリングの誤判定（消失・テクスチャ化け）を防止
-  float maxDistSq = 0.0f;
-  for (const auto& v : modelData.vertices) {
-    float distSq = v.position.x * v.position.x + v.position.y * v.position.y + v.position.z * v.position.z;
-    if (distSq > maxDistSq) {
-      maxDistSq = distSq;
-    }
-  }
-  modelData.boundingRadius = (maxDistSq > 0.0001f) ? std::sqrt(maxDistSq) : 2.0f;
-
   return modelData;
 }
 
