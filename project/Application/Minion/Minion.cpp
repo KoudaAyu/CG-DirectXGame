@@ -1,6 +1,4 @@
 #include "Minion.h"
-#include "Baziru3_Engine/Graphics/3D/Object/Object3dCom.h"
-#include "TextureManager.h"
 #include <algorithm>
 #include <cmath>
 
@@ -8,26 +6,24 @@ Minion::Minion() {
     object3d_ = std::make_unique<Object3d>();
 }
 
-void Minion::Initialize(Object3dCom* object3dCom, Camera* camera, const Vector3& spawnPos, MinionType type) {
-    object3dCom_ = object3dCom;
-    camera_ = camera;
+void Minion::Initialize(Object3dCom* object3dCom, const Vector3& spawnPos, MinionType type) {
     position_ = spawnPos;
     type_ = type;
     state_ = MinionState::Following;
     isActive_ = true;
 
-    // モデル読み込み
-    modelData_ = Object3d::LoadObjFile("Resources", "suzanne.obj");
-    textureIndex_ = TextureManager::GetInstance()->Load("Resources/uvChecker.png");
-    modelData_.material.textureIndex = textureIndex_;
-
     if (object3d_) {
-        object3d_->Initialize(object3dCom_, modelData_);
-        object3d_->SetCamera(camera_);
+        bool loaded = object3d_->Initialize("Resources", "suzanne.obj");
+        if (!loaded) {
+            object3d_->Initialize("Resources", "plane.obj");
+        }
         object3d_->SetTranslate(position_);
         object3d_->SetScale(scale_);
         object3d_->SetRotate(rotation_);
-        object3d_->SetColor({ 1.0f, 0.3f, 0.3f, 1.0f }); // 赤色ミニオン
+        object3d_->SetColor({ 1.0f, 0.3f, 0.3f, 1.0f });
+        if (object3dCom) {
+            object3d_->SetObject3dCom(object3dCom);
+        }
         object3d_->Update();
     }
 }
@@ -62,7 +58,6 @@ void Minion::Update(float deltaTime) {
 
     switch (state_) {
     case MinionState::Following: {
-        // スロット座標に向かってスムーズに移動 (Lerp / 追従)
         Vector3 diff = targetSlotPos_ - position_;
         diff.y = 0.0f;
         float dist = std::sqrt(diff.x * diff.x + diff.z * diff.z);
@@ -73,32 +68,26 @@ void Minion::Update(float deltaTime) {
             position_.x += (diff.x / dist) * step;
             position_.z += (diff.z / dist) * step;
 
-            // 移動方向を向く
             rotation_.y = std::atan2(diff.x, diff.z);
         }
 
-        // 接地Y座標の維持 ＋ ピョコピョコ跳ね
         position_.y = groundY_ + std::sin(bounceTimer_ * 14.0f) * 0.08f;
         scale_ = { 0.35f, 0.35f, 0.35f };
         break;
     }
 
     case MinionState::Merging: {
-        // プレイヤー中心に向かって吸引移動
         position_ += velocity_ * deltaTime;
         scale_ = { 0.25f, 0.25f, 0.25f };
         break;
     }
 
     case MinionState::Thrown: {
-        // 放物線移動（重力適用）
         velocity_.y += gravity_ * deltaTime;
         position_ += velocity_ * deltaTime;
 
-        // 地面着地判定
         if (position_.y <= groundY_) {
             position_.y = groundY_;
-            // 着地バウンド
             if (std::abs(velocity_.y) > 2.0f) {
                 velocity_.y = -velocity_.y * 0.4f;
                 velocity_.x *= 0.6f;
@@ -109,7 +98,6 @@ void Minion::Update(float deltaTime) {
             }
         }
 
-        // 飛翔中の回転演出
         rotation_.x += 10.0f * deltaTime;
         break;
     }
@@ -134,11 +122,6 @@ void Minion::Update(float deltaTime) {
 }
 
 void Minion::Draw(const RenderContext& ctx) {
-    if (!isActive_ || !object3d_ || !object3dCom_) return;
-
-    RenderContext localCtx = ctx;
-    if (textureIndex_ != TextureManager::kInvalidTextureIndex) {
-        localCtx.textureHandle = TextureManager::GetInstance()->GetSrvHandleGPU(textureIndex_);
-    }
-    object3dCom_->Draw(object3d_.get(), localCtx, modelData_, true);
+    if (!isActive_ || !object3d_) return;
+    object3d_->Draw(ctx);
 }

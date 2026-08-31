@@ -7,7 +7,6 @@
 #include <memory>
 
 class Object3dCom;
-class Camera;
 
 enum class MinionState {
     Following,  // プレイヤーのスロットを追従中
@@ -31,7 +30,7 @@ public:
     Minion();
     ~Minion() = default;
 
-    void Initialize(Object3dCom* object3dCom, Camera* camera, const Vector3& spawnPos, MinionType type = MinionType::Red);
+    void Initialize(Object3dCom* object3dCom, const Vector3& spawnPos, MinionType type = MinionType::Red);
     void Update(float deltaTime);
     void Draw(const RenderContext& ctx);
 
@@ -56,12 +55,7 @@ public:
     void AddRepulsion(const Vector3& pushVector) { position_ += pushVector; }
 
 private:
-    Object3dCom* object3dCom_ = nullptr;
-    Camera* camera_ = nullptr;
     std::unique_ptr<Object3d> object3d_;
-    Object3d::ModelData modelData_;
-    uint32_t textureIndex_ = 0;
-
     Vector3 position_{ 0.0f, 0.0f, 0.0f };
     Vector3 velocity_{ 0.0f, 0.0f, 0.0f };
     Vector3 rotation_{ 0.0f, 0.0f, 0.0f };

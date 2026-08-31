@@ -125,7 +125,7 @@ void Object3dCom::Draw(Object3d* object, const RenderContext& ctx, const Object3
 				if (wireframePSO)
 				{
 					ctx.commandList->SetPipelineState(wireframePSO.Get());
-					object->Draw(ctx);
+					object->DrawInternal(ctx);
 				}
 			}
 		}

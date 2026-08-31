@@ -19,7 +19,7 @@ void MinionManager::SpawnMinion(const Vector3& spawnPos, int count, MinionType t
         float offsetX = ((std::rand() % 100) / 100.0f - 0.5f) * 2.0f;
         float offsetZ = ((std::rand() % 100) / 100.0f - 0.5f) * 2.0f;
         Vector3 pos = { spawnPos.x + offsetX, spawnPos.y + 0.2f, spawnPos.z + offsetZ };
-        minion->Initialize(object3dCom_, camera_, pos, type);
+        minion->Initialize(object3dCom_, pos, type);
         minions_.push_back(std::move(minion));
     }
 }
