@@ -832,6 +832,7 @@ void AppParticleManager::EmitDeathFlash(std::mt19937& randomEngine, const Vector
 	}
 }
 
+<<<<<<< HEAD
 void AppParticleManager::EmitEnemyDestroyGPUBurst(std::mt19937& randomEngine, const Vector3& position, const Vector3& hitDirection, uint32_t particleTexIndex, uint32_t flashTexIndex, uint32_t smokeTexIndex)
 {
 	// 1. 巨大スターバースト衝撃閃光
@@ -1066,7 +1067,6 @@ void AppParticleManager::EmitRiverSplashDroplet(std::mt19937& randomEngine, cons
 		EmitDustWithVelocity(randomEngine, position + Vector3{ 0.0f, 0.02f, 0.0f }, 0.22f, col, vel, 0.45f, waterTexIndex);
 	}
 }
-
 void AppParticleManager::Draw()
 {
 	if (!enginePM_) return;

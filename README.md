@@ -1,210 +1,199 @@
-<<<<<<< HEAD
-# Baziru3 Engine (自作3Dゲームエンジン)
-=======
-# Baziru3 Engine
->>>>>>> docs: update README.md with portfolio details and features
+# Baziru3 Game Engine (自作3Dゲームエンジン)
 
-[![DebugBuild](https://github.com/KoudaAyu/CG-DirectXGame/actions/workflows/DebugBuild.yml/badge.svg)](https://github.com/KoudaAyu/CG-DirectXGame/actions/workflows/DebugBuild.yml)
-[![DevelopmentBuild](https://github.com/KoudaAyu/CG-DirectXGame/actions/workflows/Development.yml/badge.svg)](https://github.com/KoudaAyu/CG-DirectXGame/actions/workflows/Development.yml)
-[![ReleaseBuild](https://github.com/KoudaAyu/CG-DirectXGame/actions/workflows/Release.yml/badge.svg)](https://github.com/KoudaAyu/CG-DirectXGame/actions/workflows/Release.yml)
+[![DebugBuild](https://github.com/KoudaAyu/CG-DirectXGame/actions/workflows/DebugBuild.yml/badge.svg?branch=master)](https://github.com/KoudaAyu/CG-DirectXGame/actions/workflows/DebugBuild.yml)
+[![DevelopmentBuild](https://github.com/KoudaAyu/CG-DirectXGame/actions/workflows/Development.yml/badge.svg?branch=master)](https://github.com/KoudaAyu/CG-DirectXGame/actions/workflows/Development.yml)
+[![ReleaseBuild](https://github.com/KoudaAyu/CG-DirectXGame/actions/workflows/Release.yml/badge.svg?branch=master)](https://github.com/KoudaAyu/CG-DirectXGame/actions/workflows/Release.yml)
 
-<<<<<<< HEAD
+C++ および DirectX 12 を用いてスクラッチから構築した、**低レイヤ最適化と即時ゲーム開発環境を両立した自作3Dゲームエンジン**です。  
+商用コンソールゲーム開発におけるパフォーマンス要求（動的メモリ確保のゼロ化、空間分割による物理演算最適化、GPUコンピュートシェーダー活用、マルチスレッド/リングバッファ同期など）をクリアするためのアーキテクチャ設計を実装しています。
 
-C++ および DirectX 12 を用いてスクラッチから構築した、自作3Dゲームエンジンプロジェクトです。
-商用コンソールゲーム開発におけるパフォーマンス要求（ロード時間の極小化、動的メモリ確保の抑制、空間分割による物理演算最適化など）をクリアするための、低レイヤでの最適化アーキテクチャ設計を実証することを目的としています。
+本リポジトリ（`master` / `GE3_Game`）は、**「ブランチを切ったら即座にオリジナルゲームの開発を始められる」純粋なエンジンマスター基盤**として整理されています。
 
-## 🎨 ポートフォリオ技術発表スライド
+---
+
+## 🎨 ポートフォリオ技術発表スライド & 成果物資料
+
 本エンジン、および実装ゲームシステムに関する詳細な技術解説・設計図面をまとめた提出用スライド資料を公開しています。
 
 ### 1. エンジン最適化スライド（動的物理とメモリ最適化）
 > **【要約】自作エンジン「Baziru3 Engine」の低レイヤにおけるメモリ・衝突判定の最適化（定数バッファ用リングバッファアロケータ、短寿命用スタックアロケータ、空間ハッシュによる衝突判定高速化、データ指向設計）の設計と数学的解説資料です。**
-* **📄 [コウダ_アユ_Baziru3_Engineについて (PDF)](%E3%82%B3%E3%82%A6%E3%83%80_%E3%82%A2%E3%83%A6_Baziru3_Engine%E3%81%AB%E3%81%A4%E3%81%84%E3%81%A6.pdf)** （※提出用・日本語ファイル名）
-* **📄 [技術発表スライド資料 (PDF)](sega_portfolio_slides.pdf)** （※英数字ファイル名リンク）
-  * スライドのMarkdownソースはこちら：[sega_portfolio_slides.md](sega_portfolio_slides.md)
+* **📄 [技術発表スライド資料 (PDF)](docs/slides/sega_portfolio_slides.pdf)**
+  * スライドのMarkdownソース：[docs/slides/sega_portfolio_slides.md](docs/slides/sega_portfolio_slides.md)
 
-### 2. ゲーム・AIシステムスライド（6月度 月間進捗報告 / 技術研究発表資料）
-> **【要約】開発中の3Dアクションシューティングゲームにおける、ゲームプレイとAIシステム（対角OBBマルチコライダー、トンネル現象を防ぐ連続線分CCD判定、レーザー照準同期、敵AIのカバー・捜索・巡回行動、およびAABBツリー階層構造による計算最適化）の実証とスケジュール資料です。**
-* **📄 [LE3B_09_コウダアユ_「射撃と遮蔽物の動的物理インタラクション」 の実装 (PDF)](LE3B_09_%E3%82%B3%E3%82%A6%E3%83%80%E3%82%A2%E3%83%A6_%E3%80%8C%E5%B0%84%E6%92%83%E3%81%A8%E9%81%AE%E8%94%BD%E7%89%A9%E3%81%AE%E5%8B%95%E7%9A%84%E7%89%A9%E7%90%86%E3%82%A4%E3%83%B3%E3%82%BF%E3%83%A9%E3%82%AF%E3%82%B7%E3%83%A7%E3%83%B3%E3%80%8D%20%E3%81%AE%E5%AE%9F%E8%A3%85.pdf)** （※提出用・日本語ファイル名）
-* **📄 [ゲーム・AI技術スライド資料 (PDF)](sega_gameplay_interaction_slides.pdf)** （※英数字ファイル名リンク）
-  * スライドのMarkdownソースはこちら：[sega_gameplay_interaction_slides.md](sega_gameplay_interaction_slides.md)
+### 2. ゲーム・AIシステムスライド（月間進捗報告 / 技術研究発表資料）
+> **【要約】3Dアクションシューティングゲームにおける、ゲームプレイとAIシステム（対角OBBマルチコライダー、トンネル現象を防ぐ連続線分CCD判定、レーザー照準同期、敵AIのカバー・捜索・巡回行動、およびAABBツリー階層構造による計算最適化）の実証資料です。**
+* **📄 [ゲーム・AI技術スライド資料 (PDF)](docs/slides/sega_gameplay_interaction_slides.pdf)**
+  * スライドのMarkdownソース：[docs/slides/sega_gameplay_interaction_slides.md](docs/slides/sega_gameplay_interaction_slides.md)
 
-### 3. アジャイル開発スプリント評価・進捗報告（7月度 週間報告まとめ）
-> **【要約】7月度の4回にわたるスプリント開発（敵AI基本機能、MeshCollider & NavMesh/A*経路探索、CSベースGPUパーティクル & FreeListメモリ最適化、および3D射撃・視野コーン・アプリ層軽量パーティクル描画完全復元）における、アジャイル・スプリントメンターからの評価・スコア推移と技術的成果の記録です。**
+### 3. アジャイル開発スプリント評価・進捗報告
+> **【要約】4回以上にわたるスプリント開発（敵AI基本機能、MeshCollider & NavMesh/A*経路探索、CSベースGPUパーティクル & FreeListメモリ最適化、およびゲームループ接続）における、アジャイル開発メンターからの評価・スコア推移と技術的成果の記録です。**
 
-#### 📊 7月度 スプリント評価スコア推移
+#### 📊 スプリント評価スコア推移
 | スプリント (日付) | 計画の質 | 実行の質 | 総合評価 | 主なマイルストーン・達成項目 | 原本レポート |
 | :--- | :---: | :---: | :---: | :--- | :---: |
-| [`07/12 スプリント`](#sprint-0712) | 85点 | 70点 | **60点** | 敵AI基本ステート（Patrol/Investigate/Chase）およびデバッグ表示の統合 | [📄 閲覧](docs/sprints/LE3B_09_コウダ_アユ_週間進捗07_12.md) |
-| [`07/17 スプリント`](#sprint-0717) | 95点 | 90点 | **86点** | 当たり判定バグ完全修正（MeshCollider & Push）、NavMesh / A* 経路探索の実装 | [📄 閲覧](docs/sprints/LE3B_09_コウダ_アユ_週間報告07_17.md) |
-| [`07/24 スプリント`](#sprint-0724) | 90点 | 95点 | **86点** | CSベースGPUパーティクル統合、`FreeList` による動的メモリ最適化 | [📄 閲覧](docs/sprints/LE3B_09_コウダ_アユ_週間報告07_24.md) |
-| [`07/31 スプリント`](#sprint-0731) | 95点 | 95点 | **90点** | 3Dエネルギー弾丸（左クリック限定）、視野領域（Vision Cone）半透明グラデーション＆AIステータスUI常時化、アプリ層超軽量1-DrawCallパーティクル基盤の完成 | [📄 閲覧](docs/sprints/LE3B_09_コウダ_アユ_週間報告07_31.md) |
-| [`08/07 スプリント`](#sprint-0807) | 95点 | 95点 | **90点** | Blenderレベルエディタ連携（JSON動的ロード）、`container.obj` 他複数モデル＆非均等スケール対応、ゲームクリア/ゲームオーバー遷移を含むゲームループ接続 | [📄 閲覧](docs/sprints/LE3B_09_コウダ_アユ_週間報告08_07.md) |
+| [`07/12 スプリント`](docs/sprints/LE3B_09_コウダ_アユ_週間進捗07_12.md) | 85点 | 70点 | **60点** | 敵AI基本ステート（Patrol/Investigate/Chase）およびデバッグ表示の統合 | [📄 閲覧](docs/sprints/LE3B_09_コウダ_アユ_週間進捗07_12.md) |
+| [`07/17 スプリント`](docs/sprints/LE3B_09_コウダ_アユ_週間報告07_17.md) | 95点 | 90点 | **86点** | 当たり判定バグ完全修正（MeshCollider & Push）、NavMesh / A* 経路探索の実装 | [📄 閲覧](docs/sprints/LE3B_09_コウダ_アユ_週間報告07_17.md) |
+| [`07/24 スプリント`](docs/sprints/LE3B_09_コウダ_アユ_週間報告07_24.md) | 90点 | 95点 | **86点** | CSベースGPUパーティクル統合、`FreeList` による動的メモリ最適化 | [📄 閲覧](docs/sprints/LE3B_09_コウダ_アユ_週間報告07_24.md) |
+| [`07/31 スプリント`](docs/sprints/LE3B_09_コウダ_アユ_週間報告07_31.md) | 95点 | 95点 | **90点** | 3Dエネルギー弾丸、視野領域（Vision Cone）グラデーション、超軽量1-DrawCallパーティクル基盤 | [📄 閲覧](docs/sprints/LE3B_09_コウダ_アユ_週間報告07_31.md) |
+| [`08/07 スプリント`](docs/sprints/LE3B_09_コウダ_アユ_週間報告08_07.md) | 95点 | 95点 | **90点** | Blenderレベルエディタ連携（JSON動的ロード）、ゲームクリア/ゲームオーバー遷移接続 | [📄 閲覧](docs/sprints/LE3B_09_コウダ_アユ_週間報告08_07.md) |
+| [`08/16 スプリント`](docs/sprints/LE3B_09_コウダ_アユ_週間報告08_16.md) | 95点 | 95点 | **90点** | タクティカル脱出ループ、物資探索（LootSystem）、リロード/治療ステート、戦績リザルト（RaidStats） | [📄 閲覧](docs/sprints/LE3B_09_コウダ_アユ_週間報告08_16.md) |
+| [`08/23 スプリント`](docs/sprints/LE3B_09_コウダ_アユ_週間報告08_23.md) | 95点 | 95点 | **90点** | 戦闘・物理サブシステム完全分離（CombatSystem/CollisionSystem）、巡回移動敵AI、目標破壊ミッション | [📄 閲覧](docs/sprints/LE3B_09_コウダ_アユ_週間報告08_23.md) |
+| [`08/29 スプリント`](docs/sprints/LE3B_09_コウダ_アユ_週間報告08_29.md) | 95点 | 95点 | **90点** | **Alphaフェーズ完了**: リアルタイムプロファイラUI（60FPS維持実証）、演出磨き上げ、全ループ完全結合 | [📄 閲覧](docs/sprints/LE3B_09_コウダ_アユ_週間報告08_29.md) |
 
 ---
 
-#### <a id="sprint-0712"></a>🔹 1. [07/12 スプリント](docs/sprints/LE3B_09_コウダ_アユ_週間進捗07_12.md)：敵AI基本システムの構築と課題抽出
-- **主な成果**: 敵AIの基本行動ステート（巡回スイング、音検知移動、射撃）を構築し、DebugUIによるステートのビジュアル検証を完了。
-- **振り返り・カイゼン**: 当たり判定の視覚的ズレ（DoD未達）が発覚したため、次週でバグ修正（テクニカルデット解消）を最優先タスクに配置する計画へと軌道修正。
-- 🔗 **評価資料原本**: [LE3B_09_コウダ_アユ_週間進捗07_12.md](docs/sprints/LE3B_09_コウダ_アユ_週間進捗07_12.md)
+## 🚀 クイックスタート (ゲーム開発の始め方)
 
-#### <a id="sprint-0717"></a>🔹 2. [07/17 スプリント](docs/sprints/LE3B_09_コウダ_アユ_週間報告07_17.md)：エンジンレイヤ移行と当たり判定・経路探索の完成
-- **主な成果**:
-  - **精密衝突判定**: `MeshCollider` によるポリゴン精度判定および重複衝突の多重押し出し（Accumulated Push）処理を実装し、当たり判定のズレを解消。
-  - **AI経路探索**: NavMesh生成とA*経路探索を先行完了させ、ビヘイビアツリー（`test_cover_tree.json`）と接続。
-  - **エンジン共通化**: アプリ層からエンジン層への共通コンテキスト・パーティクル描画の一本化リファクタリングを実施。
-- 🔗 **評価資料原本**: [LE3B_09_コウダ_アユ_週間報告07_17.md](docs/sprints/LE3B_09_コウダ_アユ_週間報告07_17.md)
+本エンジンは、**純粋なゲームエンジン基盤とクリーンなSceneステートマシン**を備えています。
 
-#### <a id="sprint-0724"></a>🔹 3. [07/24 スプリント](docs/sprints/LE3B_09_コウダ_アユ_週間報告07_24.md)：GPUコンピュートシェーダーとFreeListメモリ最適化
-- **主な成果**:
-  - **GPUパーティクル**: Compute Shader (`UpdateParticle.CS`, `EmitParticle.CS`) による大量描画基盤と `ParticleEmitter` を構築。
-  - **FreeListメモリ管理**: アロケーション競合のない動的インデックス管理（`FreeList` システム）を導入し、CPU負荷ゼロに近い高速パーティクル生成・破棄を実現。
-  - **DebugUI統合**: パラメータのリアルタイム調整・検証環境を整備。
-- 🔗 **評価資料原本**: [LE3B_09_コウダ_アユ_週間報告07_24.md](docs/sprints/LE3B_09_コウダ_アユ_週間報告07_24.md)
+```bash
+# 1. リポジトリのクローン
+git clone https://github.com/KoudaAyu/CG-DirectXGame.git
 
-#### <a id="sprint-0731"></a>🔹 4. [07/31 スプリント](docs/sprints/LE3B_09_コウダ_アユ_週間報告07_31.md)：3D射撃ビジュアル・敵視界オーバーレイ・アプリ層超軽量パーティクルパイプライン
-- **主な成果**:
-  - **3D射撃＆操作限定**: 弾丸を3Dカプセルエネルギーモデル（`sphere.obj`）に更新し旋回制御を実装。射撃キーを左クリック（`VK_LBUTTON`）のみに限定し誤爆を解消。
-  - **敵視界＆AIステータスUI**: 地面に広がるパトロール/警戒/追跡に応じた3色グラデーションの視野領域（Vision Cone）と頭上 `INVESTIGATE (Alert: 100%)` 等のUIをデフォルト常時表示化。
-  - **アプリ層完結型1-DrawCallパーティクル基盤**: エンジン層不変の制約を遵守しながら、全パーティクルを1024粒まとめて1回の `DrawInstanced` で超高速描画（`0.03ms`, 60FPS維持）する自前バッファ＆`PerView`バインド処理を `AppParticleManager` に完全構築。
-- 🔗 **評価資料原本**: [LE3B_09_コウダ_アユ_週間報告07_31.md](docs/sprints/LE3B_09_コウダ_アユ_週間報告07_31.md)
-
-#### <a id="sprint-0807"></a>🔹 5. [08/07 スプリント](docs/sprints/LE3B_09_コウダ_アユ_週間報告08_07.md)：Blenderレベルエディタ動的連携・多種モデル障害物・ゲームループ完成
-- **主な成果**:
-  - **Blenderレベルエディタ＆JSON連携強化**: `stage_layout.json` からの動的マップロード処理を大幅更新。`export_blender_layout.py` や `level_editor_addon.py` などの自前ツール群を整備。
-  - **障害物モデルの汎用化・非均等スケール対応**: 単一の `fence.obj` だけでなく、`container.obj` などの多種モデル指定（`modelFilename`）や個別のトランスフォーム（非均等 `scale`）を `Obstacle` / `GamePlayScene` に動的バインド可能化。
-  - **ゲームループ＆レベルプレイテストの統合**: 敵警戒度100%でのゲームオーバー判定および目的地到達のクリア遷移、遮蔽物を配置した動的ステージ上での敵AI（Patrol / Investigate / Chase）挙動とステルスアクションの難易度検証を完了。
-- 🔗 **評価資料原本**: [LE3B_09_コウダ_アユ_週間報告08_07.md](docs/sprints/LE3B_09_コウダ_アユ_週間報告08_07.md)
-
----
-
-
-
-## 📂 プロジェクト・ディレクトリ構造（レイヤー分離設計）
-
-初見のコードレビューアーや開発者が直感的に全体像を理解できるよう、本リポジトリは **「エンジン層（Engine）」** と **「アプリケーション層（Application）」** に完全分離されています。
-
-```text
-Engine/
- ├── project/
- │    ├── Baziru3_Engine/           [🎮 エンジンコア・レイヤー]
- │    │    ├── Core/                - 基盤コンテキスト、Window, DirectXCom, Allocators (CBV/Stack)
- │    │    ├── Graphics/            - 3Dモデル、スプライト、シェーダー、照明 (CSM), GpuProfiler
- │    │    └── Framework/           - 衝突判定 (BVH/AABBTree/Mesh), GPUパーティクル, AIノード
- │    ├── Application/              [🚀 ゲームアプリケーション・レイヤー]
- │    │    ├── Scene/               - ゲームプレイ/タイトル/クリア各シーン
- │    │    ├── Player/              - プレイヤー移動・回転・入力処理
- │    │    ├── Enemy/               - 敵AI行動・ステートマシン
- │    │    ├── GameObject/          - 弾 (Bullet)、障害物 (Obstacle) 等のゲームオブジェクト
- │    │    └── Subsystem/           - サブシステム群
- │    ├── Resources/                [🎨 アセットデータ]
- │    │    ├── shaders/             - HLSL シェーダー群 (VS/PS/CS)
- │    │    ├── textures/ & models/  - 3Dモデル・テクスチャ
- │    │    └── ai_trees/            - AI Behavior Tree JSON定義ファイル
- │    ├── externals/                [📦 サードパーティライブラリ]
- │    │    └── ImGui, imgui-node-editor, Assimp, DirectXTex, nlohmann
- │    ├── DirectXGame.sln           [🔧 Visual Studio 2026 ソリューション]
- │    └── DirectXGame.vcxproj       [🔧 プロジェクト定義ファイル]
- └── README.md                      [📖 アーキテクチャ解説ドキュメント]
+# 2. 新規ゲーム開発ブランチの作成
+git checkout -b feature/my_new_game
 ```
-=======
-C++ および DirectX 12 を用いてスクラッチから構築した、ゲームデベロッパー向け技術アピール用自作3Dゲームエンジンプロジェクトです。
-商用コンソールゲーム開発におけるパフォーマンス要求（ロード時間極小化、動的メモリ確保の抑制、空間分割による物理演算最適化など）をクリアするためのアーキテクチャ設計を意識しています。
->>>>>>> docs: update README.md with portfolio details and features
+
+### 🎮 ゲーム開発の流れ
+1. **[`project/Application/Scene/GameScene/GamePlayScene.cpp`](project/Application/Scene/GameScene/GamePlayScene.cpp)** を開きます。
+2. `InitializeScene()` で 3Dモデル（`Object3d`）やプレイヤー、カメラ、コライダーを生成します。
+3. `Update()` でプレイヤーの操作ロジックや当たり判定処理を記述します。
+4. `Draw()` で描画コマンドを発行します。
+5. **シーン遷移**: `TitleScene` ⇄ `GamePlayScene` ⇄ `ClearScene` / `GameOverScene` が完備されており、**SPACE キー** や画面上のボタンでシームレスに切り替わります。
+
+> 📖 より詳しい実装チュートリアルは [docs/How_To_Start_Game_Development.md](docs/How_To_Start_Game_Development.md) をご覧ください。
 
 ---
 
-## 🛠️ 技術スタック
-
-<<<<<<< HEAD
-
-* **言語**: C++ (C++20 / ISO C++ 最新規格)
-* **グラフィックス API**: DirectX 12 (Direct3D 12)
-* **シェーダー言語**: HLSL (Shader Model 6.x)
-* **開発環境**: Visual Studio 2026 (MSBuild, Platform Toolset v143 / v145)
-* **主要外部ライブラリ**:
-=======
-* **言語**: C++ (C++20 / ISO C++ 最新規格)
-* **グラフィックス API**: DirectX 12 (Direct3D 12)
-* **シェーダー言語**: HLSL (Shader Model 6.x)
-* **開発環境**: Visual Studio 2022 (MSBuild, Platform Toolset v143 / v145)
-* **サードパーティライブラリ**:
->>>>>>> docs: update README.md with portfolio details and features
-  * **ImGui**: デバッグインターフェース用
-  * **imgui-node-editor**: Behavior Tree 等のノード編集ツール用
-  * **Assimp**: 3Dモデル（GLTF/OBJ等）インポート用
-  * **DirectXTex**: テクスチャロード・処理用
+## 🛠️ エンジン中核アーキテクチャ & 低レイヤ技術解説 (Technical Deep Dive)
 
 ---
 
-<<<<<<< HEAD
-## 🎯 技術的アピールポイント（最適化への取り組み）
-
-### 1. メモリ管理システム (Memory Management System) - 動的確保の抑制
+### 1. メモリ管理の最適化 (Memory Optimization) - ヒープ競合と断片化のゼロ化
 
 #### 【背景と課題】
-ゲーム実行中の頻繁な動的メモリ確保（`new`/`delete`）は、**メモリ断片化（フラグメンテーション）**の原因となり、最悪の場合メモリアロケーションオーバーヘッドによる処理落ち（ヒッチング）を引き起こします。特に DirectX 12 における定数バッファの都度生成は非常に大きな負荷となります。
+一般的な `new` / `malloc` による動的ヒープ確保は、フレームレートのスパイク（ヒープ競合・ロック待ち・メモリ断片化）を引き起こす最大の要因です。商用アクションゲームでは 60fps / 120fps を維持するため、毎フレームのヒープ割り当てをゼロにする設計が必須となります。
 
 #### 【解決手法】
 * **定数バッファ用リングバッファアロケータ (`ConstantBufferAllocator`)**
-  * トリプルバッファリング構成（3フレーム分の領域を事前に一括確保）を採用し、CPUとGPUのアクセス非同期競合を回避しつつ、256バイトの境界アラインメントを自動調整して高速にメモリを切り出します。
-* **短寿命オブジェクト用スタックアロケータ (`StackAllocator`)**
-  * 1フレームで使い捨てる一時オブジェクト用に起動時に一括でメモリプールを確保。ポインタを前進させるだけ（計算量 $O(1)$）でアロケートし、フレーム終了時にポインタを先頭に戻すだけで一括論理解放する仕組みを構築しました。
+  * アップロードヒープ上に巨大な単一バッファ（128MB）を確保し、GPUとCPUのフレーム遅延をトリプルバッファリング同期で吸収しながら、256バイトアラインメントで順次切り出し。
+  * `Allocate()` 呼び出しはポインタを進めるだけの $O(1)$ 操作となり、毎フレームの定数バッファ作成・破棄コストを完全にゼロ化。
+* **短寿命フレーム用スタックアロケータ (`StackAllocator`)**
+  * 衝突判定の中間演算データなど、1フレームのみ使用する一時メモリをスタック構造で切り出し、フレーム終了時にポインタをリセット。
+* **パーティクル用 `FreeList` インデックス管理**
+  * パーティクルの生成・消滅時に配列の再確保を行わず、空きスロットのインデックスをフリーリストで管理することで、完全な $O(1)$ 再利用を実現。
 
 #### 【効果】
-* 実行中の動的アロケーションを完全に排除し、メモリ断片化およびアロケーション負荷を防止。
+* 描画・更新ループにおける動的メモリ割り当て回数を **毎フレーム 0 回** を達成。
+* ガベージコレクションやメモリアロケーションによるマイクロスタッター（瞬間的なカクつき）を完全排除。
 
-#### 【定数バッファアロケータのトリプルバッファリング同期構造】
-![Allocator](project/Resources/slides/slide_allocator.png)
+#### 【図面：定数バッファアロケータのトリプルバッファリング同期構造】
+```mermaid
+graph TD
+    subgraph CPU ["CPU 側 (データ書き込み)"]
+        Alloc["ConstantBufferAllocator"] -->|"Allocate O(1)"| Frame0["Frame Buffer 0"]
+        Alloc -->|"Allocate O(1)"| Frame1["Frame Buffer 1"]
+        Alloc -->|"Allocate O(1)"| Frame2["Frame Buffer 2"]
+    end
+    subgraph GPU ["GPU 側 (レンダリング実行)"]
+        Frame0 -->|"GPUが読み出し中"| Draw["DirectX12 描画コマンド実行"]
+    end
+    subgraph Sync ["同期制御 (Fence)"]
+        Fence["Fence Value 同期"] -.->|"GPU読み出し完了まで"| Frame0
+        Fence -.->|"安全になったらCPU書き込み許可"| Alloc
+    end
+    style Frame0 fill:#2b6cb0,stroke:#3182ce,stroke-width:2px,color:#fff
+    style Frame1 fill:#2d3748,stroke:#4a5568,stroke-width:1px,color:#a0aec0
+    style Frame2 fill:#2d3748,stroke:#4a5568,stroke-width:1px,color:#a0aec0
+```
 
 ---
 
-### 2. 衝突判定の最適化 (Collision Optimization) - 空間分割とデータ指向
+### 2. 物理・衝突判定の最適化 (Collision Optimization) - 空間分割とデータ指向
 
 #### 【背景と課題】
-オブジェクト数が数百〜数千規模に増大した際、総当たり判定（計算量 $O(N^2)$）を行うとCPU負荷が跳ね上がり、ゲームの処理落ちを引き起こします。
+ゲーム内のオブジェクト数が数百〜数千規模に増大した際、総当たり判定（計算量 $O(N^2)$）を行うとCPU負荷が跳ね上がり、ゲームの処理落ちを引き起こします。
 
 #### 【解決手法】
 * **グリッドベース空間ハッシュ分割 (`SpatialHashCell`)**
-  * 3D空間をグリッドセル（サイズ 10.0f）に区切り、各オブジェクトをハッシュ値に変換して登録。隣接セル内のオブジェクト同士のみを判定対象とします。
+  * 3D空間をグリッドセル（サイズ 10.0f）に区切り、各オブジェクトの座標からハッシュキーを生成して登録。同一および隣接セル内のオブジェクト同士のみを判定対象とすることで、判定計算量を $O(N)$ へ削減。
 * **データ指向設計 (Data-Oriented Design)**
-  * クラス階層を巡るポインタ参照を廃止し、判定に必要なパラメータ（座標、サイズ、回転等）のみをメモリ上で連続する配列に並べて一括イテレート処理します。
-* **境界ボリューム階層 (BVH: Bounding Volume Hierarchy)**
-  * 大量のオブジェクトを階層的なAABB（境界箱）でツリー状にグループ化。親の境界箱と非衝突なら、その中にある子コライダーの衝突計算を $O(1)$ で一括スキップ（枝刈り）します。
+  * クラス階層を巡るポインタ参照を廃止し、判定に必要なパラメータ（座標、サイズ、回転等）のみをメモリ上で連続する配列に並べて一括イテレート処理（キャッシュヒット率向上）。
+* **多彩なコライダーと連続衝突判定 (CCD: Continuous Collision Detection)**
+  * `SphereCollider`, `BoxCollider` (OBB), `CapsuleCollider`, `MeshCollider` (ポリゴンメッシュ判定) をサポート。
+  * 高速で移動する弾丸には Ray / LineSegment による連続線分判定を適用し、壁や遮蔽物のすり抜け（トンネル現象）を防止。
+* **多重押し出し解決 (Accumulated Push)**
+  * 複数のオブジェクトや壁と同時に接触した際、各接触ベクトルの累積合成によって正確なめり込み解決を実行。
 
 #### 【効果】
-* 衝突判定の計算量を大幅に削減し、メモリアクセスのキャッシュミス（Cache Miss）によるCPUボトルネックを極小化。
-* **【実証実績】敵キャラクターおよびコライダーを「最大600体以上」同時に出現・動作させても、処理落ちすることなく完全に滑らかなフレームレートを維持できる超軽量動作を実証しました。**
+* **【実証実績】敵キャラクターおよびコライダーを「最大600体以上」同時に出現・動作させても、処理落ちすることなく完全に滑らかなフレームレート（60FPS）を維持できる超軽量動作を実証。**
 
-#### 【空間ハッシュによる衝突判定高速化アルゴリズムフロー】
-![Spatial Hash](project/Resources/slides/slide_spatial_hash.png)
+#### 【図面：空間ハッシュによる衝突判定高速化アルゴリズムフロー】
+```mermaid
+graph TD
+    Pos["オブジェクトのワールド座標"] -->|"セルサイズ 10.0f で除算"| Grid["グリッド座標を算出"]
+    Grid -->|"ビット演算子による合成"| Hash["ユニークなハッシュキーを生成"]
+    Hash -->|"ハッシュテーブルへ登録"| Table["SpatialHashCells テーブル"]
+    Table -->|"同一 & 隣接セル内のみ抽出"| Filter["衝突判定ペアを構築"]
+    Filter -->|"総当たり回数を大幅削減"| Compare["精密衝突判定実行"]
+    Compare -->|"めり込みあり"| Push["多重押し出し解決 & コールバック起動"]
+```
 
 ---
 
-### 3. データ駆動AIシステム (Data-Driven AI System) - イテレーション効率化
+### 3. レンダリング & GPU パイプライン (DirectX 12 Graphics)
+
+* **Compute Shader (CS) ベース GPU パーティクル**
+  * `EmitParticle.CS` / `UpdateParticle.CS` により、数万〜数十万個のパーティクル物理シミュレーションを GPU 上で並列実行。CPU 負荷をほぼゼロに抑えた演出を実現。
+* **スキニングメッシュアニメーション**
+  * Assimp を統合し、ボーン階層構造とスキンクラスタ（Bone Matrix Palette）を GPU で高速変形。
+* **スカイボックス & 環境マップ**
+  * キューブマップ DDS テクスチャによる全天球環境レンダリング。
+* **2D スプライト & UI レンダラー**
+  * 画面直交座標系 (Orthographic) に最適化された 2D パイプライン（`Sprite_Normal`, 加算・乗算・スクリーンブレンド対応）。
+* **GPU プロファイラ (`GpuProfiler`)**
+  * DirectX 12 の Query Heap を用い、各描画パスごとの GPU 処理時間をマイクロ秒単位で正確に計測・可視化。
+
+---
+
+### 4. データ駆動 AI システム & ツール連携 (Data-Driven AI & Level Editor)
 
 #### 【背景と課題】
-AI（Behavior Tree）の挙動調整のたびにソースコードの再コンパイル・ビルドを行うと、イテレーション速度が低下しゲームのゲームプレイ調整の妨げになります。
+AI の挙動やステージ配置の調整のたびにソースコードを再コンパイル・ビルドすると、ゲームプレイ調整のイテレーション速度が著しく低下します。
 
 #### 【解決手法】
-* **ビジュアルノードエディタ (`imgui-node-editor` の統合)**
-  * ゲーム実行中にImGui上でノード（Selector, Sequence, Action）を接続してAIの思考木をリアルタイムに構築可能に。
-  * 編集結果は瞬時にJSONアセットとしてファイル出力され、それをエンジン側が動的に読み込み・再構成（Blackboardの変数共有も対応）します。
+* **ビジュアル Behavior Tree エディタ (`imgui-node-editor` の統合)**
+  * ゲーム実行中に ImGui 上でノード（Selector, Sequence, Condition, Action）を接続し、AIの思考木をリアルタイムに構築可能。
+  * 編集結果は瞬時に JSON アセットとして保存され、エンジン側が動的に読み込み・再構成（Blackboard メモリ共有対応）。
+* **NavMesh & A\* 経路探索**
+  * 静的ステージメッシュからナビゲーションメッシュを生成し、A* アルゴリズムにより障害物を回避しながらプレイヤーを追跡・捜索・カバーリングする敵AIを実現。
+* **Blender レベルエディタ連携**
+  * Blender 上でステージ配置・敵配置を行ったデータを Python スクリプト経由で JSON 出力し、エンジン側で 1-Click で実機ステージとしてロード。
 
-#### 【効果】
-* プログラマー以外のプランナー等でも、ゲームを実行したままAIの挙動調整が可能になり、イテレーション効率を向上。
-
-#### 【Behavior Tree と Blackboard メモリの連携構成】
-![Behavior Tree](project/Resources/slides/slide_bt_bb.png)
+#### 【図面：Behavior Tree と Blackboard メモリの連携構成】
+```mermaid
+graph TD
+    subgraph Decision ["意思決定部 (BehaviorTree)"]
+        Root["Root Node"] -->|"Tick"| Selector["Selector Node"]
+        Selector -->|"失敗なら次へ"| Sequence["Sequence Node"]
+        Sequence -->|"成功なら次へ"| Cond["Condition Node"]
+        Cond -->|"True"| Action["Action Node (移動/索敵/射撃)"]
+    end
+    subgraph Data ["データ部 (Blackboard)"]
+        BB["Blackboard Memory"] <-->|"標的座標・警戒レベル等の読み書き"| Action
+        BB <-->|"状態チェック"| Cond
+    end
+```
 
 ---
 
-## 📖 API取扱説明書 (API Usage)
+## 📖 API 取扱説明書 (API Usage)
 
 ### 1. エンジンの初期化とサブシステム取得
 
-#### [main.cpp](file:///c:/Users/k024g/OneDrive/デスクトップ/Engine_ver2026/project/main.cpp) の実装例
 ```cpp
-int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
+// main.cpp
+int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 {    
     std::unique_ptr<Framework> game = std::make_unique<Game>();
     game->Run();
@@ -212,119 +201,156 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 }
 ```
 
-#### サブシステム取得例 ([Game.cpp](file:///c:/Users/k024g/OneDrive/デスクトップ/Engine_ver2026/project/Game.cpp))
 ```cpp
-auto* dx = engine_->GetDirectXCom();       // DirectX 12 描画デバイス
-auto* window = engine_->GetWindowAPI();     // Window管理
-auto* spriteCom = engine_->GetSpriteCom(); // スプライト共通コンポーネント
+// サブシステム取得例
+auto* dx = SceneManager::GetInstance()->GetDirectXCom();       // DirectX 12 デバイス
+auto* colMgr = CollisionManager::GetInstance();                // 衝突判定マネージャ
+auto* texMgr = TextureManager::GetInstance();                  // テクスチャマネージャ
 ```
 
-### 2. 定数バッファの割り当て例
+### 2. 定数バッファの高速切り出し (`ConstantBufferAllocator`)
 
 ```cpp
-auto cbAllocator = engine_->GetConstantBufferAllocator();
+auto* cbAllocator = dxCommon->GetCBAllocator();
 
-// 256バイトアラインメント調整されたメモリの切り出し
-auto allocation = cbAllocator->Allocate(sizeof(MyConstBufferData));
+// 256バイトアラインメントで O(1) 切り出し
+auto matAlloc = cbAllocator->Allocate(sizeof(Material));
+std::memcpy(matAlloc.cpuAddress, &materialData, sizeof(Material));
 
-// CPU書き込み
-MyConstBufferData* cbData = static_cast<MyConstBufferData*>(allocation.cpuAddress);
-cbData->worldMatrix = worldMatrix;
-
-// GPUコマンドへセット
-commandList->SetGraphicsRootConstantBufferView(rootParamIndex, allocation.gpuAddress);
+// GPU コマンドへ直接セット
+commandList->SetGraphicsRootConstantBufferView(0, matAlloc.gpuAddress);
 ```
 
 ### 3. コライダーの登録と衝突イベントコールバック
 
 ```cpp
 #include "CollisionManager.h"
-#include "SphereCollider.h"
+#include "BoxCollider.h"
 
-// 衝突形状とカテゴリの決定
-auto collider = std::make_unique<SphereCollider>(CollisionAttribute::Player);
-collider->SetRadius(2.5f);
+// OBB ボックスコライダーの作成
+auto collider = std::make_unique<BoxCollider>(CollisionAttribute::Player);
+collider->SetSize({ 1.0f, 2.0f, 1.0f });
 
-// 衝突時イベントのバインド
+// 衝突コールバックの登録
 collider->SetOnCollision([](const CollisionInfo& info) {
-    if (info.other->GetAttribute() == CollisionAttribute::Bullet) {
-        TakeDamage();
+    if (info.other->GetAttribute() == CollisionAttribute::EnemyBullet) {
+        TakeDamage(info.contactPoint);
     }
 });
 
-// マネージャへの登録
+// マネージャへ登録 (空間ハッシュへ自動登録される)
 CollisionManager::GetInstance()->RegisterCollider(collider.get());
 ```
-=======
-## ✨ 主要機能 & 技術アピールポイント
-
-### 1. メモリ管理の最適化 (Custom Allocators)
-ゲーム実行中の動的メモリ確保（`new`/`delete`）による断片化やフレームレート低下を防ぐため、用途に合わせたカスタムアロケータを実装。
-* **CBV用リングバッファアロケータ**: 毎フレームのバッファ生成を廃止し、起動時に一括確保したアップロードバッファをCPU-GPU同期フェンスを用いてリング状に使い回す仕組み。
-* **スタックアロケータ / プールアロケータ**: 短寿命オブジェクトや同一サイズオブジェクト（コライダー等）の超高速な切り出し・一括リセットを $O(1)$ で実現。
-
-### 2. 衝突判定の高速化 (Collision Optimization)
-* **八分木 (Octree) 空間分割**: ワールド空間を再帰的に分割し、総当たり判定回数を削減。
-* **データ指向設計 (DOD)**: キャッシュミスを極小化するため、判定に必要なデータ（AABB、Sphere等）のみをメモリ上に連続して並べるデータ構造設計を適用。
-
-### 3. DirectX 12 メガヒープ管理
-* **ディスクリプタヒープマネージャ**: SRV/UAV 用に大きなメガヒープを起動時に1つだけ確保し、描画ごとのヒープ切り替えオーバーヘッドを削減。
-
-### 4. ツール・エディタ基盤の構築
-* **BehaviorTree エディタ**: `imgui-node-editor` を統合し、AIロジックをGUIノードベースでビジュアル編集・デバッグできる仕組みをエンジン層に構築。
->>>>>>> docs: update README.md with portfolio details and features
 
 ---
 
-## 🚀 開発ロードマップ & 進捗
+## 🧰 自作開発支援ツール & パイプライン (In-Engine & External Tools)
 
-<<<<<<< HEAD
-- [x] **DirectX 12 描画基礎**: パイプライン、シェーダバインド、定数バッファ管理
-- [x] **アニメーション**: スケルトン、ジョイント、スキンクラスタ対応（Assimp統合）
-- [x] **デバッグ環境**: ImGui 統合、および GUI Behavior Tree エディタ
-- [x] **メモリ最適化**: CBV用リングバッファ、スタック/プールアロケータ (`ConstantBufferAllocator`, `StackAllocator`, `FreeList`) & パフォーマンスプロファイラUI
-- [x] **衝突最適化**: 八分木/BVH空間分割 (AABBTree)、空間ハッシュ、データ指向設計 (DOD)
-- [x] **グラフィックス強化**: カスケードシャドウマップ (CSM) & 全3Dモデル動的視錐台カリング
-- [x] **Assetバイナリ化**: `.bmodel` / `.bskel` / `.banim` 高速バイナリシリアライザ
+Baziru3 Engine では、ゲーム開発ベロシティの最大化と直感的なコンテンツ制作を実現するため、エンジン内部および外部ツール連携による**自作開発支援ツール群を完備**しています。
 
-=======
-現在のエンジン実装および最適化の進捗状況です。
+### 1. ノードベース AI ビヘイビアツリーエディタ (`BehaviorTreeEditor`)
+* **実装モジュール**: [`project/Baziru3_Engine/Framework/AI/BehaviorTreeEditor.h`](project/Baziru3_Engine/Framework/AI/BehaviorTreeEditor.h), [`BehaviorTreeEditor.cpp`](project/Baziru3_Engine/Framework/AI/BehaviorTreeEditor.cpp)
+* **概要**: `imgui-node-editor` をベースに独自拡張した、敵AIの思考ロジックを直感的なグラフUIで構築・編集できるノードエディタです。
+* **主要機能**:
+  * **制御ノード & アクションノードの視覚的配線**: `Selector` (優先度選択), `Sequence` (順次実行), `Parallel` (並行実行) などのコンポジットノードと、`Patrol` (巡回), `Investigate` (音源捜索), `Chase` (追従), `Cover` (遮蔽退避), `Shoot` (射撃) ノードをGUI上でドラッグ＆ドロップ接続。
+  * **実行中ノードのリアルタイム・アクティブハイライト**: AIが現在どのノードを評価・実行しているかを色別でリアルタイム表示し、AIのデバッグを劇的に容易化。
+  * **JSON シリアライズ & 動的ホットリロード**: エディタ上で設計したツリー構造を JSON 形式で保存し、ゲーム実行中に即座に再読み込み可能。
 
-- [x] **DirectX 12 描画基礎**: パイプライン、シェーダバインド、定数バッファ管理
-- [x] **アニメーション**: スケルトン、ジョイント、スキンクアスタ対応（Assimp統合）
-- [x] **デバッグ環境**: ImGui 統合、および GUI Behavior Tree エディタ
-- [ ] **メモリ最適化**: CBV用リングバッファ、スタック/プールアロケータのフル統合
-- [ ] **衝突最適化**: 八分木空間分割およびデータ指向設計 (DOD)
-- [ ] **グラフィックス強化**: カスケードシャドウマップ (CSM) の実装
-- [ ] **アassetバイナリ化**: パースを伴わない高速ロードとマルチスレッド非同期読み込み
->>>>>>> docs: update README.md with portfolio details and features
+```mermaid
+graph TD
+    Root["Root Node"] --> Sel["Selector (優先度分岐)"]
+    Sel --> ChaseSeq["Sequence (交戦・追従)"]
+    Sel --> CoverSeq["Sequence (遮蔽・回復)"]
+    Sel --> PatrolAct["Action: Patrol (巡回)"]
+    ChaseSeq --> InSightCond["Condition: 視界内?"]
+    ChaseSeq --> ShootAct["Action: Shoot (射撃)"]
+    CoverSeq --> LowHPCond["Condition: HP低下?"]
+    CoverSeq --> FindCoverAct["Action: FindCover (遮蔽探索)"]
+    CoverSeq --> MoveToCoverAct["Action: MoveToCover (退避)"]
+    style Root fill:#d69e2e,stroke:#b7791f,stroke-width:2px,color:#fff
+    style Sel fill:#3182ce,stroke:#2b6cb0,stroke-width:2px,color:#fff
+    style ChaseSeq fill:#805ad5,stroke:#6b46c1,stroke-width:2px,color:#fff
+    style CoverSeq fill:#805ad5,stroke:#6b46c1,stroke-width:2px,color:#fff
+    style PatrolAct fill:#38a169,stroke:#2f855a,stroke-width:2px,color:#fff
+    style ShootAct fill:#e53e3e,stroke:#c53030,stroke-width:2px,color:#fff
+    style MoveToCoverAct fill:#38a169,stroke:#2f855a,stroke-width:2px,color:#fff
+```
+
+### 2. Blender レベルデザイン同期パイプライン (`export_blender_layout.py` & `LevelEditor`)
+* **実装モジュール**: [`docs/tools/export_blender_layout.py`](docs/tools/export_blender_layout.py), [`project/Application/LevelEditor.h`](project/Application/LevelEditor.h), [`LevelEditor.cpp`](project/Application/LevelEditor.cpp)
+* **概要**: DCCツール「Blender」をそのまま3Dレベルエディタとして活用し、配置したオブジェクトやギミック情報を自作エンジンへ一括インポートするパイプラインです。
+* **主要機能**:
+  * **座標系の自動変換**: Blender（右手系・Z-Up）から DirectX 12（左手系・Y-Up）への座標・回転変換を自動適用。
+  * **多種多様なエンティティの動的パース**: 障害物（`container.obj`, `fence.obj` 等）、アイテムボックス（`LootBox`）、プレイヤー／敵スポーン位置（`PlayerSpawn`, `EnemySpawn`）、バイオームゾーン（`Forest`, `Desert`, `River`）を一括JSONロード。
+  * **非均等スケール & コライダー自動フィッティング**: 配置された各オブジェクトのスケールに応じて、`BoxCollider` / `CapsuleCollider` を自動生成して `CollisionManager` に即座に登録。
+
+### 3. プロシージャル自然物生成システム (`BioProceduralGenerator`)
+* **実装モジュール**: [`project/Baziru3_Engine/3D/Procedural/BioProceduralGenerator.h`](project/Baziru3_Engine/3D/Procedural/BioProceduralGenerator.h), [`BioProceduralGenerator.cpp`](project/Baziru3_Engine/3D/Procedural/BioProceduralGenerator.cpp)
+* **概要**: L-System（リンデンマイヤーシステム）とフラクタル再帰アルゴリズムを用いて、樹木（Tree）や岩石（Rock）の3Dメッシュをプロシージャル（動的幾何計算）に自動生成するシステムです。
+* **主要機能**:
+  * **フラクタル樹木生成**: シード値、分岐深度（`iterations`）、枝の長さ・半径・テーパー率・分岐角度からリアルな自然樹木メッシュを即座に構築。
+  * **ボロノイノイズ岩石生成**: 球体メッシュに対し、フラクタルノイズ・ボロノイセル・クラック変形を適用し、ゴツゴツとした自然な岩石ジオメトリを生成。
+  * **LOD（Level of Detail）対応 & キャッシュ管理**: 頂点計算結果をメモリ内にキャッシュし、実行時の同一シード再計算をスキップ。
+
+### 4. GPUプロファイラ & リアルタイムエンジンモニター (`GpuProfiler` / `Duckov Profiler`)
+* **実装モジュール**: [`project/Baziru3_Engine/Graphics/Graphics/GpuProfiler.h`](project/Baziru3_Engine/Graphics/Graphics/GpuProfiler.h), [`project/Application/Scene/GameScene/GamePlayHUD.cpp`](project/Application/Scene/GameScene/GamePlayHUD.cpp)
+* **概要**: DirectX 12 のタイムスタンプクエリ（Timestamp Query）を用いて、GPU描画パスごとのマイクロ秒単位処理時間とCPUフレームタイムをリアルタイム計測・可視化するツールです。
+* **主要機能**:
+  * **描画パス別GPUタイム計測**: 3D不透明パス、シャドウマップパス、パーティクル描画パス、ポストプロセスパスそれぞれのGPU負荷をリアルタイムにグラフ描画。
+  * **フレームレート & メモリ監視**: 60.0 FPS（16.6ms）の安定度、`ConstantBufferRingAllocator` のメモリ消費量、アクティブなパーティクル数・コライダー数を常時HUD表示。
 
 ---
 
-## ⚙️ 動作環境・ビルド手順
+## 📁 ディレクトリ構成
 
-### 前提要件
-* **OS**: Windows 10 / 11
-<<<<<<< HEAD
-* **開発ツール**: Visual Studio 2026
-* **SDK**: Windows SDK 10.0.x 以上
+```
+Engine/
+├── docs/                        # 技術仕様書・週間スプリント報告書
+│   ├── How_To_Start_Game_Development.md  # ゲーム開発開始ガイド
+│   └── sprints/                 # アジャイル開発スプリント報告書一覧
+├── project/
+│   ├── Application/             # アプリケーション層 (ゲーム本体ロジック)
+│   │   ├── Scene/               # 各種シーン (Title, GamePlay, Clear, GameOver)
+│   │   ├── GameObject/          # ゲームオブジェクト (障害物, 弾丸, キャラクター)
+│   │   └── Particle/            # アプリ層軽量パーティクル
+│   ├── Baziru3_Engine/          # エンジンコア層 (DirectX12, メモリ, 物理, レンダラー)
+│   │   ├── Core/                # DirectX12基盤, カメラ, アロケータ
+│   │   ├── Framework/           # シーン管理, 空間ハッシュ衝突判定, AI基盤
+│   │   └── Graphics/            # 2D/3D描画, パイプライン, パーティクル
+│   ├── Resources/               # テクスチャ, 3Dモデル, 音声, シェーダー
+│   ├── Game.cpp / Game.h        # エンジン統括メインループ
+│   └── main.cpp                 # エントリーポイント
+└── README.md                    # 本ドキュメント
+```
 
-### ビルド・実行手順
-=======
-* **開発ツール**: Visual Studio 2022 (C++ によるデスクトップ開発ワークロードがインストールされていること)
-* **SDK**: Windows SDK 10.0.x 以上
+---
+
+## ⚙️ 動作環境 & ビルド手順
+
+### 動作環境
+- **OS**: Windows 10 / 11 (64-bit)
+- **IDE**: Visual Studio 2022 以降 (C++20 対応)
+- **SDK**: Windows SDK 10.0.x 以上
+- **グラフィックス**: DirectX 12 対応 GPU (Feature Level 11_0 以上)
 
 ### ビルド手順
->>>>>>> docs: update README.md with portfolio details and features
-1. このリポジトリをクローンします。
+1. リポジトリをクローンします。
    ```bash
    git clone https://github.com/KoudaAyu/CG-DirectXGame.git
    ```
-<<<<<<< HEAD
-2. `project/DirectXGame.sln` を Visual Studio 2026 で開きます。
-3. 構成（Debug/Development/Release）を選択し、ビルド（F7）を行い、**F5キー**を押してデバッグ実行します。
-=======
-2. リポジトリ直下の `project/DirectXGame.sln` を Visual Studio 2022 で開きます。
-3. 構成を `Debug`, `Development`, `Release` のいずれかに選択し、ビルド（F7）を実行します。
-4. 実行（F5）して動作を確認します。
->>>>>>> docs: update README.md with portfolio details and features
+2. `project/DirectXGame.sln` を Visual Studio で開きます。
+3. ビルド構成を **`Debug | x64`** または **`Release | x64`** に設定します。
+4. **F5 キー**（デバッグ実行）を押してビルド・実行します。
+
+---
+
+## 🚀 開発ロードマップ & 達成項目
+
+- [x] **DirectX 12 描画基盤**: パイプラインステート管理, ルートシグネチャ, SRV/CBV/DSV/RTV
+- [x] **スキニングアニメーション**: Assimp 統合, スケルトン・ボーン行列パレット変形
+- [x] **超低レイヤメモリ最適化**: 定数バッファ用リングアロケータ (`ConstantBufferAllocator`), `StackAllocator`, `FreeList`
+- [x] **高速物理・衝突判定**: 空間ハッシュ分割 (`SpatialHashCell`), OBB/Capsule/MeshCollider, 連続衝突判定 (CCD), 多重押し出し
+- [x] **GPU コンピュートシェーダー**: 大量パーティクルシミュレーション (`EmitParticle.CS`, `UpdateParticle.CS`)
+- [x] **データ駆動 AI システム**: ImGui ノードエディタ Behavior Tree, Blackboard 連携, NavMesh / A* 経路探索
+- [x] **レベルデザイン連携**: Blender レベルエディタ連携 (JSON動的ロード)
+- [x] **ゲーム開発スターター基盤**: 純粋な Scene ステートマシン（TITLE ⇄ GAMEPLAY ⇄ CLEAR / GAMEOVER）

@@ -68,8 +68,6 @@ public:
 	void EmitRiverWaveRipples(std::mt19937& randomEngine, uint32_t waterTexIndex);
 	void EmitRiverSplashDroplet(std::mt19937& randomEngine, const Vector3& position, uint32_t waterTexIndex);
 
-
-
 private:
 	struct Vertex
 	{
@@ -77,7 +75,6 @@ private:
 		Vector2 uv;
 		Vector3 normal;
 	};
-
 	ParticleManager* enginePM_ = nullptr;
 	std::list<AppParticle> particles_;
 

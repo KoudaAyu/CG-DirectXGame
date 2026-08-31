@@ -167,21 +167,39 @@ Model::ModelData Model::LoadObjFile(const std::string& directoryPath, const std:
             for (int32_t faceVertex = 0; faceVertex < 3; ++faceVertex)
             {
                 std::string vertexDefinition;
-                s >> vertexDefinition; //頂点の定義を取得
+                if (!(s >> vertexDefinition)) break;
 
-                //頂点の要素へのIndexは、位置、UV、法線の順で入っているため、分解してIndexを取得する
                 std::istringstream v(vertexDefinition);
-                uint32_t elementIndices[3];
+                uint32_t elementIndices[3] = { 1, 1, 1 };
                 for (int32_t element = 0; element < 3; ++element)
                 {
                     std::string index;
-                    std::getline(v, index, '/'); //スラッシュで区切って要素を取得
-                    elementIndices[element] = std::stoi(index);
+                    if (std::getline(v, index, '/'))
+                    {
+                        if (!index.empty())
+                        {
+                            try
+                            {
+                                elementIndices[element] = static_cast<uint32_t>(std::stoul(index));
+                            }
+                            catch (...)
+                            {
+                                elementIndices[element] = 1;
+                            }
+                        }
+                    }
                 }
-                //要素へのIndexから実際の用をの値を取得して、頂点を構築する
-                Vector4 position = positions[elementIndices[0] - 1]; //OBJファイルは1始まりなので-1する
-                Vector2 texcoord = texcoords[elementIndices[1] - 1];
-                Vector3 normal = normals[elementIndices[2] - 1];
+
+                Vector4 position = (elementIndices[0] > 0 && elementIndices[0] <= positions.size())
+                                       ? positions[elementIndices[0] - 1]
+                                       : Vector4{ 0.0f, 0.0f, 0.0f, 1.0f };
+                Vector2 texcoord = (elementIndices[1] > 0 && elementIndices[1] <= texcoords.size())
+                                       ? texcoords[elementIndices[1] - 1]
+                                       : Vector2{ 0.0f, 0.0f };
+                Vector3 normal = (elementIndices[2] > 0 && elementIndices[2] <= normals.size())
+                                     ? normals[elementIndices[2] - 1]
+                                     : Vector3{ 0.0f, 1.0f, 0.0f };
+
                 triangle[faceVertex] = { position, texcoord, normal };
             }
             // Object3d 側と同じワインディング順で追加

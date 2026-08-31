@@ -825,7 +825,7 @@ DirectX::ScratchImage DirectXCom::LoadTexture(const std::string& filePath)
 	//テクスチャファイルを読み込んでプログラムで使えるようにする
     DirectX::ScratchImage image{};
     std::wstring filePathW = StringUtil::ConvertString(filePath);
-    HRESULT hr = S_OK;
+    HRESULT hr = E_FAIL;
 
     // ファイル拡張子で読み込み方法を選択する (.dds は DirectXTex の DDS ローダーを使う)
     if (filePathW.ends_with(L".dds") || filePathW.ends_with(L".DDS"))
@@ -837,7 +837,29 @@ DirectX::ScratchImage DirectXCom::LoadTexture(const std::string& filePath)
         // WIC で読み込む（SRGB を強制）
         hr = DirectX::LoadFromWICFile(filePathW.c_str(), DirectX::WIC_FLAGS_FORCE_SRGB, nullptr, image);
     }
-    assert(SUCCEEDED(hr));
+
+    // 読み込み失敗時はダミー（4x4 単色ホワイト）テクスチャをオンメモリー生成してフォールバック
+    if (FAILED(hr))
+    {
+        char warnBuf[512];
+        sprintf_s(warnBuf, "[DirectXCom Warning] Failed to load texture '%s' (hr=0x%08X). Generating fallback texture.\n", filePath.c_str(), static_cast<unsigned int>(hr));
+        OutputDebugStringA(warnBuf);
+
+        // 4x4 ホワイトピクセルをオンメモリ生成
+        hr = image.Initialize2D(DXGI_FORMAT_R8G8B8A8_UNORM, 4, 4, 1, 1);
+        if (SUCCEEDED(hr))
+        {
+            const DirectX::Image* img = image.GetImage(0, 0, 0);
+            if (img && img->pixels)
+            {
+                uint32_t* pixels = reinterpret_cast<uint32_t*>(img->pixels);
+                for (size_t i = 0; i < 16; ++i)
+                {
+                    pixels[i] = 0xFFFFFFFF; // 純白不透明 RGBA
+                }
+            }
+        }
+    }
 
     // ミニマップの作成／準備
     DirectX::ScratchImage mipImages{};
@@ -850,7 +872,11 @@ DirectX::ScratchImage DirectXCom::LoadTexture(const std::string& filePath)
     {
         // レベル 0 を指定するとフルチェーンを生成する
         hr = DirectX::GenerateMipMaps(image.GetImages(), image.GetImageCount(), image.GetMetadata(), DirectX::TEX_FILTER_SRGB, 0, mipImages);
-        assert(SUCCEEDED(hr));
+        if (FAILED(hr))
+        {
+            // MipMap生成に失敗した場合はそのまま使用
+            mipImages = std::move(image);
+        }
     }
 
     // ミニマップ付きのデータを返す

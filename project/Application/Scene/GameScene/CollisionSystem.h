@@ -37,11 +37,6 @@ private:
 	/// </summary>
 	void ResolveContactDamage();
 
-	/// <summary>
-	/// プレイヤーおよび移動敵と障害物(BoxCollider)との手動押し出し解決処理
-	/// </summary>
-	void ResolveCharacterObstacleCollisions();
-
 private:
 	GamePlayScene* scene_ = nullptr;    // ゲームプレイシーンへの参照
 };

@@ -15,8 +15,6 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Application\Enemy\Enemy.cpp" />
-    <ClCompile Include="Application\Enemy\MovingEnemy.cpp" />
     <ClCompile Include="Baziru3_Engine\Graphics\3D\Model\SkinCluster\SkinCluster.cpp" />
     <ClCompile Include="Baziru3_Engine\Framework\Animation\Joint\Joint.cpp" />
     <ClCompile Include="Baziru3_Engine\Framework\Animation\NodeAnimation\Node.cpp" />
@@ -63,8 +61,6 @@
     <ClCompile Include="Baziru3_Engine\Graphics\SkyBox\SkyboxCom.cpp" />
     <ClCompile Include="Baziru3_Engine\Core\Platform\Windows\CrashDump.cpp" />
     <ClCompile Include="Baziru3_Engine\Core\Base\DebugUI.cpp" />
-    <ClCompile Include="Application\Framework.cpp" />
-    <ClCompile Include="Application\GameObject\Bullet.cpp" />
 
     <ClCompile Include="Baziru3_Engine\Core\Base\EngineAssert.cpp" />
     <ClCompile Include="Baziru3_Engine\Core\Base\EngineContext.cpp" />
@@ -72,12 +68,19 @@
     <ClCompile Include="Baziru3_Engine\Core\Base\ConstantBufferRingAllocator.cpp" />
 
     <ClCompile Include="Game.cpp" />
+    <ClCompile Include="Application\Framework.cpp" />
+    <ClCompile Include="Application\GameObject\Bullet.cpp" />
+    <ClCompile Include="Application\Obstacle.cpp" />
+    <ClCompile Include="Application\LevelEditor.cpp" />
     <ClCompile Include="Application\Scene\GameScene\GamePlayScene.cpp" />
     <ClCompile Include="Application\Scene\GameScene\CollisionSystem.cpp" />
     <ClCompile Include="Application\Scene\GameScene\CombatSystem.cpp" />
     <ClCompile Include="Application\Scene\GameScene\LootSystem.cpp" />
     <ClCompile Include="Application\Scene\GameScene\GamePlayHUD.cpp" />
     <ClCompile Include="Application\Particle\AppParticleManager.cpp" />
+    <ClCompile Include="Application\Player\Player.cpp" />
+    <ClCompile Include="Application\Enemy\Enemy.cpp" />
+    <ClCompile Include="Application\Enemy\MovingEnemy.cpp" />
     <ClCompile Include="Application\Scene\ClearScene\ClearScene.cpp" />
     <ClCompile Include="Application\Scene\GameOverScene\GameOverScene.cpp" />
     <ClCompile Include="Baziru3_Engine\Graphics\Light\Light.cpp" />
@@ -100,14 +103,9 @@
     <ClCompile Include="Baziru3_Engine\Graphics\Shapes\Sphere\Sphere.cpp" />
     <ClCompile Include="Baziru3_Engine\Graphics\2D\Sprite\SpriteManager.cpp" />
     <ClCompile Include="Baziru3_Engine\Core\Base\Srv\SRVManager.cpp" />
-    <ClCompile Include="Application\Player\Player.cpp" />
-    <ClCompile Include="Application\Obstacle.cpp" />
-    <ClCompile Include="Application\Scene\GameScene\Target.cpp" />
-    <ClCompile Include="Application\Scene\GameScene\TutorialSign.cpp" />
     <ClCompile Include="Baziru3_Engine\Graphics\3D\Object\SkinningObject3dCom.cpp" />
     <ClCompile Include="Baziru3_Engine\Core\Base\SubsystemFactory.cpp" />
     <ClCompile Include="Baziru3_Engine\Framework\Collision\Collider.cpp" />
-    <ClCompile Include="Application\LevelEditor.cpp" />
     <ClCompile Include="Baziru3_Engine\3D\Water\River.cpp" />
     <ClCompile Include="Baziru3_Engine\3D\Procedural\BioProceduralGenerator.cpp" />
     <ClCompile Include="Baziru3_Engine\Graphics\Graphics\GpuProfiler.cpp" />
@@ -368,6 +366,9 @@
     <ProjectReference Include="externals\DirectXTex\DirectXTex_Desktop_2022_Win10.vcxproj">
       <Project>{371b9fa9-4c90-4ac6-a123-aced756d6c77}</Project>
     </ProjectReference>
+    <ProjectReference Include="externals\imgui\imgui.vcxproj">
+      <Project>{24c0d8c4-f20f-401f-9504-cfac18c13858}</Project>
+    </ProjectReference>
   </ItemGroup>
   <ItemGroup>
     <None Include="Resources\shaders\CopyImage.hlsli" />
@@ -386,20 +387,23 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v145</PlatformToolset>
+    <PlatformToolset Condition="'$(DefaultPlatformToolset)' != ''">$(DefaultPlatformToolset)</PlatformToolset>
+    <PlatformToolset Condition="'$(DefaultPlatformToolset)' == ''">v143</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v145</PlatformToolset>
+    <PlatformToolset Condition="'$(DefaultPlatformToolset)' != ''">$(DefaultPlatformToolset)</PlatformToolset>
+    <PlatformToolset Condition="'$(DefaultPlatformToolset)' == ''">v143</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Development|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v145</PlatformToolset>
+    <PlatformToolset Condition="'$(DefaultPlatformToolset)' != ''">$(DefaultPlatformToolset)</PlatformToolset>
+    <PlatformToolset Condition="'$(DefaultPlatformToolset)' == ''">v143</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
@@ -419,19 +423,19 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <OutDir>$(SolutionDir)..\generated\output\$(Configuration)\</OutDir>
-    <IntDir>$(SolutionDir)..\generated\obj\$(ProjectName)\$(Configuration)\</IntDir>
-    <IncludePath>$(SolutionDir)..\externals\imgui;$(SolutionDir)..\externals\DirectXTex;$(SolutionDir)..\externals\assimp\include;$(IncludePath)</IncludePath>
+    <OutDir>$(ProjectDir)..\generated\output\$(Configuration)\</OutDir>
+    <IntDir>$(ProjectDir)..\generated\obj\$(ProjectName)\$(Configuration)\</IntDir>
+    <IncludePath>$(ProjectDir)externals\imgui;$(ProjectDir)externals\DirectXTex;$(ProjectDir)externals\assimp\include;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Development|x64'">
-    <OutDir>$(SolutionDir)..\generated\output\$(Configuration)\</OutDir>
-    <IntDir>$(SolutionDir)..\generated\obj\$(ProjectName)\$(Configuration)\</IntDir>
-    <IncludePath>$(SolutionDir)..\externals\imgui;$(SolutionDir)..\externals\DirectXTex;$(SolutionDir)..\externals\assimp\include;$(IncludePath)</IncludePath>
+    <OutDir>$(ProjectDir)..\generated\output\$(Configuration)\</OutDir>
+    <IntDir>$(ProjectDir)..\generated\obj\$(ProjectName)\$(Configuration)\</IntDir>
+    <IncludePath>$(ProjectDir)externals\imgui;$(ProjectDir)externals\DirectXTex;$(ProjectDir)externals\assimp\include;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <OutDir>$(SolutionDir)..\generated\output\$(Configuration)\</OutDir>
-    <IntDir>$(SolutionDir)..\generated\obj\$(ProjectName)\$(Configuration)\</IntDir>
-    <IncludePath>$(SolutionDir)..\externals\imgui;$(SolutionDir)..\externals\DirectXTex;$(SolutionDir)..\externals\assimp\include;$(IncludePath)</IncludePath>
+    <OutDir>$(ProjectDir)..\generated\output\$(Configuration)\</OutDir>
+    <IntDir>$(ProjectDir)..\generated\obj\$(ProjectName)\$(Configuration)\</IntDir>
+    <IncludePath>$(ProjectDir)externals\imgui;$(ProjectDir)externals\DirectXTex;$(ProjectDir)externals\assimp\include;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
@@ -443,10 +447,7 @@
       <AdditionalOptions>/utf-8 /FS %(AdditionalOptions)</AdditionalOptions>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
-      <Optimization>MaxSpeed</Optimization>
-      <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
-      <IntrinsicFunctions>true</IntrinsicFunctions>
-      <TreatWarningAsError>true</TreatWarningAsError>
+      <TreatWarningAsError>false</TreatWarningAsError>
       <AdditionalIncludeDirectories>$(ProjectDir)Baziru3_Engine\Core;$(ProjectDir)Baziru3_Engine\Graphics;$(ProjectDir)Baziru3_Engine\Framework;$(ProjectDir);$(ProjectDir)\externals\DirectXTex;$(ProjectDir)\externals\imgui;$(ProjectDir)\externals\assimp\include;$(ProjectDir)Application;$(ProjectDir)Application\Fade;$(ProjectDir)Application\Player;$(ProjectDir)Application\Scene;$(ProjectDir)Application\Scene\GameScene;$(ProjectDir)Application\Scene\TitleScene;$(ProjectDir)Application\GameObject;$(ProjectDir)Application\Subsystem;$(ProjectDir)Baziru3_Engine\Graphics\2D;$(ProjectDir)Baziru3_Engine\Graphics\2D\Sprite;$(ProjectDir)Baziru3_Engine\Graphics\2D\Texture;$(ProjectDir)Baziru3_Engine\Graphics\3D\Model;$(ProjectDir)Baziru3_Engine\Graphics\3D\Model\SkinCluster;$(ProjectDir)Baziru3_Engine\Graphics\3D\Object;$(ProjectDir)Baziru3_Engine\Framework\Audio;$(ProjectDir)Baziru3_Engine\Framework\Animation;$(ProjectDir)Baziru3_Engine\Framework\Animation\Joint;$(ProjectDir)Baziru3_Engine\Framework\Animation\Keyframe;$(ProjectDir)Baziru3_Engine\Framework\Animation\NodeAnimation;$(ProjectDir)Baziru3_Engine\Framework\Animation\Skeleton;$(ProjectDir)Baziru3_Engine\Core\Base;$(ProjectDir)Baziru3_Engine\Core\Base\ImGui;$(ProjectDir)Baziru3_Engine\Core\Base\Log;$(ProjectDir)Baziru3_Engine\Core\Base\OffScreenRendering;$(ProjectDir)Baziru3_Engine\Core\Base\Scene;$(ProjectDir)Baziru3_Engine\Core\Base\Srv;$(ProjectDir)Baziru3_Engine\Core\Base\Windows;$(ProjectDir)Baziru3_Engine\Core\Camera;$(ProjectDir)Baziru3_Engine\Core\Camera\DebugCamera;$(ProjectDir)Baziru3_Engine\Graphics\Graphics\Material;$(ProjectDir)Baziru3_Engine\Core\IO;$(ProjectDir)Baziru3_Engine\Core\IO\Key;$(ProjectDir)Baziru3_Engine\Core\IO\Mouse;$(ProjectDir)Baziru3_Engine\Graphics\Light;$(ProjectDir)Baziru3_Engine\Core\Math;$(ProjectDir)Baziru3_Engine\Framework\Particle;$(ProjectDir)Baziru3_Engine\Core\Platform\Windows;$(ProjectDir)Baziru3_Engine\Graphics\Primitive\Cylinder;$(ProjectDir)Baziru3_Engine\Framework\Scene;$(ProjectDir)Baziru3_Engine\Framework\Scene\Factory;$(ProjectDir)Baziru3_Engine\Framework\Scene\Manager;$(ProjectDir)Baziru3_Engine\Graphics\Shapes\Sphere;$(ProjectDir)Baziru3_Engine\Graphics\SkyBox;$(ProjectDir)Baziru3_Engine\Framework\AI;$(ProjectDir)externals;$(ProjectDir)externals\imgui-node-editor</AdditionalIncludeDirectories>
       <BasicRuntimeChecks>Default</BasicRuntimeChecks>
     </ClCompile>
@@ -454,9 +455,8 @@
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <TreatLinkerWarningAsErrors>false</TreatLinkerWarningAsErrors>
-      <AdditionalDependencies>assimp-vc143-mtd.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>$(SolutionDir)..\generated\output\$(Configuration);$(ProjectDir)externals\assimp\lib\Debug;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalOptions>/ignore:4099 %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalDependencies>imgui.lib;assimp-vc143-mtd.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(ProjectDir)..\generated\output\$(Configuration);$(ProjectDir)..\generated\output\Debug;$(ProjectDir)externals\assimp\lib\$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <PostBuildEvent>
       <Command>copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxcompiler.dll" "$(TargetDir)dxcompiler.dll"</Command>
@@ -471,7 +471,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;_CONSOLE;USE_IMGUI;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <AdditionalOptions>/utf-8 /FS %(AdditionalOptions)</AdditionalOptions>
@@ -485,8 +485,8 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>assimp-vc143-mt.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>$(SolutionDir)..\generated\output\$(Configuration);$(SolutionDir)externals\assimp\lib\$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>imgui.lib;assimp-vc143-mt.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(ProjectDir)..\generated\output\$(Configuration);$(ProjectDir)..\generated\output\Release;$(ProjectDir)externals\assimp\lib\$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <PostBuildEvent>
       <Command>copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxcompiler.dll" "$(TargetDir)dxcompiler.dll"</Command>
@@ -498,7 +498,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;_CONSOLE;USE_IMGUI;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <AdditionalOptions>/utf-8 /FS %(AdditionalOptions)</AdditionalOptions>
@@ -513,8 +513,8 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <LinkTimeCodeGeneration />
-      <AdditionalDependencies>assimp-vc143-mt.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>$(SolutionDir)..\generated\output\$(Configuration);$(ProjectDir)externals\assimp\lib\Release;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>imgui.lib;assimp-vc143-mt.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(ProjectDir)..\generated\output\$(Configuration);$(ProjectDir)..\generated\output\Development;$(ProjectDir)..\generated\output\Release;$(ProjectDir)externals\assimp\lib\Release;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <PostBuildEvent>
       <Command>copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxcompiler.dll" "$(TargetDir)dxcompiler.dll"</Command>

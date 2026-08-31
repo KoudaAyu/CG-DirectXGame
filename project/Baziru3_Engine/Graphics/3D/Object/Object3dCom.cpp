@@ -30,6 +30,18 @@ void Object3dCom::PreDraw()
 
 void Object3dCom::Draw(Object3d* object, const RenderContext& ctx, const Object3d::ModelData& modelData, bool drawObject)
 {
+    static thread_local int s_callDepth = 0;
+    struct DepthGuard {
+        DepthGuard() { ++s_callDepth; }
+        ~DepthGuard() { --s_callDepth; }
+    } depthGuard;
+
+    if (s_callDepth > 5)
+    {
+        OutputDebugStringA("[Object3dCom ERROR] Recursive Draw detected! Skipping to prevent Stack Overflow.\n");
+        return;
+    }
+
     if (!ctx.commandList) return;
     if (!ctx.camera)
 	{
@@ -40,9 +52,15 @@ void Object3dCom::Draw(Object3d* object, const RenderContext& ctx, const Object3
 	ctx.commandList->SetGraphicsRootSignature(GetRootSignature().Get());
 	ctx.commandList->SetPipelineState(GetPipelineState().Get());
    
-    if (ctx.textureHandle.ptr != 0)
+    D3D12_GPU_DESCRIPTOR_HANDLE mainTextureHandle = ctx.textureHandle;
+    if (mainTextureHandle.ptr == 0)
     {
-        ctx.commandList->SetGraphicsRootDescriptorTable(2, ctx.textureHandle);
+        mainTextureHandle = TextureManager::GetInstance()->GetSrvHandleGPU(
+            TextureManager::GetInstance()->GetTextureIndexByFilePath("Resources/CG4/human/white.png"));
+    }
+    if (mainTextureHandle.ptr != 0)
+    {
+        ctx.commandList->SetGraphicsRootDescriptorTable(2, mainTextureHandle);
     }
 
     uint32_t skyboxIndex = SceneManager::GetInstance()->GetSkyboxTextureIndex();
@@ -53,7 +71,7 @@ void Object3dCom::Draw(Object3d* object, const RenderContext& ctx, const Object3
     }
     else
     {
-        skyboxHandle = ctx.textureHandle;
+        skyboxHandle = mainTextureHandle;
     }
     if (skyboxHandle.ptr != 0)
     {
@@ -81,7 +99,7 @@ void Object3dCom::Draw(Object3d* object, const RenderContext& ctx, const Object3
 
 	if (object)
 	{
-		object->Draw(ctx);
+		object->DrawInternal(ctx);
 
 		// GPU-accelerated wireframe overlay draw (if enabled in Collision Debug panel)
 		if (CollisionManager::GetInstance()->IsShowDebugColliders() && CollisionManager::GetInstance()->IsShowMeshWireframe())
