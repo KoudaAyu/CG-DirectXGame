@@ -27,7 +27,7 @@ class MyAddonPropertiesV2(bpy.types.PropertyGroup):
     project_path: bpy.props.StringProperty(
         name="プロジェクトパス",
         description="DirectXGame.sln があるprojectフォルダを選択してください",
-        default="C:\\Users\\3329a\\OneDrive\\デスクトップ\\Engine\\project",
+        default=os.path.dirname(os.path.abspath(__file__)) if '__file__' in globals() else "C:\\Users\\k024g\\OneDrive\\デスクトップ\\Engine_ver2026\\project",
         subtype='DIR_PATH'
     )
     auto_export: bpy.props.BoolProperty(
@@ -458,10 +458,17 @@ def export_scene_to_json():
     Blenderの全メッシュ（コンテナ、フェンス、土嚢、ドラム缶、木箱、見張り塔、橋、川、木、自作オブジェクト等）を
     project/Resources/stage_layout.json に自動で全書き出し保存する関数。
     """
-    project_root = r"c:\Users\3329a\OneDrive\デスクトップ\Engine\project"
-    resources_dir = os.path.join(project_root, "Resources")
-    os.makedirs(resources_dir, exist_ok=True)
-    output_path = os.path.join(resources_dir, "stage_layout.json")
+    addons_dir = os.path.dirname(os.path.abspath(__file__)) if '__file__' in globals() else ""
+    project_path = ""
+    if hasattr(bpy.context.scene, "my_addon_properties_v2"):
+        project_path = bpy.path.abspath(bpy.context.scene.my_addon_properties_v2.project_path)
+    
+    if project_path and os.path.exists(project_path):
+        output_path = os.path.join(project_path, "Resources", "stage_layout.json")
+    elif addons_dir and os.path.exists(addons_dir):
+        output_path = os.path.join(addons_dir, "Resources", "stage_layout.json")
+    else:
+        output_path = os.path.join("Resources", "stage_layout.json")
 
     layout_data = []
     active_obj = bpy.context.active_object
@@ -1607,8 +1614,12 @@ class MYADDON_OT_export_scene(bpy.types.Operator):
         project_dir = bpy.path.abspath(addon_props.project_path)
         
         if not project_dir or not os.path.exists(project_dir):
-            self.report({'ERROR'}, "有効なプロジェクトパスを選択してください。")
-            return {'CANCELLED'}
+            script_dir = os.path.dirname(os.path.abspath(__file__)) if '__file__' in globals() else ""
+            if script_dir and os.path.exists(script_dir):
+                project_dir = script_dir
+            else:
+                self.report({'ERROR'}, "有効なプロジェクトパスを選択してください。")
+                return {'CANCELLED'}
         
         output_path = os.path.join(project_dir, "Resources", "stage_layout.json")
         layout_data = []
