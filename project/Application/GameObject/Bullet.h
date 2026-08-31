@@ -29,7 +29,9 @@ public:
     Vector3 GetDirection() const { return direction_; }
     bool IsNearMissTriggered() const { return nearMissTriggered_; }
     void MarkNearMissTriggered() { nearMissTriggered_ = true; }
+    void TriggerNearMiss() { nearMissTriggered_ = true; }
     void Kill() { isDead_ = true; }
+
 
 private:
     Object3dCom* object3dCom_ = nullptr;

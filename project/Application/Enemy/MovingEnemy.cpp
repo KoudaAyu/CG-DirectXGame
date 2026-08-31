@@ -66,23 +66,29 @@ void MovingEnemy::Initialize(Object3dCom* object3dCom, Camera* camera)
     object3dCom_ = object3dCom;
     camera_ = camera;
 
-    Object3d::ModelData model = Object3d::LoadObjFile("Resources", "plane.obj");
+    Object3d::ModelData model = Object3d::LoadObjFile("Resources", "player.obj");
+    model.material.textureFilePath = "Resources/duck_enemy.png";
+
+    defaultTextureIndex_ = TextureManager::GetInstance()->Load("Resources/duck_enemy.png");
+    model.material.textureIndex = defaultTextureIndex_;
+
     object3d_ = std::make_unique<Object3d>();
     object3d_->Initialize(object3dCom_, model);
+    object3d_->SetCamera(camera_);
 
     // 初期配置 (パトロールA地点)
     position_ = patrolA_;
     object3d_->SetTranslate(position_);
     object3d_->SetScale({ 1.0f, 1.0f, 1.0f });
-    object3d_->SetColor({ 1.2f, 0.4f, 0.4f, 1.0f });
+    object3d_->SetColor({ 1.0f, 1.0f, 1.0f, 1.0f });
 
     // コライダーの初期化と登録
-    collider_ = std::make_unique<SphereCollider>(0.6f, &position_, CollisionAttribute::Enemy);
+    collider_ = std::make_unique<SphereCollider>(0.55f, &position_, CollisionAttribute::Enemy);
+    collider_->SetPositionOffset({ 0.0f, 0.55f, 0.0f });
     CollisionManager::GetInstance()->RegisterCollider(collider_.get());
 
-    // 敵として分かりやすくするため、警告色である monsterBall.png を強制設定
-    defaultTextureIndex_ = TextureManager::GetInstance()->Load("Resources/monsterBall.png");
-    model.material.textureIndex = defaultTextureIndex_;
+    // ナビメッシュグリッドを初期化時に一度だけ構築（毎フレームの全再構築による処理落ちを回避）
+    BaziruEngine::AI::NavMesh::GetInstance()->BuildGrid(-20.0f, 20.0f, -5.0f, 45.0f, 0.5f, 0.85f);
 
     hp_ = maxHp_;
     isDead_ = false;
@@ -175,7 +181,7 @@ void MovingEnemy::Update(WindowAPI* windowAPI, const Vector3* targetPosition, co
             {
                 position_ = patrolA_;
                 object3d_->SetTranslate(position_);
-                object3d_->SetColor({ 0.8f, 0.9f, 1.0f, 1.0f });
+                object3d_->SetColor({ 1.0f, 1.0f, 1.0f, 1.0f });
             }
         }
 
@@ -209,8 +215,7 @@ void MovingEnemy::Update(WindowAPI* windowAPI, const Vector3* targetPosition, co
 
     if (!object3d_) return;
 
-    // AI 意思決定 & 移動処理
-    const Vector3& currentPos = position_;
+    Vector3 currentPos = GetPosition();
     const float frameScale = deltaTime * 60.0f;
 
     if (coverIgnoreTimer_ > 0.0f)
@@ -229,7 +234,10 @@ void MovingEnemy::Update(WindowAPI* windowAPI, const Vector3* targetPosition, co
         Vector3 toPlayer = { targetPosition->x - currentPos.x, 0.0f, targetPosition->z - currentPos.z };
         float dist = std::sqrt(toPlayer.x * toPlayer.x + toPlayer.z * toPlayer.z);
 
-        if (dist <= maxSightRange_)
+        // プレイヤーが遮蔽中の場合は視認距離が55%に半減（ステルスボーナス）
+        float effectiveSight = isPlayerInCover ? (maxSightRange_ * 0.55f) : maxSightRange_;
+
+        if (dist <= effectiveSight)
         {
             float yaw = object3d_->GetRotate().y;
             Vector3 forward = { std::sin(yaw), 0.0f, std::cos(yaw) };
@@ -240,6 +248,7 @@ void MovingEnemy::Update(WindowAPI* windowAPI, const Vector3* targetPosition, co
 
             if (angle <= fovAngle_ * 0.5f)
             {
+                // 壁・コンテナの堅牢マルチポイント遮蔽判定
                 if (HasLineOfSight(*targetPosition, obstacles))
                 {
                     canSeePlayer = true;
@@ -248,10 +257,11 @@ void MovingEnemy::Update(WindowAPI* windowAPI, const Vector3* targetPosition, co
         }
     }
 
-    // 索敵メーターの更新
+    // 索敵メーターの更新 (遮蔽中は緩やかに発見、逃げ込む猶予を確保)
     if (canSeePlayer)
     {
-        detectionMeter_ += 1.5f * deltaTime; // 約0.6秒で発見状態へ
+        float detectSpeed = isPlayerInCover ? 0.60f : 0.85f;
+        detectionMeter_ += detectSpeed * deltaTime;
         if (detectionMeter_ >= 1.0f)
         {
             detectionMeter_ = 1.0f;
@@ -355,9 +365,6 @@ void MovingEnemy::Update(WindowAPI* windowAPI, const Vector3* targetPosition, co
             // 驚きフリーズ中（!マーク表示中）は移動しない
             if (alertTimer_ <= 0.0f)
             {
-                // グリッドを事前にビルドして、正しい進入判定が行えるようにする
-                BaziruEngine::AI::NavMesh::GetInstance()->BuildGrid(-20.0f, 20.0f, -5.0f, 45.0f, 0.5f, 0.85f);
-
                 // NavMeshクランプ：敵が障害物の通行不可領域に入り込んでいる場合、最も近い安全な場所へ押し戻す
                 if (!BaziruEngine::AI::NavMesh::GetInstance()->IsWalkable(position_, 0.85f))
                 {
@@ -376,8 +383,6 @@ void MovingEnemy::Update(WindowAPI* windowAPI, const Vector3* targetPosition, co
                         blackboard->Clear("CoverPath");
 
                         // A* 経路探索で障害物を賢く迂回しながらプレイヤーを追尾（フォールバック）
-                        BaziruEngine::AI::NavMesh::GetInstance()->BuildGrid(-20.0f, 20.0f, -5.0f, 45.0f, 0.5f, 0.85f);
-                        
                         Vector3 walkableStart = GetNearestWalkablePosition(position_, 0.85f);
                         Vector3 walkableTarget = GetNearestWalkablePosition(*targetPosition, 0.85f);
                         std::vector<Vector3> path = BaziruEngine::AI::NavMesh::GetInstance()->FindPath(walkableStart, walkableTarget);
@@ -596,8 +601,6 @@ void MovingEnemy::Update(WindowAPI* windowAPI, const Vector3* targetPosition, co
                         if (status == BaziruEngine::AI::BehaviorStatus::Failure)
                         {
                             // A* 経路探索で障害物を賢く迂回しながらプレイヤーを追尾（フォールバック）
-                            BaziruEngine::AI::NavMesh::GetInstance()->BuildGrid(-20.0f, 20.0f, -5.0f, 45.0f, 0.5f, 0.85f);
-                            
                             Vector3 walkableStart = GetNearestWalkablePosition(position_, 0.85f);
                             Vector3 walkableTarget = GetNearestWalkablePosition(*targetPosition, 0.85f);
                             std::vector<Vector3> path = BaziruEngine::AI::NavMesh::GetInstance()->FindPath(walkableStart, walkableTarget);
@@ -863,7 +866,7 @@ void MovingEnemy::Draw(const RenderContext& ctx)
     RenderContext enemyCtx = ctx;
     const Object3d::ModelData& modelData = object3d_->GetModelData();
     uint32_t texIdx = defaultTextureIndex_;
-    if (enemyCtx.textureHandle.ptr == 0 && texIdx != 0 && texIdx != UINT32_MAX)
+    if (enemyCtx.textureHandle.ptr == 0 && texIdx != UINT32_MAX)
     {
         enemyCtx.textureHandle = TextureManager::GetInstance()->GetSrvHandleGPU(texIdx);
     }
@@ -939,59 +942,64 @@ void MovingEnemy::Finalize()
 
 bool MovingEnemy::HasLineOfSight(const Vector3& playerPos, const std::vector<std::unique_ptr<Obstacle>>& obstacles)
 {
-    Vector3 enemyPos = GetPosition();
-    Vector3 toPlayer = { playerPos.x - enemyPos.x, playerPos.y - enemyPos.y, playerPos.z - enemyPos.z };
-    float distToPlayer = std::sqrt(toPlayer.x * toPlayer.x + toPlayer.y * toPlayer.y + toPlayer.z * toPlayer.z);
-    if (distToPlayer < 1e-4f) return true;
+    (void)obstacles;
+    Vector3 enemyEye = GetPosition() + Vector3{ 0.0f, 0.55f, 0.0f };
 
-    Vector3 rayDir = { toPlayer.x / distToPlayer, toPlayer.y / distToPlayer, toPlayer.z / distToPlayer };
+    // プレイヤーの頭(0.75m)、胴体(0.40m)、足元(0.15m)の3点判定
+    const float yOffsets[3] = { 0.75f, 0.40f, 0.15f };
+    int visiblePoints = 0;
 
-    Collider* hitCollider = nullptr;
-    float hitDist = 0.0f;
-
-    // 障害物の簡易Boxコライダーを一時的に無効化（レイキャストが精密なMeshコライダーに当たるようにするため）
-    for (auto& obs : obstacles)
+    for (float yOff : yOffsets)
     {
-        if (obs)
-        {
-            if (obs->GetCollider()) obs->GetCollider()->SetIsEnabled(false);
-            if (obs->GetCollider2()) obs->GetCollider2()->SetIsEnabled(false);
-        }
-    }
+        Vector3 targetPoint = { playerPos.x, playerPos.y + yOff, playerPos.z };
+        Vector3 toTarget = { targetPoint.x - enemyEye.x, targetPoint.y - enemyEye.y, targetPoint.z - enemyEye.z };
+        float dist = std::sqrt(toTarget.x * toTarget.x + toTarget.y * toTarget.y + toTarget.z * toTarget.z);
+        if (dist < 1e-4f) { visiblePoints++; continue; }
 
-    // 高さ0.5fの胴体付近からレイを飛ばし、プレイヤーとの間にある遮蔽物のMeshColliderを精密に検出します
-    if (CollisionManager::GetInstance()->Raycast(enemyPos + Vector3{ 0.0f, 0.5f, 0.0f }, rayDir, distToPlayer, hitCollider, hitDist))
-    {
-        if (hitCollider && hitCollider->GetAttribute() == CollisionAttribute::Obstacle)
+        Vector3 dir = { toTarget.x / dist, toTarget.y / dist, toTarget.z / dist };
+        Collider* hitCollider = nullptr;
+        float hitDist = 0.0f;
+
+        bool hitObstacle = false;
+        if (CollisionManager::GetInstance()->Raycast(enemyEye, dir, dist, hitCollider, hitDist))
         {
-            // コライダーを再有効化
-            for (auto& obs : obstacles)
+            if (hitCollider && hitCollider->GetAttribute() == CollisionAttribute::Obstacle)
             {
-                if (obs)
-                {
-                    if (obs->GetCollider()) obs->GetCollider()->SetIsEnabled(true);
-                    if (obs->GetCollider2()) obs->GetCollider2()->SetIsEnabled(true);
-                }
+                hitObstacle = true;
             }
-            return false; // 障害物に遮蔽されている
+        }
+
+        if (!hitObstacle)
+        {
+            visiblePoints++;
         }
     }
 
-    // コライダーを再有効化
-    for (auto& obs : obstacles)
-    {
-        if (obs)
-        {
-            if (obs->GetCollider()) obs->GetCollider()->SetIsEnabled(true);
-            if (obs->GetCollider2()) obs->GetCollider2()->SetIsEnabled(true);
-        }
-    }
-    return true; // 視線が通っている
+    // 遮蔽物に隠れている場合は視線遮断
+    return (visiblePoints >= 2);
 }
 
 void MovingEnemy::HearNoise(const Vector3& noisePosition)
 {
     if (isDead_ || state_ == AIState::Chase) return;
+
+    // 音源と敵の間に障害物があるかチェック（壁越しはノイズ遮断）
+    Vector3 enemyPos = GetPosition() + Vector3{ 0.0f, 0.5f, 0.0f };
+    Vector3 toNoise = { noisePosition.x - enemyPos.x, 0.0f, noisePosition.z - enemyPos.z };
+    float dist = std::sqrt(toNoise.x * toNoise.x + toNoise.z * toNoise.z);
+    if (dist > 1e-4f)
+    {
+        Vector3 dir = { toNoise.x / dist, 0.0f, toNoise.z / dist };
+        Collider* hitCollider = nullptr;
+        float hitDist = 0.0f;
+        if (CollisionManager::GetInstance()->Raycast(enemyPos, dir, dist, hitCollider, hitDist))
+        {
+            if (hitCollider && hitCollider->GetAttribute() == CollisionAttribute::Obstacle)
+            {
+                return; // 壁越しの足音は遮断されて聞こえない
+            }
+        }
+    }
 
     state_ = AIState::Investigate;
     investigateTarget_ = noisePosition;

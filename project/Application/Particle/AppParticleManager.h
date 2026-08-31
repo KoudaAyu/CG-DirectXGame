@@ -45,20 +45,58 @@ public:
 	void EmitDustWithVelocity(std::mt19937& randomEngine, const Vector3& position, float scale, const Vector4& color, const Vector3& velocity, float lifeTime, uint32_t textureIndex);
 	void EmitShellCasing(std::mt19937& randomEngine, const Vector3& position, const Vector3& forward, const Vector4& color, const Vector3& scale, uint32_t textureIndex);
 	void EmitFeather(std::mt19937& randomEngine, const Vector3& position, const Vector4& color, uint32_t textureIndex);
+	void EmitBloodDrop(std::mt19937& randomEngine, const Vector3& position, const Vector3& baseVelocity, float speed, uint32_t textureIndex);
+	void EmitBloodMist(std::mt19937& randomEngine, const Vector3& position, float scale, uint32_t textureIndex);
+	void EmitBloodBurst(std::mt19937& randomEngine, const Vector3& position, const Vector3& hitDirection, uint32_t textureIndex, uint32_t flashTexIndex);
+	void EmitViolentBloodSpray(std::mt19937& randomEngine, const Vector3& hitPoint, const Vector3& bulletDir, bool isCritical, uint32_t bloodTexIndex, uint32_t smokeTexIndex);
+	void EmitViolentBloodBurst(std::mt19937& randomEngine, const Vector3& enemyPos, const Vector3& hitDir, uint32_t bloodTexIndex, uint32_t smokeTexIndex, uint32_t flashTexIndex);
+	void EmitDarkBloodSmoke(std::mt19937& randomEngine, const Vector3& position, float scale, uint32_t smokeTexIndex);
 	void EmitMuzzleFlash(std::mt19937& randomEngine, const Vector3& position, const Vector3& direction, const Vector3& right, const Vector3& up, const Vector4& color, float speedMultiplier, uint32_t textureIndex);
 	void EmitMuzzleFlare(std::mt19937& randomEngine, const Vector3& position, float scale, const Vector4& color, float lifeTime, uint32_t textureIndex);
 	void EmitDeathFlash(std::mt19937& randomEngine, const Vector3& position, float scale, const Vector4& color, float lifeTime, uint32_t textureIndex);
 
-	void EmitDodgeRollDust(std::mt19937& randomEngine, const Vector3& position, const Vector3& direction, uint32_t textureIndex);
-	void EmitFootstepDust(std::mt19937& randomEngine, const Vector3& position, uint32_t textureIndex);
-	void EmitHelipadBeaconMotes(std::mt19937& randomEngine, const Vector3& position, uint32_t textureIndex);
-	void EmitRiverWaveRipples(std::mt19937& randomEngine, const Vector3& position, uint32_t textureIndex);
-	void EmitRiverWaveRipples(std::mt19937& randomEngine, uint32_t textureIndex);
-	void EmitRiverSplashDroplet(std::mt19937& randomEngine, const Vector3& position, uint32_t textureIndex);
-	void Draw(const RenderContext& ctx) { Draw(); }
+	// --- 💥 大迫力GPUインスタンシング撃破爆散パーティクル ---
+	void EmitEnemyDestroyGPUBurst(std::mt19937& randomEngine, const Vector3& position, const Vector3& hitDirection, uint32_t particleTexIndex, uint32_t flashTexIndex, uint32_t smokeTexIndex);
+	void EmitTargetDestroyGPUBurst(std::mt19937& randomEngine, const Vector3& position, uint32_t particleTexIndex, uint32_t flashTexIndex, uint32_t smokeTexIndex);
+
+	// --- 🏃 プレイヤーアクション＆環境GPUパーティクル ---
+	void EmitDodgeRollDust(std::mt19937& randomEngine, const Vector3& position, const Vector3& moveDirection, uint32_t smokeTexIndex);
+	void EmitFootstepDust(std::mt19937& randomEngine, const Vector3& position, uint32_t smokeTexIndex);
+	void EmitRicochetSparks(std::mt19937& randomEngine, const Vector3& hitPoint, const Vector3& hitNormal, uint32_t sparkTexIndex, uint32_t smokeTexIndex);
+	void EmitWaterSplash(std::mt19937& randomEngine, const Vector3& hitPoint, uint32_t waterTexIndex);
+	void EmitHelipadBeaconMotes(std::mt19937& randomEngine, const Vector3& helipadPos, uint32_t particleTexIndex);
+	void EmitRiverWaveRipples(std::mt19937& randomEngine, uint32_t waterTexIndex);
+	void EmitRiverSplashDroplet(std::mt19937& randomEngine, const Vector3& position, uint32_t waterTexIndex);
+
+
+
+private:
+	struct Vertex
+	{
+		Vector4 pos;
+		Vector2 uv;
+		Vector3 normal;
+	};
+
 	ParticleManager* enginePM_ = nullptr;
 	std::list<AppParticle> particles_;
 
+	static const uint32_t kNumMaxInstances = 1024;
+	Microsoft::WRL::ComPtr<ID3D12Resource> instancingResource_ = nullptr;
+	ParticleManager::ParticleCS* instanceData_ = nullptr;
+	uint32_t instancingSrvIndex_ = 0;
+	D3D12_GPU_DESCRIPTOR_HANDLE instancingSrvHandleGPU_{};
+
+	Microsoft::WRL::ComPtr<ID3D12Resource> quadVertexBuffer_ = nullptr;
+	D3D12_VERTEX_BUFFER_VIEW quadVertexBufferView_{};
+
+	Microsoft::WRL::ComPtr<ID3D12Resource> perViewResource_ = nullptr;
+	ParticleManager::PerView* perViewData_ = nullptr;
+
 public:
 	void Draw();
+	void Draw(const RenderContext& ctx);
 };
+
+
+

@@ -70,14 +70,21 @@
     <ClCompile Include="Game.cpp" />
     <ClCompile Include="Application\Framework.cpp" />
     <ClCompile Include="Application\GameObject\Bullet.cpp" />
-    <ClCompile Include="Application\Obstacle.cpp" />
     <ClCompile Include="Application\LevelEditor.cpp" />
+    <ClCompile Include="Application\Scene\GameScene\GamePlayScene.cpp" />
+    <ClCompile Include="Application\Scene\GameScene\CollisionSystem.cpp" />
+    <ClCompile Include="Application\Scene\GameScene\CombatSystem.cpp" />
+    <ClCompile Include="Application\Scene\GameScene\LootSystem.cpp" />
+    <ClCompile Include="Application\Scene\GameScene\GamePlayHUD.cpp" />
+    <ClCompile Include="Application\Scene\GameScene\Target.cpp" />
+    <ClCompile Include="Application\Scene\GameScene\TutorialSign.cpp" />
     <ClCompile Include="Application\Particle\AppParticleManager.cpp" />
     <ClCompile Include="Application\Player\Player.cpp" />
     <ClCompile Include="Application\Enemy\Enemy.cpp" />
     <ClCompile Include="Application\Enemy\MovingEnemy.cpp" />
-    <ClCompile Include="Application\Scene\GameScene\GamePlayScene.cpp" />
     <ClCompile Include="Application\Scene\ClearScene\ClearScene.cpp" />
+    <ClCompile Include="Application\Scene\GameOverScene\GameOverScene.cpp" />
+    <ClCompile Include="Application\Obstacle.cpp" />
     <ClCompile Include="Baziru3_Engine\Graphics\Light\Light.cpp" />
     <ClCompile Include="Baziru3_Engine\Graphics\Light\CascadingShadowMap.cpp" />
 

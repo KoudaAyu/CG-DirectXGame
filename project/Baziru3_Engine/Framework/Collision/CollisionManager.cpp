@@ -931,7 +931,7 @@ bool CollisionManager::CheckCapsuleCapsule(const CollisionData& a, const Collisi
     return false;
 }
 
-bool CollisionManager::Raycast(const Vector3& rayStart, const Vector3& rayDir, float maxDist, Collider*& outHitCollider, float& outHitDist)
+bool CollisionManager::Raycast(const Vector3& rayStart, const Vector3& rayDir, float maxDist, Collider*& outHitCollider, float& outHitDist, uint32_t targetAttributeMask)
 {
     Collider* closestCollider = nullptr;
     float closestDist = maxDist;
@@ -942,6 +942,7 @@ bool CollisionManager::Raycast(const Vector3& rayStart, const Vector3& rayDir, f
     for (Collider* col : colliders_)
     {
         if (!col || !col->IsEnabled()) continue;
+        if ((static_cast<uint32_t>(col->GetAttribute()) & targetAttributeMask) == 0) continue;
         CollisionData data;
         data.originalCollider = col;
         data.type = col->GetType();
