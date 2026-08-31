@@ -33,9 +33,6 @@ public:
     ~Minion() = default;
 
     void Initialize(Object3dCom* object3dCom, Camera* camera, const Vector3& spawnPos, MinionType type = MinionType::Red);
-    void Initialize(Object3dCom* object3dCom, const Vector3& spawnPos, MinionType type = MinionType::Red) {
-        Initialize(object3dCom, nullptr, spawnPos, type);
-    }
     void Update(float deltaTime);
     void Draw(const RenderContext& ctx);
 

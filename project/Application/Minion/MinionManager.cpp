@@ -19,7 +19,7 @@ void MinionManager::SpawnMinion(const Vector3& spawnPos, int count, MinionType t
         float offsetX = ((std::rand() % 100) / 100.0f - 0.5f) * 2.0f;
         float offsetZ = ((std::rand() % 100) / 100.0f - 0.5f) * 2.0f;
         Vector3 pos = { spawnPos.x + offsetX, spawnPos.y + 0.2f, spawnPos.z + offsetZ };
-        minion->Initialize(object3dCom_, pos, type);
+        minion->Initialize(object3dCom_, camera_, pos, type);
         minions_.push_back(std::move(minion));
     }
 }
@@ -48,36 +48,35 @@ int MinionManager::GetActiveCount() const {
 }
 
 void MinionManager::CalculateFormationSlots(const Vector3& playerPos, float playerYaw) {
-    // プレイヤーの進行方向（前方）と右方向ベクトル
-    Vector3 forward = { std::sin(playerYaw), 0.0f, std::cos(playerYaw) };
-    Vector3 right   = { forward.z, 0.0f, -forward.x };
-
-    int row = 1;
-    int colsInRow = 3;
-    int colIndex = 0;
+    int slotIndex = 0;
+    int ring = 1;
+    int slotsInRing = 4;
+    int ringSlotCounter = 0;
 
     for (auto& minion : minions_) {
         if (!minion || !minion->IsActive()) continue;
         if (minion->GetState() != MinionState::Following) continue;
 
-        float backDist = slotBaseRadius_ + (row - 1) * slotRowSpacing_;
-        float sideSpacing = 0.42f;
-        float sideOffset = (static_cast<float>(colIndex) - static_cast<float>(colsInRow - 1) * 0.5f) * sideSpacing;
+        float ringRadius = slotBaseRadius_ + (ring - 1) * slotRowSpacing_;
+        
+        float angleStep = (kPi * 0.7f) / static_cast<float>(slotsInRing);
+        float baseAngle = (playerYaw + kPi) - (kPi * 0.35f);
+        float angle = baseAngle + angleStep * (ringSlotCounter + 0.5f);
 
-        // スロット位置 = プレイヤー位置 - 前方 * 後方距離 + 右方向 * 左右オフセット
         Vector3 slotPos;
-        slotPos.x = playerPos.x - forward.x * backDist + right.x * sideOffset;
+        slotPos.x = playerPos.x + std::sin(angle) * ringRadius;
         slotPos.y = playerPos.y;
-        slotPos.z = playerPos.z - forward.z * backDist + right.z * sideOffset;
+        slotPos.z = playerPos.z + std::cos(angle) * ringRadius;
 
         minion->SetTargetPosition(slotPos);
 
-        colIndex++;
-        if (colIndex >= colsInRow) {
-            row++;
-            colsInRow += 2;
-            colIndex = 0;
+        ringSlotCounter++;
+        if (ringSlotCounter >= slotsInRing) {
+            ring++;
+            slotsInRing += 3;
+            ringSlotCounter = 0;
         }
+        slotIndex++;
     }
 }
 
