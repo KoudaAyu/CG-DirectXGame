@@ -4,6 +4,7 @@
 #include "Matrix4x4.h"
 #include "RenderContext.h"
 #include "Baziru3_Engine/Graphics/3D/Object/Object3d.h"
+#include "Baziru3_Engine/Framework/Collision/SphereCollider.h"
 #include <memory>
 
 class Object3dCom;
@@ -11,13 +12,29 @@ class Camera;
 class KeyInput;
 class MinionManager;
 
+/// @brief スライム用GPU定数バッファのCPU側構造体（Slime.hlsli の SlimeParams と一致させる）
+struct SlimeParamsCPU
+{
+    float time = 0.0f;
+    float wobbleStrength = 0.12f;
+    float wobbleFrequency = 4.0f;
+    float impulseStrength = 0.0f;
+    Vector3 squashStretch{ 0.0f, 0.0f, 0.0f };
+    float padding1 = 0.0f;
+    Vector4 baseColor{ 0.2f, 0.85f, 1.0f, 0.9f };
+    float fresnelPower = 3.0f;
+    float envReflection = 0.4f;
+    float innerGlow = 0.4f;
+    float specularShininess = 64.0f;
+};
+
 /**
- * @brief ピクミン×ロコロコ プレイヤーキャラクター
+ * @brief ピクミン×ロコロコ プレイヤーキャラクター（スライム描画版）
  */
 class PikminPlayer {
 public:
     PikminPlayer();
-    ~PikminPlayer() = default;
+    ~PikminPlayer();
 
     void Initialize(Object3dCom* object3dCom, Camera* camera, const Vector3& startPos = { 0.0f, 0.0f, 0.0f });
     void Update(float deltaTime, KeyInput* keyInput, MinionManager* minionManager);
@@ -42,6 +59,14 @@ public:
 
     float GetThrowPower() const { return throwPower_; }
     void SetThrowPower(float p) { throwPower_ = p; }
+
+    // スライムパラメータの公開（ImGui調整用）
+    SlimeParamsCPU& GetSlimeParams() { return slimeParams_; }
+    SphereCollider* GetCollider() const { return collider_.get(); }
+
+private:
+    void DrawSlime(Object3d* object, const Object3d::ModelData& modelData,
+                   const RenderContext& ctx, uint32_t textureIndex);
 
 private:
     Object3dCom* object3dCom_ = nullptr;
@@ -75,4 +100,12 @@ private:
 
     // 合体時スケールイージング
     float mergeScaleAnimation_ = 1.0f;
+
+    // スライム固有
+    SlimeParamsCPU slimeParams_;
+    float totalTime_ = 0.0f;         // シェーダーに渡す累積時間
+    Vector3 prevVelocity_{ 0.0f, 0.0f, 0.0f }; // スクワッシュ計算用の前フレーム速度
+
+    // 合体時の当たり判定
+    std::unique_ptr<SphereCollider> collider_;
 };
