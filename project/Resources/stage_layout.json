@@ -1,10 +1,452 @@
 [
     {
-        "name": "River",
-        "type": "River",
+        "name": "SupplyCrate_Left",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "duckov_crate.obj",
+        "position": {
+            "x": -3.5,
+            "y": 0.0,
+            "z": 5.0
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "SupplyCrate_Right",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "duckov_crate.obj",
+        "position": {
+            "x": 3.5,
+            "y": 0.0,
+            "z": 5.0
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "SupplyCrate_Outpost_Left",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "duckov_crate.obj",
+        "position": {
+            "x": -7.0,
+            "y": 0.0,
+            "z": 14.0
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "SupplyCrate_Outpost_Right",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "duckov_crate.obj",
+        "position": {
+            "x": 7.0,
+            "y": 0.0,
+            "z": 14.0
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "CargoContainer_1",
+        "type": "Container",
+        "modelDirectory": "Resources",
+        "modelFilename": "container.obj",
+        "position": {
+            "x": -2.5,
+            "y": 0.0,
+            "z": 12.0
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "CargoContainer_2",
+        "type": "Container",
+        "modelDirectory": "Resources",
+        "modelFilename": "container.obj",
+        "position": {
+            "x": 2.5,
+            "y": 0.0,
+            "z": 12.0
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "OilDrums_LeftChoke",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "duckov_barrel_stack.obj",
+        "position": {
+            "x": -4.0,
+            "y": 0.0,
+            "z": 22.0
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "OilDrums_RightChoke",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "duckov_barrel_stack.obj",
+        "position": {
+            "x": 4.0,
+            "y": 0.0,
+            "z": 22.0
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "Fence_obs1_LeftNear",
+        "type": "Fence",
+        "modelDirectory": "Resources",
+        "modelFilename": "fence.obj",
+        "position": {
+            "x": -5.0,
+            "y": 0.0,
+            "z": 8.0
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "Fence_obs2_LeftFar",
+        "type": "Fence",
+        "modelDirectory": "Resources",
+        "modelFilename": "fence.obj",
+        "position": {
+            "x": -5.0,
+            "y": 0.0,
+            "z": 18.0
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "Fence_obs3_RightNear",
+        "type": "Fence",
+        "modelDirectory": "Resources",
+        "modelFilename": "fence.obj",
+        "position": {
+            "x": 5.0,
+            "y": 0.0,
+            "z": 8.0
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "Fence_obs4_RightFar",
+        "type": "Fence",
+        "modelDirectory": "Resources",
+        "modelFilename": "fence.obj",
+        "position": {
+            "x": 5.0,
+            "y": 0.0,
+            "z": 18.0
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "SandbagWall_BridgeFront",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "bridge.obj",
         "position": {
             "x": 0.0,
             "y": 0.0,
+            "z": 17.5
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "River_Water_Surface",
+        "type": "River",
+        "modelDirectory": "Resources",
+        "modelFilename": "river.obj",
+        "position": {
+            "x": 0.0,
+            "y": 0.02,
+            "z": 18.75
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 60.0,
+            "y": 1.0,
+            "z": 5.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "Wooden_Bridge_Center",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "bridge.obj",
+        "position": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 20.0
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "Watchtower_NorthWest",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "watchtower.obj",
+        "position": {
+            "x": -9.0,
+            "y": 0.0,
+            "z": 24.0
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "Watchtower_NorthEast",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "watchtower.obj",
+        "position": {
+            "x": 9.0,
+            "y": 0.0,
+            "z": 24.0
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "SandbagWall_Extraction",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "duckov_sandbag_wall.obj",
+        "position": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 27.0
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "SandbagWall_Extraction_Left",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "duckov_sandbag_wall.obj",
+        "position": {
+            "x": -4.5,
+            "y": 0.0,
+            "z": 28.5
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "SandbagWall_Extraction_Right",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "duckov_sandbag_wall.obj",
+        "position": {
+            "x": 4.5,
+            "y": 0.0,
+            "z": 28.5
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "Player_Spawn_Point",
+        "type": "SpawnPoint",
+        "modelDirectory": "Resources",
+        "modelFilename": "sphere.obj",
+        "position": {
+            "x": 0.0,
+            "y": 0.6,
             "z": 0.0
         },
         "rotation": {
@@ -17,152 +459,119 @@
             "y": 1.0,
             "z": 1.0
         },
-        "parameters": {
-            "points": [
-                {
-                    "x": -44.7321,
-                    "y": 0.0,
-                    "z": 11.172
-                },
-                {
-                    "x": -45.2912,
-                    "y": 0.0,
-                    "z": 10.3441
-                },
-                {
-                    "x": -46.4093,
-                    "y": 0.0,
-                    "z": 8.6882
-                },
-                {
-                    "x": -48.0865,
-                    "y": 0.0,
-                    "z": 6.2045
-                },
-                {
-                    "x": -50.3227,
-                    "y": 0.0,
-                    "z": 2.8928
-                },
-                {
-                    "x": -51.7483,
-                    "y": 0.0,
-                    "z": 0.3859
-                },
-                {
-                    "x": -52.3632,
-                    "y": 0.0,
-                    "z": -1.3161
-                },
-                {
-                    "x": -52.1675,
-                    "y": 0.0,
-                    "z": -2.2134
-                },
-                {
-                    "x": -51.1611,
-                    "y": 0.0,
-                    "z": -2.3058
-                },
-                {
-                    "x": -50.2342,
-                    "y": 0.0,
-                    "z": -2.2314
-                },
-                {
-                    "x": -49.3869,
-                    "y": 0.0,
-                    "z": -1.9902
-                },
-                {
-                    "x": -48.6191,
-                    "y": 0.0,
-                    "z": -1.5822
-                },
-                {
-                    "x": -47.9309,
-                    "y": 0.0,
-                    "z": -1.0074
-                },
-                {
-                    "x": -47.492,
-                    "y": 0.0,
-                    "z": -0.4443
-                },
-                {
-                    "x": -47.3025,
-                    "y": 0.0,
-                    "z": 0.1072
-                },
-                {
-                    "x": -47.3624,
-                    "y": 0.0,
-                    "z": 0.647
-                },
-                {
-                    "x": -47.6716,
-                    "y": 0.0,
-                    "z": 1.1752
-                },
-                {
-                    "x": -48.2622,
-                    "y": 0.0,
-                    "z": 1.6241
-                },
-                {
-                    "x": -49.1343,
-                    "y": 0.0,
-                    "z": 1.9938
-                },
-                {
-                    "x": -50.2878,
-                    "y": 0.0,
-                    "z": 2.2843
-                },
-                {
-                    "x": -51.7227,
-                    "y": 0.0,
-                    "z": 2.4955
-                },
-                {
-                    "x": -52.0836,
-                    "y": 0.0,
-                    "z": 1.0772
-                },
-                {
-                    "x": -51.3706,
-                    "y": 0.0,
-                    "z": -1.9707
-                },
-                {
-                    "x": -49.5836,
-                    "y": 0.0,
-                    "z": -6.6483
-                },
-                {
-                    "x": -46.7226,
-                    "y": 0.0,
-                    "z": -12.9554
-                },
-                {
-                    "x": -44.5769,
-                    "y": 0.0,
-                    "z": -17.6857
-                },
-                {
-                    "x": -43.1464,
-                    "y": 0.0,
-                    "z": -20.8393
-                },
-                {
-                    "x": -42.4312,
-                    "y": 0.0,
-                    "z": -22.416
-                }
-            ],
-            "river_width": 3.5,
-            "river_flow_speed": 1.0,
-            "river_wave_scale": 1.0
-        }
+        "isStatic": true
+    },
+    {
+        "name": "Enemy_Spawn_Point",
+        "type": "SpawnPoint",
+        "modelDirectory": "Resources",
+        "modelFilename": "sphere.obj",
+        "position": {
+            "x": 0.0,
+            "y": 0.6,
+            "z": 20.0
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "Goal_Extraction_Ring",
+        "type": "GoalRing",
+        "modelDirectory": "Resources",
+        "modelFilename": "ring.obj",
+        "position": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 32.0
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "ShootingTarget_1",
+        "type": "Target",
+        "modelDirectory": "Resources",
+        "modelFilename": "shooting_target.obj",
+        "position": {
+            "x": -4.5,
+            "y": 0.0,
+            "z": 9.0
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "radius": 0.8,
+        "isStatic": true
+    },
+    {
+        "name": "ShootingTarget_2",
+        "type": "Target",
+        "modelDirectory": "Resources",
+        "modelFilename": "shooting_target.obj",
+        "position": {
+            "x": 4.5,
+            "y": 0.0,
+            "z": 13.0
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "radius": 0.8,
+        "isStatic": true
+    },
+    {
+        "name": "ShootingTarget_3",
+        "type": "Target",
+        "modelDirectory": "Resources",
+        "modelFilename": "shooting_target.obj",
+        "position": {
+            "x": -2.5,
+            "y": 0.0,
+            "z": 25.5
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "radius": 0.8,
+        "isStatic": true
     }
 ]

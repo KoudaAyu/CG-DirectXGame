@@ -58,6 +58,13 @@ void GamePlayScene::InitializeScene()
 	particleManager = GetParticleManager();
 	appParticleManager_ = std::make_unique<AppParticleManager>();
 	appParticleManager_->Initialize(particleManager);
+	// 📷 カメラの初期化（Escape from Duckov 斜め45度トップダウン見下ろし視点）
+	if (camera_)
+	{
+		camera_->SetTranslate(Vector3{ 0.0f, 20.0f, -20.0f });
+		camera_->SetRotate({ 0.785f, 0.0f, 0.0f });
+		camera_->Update();
+	}
 
 	// 標的リストの初期化（InitializeObstacles内でstage_layout.jsonから読み込まれます）
 	targets_.clear();
@@ -81,15 +88,6 @@ void GamePlayScene::InitializeScene()
 	combatSystem_ = std::make_unique<CombatSystem>(this);
 	collisionSystem_ = std::make_unique<CollisionSystem>(this);
 	RaidStats::GetInstance().Reset();
-
-	// 📷 カメラの初期化（Escape from Duckov 斜め45度トップダウン見下ろし視点）
-	if (camera_)
-	{
-		Vector3 pPos = player_ ? player_->GetPosition() : Vector3{ 0.0f, 0.0f, 0.0f };
-		camera_->SetTranslate(pPos + Vector3{ 0.0f, 20.0f, -20.0f });
-		camera_->SetRotate({ 0.785f, 0.0f, 0.0f });
-		camera_->Update();
-	}
 
 	// 視野コーン（Vision Cone）やデバッグギズモはデフォルト非表示（F1でいつでも切替可能）
 	showDebugGizmos_ = false;
@@ -1475,38 +1473,6 @@ void GamePlayScene::Update()
 		}
 	}
 
-	UpdateExtractionGoal(deltaTime);
-	if (lootSystem_)
-	{
-		lootSystem_->Update(deltaTime, player_.get(), appParticleManager_.get(), floatingTexts_);
-	}
-
-	UpdateEnvironment();
-	UpdateObstacles();
-
-	// 標的の更新
-	for (auto& t : targets_)
-	{
-		if (t) t->Update(deltaTime);
-	}
-
-	// すべての的が破壊されたかチェック
-	int totalTargets = static_cast<int>(targets_.size());
-	int destroyedCount = 0;
-	bool anyTargetAlive = false;
-	for (const auto& t : targets_)
-	{
-		if (t && !t->IsDead())
-		{
-			anyTargetAlive = true;
-		}
-		else if (t && t->IsDead())
-		{
-			destroyedCount++;
-		}
-	}
-	allTargetsDestroyed_ = (totalTargets > 0 && !anyTargetAlive && destroyedCount >= totalTargets);
-
 	UpdateSprites(deltaTime);
 	UpdateDebugInput();
 	UpdateCharacters(deltaTime);
@@ -1523,45 +1489,8 @@ void GamePlayScene::Update()
 	{
 		player_->PostCollisionUpdate();
 	}
-	UpdatePlayerHpBar();
-	CheckGameOver();
-	if (sceneEntranceFadeTimer_ > 0.0f)
-	{
-		sceneEntranceFadeTimer_ -= realDeltaTime;
-		if (sceneEntranceFadeTimer_ < 0.0f) sceneEntranceFadeTimer_ = 0.0f;
-	}
 
-	UpdateStressTestMode();
-
-
-	// ライト点滅（マズルフラッシュ効果）の更新
-	if (light)
-	{
-		float intensity = 1.0f;
-		if (lightFlashTimer_ > 0.0f)
-		{
-			lightFlashTimer_ -= deltaTime;
-			intensity = 5.5f; // 眩しく発光
-		}
-		else
-		{
-			intensity = 1.0f; // 通常の明るさ
-		}
-
-		auto resource = light->GetDirectionalLightResource();
-		if (resource)
-		{
-			Object3d::DirectionalLight* data = nullptr;
-			resource->Map(0, nullptr, reinterpret_cast<void**>(&data));
-			if (data)
-			{
-				data->intensity = intensity;
-			}
-			resource->Unmap(0, nullptr);
-		}
-	}
-
-	// 📷 カメラのプレイヤー追従＆シネマティック更新
+	// 📷 カメラのプレイヤー追従＆シネマティック更新（全オブジェクトの更新前に最新フレーム位置を反映）
 	if (camera_ && player_)
 	{
 		Vector3 playerPos = player_->GetPosition();
@@ -1599,6 +1528,75 @@ void GamePlayScene::Update()
 		}
 
 		camera_->Update();
+	}
+
+	UpdateExtractionGoal(deltaTime);
+	if (lootSystem_)
+	{
+		lootSystem_->Update(deltaTime, player_.get(), appParticleManager_.get(), floatingTexts_);
+	}
+
+	UpdateEnvironment();
+	UpdateObstacles();
+
+	// 標的の更新
+	for (auto& t : targets_)
+	{
+		if (t) t->Update(deltaTime);
+	}
+
+	// すべての的が破壊されたかチェック
+	int totalTargets = static_cast<int>(targets_.size());
+	int destroyedCount = 0;
+	bool anyTargetAlive = false;
+	for (const auto& t : targets_)
+	{
+		if (t && !t->IsDead())
+		{
+			anyTargetAlive = true;
+		}
+		else if (t && t->IsDead())
+		{
+			destroyedCount++;
+		}
+	}
+	allTargetsDestroyed_ = (totalTargets > 0 && !anyTargetAlive && destroyedCount >= totalTargets);
+
+	UpdatePlayerHpBar();
+	CheckGameOver();
+	if (sceneEntranceFadeTimer_ > 0.0f)
+	{
+		sceneEntranceFadeTimer_ -= realDeltaTime;
+		if (sceneEntranceFadeTimer_ < 0.0f) sceneEntranceFadeTimer_ = 0.0f;
+	}
+
+	UpdateStressTestMode();
+
+	// ライト点滅（マズルフラッシュ効果）の更新
+	if (light)
+	{
+		float intensity = 1.0f;
+		if (lightFlashTimer_ > 0.0f)
+		{
+			lightFlashTimer_ -= deltaTime;
+			intensity = 5.5f; // 眩しく発光
+		}
+		else
+		{
+			intensity = 1.0f; // 通常の明るさ
+		}
+
+		auto resource = light->GetDirectionalLightResource();
+		if (resource)
+		{
+			Object3d::DirectionalLight* data = nullptr;
+			resource->Map(0, nullptr, reinterpret_cast<void**>(&data));
+			if (data)
+			{
+				data->intensity = intensity;
+			}
+			resource->Unmap(0, nullptr);
+		}
 	}
 
 	// 浮遊テキストの更新
@@ -1778,10 +1776,9 @@ void GamePlayScene::InitializeObstacles()
 		}
 	}
 
-	// 読み込みに失敗した、またはデータが空だった場合はコンテナ＋直立フェンスの最新デフォルト配置を使用
-	if (!success || obstacles_.empty())
+	// 読み込みに失敗した、またはデータが不足していた場合はコンテナ＋直立フェンスの最新デフォルト配置を使用
+	if (!success || obstacles_.size() <= 2)
 	{
-		obstacles_.clear();
 		OutputDebugStringA("GamePlayScene: Using updated default obstacle placement.\n");
 
 		// コンテナ2個
@@ -1808,21 +1805,21 @@ void GamePlayScene::InitializeObstacles()
 			fobs->Initialize(object3dCom, camera_, fpos, 1.0f, "fence.obj", { 1.0f, 1.0f, 1.0f }, { 0.0f, 0.0f, 0.0f });
 			obstacles_.push_back(std::move(fobs));
 		}
+	}
 
-		if (targets_.empty())
-		{
-			auto t1 = std::make_unique<Target>();
-			t1->Initialize(object3dCom, camera_, { -4.5f, 0.0f, 9.0f }, 0.8f);
-			targets_.push_back(std::move(t1));
+	if (targets_.empty())
+	{
+		auto t1 = std::make_unique<Target>();
+		t1->Initialize(object3dCom, camera_, { -4.5f, 0.0f, 9.0f }, 0.8f);
+		targets_.push_back(std::move(t1));
 
-			auto t2 = std::make_unique<Target>();
-			t2->Initialize(object3dCom, camera_, { 4.5f, 0.0f, 13.0f }, 0.8f);
-			targets_.push_back(std::move(t2));
+		auto t2 = std::make_unique<Target>();
+		t2->Initialize(object3dCom, camera_, { 4.5f, 0.0f, 13.0f }, 0.8f);
+		targets_.push_back(std::move(t2));
 
-			auto t3 = std::make_unique<Target>();
-			t3->Initialize(object3dCom, camera_, { -2.5f, 0.0f, 25.5f }, 0.8f);
-			targets_.push_back(std::move(t3));
-		}
+		auto t3 = std::make_unique<Target>();
+		t3->Initialize(object3dCom, camera_, { -2.5f, 0.0f, 25.5f }, 0.8f);
+		targets_.push_back(std::move(t3));
 	}
 }
 

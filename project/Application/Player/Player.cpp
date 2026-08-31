@@ -422,15 +422,7 @@ void Player::Update(float deltaTime, MouseInput* mouseInput)
         }
     }
 
-    // --- 8. カメラのプレイヤー追従 ---
-    if (camera_)
-    {
-        Vector3 playerPos = position_;
-        Vector3 cameraOffset = { 0.0f, 20.0f, -20.0f }; // 斜め45度見下ろしオフセット
-        camera_->SetTranslate(playerPos + cameraOffset);
-    }
-
-    // --- 9. 照準拡散率（レティクルブレ）の更新 ---
+    // --- 8. 照準拡散率（レティクルブレ）の更新 ---
     UpdateSpread(deltaTime, isMoving);
     isMoving_ = isMoving;
 
