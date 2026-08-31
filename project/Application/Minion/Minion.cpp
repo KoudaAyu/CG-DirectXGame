@@ -1,4 +1,4 @@
-w#include "Minion.h"
+#include "Minion.h"
 #include "Application/GameObject/SlimeMesh.h"
 #include "Baziru3_Engine/Graphics/3D/Object/Object3dCom.h"
 #include "Baziru3_Engine/Core/Base/Pipeline/PipelineStateManager.h"
