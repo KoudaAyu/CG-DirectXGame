@@ -17,7 +17,7 @@ public:
     ~MinionManager() = default;
 
     void Initialize(Object3dCom* object3dCom, Camera* camera);
-    void Update(float deltaTime, const Vector3& playerPos, float playerYaw, bool isMerged);
+    void Update(float deltaTime, const Vector3& playerPos, float playerYaw, bool isMerged, float playerRadius = 0.8f);
     void Draw(const RenderContext& ctx);
 
     // --- 群衆の操作 ---
@@ -27,6 +27,7 @@ public:
 
     // 投擲指示
     bool ThrowMinion(const Vector3& launchPos, const Vector3& forwardDir, float throwPower = 15.0f, float upPower = 8.0f);
+    bool ThrowMinionWithVelocity(const Vector3& launchPos, const Vector3& velocity);
 
     // ホイッスル呼び戻し
     void Whistle(const Vector3& whistlePos, float radius = 8.0f);
@@ -37,6 +38,7 @@ public:
 
     // ゲッター
     int GetActiveCount() const;
+    int GetMergedCount() const;
     int GetTotalCount() const { return static_cast<int>(minions_.size()); }
     bool IsAllMerged() const { return isAllMerged_; }
 

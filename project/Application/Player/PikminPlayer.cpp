@@ -1,6 +1,8 @@
 #include "PikminPlayer.h"
 #include "Application/Minion/MinionManager.h"
 #include "Application/GameObject/SlimeMesh.h"
+#include "Application/GameObject/AimGuide.h"
+#include "Baziru3_Engine/Core/IO/Mouse/MouseInput.h"
 #include "Baziru3_Engine/Graphics/3D/Object/Object3dCom.h"
 #include "Baziru3_Engine/Core/Base/Pipeline/PipelineStateManager.h"
 #include "Baziru3_Engine/Core/Base/Allocator/ConstantBufferAllocator.h"
@@ -82,6 +84,11 @@ void PikminPlayer::Initialize(Object3dCom* object3dCom, Camera* camera, const Ve
     CollisionManager::GetInstance()->RegisterCollider(collider_.get());
 }
 
+float PikminPlayer::CalculateMergedScale(int minionCount) const {
+    if (minionCount <= 0) return 0.8f;
+    return 0.8f + 0.24f * std::pow(static_cast<float>(minionCount), 0.65f);
+}
+
 void PikminPlayer::SetPosition(const Vector3& pos) {
     position_ = pos;
     if (normalModel_) normalModel_->SetTranslate(pos);
@@ -99,17 +106,21 @@ void PikminPlayer::ToggleMerge() {
 void PikminPlayer::SetMerged(bool merged) {
     isMerged_ = merged;
     mergeScaleAnimation_ = 0.0f;
+    if (!merged) {
+        lastAbsorbedCount_ = 0;
+        currentMergedScale_ = 0.8f;
+    }
 
     // 合体/分裂時に衝撃波紋を発生させる
     slimeParams_.impulseStrength = 0.3f;
 
-    // コライダー半径を切り替え
+    // コライダー半径を初期化
     if (collider_) {
-        collider_->SetRadius(merged ? 2.0f : 0.8f);
+        collider_->SetRadius(merged ? currentMergedScale_ : 0.8f);
     }
 }
 
-void PikminPlayer::Update(float deltaTime, KeyInput* keyInput, MinionManager* minionManager) {
+void PikminPlayer::Update(float deltaTime, KeyInput* keyInput, MinionManager* minionManager, MouseInput* mouseInput, AimGuide* aimGuide) {
     throwCooldownTimer_ -= deltaTime;
     mergeScaleAnimation_ = (std::min)(1.0f, mergeScaleAnimation_ + deltaTime * 4.0f);
     totalTime_ += deltaTime;
@@ -130,6 +141,7 @@ void PikminPlayer::Update(float deltaTime, KeyInput* keyInput, MinionManager* mi
             ToggleMerge();
         }
 
+        // キーボードでの前方投擲
         if (keyInput->PushKey(DIK_F) || keyInput->TriggerKey(DIK_J)) {
             if (throwCooldownTimer_ <= 0.0f && minionManager && !isMerged_) {
                 Vector3 launchPos = position_ + GetForwardVector() * 0.8f;
@@ -142,6 +154,44 @@ void PikminPlayer::Update(float deltaTime, KeyInput* keyInput, MinionManager* mi
 
         if (keyInput->PushKey(DIK_Q)) {
             if (minionManager) {
+                minionManager->Whistle(position_, 10.0f);
+            }
+        }
+    }
+
+    // --- マウスによる投擲 & ホイッスル ---
+    if (!isMerged_ && mouseInput && minionManager) {
+        // マウス左クリックで目標地点へ投擲（クリック単発 または 押しっぱなし連射）
+        bool isThrowRequested = mouseInput->TriggerButton(0) || mouseInput->PushButton(0);
+        if (isThrowRequested && throwCooldownTimer_ <= 0.0f) {
+            Vector3 launchPos = position_;
+            launchPos.y += 0.5f;
+
+            if (aimGuide && aimGuide->IsTargetValid()) {
+                Vector3 targetVel = aimGuide->GetCalculatedVelocity();
+                if (minionManager->ThrowMinionWithVelocity(launchPos, targetVel)) {
+                    throwCooldownTimer_ = 0.12f; // リズミカルな連射間隔
+
+                    // 投擲時にプレイヤーの向きを目標地点に向ける
+                    Vector3 targetPos = aimGuide->GetTargetPosition();
+                    float aimYaw = std::atan2(targetPos.x - position_.x, targetPos.z - position_.z);
+                    rotation_.y = aimYaw;
+                }
+            } else {
+                // ガイド無効時は前方へ投擲
+                launchPos = position_ + GetForwardVector() * 0.8f;
+                launchPos.y += 0.5f;
+                if (minionManager->ThrowMinion(launchPos, GetForwardVector(), throwPower_, throwUpPower_)) {
+                    throwCooldownTimer_ = 0.15f;
+                }
+            }
+        }
+
+        // マウス右クリックでマウス位置へホイッスル（呼び戻し）
+        if (mouseInput->TriggerButton(1) || mouseInput->PushButton(1)) {
+            if (aimGuide && aimGuide->IsTargetValid()) {
+                minionManager->Whistle(aimGuide->GetTargetPosition(), 8.0f);
+            } else {
                 minionManager->Whistle(position_, 10.0f);
             }
         }
@@ -180,8 +230,6 @@ void PikminPlayer::Update(float deltaTime, KeyInput* keyInput, MinionManager* mi
         }
     }
 
-    position_.y = isMerged_ ? 1.0f : 0.5f;
-
     // --- スクワッシュ＆ストレッチの計算（移動の慣性から） ---
     Vector3 accel = {
         (currentVelocity.x - prevVelocity_.x) / (std::max)(deltaTime, 0.001f),
@@ -210,13 +258,31 @@ void PikminPlayer::Update(float deltaTime, KeyInput* keyInput, MinionManager* mi
     slimeParams_.time = totalTime_;
 
     if (isMerged_) {
+        int mergedCount = minionManager ? minionManager->GetMergedCount() : 0;
+        float targetScale = CalculateMergedScale(mergedCount);
+
+        // 新たなミニオンを吸収した時に衝撃波紋パルス
+        if (mergedCount > lastAbsorbedCount_) {
+            slimeParams_.impulseStrength = (std::min)(0.5f, slimeParams_.impulseStrength + 0.15f);
+            lastAbsorbedCount_ = mergedCount;
+        }
+
+        // 合体サイズの動的スムーズ補間
+        currentMergedScale_ += (targetScale - currentMergedScale_) * (std::min)(1.0f, deltaTime * 8.0f);
+
         float t = mergeScaleAnimation_;
-        float bounce = 1.0f + std::sin(t * kPi) * 0.4f;
-        float baseScale = 2.0f * (0.5f + 0.5f * t);
-        scale_ = { baseScale * bounce, baseScale * bounce, baseScale * bounce };
+        float bounce = 1.0f + std::sin(t * kPi) * 0.25f;
+        float currentScale = currentMergedScale_ * bounce;
+        scale_ = { currentScale, currentScale, currentScale };
 
         // 合体時のスライムカラー（黄金色）
         slimeParams_.baseColor = { 1.0f, 0.8f, 0.2f, 0.92f };
+
+        // 接地高さ・コライダー半径を動的スケールに追従
+        position_.y = currentScale * 0.5f;
+        if (collider_) {
+            collider_->SetRadius(currentScale);
+        }
 
         if (giantModel_) {
             giantModel_->SetTranslate(position_);
@@ -225,10 +291,17 @@ void PikminPlayer::Update(float deltaTime, KeyInput* keyInput, MinionManager* mi
             giantModel_->Update();
         }
     } else {
+        lastAbsorbedCount_ = 0;
+        currentMergedScale_ = 0.8f;
         scale_ = { 0.8f, 0.8f, 0.8f };
 
         // 通常時のスライムカラー（水色）
         slimeParams_.baseColor = { 0.2f, 0.85f, 1.0f, 0.9f };
+
+        position_.y = 0.5f;
+        if (collider_) {
+            collider_->SetRadius(0.8f);
+        }
 
         if (normalModel_) {
             normalModel_->SetTranslate(position_);

@@ -1,4 +1,4 @@
-#include "Minion.h"
+w#include "Minion.h"
 #include "Application/GameObject/SlimeMesh.h"
 #include "Baziru3_Engine/Graphics/3D/Object/Object3dCom.h"
 #include "Baziru3_Engine/Core/Base/Pipeline/PipelineStateManager.h"
@@ -133,24 +133,37 @@ void Minion::Update(float deltaTime) {
 
     switch (state_) {
     case MinionState::Following: {
-        // スロット座標に向かってスムーズに移動 (Lerp / 追従)
         Vector3 diff = targetSlotPos_ - position_;
         diff.y = 0.0f;
         float dist = std::sqrt(diff.x * diff.x + diff.z * diff.z);
 
         if (dist > 0.05f) {
-            float currentFollowSpeed = followSpeed_;
-            // 離れている場合は素早く追いつく（画面端での取り残され防止）
-            if (dist > 2.0f) {
-                currentFollowSpeed = followSpeed_ + (dist - 2.0f) * 4.0f;
+            // 画面外や遠距離でも一切クランプせず、ワールド空間で一定の自然な速度で移動
+            float targetSpeed = followSpeed_;
+            if (dist < 0.8f) {
+                targetSpeed = (dist / 0.8f) * followSpeed_; // スロット直前のみ滑らかに減速
             }
-            float step = currentFollowSpeed * deltaTime;
-            if (step > dist) step = dist;
-            position_.x += (diff.x / dist) * step;
-            position_.z += (diff.z / dist) * step;
+            Vector3 desiredVel = { (diff.x / dist) * targetSpeed, 0.0f, (diff.z / dist) * targetSpeed };
 
-            // 移動方向を向く
-            rotation_.y = std::atan2(diff.x, diff.z);
+            // 慣性を持った速度補間
+            velocity_.x += (desiredVel.x - velocity_.x) * (std::min)(1.0f, deltaTime * 10.0f);
+            velocity_.z += (desiredVel.z - velocity_.z) * (std::min)(1.0f, deltaTime * 10.0f);
+
+            position_.x += velocity_.x * deltaTime;
+            position_.z += velocity_.z * deltaTime;
+
+            // スムーズな旋回
+            float moveSpeed = std::sqrt(velocity_.x * velocity_.x + velocity_.z * velocity_.z);
+            if (moveSpeed > 0.1f) {
+                float targetYaw = std::atan2(velocity_.x, velocity_.z);
+                float diffYaw = targetYaw - rotation_.y;
+                while (diffYaw > 3.14159265f) diffYaw -= 2.0f * 3.14159265f;
+                while (diffYaw < -3.14159265f) diffYaw += 2.0f * 3.14159265f;
+                rotation_.y += diffYaw * (std::min)(1.0f, deltaTime * 12.0f);
+            }
+        } else {
+            velocity_.x *= 0.8f;
+            velocity_.z *= 0.8f;
         }
 
         // 接地Y座標の維持 ＋ ピョコピョコ跳ね

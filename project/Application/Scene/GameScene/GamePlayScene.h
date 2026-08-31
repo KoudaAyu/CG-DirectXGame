@@ -3,9 +3,11 @@
 #include "BaseScene.h"
 #include "Camera.h"
 #include "KeyInput.h"
+#include "Baziru3_Engine/Core/IO/Mouse/MouseInput.h"
 #include "Baziru3_Engine/Graphics/Graphics/SceneRenderRequests.h"
 #include "Application/Player/PikminPlayer.h"
 #include "Application/Minion/MinionManager.h"
+#include "Application/GameObject/AimGuide.h"
 #include "Baziru3_Engine/Graphics/3D/Object/Object3d.h"
 
 #include <memory>
@@ -31,10 +33,12 @@ private:
 
 private:
     std::unique_ptr<KeyInput> keyInput_;
+    std::unique_ptr<MouseInput> mouseInput_;
     std::unique_ptr<Camera> playCamera_;
 
     std::unique_ptr<PikminPlayer> player_;
     std::unique_ptr<MinionManager> minionManager_;
+    std::unique_ptr<AimGuide> aimGuide_;
 
     std::unique_ptr<Object3d> groundPlane_;
     Object3d::ModelData groundModelData_;

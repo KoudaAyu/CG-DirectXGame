@@ -20,6 +20,9 @@ void GamePlayScene::InitializeScene()
     {
         keyInput_ = std::make_unique<KeyInput>();
         keyInput_->Initialize(dxCommon_->GetWindowAPI());
+
+        mouseInput_ = std::make_unique<MouseInput>();
+        mouseInput_->Initialize(dxCommon_->GetWindowAPI());
     }
 
     // 2. カメラの初期化 (斜め見下ろし追従カメラ)
@@ -60,15 +63,21 @@ void GamePlayScene::InitializeScene()
     minionManager_->Initialize(object3dCom, playCamera_.get());
     minionManager_->SpawnMinion({ 0.0f, 0.0f, -2.0f }, 12, MinionType::Red);
 
+    // 6. マウス照準・放物線ガイドの初期化
+    aimGuide_ = std::make_unique<AimGuide>();
+    aimGuide_->Initialize(object3dCom, playCamera_.get());
+
     isInitialized_ = true;
 }
 
 void GamePlayScene::Finalize()
 {
+    aimGuide_.reset();
     groundPlane_.reset();
     minionManager_.reset();
     player_.reset();
     playCamera_.reset();
+    mouseInput_.reset();
     keyInput_.reset();
     isInitialized_ = false;
 }
@@ -81,12 +90,6 @@ void GamePlayScene::Update()
     {
         keyInput_->Update();
 
-        // プレイヤーの更新
-        if (player_)
-        {
-            player_->Update(deltaTime, keyInput_.get(), minionManager_.get());
-        }
-
         // SPACEキーでクリアシーンへ遷移
         if (keyInput_->TriggerKey(DIK_SPACE))
         {
@@ -94,10 +97,29 @@ void GamePlayScene::Update()
         }
     }
 
+    if (mouseInput_)
+    {
+        mouseInput_->Update();
+    }
+
+    // 放物線照準ガイドの更新
+    if (aimGuide_ && player_ && playCamera_)
+    {
+        Vector3 launchOrigin = player_->GetPosition();
+        launchOrigin.y += 0.5f;
+        aimGuide_->Update(launchOrigin, mouseInput_.get(), playCamera_.get(), player_->IsMerged());
+    }
+
+    // プレイヤーの更新
+    if (player_)
+    {
+        player_->Update(deltaTime, keyInput_.get(), minionManager_.get(), mouseInput_.get(), aimGuide_.get());
+    }
+
     // ミニオンマネージャーの更新
     if (minionManager_ && player_)
     {
-        minionManager_->Update(deltaTime, player_->GetPosition(), player_->GetYaw(), player_->IsMerged());
+        minionManager_->Update(deltaTime, player_->GetPosition(), player_->GetYaw(), player_->IsMerged(), player_->GetCurrentScale());
     }
 
     // 衝突判定と押し出しの更新
@@ -109,7 +131,7 @@ void GamePlayScene::Update()
         groundPlane_->Update();
     }
 
-    // カメラのスムーズ追従
+    // カメラのスムーズ追従 (Smooth Damping)
     if (playCamera_ && player_)
     {
         Vector3 playerPos = player_->GetPosition();
@@ -118,7 +140,14 @@ void GamePlayScene::Update()
             playerPos.y + cameraOffset_.y,
             playerPos.z + cameraOffset_.z
         };
-        playCamera_->SetTranslate(targetCamPos);
+        Vector3 currentCamPos = playCamera_->GetTranslate();
+        float smoothRate = (std::min)(1.0f, deltaTime * 8.0f);
+        Vector3 newCamPos;
+        newCamPos.x = currentCamPos.x + (targetCamPos.x - currentCamPos.x) * smoothRate;
+        newCamPos.y = currentCamPos.y + (targetCamPos.y - currentCamPos.y) * smoothRate;
+        newCamPos.z = currentCamPos.z + (targetCamPos.z - currentCamPos.z) * smoothRate;
+
+        playCamera_->SetTranslate(newCamPos);
         playCamera_->SetRotate({ 0.55f, 0.0f, 0.0f });
         playCamera_->Update();
     }
@@ -153,13 +182,19 @@ void GamePlayScene::Draw(SceneRenderRequests& renderRequests)
         object3dCom->Draw(groundPlane_.get(), groundCtx, groundModelData_, true);
     }
 
-    // 2. ミニオン群衆の描画
+    // 2. 放物線照準ガイドの描画 (地面の上に重なるように先に描画)
+    if (aimGuide_)
+    {
+        aimGuide_->Draw(ctx);
+    }
+
+    // 3. ミニオン群衆の描画
     if (minionManager_)
     {
         minionManager_->Draw(ctx);
     }
 
-    // 3. プレイヤーの描画
+    // 4. プレイヤーの描画
     if (player_)
     {
         player_->Draw(ctx);
@@ -186,16 +221,25 @@ void GamePlayScene::DrawDebugUI()
     ImGui::TextColored(ImVec4(1.0f, 0.9f, 0.2f, 1.0f), "[ Controls ]");
     ImGui::BulletText("WASD / Arrows: Move");
     ImGui::BulletText("E key: Merge (LocoRoco) <-> Split (Pikmin)");
-    ImGui::BulletText("F / J key: Throw Minion (Pikmin mode only)");
-    ImGui::BulletText("Q key: Whistle (Recall minions)");
+    ImGui::BulletText("Mouse Left Click: Aim & Throw to Target (放物線投擲)");
+    ImGui::BulletText("Mouse Right Click: Whistle at Cursor (マウス位置へ笛)");
+    ImGui::BulletText("F / J key: Forward Throw");
+    ImGui::BulletText("Q key: Whistle around player");
     ImGui::BulletText("SPACE key: Clear Scene");
     ImGui::Separator();
 
     // 2. ステート表示 & 合体トグル
-    if (player_)
+    if (player_ && minionManager_)
     {
         bool isMerged = player_->IsMerged();
-        ImGui::Text("Player Mode: %s", isMerged ? "LocoRoco (Merged / Giant)" : "Pikmin (Split / Squad)");
+        int mergedCount = minionManager_->GetMergedCount();
+        int totalCount = minionManager_->GetTotalCount();
+        if (isMerged) {
+            ImGui::Text("Player Mode: LocoRoco (Giant / Absorbed: %d / %d, Scale: %.2f)",
+                        mergedCount, totalCount, player_->GetCurrentScale());
+        } else {
+            ImGui::Text("Player Mode: Pikmin (Split / Squad, Scale: %.2f)", player_->GetCurrentScale());
+        }
 
         if (ImGui::Button(isMerged ? "SPLIT (Pikmin Mode)" : "MERGE (LocoRoco Mode)", ImVec2(280, 36)))
         {

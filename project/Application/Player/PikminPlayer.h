@@ -10,7 +10,9 @@
 class Object3dCom;
 class Camera;
 class KeyInput;
+class MouseInput;
 class MinionManager;
+class AimGuide;
 
 /// @brief スライム用GPU定数バッファのCPU側構造体（Slime.hlsli の SlimeParams と一致させる）
 struct SlimeParamsCPU
@@ -37,7 +39,7 @@ public:
     ~PikminPlayer();
 
     void Initialize(Object3dCom* object3dCom, Camera* camera, const Vector3& startPos = { 0.0f, 0.0f, 0.0f });
-    void Update(float deltaTime, KeyInput* keyInput, MinionManager* minionManager);
+    void Update(float deltaTime, KeyInput* keyInput, MinionManager* minionManager, MouseInput* mouseInput = nullptr, AimGuide* aimGuide = nullptr);
     void Draw(const RenderContext& ctx);
 
     // --- ゲッター / セッター ---
@@ -63,6 +65,9 @@ public:
     // スライムパラメータの公開（ImGui調整用）
     SlimeParamsCPU& GetSlimeParams() { return slimeParams_; }
     SphereCollider* GetCollider() const { return collider_.get(); }
+    float GetCurrentScale() const { return scale_.x; }
+
+    float CalculateMergedScale(int minionCount) const;
 
 private:
     void DrawSlime(Object3d* object, const Object3d::ModelData& modelData,
@@ -100,6 +105,8 @@ private:
 
     // 合体時スケールイージング
     float mergeScaleAnimation_ = 1.0f;
+    float currentMergedScale_ = 0.8f;
+    int lastAbsorbedCount_ = 0;
 
     // スライム固有
     SlimeParamsCPU slimeParams_;

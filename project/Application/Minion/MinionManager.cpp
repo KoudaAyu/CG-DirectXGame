@@ -57,6 +57,17 @@ int MinionManager::GetActiveCount() const {
     return count;
 }
 
+int MinionManager::GetMergedCount() const {
+    if (!isMergedState_) return 0;
+    int count = 0;
+    for (const auto& m : minions_) {
+        if (m && !m->IsActive()) {
+            count++;
+        }
+    }
+    return count;
+}
+
 void MinionManager::CalculateFormationSlots(const Vector3& playerPos, float playerYaw) {
     int slotIndex = 0;
     int ring = 1;
@@ -142,9 +153,9 @@ void MinionManager::TriggerSplit(const Vector3& playerPos) {
             minion->SetPosition(playerPos);
             minion->SetFollowSpeed(followSpeed_);
             
-            float angle = angleStep * index + ((std::rand() % 100) / 100.0f - 0.5f) * 0.2f;
-            float popSpeed = 4.0f + (std::rand() % 100) / 50.0f; // 4.0f ~ 6.0f (適度な広がり)
-            float upSpeed = 5.5f + (std::rand() % 100) / 50.0f;  // 5.5f ~ 7.5f (適度な跳躍)
+            float angle = angleStep * index + ((std::rand() % 100) / 100.0f - 0.5f) * 0.3f;
+            float popSpeed = 6.0f + (std::rand() % 100) / 25.0f; // 6.0f ~ 10.0f
+            float upSpeed = 6.0f + (std::rand() % 100) / 25.0f;  // 6.0f ~ 10.0f
 
             Vector3 launchVel = {
                 std::sin(angle) * popSpeed,
@@ -160,15 +171,21 @@ void MinionManager::TriggerSplit(const Vector3& playerPos) {
 bool MinionManager::ThrowMinion(const Vector3& launchPos, const Vector3& forwardDir, float throwPower, float upPower) {
     if (isMergedState_) return false;
 
+    Vector3 vel = {
+        forwardDir.x * throwPower,
+        upPower,
+        forwardDir.z * throwPower
+    };
+    return ThrowMinionWithVelocity(launchPos, vel);
+}
+
+bool MinionManager::ThrowMinionWithVelocity(const Vector3& launchPos, const Vector3& velocity) {
+    if (isMergedState_) return false;
+
     for (auto& minion : minions_) {
         if (minion && minion->IsActive() && minion->GetState() == MinionState::Following) {
             minion->SetPosition(launchPos);
-            Vector3 vel = {
-                forwardDir.x * throwPower,
-                upPower,
-                forwardDir.z * throwPower
-            };
-            minion->Launch(vel);
+            minion->Launch(velocity);
             return true;
         }
     }
@@ -188,7 +205,7 @@ void MinionManager::Whistle(const Vector3& whistlePos, float radius) {
     }
 }
 
-void MinionManager::Update(float deltaTime, const Vector3& playerPos, float playerYaw, bool isMerged) {
+void MinionManager::Update(float deltaTime, const Vector3& playerPos, float playerYaw, bool isMerged, float playerRadius) {
     if (isMergedState_ != isMerged) {
         if (isMerged) {
             TriggerMerge(playerPos);
@@ -202,11 +219,14 @@ void MinionManager::Update(float deltaTime, const Vector3& playerPos, float play
         ResolveSeparation();
     } else {
         bool allInactive = true;
+        float absorbRadius = (std::max)(0.6f, playerRadius * 0.7f);
+        float absorbRadiusSq = absorbRadius * absorbRadius;
+
         for (auto& minion : minions_) {
             if (minion && minion->IsActive() && minion->GetState() == MinionState::Merging) {
                 Vector3 diff = minion->GetPosition() - playerPos;
                 float distSq = diff.x * diff.x + diff.y * diff.y + diff.z * diff.z;
-                if (distSq < 0.6f * 0.6f) {
+                if (distSq < absorbRadiusSq) {
                     minion->SetActive(false);
                 } else {
                     allInactive = false;

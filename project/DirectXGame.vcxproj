@@ -123,6 +123,7 @@
     <ClCompile Include="Application\Minion\MinionManager.cpp" />
     <ClCompile Include="Application\Player\PikminPlayer.cpp" />
     <ClCompile Include="Application\GameObject\SlimeMesh.cpp" />
+    <ClCompile Include="Application\GameObject\AimGuide.cpp" />
     <ClCompile Include="Baziru3_Engine\Graphics\3D\Trajectory\TrajectoryRenderer.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -363,6 +364,7 @@
     <ClInclude Include="Application\Minion\MinionManager.h" />
     <ClInclude Include="Application\Player\PikminPlayer.h" />
     <ClInclude Include="Application\GameObject\SlimeMesh.h" />
+    <ClInclude Include="Application\GameObject\AimGuide.h" />
     <ClInclude Include="Baziru3_Engine\Graphics\3D\Trajectory\TrajectoryRenderer.h" />
   </ItemGroup>
   <ItemGroup>

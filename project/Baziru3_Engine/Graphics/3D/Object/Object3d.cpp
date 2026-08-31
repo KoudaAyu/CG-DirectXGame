@@ -257,7 +257,7 @@ void Object3d::Update() {
       float clipX = x / w;
       float clipY = y / w;
       float clipZ = z / w;
-      float margin = radius / w;
+      float margin = (radius * 3.0f) / w + 0.5f;
 
       if (clipX < -1.0f - margin || clipX > 1.0f + margin ||
           clipY < -1.0f - margin || clipY > 1.0f + margin ||
@@ -265,19 +265,14 @@ void Object3d::Update() {
         isCulled_ = true;
       }
     } else {
-      if (w < -radius) {
+      if (w < -radius * 3.0f) {
         isCulled_ = true;
       }
     }
   }
 
-  if (isCulled_) {
-    return;
-  }
-
-  // ステップ1: アニメーション時間を進める
-  // ステップ2: 骨ごとのLocal情報を更新する
-  if (!isShared_) {
+  // アニメーション・ボーン更新（非表示時はスキップ）
+  if (!isShared_ && !isCulled_) {
     if (animator_.HasAnimation()) {
       animator_.Update(deltaTime_);
       // ステップ3: SkeletonSpaceの情報を更新する
