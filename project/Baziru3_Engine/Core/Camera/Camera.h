@@ -47,6 +47,14 @@ public:
   void SetNearZ(float nearZ) { nearZ_ = nearZ; }
   float GetFarZ() const { return farZ_; }
   void SetFarZ(float farZ) { farZ_ = farZ; }
+  // カメラシェイク演出
+  void AddShake(float intensity, float duration) {
+    shakeIntensity_ = intensity;
+    shakeDuration_ = duration;
+    shakeTimer_ = duration;
+  }
+  bool IsShaking() const { return shakeTimer_ > 0.0f; }
+
   // Access to GPU-side camera virtual address
   D3D12_GPU_VIRTUAL_ADDRESS GetCameraGpuAddress() const {
     return cameraGpuAddress_;
@@ -78,4 +86,9 @@ private:
   DirectXCom *directXCom_ = nullptr;
   CameraForGPU cameraData_{};
   D3D12_GPU_VIRTUAL_ADDRESS cameraGpuAddress_ = 0;
+
+  // カメラシェイク
+  float shakeIntensity_ = 0.0f;
+  float shakeDuration_ = 0.0f;
+  float shakeTimer_ = 0.0f;
 };

@@ -28,8 +28,25 @@ void Camera::Initialize(DirectXCom *directXCom) {
 void Camera::Finalize() { directXCom_ = nullptr; }
 
 void Camera::Update() {
+  Vector3 finalTranslate = transform_.GetTranslate();
+
+  if (shakeTimer_ > 0.0f) {
+    float dt = 1.0f / 60.0f;
+    shakeTimer_ -= dt;
+    float progress = (shakeDuration_ > 0.0f) ? (shakeTimer_ / shakeDuration_) : 0.0f;
+    float currentPower = shakeIntensity_ * progress;
+
+    float offsetX = (((std::rand() % 200) / 100.0f) - 1.0f) * currentPower;
+    float offsetY = (((std::rand() % 200) / 100.0f) - 1.0f) * currentPower;
+    float offsetZ = (((std::rand() % 200) / 100.0f) - 1.0f) * currentPower * 0.5f;
+
+    finalTranslate.x += offsetX;
+    finalTranslate.y += offsetY;
+    finalTranslate.z += offsetZ;
+  }
+
   worldMatrix_ = MakeAffineMatrix(transform_.GetScale(), transform_.GetRotate(),
-                                  transform_.GetTranslate());
+                                  finalTranslate);
   viewMatrix_ = Inverse(worldMatrix_);
 
   projectionMatrix_ =
@@ -37,7 +54,7 @@ void Camera::Update() {
 
   viewProjectionMatrix_ = Multiply(viewMatrix_, projectionMatrix_);
 
-  cameraData_.worldPosition = transform_.GetTranslate();
+  cameraData_.worldPosition = finalTranslate;
 
   DirectXCom* dx = directXCom_;
   if (!dx) {

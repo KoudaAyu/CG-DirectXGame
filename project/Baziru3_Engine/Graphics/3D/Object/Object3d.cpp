@@ -803,6 +803,11 @@ void Object3d::Draw(const RenderContext &ctx) {
   }
   if (!com) return;
 
+  if (ctx.camera && camera_ != ctx.camera) {
+    camera_ = ctx.camera;
+    Update();
+  }
+
   // テクスチャ解決
   RenderContext resolvedCtx = ctx;
   const auto &modelData = GetModelData();

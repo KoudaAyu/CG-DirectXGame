@@ -9,6 +9,7 @@
 #include "ParticleManager.h"
 #include "Application/Scene/GameScene/GamePlayScene.h"
 #include "BehaviorTreeEditor.h"
+#include "Baziru3_Engine/Graphics/3D/Trajectory/TrajectoryRenderer.h"
 #include "Baziru3_Engine/Graphics/Graphics/GpuProfiler.h"
 #include "Baziru3_Engine/Framework/Collision/CollisionManager.h"
 #include "Baziru3_Engine/Core/Base/Allocator/ConstantBufferAllocator.h"
@@ -49,6 +50,9 @@ void DebugUI::Update()
     {
         ImGui::ColorEdit4("Material Color", &materialManager_->GetMaterialDataColor().x);
     }
+
+    // 投擲軌道調整ツール (Trajectory Tuning Tool)
+    TrajectoryRenderer::GetInstance()->DrawImGui();
 
     // Sprite position window: size (500,100), sliders (x,y) with initial (100,100) and format integer 4 digits, decimal 1
     ImGui::SetNextWindowSize(ImVec2(500.0f, 100.0f), ImGuiCond_Once);
