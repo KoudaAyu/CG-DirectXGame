@@ -2,6 +2,7 @@
 #include "SceneManager.h"
 #include "DirectXCom.h"
 #include "Baziru3_Engine/Graphics/3D/Object/Object3dCom.h"
+#include "Baziru3_Engine/Framework/Collision/CollisionManager.h"
 #include "TextureManager.h"
 #include "RenderContext.h"
 
@@ -11,6 +12,9 @@
 
 void GamePlayScene::InitializeScene()
 {
+    // 0. 衝突判定マネージャーの初期化
+    CollisionManager::GetInstance()->Initialize();
+
     // 1. 入力システムの初期化
     if (dxCommon_ && dxCommon_->GetWindowAPI())
     {
@@ -96,6 +100,9 @@ void GamePlayScene::Update()
         minionManager_->Update(deltaTime, player_->GetPosition(), player_->GetYaw(), player_->IsMerged());
     }
 
+    // 衝突判定と押し出しの更新
+    CollisionManager::GetInstance()->Update();
+
     // 地面プレーン更新
     if (groundPlane_)
     {
@@ -162,6 +169,12 @@ void GamePlayScene::Draw(SceneRenderRequests& renderRequests)
 void GamePlayScene::DrawDebugUI()
 {
 #ifdef USE_IMGUI
+    // コライダーのデバッグワイヤーフレーム描画
+    if (playCamera_)
+    {
+        CollisionManager::GetInstance()->DrawDebug(playCamera_.get());
+    }
+
     ImGui::SetNextWindowPos(ImVec2(20, 20), ImGuiCond_FirstUseEver);
     ImGui::SetNextWindowSize(ImVec2(460, 480), ImGuiCond_FirstUseEver);
     ImGui::Begin("Pikmin x LocoRoco Debug Panel", nullptr, ImGuiWindowFlags_AlwaysAutoResize);

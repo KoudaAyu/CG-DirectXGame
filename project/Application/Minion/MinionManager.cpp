@@ -20,7 +20,17 @@ void MinionManager::SpawnMinion(const Vector3& spawnPos, int count, MinionType t
         float offsetZ = ((std::rand() % 100) / 100.0f - 0.5f) * 2.0f;
         Vector3 pos = { spawnPos.x + offsetX, spawnPos.y + 0.2f, spawnPos.z + offsetZ };
         minion->Initialize(object3dCom_, camera_, pos, type);
+        minion->SetFollowSpeed(followSpeed_);
         minions_.push_back(std::move(minion));
+    }
+}
+
+void MinionManager::SetFollowSpeed(float speed) {
+    followSpeed_ = speed;
+    for (auto& m : minions_) {
+        if (m) {
+            m->SetFollowSpeed(speed);
+        }
     }
 }
 
@@ -130,10 +140,11 @@ void MinionManager::TriggerSplit(const Vector3& playerPos) {
         if (minion) {
             minion->SetActive(true);
             minion->SetPosition(playerPos);
+            minion->SetFollowSpeed(followSpeed_);
             
-            float angle = angleStep * index + ((std::rand() % 100) / 100.0f - 0.5f) * 0.3f;
-            float popSpeed = 6.0f + (std::rand() % 100) / 25.0f;
-            float upSpeed = 6.0f + (std::rand() % 100) / 30.0f;
+            float angle = angleStep * index + ((std::rand() % 100) / 100.0f - 0.5f) * 0.2f;
+            float popSpeed = 4.0f + (std::rand() % 100) / 50.0f; // 4.0f ~ 6.0f (適度な広がり)
+            float upSpeed = 5.5f + (std::rand() % 100) / 50.0f;  // 5.5f ~ 7.5f (適度な跳躍)
 
             Vector3 launchVel = {
                 std::sin(angle) * popSpeed,

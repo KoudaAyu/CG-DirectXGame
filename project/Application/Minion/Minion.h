@@ -4,6 +4,7 @@
 #include "Matrix4x4.h"
 #include "RenderContext.h"
 #include "Baziru3_Engine/Graphics/3D/Object/Object3d.h"
+#include "Baziru3_Engine/Framework/Collision/SphereCollider.h"
 #include "Application/Player/PikminPlayer.h" // SlimeParamsCPU
 #include <memory>
 
@@ -30,7 +31,7 @@ enum class MinionType {
 class Minion {
 public:
     Minion();
-    ~Minion() = default;
+    ~Minion();
 
     void Initialize(Object3dCom* object3dCom, Camera* camera, const Vector3& spawnPos, MinionType type = MinionType::Red);
     void Update(float deltaTime);
@@ -48,7 +49,7 @@ public:
     void AttractTo(const Vector3& attractCenter, float attractSpeed = 25.0f);
 
     bool IsActive() const { return isActive_; }
-    void SetActive(bool active) { isActive_ = active; }
+    void SetActive(bool active);
 
     MinionType GetType() const { return type_; }
     float GetRadius() const { return radius_; }
@@ -58,6 +59,12 @@ public:
 
     // スライムパラメータの公開（共有調整用）
     SlimeParamsCPU& GetSlimeParams() { return slimeParams_; }
+
+    void SetFollowSpeed(float speed) { followSpeed_ = speed; }
+    float GetFollowSpeed() const { return followSpeed_; }
+
+    // コライダーの取得
+    SphereCollider* GetCollider() const { return collider_.get(); }
 
 private:
     void DrawSlime(const RenderContext& ctx);
@@ -89,4 +96,7 @@ private:
     float totalTime_ = 0.0f;
     float bounceTimer_ = 0.0f;
     Vector3 prevVelocity_{ 0.0f, 0.0f, 0.0f };
+
+    // 当たり判定
+    std::unique_ptr<SphereCollider> collider_;
 };

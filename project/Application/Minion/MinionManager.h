@@ -41,7 +41,7 @@ public:
     bool IsAllMerged() const { return isAllMerged_; }
 
     // パラメータ調整
-    void SetFollowSpeed(float speed) { followSpeed_ = speed; }
+    void SetFollowSpeed(float speed);
     float GetFollowSpeed() const { return followSpeed_; }
     void SetSlotRadius(float radius) { slotBaseRadius_ = radius; }
     float GetSlotRadius() const { return slotBaseRadius_; }

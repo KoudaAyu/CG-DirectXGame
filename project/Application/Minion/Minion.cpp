@@ -3,6 +3,7 @@
 #include "Baziru3_Engine/Graphics/3D/Object/Object3dCom.h"
 #include "Baziru3_Engine/Core/Base/Pipeline/PipelineStateManager.h"
 #include "Baziru3_Engine/Core/Base/Allocator/ConstantBufferAllocator.h"
+#include "Baziru3_Engine/Framework/Collision/CollisionManager.h"
 #include "TextureManager.h"
 #include "DirectXCom.h"
 #include "SceneManager.h"
@@ -13,6 +14,12 @@
 
 Minion::Minion() {
     object3d_ = std::make_unique<Object3d>();
+}
+
+Minion::~Minion() {
+    if (collider_) {
+        CollisionManager::GetInstance()->UnregisterCollider(collider_.get());
+    }
 }
 
 void Minion::Initialize(Object3dCom* object3dCom, Camera* camera, const Vector3& spawnPos, MinionType type) {
@@ -57,6 +64,17 @@ void Minion::Initialize(Object3dCom* object3dCom, Camera* camera, const Vector3&
     slimeParams_.envReflection = 0.3f;
     slimeParams_.innerGlow = 0.35f;
     slimeParams_.specularShininess = 48.0f;
+
+    // ミニオン単体の当たり判定（SphereCollider）を生成・登録
+    collider_ = std::make_unique<SphereCollider>(radius_, &position_, CollisionAttribute::Player);
+    CollisionManager::GetInstance()->RegisterCollider(collider_.get());
+}
+
+void Minion::SetActive(bool active) {
+    isActive_ = active;
+    if (collider_) {
+        collider_->SetIsEnabled(active && state_ != MinionState::Merging);
+    }
 }
 
 void Minion::SetPosition(const Vector3& pos) {
@@ -70,6 +88,7 @@ void Minion::Launch(const Vector3& velocity) {
     velocity_ = velocity;
     state_ = MinionState::Thrown;
     bounceTimer_ = 0.0f;
+    scale_ = { 0.35f, 0.35f, 0.35f }; // スケールを通常サイズに確実に復帰
 
     // 投げ飛ばし時のスクワッシュ（進行方向に引き伸ばし）
     slimeParams_.impulseStrength = 0.25f;
@@ -87,7 +106,18 @@ void Minion::AttractTo(const Vector3& attractCenter, float attractSpeed) {
 }
 
 void Minion::Update(float deltaTime) {
-    if (!isActive_) return;
+    if (!isActive_) {
+        if (collider_) {
+            collider_->SetIsEnabled(false);
+        }
+        return;
+    }
+
+    if (collider_) {
+        bool isColliderActive = isActive_ && (state_ != MinionState::Merging);
+        collider_->SetIsEnabled(isColliderActive);
+        collider_->SetRadius(radius_);
+    }
 
     bounceTimer_ += deltaTime;
     totalTime_ += deltaTime;
@@ -109,7 +139,12 @@ void Minion::Update(float deltaTime) {
         float dist = std::sqrt(diff.x * diff.x + diff.z * diff.z);
 
         if (dist > 0.05f) {
-            float step = followSpeed_ * deltaTime;
+            float currentFollowSpeed = followSpeed_;
+            // 離れている場合は素早く追いつく（画面端での取り残され防止）
+            if (dist > 2.0f) {
+                currentFollowSpeed = followSpeed_ + (dist - 2.0f) * 4.0f;
+            }
+            float step = currentFollowSpeed * deltaTime;
             if (step > dist) step = dist;
             position_.x += (diff.x / dist) * step;
             position_.z += (diff.z / dist) * step;
@@ -145,6 +180,9 @@ void Minion::Update(float deltaTime) {
         // 放物線移動（重力適用）
         velocity_.y += gravity_ * deltaTime;
         position_ += velocity_ * deltaTime;
+
+        // 飛翔中も通常スケールを維持
+        scale_ = { 0.35f, 0.35f, 0.35f };
 
         // 地面着地判定
         if (position_.y <= groundY_) {
