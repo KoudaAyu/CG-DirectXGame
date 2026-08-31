@@ -119,7 +119,9 @@
     <ClCompile Include="externals\imgui-node-editor\imgui_node_editor_api.cpp" />
     <ClCompile Include="externals\imgui-node-editor\imgui_canvas.cpp" />
     <ClCompile Include="externals\imgui-node-editor\crude_json.cpp" />
-
+    <ClCompile Include="Application\Minion\Minion.cpp" />
+    <ClCompile Include="Application\Minion\MinionManager.cpp" />
+    <ClCompile Include="Application\Player\PikminPlayer.cpp" />
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="Resources\shaders\InitializeParticle.CS.hlsl">
@@ -345,6 +347,9 @@
     <ClInclude Include="externals\imgui-node-editor\imgui_node_editor_internal.inl" />
     <ClInclude Include="externals\imgui-node-editor\imgui_canvas.h" />
     <ClInclude Include="externals\imgui-node-editor\crude_json.h" />
+    <ClInclude Include="Application\Minion\Minion.h" />
+    <ClInclude Include="Application\Minion\MinionManager.h" />
+    <ClInclude Include="Application\Player\PikminPlayer.h" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="externals\DirectXTex\DirectXTex_Desktop_2022_Win10.vcxproj">

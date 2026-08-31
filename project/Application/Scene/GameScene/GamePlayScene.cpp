@@ -1,6 +1,9 @@
 #include "GamePlayScene.h"
 #include "SceneManager.h"
 #include "DirectXCom.h"
+#include "Baziru3_Engine/Graphics/3D/Object/Object3dCom.h"
+#include "TextureManager.h"
+#include "RenderContext.h"
 
 #ifdef USE_IMGUI
 #include <imgui.h>
@@ -15,25 +18,70 @@ void GamePlayScene::InitializeScene()
         keyInput_->Initialize(dxCommon_->GetWindowAPI());
     }
 
-    // 2. カメラの初期化
-    camera_ = std::make_unique<Camera>();
-    camera_->Initialize(dxCommon_);
-    camera_->SetTranslate({ 0.0f, 5.0f, -10.0f });
-    camera_->SetRotate({ 0.35f, 0.0f, 0.0f });
-    camera_->Update();
+    // 2. カメラの初期化 (斜め見下ろし追従カメラ)
+    playCamera_ = std::make_unique<Camera>();
+    playCamera_->Initialize(dxCommon_);
+    playCamera_->SetTranslate({ 0.0f, 12.0f, -16.0f });
+    playCamera_->SetRotate({ 0.55f, 0.0f, 0.0f });
+    playCamera_->Update();
+
+    if (sceneManager_) {
+        sceneManager_->SetCamera(playCamera_.get());
+    }
+
+    Object3dCom* object3dCom = GetObject3dCom();
+
+    // 3. 地面プレーンの初期化
+    groundModelData_ = Object3d::LoadObjFile("Resources", "plane.obj");
+    groundTextureIndex_ = TextureManager::GetInstance()->Load("Resources/uvChecker.png");
+    groundModelData_.material.textureIndex = groundTextureIndex_;
+
+    groundPlane_ = std::make_unique<Object3d>();
+    if (groundPlane_) {
+        groundPlane_->Initialize(object3dCom, groundModelData_);
+        groundPlane_->SetCamera(playCamera_.get());
+        groundPlane_->SetTranslate({ 0.0f, 0.0f, 0.0f });
+        groundPlane_->SetScale({ 60.0f, 1.0f, 60.0f });
+        groundPlane_->SetRotate({ 0.0f, 0.0f, 0.0f });
+        groundPlane_->SetColor({ 0.35f, 0.75f, 0.35f, 1.0f }); // 鮮やかな草原カラー
+        groundPlane_->Update();
+    }
+
+    // 4. プレイヤーの初期化
+    player_ = std::make_unique<PikminPlayer>();
+    player_->Initialize(object3dCom, playCamera_.get(), { 0.0f, 0.5f, 0.0f });
+
+    // 5. ミニオンマネージャーの初期化（初期12体をスポーン）
+    minionManager_ = std::make_unique<MinionManager>();
+    minionManager_->Initialize(object3dCom, playCamera_.get());
+    minionManager_->SpawnMinion({ 0.0f, 0.0f, -2.0f }, 12, MinionType::Red);
+
+    isInitialized_ = true;
 }
 
 void GamePlayScene::Finalize()
 {
-    camera_.reset();
+    groundPlane_.reset();
+    minionManager_.reset();
+    player_.reset();
+    playCamera_.reset();
     keyInput_.reset();
+    isInitialized_ = false;
 }
 
 void GamePlayScene::Update()
 {
+    float deltaTime = 1.0f / 60.0f;
+
     if (keyInput_)
     {
         keyInput_->Update();
+
+        // プレイヤーの更新
+        if (player_)
+        {
+            player_->Update(deltaTime, keyInput_.get(), minionManager_.get());
+        }
 
         // SPACEキーでクリアシーンへ遷移
         if (keyInput_->TriggerKey(DIK_SPACE))
@@ -42,48 +90,33 @@ void GamePlayScene::Update()
         }
     }
 
-    if (camera_)
+    // ミニオンマネージャーの更新
+    if (minionManager_ && player_)
     {
-        camera_->Update();
+        minionManager_->Update(deltaTime, player_->GetPosition(), player_->GetYaw(), player_->IsMerged());
     }
 
-#ifdef USE_IMGUI
-    // 画面上部に目立つゲームプレイHUDを表示
-    ImGui::SetNextWindowPos(ImVec2(360, 40), ImGuiCond_Always);
-    ImGui::SetNextWindowSize(ImVec2(560, 210), ImGuiCond_Always);
-    ImGui::Begin("GAMEPLAY_HUD", nullptr,
-        ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoTitleBar);
-
-    ImGui::Spacing();
-    ImGui::SetWindowFontScale(1.6f);
-    ImGui::TextColored(ImVec4(0.2f, 1.0f, 0.4f, 1.0f), "=== [ GAMEPLAY SCENE ] ===");
-    ImGui::SetWindowFontScale(1.0f);
-
-    ImGui::Spacing();
-    ImGui::TextColored(ImVec4(0.9f, 0.9f, 0.9f, 1.0f), "Game logic canvas is ready. Implement your gameplay here.");
-    ImGui::Separator();
-    ImGui::Spacing();
-
-    ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.4f, 1.0f), ">> Press SPACE key to CLEAR scene <<");
-    ImGui::Spacing();
-
-    if (ImGui::Button("Go To CLEAR Scene", ImVec2(165, 34)))
+    // 地面プレーン更新
+    if (groundPlane_)
     {
-        SceneManager::GetInstance()->ChangeScene("CLEAR");
-    }
-    ImGui::SameLine();
-    if (ImGui::Button("Go To GAMEOVER Scene", ImVec2(165, 34)))
-    {
-        SceneManager::GetInstance()->ChangeScene("GAMEOVER");
-    }
-    ImGui::SameLine();
-    if (ImGui::Button("Back To TITLE", ImVec2(165, 34)))
-    {
-        SceneManager::GetInstance()->ChangeScene("TITLE");
+        groundPlane_->Update();
     }
 
-    ImGui::End();
-#endif
+    // カメラのスムーズ追従
+    if (playCamera_ && player_)
+    {
+        Vector3 playerPos = player_->GetPosition();
+        Vector3 targetCamPos = {
+            playerPos.x + cameraOffset_.x,
+            playerPos.y + cameraOffset_.y,
+            playerPos.z + cameraOffset_.z
+        };
+        playCamera_->SetTranslate(targetCamPos);
+        playCamera_->SetRotate({ 0.55f, 0.0f, 0.0f });
+        playCamera_->Update();
+    }
+
+    DrawDebugUI();
 }
 
 void GamePlayScene::Draw(SceneRenderRequests& renderRequests)
@@ -95,4 +128,144 @@ void GamePlayScene::Draw(SceneRenderRequests& renderRequests)
     {
         SceneManager::GetInstance()->DrawSkybox(dxCommon_->GetCommandList().Get());
     }
+
+    Object3dCom* object3dCom = GetObject3dCom();
+    if (!object3dCom || !dxCommon_ || !dxCommon_->GetCommandList()) return;
+
+    RenderContext ctx;
+    ctx.commandList = dxCommon_->GetCommandList().Get();
+    ctx.camera = playCamera_.get();
+
+    // 1. 地面の描画
+    if (groundPlane_)
+    {
+        RenderContext groundCtx = ctx;
+        if (groundTextureIndex_ != TextureManager::kInvalidTextureIndex) {
+            groundCtx.textureHandle = TextureManager::GetInstance()->GetSrvHandleGPU(groundTextureIndex_);
+        }
+        object3dCom->Draw(groundPlane_.get(), groundCtx, groundModelData_, true);
+    }
+
+    // 2. ミニオン群衆の描画
+    if (minionManager_)
+    {
+        minionManager_->Draw(ctx);
+    }
+
+    // 3. プレイヤーの描画
+    if (player_)
+    {
+        player_->Draw(ctx);
+    }
+}
+
+void GamePlayScene::DrawDebugUI()
+{
+#ifdef USE_IMGUI
+    ImGui::SetNextWindowPos(ImVec2(20, 20), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowSize(ImVec2(460, 480), ImGuiCond_FirstUseEver);
+    ImGui::Begin("Pikmin x LocoRoco Debug Panel", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
+
+    ImGui::TextColored(ImVec4(0.2f, 1.0f, 0.4f, 1.0f), "=== [ Pikmin x LocoRoco 3D Prototype ] ===");
+    ImGui::Separator();
+
+    // 1. 操作説明
+    ImGui::TextColored(ImVec4(1.0f, 0.9f, 0.2f, 1.0f), "[ Controls ]");
+    ImGui::BulletText("WASD / Arrows: Move");
+    ImGui::BulletText("E key: Merge (LocoRoco) <-> Split (Pikmin)");
+    ImGui::BulletText("F / J key: Throw Minion (Pikmin mode only)");
+    ImGui::BulletText("Q key: Whistle (Recall minions)");
+    ImGui::BulletText("SPACE key: Clear Scene");
+    ImGui::Separator();
+
+    // 2. ステート表示 & 合体トグル
+    if (player_)
+    {
+        bool isMerged = player_->IsMerged();
+        ImGui::Text("Player Mode: %s", isMerged ? "LocoRoco (Merged / Giant)" : "Pikmin (Split / Squad)");
+
+        if (ImGui::Button(isMerged ? "SPLIT (Pikmin Mode)" : "MERGE (LocoRoco Mode)", ImVec2(280, 36)))
+        {
+            player_->ToggleMerge();
+        }
+    }
+
+    ImGui::Separator();
+
+    // 3. ミニオン群衆管理
+    if (minionManager_ && player_)
+    {
+        int activeCount = minionManager_->GetActiveCount();
+        int totalCount = minionManager_->GetTotalCount();
+        ImGui::Text("Minions: %d Active / %d Total", activeCount, totalCount);
+
+        if (ImGui::Button("+1 Spawn")) {
+            minionManager_->SpawnMinion(player_->GetPosition(), 1);
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("+5 Spawn")) {
+            minionManager_->SpawnMinion(player_->GetPosition(), 5);
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("+10 Spawn")) {
+            minionManager_->SpawnMinion(player_->GetPosition(), 10);
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Clear All")) {
+            minionManager_->ClearMinions();
+        }
+
+        // スライダー調整
+        float followSpeed = minionManager_->GetFollowSpeed();
+        if (ImGui::SliderFloat("Follow Speed", &followSpeed, 2.0f, 30.0f)) {
+            minionManager_->SetFollowSpeed(followSpeed);
+        }
+
+        float slotRadius = minionManager_->GetSlotRadius();
+        if (ImGui::SliderFloat("Formation Radius", &slotRadius, 0.5f, 4.0f)) {
+            minionManager_->SetSlotRadius(slotRadius);
+        }
+    }
+
+    ImGui::Separator();
+
+    // 4. プレイヤー調整
+    if (player_)
+    {
+        float normalSpeed = player_->GetNormalSpeed();
+        if (ImGui::SliderFloat("Normal Move Speed", &normalSpeed, 2.0f, 25.0f)) {
+            player_->SetNormalSpeed(normalSpeed);
+        }
+
+        float mergedSpeed = player_->GetMergedSpeed();
+        if (ImGui::SliderFloat("Merged Roll Speed", &mergedSpeed, 5.0f, 35.0f)) {
+            player_->SetMergedSpeed(mergedSpeed);
+        }
+
+        float throwPower = player_->GetThrowPower();
+        if (ImGui::SliderFloat("Throw Power", &throwPower, 5.0f, 35.0f)) {
+            player_->SetThrowPower(throwPower);
+        }
+    }
+
+    ImGui::Separator();
+
+    // 5. シーン遷移
+    if (ImGui::Button("Go To CLEAR", ImVec2(130, 28)))
+    {
+        SceneManager::GetInstance()->ChangeScene("CLEAR");
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Go To GAMEOVER", ImVec2(130, 28)))
+    {
+        SceneManager::GetInstance()->ChangeScene("GAMEOVER");
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("TITLE", ImVec2(90, 28)))
+    {
+        SceneManager::GetInstance()->ChangeScene("TITLE");
+    }
+
+    ImGui::End();
+#endif
 }
