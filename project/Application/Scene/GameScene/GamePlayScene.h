@@ -29,10 +29,11 @@
 #include "../../Enemy/MovingEnemy.h"
 #include "Bullet.h"
 #include "Obstacle.h"
-
 #include "Target.h"
 #include "TutorialSign.h"
 #include "../../LevelEditor.h"
+#include "LootSystem.h"
+#include "GamePlayHUD.h"
 
 class Camera;
 class SpriteCom;
@@ -42,54 +43,57 @@ class CollisionSystem;
 struct SceneRenderRequests;
 
 /// <summary>
-/// メインのゲームプレイシーンクラス
-/// キャラクター、ステージ環境、サブシステムの初期化・更新・描画の統括を行います。
+/// メインのゲームプレイシーンクラス (GamePlayScene)
+/// 各種サブシステム（LootSystem, GamePlayHUD, CombatSystem, CollisionSystem, LevelEditor）を統括し、
+/// レイドの展開、プレイヤー/敵AIの協調動作、脱出判定、クリア/ゲームオーバー遷移を管理します。
 /// </summary>
 class GamePlayScene : public BaseScene
 {
-	friend class CombatSystem;
-	friend class CollisionSystem;
+    friend class CombatSystem;
+    friend class CollisionSystem;
 
 public:
-	/// <summary>
-	/// コンストラクタ
-	/// </summary>
-	GamePlayScene();
+    // =========================================================================
+    // 定数定義 (Named Constants) - マジックナンバー排除
+    // =========================================================================
+    static constexpr float kFixedDeltaTime         = 1.0f / 60.0f; // 基準フレーム時間
+    static constexpr float kExtractionMaxTime      = 3.0f;         // 脱出パッド滞在所要時間 (3.0秒)
+    static constexpr float kClearSlowMoDuration    = 1.5f;         // 生還クリア時のスロー演出時間 (1.5秒)
+    static constexpr float kDeathSequenceDuration  = 2.0f;         // 戦死時の暗転演出時間 (2.0秒)
+    static constexpr float kExtractionRadius       = 2.2f;         // 脱出ゾーン有効半径 (2.2m)
+    static constexpr float kEnemyBulletDamage      = 10.0f;        // 敵の射撃ダメージ
+    static constexpr float kContactDamage          = 20.0f;        // 敵接触ダメージ
+    static constexpr float kBulletHitRadius        = 0.25f;        // 弾丸当たり判定半径
+    static constexpr float kPlayerHitRadius        = 0.6f;         // プレイヤー当たり判定半径
+    static constexpr float kEnemyHitRadius         = 0.6f;         // 敵当たり判定半径
 
-	/// <summary>
-	/// シーンの初期化処理
-	/// エンジンの各コンポーネント取得、キャラ・背景・サブシステムの初期設定を行います。
-	/// </summary>
-    void InitializeScene() override;
-
-	/// <summary>
-	/// シーンの終了処理（メモリ解放）
-	/// 各種オブジェクト・サブシステムのクリーンアップを行います。
-	/// </summary>
-    void Finalize() override;
-
-	/// <summary>
-	/// デストラクタ
-	/// </summary>
+public:
+    GamePlayScene();
     ~GamePlayScene() override;
 
-	/// <summary>
-	/// シーンの更新処理
-	/// サブシステム、演出タイマー、カメラ演出、UIの毎フレーム更新を行います。
-	/// </summary>
+    /// <summary>
+    /// シーンの初期化（エンジンコンポーネント、各マネージャー、ステージ、サブシステムのセットアップ）
+    /// </summary>
+    void InitializeScene() override;
+
+    /// <summary>
+    /// シーンの終了処理（メモリ解放と登録解除）
+    /// </summary>
+    void Finalize() override;
+
+    /// <summary>
+    /// 毎フレームの更新（サブシステム・タイマー・AI・演出・UIの更新）
+    /// </summary>
     void Update() override;
 
-	/// <summary>
-	/// シーンの描画処理
-	/// プレイヤー、敵、障害物、エフェクト、UIスプライトの描画を要求します。
-	/// </summary>
-	/// <param name="renderRequests">レンダリングリクエストマネージャー</param>
+    /// <summary>
+    /// シーンの3D/2D描画要求（レンダリングキューへの登録）
+    /// </summary>
     void Draw(SceneRenderRequests& renderRequests) override;
 
+    // --- 外部インターフェース ---
     void SetSpriteCom(SpriteCom* spriteCom) { this->spriteCom = spriteCom; }
     Emitter& GetEmitter() { return emitter; }
-
-	// --- ゲッター & ユーティリティ ---
     bool IsGameCleared() const { return isGameCleared_; }
     float GetExtractionTimer() const { return extractionTimer_; }
     AppParticleManager* GetAppParticleManager() const { return appParticleManager_.get(); }
@@ -99,12 +103,11 @@ public:
     Vector3 GetGoalPosition() const { return goalRingTransform_.translate; }
     const std::vector<std::unique_ptr<Target>>& GetTargets() const { return targets_; }
     std::vector<std::unique_ptr<Target>>& GetTargets() { return targets_; }
+    LootSystem* GetLootSystem() const { return lootSystem_.get(); }
 
-	/// <summary>
-	/// カメラシェイク（揺れ）エフェクトを誘発します
-	/// </summary>
-	/// <param name="duration">効果時間(秒)</param>
-	/// <param name="intensity">揺れの強さ</param>
+    /// <summary>
+    /// カメラシェイク（揺れ）エフェクトの誘発
+    /// </summary>
     void TriggerCameraShake(float duration, float intensity) {
         cameraShakeTime_ = duration;
         cameraShakeDurationMax_ = duration > 0.0f ? duration : 1.0f;
@@ -112,14 +115,27 @@ public:
     }
 
     /// <summary>
-    /// ヒットストップ（時間一時停止）を誘発します
+    /// ヒットストップ（時間一時停止）の誘発
     /// </summary>
-    /// <param name="duration">効果時間(秒)</param>
     void TriggerHitStop(float duration) {
         hitStopTimer_ = duration;
     }
 
+    /// <summary>
+    /// 被弾方向インジケーター（赤いアーク）の誘発
+    /// </summary>
+    void TriggerDamageIndicator(float worldAngle) {
+        hitIndicatorTimer_ = 0.65f;
+        hitIndicatorAngle_ = worldAngle;
+    }
+
+    /// <summary>
+    /// 浮遊ダメージ/物資獲得テキストの追加
+    /// </summary>
+    void AddFloatingText(const Vector3& worldPos, const std::string& text, const Vector4& color, bool isCritical = false);
+
 private:
+    // --- 内部初期化 & 更新メソッド ---
     float AdvanceDeltaTime();
     void InitializeEnvironment();
     void InitializeCharacters();
@@ -136,11 +152,12 @@ private:
     void UpdatePlayerHpBar();
     void CheckGameOver();
     void UpdateObstacles();
+    void UpdateStressTestMode();
 
-    // ヘルパーメソッド
     RenderContext BuildRenderContext() const;
     static bool IsWithinRadius(const Vector3& a, const Vector3& b, float radius);
 
+private:
     // --- コアシステム & エンジンコンテキスト ---
     DirectXCom* directXCom = nullptr;
     Camera* camera_ = nullptr;
@@ -152,117 +169,94 @@ private:
     std::unique_ptr<AppParticleManager> appParticleManager_;
     SpriteCom* spriteCom = nullptr;
 
-    // --- ゲームエンティティ & オブジェクト ---
+    // --- 分割されたモジュール サブシステム ---
+    std::unique_ptr<CombatSystem> combatSystem_;
+    std::unique_ptr<CollisionSystem> collisionSystem_;
+    std::unique_ptr<LootSystem> lootSystem_;
+    std::unique_ptr<GamePlayHUD> hud_;
+    std::unique_ptr<LevelEditor> levelEditor_;
+
+    // --- ゲームエンティティ ---
     std::unique_ptr<Player> player_;
     std::unique_ptr<Enemy> enemy_;
     std::unique_ptr<MovingEnemy> movingEnemy_;
     std::vector<std::unique_ptr<Obstacle>> obstacles_;
+    std::vector<std::unique_ptr<Target>> targets_;
     std::unique_ptr<Sphere> sphere_;
     std::unique_ptr<Ring> goalRing_;
+    std::unique_ptr<Object3d> extractionPadObject_;
+    uint32_t extractionPadTextureIndex_ = 0;
     std::unique_ptr<HitEffect> hitEffect_;
-    std::vector<std::unique_ptr<Target>> targets_;
-    bool allTargetsDestroyed_ = false;
 
-    // --- 分割されたサブシステム ---
-    std::unique_ptr<CombatSystem> combatSystem_;
-    std::unique_ptr<CollisionSystem> collisionSystem_;
-
-    // --- パーティクルエミッター ---
+    // --- パーティクル & スプライト ---
     Emitter emitter;
     ParticleEmitter particleEmitter;
-
-    // --- スプライト & UI ---
     std::vector<std::unique_ptr<Sprite>> sprites;
     std::unique_ptr<SpriteManager> spriteManager_;
     Sprite::Transform goalRingTransform_{};
     Sprite* playerHpBarBg_ = nullptr;
     Sprite* playerHpBarFg_ = nullptr;
+    Sprite* playerStaminaBarBg_ = nullptr;
+    Sprite* playerStaminaBarFg_ = nullptr;
     Sprite* playerReloadBarBg_ = nullptr;
     Sprite* playerReloadBarFg_ = nullptr;
     int cursorSpriteIndex = -1;
+    Sprite* vignetteSprite_ = nullptr;
+    float vignetteAlpha_ = 0.0f;
+    std::vector<Sprite*> speedLines_;
+    float speedLineAlpha_ = 0.0f;
 
     // --- インプット ---
     MouseInput mouseInput;
     DebugCamera debugCamera_;
 
-    // --- 初期化フラグ ---
-    bool sphereInitialized = false;
-    bool hitEffectInitialized = false;
-
     // --- テクスチャインデックス ---
-    uint32_t cylinderTextureIndex_ = TextureManager::kInvalidTextureIndex;
-    uint32_t particleTextureA = TextureManager::kInvalidTextureIndex;
-    uint32_t particleTextureB = TextureManager::kInvalidTextureIndex;
-    uint32_t bloodTextureIndex_ = TextureManager::kInvalidTextureIndex;
-    uint32_t smokeTextureIndex_ = TextureManager::kInvalidTextureIndex;
-    uint32_t fenceTextureIndex_ = TextureManager::kInvalidTextureIndex;
+    uint32_t cylinderTextureIndex_  = TextureManager::kInvalidTextureIndex;
+    uint32_t particleTextureA       = TextureManager::kInvalidTextureIndex;
+    uint32_t particleTextureB       = TextureManager::kInvalidTextureIndex;
+    uint32_t bloodTextureIndex_     = TextureManager::kInvalidTextureIndex;
+    uint32_t smokeTextureIndex_     = TextureManager::kInvalidTextureIndex;
+    uint32_t fenceTextureIndex_     = TextureManager::kInvalidTextureIndex;
     uint32_t starburstTextureIndex_ = TextureManager::kInvalidTextureIndex;
 
-    // --- ステート & タイマー ---
+    // --- ゲームステート & タイマー ---
+    bool allTargetsDestroyed_ = false;
     bool isGameCleared_ = false;
-    float clearSlowMoTimer_ = 1.5f;
-    float extractionTimer_ = 5.0f;
+    float clearSlowMoTimer_ = kClearSlowMoDuration;
+    float extractionTimer_ = kExtractionMaxTime;
+    bool isPlayerInExtractionZone_ = false;
+    bool isDeathSequenceActive_ = false;
+    float deathSequenceTimer_ = 0.0f;
+    float sceneEntranceFadeTimer_ = 0.8f; // シーン入場時のフェードインタイマー
     std::chrono::steady_clock::time_point lastTime_;
+
+    // --- 演出パラメータ ---
+    float cameraShakeTime_ = 0.0f;
+    float cameraShakeIntensity_ = 0.0f;
+    float cameraShakeDurationMax_ = 1.0f;
+    float hitStopTimer_ = 0.0f;
+    float hitIndicatorTimer_ = 0.0f;
+    float hitIndicatorAngle_ = 0.0f;
     float playerDustTimer_ = 0.0f;
     float playerReloadCasingTimer_ = 0.0f;
     float escapeSmokeTimer_ = 0.0f;
     float lightFlashTimer_ = 0.0f;
     float clearCelebrateTimer_ = 0.0f;
     bool wasPlayerDodging_ = false;
-    std::vector<Sprite*> speedLines_;
-    float speedLineAlpha_ = 0.0f;
-
-    // --- カメラシェイク用パラメータ ---
-    float cameraShakeTime_ = 0.0f;
-    float cameraShakeIntensity_ = 0.0f;
-    float cameraShakeDurationMax_ = 1.0f;
-
-    // --- ヒットストップ用パラメータ ---
-    float hitStopTimer_ = 0.0f;
-
-    // --- ビネット＆リロード完了時の演出パラメータ ---
-    Sprite* vignetteSprite_ = nullptr;
-    float vignetteAlpha_ = 0.0f;
     bool wasPlayerReloading_ = false;
     bool wasPlayerReloadingPrev_ = false;
     int remainingAmmoOnReload_ = 0;
     int droppedCasingsCount_ = 0;
 
-    // --- 浮遊ダメージテキスト構造体 ---
-    struct FloatingText {
-        Vector3 position;
-        std::string text;
-        Vector4 color;
-        float lifeTime;
-        float maxLifeTime;
-        bool isCritical;
-    };
+    // --- 浮遊テキスト & 音響ギズモ ---
     std::vector<FloatingText> floatingTexts_;
-    void AddFloatingText(const Vector3& worldPos, const std::string& text, const Vector4& color, bool isCritical = false);
-
-    // --- ゲームプレイ定数 ---
-    static constexpr float kFixedDeltaTime = 1.0f / 60.0f;
-    static constexpr float kEnemyBulletDamage = 10.0f;
-    static constexpr float kContactDamage = 20.0f;
-    static constexpr float bulletHitRadius_ = 0.25f;
-    static constexpr float playerHitRadius_ = 0.6f;
-    static constexpr float enemyHitRadius_ = 0.6f;
-
-    // --- タクティカル音響 ＆ デバッグ表示 ---
     float playerSoundRadius_ = 0.0f;
     float playerSoundMaxRadius_ = 0.0f;
     float playerSoundTimer_ = 0.0f;
-    bool showDebugGizmos_ = true; // デバッグコーンと音波リングの表示フラグ (F1でトグル)
+    bool showDebugGizmos_ = false;
 
-    // --- ✨ アプリケーション層で一発読み込みされるレベルエディタ ---
-    std::unique_ptr<LevelEditor> levelEditor_;
-
-    // --- 🎮 高性能・最適化実証用 ImGui パフォーマンス・トラッカー / ベンチマーク ---
+    // --- パフォーマンストラッカー & ストレステスト ---
     bool showPerformanceTracker_ = true;
     bool isStressTestActive_ = false;
     std::vector<std::unique_ptr<Obstacle>> stressTestObstacles_;
-    void DrawPerformanceTrackerUI(float deltaTime);
-    void UpdateStressTestMode();
 };
-
-

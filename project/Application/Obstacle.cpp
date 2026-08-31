@@ -1,7 +1,11 @@
 #include "Obstacle.h"
 #include "TextureManager.h"
+#include <unordered_map>
 
 #include "Baziru3_Engine/Framework/Collision/CollisionManager.h"
+
+// 重複ロードを防ぎシーン遷移を爆速化するための静的モデルキャッシュ
+static std::unordered_map<std::string, Object3d::ModelData> sModelCache;
 
 void Obstacle::Initialize(Object3dCom* object3dCom, Camera* camera, const Vector3& position, float radius, const std::string& modelFilename, const Vector3& scale, const Vector3& rotation)
 {
@@ -10,18 +14,22 @@ void Obstacle::Initialize(Object3dCom* object3dCom, Camera* camera, const Vector
     radius_ = radius;
     rotation_ = rotation;
 
-    // 指定されたモデルファイルをロード
+    // 指定されたモデルファイルをロード (キャッシュがあれば即座に再利用)
     std::string filename = modelFilename.empty() ? "fence.obj" : modelFilename;
-    Object3d::ModelData model = Object3d::LoadObjFile("Resources", filename);
-
-    // MTLファイルが存在しない・map_Kdが未定義でtextureFilePathが空の場合は
-    // uvChecker.png をデフォルトテクスチャに設定
-    // (Object3d::Initialize内でtextureFilePathからtextureIndexをロードするため、
-    //  Initialize呼び出し前にtextureFilePathを確定させる必要がある)
-    if (model.material.textureFilePath.empty())
+    
+    auto it = sModelCache.find(filename);
+    if (it == sModelCache.end())
     {
-        model.material.textureFilePath = "Resources/CG4/human/white.png";
+        Object3d::ModelData loaded = Object3d::LoadObjFile("Resources", filename);
+        if (loaded.material.textureFilePath.empty())
+        {
+            loaded.material.textureFilePath = "Resources/CG4/human/white.png";
+        }
+        sModelCache[filename] = loaded;
+        it = sModelCache.find(filename);
     }
+
+    const Object3d::ModelData& model = it->second;
 
     object3d_ = std::make_unique<Object3d>();
     object3d_->Initialize(object3dCom, model);

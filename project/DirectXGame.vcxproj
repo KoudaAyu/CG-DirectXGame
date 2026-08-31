@@ -75,8 +75,11 @@
     <ClCompile Include="Application\Scene\GameScene\GamePlayScene.cpp" />
     <ClCompile Include="Application\Scene\GameScene\CollisionSystem.cpp" />
     <ClCompile Include="Application\Scene\GameScene\CombatSystem.cpp" />
+    <ClCompile Include="Application\Scene\GameScene\LootSystem.cpp" />
+    <ClCompile Include="Application\Scene\GameScene\GamePlayHUD.cpp" />
     <ClCompile Include="Application\Particle\AppParticleManager.cpp" />
     <ClCompile Include="Application\Scene\ClearScene\ClearScene.cpp" />
+    <ClCompile Include="Application\Scene\GameOverScene\GameOverScene.cpp" />
     <ClCompile Include="Baziru3_Engine\Graphics\Light\Light.cpp" />
     <ClCompile Include="Baziru3_Engine\Graphics\Light\CascadingShadowMap.cpp" />
 
@@ -247,6 +250,9 @@
     <ClInclude Include="Baziru3_Engine\Framework\Animation\Skeleton\SkeletonDebug.h" />
     <ClInclude Include="Baziru3_Engine\Framework\Effect\HitEffect.h" />
     <ClInclude Include="Application\Particle\AppParticleManager.h" />
+    <ClInclude Include="Application\Scene\GameScene\LootSystem.h" />
+    <ClInclude Include="Application\Scene\GameScene\GamePlayHUD.h" />
+    <ClInclude Include="Application\Scene\GameScene\RaidStats.h" />
     <ClInclude Include="Baziru3_Engine\Framework\Scene\Fade.h" />
     <ClInclude Include="Baziru3_Engine\Graphics\Graphics\Particle\ParticleRenderer.h" />
     <ClInclude Include="Baziru3_Engine\Graphics\Graphics\SceneRenderRequests.h" />
@@ -308,6 +314,7 @@
     <ClInclude Include="Application\Scene\GameScene\CollisionSystem.h" />
     <ClInclude Include="Application\Scene\GameScene\CombatSystem.h" />
     <ClInclude Include="Application\Scene\ClearScene\ClearScene.h" />
+    <ClInclude Include="Application\Scene\GameOverScene\GameOverScene.h" />
     <ClInclude Include="Baziru3_Engine\Framework\Particle\ParticleEmitter.h" />
     <ClInclude Include="Baziru3_Engine\Framework\Particle\ParticleManager.h" />
     <ClInclude Include="Baziru3_Engine\Graphics\Light\Light.h" />

@@ -101,7 +101,7 @@ bool Enemy::FaceTarget(const Vector3& targetPosition, float deltaTime)
     return true;
 }
 
-void Enemy::Update(WindowAPI* windowAPI, const Vector3* targetPosition, const std::vector<std::unique_ptr<Obstacle>>& obstacles, float deltaTime)
+void Enemy::Update(WindowAPI* windowAPI, const Vector3* targetPosition, const std::vector<std::unique_ptr<Obstacle>>& obstacles, float deltaTime, bool isPlayerInCover)
 {
     if (isDead_)
     {
@@ -113,29 +113,8 @@ void Enemy::Update(WindowAPI* windowAPI, const Vector3* targetPosition, const st
             hp_ = maxHp_;
             state_ = AIState::Patrol;
             detectionMeter_ = 0.0f;
-            alertTimer_ = 0.0f;
-            if (object3d_)
-            {
-                position_ = { 4.0f, 0.0f, 13.0f };
-                object3d_->SetTranslate(position_);
-                object3d_->SetColor({ 1.2f, 0.4f, 0.4f, 1.0f });
-            }
-        }
-
-        if (hpBarBg_ && windowAPI)
-        {
-            hpBarBg_->SetSize({ 0.0f, 0.0f });
-            hpBarBg_->Update();
-        }
-        if (hpBarFg_ && windowAPI)
-        {
-            hpBarFg_->SetSize({ 0.0f, 0.0f });
-            hpBarFg_->Update();
-        }
-
-        if (object3d_)
-        {
-            object3d_->Update();
+            SetPosition({ 4.0f, 0.0f, 13.0f });
+            object3d_->SetColor({ 1.0f, 1.0f, 1.0f, 1.0f });
         }
         return;
     }
@@ -150,7 +129,10 @@ void Enemy::Update(WindowAPI* windowAPI, const Vector3* targetPosition, const st
         Vector3 toPlayer = { targetPosition->x - enemyPos.x, 0.0f, targetPosition->z - enemyPos.z };
         float dist = std::sqrt(toPlayer.x * toPlayer.x + toPlayer.z * toPlayer.z);
 
-        if (dist <= maxSightRange_)
+        // プレイヤーが遮蔽中の場合は視認距離が55%に半減（ステルスボーナス）
+        float effectiveSight = isPlayerInCover ? (maxSightRange_ * 0.55f) : maxSightRange_;
+
+        if (dist <= effectiveSight)
         {
             // 視線の向きを計算（回転角度 object3d_->GetRotate().y から前方方向）
             float yaw = object3d_->GetRotate().y;
@@ -166,7 +148,7 @@ void Enemy::Update(WindowAPI* windowAPI, const Vector3* targetPosition, const st
             // 視界角の半分（fovAngle_ / 2.0f）の範囲内かチェック
             if (angle <= fovAngle_ * 0.5f)
             {
-                // 壁の遮蔽判定
+                // 壁・コンテナの堅牢マルチポイント遮蔽判定
                 if (HasLineOfSight(*targetPosition, obstacles))
                 {
                     canSeePlayer = true;
@@ -175,10 +157,11 @@ void Enemy::Update(WindowAPI* windowAPI, const Vector3* targetPosition, const st
         }
     }
 
-    // 索敵メーターの更新
+    // 索敵メーターの更新 (遮蔽中は緩やかに発見、逃げ込む猶予を確保)
     if (canSeePlayer)
     {
-        detectionMeter_ += 1.5f * deltaTime; // 約0.6秒で発見状態へ
+        float detectSpeed = isPlayerInCover ? 0.60f : 0.85f;
+        detectionMeter_ += detectSpeed * deltaTime;
         if (detectionMeter_ >= 1.0f)
         {
             detectionMeter_ = 1.0f;
@@ -348,29 +331,63 @@ void Enemy::Update(WindowAPI* windowAPI, const Vector3* targetPosition, const st
 bool Enemy::HasLineOfSight(const Vector3& playerPos, const std::vector<std::unique_ptr<Obstacle>>& obstacles)
 {
     (void)obstacles;
-    Vector3 enemyPos = GetPosition();
-    Vector3 toPlayer = { playerPos.x - enemyPos.x, playerPos.y - enemyPos.y, playerPos.z - enemyPos.z };
-    float distToPlayer = std::sqrt(toPlayer.x * toPlayer.x + toPlayer.y * toPlayer.y + toPlayer.z * toPlayer.z);
-    if (distToPlayer < 1e-4f) return true;
+    Vector3 enemyEye = GetPosition() + Vector3{ 0.0f, 0.55f, 0.0f };
 
-    Vector3 rayDir = { toPlayer.x / distToPlayer, toPlayer.y / distToPlayer, toPlayer.z / distToPlayer };
+    // プレイヤーの頭(0.75m)、胴体(0.40m)、足元(0.15m)の3点判定
+    const float yOffsets[3] = { 0.75f, 0.40f, 0.15f };
+    int visiblePoints = 0;
 
-    Collider* hitCollider = nullptr;
-    float hitDist = 0.0f;
-
-    if (CollisionManager::GetInstance()->Raycast(enemyPos + Vector3{ 0.0f, 0.5f, 0.0f }, rayDir, distToPlayer, hitCollider, hitDist))
+    for (float yOff : yOffsets)
     {
-        if (hitCollider && hitCollider->GetAttribute() == CollisionAttribute::Obstacle)
+        Vector3 targetPoint = { playerPos.x, playerPos.y + yOff, playerPos.z };
+        Vector3 toTarget = { targetPoint.x - enemyEye.x, targetPoint.y - enemyEye.y, targetPoint.z - enemyEye.z };
+        float dist = std::sqrt(toTarget.x * toTarget.x + toTarget.y * toTarget.y + toTarget.z * toTarget.z);
+        if (dist < 1e-4f) { visiblePoints++; continue; }
+
+        Vector3 dir = { toTarget.x / dist, toTarget.y / dist, toTarget.z / dist };
+        Collider* hitCollider = nullptr;
+        float hitDist = 0.0f;
+
+        bool hitObstacle = false;
+        if (CollisionManager::GetInstance()->Raycast(enemyEye, dir, dist, hitCollider, hitDist))
         {
-            return false;
+            if (hitCollider && hitCollider->GetAttribute() == CollisionAttribute::Obstacle)
+            {
+                hitObstacle = true;
+            }
+        }
+
+        if (!hitObstacle)
+        {
+            visiblePoints++;
         }
     }
-    return true;
+
+    // 遮蔽物に完全に隠れている（visiblePoints == 0）または大部分隠れている場合は視線遮断
+    return (visiblePoints >= 2);
 }
 
 void Enemy::HearNoise(const Vector3& noisePosition)
 {
     if (isDead_ || state_ == AIState::Chase) return;
+
+    // 音源と敵の間に障害物があるかチェック（壁越しはノイズ遮断）
+    Vector3 enemyPos = GetPosition() + Vector3{ 0.0f, 0.5f, 0.0f };
+    Vector3 toNoise = { noisePosition.x - enemyPos.x, 0.0f, noisePosition.z - enemyPos.z };
+    float dist = std::sqrt(toNoise.x * toNoise.x + toNoise.z * toNoise.z);
+    if (dist > 1e-4f)
+    {
+        Vector3 dir = { toNoise.x / dist, 0.0f, toNoise.z / dist };
+        Collider* hitCollider = nullptr;
+        float hitDist = 0.0f;
+        if (CollisionManager::GetInstance()->Raycast(enemyPos, dir, dist, hitCollider, hitDist))
+        {
+            if (hitCollider && hitCollider->GetAttribute() == CollisionAttribute::Obstacle)
+            {
+                return; // 壁越しの足音は遮断されて聞こえない
+            }
+        }
+    }
 
     state_ = AIState::Investigate;
     investigateTarget_ = noisePosition;

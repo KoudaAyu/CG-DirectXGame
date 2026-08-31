@@ -9,24 +9,21 @@ void TutorialSign::Initialize(Object3dCom* object3dCom, Camera* camera, const Ve
     message_ = message;
     triggerRadius_ = triggerRadius;
 
-    // plane.obj を看板の看板板として使用
-    Object3d::ModelData model = Object3d::LoadObjFile("Resources", "plane.obj");
+    // signpost.obj (立体的な木製ミリタリーサインポスト) を使用
+    Object3d::ModelData model = Object3d::LoadObjFile("Resources", "signpost.obj");
+    model.material.textureFilePath = "Resources/signpost.png";
+    defaultTextureIndex_ = TextureManager::GetInstance()->Load("Resources/signpost.png");
+    model.material.textureIndex = defaultTextureIndex_;
+
     object3d_ = std::make_unique<Object3d>();
     object3d_->Initialize(object3dCom, model);
     object3d_->SetCamera(camera);
 
-    // 地面から少し浮かせ、看板らしく見えるように直立（X軸に90度回転）させる
     Vector3 drawPos = position_;
-    drawPos.y = 0.5f; // 少し浮かす
+    drawPos.y = 0.0f; // 地面に自然に接地
     object3d_->SetTranslate(drawPos);
-    object3d_->SetScale({ 0.8f, 0.8f, 0.8f });
-    object3d_->SetRotate({ 1.570796f, 0.0f, 0.0f }); // 直立させる
-
-    // 看板らしく木目調のフェンステクスチャをロード
-    if (model.material.textureFilePath.empty())
-    {
-        defaultTextureIndex_ = TextureManager::GetInstance()->Load("Resources/fence.png"); // 木目調を流用
-    }
+    object3d_->SetScale({ 0.9f, 0.9f, 0.9f });
+    object3d_->SetRotate({ 0.0f, 0.0f, 0.0f });
 
     object3d_->Update();
 }

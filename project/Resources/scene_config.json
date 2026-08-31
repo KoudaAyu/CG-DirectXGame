@@ -1,0 +1,44 @@
+{
+  "transitions": {
+    "CLEAR": {
+      "frameCount": 26,
+      "hudColor": [
+        1.0,
+        0.8500000238418579,
+        0.0
+      ],
+      "subtitle": "TACTICAL AIRLIFT INBOUND... RETURNING TO BASE",
+      "title": "EXTRACTION CONFIRMED"
+    },
+    "GAMEOVER": {
+      "frameCount": 24,
+      "hudColor": [
+        1.0,
+        0.20000000298023224,
+        0.25
+      ],
+      "subtitle": "CASUALTY DETECTED... INITIATING RESCUE OPERATION",
+      "title": "SIGNAL LOST"
+    },
+    "GAMEPLAY": {
+      "frameCount": 24,
+      "hudColor": [
+        0.0,
+        1.0,
+        0.75
+      ],
+      "subtitle": "OBJECTIVE: DESTROY 3 TARGETS & EXTRACT SAFELY",
+      "title": "DEPLOYING AGENT DUCK"
+    },
+    "TITLE": {
+      "frameCount": 24,
+      "hudColor": [
+        0.0,
+        0.8500000238418579,
+        1.0
+      ],
+      "subtitle": "TACTICAL BRIEFING TERMINAL INITIALIZED",
+      "title": "RETURNING TO HQ"
+    }
+  }
+}

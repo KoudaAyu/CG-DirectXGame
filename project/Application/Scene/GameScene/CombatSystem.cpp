@@ -287,7 +287,7 @@ void CombatSystem::UpdateBullets(float deltaTime)
 				float dz = bPos.z - pPos.z;
 				float dist = std::sqrt(dx * dx + dz * dz);
 				
-				float minHitDist = scene_->playerHitRadius_ + scene_->bulletHitRadius_;
+				float minHitDist = GamePlayScene::kPlayerHitRadius + GamePlayScene::kBulletHitRadius;
 				float nearMissDist = minHitDist + 1.20f; // 当たり判定の少し外側をかすり判定とする
 
 				if (dist > minHitDist && dist <= nearMissDist)

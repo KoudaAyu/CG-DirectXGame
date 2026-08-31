@@ -25,7 +25,7 @@ public:
 
 public:
     void Initialize(Object3dCom* object3dCom, Camera* camera);
-    void Update(WindowAPI* windowAPI, const Vector3* targetPosition, const std::vector<std::unique_ptr<Obstacle>>& obstacles, float deltaTime);
+    void Update(WindowAPI* windowAPI, const Vector3* targetPosition, const std::vector<std::unique_ptr<Obstacle>>& obstacles, float deltaTime, bool isPlayerInCover = false);
     void Draw(const RenderContext& ctx);
     void Finalize();
     void OnHit(const Vector3& attackerPos);

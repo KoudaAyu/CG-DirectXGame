@@ -13,6 +13,7 @@
 #include "Baziru3_Engine/Framework/Collision/BoxCollider.h"
 #include "Baziru3_Engine/Framework/Collision/CapsuleCollider.h"
 #include "CombatSystem.h"
+#include "RaidStats.h"
 #include <cmath>
 #include <algorithm>
 
@@ -108,6 +109,7 @@ void CollisionSystem::ResolveBulletCollisions()
 					int prevHp = scene_->enemy_->GetHP();
 					scene_->enemy_->OnHit(scene_->player_ ? scene_->player_->GetPosition() : Vector3{0.0f,0.0f,0.0f});
 					int dmg = prevHp - scene_->enemy_->GetHP();
+					RaidStats::GetInstance().shotsHit++;
 					if (dmg > 0)
 					{
 						bool isCritical = (rand() % 100 < 30);
@@ -135,6 +137,7 @@ void CollisionSystem::ResolveBulletCollisions()
 
 						if (scene_->enemy_->IsDead())
 						{
+							RaidStats::GetInstance().enemiesKilled++;
 							scene_->TriggerHitStop(0.14f);
 						}
 						else if (isCritical)
@@ -145,26 +148,21 @@ void CollisionSystem::ResolveBulletCollisions()
 
 					if (scene_->enemy_->IsDead())
 					{
-						scene_->TriggerCameraShake(0.6f, 1.4f);
-						if (scene_->hitEffect_)
-						{
-							scene_->hitEffect_->Play(enemyPos);
-							scene_->hitEffect_->SpawnPlaneParticles(enemyPos);
-						}
-						// 🩸 敵死亡時のバイオレントな大スプラッター＆血煙大爆発 (Violent Blood Burst)
+						scene_->TriggerCameraShake(0.65f, 1.6f);
+						// 💥 敵撃破時の大迫力GPUインスタンシング爆散＆スパークスプラッター
 						if (scene_->particleManager && scene_->appParticleManager_)
 						{
 							Vector3 hitDir = bPosCurrent - bPosPrev;
 							float hlen = std::sqrt(hitDir.x * hitDir.x + hitDir.y * hitDir.y + hitDir.z * hitDir.z);
 							if (hlen > 1e-4f) hitDir = { hitDir.x / hlen, hitDir.y / hlen, hitDir.z / hlen };
 
-							scene_->appParticleManager_->EmitViolentBloodBurst(
+							scene_->appParticleManager_->EmitEnemyDestroyGPUBurst(
 								scene_->particleManager->GetRandomEngine(),
 								enemyPos,
 								hitDir,
-								scene_->bloodTextureIndex_,
-								scene_->smokeTextureIndex_,
-								scene_->starburstTextureIndex_
+								scene_->particleTextureB,
+								scene_->starburstTextureIndex_,
+								scene_->smokeTextureIndex_
 							);
 						}
 					}
@@ -183,6 +181,7 @@ void CollisionSystem::ResolveBulletCollisions()
 					int prevHp = scene_->movingEnemy_->GetHP();
 					scene_->movingEnemy_->OnHit(scene_->player_ ? scene_->player_->GetPosition() : Vector3{0.0f,0.0f,0.0f});
 					int dmg = prevHp - scene_->movingEnemy_->GetHP();
+					RaidStats::GetInstance().shotsHit++;
 					if (dmg > 0)
 					{
 						bool isCritical = (rand() % 100 < 30);
@@ -210,6 +209,7 @@ void CollisionSystem::ResolveBulletCollisions()
 
 						if (scene_->movingEnemy_->IsDead())
 						{
+							RaidStats::GetInstance().enemiesKilled++;
 							scene_->TriggerHitStop(0.14f);
 						}
 						else if (isCritical)
@@ -220,26 +220,21 @@ void CollisionSystem::ResolveBulletCollisions()
 
 					if (scene_->movingEnemy_->IsDead())
 					{
-						scene_->TriggerCameraShake(0.6f, 1.4f);
-						if (scene_->hitEffect_)
-						{
-							scene_->hitEffect_->Play(enemyPos);
-							scene_->hitEffect_->SpawnPlaneParticles(enemyPos);
-						}
-						// 🩸 敵死亡時のバイオレントな大スプラッター＆血煙大爆発 (Violent Blood Burst)
+						scene_->TriggerCameraShake(0.65f, 1.6f);
+						// 💥 移動敵撃破時の大迫力GPUインスタンシング爆散＆スパークスプラッター
 						if (scene_->particleManager && scene_->appParticleManager_)
 						{
 							Vector3 hitDir = bPosCurrent - bPosPrev;
 							float hlen = std::sqrt(hitDir.x * hitDir.x + hitDir.y * hitDir.y + hitDir.z * hitDir.z);
 							if (hlen > 1e-4f) hitDir = { hitDir.x / hlen, hitDir.y / hlen, hitDir.z / hlen };
 
-							scene_->appParticleManager_->EmitViolentBloodBurst(
+							scene_->appParticleManager_->EmitEnemyDestroyGPUBurst(
 								scene_->particleManager->GetRandomEngine(),
 								enemyPos,
 								hitDir,
-								scene_->bloodTextureIndex_,
-								scene_->smokeTextureIndex_,
-								scene_->starburstTextureIndex_
+								scene_->particleTextureB,
+								scene_->starburstTextureIndex_,
+								scene_->smokeTextureIndex_
 							);
 						}
 					}
@@ -260,6 +255,7 @@ void CollisionSystem::ResolveBulletCollisions()
 						int prevHp = target->GetHP();
 						target->OnHit(1);
 						int dmg = prevHp - target->GetHP();
+						RaidStats::GetInstance().shotsHit++;
 						if (dmg > 0)
 						{
 							bool isCritical = (rand() % 100 < 30);
@@ -273,24 +269,18 @@ void CollisionSystem::ResolveBulletCollisions()
 
 						if (target->IsDead())
 						{
-							scene_->TriggerCameraShake(0.35f, 0.6f);
-							if (scene_->hitEffect_)
-							{
-								scene_->hitEffect_->Play(targetPos);
-								scene_->hitEffect_->SpawnPlaneParticles(targetPos);
-							}
+							RaidStats::GetInstance().targetsDestroyed++;
+							scene_->TriggerCameraShake(0.4f, 0.8f);
+							// 💥 標的破壊時の超高速GPU破砕スパーク＆ダストリング爆散
 							if (scene_->particleManager && scene_->appParticleManager_)
 							{
-								scene_->appParticleManager_->EmitDeathFlash(scene_->particleManager->GetRandomEngine(), targetPos, 4.0f, { 1.0f, 0.8f, 0.2f, 1.0f }, 0.35f, scene_->starburstTextureIndex_);
-
-								for (int i = 0; i < 40; ++i)
-								{
-									scene_->appParticleManager_->EmitFeather(scene_->particleManager->GetRandomEngine(), targetPos, { 1.0f, 0.9f, 0.6f, 1.0f }, scene_->particleTextureB);
-								}
-								for (int i = 0; i < 20; ++i)
-								{
-									scene_->appParticleManager_->EmitSpark(scene_->particleManager->GetRandomEngine(), targetPos, {0,0,0}, { 1.0f, 0.6f, 0.2f, 1.0f }, 0.15f, 1.2f, scene_->particleTextureB);
-								}
+								scene_->appParticleManager_->EmitTargetDestroyGPUBurst(
+									scene_->particleManager->GetRandomEngine(),
+									targetPos + Vector3{ 0.0f, 0.6f, 0.0f },
+									scene_->particleTextureB,
+									scene_->starburstTextureIndex_,
+									scene_->smokeTextureIndex_
+								);
 							}
 							scene_->AddFloatingText(targetPos + Vector3{ 0.0f, 1.5f, 0.0f }, "TARGET DESTROYED", { 0.0f, 1.0f, 0.5f, 1.0f }, true);
 						}
@@ -312,16 +302,25 @@ void CollisionSystem::ResolveBulletCollisions()
 				if (CheckBulletCapsuleHit(bPosPrev, bPosCurrent, kBulletRadius, playerPos, kDuckHeight, kDuckRadius, hitPoint))
 				{
 					float prevHp = scene_->player_->GetHP();
-					scene_->player_->TakeDamage(20.0f);
+					scene_->player_->TakeDamage(20.0f, "HOSTILE SENTRY (AK-74M)", "5.45x39mm PS CARTRIDGE (CHEST PENETRATION)");
 					if (scene_->player_->GetHP() < prevHp)
 					{
-						scene_->TriggerCameraShake(0.25f, 0.5f); // 被弾カメラシェイク
-						scene_->TriggerHitStop(0.04f);           // 被弾時の短いスローモーション
-						scene_->AddFloatingText(playerPos + Vector3{ 0.0f, 1.0f, 0.0f }, "WARNING -20", { 1.0f, 0.1f, 0.1f, 1.0f }, true);
+						// 💥 被弾リアクション演出の全発動
+						scene_->vignetteAlpha_ = 0.85f;          // 画面全体がピカッと赤く染まるフラッシュ
+						scene_->TriggerCameraShake(0.35f, 0.9f); // 重い直撃カメラシェイク
+						scene_->TriggerHitStop(0.06f);           // 一瞬の被弾ヒットストップ
+
+						// どの方向から撃たれたかを計算して被弾方向インジケーターをトリガー
+						Vector3 bDir = bullet->GetDirection();
+						float hitAngle = std::atan2(-bDir.x, -bDir.z); // 弾丸が飛んできた方角
+						scene_->TriggerDamageIndicator(hitAngle);
+
+						// 3Dダメージポップアップ
+						scene_->AddFloatingText(playerPos + Vector3{ 0.0f, 1.2f, 0.0f }, "💥 -20 HP", { 1.0f, 0.15f, 0.15f, 1.0f }, true);
 
 						if (scene_->particleManager && scene_->appParticleManager_)
 						{
-							for (int i = 0; i < 20; ++i)
+							for (int i = 0; i < 25; ++i)
 							{
 								scene_->appParticleManager_->EmitFeather(scene_->particleManager->GetRandomEngine(), playerPos, { 1.0f, 1.0f, 1.0f, 1.0f }, scene_->particleTextureB);
 							}
@@ -364,13 +363,18 @@ void CollisionSystem::ResolveObstacleCollisions()
 			// 木製の障害物に着弾した際のおがくず（飛散）パーティクル演出
 			if (scene_->particleManager && scene_->appParticleManager_)
 			{
-				scene_->appParticleManager_->EmitMuzzleFlare(
+				// 障壁・遮蔽物への着弾時の跳弾火花 ＆ 着弾ダストスモーク (GPU Particle Burst)
+				Vector3 bDir = bullet->GetDirection();
+				Vector3 hitNormal = { -bDir.x, 0.4f, -bDir.z };
+				float nlen = std::sqrt(hitNormal.x * hitNormal.x + hitNormal.y * hitNormal.y + hitNormal.z * hitNormal.z);
+				if (nlen > 1e-4f) hitNormal = { hitNormal.x / nlen, hitNormal.y / nlen, hitNormal.z / nlen };
+
+				scene_->appParticleManager_->EmitRicochetSparks(
 					scene_->particleManager->GetRandomEngine(),
 					bPos,
-					0.32f,
-					{ 1.0f, 0.9f, 0.6f, 0.9f },
-					0.06f,
-					scene_->particleTextureB
+					hitNormal,
+					scene_->particleTextureB,
+					scene_->smokeTextureIndex_
 				);
 
 				// 木片（フェンス素材テクスチャ）のバースト
@@ -431,10 +435,10 @@ void CollisionSystem::ResolveContactDamage()
 	}
 
 	// 固定敵との接触ダメージ
-	if (scene_->IsWithinRadius(scene_->player_->GetPosition(), scene_->enemy_->GetPosition(), scene_->playerHitRadius_ + scene_->enemyHitRadius_))
+	if (scene_->IsWithinRadius(scene_->player_->GetPosition(), scene_->enemy_->GetPosition(), GamePlayScene::kPlayerHitRadius + GamePlayScene::kEnemyHitRadius))
 	{
 		float prevHp = scene_->player_->GetHP();
-		scene_->player_->TakeDamage(scene_->kContactDamage);
+		scene_->player_->TakeDamage(GamePlayScene::kContactDamage, "SENTRY GUARD", "BLUNT FORCE TRAUMA (CLOSE COMBAT)");
 		if (scene_->player_->GetHP() < prevHp)
 		{
 			scene_->vignetteAlpha_ = 0.6f;
@@ -447,10 +451,10 @@ void CollisionSystem::ResolveContactDamage()
 	// 移動敵との接触ダメージ
 	if (scene_->movingEnemy_ && !scene_->movingEnemy_->IsDead())
 	{
-		if (scene_->IsWithinRadius(scene_->player_->GetPosition(), scene_->movingEnemy_->GetPosition(), scene_->playerHitRadius_ + scene_->enemyHitRadius_))
+		if (scene_->IsWithinRadius(scene_->player_->GetPosition(), scene_->movingEnemy_->GetPosition(), GamePlayScene::kPlayerHitRadius + GamePlayScene::kEnemyHitRadius))
 		{
 			float prevHp = scene_->player_->GetHP();
-			scene_->player_->TakeDamage(scene_->kContactDamage);
+			scene_->player_->TakeDamage(GamePlayScene::kContactDamage, "PATROL ENFORCER", "CQC MELEE ENGAGEMENT (FATAL IMPACT)");
 			if (scene_->player_->GetHP() < prevHp)
 			{
 				scene_->vignetteAlpha_ = 0.6f;

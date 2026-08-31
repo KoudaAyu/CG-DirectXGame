@@ -1,21 +1,7 @@
-# Material for Watchtower
-newmtl TowerWood
-Ka 0.35 0.25 0.12
-Kd 0.5 0.36 0.18
-Ks 0.1 0.1 0.1
-Ns 10.0
-map_Kd CG4/human/white.png
-
-newmtl TowerMetal
-Ka 0.3 0.3 0.3
-Kd 0.45 0.45 0.45
-Ks 0.3 0.3 0.3
-Ns 30.0
-map_Kd CG4/human/white.png
-
-newmtl TowerRoof
-Ka 0.2 0.15 0.05
-Kd 0.35 0.25 0.1
-Ks 0.1 0.1 0.1
-Ns 5.0
-map_Kd CG4/human/white.png
+# Material for watchtower.mtl
+newmtl Material_watchtower.mtl
+Ka 1.0 1.0 1.0
+Kd 1.0 1.0 1.0
+Ks 0.15 0.15 0.15
+Ns 15.0
+map_Kd duckov_crate.png
