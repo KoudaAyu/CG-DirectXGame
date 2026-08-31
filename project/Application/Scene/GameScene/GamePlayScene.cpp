@@ -1942,6 +1942,20 @@ void GamePlayScene::Draw(SceneRenderRequests& renderRequests)
 		hitEffect_->Draw();
 	}
 
+	// パーティクル描画（AppParticleManager 自前パイプラインで直接レンダリング）
+	// ※ ParticleRenderer::Draw() は GetNumInstance()==0 で早期リターンするため
+	//   エンジン経由ではなく Draw(ctx) で自前のシェーダーパイプラインを使って描画する
+	if (appParticleManager_ && particleManager)
+	{
+		RenderContext particleCtx = ctx;
+		// スモーク用テクスチャをデフォルトのパーティクルテクスチャとして設定
+		if (smokeTextureIndex_ != TextureManager::kInvalidTextureIndex)
+		{
+			particleCtx.textureHandle = TextureManager::GetInstance()->GetSrvHandleGPU(smokeTextureIndex_);
+		}
+		appParticleManager_->Draw(particleCtx);
+	}
+
 	if (spriteManager_)
 	{
 		spriteManager_->DrawAll(ctx, &debugCamera_, &sprites);
