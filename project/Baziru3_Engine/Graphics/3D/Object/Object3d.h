@@ -179,6 +179,8 @@ public:
   void SetFresnelF0(float f0);
 
   void SetDeltaTime(float dt) { deltaTime_ = dt; }
+  void SetAllowWireframeOverlay(bool allow) { allowWireframeOverlay_ = allow; }
+  bool IsAllowWireframeOverlay() const { return allowWireframeOverlay_; }
   bool HasAnimation() const { return animator_.HasAnimation(); }
   Skeleton &GetSkeleton() { return skeleton_; }
   const Skeleton &GetSkeleton() const { return skeleton_; }
@@ -232,5 +234,6 @@ private:
   bool wasDrawnLastFrame_ = false;
   bool isShared_ = false;
   bool isCulled_ = false;
+  bool allowWireframeOverlay_ = true;
   Object3d *masterObject_ = nullptr;
 };

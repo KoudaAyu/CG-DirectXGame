@@ -38,6 +38,7 @@ public:
 
     // ゲッター
     int GetActiveCount() const;
+    int GetReadyCount(const Vector3& playerPos, float maxPickupRadius = 3.5f) const;
     int GetMergedCount() const;
     int GetTotalCount() const { return static_cast<int>(minions_.size()); }
     bool IsAllMerged() const { return isAllMerged_; }

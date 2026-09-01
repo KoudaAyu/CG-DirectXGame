@@ -34,6 +34,7 @@ void TrajectoryRenderer::Initialize(DirectXCom* dxCommon, Object3dCom* object3dC
             dotObjects_[i]->Initialize(object3dCom_, dotModelData_);
             dotObjects_[i]->SetScale({ 0.12f, 0.12f, 0.12f });
             dotObjects_[i]->SetColor(dotColor_);
+            dotObjects_[i]->SetAllowWireframeOverlay(false);
             dotObjects_[i]->Update();
         }
     }
@@ -43,6 +44,7 @@ void TrajectoryRenderer::Initialize(DirectXCom* dxCommon, Object3dCom* object3dC
         landingMarker_->Initialize(object3dCom_, dotModelData_);
         landingMarker_->SetScale({ 0.55f, 0.04f, 0.55f });
         landingMarker_->SetColor(landingColor_);
+        landingMarker_->SetAllowWireframeOverlay(false);
         landingMarker_->Update();
     }
 }

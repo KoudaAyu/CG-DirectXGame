@@ -138,9 +138,11 @@ void Minion::Update(float deltaTime) {
         float dist = std::sqrt(diff.x * diff.x + diff.z * diff.z);
 
         if (dist > 0.05f) {
-            // 画面外や遠距離でも一切クランプせず、ワールド空間で一定の自然な速度で移動
+            // 距離が離れている場合はダッシュして素早く隊列に復帰
             float targetSpeed = followSpeed_;
-            if (dist < 0.8f) {
+            if (dist > 4.0f) {
+                targetSpeed = followSpeed_ * (std::min)(1.6f, 1.0f + (dist - 4.0f) * 0.08f);
+            } else if (dist < 0.8f) {
                 targetSpeed = (dist / 0.8f) * followSpeed_; // スロット直前のみ滑らかに減速
             }
             Vector3 desiredVel = { (diff.x / dist) * targetSpeed, 0.0f, (diff.z / dist) * targetSpeed };
@@ -166,12 +168,17 @@ void Minion::Update(float deltaTime) {
             velocity_.z *= 0.8f;
         }
 
+        // 移動速度に応じたピョコピョコ跳ねアニメーション
+        float currentSpeed = std::sqrt(velocity_.x * velocity_.x + velocity_.z * velocity_.z);
+        float bounceRate = (currentSpeed > 0.5f) ? (14.0f + (currentSpeed / followSpeed_) * 6.0f) : 8.0f;
+        float bounceHeight = (currentSpeed > 0.5f) ? 0.08f : 0.03f;
+
         // 接地Y座標の維持 ＋ ピョコピョコ跳ね
-        position_.y = groundY_ + std::sin(bounceTimer_ * 14.0f) * 0.08f;
+        position_.y = groundY_ + std::sin(bounceTimer_ * bounceRate) * bounceHeight;
         scale_ = { 0.35f, 0.35f, 0.35f };
 
         // 跳ねに連動したスクワッシュ（微小な上下潰れ）
-        float bouncePhase = std::sin(bounceTimer_ * 14.0f);
+        float bouncePhase = std::sin(bounceTimer_ * bounceRate);
         slimeParams_.squashStretch.y = -bouncePhase * 0.04f;
         slimeParams_.squashStretch.x = bouncePhase * 0.02f;
         slimeParams_.squashStretch.z = bouncePhase * 0.02f;

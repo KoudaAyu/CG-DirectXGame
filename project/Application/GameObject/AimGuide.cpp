@@ -152,9 +152,9 @@ void AimGuide::Initialize(Object3dCom* object3dCom, Camera* camera) {
     object3dCom_ = object3dCom;
     camera_ = camera;
 
-    reticleTextureIndex_ = TextureManager::GetInstance()->Load("Resources/uvChecker.png");
+    reticleTextureIndex_ = TextureManager::GetInstance()->Load("Resources/CG4/human/white.png");
 
-    // 照準リングメッシュ初期化 (内径0.6, 外径0.8, 36分割)
+    // 照準リングメッシュ初期化 (内径0.55, 外径0.75, 36分割)
     reticleModelData_ = GenerateRingMesh(0.55f, 0.75f, 36);
     reticleModelData_.material.textureIndex = reticleTextureIndex_;
 
@@ -165,6 +165,7 @@ void AimGuide::Initialize(Object3dCom* object3dCom, Camera* camera) {
         reticleObject_->SetScale({ 1.0f, 1.0f, 1.0f });
         reticleObject_->SetColor({ 0.2f, 0.9f, 1.0f, 0.85f });
         reticleObject_->SetEnableLighting(false);
+        reticleObject_->SetAllowWireframeOverlay(false); // ガイドUIのためワイヤーフレームデバッグ表示の対象外
         reticleObject_->Update();
     }
 
@@ -180,6 +181,7 @@ void AimGuide::Initialize(Object3dCom* object3dCom, Camera* camera) {
         dot->SetScale({ 0.12f, 0.12f, 0.12f });
         dot->SetColor({ 0.3f, 0.95f, 1.0f, 0.75f });
         dot->SetEnableLighting(false);
+        dot->SetAllowWireframeOverlay(false); // ガイドUIのためワイヤーフレームデバッグ表示の対象外
         dot->Update();
     }
 }

@@ -102,7 +102,7 @@ void Object3dCom::Draw(Object3d* object, const RenderContext& ctx, const Object3
 		object->DrawInternal(ctx);
 
 		// GPU-accelerated wireframe overlay draw (if enabled in Collision Debug panel)
-		if (CollisionManager::GetInstance()->IsShowDebugColliders() && CollisionManager::GetInstance()->IsShowMeshWireframe())
+		if (object->IsAllowWireframeOverlay() && CollisionManager::GetInstance()->IsShowDebugColliders() && CollisionManager::GetInstance()->IsShowMeshWireframe())
 		{
 			bool drawWireframe = true;
 			if (ctx.camera)

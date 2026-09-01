@@ -253,8 +253,9 @@ void GamePlayScene::DrawDebugUI()
     if (minionManager_ && player_)
     {
         int activeCount = minionManager_->GetActiveCount();
+        int readyCount = minionManager_->GetReadyCount(player_->GetPosition());
         int totalCount = minionManager_->GetTotalCount();
-        ImGui::Text("Minions: %d Active / %d Total", activeCount, totalCount);
+        ImGui::Text("Minions: %d Ready to Throw | %d Active | %d Total", readyCount, activeCount, totalCount);
 
         if (ImGui::Button("+1 Spawn")) {
             minionManager_->SpawnMinion(player_->GetPosition(), 1);

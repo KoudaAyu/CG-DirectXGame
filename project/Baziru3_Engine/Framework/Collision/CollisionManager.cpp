@@ -1663,7 +1663,7 @@ void CollisionManager::DrawDebug(Camera* camera)
 	ImU32 objVisualColor = ImGui::ColorConvertFloat4ToU32({ 0.0f, 1.0f, 0.5f, 0.7f }); // Neon Green
 	for (Object3d* obj : Object3d::GetInstances())
 	{
-		if (!obj || !obj->WasDrawnLastFrame()) continue;
+		if (!obj || !obj->WasDrawnLastFrame() || !obj->IsAllowWireframeOverlay()) continue;
 		Vector3 worldPos = obj->GetTranslate();
 
 		// If skeleton joints are present, draw as a Box wrapping all joint world coordinates!

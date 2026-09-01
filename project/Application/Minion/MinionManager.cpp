@@ -57,6 +57,22 @@ int MinionManager::GetActiveCount() const {
     return count;
 }
 
+int MinionManager::GetReadyCount(const Vector3& playerPos, float maxPickupRadius) const {
+    if (isMergedState_) return 0;
+    int count = 0;
+    float maxDistSq = maxPickupRadius * maxPickupRadius;
+    for (const auto& m : minions_) {
+        if (m && m->IsActive() && m->GetState() == MinionState::Following) {
+            Vector3 diff = m->GetPosition() - playerPos;
+            diff.y = 0.0f;
+            if (diff.x * diff.x + diff.z * diff.z <= maxDistSq) {
+                count++;
+            }
+        }
+    }
+    return count;
+}
+
 int MinionManager::GetMergedCount() const {
     if (!isMergedState_) return 0;
     int count = 0;
@@ -182,13 +198,30 @@ bool MinionManager::ThrowMinion(const Vector3& launchPos, const Vector3& forward
 bool MinionManager::ThrowMinionWithVelocity(const Vector3& launchPos, const Vector3& velocity) {
     if (isMergedState_) return false;
 
+    // 手元付近（半径3.5m以内）にいる追従中ミニオンの中から、最も投擲位置に近いものを選択
+    Minion* bestMinion = nullptr;
+    float bestDistSq = 3.5f * 3.5f; // 投擲可能範囲の最大距離の2乗
+
     for (auto& minion : minions_) {
-        if (minion && minion->IsActive() && minion->GetState() == MinionState::Following) {
-            minion->SetPosition(launchPos);
-            minion->Launch(velocity);
-            return true;
+        if (!minion || !minion->IsActive()) continue;
+        if (minion->GetState() != MinionState::Following) continue;
+
+        Vector3 diff = minion->GetPosition() - launchPos;
+        diff.y = 0.0f; // 水平距離で判定
+        float distSq = diff.x * diff.x + diff.z * diff.z;
+
+        if (distSq < bestDistSq) {
+            bestDistSq = distSq;
+            bestMinion = minion.get();
         }
     }
+
+    if (bestMinion) {
+        bestMinion->SetPosition(launchPos);
+        bestMinion->Launch(velocity);
+        return true;
+    }
+
     return false;
 }
 
