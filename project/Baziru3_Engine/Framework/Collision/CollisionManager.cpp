@@ -188,7 +188,9 @@ void CollisionManager::Update()
         if (data.type == ColliderType::Sphere)
         {
             SphereCollider* sphere = static_cast<SphereCollider*>(col);
-            data.shape.radius = sphere->GetRadius();
+            data.shape.radius = sphere->GetEffectiveRadius();
+            data.shape.scale = sphere->GetScale();
+            data.shape.rotation = sphere->GetRotation();
         }
         else if (data.type == ColliderType::Box)
         {
@@ -530,19 +532,40 @@ bool CollisionManager::CheckSphereSphere(const CollisionData& a, const Collision
 
     Vector3 dir = posB - posA;
     float dist = Length(dir);
-    float minDist = a.shape.radius + b.shape.radius;
+
+    // 接触方向単位ベクトル
+    Vector3 unitDir = (dist > 1e-4f) ? Normalize(dir) : Vector3{ 0.0f, 0.0f, 1.0f };
+
+    // 各コライダーの接触方向における変形実効半径を計算
+    auto getEllipsoidRadiusInDir = [](const CollisionData& col, const Vector3& d) -> float {
+        Vector3 s = col.shape.scale;
+        float rx = col.shape.radius * (s.x > 0.001f ? s.x : 1.0f);
+        float ry = col.shape.radius * (s.y > 0.001f ? s.y : 1.0f);
+        float rz = col.shape.radius * (s.z > 0.001f ? s.z : 1.0f);
+
+        // オイラー回転 (Y -> X -> Z の逆回転でローカル方向を算出)
+        Vector3 rot = col.shape.rotation;
+        float cosP = std::cos(-rot.x), sinP = std::sin(-rot.x);
+        float cosY = std::cos(-rot.y), sinY = std::sin(-rot.y);
+        float cosR = std::cos(-rot.z), sinR = std::sin(-rot.z);
+
+        // Z逆回転 -> X逆回転 -> Y逆回転
+        Vector3 ld = { d.x * cosR - d.y * sinR, d.x * sinR + d.y * cosR, d.z };
+        ld = { ld.x, ld.y * cosP - ld.z * sinP, ld.y * sinP + ld.z * cosP };
+        ld = { ld.x * cosY + ld.z * sinY, ld.y, -ld.x * sinY + ld.z * cosY };
+
+        float effR = std::sqrt(ld.x * ld.x * rx * rx + ld.y * ld.y * ry * ry + ld.z * ld.z * rz * rz);
+        return (effR > 0.001f) ? effR : col.shape.radius;
+    };
+
+    float radA = getEllipsoidRadiusInDir(a, unitDir);
+    float radB = getEllipsoidRadiusInDir(b, unitDir * -1.0f);
+    float minDist = radA + radB;
 
     if (dist < minDist)
     {
         outPushLen = minDist - dist;
-        if (dist > 1e-4f)
-        {
-            outPushDir = Normalize(dir);
-        }
-        else
-        {
-            outPushDir = { 0.0f, 0.0f, 1.0f };
-        }
+        outPushDir = unitDir;
         return true;
     }
     return false;
@@ -1312,16 +1335,34 @@ void CollisionManager::DrawDebug(Camera* camera)
 		{
 			SphereCollider* sphere = static_cast<SphereCollider*>(col);
 			float radius = sphere->GetRadius();
+			Vector3 scale = sphere->GetScale();
+			Vector3 rot = sphere->GetRotation();
 			const int numSegments = 24;
+
+			// オイラー角 (Pitch, Yaw, Roll) によるローカル座標変換ラムダ
+			float cosP = std::cos(rot.x), sinP = std::sin(rot.x);
+			float cosY = std::cos(rot.y), sinY = std::sin(rot.y);
+			float cosR = std::cos(rot.z), sinR = std::sin(rot.z);
+
+			auto transformLocal = [&](const Vector3& local) -> Vector3 {
+				// 1. スケール適用
+				Vector3 s = { local.x * scale.x, local.y * scale.y, local.z * scale.z };
+				// 2. 回転適用 (Y -> X -> Z)
+				Vector3 ry = { s.x * cosY + s.z * sinY, s.y, -s.x * sinY + s.z * cosY };
+				Vector3 rx = { ry.x, ry.y * cosP - ry.z * sinP, ry.y * sinP + ry.z * cosP };
+				Vector3 rz = { rx.x * cosR - rx.y * sinR, rx.x * sinR + rx.y * cosR, rx.z };
+				// 3. 平行移動
+				return { worldPos.x + rz.x, worldPos.y + rz.y, worldPos.z + rz.z };
+			};
 
 			// 1. 赤道円 (XZ平面)
 			std::vector<ImVec2> pts2D;
 			for (int i = 0; i <= numSegments; ++i)
 			{
 				float angle = i * (6.2831853f / numSegments);
-				Vector3 p3D = { worldPos.x + std::cos(angle) * radius, worldPos.y, worldPos.z + std::sin(angle) * radius };
+				Vector3 local = { std::cos(angle) * radius, 0.0f, std::sin(angle) * radius };
 				ImVec2 p2D;
-				if (project3DTo2D(p3D, p2D)) pts2D.push_back(p2D);
+				if (project3DTo2D(transformLocal(local), p2D)) pts2D.push_back(p2D);
 			}
 			if (pts2D.size() > 1) drawList->AddPolyline(pts2D.data(), (int)pts2D.size(), colColor, false, 2.0f);
 
@@ -1330,9 +1371,9 @@ void CollisionManager::DrawDebug(Camera* camera)
 			for (int i = 0; i <= numSegments; ++i)
 			{
 				float angle = i * (6.2831853f / numSegments);
-				Vector3 p3D = { worldPos.x + std::cos(angle) * radius, worldPos.y + std::sin(angle) * radius, worldPos.z };
+				Vector3 local = { std::cos(angle) * radius, std::sin(angle) * radius, 0.0f };
 				ImVec2 p2D;
-				if (project3DTo2D(p3D, p2D)) pts2D.push_back(p2D);
+				if (project3DTo2D(transformLocal(local), p2D)) pts2D.push_back(p2D);
 			}
 			if (pts2D.size() > 1) drawList->AddPolyline(pts2D.data(), (int)pts2D.size(), colColor, false, 2.0f);
 
@@ -1341,24 +1382,25 @@ void CollisionManager::DrawDebug(Camera* camera)
 			for (int i = 0; i <= numSegments; ++i)
 			{
 				float angle = i * (6.2831853f / numSegments);
-				Vector3 p3D = { worldPos.x, worldPos.y + std::sin(angle) * radius, worldPos.z + std::cos(angle) * radius };
+				Vector3 local = { 0.0f, std::sin(angle) * radius, std::cos(angle) * radius };
 				ImVec2 p2D;
-				if (project3DTo2D(p3D, p2D)) pts2D.push_back(p2D);
+				if (project3DTo2D(transformLocal(local), p2D)) pts2D.push_back(p2D);
 			}
 			if (pts2D.size() > 1) drawList->AddPolyline(pts2D.data(), (int)pts2D.size(), colColor, false, 2.0f);
 
 			// 4. 緯線円 (上下 ±45度)
-			float latRadii[2] = { radius * 0.7071f, radius * 0.7071f };
-			float latYs[2]    = { worldPos.y + radius * 0.7071f, worldPos.y - radius * 0.7071f };
+			float latR = radius * 0.7071f;
+			float latY = radius * 0.7071f;
 			for (int lat = 0; lat < 2; ++lat)
 			{
+				float ySign = (lat == 0) ? 1.0f : -1.0f;
 				pts2D.clear();
 				for (int i = 0; i <= numSegments; ++i)
 				{
 					float angle = i * (6.2831853f / numSegments);
-					Vector3 p3D = { worldPos.x + std::cos(angle) * latRadii[lat], latYs[lat], worldPos.z + std::sin(angle) * latRadii[lat] };
+					Vector3 local = { std::cos(angle) * latR, ySign * latY, std::sin(angle) * latR };
 					ImVec2 p2D;
-					if (project3DTo2D(p3D, p2D)) pts2D.push_back(p2D);
+					if (project3DTo2D(transformLocal(local), p2D)) pts2D.push_back(p2D);
 				}
 				if (pts2D.size() > 1) drawList->AddPolyline(pts2D.data(), (int)pts2D.size(), colColor, false, 1.2f);
 			}
