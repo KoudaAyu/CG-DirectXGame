@@ -44,7 +44,7 @@ void Obstacle::Initialize(Object3dCom* object3dCom, Camera* camera, const Vector
         loaded.boundingRadius = std::sqrt(maxDistSq);
         if (filename.find("ground") != std::string::npos || filename.find("plane") != std::string::npos || filename.find("river") != std::string::npos)
         {
-            loaded.boundingRadius = (std::max)(loaded.boundingRadius, 60.0f);
+            loaded.boundingRadius = (std::max)(loaded.boundingRadius, 120.0f);
         }
         else if (loaded.boundingRadius < 1.0f)
         {

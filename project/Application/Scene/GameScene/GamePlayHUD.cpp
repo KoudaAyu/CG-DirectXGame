@@ -7,6 +7,7 @@
 #include "Obstacle.h"
 #include "Target.h"
 #include "RaidStats.h"
+#include "TutorialSign.h"
 #include <cmath>
 #include <algorithm>
 
@@ -50,6 +51,7 @@ void GamePlayHUD::Draw(const GamePlayHUDContext& ctx, float deltaTime)
     DrawVisionConesAndGizmos(ctx);
     DrawLootingHUD(ctx);
     DrawMissionObjectiveHUD(ctx);
+    DrawTutorialSignHUD(ctx);
     DrawPlayerAmmoHUD(ctx, deltaTime);
     DrawDeathSequenceHUD(ctx);
     DrawPerformanceTrackerUI(ctx, deltaTime);
@@ -645,3 +647,55 @@ void GamePlayHUD::DrawPerformanceTrackerUI(const GamePlayHUDContext& ctx, float 
     ImGui::End();
 #endif
 }
+
+void GamePlayHUD::DrawTutorialSignHUD(const GamePlayHUDContext& ctx)
+{
+#ifdef USE_IMGUI
+    if (!ctx.tutorialSigns || !ctx.camera) return;
+
+    ImGuiIO& io = ImGui::GetIO();
+    float screenW = io.DisplaySize.x;
+    float screenH = io.DisplaySize.y;
+    if (screenW <= 0.0f || screenH <= 0.0f) return;
+
+    const Matrix4x4& vp = ctx.camera->GetViewProjectionMatrix();
+
+    for (const auto& sign : *ctx.tutorialSigns)
+    {
+        if (!sign || !sign->IsPlayerNear()) continue;
+
+        Vector3 signPos = sign->GetPosition();
+        signPos.y += 1.8f; // 看板の頭上
+
+        Vector2 screenPos;
+        bool onScreen = Project3DTo2D(signPos, vp, screenW, screenH, screenPos);
+
+        // 画面外の場合は画面中央下部に固定表示
+        if (!onScreen || screenPos.x < 50.0f || screenPos.x > screenW - 50.0f || screenPos.y < 50.0f || screenPos.y > screenH - 50.0f)
+        {
+            screenPos = { screenW * 0.5f, screenH * 0.72f };
+        }
+
+        std::string msg = sign->GetMessage();
+
+        ImGui::SetNextWindowPos(ImVec2(screenPos.x, screenPos.y), ImGuiCond_Always, ImVec2(0.5f, 1.0f));
+        ImGui::SetNextWindowBgAlpha(0.88f);
+
+        ImGuiWindowFlags flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize |
+                                 ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing |
+                                 ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoMove;
+
+        std::string winId = "TutorialSign##" + std::to_string(reinterpret_cast<uintptr_t>(sign.get()));
+        if (ImGui::Begin(winId.c_str(), nullptr, flags))
+        {
+            ImGui::TextColored(ImVec4(1.0f, 0.85f, 0.2f, 1.0f), (const char*)u8"📜 [ TUTORIAL GUIDE - 作戦教本 ]");
+            ImGui::Separator();
+            ImGui::Spacing();
+            ImGui::TextColored(ImVec4(1.0f, 1.0f, 1.0f, 1.0f), "%s", msg.c_str());
+            ImGui::Spacing();
+        }
+        ImGui::End();
+    }
+#endif
+}
+

@@ -12,6 +12,7 @@ class Enemy;
 class MovingEnemy;
 class Obstacle;
 class Target;
+class TutorialSign;
 
 /// <summary>
 /// HUD描画に必要なシーン情報のコンテキスト構造体
@@ -24,6 +25,7 @@ struct GamePlayHUDContext
     MovingEnemy* movingEnemy                 = nullptr;
     const std::vector<std::unique_ptr<Obstacle>>* obstacles = nullptr;
     const std::vector<std::unique_ptr<Target>>* targets     = nullptr;
+    const std::vector<std::unique_ptr<TutorialSign>>* tutorialSigns = nullptr;
     const std::vector<LootableProp>* lootProps              = nullptr;
     const std::vector<FloatingText>* floatingTexts          = nullptr;
 
@@ -64,6 +66,7 @@ public:
 public:
     // --- 個別HUD描画メソッド ---
     void DrawMissionObjectiveHUD(const GamePlayHUDContext& ctx);
+    void DrawTutorialSignHUD(const GamePlayHUDContext& ctx);
     void DrawPlayerAmmoHUD(const GamePlayHUDContext& ctx, float deltaTime);
     void DrawLootingHUD(const GamePlayHUDContext& ctx);
     void DrawDamageIndicator(const GamePlayHUDContext& ctx);

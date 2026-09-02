@@ -103,6 +103,7 @@ public:
     Vector3 GetGoalPosition() const { return goalRingTransform_.translate; }
     const std::vector<std::unique_ptr<Target>>& GetTargets() const { return targets_; }
     std::vector<std::unique_ptr<Target>>& GetTargets() { return targets_; }
+    const std::vector<std::unique_ptr<TutorialSign>>& GetTutorialSigns() const { return tutorialSigns_; }
     LootSystem* GetLootSystem() const { return lootSystem_.get(); }
 
     /// <summary>
@@ -182,6 +183,7 @@ private:
     std::unique_ptr<MovingEnemy> movingEnemy_;
     std::vector<std::unique_ptr<Obstacle>> obstacles_;
     std::vector<std::unique_ptr<Target>> targets_;
+    std::vector<std::unique_ptr<TutorialSign>> tutorialSigns_;
     std::unique_ptr<Sphere> sphere_;
     std::unique_ptr<Ring> goalRing_;
     std::unique_ptr<Object3d> extractionPadObject_;

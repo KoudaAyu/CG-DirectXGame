@@ -1741,14 +1741,31 @@ void GamePlayScene::InitializeObstacles()
 						obstacles_.push_back(std::move(obs));
 					}
 				}
-				// ステージ最下層に落ち着いた土・草地カラーの広大な水平地面フロアを敷く（空の青色が筒抜けになるのを完全に防止）
-				auto ground = std::make_unique<Obstacle>();
-				ground->Initialize(object3dCom, camera_, { 0.0f, -0.01f, 15.0f }, 1.0f, "ground.obj", { 1.0f, 1.0f, 1.0f }, { 0.0f, 0.0f, 0.0f });
-				obstacles_.insert(obstacles_.begin(), std::move(ground));
+				// ステージ最下層に25x25mタイル16枚（4x4グリッド）で地面を敷く
+				// ground.obj単体(100x100m)だとフラスタムカリングで端が消えるため分割する
+				{
+					const float tileSize = 25.0f; // タイル1枚のサイズ
+					const int gridW = 4;
+					const int gridH = 4;
+					// グリッドの中心を (0, -0.01, 15) に合わせる
+					const float startX = 0.0f - tileSize * gridW * 0.5f + tileSize * 0.5f;
+					const float startZ = 15.0f - tileSize * gridH * 0.5f + tileSize * 0.5f;
+					for (int gz = 0; gz < gridH; ++gz)
+					{
+						for (int gx = 0; gx < gridW; ++gx)
+						{
+							Vector3 tilePos = { startX + gx * tileSize, -0.01f, startZ + gz * tileSize };
+							auto tile = std::make_unique<Obstacle>();
+							tile->Initialize(object3dCom, camera_, tilePos, 1.0f, "ground_tile.obj", { 1.0f, 1.0f, 1.0f }, { 0.0f, 0.0f, 0.0f });
+							obstacles_.insert(obstacles_.begin(), std::move(tile));
+						}
+					}
+				}
 
 				// 橋の下を東西に横断する美しいクリアブルーの川水面を配置（幅60m x 奥行き5m）
+				// ※ 地面とのZファイト防止のため Y=0.04f に配置
 				auto river = std::make_unique<Obstacle>();
-				river->Initialize(object3dCom, camera_, { 0.0f, 0.02f, 18.75f }, 1.0f, "river.obj", { 60.0f, 1.0f, 5.0f }, { 0.0f, 0.0f, 0.0f });
+				river->Initialize(object3dCom, camera_, { 0.0f, 0.04f, 18.75f }, 1.0f, "river.obj", { 60.0f, 1.0f, 5.0f }, { 0.0f, 0.0f, 0.0f });
 				obstacles_.insert(obstacles_.begin() + 1, std::move(river));
 
 
@@ -1770,6 +1787,25 @@ void GamePlayScene::InitializeObstacles()
 	if (!success || obstacles_.size() <= 2)
 	{
 		OutputDebugStringA("GamePlayScene: Using updated default obstacle placement.\n");
+
+		// ステージ最下層に25x25mタイル16枚（4x4グリッド）で地面を敷く
+		{
+			const float tileSize = 25.0f;
+			const int gridW = 4;
+			const int gridH = 4;
+			const float startX = 0.0f - tileSize * gridW * 0.5f + tileSize * 0.5f;
+			const float startZ = 15.0f - tileSize * gridH * 0.5f + tileSize * 0.5f;
+			for (int gz = 0; gz < gridH; ++gz)
+			{
+				for (int gx = 0; gx < gridW; ++gx)
+				{
+					Vector3 tilePos = { startX + gx * tileSize, -0.01f, startZ + gz * tileSize };
+					auto tile = std::make_unique<Obstacle>();
+					tile->Initialize(object3dCom, camera_, tilePos, 1.0f, "ground_tile.obj", { 1.0f, 1.0f, 1.0f }, { 0.0f, 0.0f, 0.0f });
+					obstacles_.push_back(std::move(tile));
+				}
+			}
+		}
 
 		// コンテナ2個
 		auto c1 = std::make_unique<Obstacle>();
@@ -1811,6 +1847,34 @@ void GamePlayScene::InitializeObstacles()
 		t3->Initialize(object3dCom, camera_, { -2.5f, 0.0f, 25.5f }, 0.8f);
 		targets_.push_back(std::move(t3));
 	}
+
+	// --- 📜 8/31 チュートリアル用看板 (TutorialSign) の完全配置 ---
+	tutorialSigns_.clear();
+	{
+		// 看板1: 初期位置（基本移動＆回避ローリング）
+		auto sign1 = std::make_unique<TutorialSign>();
+		sign1->Initialize(object3dCom, camera_, { -2.5f, 0.0f, 2.0f },
+			(const char*)u8"【 基本操作訓練 】\n[ W ][ A ][ S ][ D ] : 移動\n[ SPACE ] : 回避ローリング（素早く前転・無敵時間あり！）", 3.2f);
+		tutorialSigns_.push_back(std::move(sign1));
+
+		// 看板2: 射撃練習エリア（照準・射撃・リロード）
+		auto sign2 = std::make_unique<TutorialSign>();
+		sign2->Initialize(object3dCom, camera_, { 2.5f, 0.0f, 7.5f },
+			(const char*)u8"【 射撃・リロード訓練 】\n[ マウス ] : 照準  /  [ 左クリック ] : 射撃\n[ R ] : リロード（弾込め）\n※配置された 🎯 標的（Target）をすべて破壊せよ！", 3.2f);
+		tutorialSigns_.push_back(std::move(sign2));
+
+		// 看板3: 遮蔽・戦術エリア（COVER＆ステルス）
+		auto sign3 = std::make_unique<TutorialSign>();
+		sign3->Initialize(object3dCom, camera_, { -3.0f, 0.0f, 15.0f },
+			(const char*)u8"【 戦術遮蔽（COVER）訓練 】\nコンテナや土嚢のそばに行くと 自動的に 🛡️ COVER 状態！\n敵の視界が大幅に遮られ、見つかりにくくなるぞ！", 3.2f);
+		tutorialSigns_.push_back(std::move(sign3));
+
+		// 看板4: 脱出エリア（ヘリパッド脱出目標）
+		auto sign4 = std::make_unique<TutorialSign>();
+		sign4->Initialize(object3dCom, camera_, { 2.5f, 0.0f, 26.5f },
+			(const char*)u8"【 レイド脱出訓練 】\nすべての標的を破壊後、最奥の 🚁 脱出パッド へ向かえ！\nパッド内でカウントダウン完了で生還（CLEAR）だ！", 3.2f);
+		tutorialSigns_.push_back(std::move(sign4));
+	}
 }
 
 void GamePlayScene::UpdateObstacles()
@@ -1820,6 +1884,18 @@ void GamePlayScene::UpdateObstacles()
 		if (obs)
 		{
 			obs->Update();
+		}
+	}
+
+	if (player_)
+	{
+		Vector3 pPos = player_->GetPosition();
+		for (auto& sign : tutorialSigns_)
+		{
+			if (sign)
+			{
+				sign->Update(pPos);
+			}
 		}
 	}
 }
@@ -1917,6 +1993,15 @@ void GamePlayScene::Draw(SceneRenderRequests& renderRequests)
 		}
 	}
 
+	// 📜 チュートリアル看板の描画
+	for (auto& sign : tutorialSigns_)
+	{
+		if (sign)
+		{
+			sign->Draw(ctx);
+		}
+	}
+
 	// 立体脱出ヘリパッドの描画
 	if (extractionPadObject_)
 	{
@@ -1968,6 +2053,7 @@ void GamePlayScene::Draw(SceneRenderRequests& renderRequests)
 		hudCtx.movingEnemy = movingEnemy_.get();
 		hudCtx.obstacles = &obstacles_;
 		hudCtx.targets = &targets_;
+		hudCtx.tutorialSigns = &tutorialSigns_;
 		hudCtx.lootProps = lootSystem_ ? &lootSystem_->GetProps() : nullptr;
 		hudCtx.floatingTexts = &floatingTexts_;
 		hudCtx.extractionGoalPos = goalRingTransform_.translate;
