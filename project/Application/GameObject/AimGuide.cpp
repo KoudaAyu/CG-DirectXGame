@@ -1,4 +1,5 @@
 #include "AimGuide.h"
+#include "Application/GameObject/SlimePhysics.h"
 #include "Baziru3_Engine/Graphics/3D/Object/Object3dCom.h"
 #include "Baziru3_Engine/Core/Camera/Camera.h"
 #include "Baziru3_Engine/Core/IO/Mouse/MouseInput.h"
@@ -257,7 +258,7 @@ void AimGuide::Update(const Vector3& launchPos, MouseInput* mouseInput, Camera* 
         clampedTarget.x = launchPos.x + toTarget.x * ratio;
         clampedTarget.z = launchPos.z + toTarget.z * ratio;
         // 傾斜面上の厳密な高さを再計算
-        clampedTarget.y = -std::tan(stageTilt.y) * clampedTarget.x - (std::tan(stageTilt.x) / (std::max)(cosRoll, 0.01f)) * clampedTarget.z;
+        clampedTarget.y = SlimePhysics::CalculateGroundHeight(clampedTarget.x, clampedTarget.z, stageTilt);
         horizontalDist = maxRange_;
     }
 

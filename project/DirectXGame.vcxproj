@@ -124,6 +124,7 @@
     <ClCompile Include="Application\Minion\MinionManager.cpp" />
     <ClCompile Include="Application\Player\PikminPlayer.cpp" />
     <ClCompile Include="Application\GameObject\SlimeMesh.cpp" />
+    <ClCompile Include="Application\GameObject\SlimePhysics.cpp" />
     <ClCompile Include="Application\GameObject\AimGuide.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -236,6 +237,7 @@
     </FxCompile>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Application\GameObject\SlimePhysics.h" />
     <ClInclude Include="Baziru3_Engine\Framework\Animation\NodeAnimation\Node.h" />
     <ClInclude Include="Baziru3_Engine\Framework\Animation\NodeAnimation\NodeStruct.h" />
     <ClInclude Include="Baziru3_Engine\Graphics\3D\Model\SkinCluster\SkinCluster.h" />

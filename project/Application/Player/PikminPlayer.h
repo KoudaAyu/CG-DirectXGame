@@ -14,21 +14,7 @@ class MouseInput;
 class MinionManager;
 class AimGuide;
 
-/// @brief スライム用GPU定数バッファのCPU側構造体（Slime.hlsli の SlimeParams と一致させる）
-struct SlimeParamsCPU
-{
-    float time = 0.0f;
-    float wobbleStrength = 0.12f;
-    float wobbleFrequency = 4.0f;
-    float impulseStrength = 0.0f;
-    Vector3 squashStretch{ 0.0f, 0.0f, 0.0f };
-    float padding1 = 0.0f;
-    Vector4 baseColor{ 0.2f, 0.85f, 1.0f, 0.9f };
-    float fresnelPower = 3.0f;
-    float envReflection = 0.4f;
-    float innerGlow = 0.4f;
-    float specularShininess = 64.0f;
-};
+#include "Application/GameObject/SlimePhysics.h"
 
 /**
  * @brief ピクミン×ロコロコ プレイヤーキャラクター（スライム描画版）

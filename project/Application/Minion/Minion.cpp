@@ -1,5 +1,6 @@
 #include "Minion.h"
 #include "Application/GameObject/SlimeMesh.h"
+#include "Application/GameObject/SlimePhysics.h"
 #include "Baziru3_Engine/Graphics/3D/Object/Object3dCom.h"
 #include "Baziru3_Engine/Core/Base/Pipeline/PipelineStateManager.h"
 #include "Baziru3_Engine/Core/Base/Allocator/ConstantBufferAllocator.h"
@@ -166,36 +167,20 @@ void Minion::Update(float deltaTime, const Vector2& stageTilt) {
         rotation_.z = -stageTilt.y;
 
         // 傾斜面の上に乗る（床の傾斜に沿って底面がピタッと接地）
-        float cosPitch = std::cos(stageTilt.x);
-        float cosRoll = std::cos(stageTilt.y);
-        float ny = (std::max)(cosPitch * cosRoll, 0.01f);
-        float groundHeight = -std::tan(stageTilt.y) * position_.x - (std::tan(stageTilt.x) / (std::max)(cosRoll, 0.01f)) * position_.z;
-        position_.y = groundHeight + groundY_ / ny;
+        position_.y = SlimePhysics::CalculateGroundedCenterY(position_.x, position_.z, stageTilt, groundY_);
         scale_ = { 0.35f, 0.35f, 0.35f };
 
-        // --- 液体スライムの傾斜流動＆スクワッシュ変形 ---
-        Vector3 currentVel = velocity_;
-        Vector3 accel = {
-            (currentVel.x - prevVelocity_.x) / (std::max)(deltaTime, 0.001f),
-            0.0f,
-            (currentVel.z - prevVelocity_.z) / (std::max)(deltaTime, 0.001f)
-        };
-        prevVelocity_ = currentVel;
-
-        float currentSpeed = std::sqrt(currentVel.x * currentVel.x + currentVel.z * currentVel.z);
-        float tiltMag = std::sqrt(stageTilt.x * stageTilt.x + stageTilt.y * stageTilt.y);
-
-        // ステージ傾斜による液体流動ベクトル（傾けた下り坂方向へのドロッとした内容物移動）
-        float targetFlowX = std::sin(stageTilt.y) * 1.8f + currentVel.x * 0.02f;
-        float targetFlowZ = std::sin(stageTilt.x) * 1.8f + currentVel.z * 0.02f;
-
-        // 傾斜および接地重力による上下の強い平坦化（傾けるほど平たく潰れる）
-        float targetSquashY = -0.16f - (std::min)(tiltMag * 0.45f + currentSpeed * 0.02f, 0.35f);
-
-        // スムーズスプリング補間
-        slimeParams_.squashStretch.x += (targetFlowX - slimeParams_.squashStretch.x) * (std::min)(1.0f, deltaTime * 12.0f);
-        slimeParams_.squashStretch.z += (targetFlowZ - slimeParams_.squashStretch.z) * (std::min)(1.0f, deltaTime * 12.0f);
-        slimeParams_.squashStretch.y += (targetSquashY - slimeParams_.squashStretch.y) * (std::min)(1.0f, deltaTime * 12.0f);
+        // --- 液体スライムの動的変形（SlimePhysics ユーティリティで一元計算） ---
+        SlimePhysics::DeformInput deformInput;
+        deformInput.velocity = velocity_;
+        deformInput.prevVelocity = prevVelocity_;
+        deformInput.stageTilt = stageTilt;
+        deformInput.deltaTime = deltaTime;
+        deformInput.isGrounded = true;
+        deformInput.isMerged = false;
+        deformInput.massScale = 1.0f;
+        SlimePhysics::UpdateDeformation(slimeParams_, deformInput);
+        prevVelocity_ = velocity_;
 
         break;
     }
@@ -230,22 +215,20 @@ void Minion::Update(float deltaTime, const Vector2& stageTilt) {
             rotation_.y = std::atan2(velocity_.x, velocity_.z);
         }
 
-        // 空中での水滴・涙型変形（板の傾斜流動は受けず、飛行速度と鉛直重力による進行方向への伸び）
-        float targetFlowX = velocity_.x * 0.025f;
-        float targetFlowZ = velocity_.z * 0.025f;
-        // 垂直速度に応じた自然な水滴の伸び（上昇・下降に応じた縦変形）
-        float targetSquashY = (std::min)((std::max)(velocity_.y * 0.018f, -0.15f), 0.25f);
-
-        slimeParams_.squashStretch.x += (targetFlowX - slimeParams_.squashStretch.x) * (std::min)(1.0f, deltaTime * 12.0f);
-        slimeParams_.squashStretch.z += (targetFlowZ - slimeParams_.squashStretch.z) * (std::min)(1.0f, deltaTime * 12.0f);
-        slimeParams_.squashStretch.y += (targetSquashY - slimeParams_.squashStretch.y) * (std::min)(1.0f, deltaTime * 12.0f);
+        // 空中での水滴・涙型変形（SlimePhysics ユーティリティで計算）
+        SlimePhysics::DeformInput airDeformInput;
+        airDeformInput.velocity = velocity_;
+        airDeformInput.prevVelocity = prevVelocity_;
+        airDeformInput.stageTilt = stageTilt;
+        airDeformInput.deltaTime = deltaTime;
+        airDeformInput.isGrounded = false;
+        airDeformInput.isMerged = false;
+        airDeformInput.massScale = 1.0f;
+        SlimePhysics::UpdateDeformation(slimeParams_, airDeformInput);
+        prevVelocity_ = velocity_;
 
         // 地面着地判定（傾いた板との接触判定）
-        float cosPitch = std::cos(stageTilt.x);
-        float cosRoll = std::cos(stageTilt.y);
-        float ny = (std::max)(cosPitch * cosRoll, 0.01f);
-        float groundHeight = -std::tan(stageTilt.y) * position_.x - (std::tan(stageTilt.x) / (std::max)(cosRoll, 0.01f)) * position_.z;
-        float landingY = groundHeight + groundY_ / ny;
+        float landingY = SlimePhysics::CalculateGroundedCenterY(position_.x, position_.z, stageTilt, groundY_);
         if (position_.y <= landingY) {
             position_.y = landingY;
             velocity_.y = 0.0f;
@@ -264,11 +247,7 @@ void Minion::Update(float deltaTime, const Vector2& stageTilt) {
     }
 
     case MinionState::Idle: {
-        float cosPitch = std::cos(stageTilt.x);
-        float cosRoll = std::cos(stageTilt.y);
-        float ny = (std::max)(cosPitch * cosRoll, 0.01f);
-        float groundHeight = -std::tan(stageTilt.y) * position_.x - (std::tan(stageTilt.x) / (std::max)(cosRoll, 0.01f)) * position_.z;
-        position_.y = groundHeight + groundY_ / ny;
+        position_.y = SlimePhysics::CalculateGroundedCenterY(position_.x, position_.z, stageTilt, groundY_);
         scale_ = { 0.35f, 0.35f, 0.35f };
         break;
     }
@@ -279,10 +258,7 @@ void Minion::Update(float deltaTime, const Vector2& stageTilt) {
     }
 
     // 傾斜面の高さ変動に対する絶対安全クランプ（角度変更時にも地面の下に100%埋まらない）
-    float cosPitchSafe = std::cos(stageTilt.x);
-    float cosRollSafe = std::cos(stageTilt.y);
-    float nySafe = (std::max)(cosPitchSafe * cosRollSafe, 0.01f);
-    float currentGroundSurfaceY = -std::tan(stageTilt.y) * position_.x - (std::tan(stageTilt.x) / (std::max)(cosRollSafe, 0.01f)) * position_.z + groundY_ / nySafe;
+    float currentGroundSurfaceY = SlimePhysics::CalculateGroundedCenterY(position_.x, position_.z, stageTilt, groundY_);
     if (position_.y < currentGroundSurfaceY) {
         position_.y = currentGroundSurfaceY;
         if (state_ == MinionState::Thrown) {
