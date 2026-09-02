@@ -16,6 +16,7 @@ public:
     std::unique_ptr<BaseScene> CreateScene(const std::string& sceneName) override;
 
     void Register(const std::string& sceneName, std::function<std::unique_ptr<BaseScene>()> creator) override;
+    std::vector<std::string> GetRegisteredSceneNames() const override;
 
 private:
     std::unordered_map<std::string, std::function<std::unique_ptr<BaseScene>()>> creators_;

@@ -15,5 +15,6 @@ public:
 
    
     virtual void Register(const std::string& sceneName, std::function<std::unique_ptr<BaseScene>()> creator) = 0;
+    virtual std::vector<std::string> GetRegisteredSceneNames() const { return {}; }
 };
 

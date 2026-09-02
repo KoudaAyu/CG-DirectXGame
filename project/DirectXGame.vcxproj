@@ -94,6 +94,7 @@
     <ClCompile Include="Baziru3_Engine\Framework\Scene\Factory\SceneFactory.cpp" />
     <ClCompile Include="Baziru3_Engine\Framework\Scene\Manager\SceneManager.cpp" />
     <ClCompile Include="Baziru3_Engine\Framework\Scene\Factory\SceneRegistration.cpp" />
+    <ClCompile Include="Baziru3_Engine\Framework\Scene\EngineDefaultScene.cpp" />
     <ClCompile Include="Baziru3_Engine\Graphics\SkyBox\SkyBox.cpp" />
     <ClCompile Include="Baziru3_Engine\Graphics\Shapes\Sphere\Sphere.cpp" />
     <ClCompile Include="Baziru3_Engine\Graphics\2D\Sprite\SpriteManager.cpp" />
@@ -322,6 +323,7 @@
     <ClInclude Include="Baziru3_Engine\Framework\Scene\Factory\SceneFactory.h" />
     <ClInclude Include="Baziru3_Engine\Framework\Scene\Manager\SceneManager.h" />
     <ClInclude Include="Baziru3_Engine\Framework\Scene\Factory\SceneRegistration.h" />
+    <ClInclude Include="Baziru3_Engine\Framework\Scene\EngineDefaultScene.h" />
     <ClInclude Include="Baziru3_Engine\Graphics\SkyBox\SkyBox.h" />
     <ClInclude Include="Baziru3_Engine\Graphics\Shapes\Sphere\Sphere.h" />
     <ClInclude Include="Baziru3_Engine\Graphics\2D\Sprite\SpriteManager.h" />

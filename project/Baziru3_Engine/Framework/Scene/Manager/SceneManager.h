@@ -1,11 +1,14 @@
 #pragma once
 #include <iostream>
 #include "AbstractSceneFactory.h"
+#include "SceneFactory.h"
 #include "BaseScene.h"
 #include <memory>
 #include <cstdint>
 #include <string>
 #include <string_view>
+#include <unordered_map>
+#include <vector>
 
 class DirectXCom;
 class Camera;
@@ -101,12 +104,81 @@ public:
     [[nodiscard]] bool  GetShowSkybox()    const { return showSkybox_; }
     [[nodiscard]] bool* GetShowSkyboxPtr()       { return &showSkybox_; }
 
+    // --- 1行シーン登録テンプレート ---
+    template <typename T>
+    void RegisterScene(const std::string& sceneName)
+    {
+        if (!sceneFactory_) {
+            sceneFactory_ = std::make_unique<SceneFactory>();
+        }
+        sceneFactory_->Register(sceneName, []() -> std::unique_ptr<BaseScene> {
+            return std::make_unique<T>();
+        });
+    }
+
+    // シーン遷移状態
+    enum class TransitionState
+    {
+        None,
+        FadeOut,
+        Switching,
+        FadeIn
+    };
+
+    // シーン遷移中かどうか
+    [[nodiscard]] bool IsTransitioning() const { return transitionState_ != TransitionState::None; }
+    [[nodiscard]] TransitionState GetTransitionState() const { return transitionState_; }
+    [[nodiscard]] const std::string& GetCurrentSceneName() const { return currentSceneName_; }
+    [[nodiscard]] std::vector<std::string> GetAvailableSceneNames() const;
+
+    // 現在のシーンを即座に再起動（F5リロード等）
+    void RestartCurrentScene() { ChangeScene(currentSceneName_); }
+
+    // シーン間データ共有（Scene Context）
+    void SetSceneData(const std::string& key, const std::string& value) { sceneContextData_[key] = value; }
+    void SetSceneDataInt(const std::string& key, int value) { sceneContextData_[key] = std::to_string(value); }
+    void SetSceneDataFloat(const std::string& key, float value) { sceneContextData_[key] = std::to_string(value); }
+
+    [[nodiscard]] std::string GetSceneData(const std::string& key, const std::string& defaultVal = "") const
+    {
+        auto it = sceneContextData_.find(key);
+        return it != sceneContextData_.end() ? it->second : defaultVal;
+    }
+    [[nodiscard]] int GetSceneDataInt(const std::string& key, int defaultVal = 0) const
+    {
+        auto it = sceneContextData_.find(key);
+        if (it != sceneContextData_.end()) {
+            try { return std::stoi(it->second); } catch (...) {}
+        }
+        return defaultVal;
+    }
+    [[nodiscard]] float GetSceneDataFloat(const std::string& key, float defaultVal = 0.0f) const
+    {
+        auto it = sceneContextData_.find(key);
+        if (it != sceneContextData_.end()) {
+            try { return std::stof(it->second); } catch (...) {}
+        }
+        return defaultVal;
+    }
+
+    // ImGui によるシーン切り替えデバッグUI
+    void DrawSceneSelectorUI();
+
+    void SetFadeDuration(float duration) { fadeDuration_ = duration; }
+    [[nodiscard]] float GetFadeDuration() const { return fadeDuration_; }
+
 private:
     void CommitPendingSceneChange();
 
     std::unique_ptr<AbstractSceneFactory> sceneFactory_;
     std::unique_ptr<BaseScene>            scene_     = nullptr;
     std::unique_ptr<BaseScene>            nextScene_ = nullptr;
+
+    std::string currentSceneName_ = "DEFAULT";
+    std::string pendingSceneName_ = "";
+    TransitionState transitionState_ = TransitionState::None;
+    float fadeDuration_ = 0.4f;
+    float transitionTimer_ = 0.0f;
 
     DirectXCom* dxCommon_ = nullptr;
 
@@ -124,8 +196,14 @@ private:
     bool                 showSkybox_          = true;
     Fade*                fadeApplication_     = nullptr;
 
+    std::unordered_map<std::string, std::string> sceneContextData_;
+
     bool isSceneTransitioning_       = false;
     bool hasSwitchedSceneDuringFade_ = false;
 
     std::ostream& logStream_ = std::cerr;
 };
+
+/// @brief アプリケーション側で簡単にシーンを登録できるマクロ
+#define REGISTER_SCENE(SceneClass, SceneName) \
+    SceneManager::GetInstance()->RegisterScene<SceneClass>(SceneName)
