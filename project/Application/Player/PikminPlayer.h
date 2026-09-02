@@ -59,9 +59,6 @@ public:
     float GetMergedSpeed() const { return mergedMoveSpeed_; }
     void SetMergedSpeed(float s) { mergedMoveSpeed_ = s; }
 
-    float GetThrowPower() const { return throwPower_; }
-    void SetThrowPower(float p) { throwPower_ = p; }
-
     // スライムパラメータの公開（ImGui調整用）
     SlimeParamsCPU& GetSlimeParams() { return slimeParams_; }
     SphereCollider* GetCollider() const { return collider_.get(); }
@@ -96,8 +93,6 @@ private:
     float normalMoveSpeed_ = 8.0f;
     float mergedMoveSpeed_ = 14.0f;
     float rotationSpeed_ = 12.0f;
-    float throwPower_ = 16.0f;
-    float throwUpPower_ = 7.5f;
 
     // 投擲クールダウン
     float throwCooldownTimer_ = 0.0f;

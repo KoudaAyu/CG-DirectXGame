@@ -1,7 +1,6 @@
 #include "Game.h"
 #include "Application/Scene/GameScene/GamePlayScene.h"
 #include "Baziru3_Engine/Core/Base/Pipeline/PipelineStateManager.h"
-#include "Baziru3_Engine/Graphics/3D/Trajectory/TrajectoryRenderer.h"
 #include "DebugUI.h"
 #include <future>
 
@@ -116,9 +115,6 @@ void Game::Initialize() {
     debugUI->SetOffScreenRendering(offScreenRendering_.get());
   }
 
-  // 投擲軌道予測描画ツールの初期化
-  TrajectoryRenderer::GetInstance()->Initialize(dx, object3dCom.get());
-
   // 遅延していたアップロードバッファの解放とGPU同期待ちを一括実行
   TextureManager::GetInstance()->ReleaseUploadBuffers();
 }
@@ -141,8 +137,6 @@ void Game::Finalize() {
   if (debugUI) {
     debugUI.reset();
   }
-
-  TrajectoryRenderer::GetInstance()->Finalize();
 
   if (SceneManager::GetInstance()) {
     SceneManager::GetInstance()->SetFadeApplication(nullptr);
@@ -322,10 +316,6 @@ void Game::Update() {
 
   inputManager.Update();
 
-  // 投擲軌道ツールの入力・向き自動追従更新
-  Camera* activeCam = SceneManager::GetInstance() ? SceneManager::GetInstance()->GetCamera() : camera_.get();
-  TrajectoryRenderer::GetInstance()->Update(kDeltaTime, &inputManager, activeCam);
-
   // Update mouse input and move cursor sprite
   mouseInput.Update();
   if (cursorSpriteIndex >= 0 &&
@@ -465,13 +455,6 @@ void Game::Draw() {
   }
 
   sphereRenderer_.Draw(ctx, renderRequests);
-
-  // 投擲軌道予測・落下予想地点の描画（シーンのアクティブカメラと完全同期）
-  Camera* activeCam = SceneManager::GetInstance() ? SceneManager::GetInstance()->GetCamera() : camera_.get();
-  if (!activeCam) activeCam = camera_.get();
-  RenderContext trajCtx = ctx;
-  trajCtx.camera = activeCam;
-  TrajectoryRenderer::GetInstance()->DrawAuto(trajCtx);
 
   if (!renderRequests.sceneDrawn && drawObject) {
     if (object3dCom && object3d_) {

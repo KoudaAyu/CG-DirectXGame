@@ -26,7 +26,6 @@ public:
     void SetMinionCount(int count, const Vector3& playerPos);
 
     // 投擲指示
-    bool ThrowMinion(const Vector3& launchPos, const Vector3& forwardDir, float throwPower = 15.0f, float upPower = 8.0f);
     bool ThrowMinionWithVelocity(const Vector3& launchPos, const Vector3& velocity);
 
     // ホイッスル呼び戻し

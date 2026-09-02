@@ -184,17 +184,6 @@ void MinionManager::TriggerSplit(const Vector3& playerPos) {
     }
 }
 
-bool MinionManager::ThrowMinion(const Vector3& launchPos, const Vector3& forwardDir, float throwPower, float upPower) {
-    if (isMergedState_) return false;
-
-    Vector3 vel = {
-        forwardDir.x * throwPower,
-        upPower,
-        forwardDir.z * throwPower
-    };
-    return ThrowMinionWithVelocity(launchPos, vel);
-}
-
 bool MinionManager::ThrowMinionWithVelocity(const Vector3& launchPos, const Vector3& velocity) {
     if (isMergedState_) return false;
 

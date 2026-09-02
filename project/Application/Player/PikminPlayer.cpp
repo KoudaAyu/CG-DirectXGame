@@ -141,17 +141,6 @@ void PikminPlayer::Update(float deltaTime, KeyInput* keyInput, MinionManager* mi
             ToggleMerge();
         }
 
-        // キーボードでの前方投擲
-        if (keyInput->PushKey(DIK_F) || keyInput->TriggerKey(DIK_J)) {
-            if (throwCooldownTimer_ <= 0.0f && minionManager && !isMerged_) {
-                Vector3 launchPos = position_ + GetForwardVector() * 0.8f;
-                launchPos.y += 0.5f;
-                if (minionManager->ThrowMinion(launchPos, GetForwardVector(), throwPower_, throwUpPower_)) {
-                    throwCooldownTimer_ = throwCooldown_;
-                }
-            }
-        }
-
         if (keyInput->PushKey(DIK_Q)) {
             if (minionManager) {
                 minionManager->Whistle(position_, 10.0f);
@@ -176,13 +165,6 @@ void PikminPlayer::Update(float deltaTime, KeyInput* keyInput, MinionManager* mi
                     Vector3 targetPos = aimGuide->GetTargetPosition();
                     float aimYaw = std::atan2(targetPos.x - position_.x, targetPos.z - position_.z);
                     rotation_.y = aimYaw;
-                }
-            } else {
-                // ガイド無効時は前方へ投擲
-                launchPos = position_ + GetForwardVector() * 0.8f;
-                launchPos.y += 0.5f;
-                if (minionManager->ThrowMinion(launchPos, GetForwardVector(), throwPower_, throwUpPower_)) {
-                    throwCooldownTimer_ = 0.15f;
                 }
             }
         }

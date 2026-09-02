@@ -223,7 +223,6 @@ void GamePlayScene::DrawDebugUI()
     ImGui::BulletText("E key: Merge (LocoRoco) <-> Split (Pikmin)");
     ImGui::BulletText("Mouse Left Click: Aim & Throw to Target (放物線投擲)");
     ImGui::BulletText("Mouse Right Click: Whistle at Cursor (マウス位置へ笛)");
-    ImGui::BulletText("F / J key: Forward Throw");
     ImGui::BulletText("Q key: Whistle around player");
     ImGui::BulletText("SPACE key: Clear Scene");
     ImGui::Separator();
@@ -298,11 +297,6 @@ void GamePlayScene::DrawDebugUI()
         float mergedSpeed = player_->GetMergedSpeed();
         if (ImGui::SliderFloat("Merged Roll Speed", &mergedSpeed, 5.0f, 35.0f)) {
             player_->SetMergedSpeed(mergedSpeed);
-        }
-
-        float throwPower = player_->GetThrowPower();
-        if (ImGui::SliderFloat("Throw Power", &throwPower, 5.0f, 35.0f)) {
-            player_->SetThrowPower(throwPower);
         }
 
         // --- スライム表現パラメータ調整 ---
