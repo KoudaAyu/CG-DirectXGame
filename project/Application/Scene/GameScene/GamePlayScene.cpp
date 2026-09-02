@@ -134,6 +134,13 @@ void GamePlayScene::InitializeEnvironment()
 	isGameCleared_ = false;
 	extractionTimer_ = 5.0f;
 
+	// --- ライティング初期設定（平行光源 ＆ 点光源）---
+	if (light)
+	{
+		light->SetDirectionalLight({ 1.0f, 1.0f, 1.0f, 1.0f }, { 0.25f, -1.0f, 0.45f }, 1.0f);
+		light->SetPointLight({ 1.0f, 0.85f, 0.40f, 1.0f }, { 0.0f, 0.8f, 0.0f }, 0.0f, 12.0f, 2.0f);
+	}
+
 	// --- ✨ LevelEditorはImGui編集UI用に初期化のみ（DrawはInitializeObstacles側で一括処理するため二重ロード不要）---
 	levelEditor_ = std::make_unique<LevelEditor>();
 	levelEditor_->Initialize(directXCom, object3dCom);
@@ -1572,21 +1579,33 @@ void GamePlayScene::Update()
 
 	UpdateStressTestMode();
 
-	// ライト点滅（マズルフラッシュ効果）の更新
+	// ライト点滅（平行光源 ＆ 点光源マズルフラッシュ効果）の更新
 	if (light)
 	{
-		float intensity = 1.0f;
+		float dirIntensity = 1.0f;
+		float pointIntensity = 0.0f;
+
 		if (lightFlashTimer_ > 0.0f)
 		{
 			lightFlashTimer_ -= deltaTime;
-			intensity = 5.5f; // 眩しく発光
+			dirIntensity = 2.5f; // 全体もやや眩しく発光
+			pointIntensity = 6.0f; // 銃口周囲を集中的に強烈に発光
+			
+			if (player_)
+			{
+				Vector3 pPos = player_->GetPosition();
+				pPos.y += 0.8f;
+				light->SetPointLightPosition(pPos);
+			}
 		}
 		else
 		{
-			intensity = 1.0f; // 通常の明るさ
+			dirIntensity = 1.0f;
+			pointIntensity = 0.0f;
 		}
 
-		light->SetDirectionalLightIntensity(intensity);
+		light->SetDirectionalLightIntensity(dirIntensity);
+		light->SetPointLightIntensity(pointIntensity);
 	}
 
 	// 浮遊テキストの更新

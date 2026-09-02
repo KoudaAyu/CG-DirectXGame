@@ -349,7 +349,7 @@ bool Enemy::HasLineOfSight(const Vector3& playerPos, const std::vector<std::uniq
         float hitDist = 0.0f;
 
         bool hitObstacle = false;
-        if (CollisionManager::GetInstance()->Raycast(enemyEye, dir, dist, hitCollider, hitDist))
+        if (CollisionManager::GetInstance()->Raycast(enemyEye, dir, dist, hitCollider, hitDist, static_cast<uint32_t>(CollisionAttribute::Obstacle)))
         {
             if (hitCollider && hitCollider->GetAttribute() == CollisionAttribute::Obstacle)
             {
