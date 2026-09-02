@@ -1741,10 +1741,26 @@ void GamePlayScene::InitializeObstacles()
 						obstacles_.push_back(std::move(obs));
 					}
 				}
-				// ステージ最下層に落ち着いた土・草地カラーの広大な水平地面フロアを敷く（空の青色が筒抜けになるのを完全に防止）
-				auto ground = std::make_unique<Obstacle>();
-				ground->Initialize(object3dCom, camera_, { 0.0f, -0.01f, 15.0f }, 1.0f, "ground.obj", { 1.0f, 1.0f, 1.0f }, { 0.0f, 0.0f, 0.0f });
-				obstacles_.insert(obstacles_.begin(), std::move(ground));
+				// ステージ最下層に25x25mタイル16枚（4x4グリッド）で地面を敷く
+				// ground.obj単体(100x100m)だとフラスタムカリングで端が消えるため分割する
+				{
+					const float tileSize = 25.0f; // タイル1枚のサイズ
+					const int gridW = 4;
+					const int gridH = 4;
+					// グリッドの中心を (0, -0.01, 15) に合わせる
+					const float startX = 0.0f - tileSize * gridW * 0.5f + tileSize * 0.5f;
+					const float startZ = 15.0f - tileSize * gridH * 0.5f + tileSize * 0.5f;
+					for (int gz = 0; gz < gridH; ++gz)
+					{
+						for (int gx = 0; gx < gridW; ++gx)
+						{
+							Vector3 tilePos = { startX + gx * tileSize, -0.01f, startZ + gz * tileSize };
+							auto tile = std::make_unique<Obstacle>();
+							tile->Initialize(object3dCom, camera_, tilePos, 1.0f, "ground_tile.obj", { 1.0f, 1.0f, 1.0f }, { 0.0f, 0.0f, 0.0f });
+							obstacles_.insert(obstacles_.begin(), std::move(tile));
+						}
+					}
+				}
 
 				// 橋の下を東西に横断する美しいクリアブルーの川水面を配置（幅60m x 奥行き5m）
 				auto river = std::make_unique<Obstacle>();
@@ -1771,10 +1787,24 @@ void GamePlayScene::InitializeObstacles()
 	{
 		OutputDebugStringA("GamePlayScene: Using updated default obstacle placement.\n");
 
-		// ステージ最下層に広大な地面を敷く
-		auto ground = std::make_unique<Obstacle>();
-		ground->Initialize(object3dCom, camera_, { 0.0f, -0.01f, 15.0f }, 1.0f, "ground.obj", { 1.0f, 1.0f, 1.0f }, { 0.0f, 0.0f, 0.0f });
-		obstacles_.push_back(std::move(ground));
+		// ステージ最下層に25x25mタイル16枚（4x4グリッド）で地面を敷く
+		{
+			const float tileSize = 25.0f;
+			const int gridW = 4;
+			const int gridH = 4;
+			const float startX = 0.0f - tileSize * gridW * 0.5f + tileSize * 0.5f;
+			const float startZ = 15.0f - tileSize * gridH * 0.5f + tileSize * 0.5f;
+			for (int gz = 0; gz < gridH; ++gz)
+			{
+				for (int gx = 0; gx < gridW; ++gx)
+				{
+					Vector3 tilePos = { startX + gx * tileSize, -0.01f, startZ + gz * tileSize };
+					auto tile = std::make_unique<Obstacle>();
+					tile->Initialize(object3dCom, camera_, tilePos, 1.0f, "ground_tile.obj", { 1.0f, 1.0f, 1.0f }, { 0.0f, 0.0f, 0.0f });
+					obstacles_.push_back(std::move(tile));
+				}
+			}
+		}
 
 		// コンテナ2個
 		auto c1 = std::make_unique<Obstacle>();
