@@ -271,12 +271,18 @@ void TitleScene::Update()
 
 void TitleScene::Draw(SceneRenderRequests& renderRequests)
 {
-	if (GetObject3dCom())
+	if (GetObject3dCom() && dxCommon_ && camera_)
 	{
+		RenderContext baseCtx{};
+		baseCtx.commandList = dxCommon_->GetCommandList().Get();
+		baseCtx.windowAPI = dxCommon_->GetWindowAPI();
+		baseCtx.camera = camera_;
+		baseCtx.light = SceneManager::GetInstance() ? SceneManager::GetInstance()->GetLight() : nullptr;
+
 		// 1. 奥の敵アヒル兵士の描画
 		if (enemyDuckModel_)
 		{
-			RenderContext enemyCtx{};
+			RenderContext enemyCtx = baseCtx;
 			uint32_t enemyTexIdx = TextureManager::GetInstance()->Load("Resources/duck_enemy.png");
 			if (enemyTexIdx != UINT32_MAX)
 			{
@@ -288,7 +294,7 @@ void TitleScene::Draw(SceneRenderRequests& renderRequests)
 		// 2. 手前のプレイヤーアヒルちゃんの描画
 		if (duckModel_)
 		{
-			RenderContext ctx{};
+			RenderContext ctx = baseCtx;
 			uint32_t texIdx = TextureManager::GetInstance()->Load("Resources/duck.png");
 			if (texIdx != UINT32_MAX)
 			{

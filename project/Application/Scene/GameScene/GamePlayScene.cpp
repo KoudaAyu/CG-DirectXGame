@@ -1586,17 +1586,7 @@ void GamePlayScene::Update()
 			intensity = 1.0f; // 通常の明るさ
 		}
 
-		auto resource = light->GetDirectionalLightResource();
-		if (resource)
-		{
-			Object3d::DirectionalLight* data = nullptr;
-			resource->Map(0, nullptr, reinterpret_cast<void**>(&data));
-			if (data)
-			{
-				data->intensity = intensity;
-			}
-			resource->Unmap(0, nullptr);
-		}
+		light->SetDirectionalLightIntensity(intensity);
 	}
 
 	// 浮遊テキストの更新

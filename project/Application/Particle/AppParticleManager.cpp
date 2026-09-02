@@ -1119,11 +1119,6 @@ void AppParticleManager::Draw(const RenderContext& ctx)
 
 	if (currentWriteIndex == 0) return;
 
-	for (uint32_t i = currentWriteIndex; i < kNumMaxInstances; ++i)
-	{
-		instanceData_[i] = {};
-	}
-
 	// 1. PerView CBV の計算と転送
 	Matrix4x4 backToFrontMatrix = MakeRotateYMatrix(0.0f);
 	Matrix4x4 billboardMatrix = Multiply(backToFrontMatrix, ctx.camera->GetWorldMatrix());
