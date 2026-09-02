@@ -83,8 +83,12 @@ void CollisionManager::Initialize()
     uint32_t maskPlayer   = (1 << static_cast<uint32_t>(CollisionAttribute::Enemy)) |
                             (1 << static_cast<uint32_t>(CollisionAttribute::Bullet)) |
                             (1 << static_cast<uint32_t>(CollisionAttribute::Obstacle));
+
+    uint32_t maskMinion   = (1 << static_cast<uint32_t>(CollisionAttribute::Enemy)) |
+                            (1 << static_cast<uint32_t>(CollisionAttribute::Obstacle));
     
     uint32_t maskEnemy    = (1 << static_cast<uint32_t>(CollisionAttribute::Player)) |
+                            (1 << static_cast<uint32_t>(CollisionAttribute::Minion)) |
                             (1 << static_cast<uint32_t>(CollisionAttribute::Bullet)) |
                             (1 << static_cast<uint32_t>(CollisionAttribute::Obstacle));
     
@@ -93,10 +97,12 @@ void CollisionManager::Initialize()
                             (1 << static_cast<uint32_t>(CollisionAttribute::Obstacle));
     
     uint32_t maskObstacle = (1 << static_cast<uint32_t>(CollisionAttribute::Player)) |
+                            (1 << static_cast<uint32_t>(CollisionAttribute::Minion)) |
                             (1 << static_cast<uint32_t>(CollisionAttribute::Enemy)) |
                             (1 << static_cast<uint32_t>(CollisionAttribute::Bullet));
 
     collisionMasks_[CollisionAttribute::Player]   = maskPlayer;
+    collisionMasks_[CollisionAttribute::Minion]   = maskMinion;
     collisionMasks_[CollisionAttribute::Enemy]    = maskEnemy;
     collisionMasks_[CollisionAttribute::Bullet]   = maskBullet;
     collisionMasks_[CollisionAttribute::Obstacle] = maskObstacle;
@@ -162,6 +168,30 @@ void CollisionManager::Update()
 {
     auto startTime = std::chrono::steady_clock::now();
     frameCount_++;
+
+    // 0. Object3d と SphereCollider のスケール・回転を完全自動同期（アプリ層の変更一切不要）
+    const auto& objInstances = Object3d::GetInstances();
+    for (Collider* col : colliders_)
+    {
+        if (!col || !col->IsEnabled() || col->GetType() != ColliderType::Sphere) continue;
+        SphereCollider* sphere = static_cast<SphereCollider*>(col);
+        Vector3 spherePos = sphere->GetWorldPosition();
+
+        for (Object3d* obj : objInstances)
+        {
+            if (!obj) continue;
+            Vector3 objPos = obj->GetTranslate();
+            float dx = spherePos.x - objPos.x;
+            float dy = spherePos.y - objPos.y;
+            float dz = spherePos.z - objPos.z;
+            if (dx * dx + dy * dy + dz * dz < 0.1f * 0.1f)
+            {
+                sphere->SetScale(obj->GetScale());
+                sphere->SetRotation(obj->GetRotate());
+                break;
+            }
+        }
+    }
 
     if (colliders_.size() < 2)
     {
@@ -1313,22 +1343,26 @@ void CollisionManager::DrawDebug(Camera* camera)
 		}
 
 		// Determine color by attribute
-		ImU32 colColor = ImGui::ColorConvertFloat4ToU32({ 1.0f, 1.0f, 1.0f, 0.7f }); // default white
-		if (col->GetAttribute() == CollisionAttribute::Player)
+		ImU32 colColor = ImGui::ColorConvertFloat4ToU32({ 1.0f, 1.0f, 1.0f, 0.85f }); // default white
+		if (col->GetAttribute() == CollisionAttribute::Minion || (col->GetAttribute() == CollisionAttribute::Player && col->GetType() == ColliderType::Sphere && static_cast<SphereCollider*>(col)->GetRadius() <= 0.45f))
 		{
-			colColor = ImGui::ColorConvertFloat4ToU32({ 0.0f, 1.0f, 0.5f, 0.8f }); // Neon green
+			colColor = ImGui::ColorConvertFloat4ToU32({ 1.0f, 0.5f, 0.1f, 0.95f }); // Bright Orange for Minions
+		}
+		else if (col->GetAttribute() == CollisionAttribute::Player)
+		{
+			colColor = ImGui::ColorConvertFloat4ToU32({ 0.1f, 1.0f, 0.4f, 0.95f }); // Neon green for Giant Slime / Player
 		}
 		else if (col->GetAttribute() == CollisionAttribute::Enemy)
 		{
-			colColor = ImGui::ColorConvertFloat4ToU32({ 1.0f, 0.2f, 0.2f, 0.8f }); // Red
+			colColor = ImGui::ColorConvertFloat4ToU32({ 1.0f, 0.2f, 0.2f, 0.95f }); // Red
 		}
 		else if (col->GetAttribute() == CollisionAttribute::Obstacle)
 		{
-			colColor = ImGui::ColorConvertFloat4ToU32({ 0.3f, 0.7f, 1.0f, 0.7f }); // Light blue
+			colColor = ImGui::ColorConvertFloat4ToU32({ 0.2f, 0.75f, 1.0f, 0.85f }); // Light blue
 		}
 		else if (col->GetAttribute() == CollisionAttribute::Bullet)
 		{
-			colColor = ImGui::ColorConvertFloat4ToU32({ 1.0f, 0.8f, 0.0f, 0.8f }); // Yellow
+			colColor = ImGui::ColorConvertFloat4ToU32({ 1.0f, 0.85f, 0.0f, 0.95f }); // Yellow
 		}
 
 		if (col->GetType() == ColliderType::Sphere)
@@ -1547,6 +1581,39 @@ void CollisionManager::DrawDebug(Camera* camera)
 
 				Object3d* obj = meshCollider->GetObject3d();
 				Matrix4x4 world = obj->GetWorldMatrix();
+
+				// 1. ポリゴン三角形メッシュの精密ワイヤーフレーム描画
+				const auto& modelData = obj->GetModelData();
+				ImU32 meshWireColor = ImGui::ColorConvertFloat4ToU32({ 0.0f, 0.9f, 1.0f, 0.75f }); // Cyan for mesh polygons
+				const auto& verts = modelData.vertices;
+				const auto& indices = modelData.indices;
+
+				size_t numTris = indices.empty() ? (verts.size() / 3) : (indices.size() / 3);
+				size_t maxTris = (std::min)(numTris, size_t(384)); // パフォーマンス保護
+
+				for (size_t t = 0; t < maxTris; ++t)
+				{
+					Vector4 p0_4 = indices.empty() ? verts[t * 3 + 0].position : verts[indices[t * 3 + 0]].position;
+					Vector4 p1_4 = indices.empty() ? verts[t * 3 + 1].position : verts[indices[t * 3 + 1]].position;
+					Vector4 p2_4 = indices.empty() ? verts[t * 3 + 2].position : verts[indices[t * 3 + 2]].position;
+
+					Vector3 p0 = { p0_4.x * world.m[0][0] + p0_4.y * world.m[1][0] + p0_4.z * world.m[2][0] + world.m[3][0],
+					               p0_4.x * world.m[0][1] + p0_4.y * world.m[1][1] + p0_4.z * world.m[2][1] + world.m[3][1],
+					               p0_4.x * world.m[0][2] + p0_4.y * world.m[1][2] + p0_4.z * world.m[2][2] + world.m[3][2] };
+					Vector3 p1 = { p1_4.x * world.m[0][0] + p1_4.y * world.m[1][0] + p1_4.z * world.m[2][0] + world.m[3][0],
+					               p1_4.x * world.m[0][1] + p1_4.y * world.m[1][1] + p1_4.z * world.m[2][1] + world.m[3][1],
+					               p1_4.x * world.m[0][2] + p1_4.y * world.m[1][2] + p1_4.z * world.m[2][2] + world.m[3][2] };
+					Vector3 p2 = { p2_4.x * world.m[0][0] + p2_4.y * world.m[1][0] + p2_4.z * world.m[2][0] + world.m[3][0],
+					               p2_4.x * world.m[0][1] + p2_4.y * world.m[1][1] + p2_4.z * world.m[2][1] + world.m[3][1],
+					               p2_4.x * world.m[0][2] + p2_4.y * world.m[1][2] + p2_4.z * world.m[2][2] + world.m[3][2] };
+
+					ImVec2 s0, s1, s2;
+					if (project3DTo2D(p0, s0) && project3DTo2D(p1, s1) && project3DTo2D(p2, s2))
+					{
+						ImVec2 triPts[4] = { s0, s1, s2, s0 };
+						drawList->AddPolyline(triPts, 4, meshWireColor, false, 1.2f);
+					}
+				}
 
 				// 2. Draw hierarchical AABB tree bounds (Depth 3)
 				std::vector<std::pair<Vector3, Vector3>> boundsList;
