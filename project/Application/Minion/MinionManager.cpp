@@ -141,8 +141,8 @@ void MinionManager::TriggerSplit(const Vector3& playerPos) {
             minion->SetPosition(playerPos);
             
             float angle = angleStep * index + ((std::rand() % 100) / 100.0f - 0.5f) * 0.3f;
-            float popSpeed = 6.0f + (std::rand() % 100) / 25.0f; // 6.0f ~ 10.0f
-            float upSpeed = 6.0f + (std::rand() % 100) / 25.0f;  // 6.0f ~ 10.0f
+            float popSpeed = splitPopPower_ + ((std::rand() % 100) / 100.0f - 0.5f) * (splitPopPower_ * 0.3f);
+            float upSpeed = splitUpPower_ + ((std::rand() % 100) / 100.0f - 0.5f) * (splitUpPower_ * 0.3f);
 
             Vector3 launchVel = {
                 std::sin(angle) * popSpeed,

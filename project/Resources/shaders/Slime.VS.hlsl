@@ -68,7 +68,23 @@ float3 CalculateDeformedPosition(float3 p, float3 n)
 
     float wobbleOffset = (wave1 * 0.45f + wave2 * 0.35f + wave3 * 0.20f) * wobbleStr;
 
-    // 2. スクワッシュ＆ストレッチ（慣性による体積保存変形）
+    // 2. 重力による下膨らみ・沈み込み変形（Gravity Sag: 洋梨・お餅型）
+    float sagFactor = 1.0f + 0.32f * saturate((1.0f - p.y) * 0.5f);
+    float3 def = p;
+    def.x *= sagFactor;
+    def.z *= sagFactor;
+    def.y = p.y * 0.85f - 0.08f; // 重力による下方向への沈み込み
+
+    // 3. 底面の接地平坦化（Ground Flattening: 地面にペタッと潰れる）
+    if (def.y < -0.55f)
+    {
+        float flattenRate = saturate((-0.55f - def.y) / 0.45f);
+        def.y = lerp(def.y, -0.68f, flattenRate * 0.75f);
+        def.x *= (1.0f + flattenRate * 0.22f);
+        def.z *= (1.0f + flattenRate * 0.22f);
+    }
+
+    // 4. スクワッシュ＆ストレッチ（慣性による体積保存変形）
     float3 squash = gSlimeParams.squashStretch;
     float volumeCompY = 1.0f + squash.y;
     float volumeCompXZ = 1.0f;
@@ -77,7 +93,6 @@ float3 CalculateDeformedPosition(float3 p, float3 n)
         volumeCompXZ = 1.0f / sqrt(abs(volumeCompY));
     }
 
-    float3 def = p;
     def.x *= (volumeCompXZ + squash.x);
     def.y *= volumeCompY;
     def.z *= (volumeCompXZ + squash.z);
@@ -85,7 +100,7 @@ float3 CalculateDeformedPosition(float3 p, float3 n)
     // 法線方向へ膨らませる
     def += n * wobbleOffset;
 
-    // 3. 衝撃波紋（Impulse Ripple）
+    // 5. 衝撃波紋（Impulse Ripple）
     float impulse = gSlimeParams.impulseStrength;
     if (impulse > 0.001f)
     {

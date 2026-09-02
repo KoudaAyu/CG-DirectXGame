@@ -62,6 +62,9 @@ public:
     // コライダーの取得
     SphereCollider* GetCollider() const { return collider_.get(); }
 
+    // 衝突時の弾性リアクション
+    void OnCollision(const CollisionInfo& info);
+
 private:
     void DrawSlime(const RenderContext& ctx);
 
@@ -82,10 +85,10 @@ private:
 
     bool isActive_ = true;
     float radius_ = 0.3f;
-    float tiltAccel_ = 28.0f;
-    float friction_ = 3.5f;
+    float tiltAccel_ = 35.0f;
+    float friction_ = 2.8f;
     float gravity_ = -24.0f;
-    float groundY_ = 0.2f;
+    float groundY_ = 0.24f;
 
     // スライム固有
     SlimeParamsCPU slimeParams_;

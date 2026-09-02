@@ -38,19 +38,59 @@ void GamePlayScene::InitializeScene()
 
     Object3dCom* object3dCom = GetObject3dCom();
 
-    // 3. 地面プレーンの初期化
-    groundModelData_ = Object3d::LoadObjFile("Resources", "plane.obj");
-    groundTextureIndex_ = TextureManager::GetInstance()->Load("Resources/uvChecker.png");
-    groundModelData_.material.textureIndex = groundTextureIndex_;
+    // 3. 地面グリッドメッシュの動的生成（広大なチェッカーボードグリッド）
+    {
+        const int gridN = 41; // 41x41 高解像度グリッド
+        const float uvTile = 40.0f; // UV繰り返し回数（チェッカーボード模様用）
+
+        groundModelData_.vertices.clear();
+        groundModelData_.indices.clear();
+
+        // 頂点の生成
+        for (int iz = 0; iz < gridN; ++iz) {
+            for (int ix = 0; ix < gridN; ++ix) {
+                float x = -1.0f + 2.0f * static_cast<float>(ix) / (gridN - 1);
+                float z = -1.0f + 2.0f * static_cast<float>(iz) / (gridN - 1);
+                float u = static_cast<float>(ix) / (gridN - 1) * uvTile;
+                float v = static_cast<float>(iz) / (gridN - 1) * uvTile;
+
+                Sprite::VertexData vtx{};
+                vtx.position = { x, 0.0f, z, 1.0f };
+                vtx.texcoord = { u, v };
+                vtx.normal = { 0.0f, 1.0f, 0.0f };
+                groundModelData_.vertices.push_back(vtx);
+            }
+        }
+
+        // インデックスの生成（2三角形 / セル）
+        for (int iz = 0; iz < gridN - 1; ++iz) {
+            for (int ix = 0; ix < gridN - 1; ++ix) {
+                uint32_t bl = static_cast<uint32_t>(iz * gridN + ix);
+                uint32_t br = bl + 1;
+                uint32_t tl = bl + static_cast<uint32_t>(gridN);
+                uint32_t tr = tl + 1;
+                groundModelData_.indices.push_back(bl);
+                groundModelData_.indices.push_back(tl);
+                groundModelData_.indices.push_back(br);
+                groundModelData_.indices.push_back(br);
+                groundModelData_.indices.push_back(tl);
+                groundModelData_.indices.push_back(tr);
+            }
+        }
+
+        groundTextureIndex_ = TextureManager::GetInstance()->Load("Resources/checkerBoard.png");
+        groundModelData_.material.textureIndex = groundTextureIndex_;
+    }
 
     groundPlane_ = std::make_unique<Object3d>();
     if (groundPlane_) {
         groundPlane_->Initialize(object3dCom, groundModelData_);
         groundPlane_->SetCamera(playCamera_.get());
         groundPlane_->SetTranslate({ 0.0f, 0.0f, 0.0f });
-        groundPlane_->SetScale({ 60.0f, 1.0f, 60.0f });
+        groundPlane_->SetScale({ 100.0f, 1.0f, 100.0f });
         groundPlane_->SetRotate({ 0.0f, 0.0f, 0.0f });
-        groundPlane_->SetColor({ 0.35f, 0.75f, 0.35f, 1.0f }); // 鮮やかな草原カラー
+        groundPlane_->SetColor({ 0.45f, 0.82f, 0.45f, 1.0f }); // 鮮やかな草原カラー
+        groundPlane_->SetEnableLighting(true);
         groundPlane_->Update();
     }
 
@@ -106,9 +146,9 @@ void GamePlayScene::Update()
     targetTilt_ = { 0.0f, 0.0f };
     if (keyInput_)
     {
-        // W: 奥へ傾ける (Pitch < 0) / S: 手前へ傾ける (Pitch > 0)
-        if (keyInput_->PushKey(DIK_W) || keyInput_->PushKey(DIK_UP))   targetTilt_.x -= maxTiltAngle_;
-        if (keyInput_->PushKey(DIK_S) || keyInput_->PushKey(DIK_DOWN)) targetTilt_.x += maxTiltAngle_;
+        // W: 奥へ傾ける (Pitch > 0) / S: 手前へ傾ける (Pitch < 0)
+        if (keyInput_->PushKey(DIK_W) || keyInput_->PushKey(DIK_UP))   targetTilt_.x += maxTiltAngle_;
+        if (keyInput_->PushKey(DIK_S) || keyInput_->PushKey(DIK_DOWN)) targetTilt_.x -= maxTiltAngle_;
         // A: 左へ傾ける (Roll < 0) / D: 右へ傾ける (Roll > 0)
         if (keyInput_->PushKey(DIK_A) || keyInput_->PushKey(DIK_LEFT))  targetTilt_.y -= maxTiltAngle_;
         if (keyInput_->PushKey(DIK_D) || keyInput_->PushKey(DIK_RIGHT)) targetTilt_.y += maxTiltAngle_;
@@ -119,10 +159,10 @@ void GamePlayScene::Update()
     currentTilt_.x += (targetTilt_.x - currentTilt_.x) * (std::min)(1.0f, deltaTime * speedX);
     currentTilt_.y += (targetTilt_.y - currentTilt_.y) * (std::min)(1.0f, deltaTime * speedY);
 
-    // 地面プレーンの回転を傾斜角に合わせて更新
+    // 地面プレーンの回転を傾斜角に合わせて更新 (Z回転は負で右下がり、正で左下がり)
     if (groundPlane_)
     {
-        groundPlane_->SetRotate({ currentTilt_.x, 0.0f, currentTilt_.y });
+        groundPlane_->SetRotate({ currentTilt_.x, 0.0f, -currentTilt_.y });
         groundPlane_->Update();
     }
 
@@ -131,7 +171,7 @@ void GamePlayScene::Update()
     {
         Vector3 launchOrigin = player_->GetPosition();
         launchOrigin.y += 0.5f;
-        aimGuide_->Update(launchOrigin, mouseInput_.get(), playCamera_.get(), player_->IsMerged());
+        aimGuide_->Update(launchOrigin, mouseInput_.get(), playCamera_.get(), player_->IsMerged(), currentTilt_);
     }
 
     // プレイヤーの更新（ステージ傾斜を伝達）
@@ -262,8 +302,18 @@ void GamePlayScene::DrawDebugUI()
         }
 
         float mergeRadius = minionManager_->GetMergePickupRadius();
-        if (ImGui::SliderFloat("Merge Radius", &mergeRadius, 1.0f, 15.0f, "%.1f")) {
+        if (ImGui::SliderFloat("Merge Radius (吸引合体半径)", &mergeRadius, 1.0f, 15.0f, "%.1f m")) {
             minionManager_->SetMergePickupRadius(mergeRadius);
+        }
+
+        float splitPop = minionManager_->GetSplitPopPower();
+        if (ImGui::SliderFloat("Split Pop Power (はじけ水平威力)", &splitPop, 1.0f, 30.0f, "%.1f")) {
+            minionManager_->SetSplitPopPower(splitPop);
+        }
+
+        float splitUp = minionManager_->GetSplitUpPower();
+        if (ImGui::SliderFloat("Split Up Power (はじけ上昇威力)", &splitUp, 1.0f, 25.0f, "%.1f")) {
+            minionManager_->SetSplitUpPower(splitUp);
         }
     }
 
@@ -329,14 +379,14 @@ void GamePlayScene::DrawDebugUI()
 
         // --- スライム表現パラメータ調整 ---
         auto& slimeParams = player_->GetSlimeParams();
-        if (ImGui::CollapsingHeader("Slime Jelly & Wobble Params", ImGuiTreeNodeFlags_DefaultOpen))
+        if (ImGui::CollapsingHeader("Slime Jelly & Wobble Params (ぷるぷる弾性調整)", ImGuiTreeNodeFlags_DefaultOpen))
         {
-            ImGui::SliderFloat("Wobble Strength", &slimeParams.wobbleStrength, 0.0f, 0.4f, "%.3f");
-            ImGui::SliderFloat("Wobble Frequency", &slimeParams.wobbleFrequency, 1.0f, 12.0f, "%.1f");
-            ImGui::SliderFloat("Fresnel Power", &slimeParams.fresnelPower, 0.5f, 6.0f, "%.1f");
-            ImGui::SliderFloat("Env Reflection", &slimeParams.envReflection, 0.0f, 1.0f, "%.2f");
-            ImGui::SliderFloat("Inner Glow", &slimeParams.innerGlow, 0.0f, 1.0f, "%.2f");
-            ImGui::SliderFloat("Shininess", &slimeParams.specularShininess, 8.0f, 128.0f, "%.0f");
+            ImGui::SliderFloat("Wobble Strength (表面ぷるぷる強度)", &slimeParams.wobbleStrength, 0.0f, 0.5f, "%.3f");
+            ImGui::SliderFloat("Wobble Frequency (揺れ周波数)", &slimeParams.wobbleFrequency, 1.0f, 15.0f, "%.1f");
+            ImGui::SliderFloat("Fresnel Power (エッジ発光)", &slimeParams.fresnelPower, 0.5f, 6.0f, "%.1f");
+            ImGui::SliderFloat("Env Reflection (環境反射)", &slimeParams.envReflection, 0.0f, 1.0f, "%.2f");
+            ImGui::SliderFloat("Inner Glow (内側グロー)", &slimeParams.innerGlow, 0.0f, 1.0f, "%.2f");
+            ImGui::SliderFloat("Shininess (ハイライト光沢)", &slimeParams.specularShininess, 8.0f, 128.0f, "%.0f");
 
             float color[4] = { slimeParams.baseColor.x, slimeParams.baseColor.y, slimeParams.baseColor.z, slimeParams.baseColor.w };
             if (ImGui::ColorEdit4("Slime Color", color))
@@ -344,9 +394,9 @@ void GamePlayScene::DrawDebugUI()
                 slimeParams.baseColor = { color[0], color[1], color[2], color[3] };
             }
 
-            if (ImGui::Button("Trigger Impulse Ripple"))
+            if (ImGui::Button("Trigger Impulse Ripple (衝撃波紋テスト)"))
             {
-                slimeParams.impulseStrength = 0.4f;
+                slimeParams.impulseStrength = 0.5f;
             }
         }
     }

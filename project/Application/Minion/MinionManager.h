@@ -42,6 +42,11 @@ public:
     float GetMergePickupRadius() const { return mergePickupRadius_; }
     void SetMergePickupRadius(float r) { mergePickupRadius_ = r; }
 
+    float GetSplitPopPower() const { return splitPopPower_; }
+    void SetSplitPopPower(float p) { splitPopPower_ = p; }
+    float GetSplitUpPower() const { return splitUpPower_; }
+    void SetSplitUpPower(float p) { splitUpPower_ = p; }
+
 private:
     void ResolveSeparation();
 
@@ -53,5 +58,7 @@ private:
     bool isMergedState_ = false;
     bool isAllMerged_ = false;
     float mergePickupRadius_ = 4.5f;
+    float splitPopPower_ = 8.0f;
+    float splitUpPower_ = 7.0f;
     float separationRadius_ = 0.6f;
 };

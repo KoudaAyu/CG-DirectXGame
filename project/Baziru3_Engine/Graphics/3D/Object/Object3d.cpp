@@ -380,48 +380,26 @@ void Object3d::DrawInternal(const RenderContext &ctx) {
     PrepareConstantBuffers(dx);
   }
 
-  // コマンドリストが切り替わった場合はステートキャッシュを無効化
-  if (s_lastCommandList != ctx.GetRawCommandList()) {
-    s_lastCommandList = ctx.GetRawCommandList();
-    s_lastVertexAddress = 0;
-    s_lastIndexAddress = 0;
-    s_lastMaterialAddress = 0;
-    s_lastLightAddress = 0;
-  }
-
-  // 頂点バッファのバインド (前回と同じバッファならスキップ)
-  if (s_lastVertexAddress != vertexBufferView_.BufferLocation) {
-    ctx.IASetVertexBuffers(0, 1, &vertexBufferView_);
-    s_lastVertexAddress = vertexBufferView_.BufferLocation;
-  }
-
+  // 頂点バッファのバインド
+  ctx.IASetVertexBuffers(0, 1, &vertexBufferView_);
   ctx.IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-  // インデックスバッファのバインド (前回と同じバッファならスキップ)
+  // インデックスバッファのバインド
   if (indexResource && !modelData_.indices.empty()) {
-    if (s_lastIndexAddress != indexBufferView_.BufferLocation) {
-      ctx.IASetIndexBuffer(&indexBufferView_);
-      s_lastIndexAddress = indexBufferView_.BufferLocation;
-    }
+    ctx.IASetIndexBuffer(&indexBufferView_);
   }
 
-  // マテリアル定数バッファのバインド (前回と同じアドレスならスキップ)
-  if (s_lastMaterialAddress != materialGpuAddress_) {
-    ctx.SetGraphicsRootConstantBufferView(RootParam::Object3D::kMaterial,
-                                          materialGpuAddress_);
-    s_lastMaterialAddress = materialGpuAddress_;
-  }
+  // マテリアル定数バッファのバインド
+  ctx.SetGraphicsRootConstantBufferView(RootParam::Object3D::kMaterial,
+                                        materialGpuAddress_);
 
-  // 変換行列はオブジェクトごとに異なるため、必ず設定する
+  // 変換行列のバインド
   ctx.SetGraphicsRootConstantBufferView(RootParam::Object3D::kTransform,
                                         transformationMatrixGpuAddress_);
 
-  // ライト定数バッファのバインド (前回と同じアドレスならスキップ)
-  if (s_lastLightAddress != directionalLightGpuAddress_) {
-    ctx.SetGraphicsRootConstantBufferView(RootParam::Object3D::kLight,
-                                          directionalLightGpuAddress_);
-    s_lastLightAddress = directionalLightGpuAddress_;
-  }
+  // ライト定数バッファのバインド
+  ctx.SetGraphicsRootConstantBufferView(RootParam::Object3D::kLight,
+                                        directionalLightGpuAddress_);
 
   if (indexResource && !modelData_.indices.empty()) {
     ctx.DrawIndexedInstanced(static_cast<UINT>(modelData_.indices.size()), 1, 0,

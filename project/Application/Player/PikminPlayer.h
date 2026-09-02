@@ -66,6 +66,9 @@ public:
 
     float CalculateMergedScale(int minionCount) const;
 
+    // 衝突時の弾性リアクション
+    void OnCollision(const CollisionInfo& info);
+
 private:
     void DrawSlime(Object3d* object, const Object3d::ModelData& modelData,
                    const RenderContext& ctx, uint32_t textureIndex);
@@ -90,8 +93,8 @@ private:
     bool isMerged_ = false;
 
     // パラメータ
-    float tiltAccel_ = 32.0f;
-    float friction_ = 3.2f;
+    float tiltAccel_ = 38.0f;
+    float friction_ = 2.6f;
     float rotationSpeed_ = 12.0f;
 
     // 投擲クールダウン

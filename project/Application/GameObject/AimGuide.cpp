@@ -186,7 +186,7 @@ void AimGuide::Initialize(Object3dCom* object3dCom, Camera* camera) {
     }
 }
 
-void AimGuide::Update(const Vector3& launchPos, MouseInput* mouseInput, Camera* camera, bool isMerged) {
+void AimGuide::Update(const Vector3& launchPos, MouseInput* mouseInput, Camera* camera, bool isMerged, const Vector2& stageTilt) {
     isMerged_ = isMerged;
     camera_ = camera;
     if (reticleObject_) reticleObject_->SetCamera(camera_);
@@ -224,9 +224,18 @@ void AimGuide::Update(const Vector3& launchPos, MouseInput* mouseInput, Camera* 
         rayDir.z /= rayLength;
     }
 
-    // 4. 地面プレーン (Y = 0.0f) との交差判定
-    if (std::abs(rayDir.y) > 0.0001f) {
-        float t = (0.0f - nearPos.y) / rayDir.y;
+    // 4. 傾斜面との交差判定
+    // 傾斜面: y = -z * sin(tilt.x) - x * sin(tilt.y)
+    // ⇒ x * sin(tilt.y) + y + z * sin(tilt.x) = 0
+    // 法線 N = (sin(tilt.y), 1, sin(tilt.x)), D = 0
+    float nx = std::sin(stageTilt.y);
+    float ny = 1.0f;
+    float nz = std::sin(stageTilt.x);
+    float denom = nx * rayDir.x + ny * rayDir.y + nz * rayDir.z;
+
+    if (std::abs(denom) > 0.0001f) {
+        float numerator = -(nx * nearPos.x + ny * nearPos.y + nz * nearPos.z);
+        float t = numerator / denom;
         if (t > 0.0f) {
             targetPos_ = nearPos + rayDir * t;
             isValidTarget_ = true;
@@ -252,6 +261,8 @@ void AimGuide::Update(const Vector3& launchPos, MouseInput* mouseInput, Camera* 
         float ratio = maxRange_ / horizontalDist;
         clampedTarget.x = launchPos.x + dx * ratio;
         clampedTarget.z = launchPos.z + dz * ratio;
+        // クランプ後の傾斜面高さを再計算
+        clampedTarget.y = -clampedTarget.z * std::sin(stageTilt.x) - clampedTarget.x * std::sin(stageTilt.y);
         horizontalDist = maxRange_;
     }
 
@@ -263,10 +274,24 @@ void AimGuide::Update(const Vector3& launchPos, MouseInput* mouseInput, Camera* 
     calculatedVelocity_.z = (clampedTarget.z - launchPos.z) / flightTime;
     calculatedVelocity_.y = ((clampedTarget.y - launchPos.y) - 0.5f * gravity_ * flightTime * flightTime) / flightTime;
 
-    // 8. 照準リングの更新
+    // 8. 照準リングの更新（傾斜面に完全平行に配置・法線オフセットでめり込み防止）
     if (reticleObject_) {
-        reticleObject_->SetTranslate({ targetPos_.x, 0.06f, targetPos_.z });
-        reticleObject_->SetRotate({ 0.0f, pulseTimer_ * 2.0f, 0.0f });
+        // 傾斜面の法線ベクトル
+        float nx = std::sin(stageTilt.y);
+        float ny = 1.0f;
+        float nz = std::sin(stageTilt.x);
+        float nLen = std::sqrt(nx * nx + ny * ny + nz * nz);
+        float normalOffset = 0.08f; // 地面から法線方向にわずかに浮かせる
+
+        Vector3 reticlePos = {
+            targetPos_.x + (nx / nLen) * normalOffset,
+            targetPos_.y + (ny / nLen) * normalOffset,
+            targetPos_.z + (nz / nLen) * normalOffset
+        };
+
+        reticleObject_->SetTranslate(reticlePos);
+        // 地面プレーンの回転と完全に一致させる（Y回転による傾きズレを防ぐ）
+        reticleObject_->SetRotate({ stageTilt.x, 0.0f, -stageTilt.y });
 
         float scaleAnim = 1.0f + 0.06f * std::sin(pulseTimer_ * 8.0f);
         reticleObject_->SetScale({ scaleAnim, 1.0f, scaleAnim });
