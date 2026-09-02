@@ -5,6 +5,8 @@
 #ifndef CRYSTAL_COMMON_HLSLI
 #define CRYSTAL_COMMON_HLSLI
 
+#pragma pack_matrix(row_major)
+
 // b0 : フレーム毎
 cbuffer FrameCB : register(b0)
 {

@@ -18,6 +18,9 @@
 
 namespace {
 	constexpr float kPi = 3.14159265358979323846f;
+
+	DirectXCom* dxCom;
+	ID3D12Device* d3d12Device;
 }
 
 PikminPlayer::PikminPlayer() {
@@ -85,24 +88,30 @@ void PikminPlayer::Initialize(Object3dCom* object3dCom, Camera* camera, const Ve
 
 	//------------------------------------
 	// 水晶パイプライン
-	DirectXCom* dx = object3dCom_->GetDirectXCom();
-	auto* device = dx->GetDevice().Get();
-	Crystal_.Initialize(device, DXGI_FORMAT_R8G8B8A8_UNORM_SRGB, DXGI_FORMAT_D24_UNORM_S8_UINT);
+	dxCom = object3dCom_->GetDirectXCom();
+	d3d12Device = dxCom->GetDevice().Get();
+	Crystal_.Initialize(d3d12Device, DXGI_FORMAT_R8G8B8A8_UNORM_SRGB, DXGI_FORMAT_D24_UNORM_S8_UINT);
 
-	auto& globalHeap = dx->GetSrvHeap();
 	for (int i = 0; i < 3; ++i) {
-		CrystalBufferRes_[i] = dx->CreateBufferResource(dx->GetDevice(), 256);
+		CrystalBufferRes_[i] = dxCom->CreateBufferResource(dxCom->GetDevice(), 256);
 		CrystalBufferRes_[i]->Map(0, nullptr, &CrystalMappedData_[i]);
 		D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc{
 			.BufferLocation{ CrystalBufferRes_[i]->GetGPUVirtualAddress() },
 			.SizeInBytes{ 256 },
 		};
-		DescriptorIDs_[i] = globalHeap.Allocate();
-		device->CreateConstantBufferView(
-			&cbvDesc,
-			globalHeap.GetCPUDescriptorHandle(DescriptorIDs_[i])
-		);
 	}
+
+	auto* winAPI = object3dCom_->GetDirectXCom()->GetWindowAPI();
+	CrystalFrameConstants_.ScreenSize = {
+		static_cast<float>(winAPI->GetClientWidth()),
+		static_cast<float>(winAPI->GetClientHeight())
+	};
+	CrystalFrameConstants_.InvScreenSize = {
+		1.0f / CrystalFrameConstants_.ScreenSize.x,
+		1.0f / CrystalFrameConstants_.ScreenSize.y,
+	};
+	CrystalFrameConstants_.Time = 0.0f;
+
 	//------------------------------------
 }
 
@@ -332,6 +341,16 @@ void PikminPlayer::Update(float deltaTime, KeyInput* keyInput, MinionManager* mi
 			normalModel_->Update();
 		}
 	}
+
+	auto* sceneMngr = SceneManager::GetInstance();
+	auto* camera = sceneMngr->GetCamera();
+	CrystalFrameConstants_.View = camera->GetViewMatrix();
+	CrystalFrameConstants_.ViewProj = camera->GetViewProjectionMatrix();
+	CrystalFrameConstants_.CameraPosWS = camera->GetWorldPosition();
+	CrystalFrameConstants_.Time += deltaTime;
+
+	CrystalOBJConstants_.World = normalModel_->GetWorldMatrix();
+	CrystalOBJConstants_.WorldInvTranspose = Transpose(Inverse(CrystalOBJConstants_.World));
 }
 
 void PikminPlayer::DrawSlime(Object3d* object, const Object3d::ModelData& modelData,
@@ -437,13 +456,43 @@ void PikminPlayer::Draw(const RenderContext& ctx) {
 		}
 	} else {
 		if (normalModel_) {
-			DrawSlime(normalModel_.get(), normalModelData_, ctx, normalTextureIndex_);
+			//DrawSlime(normalModel_.get(), normalModelData_, ctx, normalTextureIndex_);
 		}
 	}
 
 	std::memcpy(CrystalMappedData_[0], &CrystalFrameConstants_, sizeof(Crystal::FrameConstants));
 	std::memcpy(CrystalMappedData_[1], &CrystalMaterialParams_, sizeof(Crystal::MaterialParams));
 	std::memcpy(CrystalMappedData_[2], &CrystalOBJConstants_, sizeof(Crystal::ObjectConstants));
-	
-	//Crystal_.DrawBackfacePass(ctx.commandList, )
+
+	auto draw = [&](Object3d* obj_, const Object3d::ModelData& modelData_)->void {
+		auto vbv = obj_->GetVertexBufferView();
+		ctx.commandList->IASetVertexBuffers(0, 1, &vbv);
+		ctx.commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+		if (obj_->HasIndexBuffer()) {
+			auto ibv = obj_->GetIndexBufferView();
+			ctx.commandList->IASetIndexBuffer(&ibv);
+			ctx.commandList->DrawIndexedInstanced(static_cast<UINT>(modelData_.indices.size()), 1, 0, 0, 0);
+		}
+		else {
+			ctx.commandList->DrawInstanced(static_cast<UINT>(modelData_.vertices.size()), 1, 0, 0);
+		}
+	};
+
+	Crystal_.DrawBackfacePass(
+		ctx.commandList,
+		CrystalBufferRes_[0]->GetGPUVirtualAddress(),
+		CrystalBufferRes_[1]->GetGPUVirtualAddress(),
+		CrystalBufferRes_[2]->GetGPUVirtualAddress()
+	);
+	draw(normalModel_.get(), normalModelData_);
+
+	Crystal_.DrawFrontfacePass(
+		ctx.commandList,
+		CrystalBufferRes_[0]->GetGPUVirtualAddress(),
+		CrystalBufferRes_[1]->GetGPUVirtualAddress(),
+		CrystalBufferRes_[2]->GetGPUVirtualAddress(),
+		TextureManager::GetInstance()->GetSrvHandleGPU(normalTextureIndex_)
+	);
+	draw(normalModel_.get(), normalModelData_);
 }
