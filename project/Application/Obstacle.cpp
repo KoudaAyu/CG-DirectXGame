@@ -23,26 +23,28 @@ void Obstacle::Initialize(Object3dCom* object3dCom, Camera* camera, const Vector
         Object3d::ModelData loaded = Object3d::LoadObjFile("Resources", filename);
         if (loaded.material.textureFilePath.empty())
         {
-            loaded.material.textureFilePath = "Resources/CG4/human/white.png";
+            if (filename.find("crate") != std::string::npos) loaded.material.textureFilePath = "Resources/duckov_crate.png";
+            else if (filename.find("sandbag") != std::string::npos) loaded.material.textureFilePath = "Resources/duckov_sandbag.png";
+            else if (filename.find("barrel") != std::string::npos) loaded.material.textureFilePath = "Resources/duckov_barrel.png";
+            else if (filename.find("bridge") != std::string::npos) loaded.material.textureFilePath = "Resources/duckov_bridge.png";
+            else if (filename.find("ground") != std::string::npos || filename.find("plane") != std::string::npos) loaded.material.textureFilePath = "Resources/grass.png";
+            else if (filename.find("river") != std::string::npos || filename.find("water") != std::string::npos) loaded.material.textureFilePath = "Resources/water.png";
+            else if (filename.find("container") != std::string::npos) loaded.material.textureFilePath = "Resources/container_military.png";
+            else loaded.material.textureFilePath = "Resources/CG4/human/white.png";
         }
-        // テクスチャをロードしてインデックスをキャッシュに保持
         uint32_t texIdx = TextureManager::GetInstance()->Load(loaded.material.textureFilePath);
         loaded.material.textureIndex = texIdx;
 
-        // 頂点配列からモデルのバウンディング半径を正確に計算（視野外カリングの誤判定を完全防止）
         float maxDistSq = 0.0f;
         for (const auto& v : loaded.vertices)
         {
             float distSq = v.position.x * v.position.x + v.position.y * v.position.y + v.position.z * v.position.z;
-            if (distSq > maxDistSq)
-            {
-                maxDistSq = distSq;
-            }
+            if (distSq > maxDistSq) maxDistSq = distSq;
         }
         loaded.boundingRadius = std::sqrt(maxDistSq);
         if (filename.find("ground") != std::string::npos || filename.find("plane") != std::string::npos || filename.find("river") != std::string::npos)
         {
-            loaded.boundingRadius = (std::max)(loaded.boundingRadius, 60.0f); // 広大オブジェクト用の安全マージン
+            loaded.boundingRadius = (std::max)(loaded.boundingRadius, 60.0f);
         }
         else if (loaded.boundingRadius < 1.0f)
         {
@@ -103,50 +105,10 @@ void Obstacle::Initialize(Object3dCom* object3dCom, Camera* camera, const Vector
         ((minPos.z + maxPos.z) * 0.5f) * scale.z * radius_
     };
 
-    // --- モデルタイプに応じた個別テクスチャのロード ---
-    if (filename == "ground.obj" || filename.find("ground") != std::string::npos || filename == "plane.obj" || filename.find("plane") != std::string::npos)
-    {
-        defaultTextureIndex_ = TextureManager::GetInstance()->Load("Resources/grass.png");
-    }
-    else if (filename == "fence.obj" || filename.find("fence") != std::string::npos)
-    {
-        defaultTextureIndex_ = TextureManager::GetInstance()->Load("Resources/fence.png");
-    }
-    else if (filename.find("crate") != std::string::npos)
-    {
-        defaultTextureIndex_ = TextureManager::GetInstance()->Load("Resources/duckov_crate.png");
-    }
-    else if (filename.find("sandbag") != std::string::npos)
-    {
-        defaultTextureIndex_ = TextureManager::GetInstance()->Load("Resources/duckov_sandbag.png");
-    }
-    else if (filename.find("barrel") != std::string::npos)
-    {
-        defaultTextureIndex_ = TextureManager::GetInstance()->Load("Resources/duckov_barrel.png");
-    }
-    else if (filename.find("bridge") != std::string::npos)
-    {
-        defaultTextureIndex_ = TextureManager::GetInstance()->Load("Resources/duckov_bridge.png");
-    }
-    else if (filename.find("river") != std::string::npos || filename.find("River") != std::string::npos || filename.find("water") != std::string::npos)
-    {
-        defaultTextureIndex_ = TextureManager::GetInstance()->Load("Resources/water.png");
-    }
-    else if (filename.find("container") != std::string::npos)
-    {
-        defaultTextureIndex_ = TextureManager::GetInstance()->Load("Resources/container_military.png");
-    }
-    else if (filename.find("watchtower") != std::string::npos || filename.find("WatchTower") != std::string::npos)
-    {
-        defaultTextureIndex_ = TextureManager::GetInstance()->Load("Resources/CG4/human/white.png");
-    }
-    else
-    {
-        defaultTextureIndex_ = TextureManager::GetInstance()->Load("Resources/CG4/human/white.png");
-    }
-
     if (filename == "fence.obj" || filename.find("fence") != std::string::npos)
     {
+        defaultTextureIndex_ = TextureManager::GetInstance()->Load("Resources/fence.png");
+
         // X字のフェンスを構成する2枚の板の精密な角度 (±30.0度 = ±0.5236rad) と長さ (4.90m)、薄さ (0.15m)
         rot1_ = { rotation_.x, rotation_.y - 0.5235987f, rotation_.z };
         rot2_ = { rotation_.x, rotation_.y + 0.5235987f, rotation_.z };
@@ -324,15 +286,11 @@ void Obstacle::Update()
 
 void Obstacle::Draw(const RenderContext& ctx)
 {
-    if (!object3d_ || !object3dCom_) return;
+    if (!object3d_) return;
 
     RenderContext obsCtx = ctx;
     const Object3d::ModelData& modelData = object3d_->GetModelData();
-    uint32_t texIdx = defaultTextureIndex_;
-    if (texIdx == TextureManager::kInvalidTextureIndex)
-    {
-        texIdx = modelData.material.textureIndex;
-    }
+    uint32_t texIdx = (modelData.material.textureIndex != TextureManager::kInvalidTextureIndex) ? modelData.material.textureIndex : defaultTextureIndex_;
     if (texIdx != TextureManager::kInvalidTextureIndex)
     {
         obsCtx.textureHandle = TextureManager::GetInstance()->GetSrvHandleGPU(texIdx);

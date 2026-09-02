@@ -27,7 +27,6 @@ void Player::Initialize(Object3dCom* object3dCom, Camera* camera)
         model.material.textureFilePath = "Resources/duck.png";
     }
 
-    // プレイヤーアヒルのバウンディング半径を広めに設定（ジャンプ・ローリング時の消失防止）
     float maxDistSq = 0.0f;
     for (const auto& v : model.vertices)
     {
