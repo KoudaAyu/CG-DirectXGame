@@ -82,6 +82,10 @@ void PikminPlayer::Initialize(Object3dCom* object3dCom, Camera* camera, const Ve
     // 合体時の当たり判定（SphereCollider）
     collider_ = std::make_unique<SphereCollider>(2.0f, &position_, CollisionAttribute::Player);
     CollisionManager::GetInstance()->RegisterCollider(collider_.get());
+
+    // 水晶パイプライン
+    DirectXCom* dx = object3dCom_->GetDirectXCom();
+    Crystal_.Initialize(dx->GetDevice().Get(), DXGI_FORMAT_R8G8B8A8_UNORM_SRGB, DXGI_FORMAT_D24_UNORM_S8_UINT);
 }
 
 float PikminPlayer::CalculateMergedScale(int minionCount) const {
