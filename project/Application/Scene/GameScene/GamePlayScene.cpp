@@ -1552,6 +1552,16 @@ void GamePlayScene::Update()
 		if (t) t->Update(deltaTime);
 	}
 
+	// 📜 チュートリアル看板の更新
+	if (player_)
+	{
+		Vector3 pPos = player_->GetPosition();
+		for (auto& sign : tutorialSigns_)
+		{
+			if (sign) sign->Update(pPos);
+		}
+	}
+
 	// すべての的が破壊されたかチェック
 	int totalTargets = static_cast<int>(targets_.size());
 	int destroyedCount = 0;
@@ -1865,6 +1875,34 @@ void GamePlayScene::InitializeObstacles()
 		t3->Initialize(object3dCom, camera_, { -2.5f, 0.0f, 25.5f }, 0.8f);
 		targets_.push_back(std::move(t3));
 	}
+
+	// --- 📜 8/31 チュートリアル用看板 (TutorialSign) の完全配置 ---
+	tutorialSigns_.clear();
+	{
+		// 看板1: 初期位置（基本移動＆回避ローリング）
+		auto sign1 = std::make_unique<TutorialSign>();
+		sign1->Initialize(object3dCom, camera_, { -2.5f, 0.0f, 2.0f },
+			(const char*)u8"【 基本操作訓練 】\n[ W ][ A ][ S ][ D ] : 移動\n[ SPACE ] : 回避ローリング（素早く前転・無敵時間あり！）", 3.2f);
+		tutorialSigns_.push_back(std::move(sign1));
+
+		// 看板2: 射撃練習エリア（照準・射撃・リロード）
+		auto sign2 = std::make_unique<TutorialSign>();
+		sign2->Initialize(object3dCom, camera_, { 2.5f, 0.0f, 7.5f },
+			(const char*)u8"【 射撃・リロード訓練 】\n[ マウス ] : 照準  /  [ 左クリック ] : 射撃\n[ R ] : リロード（弾込め）\n※配置された 🎯 標的（Target）をすべて破壊せよ！", 3.2f);
+		tutorialSigns_.push_back(std::move(sign2));
+
+		// 看板3: 遮蔽・戦術エリア（COVER＆ステルス）
+		auto sign3 = std::make_unique<TutorialSign>();
+		sign3->Initialize(object3dCom, camera_, { -3.0f, 0.0f, 15.0f },
+			(const char*)u8"【 戦術遮蔽（COVER）訓練 】\nコンテナや土嚢のそばに行くと 自動的に 🛡️ COVER 状態！\n敵の視界が大幅に遮られ、見つかりにくくなるぞ！", 3.2f);
+		tutorialSigns_.push_back(std::move(sign3));
+
+		// 看板4: 脱出エリア（ヘリパッド脱出目標）
+		auto sign4 = std::make_unique<TutorialSign>();
+		sign4->Initialize(object3dCom, camera_, { 2.5f, 0.0f, 26.5f },
+			(const char*)u8"【 レイド脱出訓練 】\nすべての標的を破壊後、最奥の 🚁 脱出パッド へ向かえ！\nパッド内でカウントダウン完了で生還（CLEAR）だ！", 3.2f);
+		tutorialSigns_.push_back(std::move(sign4));
+	}
 }
 
 void GamePlayScene::UpdateObstacles()
@@ -1962,12 +2000,21 @@ void GamePlayScene::Draw(SceneRenderRequests& renderRequests)
 	}
 
 
-	// 的の描画
+	// 標的の描画
 	for (auto& t : targets_)
 	{
 		if (t)
 		{
 			t->Draw(ctx);
+		}
+	}
+
+	// 📜 チュートリアル看板の描画
+	for (auto& sign : tutorialSigns_)
+	{
+		if (sign)
+		{
+			sign->Draw(ctx);
 		}
 	}
 
@@ -2022,6 +2069,7 @@ void GamePlayScene::Draw(SceneRenderRequests& renderRequests)
 		hudCtx.movingEnemy = movingEnemy_.get();
 		hudCtx.obstacles = &obstacles_;
 		hudCtx.targets = &targets_;
+		hudCtx.tutorialSigns = &tutorialSigns_;
 		hudCtx.lootProps = lootSystem_ ? &lootSystem_->GetProps() : nullptr;
 		hudCtx.floatingTexts = &floatingTexts_;
 		hudCtx.extractionGoalPos = goalRingTransform_.translate;
