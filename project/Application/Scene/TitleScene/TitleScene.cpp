@@ -47,6 +47,7 @@ void TitleScene::InitializeScene()
 		{
 			model.material.textureFilePath = "Resources/duck.png";
 		}
+		model.boundingRadius = 10.0f;
 		duckModel_ = std::make_unique<Object3d>();
 		duckModel_->Initialize(GetObject3dCom(), model);
 		duckModel_->SetCamera(camera_);
@@ -58,6 +59,7 @@ void TitleScene::InitializeScene()
 		// 2. 奥をパトロールする敵アヒル兵士 (Enemy Duck Patrol)
 		Object3d::ModelData enemyModel = Object3d::LoadObjFile("Resources", "player.obj");
 		enemyModel.material.textureFilePath = "Resources/duck_enemy.png";
+		enemyModel.boundingRadius = 10.0f;
 		enemyDuckModel_ = std::make_unique<Object3d>();
 		enemyDuckModel_->Initialize(GetObject3dCom(), enemyModel);
 		enemyDuckModel_->SetCamera(camera_);
