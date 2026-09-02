@@ -21,10 +21,11 @@ enum class ColliderType
 /// </summary>
 enum class CollisionAttribute
 {
-    Player,    // プレイヤーアヒル
+    Player,    // プレイヤー（巨大スライム等）
+    Minion,    // ミニオン（小スライム）
     Enemy,     // 敵キャラクター
     Bullet,    // 弾丸
-    Obstacle   // 障害物（カバー等）
+    Obstacle   // 障害物（カバー・木・フェンス等）
 };
 
 struct CollisionInfo

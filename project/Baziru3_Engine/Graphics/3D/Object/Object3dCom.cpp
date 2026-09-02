@@ -43,6 +43,7 @@ void Object3dCom::Draw(Object3d* object, const RenderContext& ctx, const Object3
     }
 
     if (!ctx.commandList) return;
+    if (object && object->IsCulled()) return;
     if (!ctx.camera)
 	{
 		Logger::Log(logStream, "Warning: camera is null when drawing object. Skipping draw.\n");
@@ -102,7 +103,7 @@ void Object3dCom::Draw(Object3d* object, const RenderContext& ctx, const Object3
 		object->DrawInternal(ctx);
 
 		// GPU-accelerated wireframe overlay draw (if enabled in Collision Debug panel)
-		if (CollisionManager::GetInstance()->IsShowDebugColliders() && CollisionManager::GetInstance()->IsShowMeshWireframe())
+		if (object->IsAllowWireframeOverlay() && CollisionManager::GetInstance()->IsShowDebugColliders() && CollisionManager::GetInstance()->IsShowMeshWireframe())
 		{
 			bool drawWireframe = true;
 			if (ctx.camera)
@@ -125,7 +126,7 @@ void Object3dCom::Draw(Object3d* object, const RenderContext& ctx, const Object3
 				if (wireframePSO)
 				{
 					ctx.commandList->SetPipelineState(wireframePSO.Get());
-					object->Draw(ctx);
+					object->DrawInternal(ctx);
 				}
 			}
 		}

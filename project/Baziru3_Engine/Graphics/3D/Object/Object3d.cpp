@@ -1,5 +1,7 @@
 #include "Object3d.h"
 #include "Baziru3_Engine/Core/Base/Allocator/ConstantBufferAllocator.h"
+#include "Baziru3_Engine/Framework/Collision/CollisionManager.h"
+#include "Baziru3_Engine/Framework/Collision/SphereCollider.h"
 #include "Light.h"
 #include "Matrix4x4.h"
 #include "Object3dCom.h"
@@ -226,58 +228,34 @@ void Object3d::SetupAnimation(const Animation *animation,
 }
 
 void Object3d::Update() {
+  if (autoCollider_) {
+    const Vector3 &s = transform.GetScale();
+    float maxS = (std::max)({ std::abs(s.x), std::abs(s.y), std::abs(s.z) });
+    float baseR = (modelData_.boundingRadius > 0.0f) ? modelData_.boundingRadius : 0.5f;
+    autoCollider_->SetRadius(baseR * maxS);
+  }
+
   if (!camera_ && object3dCom_) {
     camera_ = object3dCom_->GetDefaultCamera();
   }
 
   const Vector3 &scale = transform.GetScale();
 
-  // View Frustum Culling inside Update to bypass animation, skeletal updates,
-  // and matrix math for off-screen objects
+  // 高精度 6平面 視錐台カリング (画面外オブジェクトのアニメーション・描画を完全スキップ)
   isCulled_ = false;
   if (camera_) {
-    const Matrix4x4 &vp = camera_->GetViewProjectionMatrix();
     const Vector3 &pos = transform.GetTranslate();
-    float baseRadius =
-        (modelData_.boundingRadius > 0.1f) ? modelData_.boundingRadius : 3.0f;
-    float maxScale =
-        (std::max)({std::abs(scale.x), std::abs(scale.y), std::abs(scale.z)});
+    float baseRadius = (modelData_.boundingRadius > 0.1f) ? modelData_.boundingRadius : 2.5f;
+    float maxScale = (std::max)({std::abs(scale.x), std::abs(scale.y), std::abs(scale.z)});
     float radius = baseRadius * maxScale;
 
-    float x = pos.x * vp.m[0][0] + pos.y * vp.m[1][0] + pos.z * vp.m[2][0] +
-              vp.m[3][0];
-    float y = pos.x * vp.m[0][1] + pos.y * vp.m[1][1] + pos.z * vp.m[2][1] +
-              vp.m[3][1];
-    float z = pos.x * vp.m[0][2] + pos.y * vp.m[1][2] + pos.z * vp.m[2][2] +
-              vp.m[3][2];
-    float w = pos.x * vp.m[0][3] + pos.y * vp.m[1][3] + pos.z * vp.m[2][3] +
-              vp.m[3][3];
-
-    if (w > 0.0f) {
-      float clipX = x / w;
-      float clipY = y / w;
-      float clipZ = z / w;
-      float margin = radius / w;
-
-      if (clipX < -1.0f - margin || clipX > 1.0f + margin ||
-          clipY < -1.0f - margin || clipY > 1.0f + margin ||
-          clipZ < 0.0f - margin || clipZ > 1.0f + margin) {
-        isCulled_ = true;
-      }
-    } else {
-      if (w < -radius) {
-        isCulled_ = true;
-      }
+    if (!camera_->IsInFrustum(pos, radius)) {
+      isCulled_ = true;
     }
   }
 
-  if (isCulled_) {
-    return;
-  }
-
-  // ステップ1: アニメーション時間を進める
-  // ステップ2: 骨ごとのLocal情報を更新する
-  if (!isShared_) {
+  // アニメーション・ボーン更新（非表示時はスキップ）
+  if (!isShared_ && !isCulled_) {
     if (animator_.HasAnimation()) {
       animator_.Update(deltaTime_);
       // ステップ3: SkeletonSpaceの情報を更新する
@@ -376,48 +354,26 @@ void Object3d::DrawInternal(const RenderContext &ctx) {
     PrepareConstantBuffers(dx);
   }
 
-  // コマンドリストが切り替わった場合はステートキャッシュを無効化
-  if (s_lastCommandList != ctx.GetRawCommandList()) {
-    s_lastCommandList = ctx.GetRawCommandList();
-    s_lastVertexAddress = 0;
-    s_lastIndexAddress = 0;
-    s_lastMaterialAddress = 0;
-    s_lastLightAddress = 0;
-  }
-
-  // 頂点バッファのバインド (前回と同じバッファならスキップ)
-  if (s_lastVertexAddress != vertexBufferView_.BufferLocation) {
-    ctx.IASetVertexBuffers(0, 1, &vertexBufferView_);
-    s_lastVertexAddress = vertexBufferView_.BufferLocation;
-  }
-
+  // 頂点バッファのバインド
+  ctx.IASetVertexBuffers(0, 1, &vertexBufferView_);
   ctx.IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-  // インデックスバッファのバインド (前回と同じバッファならスキップ)
+  // インデックスバッファのバインド
   if (indexResource && !modelData_.indices.empty()) {
-    if (s_lastIndexAddress != indexBufferView_.BufferLocation) {
-      ctx.IASetIndexBuffer(&indexBufferView_);
-      s_lastIndexAddress = indexBufferView_.BufferLocation;
-    }
+    ctx.IASetIndexBuffer(&indexBufferView_);
   }
 
-  // マテリアル定数バッファのバインド (前回と同じアドレスならスキップ)
-  if (s_lastMaterialAddress != materialGpuAddress_) {
-    ctx.SetGraphicsRootConstantBufferView(RootParam::Object3D::kMaterial,
-                                          materialGpuAddress_);
-    s_lastMaterialAddress = materialGpuAddress_;
-  }
+  // マテリアル定数バッファのバインド
+  ctx.SetGraphicsRootConstantBufferView(RootParam::Object3D::kMaterial,
+                                        materialGpuAddress_);
 
-  // 変換行列はオブジェクトごとに異なるため、必ず設定する
+  // 変換行列のバインド
   ctx.SetGraphicsRootConstantBufferView(RootParam::Object3D::kTransform,
                                         transformationMatrixGpuAddress_);
 
-  // ライト定数バッファのバインド (前回と同じアドレスならスキップ)
-  if (s_lastLightAddress != lightGpuAddress_) {
-    ctx.SetGraphicsRootConstantBufferView(RootParam::Object3D::kLight,
-                                          lightGpuAddress_);
-    s_lastLightAddress = lightGpuAddress_;
-  }
+  // ライト定数バッファのバインド
+  ctx.SetGraphicsRootConstantBufferView(RootParam::Object3D::kLight,
+                                        lightGpuAddress_);
 
   if (indexResource && !modelData_.indices.empty()) {
     ctx.DrawIndexedInstanced(static_cast<UINT>(modelData_.indices.size()), 1, 0,
@@ -705,6 +661,11 @@ Object3d::~Object3d() {
     instances_.pop_back();
   }
 
+  if (autoCollider_ && CollisionManager::GetInstance()) {
+    CollisionManager::GetInstance()->UnregisterCollider(autoCollider_.get());
+    autoCollider_.reset();
+  }
+
   // 持続的にマップされたリソースがある場合は安全にアンマップする
   // 二重アンマップを避けるため、CPU側のポインタが nullptr でない場合のみ Unmap
   // する
@@ -713,6 +674,31 @@ Object3d::~Object3d() {
                            static_cast<SIZE_T>(vertexBufferView_.SizeInBytes)};
     vertexResource->Unmap(0, &written);
     vertexData_ = nullptr;
+  }
+}
+
+void Object3d::SetEnableAutoCollider(bool enable, int attribute, float radius) {
+  if (!enable) {
+    if (autoCollider_ && CollisionManager::GetInstance()) {
+      CollisionManager::GetInstance()->UnregisterCollider(autoCollider_.get());
+      autoCollider_.reset();
+    }
+    return;
+  }
+
+  const Vector3& s = transform.GetScale();
+  float maxS = (std::max)({ std::abs(s.x), std::abs(s.y), std::abs(s.z) });
+  float r = (radius > 0.0f) ? radius : (modelData_.boundingRadius > 0.0f ? modelData_.boundingRadius : 0.5f);
+  r *= maxS;
+
+  if (!autoCollider_) {
+    // Vector3* を安全に渡すためメンバ変数 transform の参照ではなく translate ポインタを使用
+    autoCollider_ = std::make_unique<SphereCollider>(r, const_cast<Vector3*>(&transform.GetTranslate()), static_cast<CollisionAttribute>(attribute));
+    if (CollisionManager::GetInstance()) {
+      CollisionManager::GetInstance()->RegisterCollider(autoCollider_.get());
+    }
+  } else {
+    autoCollider_->SetRadius(r);
   }
 }
 
@@ -745,14 +731,13 @@ void Object3d::TransformationMatrixResource() {
 }
 
 void Object3d::DirectionalLightResource() {
-  // 初期値を書き込む (平行光源: 白・下向き・強度1.0, 点光源: 消灯)
+  // 初期値を書き込む
   lightData_.directionalLight.color = {1.0f, 1.0f, 1.0f, 1.0f};
   lightData_.directionalLight.direction = {0.0f, -1.0f, 0.0f};
   lightData_.directionalLight.intensity = 1.0f;
-
   lightData_.pointLight.color = {1.0f, 1.0f, 1.0f, 1.0f};
-  lightData_.pointLight.position = {0.0f, 0.0f, 0.0f};
-  lightData_.pointLight.intensity = 0.0f;
+  lightData_.pointLight.position = {0.0f, 2.0f, 0.0f};
+  lightData_.pointLight.intensity = 1.0f;
   lightData_.pointLight.radius = 10.0f;
   lightData_.pointLight.decay = 2.0f;
 }
@@ -808,6 +793,11 @@ void Object3d::Draw(const RenderContext &ctx) {
     com = SceneManager::GetInstance()->GetObject3dCom();
   }
   if (!com) return;
+
+  if (ctx.camera && camera_ != ctx.camera) {
+    camera_ = ctx.camera;
+    Update();
+  }
 
   // テクスチャ解決
   RenderContext resolvedCtx = ctx;

@@ -19,7 +19,8 @@ struct CollisionData
         float radius = 0.0f;
         float height = 0.0f;
         Vector3 size;      // Box用
-        Vector3 rotation;  // Boxの回転（オイラー角）
+        Vector3 scale{ 1.0f, 1.0f, 1.0f }; // 3軸変形スケール
+        Vector3 rotation;  // 回転（オイラー角）
     } shape;
 };
 
