@@ -241,42 +241,16 @@ void Object3d::Update() {
 
   const Vector3 &scale = transform.GetScale();
 
-  // View Frustum Culling inside Update to bypass animation, skeletal updates,
-  // and matrix math for off-screen objects
+  // 高精度 6平面 視錐台カリング (画面外オブジェクトのアニメーション・描画を完全スキップ)
   isCulled_ = false;
   if (camera_) {
-    const Matrix4x4 &vp = camera_->GetViewProjectionMatrix();
     const Vector3 &pos = transform.GetTranslate();
-    float baseRadius =
-        (modelData_.boundingRadius > 0.1f) ? modelData_.boundingRadius : 3.0f;
-    float maxScale =
-        (std::max)({std::abs(scale.x), std::abs(scale.y), std::abs(scale.z)});
+    float baseRadius = (modelData_.boundingRadius > 0.1f) ? modelData_.boundingRadius : 2.5f;
+    float maxScale = (std::max)({std::abs(scale.x), std::abs(scale.y), std::abs(scale.z)});
     float radius = baseRadius * maxScale;
 
-    float x = pos.x * vp.m[0][0] + pos.y * vp.m[1][0] + pos.z * vp.m[2][0] +
-              vp.m[3][0];
-    float y = pos.x * vp.m[0][1] + pos.y * vp.m[1][1] + pos.z * vp.m[2][1] +
-              vp.m[3][1];
-    float z = pos.x * vp.m[0][2] + pos.y * vp.m[1][2] + pos.z * vp.m[2][2] +
-              vp.m[3][2];
-    float w = pos.x * vp.m[0][3] + pos.y * vp.m[1][3] + pos.z * vp.m[2][3] +
-              vp.m[3][3];
-
-    if (w > 0.0f) {
-      float clipX = x / w;
-      float clipY = y / w;
-      float clipZ = z / w;
-      float margin = (radius * 3.0f) / w + 0.5f;
-
-      if (clipX < -1.0f - margin || clipX > 1.0f + margin ||
-          clipY < -1.0f - margin || clipY > 1.0f + margin ||
-          clipZ < 0.0f - margin || clipZ > 1.0f + margin) {
-        isCulled_ = true;
-      }
-    } else {
-      if (w < -radius * 3.0f) {
-        isCulled_ = true;
-      }
+    if (!camera_->IsInFrustum(pos, radius)) {
+      isCulled_ = true;
     }
   }
 

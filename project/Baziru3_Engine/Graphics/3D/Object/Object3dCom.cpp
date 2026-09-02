@@ -43,6 +43,7 @@ void Object3dCom::Draw(Object3d* object, const RenderContext& ctx, const Object3
     }
 
     if (!ctx.commandList) return;
+    if (object && object->IsCulled()) return;
     if (!ctx.camera)
 	{
 		Logger::Log(logStream, "Warning: camera is null when drawing object. Skipping draw.\n");

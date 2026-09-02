@@ -12,6 +12,30 @@ struct CameraForGPU {
   Vector3 worldPosition;
 };
 
+// 視錐台カリング用平面
+struct FrustumPlane {
+  Vector3 normal;
+  float distance;
+
+  float GetSignedDistance(const Vector3& point) const {
+    return normal.x * point.x + normal.y * point.y + normal.z * point.z + distance;
+  }
+};
+
+// 視錐台 (6平面: Left, Right, Bottom, Top, Near, Far)
+struct Frustum {
+  FrustumPlane planes[6];
+
+  bool IntersectsSphere(const Vector3& center, float radius) const {
+    for (int i = 0; i < 6; ++i) {
+      if (planes[i].GetSignedDistance(center) < -radius) {
+        return false; // 完全に視錐台の外側
+      }
+    }
+    return true;
+  }
+};
+
 class DirectXCom;
 
 class Camera {
@@ -29,6 +53,10 @@ public:
   const Matrix4x4 &GetProjectionMatrix() const { return projectionMatrix_; }
   const Matrix4x4 &GetViewProjectionMatrix() const {
     return viewProjectionMatrix_;
+  }
+  const Frustum &GetFrustum() const { return frustum_; }
+  bool IsInFrustum(const Vector3& center, float radius) const {
+    return frustum_.IntersectsSphere(center, radius);
   }
   const Vector3 &GetRotate() const { return transform_.GetRotate(); }
   const Vector3 &GetTranslate() const { return transform_.GetTranslate(); }
@@ -61,6 +89,9 @@ public:
   }
 
 private:
+  void UpdateFrustum();
+
+  Frustum frustum_;
   Transform transform_;
   // 回転
   Vector3 rotation_ = {0.0f, 0.0f, 0.0f};
