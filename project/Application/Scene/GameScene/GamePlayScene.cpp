@@ -1816,12 +1816,12 @@ void GamePlayScene::InitializeObstacles()
 		c2->Initialize(object3dCom, camera_, { 2.5f, 0.0f, 12.0f }, 1.0f, "container.obj", { 1.0f, 1.0f, 1.0f }, { 0.0f, 0.0f, 0.0f });
 		obstacles_.push_back(std::move(c2));
 
-		// 直立フェンス
+		// 直立フェンス（川 Z=18.75m の手前と奥に配置）
 		std::vector<Vector3> fencePositions = {
 			{ -5.0f, 0.0f, 8.0f },
 			{ 5.0f, 0.0f, 8.0f },
-			{ -5.0f, 0.0f, 18.0f },
-			{ 5.0f, 0.0f, 18.0f },
+			{ -5.0f, 0.0f, 15.5f },
+			{ 5.0f, 0.0f, 15.5f },
 			{ -2.0f, 0.0f, 29.0f },
 			{ 2.0f, 0.0f, 29.0f }
 		};

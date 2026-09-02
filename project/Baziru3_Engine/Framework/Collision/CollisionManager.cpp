@@ -226,15 +226,13 @@ void CollisionManager::Update()
                     volumeCompXZ = 1.0f / std::sqrt(std::abs(normY));
                 }
 
-                // 軟体・液体（Player/Minion）メッシュ特有のSag・接地偏平係数を自動適用
-                bool isSoftBody = (sphere->GetAttribute() == CollisionAttribute::Player || sphere->GetAttribute() == CollisionAttribute::Minion);
+                // 軟体・液体（Minion/SoftBody）メッシュ特有のSag・接地偏平係数
+                bool isSoftBody = (sphere->GetAttribute() == CollisionAttribute::Minion);
                 if (isSoftBody)
                 {
-                    // シェーダー(Slime.VS.hlsl)のSagFactor + 接地偏平 + 黒いアウトライン外周に100%一致する包絡楕円体
                     Vector3 slimeScale = { 1.56f, 0.88f, 1.56f };
                     sphere->SetRadius(maxS);
                     sphere->SetScale(slimeScale);
-                    sphere->SetPositionOffset({ 0.0f, 0.02f * maxS, 0.0f });
                 }
                 else
                 {
@@ -245,7 +243,6 @@ void CollisionManager::Update()
                     };
                     sphere->SetRadius(maxS);
                     sphere->SetScale(deformedRatio);
-                    sphere->SetPositionOffset({ 0.0f, 0.0f, 0.0f });
                 }
             }
             sphere->SetRotation(bestObj->GetRotate());
