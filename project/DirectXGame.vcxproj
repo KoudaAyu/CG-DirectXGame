@@ -450,7 +450,8 @@
       <AdditionalLibraryDirectories>$(ProjectDir)..\generated\output\$(Configuration);$(ProjectDir)..\generated\output\Debug;$(ProjectDir)externals\assimp\lib\$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <PostBuildEvent>
-      <Command>if not exist "$(TargetDir)" mkdir "$(TargetDir)"</Command>
+      <Command>if not exist "$(TargetDir)" mkdir "$(TargetDir)"
+xcopy /E /Y /I /D "$(ProjectDir)Resources" "$(TargetDir)Resources"</Command>
     </PostBuildEvent>
     <Manifest>
       <EnableDpiAwareness>PerMonitorHighDPIAware</EnableDpiAwareness>
@@ -480,7 +481,8 @@
       <AdditionalLibraryDirectories>$(ProjectDir)..\generated\output\$(Configuration);$(ProjectDir)..\generated\output\Release;$(ProjectDir)externals\assimp\lib\$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <PostBuildEvent>
-      <Command>if not exist "$(TargetDir)" mkdir "$(TargetDir)"</Command>
+      <Command>if not exist "$(TargetDir)" mkdir "$(TargetDir)"
+xcopy /E /Y /I /D "$(ProjectDir)Resources" "$(TargetDir)Resources"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Development|x64'">
@@ -508,7 +510,8 @@
       <AdditionalLibraryDirectories>$(ProjectDir)..\generated\output\$(Configuration);$(ProjectDir)..\generated\output\Development;$(ProjectDir)..\generated\output\Release;$(ProjectDir)externals\assimp\lib\Release;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <PostBuildEvent>
-      <Command>if not exist "$(TargetDir)" mkdir "$(TargetDir)"</Command>
+      <Command>if not exist "$(TargetDir)" mkdir "$(TargetDir)"
+xcopy /E /Y /I /D "$(ProjectDir)Resources" "$(TargetDir)Resources"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
