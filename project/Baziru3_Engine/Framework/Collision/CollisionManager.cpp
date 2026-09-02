@@ -80,11 +80,15 @@ void CollisionManager::Initialize()
     // デフォルトの衝突フィルタの設定 (ビットマスクの初期化)
     collisionMasks_.clear();
     
-    uint32_t maskPlayer   = (1 << static_cast<uint32_t>(CollisionAttribute::Enemy)) |
+    uint32_t maskPlayer   = (1 << static_cast<uint32_t>(CollisionAttribute::Player)) |
+                            (1 << static_cast<uint32_t>(CollisionAttribute::Minion)) |
+                            (1 << static_cast<uint32_t>(CollisionAttribute::Enemy)) |
                             (1 << static_cast<uint32_t>(CollisionAttribute::Bullet)) |
                             (1 << static_cast<uint32_t>(CollisionAttribute::Obstacle));
 
-    uint32_t maskMinion   = (1 << static_cast<uint32_t>(CollisionAttribute::Enemy)) |
+    uint32_t maskMinion   = (1 << static_cast<uint32_t>(CollisionAttribute::Player)) |
+                            (1 << static_cast<uint32_t>(CollisionAttribute::Minion)) |
+                            (1 << static_cast<uint32_t>(CollisionAttribute::Enemy)) |
                             (1 << static_cast<uint32_t>(CollisionAttribute::Obstacle));
     
     uint32_t maskEnemy    = (1 << static_cast<uint32_t>(CollisionAttribute::Player)) |
@@ -177,6 +181,10 @@ void CollisionManager::Update()
         SphereCollider* sphere = static_cast<SphereCollider*>(col);
         Vector3 spherePos = sphere->GetWorldPosition();
 
+        // 最も距離が近い Object3d を探す
+        Object3d* bestObj = nullptr;
+        float bestDistSq = 0.04f; // 0.2m以内
+
         for (Object3d* obj : objInstances)
         {
             if (!obj) continue;
@@ -184,12 +192,38 @@ void CollisionManager::Update()
             float dx = spherePos.x - objPos.x;
             float dy = spherePos.y - objPos.y;
             float dz = spherePos.z - objPos.z;
-            if (dx * dx + dy * dy + dz * dz < 0.1f * 0.1f)
+            float distSq = dx * dx + dy * dy + dz * dz;
+            if (distSq < bestDistSq)
             {
-                sphere->SetScale(obj->GetScale());
-                sphere->SetRotation(obj->GetRotate());
-                break;
+                // コライダーの既存半径に近いスケールを持つモデルを優先（giantModel等の誤検知防止）
+                float objScale = obj->GetScale().x;
+                float radiusDiff = std::abs(sphere->GetRadius() - objScale);
+                if (radiusDiff < 1.0f)
+                {
+                    bestDistSq = distSq;
+                    bestObj = obj;
+                }
             }
+        }
+
+        if (bestObj)
+        {
+            const Vector3& s = bestObj->GetScale();
+            float maxS = (std::max)({ std::abs(s.x), std::abs(s.y), std::abs(s.z) });
+            if (maxS > 0.001f)
+            {
+                float normY = s.y / maxS;
+                float volumeCompXZ = 1.0f;
+                if (std::abs(normY) > 0.01f)
+                {
+                    volumeCompXZ = 1.0f / std::sqrt(std::abs(normY));
+                }
+                Vector3 deformedRatio = { (s.x / maxS) * volumeCompXZ, normY, (s.z / maxS) * volumeCompXZ };
+
+                sphere->SetRadius(maxS);
+                sphere->SetScale(deformedRatio);
+            }
+            sphere->SetRotation(bestObj->GetRotate());
         }
     }
 
@@ -213,6 +247,16 @@ void CollisionManager::Update()
         data.attribute = col->GetAttribute();
         data.worldPosition = col->GetWorldPosition(); // 仮想関数とポインタ逆参照をここで一度だけ評価してフラット化
         data.isTrigger = col->IsTrigger();
+
+        // アプリ側で Player 属性として登録されている半径小のコライダーを Minion として自動分類
+        if (data.attribute == CollisionAttribute::Player && data.type == ColliderType::Sphere)
+        {
+            SphereCollider* sphere = static_cast<SphereCollider*>(col);
+            if (sphere->GetRadius() <= 0.45f)
+            {
+                data.attribute = CollisionAttribute::Minion;
+            }
+        }
 
         // 形状ごとの固有データを事前に取得して詰め込む
         if (data.type == ColliderType::Sphere)
@@ -376,26 +420,68 @@ void CollisionManager::Update()
                         bool isAFixed = (colA.attribute == CollisionAttribute::Obstacle);
                         bool isBFixed = (colB.attribute == CollisionAttribute::Obstacle);
 
+                        auto syncObjectPos = [&](CollisionData& cData, const Vector3& newPos) {
+                            cData.originalCollider->SetWorldPosition(newPos);
+                            cData.worldPosition = newPos;
+                            for (Object3d* obj : objInstances) {
+                                if (!obj) continue;
+                                Vector3 curObjPos = obj->GetTranslate();
+                                float dx = newPos.x - curObjPos.x;
+                                float dy = newPos.y - curObjPos.y;
+                                float dz = newPos.z - curObjPos.z;
+                                if (dx * dx + dy * dy + dz * dz < 0.3f * 0.3f) {
+                                    obj->SetTranslate(newPos);
+                                    break;
+                                }
+                            }
+                        };
+
                         if (isAFixed && !isBFixed)
                         {
                             Vector3 newPos = colB.worldPosition + pushDir * pushLen;
-                            colB.originalCollider->SetWorldPosition(newPos);
-                            colB.worldPosition = newPos;
+                            syncObjectPos(colB, newPos);
                         }
                         else if (!isAFixed && isBFixed)
                         {
                             Vector3 newPos = colA.worldPosition - pushDir * pushLen;
-                            colA.originalCollider->SetWorldPosition(newPos);
-                            colA.worldPosition = newPos;
+                            syncObjectPos(colA, newPos);
                         }
                         else if (!isAFixed && !isBFixed)
                         {
-                            Vector3 newPosA = colA.worldPosition - pushDir * (pushLen * 0.5f);
-                            Vector3 newPosB = colB.worldPosition + pushDir * (pushLen * 0.5f);
-                            colA.originalCollider->SetWorldPosition(newPosA);
-                            colB.originalCollider->SetWorldPosition(newPosB);
-                            colA.worldPosition = newPosA;
-                            colB.worldPosition = newPosB;
+                            // 質量比に基づくシッカリとした押し出し
+                            float weightA = 0.5f;
+                            float weightB = 0.5f;
+
+                            bool isAMinion = (colA.attribute == CollisionAttribute::Minion || (colA.attribute == CollisionAttribute::Player && colA.shape.radius <= 0.45f));
+                            bool isBMinion = (colB.attribute == CollisionAttribute::Minion || (colB.attribute == CollisionAttribute::Player && colB.shape.radius <= 0.45f));
+                            bool isAPlayer = (colA.attribute == CollisionAttribute::Player && !isAMinion);
+                            bool isBPlayer = (colB.attribute == CollisionAttribute::Player && !isBMinion);
+
+                            if (isAPlayer && isBMinion)
+                            {
+                                weightA = 0.0f;  // 巨大スライム（プレイヤー）はビクともせず直進
+                                weightB = 1.0f;  // ミニオンがシッカリと外側へ100%押し出される
+                            }
+                            else if (isAMinion && isBPlayer)
+                            {
+                                weightA = 1.0f;  // ミニオンがシッカリと外側へ100%押し出される
+                                weightB = 0.0f;
+                            }
+                            else if (colA.attribute == CollisionAttribute::Enemy && isBMinion)
+                            {
+                                weightA = 0.0f;
+                                weightB = 1.0f;
+                            }
+                            else if (isAMinion && colB.attribute == CollisionAttribute::Enemy)
+                            {
+                                weightA = 1.0f;
+                                weightB = 0.0f;
+                            }
+
+                            Vector3 newPosA = colA.worldPosition - pushDir * (pushLen * weightA);
+                            Vector3 newPosB = colB.worldPosition + pushDir * (pushLen * weightB);
+                            syncObjectPos(colA, newPosA);
+                            syncObjectPos(colB, newPosB);
                         }
 
                         // 物理的衝突のコールバックを発行 (OnCollision)
