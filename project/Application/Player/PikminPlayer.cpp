@@ -183,22 +183,13 @@ void PikminPlayer::Update(float deltaTime, KeyInput* keyInput, MinionManager* mi
     position_.x += velocity_.x * deltaTime;
     position_.z += velocity_.z * deltaTime;
 
-    // スライムとしての滑走（回転せず滑る・重力変形は常に下向き）
-    // X,Z軸の回転は行わない（スライムは球体のように転がらない）
-    rotation_.x = 0.0f;
-    rotation_.z = 0.0f;
+    // 床の傾斜に沿った姿勢（まな板の上に密着して床に沿って潰れる）
+    // Y軸回転を0に固定することで、オイラー角の積による法線ズレ・底面浮きを100%防止
+    rotation_.x = stageTilt.x;
+    rotation_.y = 0.0f;
+    rotation_.z = -stageTilt.y;
 
-    // 進行方向への緩やかな向き変え（ヌルッとした旋回）
-    float speed = std::sqrt(velocity_.x * velocity_.x + velocity_.z * velocity_.z);
-    if (speed > 0.3f) {
-        float targetYaw = std::atan2(velocity_.x, velocity_.z);
-        float diff = targetYaw - rotation_.y;
-        while (diff > kPi) diff -= 2.0f * kPi;
-        while (diff < -kPi) diff += 2.0f * kPi;
-        rotation_.y += diff * (std::min)(1.0f, 4.0f * deltaTime);
-    }
-
-    // --- ゼリースライムの動的変形（スクワッシュ＆ストレッチ＆慣性バウンス） ---
+    // --- 液体スライムの傾斜流動＆スクワッシュ変形 ---
     Vector3 currentVelocity = velocity_;
     Vector3 accel = {
         (currentVelocity.x - prevVelocity_.x) / (std::max)(deltaTime, 0.001f),
@@ -208,32 +199,30 @@ void PikminPlayer::Update(float deltaTime, KeyInput* keyInput, MinionManager* mi
     prevVelocity_ = currentVelocity;
 
     float speedMag = std::sqrt(currentVelocity.x * currentVelocity.x + currentVelocity.z * currentVelocity.z);
-    float accelMag = std::sqrt(accel.x * accel.x + accel.z * accel.z);
+    float tiltMag = std::sqrt(stageTilt.x * stageTilt.x + stageTilt.y * stageTilt.y);
 
-    // 転がり進行方向への伸びと上下潰れ（合体時はより顕著に）
-    float stretchRate = isMerged_ ? 0.03f : 0.022f;
-    float speedStretch = (std::min)(speedMag * stretchRate, 0.28f);
-    float accelSquash = (std::min)(accelMag * 0.006f, 0.22f);
-    float sag = isMerged_ ? -0.16f : -0.12f; // 接地重力によるポテッとした強い潰れ
+    // ステージ傾斜による液体流動ベクトル（傾けた下り坂方向へのドロッとした内容物移動）
+    float tiltFlowFactor = isMerged_ ? 2.2f : 1.8f;
+    float targetFlowX = std::sin(stageTilt.y) * tiltFlowFactor + currentVelocity.x * 0.02f;
+    float targetFlowZ = std::sin(stageTilt.x) * tiltFlowFactor + currentVelocity.z * 0.02f;
 
-    float targetSquashY = sag - accelSquash * 0.6f - speedStretch * 0.45f;
-    float targetSquashXZ = speedStretch * 0.75f + accelSquash * 0.45f - sag * 0.6f;
+    // 傾斜および接地重力による上下の強い平坦化（傾けるほど平たく潰れて流れる）
+    float sag = isMerged_ ? -0.22f : -0.16f;
+    float targetSquashY = sag - (std::min)(tiltMag * 0.45f + speedMag * 0.02f, 0.35f);
 
-    // 合体・分裂アニメーション時の弾むスクワッシュ
-    if (mergeScaleAnimation_ < 0.5f) {
-        float t = mergeScaleAnimation_ * 2.0f;
-        float bounce = std::sin(t * kPi * 2.0f) * 0.35f * (1.0f - t);
-        targetSquashY += bounce;
-        targetSquashXZ -= bounce * 0.5f;
-    }
-
-    // スムーズスプリング補間
-    slimeParams_.squashStretch.y += (targetSquashY - slimeParams_.squashStretch.y) * (std::min)(1.0f, deltaTime * 10.0f);
-    slimeParams_.squashStretch.x += (targetSquashXZ - slimeParams_.squashStretch.x) * (std::min)(1.0f, deltaTime * 10.0f);
-    slimeParams_.squashStretch.z += (targetSquashXZ - slimeParams_.squashStretch.z) * (std::min)(1.0f, deltaTime * 10.0f);
+    // スムーズスプリング補間（流動と潰れの滑らかな追従）
+    slimeParams_.squashStretch.x += (targetFlowX - slimeParams_.squashStretch.x) * (std::min)(1.0f, deltaTime * 12.0f);
+    slimeParams_.squashStretch.z += (targetFlowZ - slimeParams_.squashStretch.z) * (std::min)(1.0f, deltaTime * 12.0f);
+    slimeParams_.squashStretch.y += (targetSquashY - slimeParams_.squashStretch.y) * (std::min)(1.0f, deltaTime * 12.0f);
 
     // シェーダー時間の更新
     slimeParams_.time = totalTime_;
+
+    // 傾斜面の法線補正
+    float nx = std::sin(stageTilt.y);
+    float nz = std::sin(stageTilt.x);
+    float nLen = std::sqrt(nx * nx + 1.0f + nz * nz);
+    float groundHeight = -position_.z * nz - position_.x * nx;
 
     if (isMerged_) {
         int mergedCount = minionManager ? minionManager->GetMergedCount() : 0;
@@ -254,9 +243,8 @@ void PikminPlayer::Update(float deltaTime, KeyInput* keyInput, MinionManager* mi
         // 合体時のスライムカラー（黄金色）
         slimeParams_.baseColor = { 1.0f, 0.8f, 0.2f, 0.92f };
 
-        // 傾斜面の上に乗る（まな板の上のスライム：底面が地面にピタッと接地）
-        float groundHeight = -position_.z * std::sin(stageTilt.x) - position_.x * std::sin(stageTilt.y);
-        position_.y = groundHeight + currentScale * 0.70f;
+        // 傾斜面の上に乗る（床に沿って底面がピタッと完全接地）
+        position_.y = groundHeight + (currentScale * 0.65f) / nLen;
         if (collider_) {
             collider_->SetRadius(currentScale * 0.8f);
         }
@@ -275,8 +263,7 @@ void PikminPlayer::Update(float deltaTime, KeyInput* keyInput, MinionManager* mi
         // 通常時のスライムカラー（水色）
         slimeParams_.baseColor = { 0.2f, 0.85f, 1.0f, 0.9f };
 
-        float groundHeight = -position_.z * std::sin(stageTilt.x) - position_.x * std::sin(stageTilt.y);
-        position_.y = groundHeight + scale_.x * 0.70f;
+        position_.y = groundHeight + (scale_.x * 0.65f) / nLen;
         if (collider_) {
             collider_->SetRadius(0.8f);
         }

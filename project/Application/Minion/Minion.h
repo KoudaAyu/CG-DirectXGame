@@ -88,7 +88,7 @@ private:
     float tiltAccel_ = 35.0f;
     float friction_ = 2.8f;
     float gravity_ = -24.0f;
-    float groundY_ = 0.24f;
+    float groundY_ = 0.22f;
 
     // スライム固有
     SlimeParamsCPU slimeParams_;

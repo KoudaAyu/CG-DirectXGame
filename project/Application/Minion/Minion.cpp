@@ -159,26 +159,21 @@ void Minion::Update(float deltaTime, const Vector2& stageTilt) {
         position_.x += velocity_.x * deltaTime;
         position_.z += velocity_.z * deltaTime;
 
-        // スライムとしての滑走（回転せず滑る・重力変形は常に下向き）
-        rotation_.x = 0.0f;
-        rotation_.z = 0.0f;
+        // 床の傾斜に沿った姿勢（まな板の上に密着して床に沿って潰れる）
+        // Y軸回転を0に固定することで、オイラー角の積による法線ズレ・底面浮きを100%防止
+        rotation_.x = stageTilt.x;
+        rotation_.y = 0.0f;
+        rotation_.z = -stageTilt.y;
 
-        // 進行方向への緩やかな向き変え
-        float currentSpeed = std::sqrt(velocity_.x * velocity_.x + velocity_.z * velocity_.z);
-        if (currentSpeed > 0.2f) {
-            float targetYaw = std::atan2(velocity_.x, velocity_.z);
-            float diffYaw = targetYaw - rotation_.y;
-            while (diffYaw > 3.14159265f) diffYaw -= 2.0f * 3.14159265f;
-            while (diffYaw < -3.14159265f) diffYaw += 2.0f * 3.14159265f;
-            rotation_.y += diffYaw * (std::min)(1.0f, deltaTime * 5.0f);
-        }
-
-        // 傾斜面の上に乗る（まな板の上のスライム）
-        float groundHeight = -position_.z * std::sin(stageTilt.x) - position_.x * std::sin(stageTilt.y);
-        position_.y = groundHeight + groundY_;
+        // 傾斜面の上に乗る（床の傾斜に沿って底面がピタッと接地）
+        float nx = std::sin(stageTilt.y);
+        float nz = std::sin(stageTilt.x);
+        float nLen = std::sqrt(nx * nx + 1.0f + nz * nz);
+        float groundHeight = -position_.z * nz - position_.x * nx;
+        position_.y = groundHeight + groundY_ / nLen;
         scale_ = { 0.35f, 0.35f, 0.35f };
 
-        // --- ゼリースライムの動的変形（スクワッシュ＆ストレッチ） ---
+        // --- 液体スライムの傾斜流動＆スクワッシュ変形 ---
         Vector3 currentVel = velocity_;
         Vector3 accel = {
             (currentVel.x - prevVelocity_.x) / (std::max)(deltaTime, 0.001f),
@@ -187,18 +182,20 @@ void Minion::Update(float deltaTime, const Vector2& stageTilt) {
         };
         prevVelocity_ = currentVel;
 
-        float accelMag = std::sqrt(accel.x * accel.x + accel.z * accel.z);
-        float speedStretch = (std::min)(currentSpeed * 0.024f, 0.24f);
-        float accelSquash = (std::min)(accelMag * 0.005f, 0.2f);
-        float sag = -0.12f; // 接地重力による常時ポテッとした強い潰れ
+        float currentSpeed = std::sqrt(currentVel.x * currentVel.x + currentVel.z * currentVel.z);
+        float tiltMag = std::sqrt(stageTilt.x * stageTilt.x + stageTilt.y * stageTilt.y);
 
-        float targetSquashY = sag - accelSquash * 0.55f - speedStretch * 0.35f;
-        float targetSquashXZ = speedStretch * 0.7f + accelSquash * 0.35f - sag * 0.6f;
+        // ステージ傾斜による液体流動ベクトル（傾けた下り坂方向へのドロッとした内容物移動）
+        float targetFlowX = std::sin(stageTilt.y) * 1.8f + currentVel.x * 0.02f;
+        float targetFlowZ = std::sin(stageTilt.x) * 1.8f + currentVel.z * 0.02f;
 
-        // スムーズ補間
-        slimeParams_.squashStretch.y += (targetSquashY - slimeParams_.squashStretch.y) * (std::min)(1.0f, deltaTime * 10.0f);
-        slimeParams_.squashStretch.x += (targetSquashXZ - slimeParams_.squashStretch.x) * (std::min)(1.0f, deltaTime * 10.0f);
-        slimeParams_.squashStretch.z += (targetSquashXZ - slimeParams_.squashStretch.z) * (std::min)(1.0f, deltaTime * 10.0f);
+        // 傾斜および接地重力による上下の強い平坦化（傾けるほど平たく潰れる）
+        float targetSquashY = -0.16f - (std::min)(tiltMag * 0.45f + currentSpeed * 0.02f, 0.35f);
+
+        // スムーズスプリング補間
+        slimeParams_.squashStretch.x += (targetFlowX - slimeParams_.squashStretch.x) * (std::min)(1.0f, deltaTime * 12.0f);
+        slimeParams_.squashStretch.z += (targetFlowZ - slimeParams_.squashStretch.z) * (std::min)(1.0f, deltaTime * 12.0f);
+        slimeParams_.squashStretch.y += (targetSquashY - slimeParams_.squashStretch.y) * (std::min)(1.0f, deltaTime * 12.0f);
 
         break;
     }
@@ -214,14 +211,36 @@ void Minion::Update(float deltaTime, const Vector2& stageTilt) {
     }
 
     case MinionState::Thrown: {
-        // 放物線移動（重力適用）
+        // 空中では板の影響を受けず、純粋な鉛直真下への重力のみが働く
         velocity_.y += gravity_ * deltaTime;
-        position_ += velocity_ * deltaTime;
+
+        // 物理位置の更新
+        position_.x += velocity_.x * deltaTime;
+        position_.y += velocity_.y * deltaTime;
+        position_.z += velocity_.z * deltaTime;
 
         // 飛翔中も通常スケールを維持
         scale_ = { 0.35f, 0.35f, 0.35f };
 
-        // 地面着地判定（傾斜面に追従：跳ねずにペタッと着地）
+        // 空中での姿勢（板の傾きは受けず、進行方向を向く）
+        rotation_.x = 0.0f;
+        rotation_.z = 0.0f;
+        float horizSpeed = std::sqrt(velocity_.x * velocity_.x + velocity_.z * velocity_.z);
+        if (horizSpeed > 0.2f) {
+            rotation_.y = std::atan2(velocity_.x, velocity_.z);
+        }
+
+        // 空中での水滴・涙型変形（板の傾斜流動は受けず、飛行速度と鉛直重力による進行方向への伸び）
+        float targetFlowX = velocity_.x * 0.025f;
+        float targetFlowZ = velocity_.z * 0.025f;
+        // 垂直速度に応じた自然な水滴の伸び（上昇・下降に応じた縦変形）
+        float targetSquashY = (std::min)((std::max)(velocity_.y * 0.018f, -0.15f), 0.25f);
+
+        slimeParams_.squashStretch.x += (targetFlowX - slimeParams_.squashStretch.x) * (std::min)(1.0f, deltaTime * 12.0f);
+        slimeParams_.squashStretch.z += (targetFlowZ - slimeParams_.squashStretch.z) * (std::min)(1.0f, deltaTime * 12.0f);
+        slimeParams_.squashStretch.y += (targetSquashY - slimeParams_.squashStretch.y) * (std::min)(1.0f, deltaTime * 12.0f);
+
+        // 地面着地判定（傾いた板との接触判定）
         float groundHeight = -position_.z * std::sin(stageTilt.x) - position_.x * std::sin(stageTilt.y);
         float landingY = groundHeight + groundY_;
         if (position_.y <= landingY) {
@@ -231,19 +250,12 @@ void Minion::Update(float deltaTime, const Vector2& stageTilt) {
             velocity_.z *= 0.7f;
             state_ = MinionState::Rolling;
 
-            // 着地時の潰れスクワッシュと衝撃波紋
-            slimeParams_.squashStretch.y = -0.18f;
-            slimeParams_.squashStretch.x = 0.09f;
-            slimeParams_.squashStretch.z = 0.09f;
-            slimeParams_.impulseStrength = 0.15f;
+            // 着地時の潰れスクワッシュと衝撃波紋（板にペタッと着地）
+            slimeParams_.squashStretch.y = -0.22f;
+            slimeParams_.squashStretch.x = 0.12f;
+            slimeParams_.squashStretch.z = 0.12f;
+            slimeParams_.impulseStrength = 0.18f;
         }
-
-        // 飛翔中の回転演出
-        rotation_.x += 10.0f * deltaTime;
-
-        // 飛翔中は進行方向に引き伸ばし
-        float speed = std::sqrt(velocity_.x * velocity_.x + velocity_.z * velocity_.z);
-        slimeParams_.squashStretch.y = (std::min)(speed * 0.01f, 0.15f);
 
         break;
     }
