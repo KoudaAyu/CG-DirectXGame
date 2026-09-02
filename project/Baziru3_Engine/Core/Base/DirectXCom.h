@@ -346,9 +346,17 @@ public:
 	StackAllocator* GetStackAllocator() const { return stackAllocator_.get(); }
 
 
-	//最大SRV数(Texture枚数)
+	// 最大SRV数(Texture枚数)
 	static const uint32_t kMacSRVCount = 8192;
 
+	// 高精度 60FPS フレームリミッター用
 	std::chrono::steady_clock::time_point refrence_;
+	float targetFps_ = 60.0f;
+	bool enableFpsLimit_ = true;
 
+public:
+	void SetTargetFPS(float fps) { targetFps_ = (fps > 1.0f) ? fps : 60.0f; }
+	float GetTargetFPS() const { return targetFps_; }
+	void SetEnableFPSLimit(bool enable) { enableFpsLimit_ = enable; }
+	bool IsEnableFPSLimit() const { return enableFpsLimit_; }
 };

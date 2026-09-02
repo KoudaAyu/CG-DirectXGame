@@ -4,11 +4,13 @@
 #include <format>
 #include <thread>
 #include <vector>
+#include <immintrin.h>
 
 #include"d3dx12.h"
 #pragma comment(lib,"d3d12.lib")
 #pragma comment(lib, "dxcompiler.lib")
 #pragma comment(lib,"dxgi.lib")
+#pragma comment(lib, "winmm.lib")
 
 #include"Log.h"
 #include"StringUtil.h"
@@ -27,39 +29,57 @@ DirectXCom::DirectXCom(WindowAPI* windowAPI, std::ostream& logStream)
 
 DirectXCom::~DirectXCom()
 {
+	timeEndPeriod(1);
 }
 
 void DirectXCom::InitializeFixFPS()
 {
+	timeBeginPeriod(1);
 	refrence_ = std::chrono::steady_clock::now();
 }
 
 void DirectXCom::UpdateFixFPS()
 {
-	// 1/60秒ぴったりの時間
-	const std::chrono::microseconds kMinTime(uint64_t(1000000.0f / 60.0f));
-	// 1/60秒よりわずかに短い時間
-	const std::chrono::microseconds kMinCheckTime(uint64_t(1000000.0f / 65.0f));
-
-	// 現在時間を取得
-	std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
-	// 前回記録からの経過時間を取得する
-	std::chrono::microseconds elapsed =
-		std::chrono::duration_cast<std::chrono::microseconds>(now - refrence_);
-
-	// 1/60秒(わずかに短い時間)経っていない場合
-	if (elapsed < kMinCheckTime)
+	if (!enableFpsLimit_ || targetFps_ <= 0.0f)
 	{
-		// 1/60秒経過するまで微小なスリープを繰り返す
-		while (std::chrono::steady_clock::now() - refrence_ < kMinTime)
+		refrence_ = std::chrono::steady_clock::now();
+		return;
+	}
+
+	// 目標フレーム時間（マイクロ秒: 60FPS時 約16666µs）
+	const int64_t targetMicroseconds = static_cast<int64_t>(1000000.0 / static_cast<double>(targetFps_));
+	const std::chrono::microseconds targetDuration(targetMicroseconds);
+
+	// 次のフレーム目標時刻（累積方式でジッターを完全吸収）
+	auto targetTime = refrence_ + targetDuration;
+	auto now = std::chrono::steady_clock::now();
+
+	// 目標時刻まで高精度待機
+	if (now < targetTime)
+	{
+		// 残り時間が 1.5ms 以上ある場合はスリープで CPU 負荷を抑制
+		while (std::chrono::duration_cast<std::chrono::microseconds>(targetTime - std::chrono::steady_clock::now()).count() > 1500)
 		{
-			// 1マイクロ秒スリープ
-			std::this_thread::sleep_for(std::chrono::microseconds(1));
+			std::this_thread::sleep_for(std::chrono::milliseconds(1));
+		}
+		// 残り時間はマイクロ秒スピンロックで極限の 60.000 FPS 精度を達成
+		while (std::chrono::steady_clock::now() < targetTime)
+		{
+			_mm_pause();
 		}
 	}
 
-	// 現在の時間を記録する
-	refrence_ = std::chrono::steady_clock::now();
+	// 累積タイマー基準点更新
+	now = std::chrono::steady_clock::now();
+	// 極端な遅延（2フレーム以上遅延）が発生した場合は基準点を再同期
+	if (now - targetTime > targetDuration * 2)
+	{
+		refrence_ = now;
+	}
+	else
+	{
+		refrence_ = targetTime;
+	}
 }
 
 void DirectXCom::Initialize()
@@ -619,8 +639,8 @@ void DirectXCom::PostDraw()
 	{
 		Logger::Log(logStream, std::format("DirectXCom::PostDraw - device removed or error after ExecuteCommandLists hr=0x{:08X}\n", static_cast<unsigned int>(deviceRemoved)));
 	}
-	//GUPとOSに画面の交換を要求する
-	swapChain->Present(1, 0);
+	// GUPとOSに画面の交換を要求する (高精度リミッターで60FPS完全固定するためVSync=0)
+	swapChain->Present(0, 0);
 
 	//Fenceの値を更新
 	fenceValue++;

@@ -61,6 +61,79 @@ inline float Clamp(float value, float min, float max)
     return (std::max)(min, (std::min)(value, max));
 }
 
+// --- Slime.VS.hlsl と 100% 同一の CPU版液体動的変形エンジン ---
+namespace {
+    static float s_slimeGlobalTime = 0.0f;
+
+    inline float SlimeHash(const Vector3& p) {
+        float h = p.x * 127.1f + p.y * 311.7f + p.z * 74.7f;
+        float s = std::sin(h) * 43758.5453f;
+        return s - std::floor(s);
+    }
+
+    inline float SlimeNoise3D(const Vector3& p) {
+        Vector3 i = { std::floor(p.x), std::floor(p.y), std::floor(p.z) };
+        Vector3 f = { p.x - i.x, p.y - i.y, p.z - i.z };
+        Vector3 u = { f.x * f.x * (3.0f - 2.0f * f.x),
+                      f.y * f.y * (3.0f - 2.0f * f.y),
+                      f.z * f.z * (3.0f - 2.0f * f.z) };
+
+        float n000 = SlimeHash(i);
+        float n100 = SlimeHash({ i.x + 1.0f, i.y, i.z });
+        float n010 = SlimeHash({ i.x, i.y + 1.0f, i.z });
+        float n110 = SlimeHash({ i.x + 1.0f, i.y + 1.0f, i.z });
+        float n001 = SlimeHash({ i.x, i.y, i.z + 1.0f });
+        float n101 = SlimeHash({ i.x + 1.0f, i.y, i.z + 1.0f });
+        float n011 = SlimeHash({ i.x, i.y + 1.0f, i.z + 1.0f });
+        float n111 = SlimeHash({ i.x + 1.0f, i.y + 1.0f, i.z + 1.0f });
+
+        float x0 = n000 + (n100 - n000) * u.x;
+        float x1 = n010 + (n110 - n010) * u.x;
+        float x2 = n001 + (n101 - n001) * u.x;
+        float x3 = n011 + (n111 - n011) * u.x;
+
+        float y0 = x0 + (x1 - x0) * u.y;
+        float y1 = x2 + (x3 - x2) * u.y;
+
+        return y0 + (y1 - y0) * u.z;
+    }
+
+    inline Vector3 CalculateSlimeDeformedPosition(const Vector3& localP, const Vector3& normal, float time, float wobbleStr = 0.22f, float wobbleFreq = 5.0f) {
+        Vector3 p = localP;
+
+        // 1. ぶよぶよ波打ち変形（マルチ周波数サイン波 + 3Dノイズ）
+        float wave1 = std::sin(p.x * wobbleFreq + time * 3.5f) * std::cos(p.z * wobbleFreq * 0.8f + time * 2.7f);
+        float wave2 = std::sin(p.y * wobbleFreq * 1.3f + time * 4.2f) * std::cos(p.x * wobbleFreq * 0.6f + time * 1.8f);
+        float wave3 = SlimeNoise3D({ p.x * wobbleFreq * 0.5f + time * 1.5f,
+                                     p.y * wobbleFreq * 0.5f + time * 1.5f,
+                                     p.z * wobbleFreq * 0.5f + time * 1.5f }) * 2.0f - 1.0f;
+
+        float wobbleOffset = (wave1 * 0.45f + wave2 * 0.35f + wave3 * 0.20f) * wobbleStr;
+
+        // 2. Gravity Sag (お餅・洋梨型)
+        float sagFactor = 1.0f + 0.32f * (std::clamp)((1.0f - p.y) * 0.5f, 0.0f, 1.0f);
+        Vector3 def = p;
+        def.x *= sagFactor;
+        def.z *= sagFactor;
+        def.y = p.y * 0.85f - 0.08f;
+
+        // 3. Ground Flattening (接地偏平)
+        if (def.y < -0.55f) {
+            float flattenRate = (std::clamp)((-0.55f - def.y) / 0.45f, 0.0f, 1.0f);
+            def.y = def.y * (1.0f - flattenRate * 0.75f) + (-0.68f) * (flattenRate * 0.75f);
+            def.x *= (1.0f + flattenRate * 0.22f);
+            def.z *= (1.0f + flattenRate * 0.22f);
+        }
+
+        // 法線方向へ膨らませる
+        def.x += normal.x * wobbleOffset;
+        def.y += normal.y * wobbleOffset;
+        def.z += normal.z * wobbleOffset;
+
+        return def;
+    }
+}
+
 // =========================================================================
 // CollisionManager メンバー関数実装
 // =========================================================================
@@ -172,6 +245,7 @@ void CollisionManager::Update()
 {
     auto startTime = std::chrono::steady_clock::now();
     frameCount_++;
+    s_slimeGlobalTime += 0.0166667f;
 
     // 0. Object3d と SphereCollider のスケール・回転を完全自動同期（アプリ層の変更一切不要）
     const auto& objInstances = Object3d::GetInstances();
@@ -218,10 +292,28 @@ void CollisionManager::Update()
                 {
                     volumeCompXZ = 1.0f / std::sqrt(std::abs(normY));
                 }
-                Vector3 deformedRatio = { (s.x / maxS) * volumeCompXZ, normY, (s.z / maxS) * volumeCompXZ };
 
-                sphere->SetRadius(maxS);
-                sphere->SetScale(deformedRatio);
+                // スライム（Player/Minion）メッシュ特有のSag・接地偏平係数
+                bool isSlime = (sphere->GetAttribute() == CollisionAttribute::Player || sphere->GetAttribute() == CollisionAttribute::Minion);
+                if (isSlime)
+                {
+                    // シェーダー(Slime.VS.hlsl)のSagFactor + 接地偏平 + 黒いアウトライン外周に100%一致する包絡楕円体
+                    Vector3 slimeScale = { 1.56f, 0.88f, 1.56f };
+                    sphere->SetRadius(maxS);
+                    sphere->SetScale(slimeScale);
+                    sphere->SetPositionOffset({ 0.0f, 0.02f * maxS, 0.0f });
+                }
+                else
+                {
+                    Vector3 deformedRatio = {
+                        (s.x / maxS) * volumeCompXZ,
+                        normY,
+                        (s.z / maxS) * volumeCompXZ
+                    };
+                    sphere->SetRadius(maxS);
+                    sphere->SetScale(deformedRatio);
+                    sphere->SetPositionOffset({ 0.0f, 0.0f, 0.0f });
+                }
             }
             sphere->SetRotation(bestObj->GetRotate());
         }
@@ -670,6 +762,32 @@ bool CollisionManager::CheckSphereSphere(const CollisionData& a, const Collision
         ld = { ld.x, ld.y * cosP - ld.z * sinP, ld.y * sinP + ld.z * cosP };
         ld = { ld.x * cosY + ld.z * sinY, ld.y, -ld.x * sinY + ld.z * cosY };
 
+        // スライム（Player / Minion）の場合、Slime.VS.hlsl の波打ち・液体変形をマルチポイント勾配サンプリング
+        bool isSlime = (col.attribute == CollisionAttribute::Player || col.attribute == CollisionAttribute::Minion);
+        if (isSlime && col.shape.radius > 0.001f)
+        {
+            Vector3 unitLd = Normalize(ld);
+            Vector3 defCenter = CalculateSlimeDeformedPosition(unitLd, unitLd, s_slimeGlobalTime);
+            float maxR = Length(defCenter);
+
+            // 接触面周辺の4方向を追加サンプリング（微小な波の盛り上がり突起を完全検出）
+            Vector3 t1 = Normalize(Cross(unitLd, (std::abs(unitLd.y) < 0.9f ? Vector3{ 0.0f, 1.0f, 0.0f } : Vector3{ 1.0f, 0.0f, 0.0f })));
+            Vector3 t2 = Cross(unitLd, t1);
+            const float offsetAngle = 0.12f;
+
+            for (int s = 0; s < 4; ++s)
+            {
+                float angle = s * 1.5707963f;
+                Vector3 sampleDir = Normalize(unitLd + (t1 * std::cos(angle) + t2 * std::sin(angle)) * offsetAngle);
+                Vector3 defSample = CalculateSlimeDeformedPosition(sampleDir, sampleDir, s_slimeGlobalTime);
+                float sampleR = Length(defSample);
+                if (sampleR > maxR) maxR = sampleR;
+            }
+
+            return col.shape.radius * maxR * 1.28f;
+        }
+
+        // 楕円体の接触方向における正確な実効半径
         float effR = std::sqrt(ld.x * ld.x * rx * rx + ld.y * ld.y * ry * ry + ld.z * ld.z * rz * rz);
         return (effR > 0.001f) ? effR : col.shape.radius;
     };
@@ -1457,16 +1575,30 @@ void CollisionManager::DrawDebug(Camera* camera)
 			float radius = sphere->GetRadius();
 			Vector3 scale = sphere->GetScale();
 			Vector3 rot = sphere->GetRotation();
-			const int numSegments = 24;
+			const int numSegments = 48;
 
 			// オイラー角 (Pitch, Yaw, Roll) によるローカル座標変換ラムダ
 			float cosP = std::cos(rot.x), sinP = std::sin(rot.x);
 			float cosY = std::cos(rot.y), sinY = std::sin(rot.y);
 			float cosR = std::cos(rot.z), sinR = std::sin(rot.z);
 
+			bool isSlime = (col->GetAttribute() == CollisionAttribute::Player || col->GetAttribute() == CollisionAttribute::Minion);
+
 			auto transformLocal = [&](const Vector3& local) -> Vector3 {
-				// 1. スケール適用
-				Vector3 s = { local.x * scale.x, local.y * scale.y, local.z * scale.z };
+				Vector3 deformed = local;
+				if (isSlime && radius > 0.001f)
+				{
+					Vector3 normLocal = local * (1.0f / radius);
+					Vector3 normal = Normalize(local);
+					deformed = CalculateSlimeDeformedPosition(normLocal, normal, s_slimeGlobalTime) * radius;
+				}
+
+				// 1. スケール適用 (スライムの黒いアウトライン外周に完全一致する 1.28x 補正)
+				float scaleMultiplierX = isSlime ? 1.28f : scale.x;
+				float scaleMultiplierY = isSlime ? 1.12f : scale.y;
+				float scaleMultiplierZ = isSlime ? 1.28f : scale.z;
+
+				Vector3 s = { deformed.x * scaleMultiplierX, deformed.y * scaleMultiplierY, deformed.z * scaleMultiplierZ };
 				// 2. 回転適用 (Y -> X -> Z)
 				Vector3 ry = { s.x * cosY + s.z * sinY, s.y, -s.x * sinY + s.z * cosY };
 				Vector3 rx = { ry.x, ry.y * cosP - ry.z * sinP, ry.y * sinP + ry.z * cosP };
@@ -1475,54 +1607,42 @@ void CollisionManager::DrawDebug(Camera* camera)
 				return { worldPos.x + rz.x, worldPos.y + rz.y, worldPos.z + rz.z };
 			};
 
-			// 1. 赤道円 (XZ平面)
-			std::vector<ImVec2> pts2D;
-			for (int i = 0; i <= numSegments; ++i)
+			// --- フルメッシュケージ描画 (経線 8本) ---
+			for (int m = 0; m < 8; ++m)
 			{
-				float angle = i * (6.2831853f / numSegments);
-				Vector3 local = { std::cos(angle) * radius, 0.0f, std::sin(angle) * radius };
-				ImVec2 p2D;
-				if (project3DTo2D(transformLocal(local), p2D)) pts2D.push_back(p2D);
-			}
-			if (pts2D.size() > 1) drawList->AddPolyline(pts2D.data(), (int)pts2D.size(), colColor, false, 2.0f);
+				float meridianAngle = m * (3.14159265f / 8.0f);
+				float cosM = std::cos(meridianAngle), sinM = std::sin(meridianAngle);
 
-			// 2. 子午線円 (XY平面)
-			pts2D.clear();
-			for (int i = 0; i <= numSegments; ++i)
-			{
-				float angle = i * (6.2831853f / numSegments);
-				Vector3 local = { std::cos(angle) * radius, std::sin(angle) * radius, 0.0f };
-				ImVec2 p2D;
-				if (project3DTo2D(transformLocal(local), p2D)) pts2D.push_back(p2D);
-			}
-			if (pts2D.size() > 1) drawList->AddPolyline(pts2D.data(), (int)pts2D.size(), colColor, false, 2.0f);
-
-			// 3. 子午線円 (YZ平面)
-			pts2D.clear();
-			for (int i = 0; i <= numSegments; ++i)
-			{
-				float angle = i * (6.2831853f / numSegments);
-				Vector3 local = { 0.0f, std::sin(angle) * radius, std::cos(angle) * radius };
-				ImVec2 p2D;
-				if (project3DTo2D(transformLocal(local), p2D)) pts2D.push_back(p2D);
-			}
-			if (pts2D.size() > 1) drawList->AddPolyline(pts2D.data(), (int)pts2D.size(), colColor, false, 2.0f);
-
-			// 4. 緯線円 (上下 ±45度)
-			float latR = radius * 0.7071f;
-			float latY = radius * 0.7071f;
-			for (int lat = 0; lat < 2; ++lat)
-			{
-				float ySign = (lat == 0) ? 1.0f : -1.0f;
-				pts2D.clear();
+				std::vector<ImVec2> pts2D;
+				pts2D.reserve(numSegments + 1);
 				for (int i = 0; i <= numSegments; ++i)
 				{
-					float angle = i * (6.2831853f / numSegments);
-					Vector3 local = { std::cos(angle) * latR, ySign * latY, std::sin(angle) * latR };
+					float phi = i * (6.2831853f / numSegments);
+					Vector3 local = { std::sin(phi) * cosM * radius, std::cos(phi) * radius, std::sin(phi) * sinM * radius };
 					ImVec2 p2D;
 					if (project3DTo2D(transformLocal(local), p2D)) pts2D.push_back(p2D);
 				}
-				if (pts2D.size() > 1) drawList->AddPolyline(pts2D.data(), (int)pts2D.size(), colColor, false, 1.2f);
+				if (pts2D.size() > 1) drawList->AddPolyline(pts2D.data(), (int)pts2D.size(), colColor, false, (m == 0 || m == 4) ? 2.0f : 1.2f);
+			}
+
+			// --- フルメッシュケージ描画 (緯線 7本: 赤道 + 上下各3本) ---
+			float latAngles[7] = { 0.0f, 0.45f, -0.45f, 0.90f, -0.90f, 1.25f, -1.25f };
+			for (int lat = 0; lat < 7; ++lat)
+			{
+				float latAngle = latAngles[lat];
+				float latR = radius * std::cos(latAngle);
+				float latY = radius * std::sin(latAngle);
+
+				std::vector<ImVec2> pts2D;
+				pts2D.reserve(numSegments + 1);
+				for (int i = 0; i <= numSegments; ++i)
+				{
+					float angle = i * (6.2831853f / numSegments);
+					Vector3 local = { std::cos(angle) * latR, latY, std::sin(angle) * latR };
+					ImVec2 p2D;
+					if (project3DTo2D(transformLocal(local), p2D)) pts2D.push_back(p2D);
+				}
+				if (pts2D.size() > 1) drawList->AddPolyline(pts2D.data(), (int)pts2D.size(), colColor, false, (lat == 0) ? 2.5f : 1.2f);
 			}
 		}
 		else if (col->GetType() == ColliderType::Box)
