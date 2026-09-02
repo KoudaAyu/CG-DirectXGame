@@ -186,6 +186,8 @@ public:
   const Skeleton &GetSkeleton() const { return skeleton_; }
   const SkinCluster &GetSkinCluster() const { return skinCluster_; }
   bool IsShared() const { return isShared_; }
+  class SphereCollider* GetAutoCollider() const { return autoCollider_.get(); }
+  void SetEnableAutoCollider(bool enable, int attribute = 3 /*Obstacle*/, float radius = 0.0f);
 
 public:
   void DrawInternal(const RenderContext &ctx);
@@ -236,4 +238,7 @@ private:
   bool isCulled_ = false;
   bool allowWireframeOverlay_ = true;
   Object3d *masterObject_ = nullptr;
+
+  // エンジン自動当たり判定コライダー
+  std::unique_ptr<class SphereCollider> autoCollider_;
 };

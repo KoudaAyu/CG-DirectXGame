@@ -1312,48 +1312,55 @@ void CollisionManager::DrawDebug(Camera* camera)
 		{
 			SphereCollider* sphere = static_cast<SphereCollider*>(col);
 			float radius = sphere->GetRadius();
+			const int numSegments = 24;
 
-			// Draw horizontal circle
-			const int numSegments = 16;
+			// 1. 赤道円 (XZ平面)
 			std::vector<ImVec2> pts2D;
 			for (int i = 0; i <= numSegments; ++i)
 			{
 				float angle = i * (6.2831853f / numSegments);
-				Vector3 p3D = {
-					worldPos.x + std::cos(angle) * radius,
-					worldPos.y,
-					worldPos.z + std::sin(angle) * radius
-				};
+				Vector3 p3D = { worldPos.x + std::cos(angle) * radius, worldPos.y, worldPos.z + std::sin(angle) * radius };
 				ImVec2 p2D;
-				if (project3DTo2D(p3D, p2D))
-				{
-					pts2D.push_back(p2D);
-				}
+				if (project3DTo2D(p3D, p2D)) pts2D.push_back(p2D);
 			}
-			if (pts2D.size() > 1)
-			{
-				drawList->AddPolyline(pts2D.data(), (int)pts2D.size(), colColor, false, 2.0f);
-			}
+			if (pts2D.size() > 1) drawList->AddPolyline(pts2D.data(), (int)pts2D.size(), colColor, false, 2.0f);
 
-			// Draw vertical circle
+			// 2. 子午線円 (XY平面)
 			pts2D.clear();
 			for (int i = 0; i <= numSegments; ++i)
 			{
 				float angle = i * (6.2831853f / numSegments);
-				Vector3 p3D = {
-					worldPos.x + std::cos(angle) * radius,
-					worldPos.y + std::sin(angle) * radius,
-					worldPos.z
-				};
+				Vector3 p3D = { worldPos.x + std::cos(angle) * radius, worldPos.y + std::sin(angle) * radius, worldPos.z };
 				ImVec2 p2D;
-				if (project3DTo2D(p3D, p2D))
-				{
-					pts2D.push_back(p2D);
-				}
+				if (project3DTo2D(p3D, p2D)) pts2D.push_back(p2D);
 			}
-			if (pts2D.size() > 1)
+			if (pts2D.size() > 1) drawList->AddPolyline(pts2D.data(), (int)pts2D.size(), colColor, false, 2.0f);
+
+			// 3. 子午線円 (YZ平面)
+			pts2D.clear();
+			for (int i = 0; i <= numSegments; ++i)
 			{
-				drawList->AddPolyline(pts2D.data(), (int)pts2D.size(), colColor, false, 2.0f);
+				float angle = i * (6.2831853f / numSegments);
+				Vector3 p3D = { worldPos.x, worldPos.y + std::sin(angle) * radius, worldPos.z + std::cos(angle) * radius };
+				ImVec2 p2D;
+				if (project3DTo2D(p3D, p2D)) pts2D.push_back(p2D);
+			}
+			if (pts2D.size() > 1) drawList->AddPolyline(pts2D.data(), (int)pts2D.size(), colColor, false, 2.0f);
+
+			// 4. 緯線円 (上下 ±45度)
+			float latRadii[2] = { radius * 0.7071f, radius * 0.7071f };
+			float latYs[2]    = { worldPos.y + radius * 0.7071f, worldPos.y - radius * 0.7071f };
+			for (int lat = 0; lat < 2; ++lat)
+			{
+				pts2D.clear();
+				for (int i = 0; i <= numSegments; ++i)
+				{
+					float angle = i * (6.2831853f / numSegments);
+					Vector3 p3D = { worldPos.x + std::cos(angle) * latRadii[lat], latYs[lat], worldPos.z + std::sin(angle) * latRadii[lat] };
+					ImVec2 p2D;
+					if (project3DTo2D(p3D, p2D)) pts2D.push_back(p2D);
+				}
+				if (pts2D.size() > 1) drawList->AddPolyline(pts2D.data(), (int)pts2D.size(), colColor, false, 1.2f);
 			}
 		}
 		else if (col->GetType() == ColliderType::Box)

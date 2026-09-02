@@ -1,5 +1,7 @@
 #include "Object3d.h"
 #include "Baziru3_Engine/Core/Base/Allocator/ConstantBufferAllocator.h"
+#include "Baziru3_Engine/Framework/Collision/CollisionManager.h"
+#include "Baziru3_Engine/Framework/Collision/SphereCollider.h"
 #include "Light.h"
 #include "Matrix4x4.h"
 #include "Object3dCom.h"
@@ -226,6 +228,13 @@ void Object3d::SetupAnimation(const Animation *animation,
 }
 
 void Object3d::Update() {
+  if (autoCollider_) {
+    const Vector3 &s = transform.GetScale();
+    float maxS = (std::max)({ std::abs(s.x), std::abs(s.y), std::abs(s.z) });
+    float baseR = (modelData_.boundingRadius > 0.0f) ? modelData_.boundingRadius : 0.5f;
+    autoCollider_->SetRadius(baseR * maxS);
+  }
+
   if (!camera_ && object3dCom_) {
     camera_ = object3dCom_->GetDefaultCamera();
   }
@@ -700,6 +709,11 @@ Object3d::~Object3d() {
     instances_.pop_back();
   }
 
+  if (autoCollider_ && CollisionManager::GetInstance()) {
+    CollisionManager::GetInstance()->UnregisterCollider(autoCollider_.get());
+    autoCollider_.reset();
+  }
+
   // 持続的にマップされたリソースがある場合は安全にアンマップする
   // 二重アンマップを避けるため、CPU側のポインタが nullptr でない場合のみ Unmap
   // する
@@ -708,6 +722,31 @@ Object3d::~Object3d() {
                            static_cast<SIZE_T>(vertexBufferView_.SizeInBytes)};
     vertexResource->Unmap(0, &written);
     vertexData_ = nullptr;
+  }
+}
+
+void Object3d::SetEnableAutoCollider(bool enable, int attribute, float radius) {
+  if (!enable) {
+    if (autoCollider_ && CollisionManager::GetInstance()) {
+      CollisionManager::GetInstance()->UnregisterCollider(autoCollider_.get());
+      autoCollider_.reset();
+    }
+    return;
+  }
+
+  const Vector3& s = transform.GetScale();
+  float maxS = (std::max)({ std::abs(s.x), std::abs(s.y), std::abs(s.z) });
+  float r = (radius > 0.0f) ? radius : (modelData_.boundingRadius > 0.0f ? modelData_.boundingRadius : 0.5f);
+  r *= maxS;
+
+  if (!autoCollider_) {
+    // Vector3* を安全に渡すためメンバ変数 transform の参照ではなく translate ポインタを使用
+    autoCollider_ = std::make_unique<SphereCollider>(r, const_cast<Vector3*>(&transform.GetTranslate()), static_cast<CollisionAttribute>(attribute));
+    if (CollisionManager::GetInstance()) {
+      CollisionManager::GetInstance()->RegisterCollider(autoCollider_.get());
+    }
+  } else {
+    autoCollider_->SetRadius(r);
   }
 }
 
