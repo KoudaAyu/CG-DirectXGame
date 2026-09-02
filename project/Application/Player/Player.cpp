@@ -27,6 +27,15 @@ void Player::Initialize(Object3dCom* object3dCom, Camera* camera)
         model.material.textureFilePath = "Resources/duck.png";
     }
 
+    // プレイヤーアヒルのバウンディング半径を広めに設定（ジャンプ・ローリング時の消失防止）
+    float maxDistSq = 0.0f;
+    for (const auto& v : model.vertices)
+    {
+        float distSq = v.position.x * v.position.x + v.position.y * v.position.y + v.position.z * v.position.z;
+        if (distSq > maxDistSq) maxDistSq = distSq;
+    }
+    model.boundingRadius = (std::max)(std::sqrt(maxDistSq), 4.0f);
+
     object3d_ = std::make_unique<Object3d>();
     object3d_->Initialize(object3dCom_, model);
     object3d_->SetCamera(camera_);

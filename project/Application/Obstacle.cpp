@@ -29,6 +29,26 @@ void Obstacle::Initialize(Object3dCom* object3dCom, Camera* camera, const Vector
         uint32_t texIdx = TextureManager::GetInstance()->Load(loaded.material.textureFilePath);
         loaded.material.textureIndex = texIdx;
 
+        // 頂点配列からモデルのバウンディング半径を正確に計算（視野外カリングの誤判定を完全防止）
+        float maxDistSq = 0.0f;
+        for (const auto& v : loaded.vertices)
+        {
+            float distSq = v.position.x * v.position.x + v.position.y * v.position.y + v.position.z * v.position.z;
+            if (distSq > maxDistSq)
+            {
+                maxDistSq = distSq;
+            }
+        }
+        loaded.boundingRadius = std::sqrt(maxDistSq);
+        if (filename.find("ground") != std::string::npos || filename.find("plane") != std::string::npos || filename.find("river") != std::string::npos)
+        {
+            loaded.boundingRadius = (std::max)(loaded.boundingRadius, 60.0f); // 広大オブジェクト用の安全マージン
+        }
+        else if (loaded.boundingRadius < 1.0f)
+        {
+            loaded.boundingRadius = 3.0f;
+        }
+
         sModelCache[filename] = loaded;
         it = sModelCache.find(filename);
     }
