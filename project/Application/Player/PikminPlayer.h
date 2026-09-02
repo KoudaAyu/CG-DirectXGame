@@ -121,4 +121,10 @@ private:
 
 private:
 	CrystalPipeline Crystal_;
+	Crystal::FrameConstants CrystalFrameConstants_;
+	Crystal::MaterialParams CrystalMaterialParams_;
+	Crystal::ObjectConstants CrystalOBJConstants_;
+	uint32_t DescriptorIDs_[3];
+	void* CrystalMappedData_[3];
+	ComPtr<ID3D12Resource> CrystalBufferRes_[3];
 };
