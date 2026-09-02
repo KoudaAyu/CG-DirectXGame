@@ -1781,6 +1781,11 @@ void GamePlayScene::InitializeObstacles()
 	{
 		OutputDebugStringA("GamePlayScene: Using updated default obstacle placement.\n");
 
+		// ステージ最下層に広大な地面を敷く
+		auto ground = std::make_unique<Obstacle>();
+		ground->Initialize(object3dCom, camera_, { 0.0f, -0.01f, 15.0f }, 1.0f, "ground.obj", { 1.0f, 1.0f, 1.0f }, { 0.0f, 0.0f, 0.0f });
+		obstacles_.push_back(std::move(ground));
+
 		// コンテナ2個
 		auto c1 = std::make_unique<Obstacle>();
 		c1->Initialize(object3dCom, camera_, { -2.5f, 0.0f, 12.0f }, 1.0f, "container.obj", { 1.0f, 1.0f, 1.0f }, { 0.0f, 0.0f, 0.0f });

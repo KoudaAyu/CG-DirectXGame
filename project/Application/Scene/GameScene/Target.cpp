@@ -49,8 +49,8 @@ void Target::Draw(const RenderContext& ctx)
 
     RenderContext targetCtx = ctx;
     const Object3d::ModelData& modelData = object3d_->GetModelData();
-    uint32_t texIdx = defaultTextureIndex_;
-    if (targetCtx.textureHandle.ptr == 0 && texIdx != 0 && texIdx != UINT32_MAX)
+    uint32_t texIdx = (defaultTextureIndex_ != TextureManager::kInvalidTextureIndex) ? defaultTextureIndex_ : modelData.material.textureIndex;
+    if (texIdx != TextureManager::kInvalidTextureIndex)
     {
         targetCtx.textureHandle = TextureManager::GetInstance()->GetSrvHandleGPU(texIdx);
     }

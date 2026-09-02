@@ -25,6 +25,10 @@ void Obstacle::Initialize(Object3dCom* object3dCom, Camera* camera, const Vector
         {
             loaded.material.textureFilePath = "Resources/CG4/human/white.png";
         }
+        // テクスチャをロードしてインデックスをキャッシュに保持
+        uint32_t texIdx = TextureManager::GetInstance()->Load(loaded.material.textureFilePath);
+        loaded.material.textureIndex = texIdx;
+
         sModelCache[filename] = loaded;
         it = sModelCache.find(filename);
     }
@@ -262,19 +266,8 @@ void Obstacle::Draw(const RenderContext& ctx)
 {
     if (!object3d_) return;
 
-    RenderContext obsCtx = ctx;
-    const Object3d::ModelData& modelData = object3d_->GetModelData();
-    uint32_t texIdx = modelData.material.textureIndex;
-    if (texIdx == UINT32_MAX)
-    {
-        texIdx = defaultTextureIndex_;
-    }
-    if (obsCtx.textureHandle.ptr == 0 && texIdx != UINT32_MAX)
-    {
-        obsCtx.textureHandle = TextureManager::GetInstance()->GetSrvHandleGPU(texIdx);
-    }
-
-    object3dCom_->Draw(object3d_.get(), obsCtx, modelData, true);
+    // Object3d の標準 Draw(ctx) を呼び出して個別テクスチャを確実に解決して描画
+    object3d_->Draw(ctx);
 }
 
 void Obstacle::Finalize()

@@ -865,8 +865,8 @@ void MovingEnemy::Draw(const RenderContext& ctx)
 
     RenderContext enemyCtx = ctx;
     const Object3d::ModelData& modelData = object3d_->GetModelData();
-    uint32_t texIdx = defaultTextureIndex_;
-    if (enemyCtx.textureHandle.ptr == 0 && texIdx != UINT32_MAX)
+    uint32_t texIdx = (defaultTextureIndex_ != TextureManager::kInvalidTextureIndex) ? defaultTextureIndex_ : modelData.material.textureIndex;
+    if (texIdx != TextureManager::kInvalidTextureIndex)
     {
         enemyCtx.textureHandle = TextureManager::GetInstance()->GetSrvHandleGPU(texIdx);
     }
