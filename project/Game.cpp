@@ -89,6 +89,8 @@ void Game::Initialize() {
   debugUI = std::make_unique<DebugUI>(
       materialManager_.get(), uiSpriteManager, camera_.get(), &transformObject,
       &useMonsterBall, &drawObject, &drawSprite);
+  debugUI->SetOffScreenRendering(offScreenRendering_.get());
+  debugUI->SetLight(light.get());
   debugUI->Initialize();
 
   fadeApplication_ = std::make_unique<Fade>();

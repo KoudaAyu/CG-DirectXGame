@@ -14,6 +14,7 @@
 #include "Baziru3_Engine/Core/Base/Allocator/ConstantBufferAllocator.h"
 #include "Baziru3_Engine/Core/Base/Allocator/StackAllocator.h"
 #include "DirectXCom.h"
+#include "Light.h"
 #include <imgui.h>
 
 
@@ -194,6 +195,70 @@ void DebugUI::Update()
         if (ImGui::Combo("Specular Model", &specModel, items))
         {
             materialManager_->GetMaterialSpecularModel() = specModel;
+        }
+    }
+
+    ImGui::End();
+
+    // --- Lighting Settings (Directional Light & Point Light) ---
+    ImGui::Begin("Lighting Settings");
+
+    if (light_)
+    {
+        if (ImGui::CollapsingHeader("Directional Light", ImGuiTreeNodeFlags_DefaultOpen))
+        {
+            auto dirData = light_->GetDirectionalLightData();
+            float dirColor[4] = { dirData.color.x, dirData.color.y, dirData.color.z, dirData.color.w };
+            if (ImGui::ColorEdit4("Dir Color", dirColor))
+            {
+                light_->SetDirectionalLightColor({ dirColor[0], dirColor[1], dirColor[2], dirColor[3] });
+            }
+
+            float dirVec[3] = { dirData.direction.x, dirData.direction.y, dirData.direction.z };
+            if (ImGui::DragFloat3("Direction", dirVec, 0.02f, -1.0f, 1.0f))
+            {
+                light_->SetDirectionalLightDirection({ dirVec[0], dirVec[1], dirVec[2] });
+            }
+
+            float dirIntensity = dirData.intensity;
+            if (ImGui::DragFloat("Dir Intensity", &dirIntensity, 0.05f, 0.0f, 10.0f))
+            {
+                light_->SetDirectionalLightIntensity(dirIntensity);
+            }
+        }
+
+        if (ImGui::CollapsingHeader("Point Light", ImGuiTreeNodeFlags_DefaultOpen))
+        {
+            auto pointData = light_->GetPointLightData();
+            float ptColor[4] = { pointData.color.x, pointData.color.y, pointData.color.z, pointData.color.w };
+            if (ImGui::ColorEdit4("Point Color", ptColor))
+            {
+                light_->SetPointLightColor({ ptColor[0], ptColor[1], ptColor[2], ptColor[3] });
+            }
+
+            float ptPos[3] = { pointData.position.x, pointData.position.y, pointData.position.z };
+            if (ImGui::DragFloat3("Point Pos", ptPos, 0.1f, -100.0f, 100.0f))
+            {
+                light_->SetPointLightPosition({ ptPos[0], ptPos[1], ptPos[2] });
+            }
+
+            float ptIntensity = pointData.intensity;
+            if (ImGui::DragFloat("Point Intensity", &ptIntensity, 0.05f, 0.0f, 20.0f))
+            {
+                light_->SetPointLightIntensity(ptIntensity);
+            }
+
+            float ptRadius = pointData.radius;
+            if (ImGui::DragFloat("Point Radius", &ptRadius, 0.2f, 0.1f, 100.0f))
+            {
+                light_->SetPointLightRadius(ptRadius);
+            }
+
+            float ptDecay = pointData.decay;
+            if (ImGui::DragFloat("Point Decay", &ptDecay, 0.1f, 0.5f, 5.0f))
+            {
+                light_->SetPointLightDecay(ptDecay);
+            }
         }
     }
 

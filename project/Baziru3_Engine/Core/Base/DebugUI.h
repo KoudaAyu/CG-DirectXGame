@@ -10,6 +10,7 @@ class DebugCamera;
 class MaterialManager;
 class SpriteManager;
 class OffScreenRendering;
+class Light;
 
 namespace BaziruEngine::AI {
     class BehaviorTreeEditor;
@@ -27,6 +28,7 @@ public:
     void Finalize();
 
     void SetOffScreenRendering(OffScreenRendering* offScreenRendering) { offScreenRendering_ = offScreenRendering; }
+    void SetLight(Light* light) { light_ = light; }
 
 private:
     Sprite::Transform* transformObject_ = nullptr;
@@ -41,6 +43,7 @@ private:
     SpriteManager* spriteManager_ = nullptr;
     MaterialManager* materialManager_ = nullptr;
     OffScreenRendering* offScreenRendering_ = nullptr;
+    Light* light_ = nullptr;
 
     std::vector<std::unique_ptr<Sprite>> sprites;
 
