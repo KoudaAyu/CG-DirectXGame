@@ -102,6 +102,30 @@ void GamePlayScene::Update()
         mouseInput_->Update();
     }
 
+    // --- ステージ傾斜（ティルト）の入力とスムーズ補間 ---
+    targetTilt_ = { 0.0f, 0.0f };
+    if (keyInput_)
+    {
+        // W: 奥へ傾ける (Pitch < 0) / S: 手前へ傾ける (Pitch > 0)
+        if (keyInput_->PushKey(DIK_W) || keyInput_->PushKey(DIK_UP))   targetTilt_.x -= maxTiltAngle_;
+        if (keyInput_->PushKey(DIK_S) || keyInput_->PushKey(DIK_DOWN)) targetTilt_.x += maxTiltAngle_;
+        // A: 左へ傾ける (Roll < 0) / D: 右へ傾ける (Roll > 0)
+        if (keyInput_->PushKey(DIK_A) || keyInput_->PushKey(DIK_LEFT))  targetTilt_.y -= maxTiltAngle_;
+        if (keyInput_->PushKey(DIK_D) || keyInput_->PushKey(DIK_RIGHT)) targetTilt_.y += maxTiltAngle_;
+    }
+
+    float speedX = (std::abs(targetTilt_.x) > 0.001f) ? tiltSpeed_ : tiltReturnSpeed_;
+    float speedY = (std::abs(targetTilt_.y) > 0.001f) ? tiltSpeed_ : tiltReturnSpeed_;
+    currentTilt_.x += (targetTilt_.x - currentTilt_.x) * (std::min)(1.0f, deltaTime * speedX);
+    currentTilt_.y += (targetTilt_.y - currentTilt_.y) * (std::min)(1.0f, deltaTime * speedY);
+
+    // 地面プレーンの回転を傾斜角に合わせて更新
+    if (groundPlane_)
+    {
+        groundPlane_->SetRotate({ currentTilt_.x, 0.0f, currentTilt_.y });
+        groundPlane_->Update();
+    }
+
     // 放物線照準ガイドの更新
     if (aimGuide_ && player_ && playCamera_)
     {
@@ -110,26 +134,20 @@ void GamePlayScene::Update()
         aimGuide_->Update(launchOrigin, mouseInput_.get(), playCamera_.get(), player_->IsMerged());
     }
 
-    // プレイヤーの更新
+    // プレイヤーの更新（ステージ傾斜を伝達）
     if (player_)
     {
-        player_->Update(deltaTime, keyInput_.get(), minionManager_.get(), mouseInput_.get(), aimGuide_.get());
+        player_->Update(deltaTime, keyInput_.get(), minionManager_.get(), mouseInput_.get(), aimGuide_.get(), currentTilt_);
     }
 
-    // ミニオンマネージャーの更新
+    // ミニオンマネージャーの更新（ステージ傾斜を伝達）
     if (minionManager_ && player_)
     {
-        minionManager_->Update(deltaTime, player_->GetPosition(), player_->GetYaw(), player_->IsMerged(), player_->GetCurrentScale());
+        minionManager_->Update(deltaTime, player_->GetPosition(), player_->IsMerged(), player_->GetCurrentScale(), currentTilt_);
     }
 
     // 衝突判定と押し出しの更新
     CollisionManager::GetInstance()->Update();
-
-    // 地面プレーン更新
-    if (groundPlane_)
-    {
-        groundPlane_->Update();
-    }
 
     // カメラのスムーズ追従 (Smooth Damping)
     if (playCamera_ && player_)
@@ -219,11 +237,9 @@ void GamePlayScene::DrawDebugUI()
 
     // 1. 操作説明
     ImGui::TextColored(ImVec4(1.0f, 0.9f, 0.2f, 1.0f), "[ Controls ]");
-    ImGui::BulletText("WASD / Arrows: Move");
+    ImGui::BulletText("WASD / Arrows: Tilt Stage (ステージを傾ける)");
     ImGui::BulletText("E key: Merge (LocoRoco) <-> Split (Pikmin)");
     ImGui::BulletText("Mouse Left Click: Aim & Throw to Target (放物線投擲)");
-    ImGui::BulletText("Mouse Right Click: Whistle at Cursor (マウス位置へ笛)");
-    ImGui::BulletText("Q key: Whistle around player");
     ImGui::BulletText("SPACE key: Clear Scene");
     ImGui::Separator();
 
@@ -243,6 +259,11 @@ void GamePlayScene::DrawDebugUI()
         if (ImGui::Button(isMerged ? "SPLIT (Pikmin Mode)" : "MERGE (LocoRoco Mode)", ImVec2(280, 36)))
         {
             player_->ToggleMerge();
+        }
+
+        float mergeRadius = minionManager_->GetMergePickupRadius();
+        if (ImGui::SliderFloat("Merge Radius", &mergeRadius, 1.0f, 15.0f, "%.1f")) {
+            minionManager_->SetMergePickupRadius(mergeRadius);
         }
     }
 
@@ -271,33 +292,40 @@ void GamePlayScene::DrawDebugUI()
         if (ImGui::Button("Clear All")) {
             minionManager_->ClearMinions();
         }
+    }
 
-        // スライダー調整
-        float followSpeed = minionManager_->GetFollowSpeed();
-        if (ImGui::SliderFloat("Follow Speed", &followSpeed, 2.0f, 30.0f)) {
-            minionManager_->SetFollowSpeed(followSpeed);
+    ImGui::Separator();
+
+    // 4. ステージ傾斜（ティルト）＆物理調整
+    if (ImGui::CollapsingHeader("Stage Tilt & Rolling Physics", ImGuiTreeNodeFlags_DefaultOpen))
+    {
+        ImGui::Text("Current Tilt: Pitch %.2f deg | Roll %.2f deg",
+                    currentTilt_.x * 57.2958f, currentTilt_.y * 57.2958f);
+
+        float maxDeg = maxTiltAngle_ * 57.2958f;
+        if (ImGui::SliderFloat("Max Tilt Angle (deg)", &maxDeg, 5.0f, 35.0f, "%.1f")) {
+            maxTiltAngle_ = maxDeg * 0.0174533f;
         }
+        ImGui::SliderFloat("Tilt Speed", &tiltSpeed_, 1.0f, 15.0f, "%.1f");
+        ImGui::SliderFloat("Tilt Return Speed", &tiltReturnSpeed_, 1.0f, 15.0f, "%.1f");
 
-        float slotRadius = minionManager_->GetSlotRadius();
-        if (ImGui::SliderFloat("Formation Radius", &slotRadius, 0.5f, 4.0f)) {
-            minionManager_->SetSlotRadius(slotRadius);
+        if (player_) {
+            float accel = player_->GetTiltAccel();
+            if (ImGui::SliderFloat("Slime Tilt Accel", &accel, 10.0f, 60.0f, "%.1f")) {
+                player_->SetTiltAccel(accel);
+            }
+            float friction = player_->GetFriction();
+            if (ImGui::SliderFloat("Slime Friction", &friction, 0.5f, 8.0f, "%.1f")) {
+                player_->SetFriction(friction);
+            }
         }
     }
 
     ImGui::Separator();
 
-    // 4. プレイヤー調整
+    // 5. プレイヤー調整
     if (player_)
     {
-        float normalSpeed = player_->GetNormalSpeed();
-        if (ImGui::SliderFloat("Normal Move Speed", &normalSpeed, 2.0f, 25.0f)) {
-            player_->SetNormalSpeed(normalSpeed);
-        }
-
-        float mergedSpeed = player_->GetMergedSpeed();
-        if (ImGui::SliderFloat("Merged Roll Speed", &mergedSpeed, 5.0f, 35.0f)) {
-            player_->SetMergedSpeed(mergedSpeed);
-        }
 
         // --- スライム表現パラメータ調整 ---
         auto& slimeParams = player_->GetSlimeParams();

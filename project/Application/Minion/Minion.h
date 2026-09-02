@@ -12,7 +12,7 @@ class Object3dCom;
 class Camera;
 
 enum class MinionState {
-    Following,  // プレイヤーのスロットを追従中
+    Rolling,    // ステージ傾斜による自由転がり中
     Merging,    // プレイヤー（巨大スライム）へ合体・吸引中
     Thrown,     // プレイヤーから投げられて放物線飛行中
     Carrying,   // オブジェクト運搬中
@@ -34,14 +34,13 @@ public:
     ~Minion();
 
     void Initialize(Object3dCom* object3dCom, Camera* camera, const Vector3& spawnPos, MinionType type = MinionType::Red);
-    void Update(float deltaTime);
+    void Update(float deltaTime, const Vector2& stageTilt = { 0.0f, 0.0f });
     void Draw(const RenderContext& ctx);
 
     // --- ステート制御 ---
     void SetState(MinionState state) { state_ = state; }
     MinionState GetState() const { return state_; }
 
-    void SetTargetPosition(const Vector3& targetPos) { targetSlotPos_ = targetPos; }
     const Vector3& GetPosition() const { return position_; }
     void SetPosition(const Vector3& pos);
 
@@ -59,9 +58,6 @@ public:
 
     // スライムパラメータの公開（共有調整用）
     SlimeParamsCPU& GetSlimeParams() { return slimeParams_; }
-
-    void SetFollowSpeed(float speed) { followSpeed_ = speed; }
-    float GetFollowSpeed() const { return followSpeed_; }
 
     // コライダーの取得
     SphereCollider* GetCollider() const { return collider_.get(); }
@@ -81,13 +77,13 @@ private:
     Vector3 rotation_{ 0.0f, 0.0f, 0.0f };
     Vector3 scale_{ 0.4f, 0.4f, 0.4f };
 
-    Vector3 targetSlotPos_{ 0.0f, 0.0f, 0.0f };
-    MinionState state_ = MinionState::Following;
+    MinionState state_ = MinionState::Rolling;
     MinionType type_ = MinionType::Red;
 
     bool isActive_ = true;
     float radius_ = 0.3f;
-    float followSpeed_ = 10.0f;
+    float tiltAccel_ = 28.0f;
+    float friction_ = 3.5f;
     float gravity_ = -24.0f;
     float groundY_ = 0.2f;
 

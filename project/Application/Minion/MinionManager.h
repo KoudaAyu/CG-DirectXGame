@@ -17,7 +17,7 @@ public:
     ~MinionManager() = default;
 
     void Initialize(Object3dCom* object3dCom, Camera* camera);
-    void Update(float deltaTime, const Vector3& playerPos, float playerYaw, bool isMerged, float playerRadius = 0.8f);
+    void Update(float deltaTime, const Vector3& playerPos, bool isMerged, float playerRadius = 0.8f, const Vector2& stageTilt = { 0.0f, 0.0f });
     void Draw(const RenderContext& ctx);
 
     // --- 群衆の操作 ---
@@ -28,28 +28,21 @@ public:
     // 投擲指示
     bool ThrowMinionWithVelocity(const Vector3& launchPos, const Vector3& velocity);
 
-    // ホイッスル呼び戻し
-    void Whistle(const Vector3& whistlePos, float radius = 8.0f);
-
     // 合体 / 分裂トリガー
-    void TriggerMerge(const Vector3& playerPos);
+    void TriggerMerge(const Vector3& playerPos, float mergeRadius = 4.5f);
     void TriggerSplit(const Vector3& playerPos);
 
-    // ゲッター
+    // ゲッター / セッター
     int GetActiveCount() const;
     int GetReadyCount(const Vector3& playerPos, float maxPickupRadius = 3.5f) const;
     int GetMergedCount() const;
     int GetTotalCount() const { return static_cast<int>(minions_.size()); }
     bool IsAllMerged() const { return isAllMerged_; }
 
-    // パラメータ調整
-    void SetFollowSpeed(float speed);
-    float GetFollowSpeed() const { return followSpeed_; }
-    void SetSlotRadius(float radius) { slotBaseRadius_ = radius; }
-    float GetSlotRadius() const { return slotBaseRadius_; }
+    float GetMergePickupRadius() const { return mergePickupRadius_; }
+    void SetMergePickupRadius(float r) { mergePickupRadius_ = r; }
 
 private:
-    void CalculateFormationSlots(const Vector3& playerPos, float playerYaw);
     void ResolveSeparation();
 
 private:
@@ -59,9 +52,6 @@ private:
 
     bool isMergedState_ = false;
     bool isAllMerged_ = false;
-
-    float followSpeed_ = 12.0f;
-    float slotBaseRadius_ = 1.4f;
-    float slotRowSpacing_ = 0.9f;
+    float mergePickupRadius_ = 4.5f;
     float separationRadius_ = 0.6f;
 };

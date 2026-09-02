@@ -120,7 +120,7 @@ void PikminPlayer::SetMerged(bool merged) {
     }
 }
 
-void PikminPlayer::Update(float deltaTime, KeyInput* keyInput, MinionManager* minionManager, MouseInput* mouseInput, AimGuide* aimGuide) {
+void PikminPlayer::Update(float deltaTime, KeyInput* keyInput, MinionManager* minionManager, MouseInput* mouseInput, AimGuide* aimGuide, const Vector2& stageTilt) {
     throwCooldownTimer_ -= deltaTime;
     mergeScaleAnimation_ = (std::min)(1.0f, mergeScaleAnimation_ + deltaTime * 4.0f);
     totalTime_ += deltaTime;
@@ -129,26 +129,13 @@ void PikminPlayer::Update(float deltaTime, KeyInput* keyInput, MinionManager* mi
     slimeParams_.impulseStrength *= (1.0f - deltaTime * 5.0f);
     if (slimeParams_.impulseStrength < 0.001f) slimeParams_.impulseStrength = 0.0f;
 
-    Vector3 moveDir = { 0.0f, 0.0f, 0.0f };
-
     if (keyInput) {
-        if (keyInput->PushKey(DIK_W) || keyInput->PushKey(DIK_UP)) moveDir.z += 1.0f;
-        if (keyInput->PushKey(DIK_S) || keyInput->PushKey(DIK_DOWN)) moveDir.z -= 1.0f;
-        if (keyInput->PushKey(DIK_A) || keyInput->PushKey(DIK_LEFT)) moveDir.x -= 1.0f;
-        if (keyInput->PushKey(DIK_D) || keyInput->PushKey(DIK_RIGHT)) moveDir.x += 1.0f;
-
         if (keyInput->TriggerKey(DIK_E)) {
             ToggleMerge();
         }
-
-        if (keyInput->PushKey(DIK_Q)) {
-            if (minionManager) {
-                minionManager->Whistle(position_, 10.0f);
-            }
-        }
     }
 
-    // --- マウスによる投擲 & ホイッスル ---
+    // --- マウスによる投擲 ---
     if (!isMerged_ && mouseInput && minionManager) {
         // マウス左クリックで目標地点へ投擲（クリック単発 または 押しっぱなし連射）
         bool isThrowRequested = mouseInput->TriggerButton(0) || mouseInput->PushButton(0);
@@ -168,51 +155,44 @@ void PikminPlayer::Update(float deltaTime, KeyInput* keyInput, MinionManager* mi
                 }
             }
         }
-
-        // マウス右クリックでマウス位置へホイッスル（呼び戻し）
-        if (mouseInput->TriggerButton(1) || mouseInput->PushButton(1)) {
-            if (aimGuide && aimGuide->IsTargetValid()) {
-                minionManager->Whistle(aimGuide->GetTargetPosition(), 8.0f);
-            } else {
-                minionManager->Whistle(position_, 10.0f);
-            }
-        }
     }
 
-    float currentSpeed = isMerged_ ? mergedMoveSpeed_ : normalMoveSpeed_;
-    float len = std::sqrt(moveDir.x * moveDir.x + moveDir.z * moveDir.z);
+    // --- ステージ傾斜による物理加速度と摩擦（ティルト移動） ---
+    // stageTilt.x: ピッチ（手前/奥）、stageTilt.y: ロール（左/右）
+    float accelScale = isMerged_ ? (tiltAccel_ * 1.3f) : tiltAccel_;
+    float accelX = -std::sin(stageTilt.y) * accelScale;
+    float accelZ = std::sin(stageTilt.x) * accelScale;
 
-    // 現在の速度を記録（スクワッシュ計算用）
-    Vector3 currentVelocity = { 0.0f, 0.0f, 0.0f };
+    velocity_.x += accelX * deltaTime;
+    velocity_.z += accelZ * deltaTime;
 
-    if (len > 0.001f) {
-        moveDir.x /= len;
-        moveDir.z /= len;
+    // 地面摩擦によるスムーズ減速（合体時は慣性を大きくして滑らかに転がる）
+    float currentFriction = isMerged_ ? (friction_ * 0.7f) : friction_;
+    float decay = 1.0f - (std::min)(1.0f, currentFriction * deltaTime);
+    velocity_.x *= decay;
+    velocity_.z *= decay;
 
-        currentVelocity.x = moveDir.x * currentSpeed;
-        currentVelocity.z = moveDir.z * currentSpeed;
+    // 物理位置の更新
+    position_.x += velocity_.x * deltaTime;
+    position_.z += velocity_.z * deltaTime;
 
-        position_.x += moveDir.x * currentSpeed * deltaTime;
-        position_.z += moveDir.z * currentSpeed * deltaTime;
+    // 球体としての転がり回転（Rolling Rotation）
+    float rollSpeedFactor = isMerged_ ? 2.5f : 4.0f;
+    rotation_.x += velocity_.z * deltaTime * rollSpeedFactor;
+    rotation_.z -= velocity_.x * deltaTime * rollSpeedFactor;
 
-        float targetYaw = std::atan2(moveDir.x, moveDir.z);
+    // 進行方向へのスムーズな旋回（通常時）
+    float speed = std::sqrt(velocity_.x * velocity_.x + velocity_.z * velocity_.z);
+    if (speed > 0.2f && !isMerged_) {
+        float targetYaw = std::atan2(velocity_.x, velocity_.z);
         float diff = targetYaw - rotation_.y;
         while (diff > kPi) diff -= 2.0f * kPi;
         while (diff < -kPi) diff += 2.0f * kPi;
         rotation_.y += diff * (std::min)(1.0f, rotationSpeed_ * deltaTime);
-
-        if (isMerged_) {
-            rotation_.x += currentSpeed * deltaTime * 1.5f;
-        } else {
-            rotation_.x = 0.0f;
-        }
-    } else {
-        if (!isMerged_) {
-            rotation_.x = 0.0f;
-        }
     }
 
     // --- スクワッシュ＆ストレッチの計算（移動の慣性から） ---
+    Vector3 currentVelocity = velocity_;
     Vector3 accel = {
         (currentVelocity.x - prevVelocity_.x) / (std::max)(deltaTime, 0.001f),
         0.0f,

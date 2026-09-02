@@ -27,7 +27,7 @@ void Minion::Initialize(Object3dCom* object3dCom, Camera* camera, const Vector3&
     camera_ = camera;
     position_ = spawnPos;
     type_ = type;
-    state_ = MinionState::Following;
+    state_ = MinionState::Rolling;
     isActive_ = true;
 
     // スライム球体メッシュを生成（滑らかな小スライム）
@@ -105,7 +105,7 @@ void Minion::AttractTo(const Vector3& attractCenter, float attractSpeed) {
     }
 }
 
-void Minion::Update(float deltaTime) {
+void Minion::Update(float deltaTime, const Vector2& stageTilt) {
     if (!isActive_) {
         if (collider_) {
             collider_->SetIsEnabled(false);
@@ -132,45 +132,40 @@ void Minion::Update(float deltaTime) {
     slimeParams_.squashStretch.z *= 0.9f;
 
     switch (state_) {
-    case MinionState::Following: {
-        Vector3 diff = targetSlotPos_ - position_;
-        diff.y = 0.0f;
-        float dist = std::sqrt(diff.x * diff.x + diff.z * diff.z);
+    case MinionState::Rolling: {
+        // ステージ傾斜による下り坂重力加速度の適用
+        // stageTilt.x: ピッチ（手前/奥）、stageTilt.y: ロール（左/右）
+        float accelX = -std::sin(stageTilt.y) * tiltAccel_;
+        float accelZ = std::sin(stageTilt.x) * tiltAccel_;
 
-        if (dist > 0.05f) {
-            // 距離が離れている場合はダッシュして素早く隊列に復帰
-            float targetSpeed = followSpeed_;
-            if (dist > 4.0f) {
-                targetSpeed = followSpeed_ * (std::min)(1.6f, 1.0f + (dist - 4.0f) * 0.08f);
-            } else if (dist < 0.8f) {
-                targetSpeed = (dist / 0.8f) * followSpeed_; // スロット直前のみ滑らかに減速
-            }
-            Vector3 desiredVel = { (diff.x / dist) * targetSpeed, 0.0f, (diff.z / dist) * targetSpeed };
+        velocity_.x += accelX * deltaTime;
+        velocity_.z += accelZ * deltaTime;
 
-            // 慣性を持った速度補間
-            velocity_.x += (desiredVel.x - velocity_.x) * (std::min)(1.0f, deltaTime * 10.0f);
-            velocity_.z += (desiredVel.z - velocity_.z) * (std::min)(1.0f, deltaTime * 10.0f);
+        // 地面摩擦による減速
+        float decay = 1.0f - (std::min)(1.0f, friction_ * deltaTime);
+        velocity_.x *= decay;
+        velocity_.z *= decay;
 
-            position_.x += velocity_.x * deltaTime;
-            position_.z += velocity_.z * deltaTime;
+        // 物理位置更新
+        position_.x += velocity_.x * deltaTime;
+        position_.z += velocity_.z * deltaTime;
 
-            // スムーズな旋回
-            float moveSpeed = std::sqrt(velocity_.x * velocity_.x + velocity_.z * velocity_.z);
-            if (moveSpeed > 0.1f) {
-                float targetYaw = std::atan2(velocity_.x, velocity_.z);
-                float diffYaw = targetYaw - rotation_.y;
-                while (diffYaw > 3.14159265f) diffYaw -= 2.0f * 3.14159265f;
-                while (diffYaw < -3.14159265f) diffYaw += 2.0f * 3.14159265f;
-                rotation_.y += diffYaw * (std::min)(1.0f, deltaTime * 12.0f);
-            }
-        } else {
-            velocity_.x *= 0.8f;
-            velocity_.z *= 0.8f;
+        // 転がり回転（球体としての回転）
+        rotation_.x += velocity_.z * deltaTime * 5.0f;
+        rotation_.z -= velocity_.x * deltaTime * 5.0f;
+
+        // 進行方向へのスムーズな旋回
+        float currentSpeed = std::sqrt(velocity_.x * velocity_.x + velocity_.z * velocity_.z);
+        if (currentSpeed > 0.1f) {
+            float targetYaw = std::atan2(velocity_.x, velocity_.z);
+            float diffYaw = targetYaw - rotation_.y;
+            while (diffYaw > 3.14159265f) diffYaw -= 2.0f * 3.14159265f;
+            while (diffYaw < -3.14159265f) diffYaw += 2.0f * 3.14159265f;
+            rotation_.y += diffYaw * (std::min)(1.0f, deltaTime * 8.0f);
         }
 
         // 移動速度に応じたピョコピョコ跳ねアニメーション
-        float currentSpeed = std::sqrt(velocity_.x * velocity_.x + velocity_.z * velocity_.z);
-        float bounceRate = (currentSpeed > 0.5f) ? (14.0f + (currentSpeed / followSpeed_) * 6.0f) : 8.0f;
+        float bounceRate = (currentSpeed > 0.5f) ? (14.0f + (currentSpeed / 10.0f) * 6.0f) : 8.0f;
         float bounceHeight = (currentSpeed > 0.5f) ? 0.08f : 0.03f;
 
         // 接地Y座標の維持 ＋ ピョコピョコ跳ね
@@ -220,7 +215,7 @@ void Minion::Update(float deltaTime) {
                 slimeParams_.impulseStrength = 0.15f;
             } else {
                 velocity_ = { 0.0f, 0.0f, 0.0f };
-                state_ = MinionState::Following;
+                state_ = MinionState::Rolling;
             }
         }
 

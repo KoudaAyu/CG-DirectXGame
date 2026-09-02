@@ -39,7 +39,7 @@ public:
     ~PikminPlayer();
 
     void Initialize(Object3dCom* object3dCom, Camera* camera, const Vector3& startPos = { 0.0f, 0.0f, 0.0f });
-    void Update(float deltaTime, KeyInput* keyInput, MinionManager* minionManager, MouseInput* mouseInput = nullptr, AimGuide* aimGuide = nullptr);
+    void Update(float deltaTime, KeyInput* keyInput, MinionManager* minionManager, MouseInput* mouseInput = nullptr, AimGuide* aimGuide = nullptr, const Vector2& stageTilt = { 0.0f, 0.0f });
     void Draw(const RenderContext& ctx);
 
     // --- ゲッター / セッター ---
@@ -54,10 +54,10 @@ public:
     void SetMerged(bool merged);
 
     // パラメータ
-    float GetNormalSpeed() const { return normalMoveSpeed_; }
-    void SetNormalSpeed(float s) { normalMoveSpeed_ = s; }
-    float GetMergedSpeed() const { return mergedMoveSpeed_; }
-    void SetMergedSpeed(float s) { mergedMoveSpeed_ = s; }
+    float GetTiltAccel() const { return tiltAccel_; }
+    void SetTiltAccel(float a) { tiltAccel_ = a; }
+    float GetFriction() const { return friction_; }
+    void SetFriction(float f) { friction_ = f; }
 
     // スライムパラメータの公開（ImGui調整用）
     SlimeParamsCPU& GetSlimeParams() { return slimeParams_; }
@@ -90,8 +90,8 @@ private:
     bool isMerged_ = false;
 
     // パラメータ
-    float normalMoveSpeed_ = 8.0f;
-    float mergedMoveSpeed_ = 14.0f;
+    float tiltAccel_ = 32.0f;
+    float friction_ = 3.2f;
     float rotationSpeed_ = 12.0f;
 
     // 投擲クールダウン
