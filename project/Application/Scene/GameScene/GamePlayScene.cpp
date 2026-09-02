@@ -1848,6 +1848,12 @@ RenderContext GamePlayScene::BuildRenderContext() const
 
 void GamePlayScene::Draw(SceneRenderRequests& renderRequests)
 {
+	// 描画前にカメラを最新フレームのGPUアドレスで更新（初回フレームでも確実にcameraGpuAddress_を有効化）
+	if (camera_)
+	{
+		camera_->Update();
+	}
+
 	renderRequests.sceneDrawn = true;
 	const RenderContext ctx = BuildRenderContext();
 
