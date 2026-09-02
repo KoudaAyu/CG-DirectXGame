@@ -182,7 +182,7 @@ void Object3d::InitializeShared(Object3dCom *object3dCom,
 
   // Copy material settings
   materialData_ = masterObject->materialData_;
-  directionalLightData_ = masterObject->directionalLightData_;
+  lightData_ = masterObject->lightData_;
 
   // Copy skinning / animator reference
   skeleton_ = masterObject->skeleton_;
@@ -413,10 +413,10 @@ void Object3d::DrawInternal(const RenderContext &ctx) {
                                         transformationMatrixGpuAddress_);
 
   // ライト定数バッファのバインド (前回と同じアドレスならスキップ)
-  if (s_lastLightAddress != directionalLightGpuAddress_) {
+  if (s_lastLightAddress != lightGpuAddress_) {
     ctx.SetGraphicsRootConstantBufferView(RootParam::Object3D::kLight,
-                                          directionalLightGpuAddress_);
-    s_lastLightAddress = directionalLightGpuAddress_;
+                                          lightGpuAddress_);
+    s_lastLightAddress = lightGpuAddress_;
   }
 
   if (indexResource && !modelData_.indices.empty()) {
@@ -745,10 +745,16 @@ void Object3d::TransformationMatrixResource() {
 }
 
 void Object3d::DirectionalLightResource() {
-  // 初期値を書き込む
-  directionalLightData_.color = {1.0f, 1.0f, 1.0f, 1.0f};
-  directionalLightData_.direction = {0.0f, -1.0f, 0.0f};
-  directionalLightData_.intensity = 1.0f;
+  // 初期値を書き込む (平行光源: 白・下向き・強度1.0, 点光源: 消灯)
+  lightData_.directionalLight.color = {1.0f, 1.0f, 1.0f, 1.0f};
+  lightData_.directionalLight.direction = {0.0f, -1.0f, 0.0f};
+  lightData_.directionalLight.intensity = 1.0f;
+
+  lightData_.pointLight.color = {1.0f, 1.0f, 1.0f, 1.0f};
+  lightData_.pointLight.position = {0.0f, 0.0f, 0.0f};
+  lightData_.pointLight.intensity = 0.0f;
+  lightData_.pointLight.radius = 10.0f;
+  lightData_.pointLight.decay = 2.0f;
 }
 
 void Object3d::PrepareConstantBuffers(DirectXCom *dx) {
@@ -777,12 +783,12 @@ void Object3d::PrepareConstantBuffers(DirectXCom *dx) {
   // ライトバッファの割り当てとコピー
   // (共有オブジェクトならマスタのアドレスを使い回す)
   if (isShared_ && masterObject_) {
-    directionalLightGpuAddress_ = masterObject_->directionalLightGpuAddress_;
+    lightGpuAddress_ = masterObject_->lightGpuAddress_;
   } else {
-    auto lightAlloc = cbAllocator->Allocate(sizeof(DirectionalLight));
-    std::memcpy(lightAlloc.cpuAddress, &directionalLightData_,
-                sizeof(DirectionalLight));
-    directionalLightGpuAddress_ = lightAlloc.gpuAddress;
+    auto lightAlloc = cbAllocator->Allocate(sizeof(LightGroup));
+    std::memcpy(lightAlloc.cpuAddress, &lightData_,
+                sizeof(LightGroup));
+    lightGpuAddress_ = lightAlloc.gpuAddress;
   }
 }
 

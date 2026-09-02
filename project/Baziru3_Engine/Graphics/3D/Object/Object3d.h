@@ -59,6 +59,20 @@ public:
     float intensity;
   };
 
+  struct PointLight {
+    Vector4 color;     // ライトカラー (RGB) + 未使用 (A)
+    Vector3 position;  // 3D座標
+    float intensity;   // 輝度
+    float radius;      // 影響半径
+    float decay;       // 減衰率 (2.0f: 逆二乗則準拠)
+    float padding[2];  // 16バイト境界アライメント
+  };
+
+  struct LightGroup {
+    DirectionalLight directionalLight;
+    PointLight pointLight;
+  };
+
   Object3d();
 
   // 簡易初期化：SceneManager から Object3dCom を自動取得してモデルを読み込む（最も推奨される初期化方法）
@@ -132,8 +146,13 @@ public:
     return materialGpuAddress_;
   }
   D3D12_GPU_VIRTUAL_ADDRESS GetDirectionalLightGPUAddress() const {
-    return directionalLightGpuAddress_;
+    return lightGpuAddress_;
   }
+  D3D12_GPU_VIRTUAL_ADDRESS GetLightGPUAddress() const {
+    return lightGpuAddress_;
+  }
+  LightGroup &GetLightData() { return lightData_; }
+  const LightGroup &GetLightData() const { return lightData_; }
   const Microsoft::WRL::ComPtr<ID3D12Resource> &GetVertexResource() const {
     return vertexResource;
   }
@@ -213,12 +232,12 @@ private:
   // 定数データの実体
   Material materialData_{};
   TransformationMatrix transformationMatrixData_{};
-  DirectionalLight directionalLightData_{};
+  LightGroup lightData_{};
 
   // 毎フレーム割り当てられるGPU仮想アドレスのキャッシュ
   D3D12_GPU_VIRTUAL_ADDRESS materialGpuAddress_ = 0;
   D3D12_GPU_VIRTUAL_ADDRESS transformationMatrixGpuAddress_ = 0;
-  D3D12_GPU_VIRTUAL_ADDRESS directionalLightGpuAddress_ = 0;
+  D3D12_GPU_VIRTUAL_ADDRESS lightGpuAddress_ = 0;
 
   // アニメーション / スケルトン / スキンクラスター
   Animator animator_;
