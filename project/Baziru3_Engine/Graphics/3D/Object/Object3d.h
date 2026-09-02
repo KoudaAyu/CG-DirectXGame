@@ -198,11 +198,15 @@ public:
   void SetFresnelF0(float f0);
 
   void SetDeltaTime(float dt) { deltaTime_ = dt; }
+  void SetAllowWireframeOverlay(bool allow) { allowWireframeOverlay_ = allow; }
+  bool IsAllowWireframeOverlay() const { return allowWireframeOverlay_; }
   bool HasAnimation() const { return animator_.HasAnimation(); }
   Skeleton &GetSkeleton() { return skeleton_; }
   const Skeleton &GetSkeleton() const { return skeleton_; }
   const SkinCluster &GetSkinCluster() const { return skinCluster_; }
   bool IsShared() const { return isShared_; }
+  class SphereCollider* GetAutoCollider() const { return autoCollider_.get(); }
+  void SetEnableAutoCollider(bool enable, int attribute = 3 /*Obstacle*/, float radius = 0.0f);
 
 public:
   void DrawInternal(const RenderContext &ctx);
@@ -251,5 +255,9 @@ private:
   bool wasDrawnLastFrame_ = false;
   bool isShared_ = false;
   bool isCulled_ = false;
+  bool allowWireframeOverlay_ = true;
   Object3d *masterObject_ = nullptr;
+
+  // エンジン自動当たり判定コライダー
+  std::unique_ptr<class SphereCollider> autoCollider_;
 };

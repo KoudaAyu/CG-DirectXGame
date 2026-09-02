@@ -14,9 +14,9 @@
 #include "Baziru3_Engine/Graphics/3D/Object/Object3d.h"
 #include "Baziru3_Engine/Graphics/Shapes/Sphere/Sphere.h"
 #include "ModelManager.h"
-#include <Log.h>
 #include <cassert>
 #include <memory>
+#include "externals/imgui/imgui.h"
 
 namespace {
 static std::unique_ptr<SceneManager> &SceneManagerStorage() {
@@ -40,17 +40,74 @@ void SceneManager::ChangeScene(const std::string &sceneName) {
     sceneFactory_ = std::make_unique<SceneFactory>();
   }
 
-  auto newScene = sceneFactory_->CreateScene(sceneName);
-  if (!newScene) {
-    std::string errMsg = "[SceneManager ERROR] ChangeScene failed to create scene: " + sceneName + "\n";
-    OutputDebugStringA(errMsg.c_str());
-    Logger::Log(logStream_, errMsg);
-    return;
-  }
-
+  pendingSceneName_ = sceneName;
   std::string msg = "[SceneManager] ChangeScene requested: " + sceneName + "\n";
   OutputDebugStringA(msg.c_str());
-  nextScene_ = std::move(newScene);
+
+  if (fadeApplication_ && fadeApplication_->IsAvailable()) {
+    transitionState_ = TransitionState::FadeOut;
+    transitionTimer_ = 0.0f;
+    int frames = (std::max)(1, static_cast<int>(fadeDuration_ * 60.0f));
+    fadeApplication_->StartFadeOut(frames);
+  } else {
+    // フェードが無い場合は即時切り替え
+    auto newScene = sceneFactory_->CreateScene(sceneName);
+    if (newScene) {
+      nextScene_ = std::move(newScene);
+      CommitPendingSceneChange();
+      currentSceneName_ = sceneName;
+    }
+    transitionState_ = TransitionState::None;
+  }
+}
+
+std::vector<std::string> SceneManager::GetAvailableSceneNames() const {
+  if (sceneFactory_) {
+    return sceneFactory_->GetRegisteredSceneNames();
+  }
+  return { "DEFAULT" };
+}
+
+void SceneManager::DrawSceneSelectorUI() {
+  ImGui::Begin("Engine Scene Manager");
+  ImGui::TextColored(ImVec4(0.2f, 0.85f, 1.0f, 1.0f), "Current Scene: %s", currentSceneName_.c_str());
+  
+  const char* stateStr = "Idle";
+  if (transitionState_ == TransitionState::FadeOut) stateStr = "Fading Out...";
+  else if (transitionState_ == TransitionState::Switching) stateStr = "Switching...";
+  else if (transitionState_ == TransitionState::FadeIn) stateStr = "Fading In...";
+  ImGui::Text("Transition: %s", stateStr);
+
+  if (ImGui::Button("Restart Scene (F5)", ImVec2(160, 0))) {
+    RestartCurrentScene();
+  }
+  ImGui::SameLine();
+  ImGui::SliderFloat("Fade Duration", &fadeDuration_, 0.05f, 1.5f, "%.2fs");
+  ImGui::Separator();
+
+  ImGui::Text("Switch Scene:");
+  std::vector<std::string> scenes = GetAvailableSceneNames();
+  for (const auto& name : scenes) {
+    bool isCurrent = (name == currentSceneName_);
+    if (isCurrent) ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.7f, 0.3f, 1.0f));
+    if (ImGui::Button(name.c_str(), ImVec2(100, 0))) {
+      ChangeScene(name);
+    }
+    if (isCurrent) ImGui::PopStyleColor();
+    ImGui::SameLine();
+  }
+  ImGui::NewLine();
+
+  // シーン共有データ（Context）の表示
+  if (!sceneContextData_.empty()) {
+    if (ImGui::CollapsingHeader("Scene Context Data", ImGuiTreeNodeFlags_DefaultOpen)) {
+      for (const auto& [k, v] : sceneContextData_) {
+        ImGui::Text("  [%s] = %s", k.c_str(), v.c_str());
+      }
+    }
+  }
+
+  ImGui::End();
 }
 
 SceneManager *SceneManager::GetInstance() {
@@ -86,22 +143,61 @@ void SceneManager::Update(float deltaTime) {
     return;
   }
 
-  AsyncLoader::GetInstance()->Update();
+  // F5 キーによる開発用即時リスタート
+  if ((GetAsyncKeyState(VK_F5) & 0x0001) && transitionState_ == TransitionState::None) {
+    RestartCurrentScene();
+  }
 
-  ApplyPendingSceneChange();
+  // フェードの更新
+  if (fadeApplication_) {
+    fadeApplication_->Update();
+  }
+
+  // シーン遷移ステートマシンの更新
+  if (transitionState_ == TransitionState::FadeOut) {
+    transitionTimer_ += deltaTime;
+    if ((fadeApplication_ && fadeApplication_->IsFadeOutFinished()) || transitionTimer_ >= fadeDuration_) {
+      transitionState_ = TransitionState::Switching;
+    }
+  }
+
+  if (transitionState_ == TransitionState::Switching) {
+    if (!sceneFactory_) {
+      sceneFactory_ = std::make_unique<SceneFactory>();
+    }
+    auto newScene = sceneFactory_->CreateScene(pendingSceneName_);
+    if (newScene) {
+      nextScene_ = std::move(newScene);
+      CommitPendingSceneChange();
+      currentSceneName_ = pendingSceneName_;
+    }
+
+    transitionState_ = TransitionState::FadeIn;
+    transitionTimer_ = 0.0f;
+    if (fadeApplication_) {
+      int frames = (std::max)(1, static_cast<int>(fadeDuration_ * 60.0f));
+      fadeApplication_->StartFadeIn(frames);
+    }
+  } else if (transitionState_ == TransitionState::FadeIn) {
+    transitionTimer_ += deltaTime;
+    if ((fadeApplication_ && !fadeApplication_->IsBusy()) || transitionTimer_ >= fadeDuration_) {
+      transitionState_ = TransitionState::None;
+    }
+  }
 
   // 実行中のシーンを更新
   if (scene_) {
     scene_->Update();
   }
 
+  // ImGui デバッグUIの描画
+  DrawSceneSelectorUI();
+
   // Engine-level subsystems: update particle manager so that scenes may
   // add particle definitions but the engine performs simulation.
   if (particleManager_) {
     particleManager_->Update(deltaTime);
   }
-
-  ApplyPendingSceneChange();
 }
 
 void SceneManager::ApplyPendingSceneChange() {

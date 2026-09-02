@@ -19,7 +19,8 @@ struct CollisionData
         float radius = 0.0f;
         float height = 0.0f;
         Vector3 size;      // Box用
-        Vector3 rotation;  // Boxの回転（オイラー角）
+        Vector3 scale{ 1.0f, 1.0f, 1.0f }; // 3軸変形スケール
+        Vector3 rotation;  // 回転（オイラー角）
     } shape;
 };
 
@@ -85,7 +86,7 @@ public:
     // --- レイキャスト (Raycast) 判定機能 ---
     
     /// <summary>
-    /// レイ（光線）と登録されたコライダーとの交差判定を行い、最も近い衝突情報を取得します。
+    /// レイ（光線）とすべてのコライダーとの交差判定を行い、最も近い衝突情報を取得します。
     /// </summary>
     bool Raycast(const Vector3& rayStart, const Vector3& rayDir, float maxDist, Collider*& outHitCollider, float& outHitDist, uint32_t targetAttributeMask = 0xFFFFFFFF);
 

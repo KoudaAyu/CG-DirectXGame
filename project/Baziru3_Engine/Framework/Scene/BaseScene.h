@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include <string>
 
 class DirectXCom;
 class SceneManager;
@@ -33,6 +34,23 @@ public:
   virtual void SetSceneManager(SceneManager *sceneManager) {
     sceneManager_ = sceneManager;
   }
+
+  // --- アプリ開発用 直感ショートカット API ---
+  void ChangeScene(const std::string &sceneName);
+  void RestartScene();
+
+  SceneManager *GetSceneManager() const { return sceneManager_; }
+  Camera *GetCamera() const { return camera_; }
+  DirectXCom *GetDirectXCom() const { return dxCommon_; }
+
+  // シーン間パラメータ共有（Scene Context）
+  void SetSceneData(const std::string &key, const std::string &value);
+  void SetSceneDataInt(const std::string &key, int value);
+  void SetSceneDataFloat(const std::string &key, float value);
+
+  std::string GetSceneData(const std::string &key, const std::string &defaultVal = "") const;
+  int GetSceneDataInt(const std::string &key, int defaultVal = 0) const;
+  float GetSceneDataFloat(const std::string &key, float defaultVal = 0.0f) const;
 
 protected:
   // 各種マネージャへの簡単アクセス用ショートカットゲッター

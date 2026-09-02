@@ -37,6 +37,7 @@ private:
 
 	void CreateSpritePipelines(DirectXCom* dxCommon);
 	void CreateObject3dPipelines(DirectXCom* dxCommon);
+	void CreateSlimePipelines(DirectXCom* dxCommon);
 
 private:
 	void LoadPipelineLibrary(ID3D12Device* device);
