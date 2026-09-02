@@ -102,6 +102,9 @@
     <ClCompile Include="Baziru3_Engine\Graphics\3D\Object\SkinningObject3dCom.cpp" />
     <ClCompile Include="Baziru3_Engine\Core\Base\SubsystemFactory.cpp" />
     <ClCompile Include="Baziru3_Engine\Framework\Collision\Collider.cpp" />
+    <ClCompile Include="Baziru3_Engine\Framework\Collision\SoftBodyDeformer.cpp" />
+    <ClCompile Include="Baziru3_Engine\Framework\Collision\CollisionShapes.cpp" />
+    <ClCompile Include="Baziru3_Engine\Framework\Collision\CollisionDebugDraw.cpp" />
     <ClCompile Include="Baziru3_Engine\3D\Water\River.cpp" />
     <ClCompile Include="Baziru3_Engine\3D\Procedural\BioProceduralGenerator.cpp" />
     <ClCompile Include="Baziru3_Engine\Graphics\Graphics\GpuProfiler.cpp" />
@@ -236,6 +239,9 @@
     </FxCompile>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Baziru3_Engine\Framework\Collision\SoftBodyDeformer.h" />
+    <ClInclude Include="Baziru3_Engine\Framework\Collision\CollisionShapes.h" />
+    <ClInclude Include="Baziru3_Engine\Framework\Collision\CollisionDebugDraw.h" />
     <ClInclude Include="Baziru3_Engine\Framework\Animation\NodeAnimation\Node.h" />
     <ClInclude Include="Baziru3_Engine\Framework\Animation\NodeAnimation\NodeStruct.h" />
     <ClInclude Include="Baziru3_Engine\Graphics\3D\Model\SkinCluster\SkinCluster.h" />
