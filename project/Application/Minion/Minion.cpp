@@ -166,11 +166,11 @@ void Minion::Update(float deltaTime, const Vector2& stageTilt) {
         rotation_.z = -stageTilt.y;
 
         // 傾斜面の上に乗る（床の傾斜に沿って底面がピタッと接地）
-        float nx = std::sin(stageTilt.y);
-        float nz = std::sin(stageTilt.x);
-        float nLen = std::sqrt(nx * nx + 1.0f + nz * nz);
-        float groundHeight = -position_.z * nz - position_.x * nx;
-        position_.y = groundHeight + groundY_ / nLen;
+        float cosPitch = std::cos(stageTilt.x);
+        float cosRoll = std::cos(stageTilt.y);
+        float ny = (std::max)(cosPitch * cosRoll, 0.01f);
+        float groundHeight = -std::tan(stageTilt.y) * position_.x - (std::tan(stageTilt.x) / (std::max)(cosRoll, 0.01f)) * position_.z;
+        position_.y = groundHeight + groundY_ / ny;
         scale_ = { 0.35f, 0.35f, 0.35f };
 
         // --- 液体スライムの傾斜流動＆スクワッシュ変形 ---
@@ -241,8 +241,11 @@ void Minion::Update(float deltaTime, const Vector2& stageTilt) {
         slimeParams_.squashStretch.y += (targetSquashY - slimeParams_.squashStretch.y) * (std::min)(1.0f, deltaTime * 12.0f);
 
         // 地面着地判定（傾いた板との接触判定）
-        float groundHeight = -position_.z * std::sin(stageTilt.x) - position_.x * std::sin(stageTilt.y);
-        float landingY = groundHeight + groundY_;
+        float cosPitch = std::cos(stageTilt.x);
+        float cosRoll = std::cos(stageTilt.y);
+        float ny = (std::max)(cosPitch * cosRoll, 0.01f);
+        float groundHeight = -std::tan(stageTilt.y) * position_.x - (std::tan(stageTilt.x) / (std::max)(cosRoll, 0.01f)) * position_.z;
+        float landingY = groundHeight + groundY_ / ny;
         if (position_.y <= landingY) {
             position_.y = landingY;
             velocity_.y = 0.0f;
@@ -261,8 +264,11 @@ void Minion::Update(float deltaTime, const Vector2& stageTilt) {
     }
 
     case MinionState::Idle: {
-        float groundHeight = -position_.z * std::sin(stageTilt.x) - position_.x * std::sin(stageTilt.y);
-        position_.y = groundHeight + groundY_;
+        float cosPitch = std::cos(stageTilt.x);
+        float cosRoll = std::cos(stageTilt.y);
+        float ny = (std::max)(cosPitch * cosRoll, 0.01f);
+        float groundHeight = -std::tan(stageTilt.y) * position_.x - (std::tan(stageTilt.x) / (std::max)(cosRoll, 0.01f)) * position_.z;
+        position_.y = groundHeight + groundY_ / ny;
         scale_ = { 0.35f, 0.35f, 0.35f };
         break;
     }
@@ -273,7 +279,10 @@ void Minion::Update(float deltaTime, const Vector2& stageTilt) {
     }
 
     // 傾斜面の高さ変動に対する絶対安全クランプ（角度変更時にも地面の下に100%埋まらない）
-    float currentGroundSurfaceY = -position_.z * std::sin(stageTilt.x) - position_.x * std::sin(stageTilt.y) + groundY_;
+    float cosPitchSafe = std::cos(stageTilt.x);
+    float cosRollSafe = std::cos(stageTilt.y);
+    float nySafe = (std::max)(cosPitchSafe * cosRollSafe, 0.01f);
+    float currentGroundSurfaceY = -std::tan(stageTilt.y) * position_.x - (std::tan(stageTilt.x) / (std::max)(cosRollSafe, 0.01f)) * position_.z + groundY_ / nySafe;
     if (position_.y < currentGroundSurfaceY) {
         position_.y = currentGroundSurfaceY;
         if (state_ == MinionState::Thrown) {

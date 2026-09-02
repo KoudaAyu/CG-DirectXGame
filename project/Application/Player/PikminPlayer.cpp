@@ -218,11 +218,11 @@ void PikminPlayer::Update(float deltaTime, KeyInput* keyInput, MinionManager* mi
     // シェーダー時間の更新
     slimeParams_.time = totalTime_;
 
-    // 傾斜面の法線補正
-    float nx = std::sin(stageTilt.y);
-    float nz = std::sin(stageTilt.x);
-    float nLen = std::sqrt(nx * nx + 1.0f + nz * nz);
-    float groundHeight = -position_.z * nz - position_.x * nx;
+    // 傾斜面（地面プレーン）の厳密な高さと法線計算（D+S同時押しなどの合成傾斜でも1ミリの誤差なく完全一致）
+    float cosPitch = std::cos(stageTilt.x);
+    float cosRoll = std::cos(stageTilt.y);
+    float ny = (std::max)(cosPitch * cosRoll, 0.01f);
+    float groundHeight = -std::tan(stageTilt.y) * position_.x - (std::tan(stageTilt.x) / (std::max)(cosRoll, 0.01f)) * position_.z;
 
     if (isMerged_) {
         int mergedCount = minionManager ? minionManager->GetMergedCount() : 0;
@@ -244,7 +244,7 @@ void PikminPlayer::Update(float deltaTime, KeyInput* keyInput, MinionManager* mi
         slimeParams_.baseColor = { 1.0f, 0.8f, 0.2f, 0.92f };
 
         // 傾斜面の上に乗る（床に沿って底面がピタッと完全接地）
-        position_.y = groundHeight + (currentScale * 0.65f) / nLen;
+        position_.y = groundHeight + (currentScale * 0.65f) / ny;
         if (collider_) {
             collider_->SetRadius(currentScale * 0.8f);
         }
@@ -263,7 +263,7 @@ void PikminPlayer::Update(float deltaTime, KeyInput* keyInput, MinionManager* mi
         // 通常時のスライムカラー（水色）
         slimeParams_.baseColor = { 0.2f, 0.85f, 1.0f, 0.9f };
 
-        position_.y = groundHeight + (scale_.x * 0.65f) / nLen;
+        position_.y = groundHeight + (scale_.x * 0.65f) / ny;
         if (collider_) {
             collider_->SetRadius(0.8f);
         }

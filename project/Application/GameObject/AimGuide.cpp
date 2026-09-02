@@ -224,49 +224,44 @@ void AimGuide::Update(const Vector3& launchPos, MouseInput* mouseInput, Camera* 
         rayDir.z /= rayLength;
     }
 
-    // 4. 傾斜面との交差判定
-    // 傾斜面: y = -z * sin(tilt.x) - x * sin(tilt.y)
-    // ⇒ x * sin(tilt.y) + y + z * sin(tilt.x) = 0
-    // 法線 N = (sin(tilt.y), 1, sin(tilt.x)), D = 0
-    float nx = std::sin(stageTilt.y);
-    float ny = 1.0f;
+    // 4. 傾斜面との厳密な交差判定
+    // 地面プレーン法線 N = (cos(tilt.x)*sin(tilt.y), cos(tilt.x)*cos(tilt.y), sin(tilt.x))
+    float cosPitch = std::cos(stageTilt.x);
+    float cosRoll = std::cos(stageTilt.y);
+    float nx = cosPitch * std::sin(stageTilt.y);
+    float ny = cosPitch * cosRoll;
     float nz = std::sin(stageTilt.x);
     float denom = nx * rayDir.x + ny * rayDir.y + nz * rayDir.z;
 
-    if (std::abs(denom) > 0.0001f) {
-        float numerator = -(nx * nearPos.x + ny * nearPos.y + nz * nearPos.z);
-        float t = numerator / denom;
-        if (t > 0.0f) {
-            targetPos_ = nearPos + rayDir * t;
-            isValidTarget_ = true;
-        } else {
-            isValidTarget_ = false;
-        }
-    } else {
+    if (std::abs(denom) < 0.0001f) {
         isValidTarget_ = false;
+        return;
     }
 
-    if (!isValidTarget_) return;
+    float t = -(nx * nearPos.x + ny * nearPos.y + nz * nearPos.z) / denom;
+    if (t < 0.0f) {
+        isValidTarget_ = false;
+        return;
+    }
 
-    // 5. 水平距離の算出と射程判定
-    float dx = targetPos_.x - launchPos.x;
-    float dz = targetPos_.z - launchPos.z;
-    float horizontalDist = std::sqrt(dx * dx + dz * dz);
+    targetPos_ = nearPos + rayDir * t;
+    isValidTarget_ = true;
 
+    // 5. 射程距離クランプ（最大射程 15m）
+    Vector3 toTarget = targetPos_ - launchPos;
+    float horizontalDist = std::sqrt(toTarget.x * toTarget.x + toTarget.z * toTarget.z);
     isInRange_ = (horizontalDist <= maxRange_);
-
-    // 射程外の場合は目標地点を射程上限でクランプして計算
     Vector3 clampedTarget = targetPos_;
-    if (!isInRange_ && horizontalDist > 0.0001f) {
+    if (horizontalDist > maxRange_ && horizontalDist > 0.0001f) {
         float ratio = maxRange_ / horizontalDist;
-        clampedTarget.x = launchPos.x + dx * ratio;
-        clampedTarget.z = launchPos.z + dz * ratio;
-        // クランプ後の傾斜面高さを再計算
-        clampedTarget.y = -clampedTarget.z * std::sin(stageTilt.x) - clampedTarget.x * std::sin(stageTilt.y);
+        clampedTarget.x = launchPos.x + toTarget.x * ratio;
+        clampedTarget.z = launchPos.z + toTarget.z * ratio;
+        // 傾斜面上の厳密な高さを再計算
+        clampedTarget.y = -std::tan(stageTilt.y) * clampedTarget.x - (std::tan(stageTilt.x) / (std::max)(cosRoll, 0.01f)) * clampedTarget.z;
         horizontalDist = maxRange_;
     }
 
-    // 6. 滞空時間 T の決定（距離に応じて滑らかに変化）
+    // 6. 飛行時間の計算
     float flightTime = 0.35f + 0.024f * horizontalDist;
 
     // 7. 初速度ベクトルの計算
@@ -276,17 +271,12 @@ void AimGuide::Update(const Vector3& launchPos, MouseInput* mouseInput, Camera* 
 
     // 8. 照準リングの更新（傾斜面に完全平行に配置・法線オフセットでめり込み防止）
     if (reticleObject_) {
-        // 傾斜面の法線ベクトル
-        float nx = std::sin(stageTilt.y);
-        float ny = 1.0f;
-        float nz = std::sin(stageTilt.x);
-        float nLen = std::sqrt(nx * nx + ny * ny + nz * nz);
         float normalOffset = 0.08f; // 地面から法線方向にわずかに浮かせる
 
         Vector3 reticlePos = {
-            targetPos_.x + (nx / nLen) * normalOffset,
-            targetPos_.y + (ny / nLen) * normalOffset,
-            targetPos_.z + (nz / nLen) * normalOffset
+            targetPos_.x + nx * normalOffset,
+            targetPos_.y + ny * normalOffset,
+            targetPos_.z + nz * normalOffset
         };
 
         reticleObject_->SetTranslate(reticlePos);
