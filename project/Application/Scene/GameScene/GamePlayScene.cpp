@@ -1,4 +1,4 @@
-﻿
+
 #include "SceneManager.h"
 #include "MaterialManager.h"
 #include "Light.h"
@@ -650,26 +650,26 @@ void GamePlayScene::UpdateParticles(float deltaTime)
 		}
 	}
 
-	// 3. 川 (River) エリアの控えめで上品なさざ波・水しぶき
+	// 3. 川 (River) エリアのさざ波・水しぶき
 	if (particleManager && appParticleManager_)
 	{
-		// (A) 川の流れに沿って流れる上品なさざ波 (0.4秒おきに1個)
+		// (A) 川の流れに沿って流れる上品なさざ波 (0.15秒おきに放出)
 		static float riverWaveTimer = 0.0f;
 		riverWaveTimer += deltaTime;
-		if (riverWaveTimer >= 0.40f)
+		if (riverWaveTimer >= 0.15f)
 		{
 			appParticleManager_->EmitRiverWaveRipples(particleManager->GetRandomEngine(), particleTextureB);
 			riverWaveTimer = 0.0f;
 		}
 
-		// (B) 川面のパチパチ跳ねる水滴 (0.6秒おき)
+		// (B) 川面のパチパチ跳ねる水滴 (0.25秒おき)
 		static float riverSplashTimer = 0.0f;
 		riverSplashTimer += deltaTime;
-		if (riverSplashTimer >= 0.60f)
+		if (riverSplashTimer >= 0.25f)
 		{
-			std::uniform_real_distribution<float> rxDist(-16.0f, 16.0f);
-			std::uniform_real_distribution<float> rzDist(17.0f, 20.5f);
-			Vector3 sPos = { rxDist(particleManager->GetRandomEngine()), 0.02f, rzDist(particleManager->GetRandomEngine()) };
+			std::uniform_real_distribution<float> rxDist(-18.0f, 18.0f);
+			std::uniform_real_distribution<float> rzDist(16.5f, 21.0f);
+			Vector3 sPos = { rxDist(particleManager->GetRandomEngine()), 0.07f, rzDist(particleManager->GetRandomEngine()) };
 			appParticleManager_->EmitRiverSplashDroplet(particleManager->GetRandomEngine(), sPos, particleTextureB);
 			riverSplashTimer = 0.0f;
 		}

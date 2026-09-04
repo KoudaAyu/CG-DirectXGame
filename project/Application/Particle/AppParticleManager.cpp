@@ -2,6 +2,8 @@
 #include "ParticleEmitter.h"
 #include <algorithm>
 #include <cmath>
+#include <vector>
+#include <unordered_map>
 #include "DirectXCom.h"
 #include <cassert>
 #include "RootParam.h"
@@ -1017,22 +1019,23 @@ void AppParticleManager::EmitHelipadBeaconMotes(std::mt19937& randomEngine, cons
 
 void AppParticleManager::EmitRiverWaveRipples(std::mt19937& randomEngine, uint32_t waterTexIndex)
 {
-	// 川の上流 (X: +22m) から下流 (X: -22m) へ勢いよく流れる水流リップル＆白泡 (4個)
+	// 川の上流 (X: +22m) から下流 (X: -22m) へ勢いよく流れる水流リップル＆白泡 (5個)
 	std::uniform_real_distribution<float> zDist(16.6f, 20.9f);
 	std::uniform_real_distribution<float> xDist(-20.0f, 22.0f);
-	std::uniform_real_distribution<float> speedDist(3.2f, 5.5f);
-	std::uniform_real_distribution<float> scaleDist(0.4f, 0.9f);
-	std::uniform_real_distribution<float> lifeDist(1.2f, 2.5f);
+	std::uniform_real_distribution<float> speedDist(4.5f, 7.0f);
+	std::uniform_real_distribution<float> scaleDist(3.0f, 5.5f);
+	std::uniform_real_distribution<float> lifeDist(1.5f, 3.0f);
 
-	for (int i = 0; i < 4; ++i)
+	for (int i = 0; i < 5; ++i)
 	{
-		Vector3 spawnPos = { xDist(randomEngine), 0.02f, zDist(randomEngine) };
+		// 水面(Y=0.04f)の上に生成して深度テストによるオクルージョン（遮蔽）を解消
+		Vector3 spawnPos = { xDist(randomEngine), 0.07f, zDist(randomEngine) };
 		float spd = speedDist(randomEngine);
 		// X軸マイナス方向（左）へ流れる
-		Vector3 vel = { -spd, 0.0f, (static_cast<float>(rand()) / RAND_MAX - 0.5f) * 0.4f };
+		Vector3 vel = { -spd, 0.0f, (static_cast<float>(rand()) / RAND_MAX - 0.5f) * 0.3f };
 
-		// 白波・青白い水流リップル
-		Vector4 col = (i % 2 == 0) ? Vector4{ 0.9f, 0.95f, 1.0f, 0.45f } : Vector4{ 0.4f, 0.75f, 0.95f, 0.35f };
+		// 白波・青白い水流リップル（白泡とクリアブルー）
+		Vector4 col = (i % 2 == 0) ? Vector4{ 0.95f, 0.98f, 1.0f, 0.85f } : Vector4{ 0.5f, 0.85f, 1.0f, 0.75f };
 
 		EmitDustWithVelocity(randomEngine, spawnPos, scaleDist(randomEngine), col, vel, lifeDist(randomEngine), waterTexIndex);
 	}
@@ -1040,30 +1043,33 @@ void AppParticleManager::EmitRiverWaveRipples(std::mt19937& randomEngine, uint32
 	// 橋脚 (X: -1.2m, +1.2m) に当たって跳ねる水流ウェーブ (白泡)
 	for (float pillarX : { -1.2f, 1.2f })
 	{
-		if (rand() % 100 < 35)
+		if (rand() % 100 < 50)
 		{
-			Vector3 pPos = { pillarX, 0.04f, zDist(randomEngine) };
-			Vector3 pVel = { -2.0f, 0.6f + (static_cast<float>(rand()) / RAND_MAX) * 0.8f, (static_cast<float>(rand()) / RAND_MAX - 0.5f) * 1.2f };
-			Vector4 pCol = { 0.95f, 0.98f, 1.0f, 0.65f };
-			EmitDustWithVelocity(randomEngine, pPos, 0.5f, pCol, pVel, 0.6f, waterTexIndex);
+			Vector3 pPos = { pillarX, 0.075f, zDist(randomEngine) };
+			Vector3 pVel = { -2.5f, 0.8f + (static_cast<float>(rand()) / RAND_MAX) * 1.0f, (static_cast<float>(rand()) / RAND_MAX - 0.5f) * 1.5f };
+			Vector4 pCol = { 0.95f, 0.98f, 1.0f, 0.9f };
+			EmitDustWithVelocity(randomEngine, pPos, 1.8f, pCol, pVel, 0.7f, waterTexIndex);
 		}
 	}
 }
 
 void AppParticleManager::EmitRiverSplashDroplet(std::mt19937& randomEngine, const Vector3& position, uint32_t waterTexIndex)
 {
-	// 川面でパシャッと跳ねる水しぶき・微小水滴 (10個)
+	// 川面でパシャッと跳ねる水しぶき・水滴 (10個)
 	std::uniform_real_distribution<float> angleDist(0.0f, 6.2831853f);
-	std::uniform_real_distribution<float> speedDist(1.0f, 3.2f);
+	std::uniform_real_distribution<float> speedDist(1.5f, 3.5f);
 
 	for (int i = 0; i < 10; ++i)
 	{
 		float a = angleDist(randomEngine);
 		float spd = speedDist(randomEngine);
-		Vector3 vel = { std::cos(a) * spd, 1.5f + (static_cast<float>(rand()) / RAND_MAX) * 2.0f, std::sin(a) * spd };
-		Vector4 col = { 0.8f, 0.92f, 1.0f, 0.7f };
+		Vector3 vel = { std::cos(a) * spd, 1.8f + (static_cast<float>(rand()) / RAND_MAX) * 2.2f, std::sin(a) * spd };
+		Vector4 col = { 0.85f, 0.95f, 1.0f, 0.85f };
 
-		EmitDustWithVelocity(randomEngine, position + Vector3{ 0.0f, 0.02f, 0.0f }, 0.22f, col, vel, 0.45f, waterTexIndex);
+		// 水面(Y=0.04f)より上から跳ね上がる
+		Vector3 sPos = position;
+		sPos.y = 0.07f;
+		EmitDustWithVelocity(randomEngine, sPos, 1.2f, col, vel, 0.55f, waterTexIndex);
 	}
 }
 
@@ -1098,26 +1104,57 @@ void AppParticleManager::Draw(const RenderContext& ctx)
 {
 	if (!ctx.commandList || !enginePM_ || !instanceData_ || particles_.empty() || !ctx.camera || !perViewData_) return;
 
-	uint32_t currentWriteIndex = 0;
+	// テクスチャインデックスごとにパーティクルをグループ化してバッチ描画
+	std::unordered_map<uint32_t, std::vector<const AppParticle*>> textureGroups;
 	for (const auto& ap : particles_)
+	{
+		textureGroups[ap.textureIndex].push_back(&ap);
+	}
+
+	struct BatchDrawInfo
+	{
+		uint32_t textureIndex;
+		uint32_t startInstance;
+		uint32_t count;
+	};
+	std::vector<BatchDrawInfo> batches;
+	batches.reserve(textureGroups.size());
+
+	uint32_t currentWriteIndex = 0;
+	for (auto& pair : textureGroups)
 	{
 		if (currentWriteIndex >= kNumMaxInstances) break;
 
-		ParticleManager::ParticleCS p{};
-		p.translate = ap.transform.GetTranslate();
-		p.scale = ap.transform.GetScale();
-		p.lifeTime = ap.lifeTime;
-		p.currentTime = ap.currentTime;
-		p.velocity = ap.velocity;
+		BatchDrawInfo batch{};
+		batch.textureIndex = pair.first;
+		batch.startInstance = currentWriteIndex;
 
-		float alpha = 1.0f - (ap.currentTime / ap.lifeTime);
-		p.color = ap.color;
-		p.color.w = (std::clamp)(alpha * ap.color.w, 0.0f, 1.0f);
+		for (const auto* ap : pair.second)
+		{
+			if (currentWriteIndex >= kNumMaxInstances) break;
 
-		instanceData_[currentWriteIndex++] = p;
+			ParticleManager::ParticleCS p{};
+			p.translate = ap->transform.GetTranslate();
+			p.scale = ap->transform.GetScale();
+			p.lifeTime = ap->lifeTime;
+			p.currentTime = ap->currentTime;
+			p.velocity = ap->velocity;
+
+			float alpha = 1.0f - (ap->currentTime / ap->lifeTime);
+			p.color = ap->color;
+			p.color.w = (std::clamp)(alpha * ap->color.w, 0.0f, 1.0f);
+
+			instanceData_[currentWriteIndex++] = p;
+		}
+
+		batch.count = currentWriteIndex - batch.startInstance;
+		if (batch.count > 0)
+		{
+			batches.push_back(batch);
+		}
 	}
 
-	if (currentWriteIndex == 0) return;
+	if (currentWriteIndex == 0 || batches.empty()) return;
 
 	// 1. PerView CBV の計算と転送
 	Matrix4x4 backToFrontMatrix = MakeRotateYMatrix(0.0f);
@@ -1140,16 +1177,6 @@ void AppParticleManager::Draw(const RenderContext& ctx)
 	ctx.commandList->SetGraphicsRootConstantBufferView(RootParam::Particle::kMaterial, ctx.materialGPUAddress);
 	ctx.commandList->SetGraphicsRootDescriptorTable(RootParam::Particle::kInstancing, instancingSrvHandleGPU_);
 
-	if (ctx.textureHandle.ptr != 0)
-	{
-		ctx.commandList->SetGraphicsRootDescriptorTable(RootParam::Particle::kTextureTable, ctx.textureHandle);
-	}
-	else
-	{
-		uint32_t whiteTex = TextureManager::GetInstance()->Load("Resources/CG4/human/white.png");
-		ctx.commandList->SetGraphicsRootDescriptorTable(RootParam::Particle::kTextureTable, TextureManager::GetInstance()->GetSrvHandleGPU(whiteTex));
-	}
-
 	if (ctx.light)
 	{
 		ctx.commandList->SetGraphicsRootConstantBufferView(RootParam::Particle::kLight, ctx.light->GetDirectionalLightResource()->GetGPUVirtualAddress());
@@ -1169,7 +1196,23 @@ void AppParticleManager::Draw(const RenderContext& ctx)
 		ctx.commandList->IASetVertexBuffers(0, 1, &quadVertexBufferView_);
 	}
 
-	ctx.commandList->DrawInstanced(6, currentWriteIndex, 0, 0);
+	// 各テクスチャグループごとにSRVを切り替えてDrawInstancedを実行
+	for (const auto& batch : batches)
+	{
+		D3D12_GPU_DESCRIPTOR_HANDLE srvHandle = ctx.textureHandle;
+		if (batch.textureIndex != TextureManager::kInvalidTextureIndex && batch.textureIndex != 0)
+		{
+			srvHandle = TextureManager::GetInstance()->GetSrvHandleGPU(batch.textureIndex);
+		}
+		else if (srvHandle.ptr == 0)
+		{
+			uint32_t whiteTex = TextureManager::GetInstance()->Load("Resources/CG4/human/white.png");
+			srvHandle = TextureManager::GetInstance()->GetSrvHandleGPU(whiteTex);
+		}
+
+		ctx.commandList->SetGraphicsRootDescriptorTable(RootParam::Particle::kTextureTable, srvHandle);
+		ctx.commandList->DrawInstanced(6, batch.count, 0, batch.startInstance);
+	}
 }
 
 
