@@ -1,4 +1,7 @@
 #include "MinionManager.h"
+#include "Application/GameObject/SlimeCollision.h"
+#include "Application/GameObject/SlimePhysics.h"
+#include "Matrix4x4.h"
 #include <cmath>
 #include <cstdlib>
 #include <algorithm>
@@ -74,34 +77,113 @@ int MinionManager::GetMergedCount() const {
     return count;
 }
 
-void MinionManager::ResolveSeparation() {
+void MinionManager::ResolveSeparation(const Vector3& rotation, const Vector2& stageTilt) {
     size_t count = minions_.size();
+    if (count < 2) return;
+
+    Matrix4x4 rotMat = Multiply(MakeRotateXMatrix(rotation.x),
+                                Multiply(MakeRotateYMatrix(rotation.y), MakeRotateZMatrix(rotation.z)));
+    Vector3 stageNormal = { rotMat.m[1][0], rotMat.m[1][1], rotMat.m[1][2] };
+
     for (size_t i = 0; i < count; ++i) {
         if (!minions_[i] || !minions_[i]->IsActive()) continue;
         if (minions_[i]->GetState() != MinionState::Rolling) continue;
 
         Vector3 posA = minions_[i]->GetPosition();
+        Vector3 scaleA = minions_[i]->GetScale();
+        const Vector3& squashA = minions_[i]->GetSlimeParams().squashStretch;
+
         for (size_t j = i + 1; j < count; ++j) {
             if (!minions_[j] || !minions_[j]->IsActive()) continue;
             if (minions_[j]->GetState() != MinionState::Rolling) continue;
 
             Vector3 posB = minions_[j]->GetPosition();
-            Vector3 diff = posA - posB;
-            diff.y = 0.0f;
-            float distSq = diff.x * diff.x + diff.z * diff.z;
+            Vector3 scaleB = minions_[j]->GetScale();
+            const Vector3& squashB = minions_[j]->GetSlimeParams().squashStretch;
 
-            float minDist = separationRadius_;
-            if (distSq < minDist * minDist && distSq > 0.0001f) {
-                float dist = std::sqrt(distSq);
-                float overlap = 0.5f * (minDist - dist);
-                float factor = overlap / dist;
-                Vector3 push = { diff.x * factor, diff.y * factor, diff.z * factor };
-                minions_[i]->AddRepulsion(push);
-                minions_[j]->AddRepulsion({ -push.x, -push.y, -push.z });
+            float impulse = 0.0f;
+            // 互いに50%ずつ押し合う (weightA = 0.5, weightB = 0.5)
+            if (SlimeCollision::ResolveCollision(posA, scaleA, squashA, 0.5f,
+                                                 posB, scaleB, squashB, 0.5f,
+                                                 impulse, rotation, rotation, stageNormal)) {
+                // 傾斜面上の厳密な接地中心に再クランプ
+                posA.y = SlimePhysics::CalculateGroundedCenterY(posA.x, posA.z, stageTilt, 0.22f);
+                posB.y = SlimePhysics::CalculateGroundedCenterY(posB.x, posB.z, stageTilt, 0.22f);
+
+                minions_[i]->SetPosition(posA);
+                minions_[j]->SetPosition(posB);
+
+                // 相互の接近速度成分を除去（接触状態での無駄なめり込み加速を防止）
+                Vector3 diff = posB - posA;
+                float diffLenSq = diff.x * diff.x + diff.y * diff.y + diff.z * diff.z;
+                if (diffLenSq > 1e-6f) {
+                    Vector3 norm = diff * (1.0f / std::sqrt(diffLenSq));
+                    Vector3 velA = minions_[i]->GetVelocity();
+                    Vector3 velB = minions_[j]->GetVelocity();
+                    float closingSpeed = (velB.x - velA.x) * norm.x + (velB.y - velA.y) * norm.y + (velB.z - velA.z) * norm.z;
+                    if (closingSpeed < 0.0f) {
+                        Vector3 relImpulse = norm * (closingSpeed * 0.5f);
+                        minions_[i]->SetVelocity(velA + relImpulse);
+                        minions_[j]->SetVelocity(velB - relImpulse);
+                    }
+                }
+
+                if (impulse > 0.05f) {
+                    minions_[i]->GetSlimeParams().impulseStrength = (std::max)(minions_[i]->GetSlimeParams().impulseStrength, impulse * 0.4f);
+                    minions_[j]->GetSlimeParams().impulseStrength = (std::max)(minions_[j]->GetSlimeParams().impulseStrength, impulse * 0.4f);
+                }
             }
         }
     }
 }
+
+void MinionManager::ResolvePlayerSeparation(const Vector3& playerPos, const Vector3& playerVelocity, const Vector3& playerScale, const Vector3& playerSquash, const Vector3& playerRotation, const Vector2& stageTilt) {
+    Matrix4x4 rotMat = Multiply(MakeRotateXMatrix(playerRotation.x),
+                                Multiply(MakeRotateYMatrix(playerRotation.y), MakeRotateZMatrix(playerRotation.z)));
+    Vector3 stageNormal = { rotMat.m[1][0], rotMat.m[1][1], rotMat.m[1][2] };
+
+    Vector3 pPos = playerPos;
+    for (auto& minion : minions_) {
+        if (!minion || !minion->IsActive()) continue;
+        // 合体吸引中（Merging）のミニオンはプレイヤーに吸い込まれるため押し出さない
+        // 転がり中（Rolling）のミニオンのみを衝突押し出しの対象とする（合体巨大化時も確実に押し出す）
+        if (minion->GetState() != MinionState::Rolling) continue;
+
+        Vector3 mPos = minion->GetPosition();
+        Vector3 mScale = minion->GetScale();
+        const Vector3& mSquash = minion->GetSlimeParams().squashStretch;
+        Vector3 mRot = minion->GetRotation();
+
+        float impulse = 0.0f;
+        // プレイヤーは不動 (weight=0.0)、ミニオンが100%外側へ押し出される (weight=1.0)
+        if (SlimeCollision::ResolveCollision(pPos, playerScale, playerSquash, 0.0f,
+                                             mPos, mScale, mSquash, 1.0f,
+                                             impulse, playerRotation, mRot, stageNormal)) {
+            mPos.y = SlimePhysics::CalculateGroundedCenterY(mPos.x, mPos.z, stageTilt, 0.22f);
+            minion->SetPosition(mPos);
+
+            // プレイヤーからの押し出し速度をミニオンに伝達（巨大プレイヤーの突進・接触による弾き飛ばし）
+            Vector3 mVel = minion->GetVelocity();
+            Vector3 diff = mPos - pPos;
+            float diffLenSq = diff.x * diff.x + diff.y * diff.y + diff.z * diff.z;
+            if (diffLenSq > 1e-6f) {
+                Vector3 away = diff * (1.0f / std::sqrt(diffLenSq));
+                Vector3 relVel = mVel - playerVelocity;
+                float closingSpeed = (relVel.x * away.x + relVel.y * away.y + relVel.z * away.z);
+                if (closingSpeed < 0.0f) {
+                    // 相対接近速度を相殺し、巨大プレイヤーの押し出し速度＋衝撃反発を付与
+                    mVel += away * (-closingSpeed + impulse * 2.5f);
+                    minion->SetVelocity(mVel);
+                }
+            }
+
+            if (impulse > 0.05f) {
+                minion->GetSlimeParams().impulseStrength = (std::max)(minion->GetSlimeParams().impulseStrength, impulse * 0.6f);
+            }
+        }
+    }
+}
+
 
 void MinionManager::TriggerMerge(const Vector3& playerPos, float mergeRadius) {
     isMergedState_ = true;
@@ -185,7 +267,7 @@ bool MinionManager::ThrowMinionWithVelocity(const Vector3& launchPos, const Vect
     return false;
 }
 
-void MinionManager::Update(float deltaTime, const Vector3& playerPos, bool isMerged, float playerRadius, const Vector2& stageTilt) {
+void MinionManager::Update(float deltaTime, const Vector3& playerPos, bool isMerged, float playerScale, const Vector2& stageTilt, const Vector3& playerSquash, const Vector3& playerVelocity) {
     if (isMergedState_ != isMerged) {
         if (isMerged) {
             TriggerMerge(playerPos, mergePickupRadius_);
@@ -194,11 +276,9 @@ void MinionManager::Update(float deltaTime, const Vector3& playerPos, bool isMer
         }
     }
 
-    if (!isMergedState_) {
-        ResolveSeparation();
-    } else {
+    if (isMergedState_) {
         bool allInactive = true;
-        float absorbRadius = (std::max)(0.6f, playerRadius * 0.7f);
+        float absorbRadius = (std::max)(0.6f, playerScale * 0.7f);
         float absorbRadiusSq = absorbRadius * absorbRadius;
 
         for (auto& minion : minions_) {
@@ -216,10 +296,22 @@ void MinionManager::Update(float deltaTime, const Vector3& playerPos, bool isMer
         isAllMerged_ = allInactive;
     }
 
+    // 1. 各ミニオンの物理挙動更新（重力加速・移動・変形パラメータ計算）
     for (auto& minion : minions_) {
         if (minion) {
             minion->Update(deltaTime, stageTilt);
         }
+    }
+
+    // 2. 移動完了後の確定座標・変形状態に基づく多重球分離（衝突解消）
+    // 通常時・合体巨大化時を問わず常に実行し、小型ミニオンへのめり込みを100%防止
+    Vector3 playerScaleVec = { playerScale, playerScale, playerScale };
+    Vector3 rot = { stageTilt.x, 0.0f, -stageTilt.y };
+
+    // 2パスのリラクゼーションで多頭密集時の押し出し・めり込みを完全解消
+    for (int iter = 0; iter < 2; ++iter) {
+        ResolvePlayerSeparation(playerPos, playerVelocity, playerScaleVec, playerSquash, rot, stageTilt);
+        ResolveSeparation(rot, stageTilt);
     }
 }
 
@@ -230,3 +322,20 @@ void MinionManager::Draw(const RenderContext& ctx) {
         }
     }
 }
+
+void MinionManager::DrawDebug(Camera* camera) {
+#ifdef _DEBUG
+    if (!camera) return;
+    for (const auto& minion : minions_) {
+        if (minion && minion->IsActive() && minion->GetState() != MinionState::Merging) {
+            auto shape = SlimeCollision::BuildMultiSphere(minion->GetPosition(), minion->GetScale(), minion->GetSlimeParams().squashStretch, minion->GetRotation());
+            uint32_t color = 0xFF00FF7F; // 緑
+            if (minion->GetType() == MinionType::Red) color = 0xFF4040FF;         // 赤
+            else if (minion->GetType() == MinionType::Yellow) color = 0xFF00FFFF; // 黄
+            else if (minion->GetType() == MinionType::Blue) color = 0xFFFF8000;   // 青
+            SlimeCollision::DrawDebugMultiSphere(shape, camera, color);
+        }
+    }
+#endif
+}
+

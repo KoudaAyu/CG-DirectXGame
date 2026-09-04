@@ -17,7 +17,7 @@ public:
     ~MinionManager() = default;
 
     void Initialize(Object3dCom* object3dCom, Camera* camera);
-    void Update(float deltaTime, const Vector3& playerPos, bool isMerged, float playerRadius = 0.8f, const Vector2& stageTilt = { 0.0f, 0.0f });
+    void Update(float deltaTime, const Vector3& playerPos, bool isMerged, float playerScale = 0.8f, const Vector2& stageTilt = { 0.0f, 0.0f }, const Vector3& playerSquash = { 0.0f, 0.0f, 0.0f }, const Vector3& playerVelocity = { 0.0f, 0.0f, 0.0f });
     void Draw(const RenderContext& ctx);
 
     // --- 群衆の操作 ---
@@ -37,6 +37,7 @@ public:
     int GetReadyCount(const Vector3& playerPos, float maxPickupRadius = 3.5f) const;
     int GetMergedCount() const;
     int GetTotalCount() const { return static_cast<int>(minions_.size()); }
+    const std::vector<std::unique_ptr<Minion>>& GetMinions() const { return minions_; }
     bool IsAllMerged() const { return isAllMerged_; }
 
     float GetMergePickupRadius() const { return mergePickupRadius_; }
@@ -47,8 +48,12 @@ public:
     float GetSplitUpPower() const { return splitUpPower_; }
     void SetSplitUpPower(float p) { splitUpPower_ = p; }
 
+    // デバッグ多重球描画
+    void DrawDebug(Camera* camera);
+
 private:
-    void ResolveSeparation();
+    void ResolveSeparation(const Vector3& rotation, const Vector2& stageTilt);
+    void ResolvePlayerSeparation(const Vector3& playerPos, const Vector3& playerVelocity, const Vector3& playerScale, const Vector3& playerSquash, const Vector3& playerRotation, const Vector2& stageTilt);
 
 private:
     Object3dCom* object3dCom_ = nullptr;

@@ -2,6 +2,7 @@
 #include "Application/Minion/MinionManager.h"
 #include "Application/GameObject/SlimeMesh.h"
 #include "Application/GameObject/SlimePhysics.h"
+#include "Application/GameObject/SlimeCollision.h"
 #include "Application/GameObject/AimGuide.h"
 #include "Baziru3_Engine/Core/IO/Mouse/MouseInput.h"
 #include "Baziru3_Engine/Graphics/3D/Object/Object3dCom.h"
@@ -104,8 +105,14 @@ float PikminPlayer::CalculateMergedScale(int minionCount) const {
 
 void PikminPlayer::SetPosition(const Vector3& pos) {
     position_ = pos;
-    if (normalModel_) normalModel_->SetTranslate(pos);
-    if (giantModel_) giantModel_->SetTranslate(pos);
+    if (normalModel_) {
+        normalModel_->SetTranslate(pos);
+        normalModel_->Update();
+    }
+    if (giantModel_) {
+        giantModel_->SetTranslate(pos);
+        giantModel_->Update();
+    }
 }
 
 Vector3 PikminPlayer::GetForwardVector() const {
@@ -364,4 +371,14 @@ void PikminPlayer::Draw(const RenderContext& ctx) {
             DrawSlime(normalModel_.get(), normalModelData_, ctx, normalTextureIndex_);
         }
     }
+}
+
+void PikminPlayer::DrawDebug(Camera* camera) {
+#ifdef _DEBUG
+    if (camera) {
+        auto shape = SlimeCollision::BuildMultiSphere(position_, scale_, slimeParams_.squashStretch, rotation_);
+        uint32_t color = isMerged_ ? 0xFF00D7FF : 0xFFFFFF00; // 金色 or 水色 (ABGR/ImGui)
+        SlimeCollision::DrawDebugMultiSphere(shape, camera, color);
+    }
+#endif
 }

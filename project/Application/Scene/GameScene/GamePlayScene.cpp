@@ -107,6 +107,11 @@ void GamePlayScene::InitializeScene()
     aimGuide_ = std::make_unique<AimGuide>();
     aimGuide_->Initialize(object3dCom, playCamera_.get());
 
+    // 7. スライム同士（Minion-Minion, Player-Minion）はアプリ層の Multi-Sphere で高精度に処理するため、
+    // エンジン側の単一球判定の重複適用（二重押し出し）を解除
+    CollisionManager::GetInstance()->SetCollisionFilter(CollisionAttribute::Minion, CollisionAttribute::Minion, false);
+    CollisionManager::GetInstance()->SetCollisionFilter(CollisionAttribute::Player, CollisionAttribute::Minion, false);
+
     isInitialized_ = true;
 }
 
@@ -183,7 +188,7 @@ void GamePlayScene::Update()
     // ミニオンマネージャーの更新（ステージ傾斜を伝達）
     if (minionManager_ && player_)
     {
-        minionManager_->Update(deltaTime, player_->GetPosition(), player_->IsMerged(), player_->GetCurrentScale(), currentTilt_);
+        minionManager_->Update(deltaTime, player_->GetPosition(), player_->IsMerged(), player_->GetCurrentScale(), currentTilt_, player_->GetSlimeParams().squashStretch, player_->GetVelocity());
     }
 
     // 衝突判定と押し出しの更新
@@ -265,7 +270,27 @@ void GamePlayScene::DrawDebugUI()
     // コライダーのデバッグワイヤーフレーム描画
     if (playCamera_)
     {
+        // スライムはアプリ層の Multi-Sphere で正確にデバッグ描画するため、
+        // エンジン側の単一球ワイヤーフレームの重複描画を一時的にスキップ
+        if (player_ && player_->GetCollider()) player_->GetCollider()->SetIsEnabled(false);
+        if (minionManager_) {
+            for (const auto& m : minionManager_->GetMinions()) {
+                if (m && m->GetCollider()) m->GetCollider()->SetIsEnabled(false);
+            }
+        }
+
         CollisionManager::GetInstance()->DrawDebug(playCamera_.get());
+
+        if (player_ && player_->GetCollider()) player_->GetCollider()->SetIsEnabled(true);
+        if (minionManager_) {
+            for (const auto& m : minionManager_->GetMinions()) {
+                if (m && m->GetCollider()) m->GetCollider()->SetIsEnabled(true);
+            }
+        }
+
+        // アプリ層の Multi-Sphere ワイヤーフレームを描画（メッシュ変形・流動に100%一致）
+        if (minionManager_) minionManager_->DrawDebug(playCamera_.get());
+        if (player_) player_->DrawDebug(playCamera_.get());
     }
 
     ImGui::SetNextWindowPos(ImVec2(20, 20), ImGuiCond_FirstUseEver);

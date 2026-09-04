@@ -129,6 +129,7 @@
     <ClCompile Include="Application\GameObject\SlimeMesh.cpp" />
     <ClCompile Include="Application\GameObject\SlimePhysics.cpp" />
     <ClCompile Include="Application\GameObject\AimGuide.cpp" />
+    <ClCompile Include="Application\GameObject\SlimeCollision.cpp" />
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="Resources\shaders\Slime.VS.hlsl">
@@ -374,6 +375,7 @@
     <ClInclude Include="Application\Player\PikminPlayer.h" />
     <ClInclude Include="Application\GameObject\SlimeMesh.h" />
     <ClInclude Include="Application\GameObject\AimGuide.h" />
+    <ClInclude Include="Application\GameObject\SlimeCollision.h" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="externals\DirectXTex\DirectXTex_Desktop_2022_Win10.vcxproj">

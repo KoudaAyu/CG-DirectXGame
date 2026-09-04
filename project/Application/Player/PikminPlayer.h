@@ -32,6 +32,9 @@ public:
     const Vector3& GetPosition() const { return position_; }
     void SetPosition(const Vector3& pos);
 
+    const Vector3& GetVelocity() const { return velocity_; }
+    const Vector3& GetRotation() const { return rotation_; }
+
     float GetYaw() const { return rotation_.y; }
     Vector3 GetForwardVector() const;
 
@@ -49,11 +52,16 @@ public:
     SlimeParamsCPU& GetSlimeParams() { return slimeParams_; }
     SphereCollider* GetCollider() const { return collider_.get(); }
     float GetCurrentScale() const { return scale_.x; }
+    const Vector3& GetScale() const { return scale_; }
+    float GetBaseRadius() const { return 0.85f; }
 
     float CalculateMergedScale(int minionCount) const;
 
     // 衝突時の弾性リアクション
     void OnCollision(const CollisionInfo& info);
+
+    // デバッグ多重球描画
+    void DrawDebug(Camera* camera);
 
 private:
     void DrawSlime(Object3d* object, const Object3d::ModelData& modelData,

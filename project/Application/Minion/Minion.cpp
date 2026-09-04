@@ -96,6 +96,7 @@ void Minion::SetPosition(const Vector3& pos) {
     position_ = pos;
     if (object3d_) {
         object3d_->SetTranslate(position_);
+        object3d_->Update();
     }
 }
 

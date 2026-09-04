@@ -44,6 +44,11 @@ public:
     const Vector3& GetPosition() const { return position_; }
     void SetPosition(const Vector3& pos);
 
+    const Vector3& GetVelocity() const { return velocity_; }
+    void SetVelocity(const Vector3& vel) { velocity_ = vel; }
+
+    const Vector3& GetRotation() const { return rotation_; }
+
     void Launch(const Vector3& velocity);
     void AttractTo(const Vector3& attractCenter, float attractSpeed = 25.0f);
 
@@ -52,6 +57,7 @@ public:
 
     MinionType GetType() const { return type_; }
     float GetRadius() const { return radius_; }
+    const Vector3& GetScale() const { return scale_; }
 
     // 反発ベクトル加算（重なり防止用）
     void AddRepulsion(const Vector3& pushVector) { position_ += pushVector; }
