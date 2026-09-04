@@ -273,8 +273,8 @@ void Player::Update(float deltaTime, MouseInput* mouseInput)
         // 地面へのくちばし・お尻の埋もれを防止するリフト包絡線（自然で軽快な前転高さ）
         float rollSin = std::sin(rollAngle);
         float rollCos = std::cos(rollAngle);
-        float clearanceLift = 0.30f * (1.0f - rollCos) + 0.12f * std::abs(rollSin);
-        float hopOffset = std::sin(progress * 3.14159f) * 0.20f;
+        float clearanceLift = GameConfig::Player::kDodgeClearanceBase * (1.0f - rollCos) + GameConfig::Player::kDodgeClearanceSide * std::abs(rollSin);
+        float hopOffset = std::sin(progress * 3.14159f) * GameConfig::Player::kDodgeHopMax;
 
         drawPos_ = position_;
         drawPos_.y = position_.y + clearanceLift + hopOffset;

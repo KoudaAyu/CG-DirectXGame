@@ -20,6 +20,7 @@
 #include "Baziru3_Engine/Framework/AI/NavMesh.h"
 
 #include "GamePlayScene.h"
+#include "Application/Config/GameConfig.h"
 #include "RaidStats.h"
 #include "Baziru3_Engine/Core/Base/Allocator/ConstantBufferAllocator.h"
 #include "imgui.h"
@@ -72,7 +73,7 @@ void GamePlayScene::InitializeScene()
 	isGameCleared_ = false;
 	isPlayerInExtractionZone_ = false;
 	extractionTimer_ = kExtractionMaxTime;
-	goalRingTransform_.translate = { 0.0f, 0.01f, 32.0f };
+	goalRingTransform_.translate = GameConfig::Environment::kExtractionPadPosition;
 
 	InitializeEnvironment();
 	InitializeCharacters();
@@ -125,14 +126,14 @@ void GamePlayScene::InitializeEnvironment()
 		extractionPadObject_ = std::make_unique<Object3d>();
 		extractionPadObject_->Initialize(object3dCom, padModel);
 		extractionPadObject_->SetCamera(camera_);
-		extractionPadObject_->SetTranslate({ 0.0f, 0.01f, 32.0f });
+		extractionPadObject_->SetTranslate(GameConfig::Environment::kExtractionPadPosition);
 		extractionPadObject_->SetScale({ 1.0f, 1.0f, 1.0f });
 		extractionPadObject_->SetRotate({ 0.0f, 0.0f, 0.0f });
 		extractionPadObject_->Update();
 	}
 
 	isGameCleared_ = false;
-	extractionTimer_ = 5.0f;
+	extractionTimer_ = kExtractionMaxTime;
 
 	// --- ✨ LevelEditorはImGui編集UI用に初期化のみ（DrawはInitializeObstacles側で一括処理するため二重ロード不要）---
 	levelEditor_ = std::make_unique<LevelEditor>();
@@ -613,7 +614,7 @@ void GamePlayScene::UpdateParticles(float deltaTime)
 			// ローリング回避中: 進行方向の逆へ足元から吹き出す土煙 (0.07秒おきに放出)
 			static float dodgeDustTimer = 0.0f;
 			dodgeDustTimer += deltaTime;
-			if (dodgeDustTimer >= 0.07f)
+			if (dodgeDustTimer >= GameConfig::Player::kDodgeDustInterval)
 			{
 				Vector3 pRot = player_->GetRotation();
 				Vector3 dodgeDir = { std::sin(pRot.y), 0.0f, std::cos(pRot.y) };
@@ -626,7 +627,7 @@ void GamePlayScene::UpdateParticles(float deltaTime)
 			// 走り移動中: 足元から舞い上がる土埃
 			static float stepTimer = 0.0f;
 			stepTimer += deltaTime;
-			if (stepTimer >= 0.12f)
+			if (stepTimer >= GameConfig::Player::kStepDustInterval)
 			{
 				appParticleManager_->EmitFootstepDust(particleManager->GetRandomEngine(), pPos, smokeTextureIndex_);
 				stepTimer = 0.0f;
@@ -662,7 +663,7 @@ void GamePlayScene::UpdateParticles(float deltaTime)
 		// (A) 川の流れに沿って流れる上品なさざ波 (0.15秒おきに放出)
 		static float riverWaveTimer = 0.0f;
 		riverWaveTimer += deltaTime;
-		if (riverWaveTimer >= 0.15f)
+		if (riverWaveTimer >= GameConfig::Environment::kRiverWaveInterval)
 		{
 			appParticleManager_->EmitRiverWaveRipples(particleManager->GetRandomEngine(), particleTextureB);
 			riverWaveTimer = 0.0f;
@@ -671,11 +672,11 @@ void GamePlayScene::UpdateParticles(float deltaTime)
 		// (B) 川面のパチパチ跳ねる水滴 (0.25秒おき)
 		static float riverSplashTimer = 0.0f;
 		riverSplashTimer += deltaTime;
-		if (riverSplashTimer >= 0.25f)
+		if (riverSplashTimer >= GameConfig::Environment::kRiverSplashInterval)
 		{
 			std::uniform_real_distribution<float> rxDist(-18.0f, 18.0f);
-			std::uniform_real_distribution<float> rzDist(16.5f, 21.0f);
-			Vector3 sPos = { rxDist(particleManager->GetRandomEngine()), 0.07f, rzDist(particleManager->GetRandomEngine()) };
+			std::uniform_real_distribution<float> rzDist(GameConfig::Environment::kRiverZMin, GameConfig::Environment::kRiverZMax);
+			Vector3 sPos = { rxDist(particleManager->GetRandomEngine()), GameConfig::Environment::kRiverSplashY, rzDist(particleManager->GetRandomEngine()) };
 			appParticleManager_->EmitRiverSplashDroplet(particleManager->GetRandomEngine(), sPos, particleTextureB);
 			riverSplashTimer = 0.0f;
 		}
@@ -1766,9 +1767,9 @@ void GamePlayScene::InitializeObstacles()
 				}
 
 				// 橋の下を東西に横断する美しいクリアブルーの川水面を配置（幅60m x 奥行き5m）
-				// ※ 地面とのZファイト防止のため Y=0.04f に配置
+				// ※ 地面とのZファイト防止のため Y=kRiverSurfaceY に配置
 				auto river = std::make_unique<Obstacle>();
-				river->Initialize(object3dCom, camera_, { 0.0f, 0.04f, 18.75f }, 1.0f, "river.obj", { 60.0f, 1.0f, 5.0f }, { 0.0f, 0.0f, 0.0f });
+				river->Initialize(object3dCom, camera_, GameConfig::Environment::kRiverPosition, 1.0f, "river.obj", GameConfig::Environment::kRiverScale, GameConfig::Environment::kRiverRotation);
 				obstacles_.insert(obstacles_.begin() + 1, std::move(river));
 
 

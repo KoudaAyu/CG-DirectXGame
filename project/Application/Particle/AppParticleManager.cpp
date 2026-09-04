@@ -11,6 +11,7 @@
 #include "Light.h"
 #include "Camera.h"
 #include <iostream>
+#include "Application/Config/GameConfig.h"
 
 
 void AppParticleManager::Initialize(ParticleManager* enginePM)
@@ -1023,16 +1024,16 @@ void AppParticleManager::EmitHelipadBeaconMotes(std::mt19937& randomEngine, cons
 void AppParticleManager::EmitRiverWaveRipples(std::mt19937& randomEngine, uint32_t waterTexIndex)
 {
 	// 川の上流 (X: +22m) から下流 (X: -22m) へ勢いよく流れる水流リップル＆白泡 (5個)
-	std::uniform_real_distribution<float> zDist(16.6f, 20.9f);
+	std::uniform_real_distribution<float> zDist(GameConfig::Environment::kRiverZMin, GameConfig::Environment::kRiverZMax);
 	std::uniform_real_distribution<float> xDist(-20.0f, 22.0f);
-	std::uniform_real_distribution<float> speedDist(4.5f, 7.0f);
-	std::uniform_real_distribution<float> scaleDist(3.0f, 5.5f);
+	std::uniform_real_distribution<float> speedDist(GameConfig::Environment::kRiverWaveSpeedMin, GameConfig::Environment::kRiverWaveSpeedMax);
+	std::uniform_real_distribution<float> scaleDist(GameConfig::Environment::kRiverWaveScaleMin, GameConfig::Environment::kRiverWaveScaleMax);
 	std::uniform_real_distribution<float> lifeDist(1.5f, 3.0f);
 
 	for (int i = 0; i < 5; ++i)
 	{
-		// 水面(Y=0.04f)の上に生成して深度テストによるオクルージョン（遮蔽）を解消
-		Vector3 spawnPos = { xDist(randomEngine), 0.07f, zDist(randomEngine) };
+		// 水面高さに自動連動したY座標で生成（深度遮蔽を原理的に防止）
+		Vector3 spawnPos = { xDist(randomEngine), GameConfig::Environment::kRiverWaveParticleY, zDist(randomEngine) };
 		float spd = speedDist(randomEngine);
 		// X軸マイナス方向（左）へ流れる
 		Vector3 vel = { -spd, 0.0f, (static_cast<float>(rand()) / RAND_MAX - 0.5f) * 0.3f };
@@ -1048,7 +1049,7 @@ void AppParticleManager::EmitRiverWaveRipples(std::mt19937& randomEngine, uint32
 	{
 		if (rand() % 100 < 50)
 		{
-			Vector3 pPos = { pillarX, 0.075f, zDist(randomEngine) };
+			Vector3 pPos = { pillarX, GameConfig::Environment::kRiverFoamPillarY, zDist(randomEngine) };
 			Vector3 pVel = { -2.5f, 0.8f + (static_cast<float>(rand()) / RAND_MAX) * 1.0f, (static_cast<float>(rand()) / RAND_MAX - 0.5f) * 1.5f };
 			Vector4 pCol = { 0.95f, 0.98f, 1.0f, 0.9f };
 			EmitDustWithVelocity(randomEngine, pPos, 1.8f, pCol, pVel, 0.7f, waterTexIndex);
@@ -1069,9 +1070,9 @@ void AppParticleManager::EmitRiverSplashDroplet(std::mt19937& randomEngine, cons
 		Vector3 vel = { std::cos(a) * spd, 1.8f + (static_cast<float>(rand()) / RAND_MAX) * 2.2f, std::sin(a) * spd };
 		Vector4 col = { 0.85f, 0.95f, 1.0f, 0.85f };
 
-		// 水面(Y=0.04f)より上から跳ね上がる
+		// 水面高さに自動連動したY座標
 		Vector3 sPos = position;
-		sPos.y = 0.07f;
+		sPos.y = GameConfig::Environment::kRiverSplashY;
 		EmitDustWithVelocity(randomEngine, sPos, 1.2f, col, vel, 0.55f, waterTexIndex);
 	}
 }

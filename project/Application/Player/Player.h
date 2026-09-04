@@ -9,6 +9,7 @@
 #include "RenderContext.h"
 #include "Baziru3_Engine/Framework/Collision/SphereCollider.h"
 #include "Baziru3_Engine/Framework/Collision/CollisionManager.h"
+#include "Application/Config/GameConfig.h"
 
 class Bullet;
 class MouseInput;
@@ -21,33 +22,33 @@ class Player
 {
 public:
     // =========================================================================
-    // 定数定義 (Named Constants) - マジックナンバーの完全排除
+    // 定数定義 (Named Constants) - GameConfig から一元参照
     // =========================================================================
-    static constexpr float kDefaultMaxHp                  = 100.0f;  // 最大体力
-    static constexpr float kDefaultMaxStamina             = 100.0f;  // 最大スタミナ
-    static constexpr int   kDefaultMaxMagazineAmmo        = 30;      // 1マガジン装填数 (30発)
-    static constexpr int   kDefaultReserveAmmo            = 90;      // 初期予備弾薬 (90発)
-    static constexpr int   kDefaultMedkitCount            = 1;       // 初期救急キット所持数
-    static constexpr float kMedkitHealAmount              = 40.0f;   // 救急キット1回あたりの回復量 (HP+40)
-    static constexpr float kHealDuration                  = 1.8f;    // 治療所要時間 (1.8秒)
-    static constexpr float kReloadDuration                = 1.5f;    // リロード所要時間 (1.5秒)
-    static constexpr float kReloadCancelledNotifyDuration = 1.2f;    // リロード中断通知の表示秒数
-    static constexpr float kDodgeDuration                 = 0.4f;    // 回避ローリング所要時間 (0.4秒)
-    static constexpr float kDodgeSpeed                    = 0.15f;   // 回避ローリング移動速度
-    static constexpr float kDodgeStaminaCost              = 30.0f;   // 回避1回あたりのスタミナ消費量
-    static constexpr float kStaminaRegenRate              = 15.0f;   // 毎秒スタミナ自然回復量
-    static constexpr float kMoveSpeed                     = 0.05f;   // 通常移動速度
-    static constexpr float kInvincibilityDuration         = 1.0f;    // 被弾後の無敵時間 (1.0秒)
-    static constexpr float kHitFlashDuration              = 0.22f;   // 被弾時の高輝度赤フラッシュ秒数
-    static constexpr float kBulletSpeed                   = 0.45f;   // 弾丸初速
-    static constexpr float kBulletLifeTime                = 2.0f;    // 弾丸生存時間 (2.0秒)
-    static constexpr float kShotCooldown                  = 0.12f;   // 連射間隔 (秒)
-    static constexpr float kColliderRadius                = 0.55f;   // 衝突判定スフィア半径
-    static constexpr float kBaseSpread                    = 0.01f;   // 基礎レティクル拡散角 (rad)
-    static constexpr float kMoveSpreadPenalty             = 0.06f;   // 移動時の拡散ペナルティ
-    static constexpr float kShootSpreadPenalty            = 0.04f;   // 射撃連射時の拡散ペナルティ
-    static constexpr float kMaxSpread                     = 0.25f;   // 最大拡散角
-    static constexpr float kSpreadRecoverRate             = 0.3f;    // 照準収束速度
+    static constexpr float kDefaultMaxHp                  = GameConfig::Player::kDefaultMaxHp;
+    static constexpr float kDefaultMaxStamina             = GameConfig::Player::kDefaultMaxStamina;
+    static constexpr int   kDefaultMaxMagazineAmmo        = GameConfig::Player::kMaxMagazineAmmo;
+    static constexpr int   kDefaultReserveAmmo            = GameConfig::Player::kDefaultReserveAmmo;
+    static constexpr int   kDefaultMedkitCount            = GameConfig::Player::kDefaultMedkitCount;
+    static constexpr float kMedkitHealAmount              = GameConfig::Player::kMedkitHealAmount;
+    static constexpr float kHealDuration                  = GameConfig::Player::kHealDuration;
+    static constexpr float kReloadDuration                = GameConfig::Player::kReloadDuration;
+    static constexpr float kReloadCancelledNotifyDuration = GameConfig::Player::kReloadCancelledNotifyDuration;
+    static constexpr float kDodgeDuration                 = GameConfig::Player::kDodgeDuration;
+    static constexpr float kDodgeSpeed                    = GameConfig::Player::kDodgeSpeed;
+    static constexpr float kDodgeStaminaCost              = GameConfig::Player::kDodgeStaminaCost;
+    static constexpr float kStaminaRegenRate              = GameConfig::Player::kStaminaRegenRate;
+    static constexpr float kMoveSpeed                     = GameConfig::Player::kMoveSpeed;
+    static constexpr float kInvincibilityDuration         = GameConfig::Player::kInvincibilityDuration;
+    static constexpr float kHitFlashDuration              = GameConfig::Player::kHitFlashDuration;
+    static constexpr float kBulletSpeed                   = GameConfig::Combat::kBulletSpeed;
+    static constexpr float kBulletLifeTime                = GameConfig::Combat::kBulletLifeTime;
+    static constexpr float kShotCooldown                  = GameConfig::Combat::kShotCooldown;
+    static constexpr float kColliderRadius                = GameConfig::Player::kColliderRadius;
+    static constexpr float kBaseSpread                    = GameConfig::Combat::kBaseSpread;
+    static constexpr float kMoveSpreadPenalty             = GameConfig::Combat::kMoveSpreadPenalty;
+    static constexpr float kShootSpreadPenalty            = GameConfig::Combat::kShootSpreadPenalty;
+    static constexpr float kMaxSpread                     = GameConfig::Combat::kMaxSpread;
+    static constexpr float kSpreadRecoverRate             = GameConfig::Combat::kSpreadRecoverRate;
 
 public:
     /// <summary>

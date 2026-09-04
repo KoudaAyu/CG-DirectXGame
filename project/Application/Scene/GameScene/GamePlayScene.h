@@ -35,6 +35,8 @@
 #include "LootSystem.h"
 #include "GamePlayHUD.h"
 
+#include "Application/Config/GameConfig.h"
+
 class Camera;
 class SpriteCom;
 class SkinningObject3dCom;
@@ -54,18 +56,18 @@ class GamePlayScene : public BaseScene
 
 public:
     // =========================================================================
-    // 定数定義 (Named Constants) - マジックナンバー排除
+    // 定数定義 (Named Constants) - GameConfig から一元参照
     // =========================================================================
-    static constexpr float kFixedDeltaTime         = 1.0f / 60.0f; // 基準フレーム時間
-    static constexpr float kExtractionMaxTime      = 3.0f;         // 脱出パッド滞在所要時間 (3.0秒)
-    static constexpr float kClearSlowMoDuration    = 1.5f;         // 生還クリア時のスロー演出時間 (1.5秒)
-    static constexpr float kDeathSequenceDuration  = 2.0f;         // 戦死時の暗転演出時間 (2.0秒)
-    static constexpr float kExtractionRadius       = 2.2f;         // 脱出ゾーン有効半径 (2.2m)
-    static constexpr float kEnemyBulletDamage      = 10.0f;        // 敵の射撃ダメージ
-    static constexpr float kContactDamage          = 20.0f;        // 敵接触ダメージ
-    static constexpr float kBulletHitRadius        = 0.25f;        // 弾丸当たり判定半径
-    static constexpr float kPlayerHitRadius        = 0.6f;         // プレイヤー当たり判定半径
-    static constexpr float kEnemyHitRadius         = 0.6f;         // 敵当たり判定半径
+    static constexpr float kFixedDeltaTime         = 1.0f / 60.0f;                                     // 基準フレーム時間
+    static constexpr float kExtractionMaxTime      = GameConfig::Environment::kExtractionMaxTime;     // 脱出パッド滞在所要時間 (3.0秒)
+    static constexpr float kClearSlowMoDuration    = GameConfig::Environment::kClearSlowMoDuration;   // 生還クリア時のスロー演出時間 (1.5秒)
+    static constexpr float kDeathSequenceDuration  = GameConfig::Environment::kDeathSequenceDuration; // 戦死時の暗転演出時間 (2.0秒)
+    static constexpr float kExtractionRadius       = GameConfig::Environment::kExtractionRadius;      // 脱出ゾーン有効半径 (2.2m)
+    static constexpr float kEnemyBulletDamage      = GameConfig::Combat::kEnemyBulletDamage;           // 敵の射撃ダメージ
+    static constexpr float kContactDamage          = GameConfig::Combat::kContactDamage;               // 敵接触ダメージ
+    static constexpr float kBulletHitRadius        = GameConfig::Combat::kBulletHitRadius;             // 弾丸当たり判定半径
+    static constexpr float kPlayerHitRadius        = GameConfig::Combat::kPlayerHitRadius;             // プレイヤー当たり判定半径
+    static constexpr float kEnemyHitRadius         = GameConfig::Combat::kEnemyHitRadius;              // 敵当たり判定半径
 
 public:
     GamePlayScene();
