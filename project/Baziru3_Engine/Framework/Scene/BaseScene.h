@@ -44,13 +44,30 @@ public:
   DirectXCom *GetDirectXCom() const { return dxCommon_; }
 
   // シーン間パラメータ共有（Scene Context）
+  template <typename T>
+  void SetSceneData(const std::string &key, const T &value);
+
   void SetSceneData(const std::string &key, const std::string &value);
+  void SetSceneData(const std::string &key, const char* value);
   void SetSceneDataInt(const std::string &key, int value);
   void SetSceneDataFloat(const std::string &key, float value);
+  void SetSceneDataDouble(const std::string &key, double value);
+  void SetSceneDataBool(const std::string &key, bool value);
+  void SetSceneDataString(const std::string &key, const std::string &value);
+
+  template <typename T>
+  T GetSceneData(const std::string &key, const T &defaultVal = T{}) const;
 
   std::string GetSceneData(const std::string &key, const std::string &defaultVal = "") const;
   int GetSceneDataInt(const std::string &key, int defaultVal = 0) const;
   float GetSceneDataFloat(const std::string &key, float defaultVal = 0.0f) const;
+  double GetSceneDataDouble(const std::string &key, double defaultVal = 0.0) const;
+  bool GetSceneDataBool(const std::string &key, bool defaultVal = false) const;
+  std::string GetSceneDataString(const std::string &key, const std::string &defaultVal = "") const;
+
+  bool HasSceneData(const std::string &key) const;
+  void RemoveSceneData(const std::string &key);
+  void ClearAllSceneData();
 
 protected:
   // 各種マネージャへの簡単アクセス用ショートカットゲッター
