@@ -1,4 +1,4 @@
-#include "GamePlayHUD.h"
+﻿#include "GamePlayHUD.h"
 #include "TextureManager.h"
 #include "Camera.h"
 #include "../../Player/Player.h"
@@ -688,7 +688,7 @@ void GamePlayHUD::DrawTutorialSignHUD(const GamePlayHUDContext& ctx)
         std::string winId = "TutorialSign##" + std::to_string(reinterpret_cast<uintptr_t>(sign.get()));
         if (ImGui::Begin(winId.c_str(), nullptr, flags))
         {
-            ImGui::TextColored(ImVec4(1.0f, 0.85f, 0.2f, 1.0f), (const char*)u8"📜 [ TUTORIAL GUIDE - 作戦教本 ]");
+            ImGui::TextColored(ImVec4(1.0f, 0.85f, 0.2f, 1.0f), (const char*)u8"★ [ TUTORIAL GUIDE - 作戦教本 ]");
             ImGui::Separator();
             ImGui::Spacing();
             ImGui::TextColored(ImVec4(1.0f, 1.0f, 1.0f, 1.0f), "%s", msg.c_str());

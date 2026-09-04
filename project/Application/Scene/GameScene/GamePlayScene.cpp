@@ -1,4 +1,4 @@
-
+﻿
 #include "SceneManager.h"
 #include "MaterialManager.h"
 #include "Light.h"
@@ -1869,19 +1869,19 @@ void GamePlayScene::InitializeObstacles()
 		// 看板2: 射撃練習エリア（照準・射撃・リロード）
 		auto sign2 = std::make_unique<TutorialSign>();
 		sign2->Initialize(object3dCom, camera_, { 2.5f, 0.0f, 7.5f },
-			(const char*)u8"【 射撃・リロード訓練 】\n[ マウス ] : 照準  /  [ 左クリック ] : 射撃\n[ R ] : リロード（弾込め）\n※配置された 🎯 標的（Target）をすべて破壊せよ！", 3.2f);
+			(const char*)u8"【 射撃・リロード訓練 】\n[ マウス ] : 照準  /  [ 左クリック ] : 射撃\n[ R ] : リロード（弾込め）\n※配置された ★ 標的（Target）をすべて破壊せよ！", 3.2f);
 		tutorialSigns_.push_back(std::move(sign2));
 
 		// 看板3: 遮蔽・戦術エリア（COVER＆ステルス）
 		auto sign3 = std::make_unique<TutorialSign>();
 		sign3->Initialize(object3dCom, camera_, { -3.0f, 0.0f, 15.0f },
-			(const char*)u8"【 戦術遮蔽（COVER）訓練 】\nコンテナや土嚢のそばに行くと 自動的に 🛡️ COVER 状態！\n敵の視界が大幅に遮られ、見つかりにくくなるぞ！", 3.2f);
+			(const char*)u8"【 戦術遮蔽（COVER）訓練 】\nコンテナや土嚢のそばに行くと 自動的に ◆ COVER 状態！\n敵の視界が大幅に遮られ、見つかりにくくなるぞ！", 3.2f);
 		tutorialSigns_.push_back(std::move(sign3));
 
 		// 看板4: 脱出エリア（ヘリパッド脱出目標）
 		auto sign4 = std::make_unique<TutorialSign>();
 		sign4->Initialize(object3dCom, camera_, { 2.5f, 0.0f, 26.5f },
-			(const char*)u8"【 レイド脱出訓練 】\nすべての標的を破壊後、最奥の 🚁 脱出パッド へ向かえ！\nパッド内でカウントダウン完了で生還（CLEAR）だ！", 3.2f);
+			(const char*)u8"【 レイド脱出訓練 】\nすべての標的を破壊後、最奥の ◆ 脱出パッド へ向かえ！\nパッド内でカウントダウン完了で生還（CLEAR）だ！", 3.2f);
 		tutorialSigns_.push_back(std::move(sign4));
 	}
 }
