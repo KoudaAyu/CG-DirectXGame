@@ -274,6 +274,7 @@ void SlimeFx::Emit(const SlimeFxDesc& desc)
     particle.age = 0.0f;
     particle.shape = desc.shape;
     particle.useSparkTexture = desc.useSparkTexture;
+    particle.useColorField = desc.useColorField;
     particle.attractTarget = desc.attractTarget;
     particle.attractStrength = desc.attractStrength;
     particle.isParked = false;
@@ -287,6 +288,9 @@ void SlimeFx::Update(float deltaTime)
     {
         return;
     }
+
+    // カラー場に渡す時計。粒の寿命とは独立に進み続ける
+    elapsedTime_ += deltaTime;
 
     const float billboardPitch = -cameraPitch_;
     const size_t count = particles_.size();
@@ -359,7 +363,15 @@ void SlimeFx::Update(float deltaTime)
 
         const float t = particle.age / particle.lifeTime;
         const float scale = particle.scaleBegin + (particle.scaleEnd - particle.scaleBegin) * t;
-        const Vector4 color = Lerp(particle.colorBegin, particle.colorEnd, t);
+        Vector4 color = Lerp(particle.colorBegin, particle.colorEnd, t);
+
+        // カラー場を使う粒は RGB だけ毎フレーム引き直す。
+        // α は上の補間結果 × 場の α なので、寿命に沿ったフェードアウトはそのまま残る
+        if (particle.useColorField && colorField_)
+        {
+            const Vector4 field = colorField_(elapsedTime_, particle.position);
+            color = {field.x, field.y, field.z, color.w * field.w};
+        }
 
         object->SetTranslate(particle.position);
         object->SetColor(color);
@@ -653,7 +665,7 @@ void SlimeFx::EmitGroundMark(std::mt19937& rng, const Vector3& position, float s
 
 void SlimeFx::EmitSphereBurst(std::mt19937& rng, const Vector3& center, int count, float speed,
                               float gravity, float drag, const Vector4& color, float scale,
-                              float lifeTime, bool spark)
+                              float lifeTime, bool spark, bool useColorField)
 {
     for (int i = 0; i < count; ++i)
     {
@@ -676,6 +688,7 @@ void SlimeFx::EmitSphereBurst(std::mt19937& rng, const Vector3& center, int coun
         desc.scaleEnd = scale * 0.15f;
         desc.lifeTime = lifeTime * (0.75f + Rand01(rng) * 0.5f);
         desc.useSparkTexture = spark;
+        desc.useColorField = useColorField;
         Emit(desc);
     }
 }
@@ -726,7 +739,7 @@ void SlimeFx::EmitShockwave(const Vector3& center, float scaleBegin, float scale
 }
 
 void SlimeFx::EmitFirework(std::mt19937& rng, const Vector3& center, const Vector4& coreColor,
-                           const Vector4& shellColor, float power)
+                           const Vector4& shellColor, float power, bool useColorField)
 {
     // 1. 中心の閃光。短く、一気に開く
     {
@@ -739,16 +752,17 @@ void SlimeFx::EmitFirework(std::mt19937& rng, const Vector3& center, const Vecto
         desc.scaleEnd = 2.2f * power;
         desc.lifeTime = 0.18f;
         desc.useSparkTexture = false;
+        desc.useColorField = useColorField;
         Emit(desc);
     }
 
     // 2. 内側の殻。速くて短い
     EmitSphereBurst(rng, center, 16, 9.0f * power, 14.0f, 1.6f, coreColor, 0.22f * power, 0.45f,
-                    true);
+                    true, useColorField);
 
     // 3. 外側の殻。減速しながら重力で落ちる（これが「花火」に見せる本体）
     EmitSphereBurst(rng, center, 22, 13.0f * power, 20.0f, 0.9f, shellColor, 0.26f * power, 0.85f,
-                    true);
+                    true, useColorField);
 
     // 4. 尾を引く火花。横長に潰して線に見せる
     for (int i = 0; i < 8; ++i)
@@ -770,6 +784,7 @@ void SlimeFx::EmitFirework(std::mt19937& rng, const Vector3& center, const Vecto
         desc.scaleAspect = 2.6f;
         desc.lifeTime = 0.5f;
         desc.useSparkTexture = true;
+        desc.useColorField = useColorField;
         Emit(desc);
     }
 }

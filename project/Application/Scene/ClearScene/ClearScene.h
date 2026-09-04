@@ -1,23 +1,246 @@
 #pragma once
 
 #include "BaseScene.h"
+#include "Sprite.h"
+#include "Vector.h"
 
-class DirectXCom;
+#include <cstdint>
+#include <memory>
+#include <random>
+#include <vector>
+
 class KeyInput;
 class Camera;
+class SlimeFx;
 struct SceneRenderRequests;
 
+/// <summary>
+/// クリアシーン
+/// UI は仮想解像度 1280x720 を基準に配置している（WindowAPI::kClientWidth/Height）
+///
+/// 構成:
+///   - "STAGE CLEAR!!" ロゴ … 1文字＝1スプライト。ランダムな順で画面上から落ちてきて着地でつぶれる
+///   - SCORE / TIME / COIN ラベル … タイトルのボタンと同じく EaseOutBack でぽぽぽっと登場
+///   - 数値 … 1枚のアトラス画像から桁ごとに切り出し、0 からカウントアップする
+///   - "PRESS SPACE TO CONTINUE" … α を往復させて点滅
+///   - 背景 … SlimeFx で打ち上げ花火。色は color(time, position) のベクター場から毎フレーム引く
+///
+/// スコアなどの値は SceneContext（SceneManager の key-value）から読む。
+/// キーは kResultScoreKey / kResultTimeKey / kResultCoinKey（.cpp 冒頭）。
+/// まだ GamePlayScene 側が値を書いていないので、無ければ既定値で動き、
+/// ImGui の "Clear Scene" > "Result" から手で入れて演出を確認できる。
+/// </summary>
 class ClearScene : public BaseScene
 {
 public:
-	void InitializeScene() override;
-	void Finalize() override;
-	void Update() override;
-	void Draw(SceneRenderRequests& renderRequests) override;
+    // SlimeFx を前方宣言のまま unique_ptr で持っているので、
+    // コンストラクタとデストラクタは両方 .cpp 側で定義する。
+    // （SceneRegistration.cpp の REGISTER_SCENE が make_unique<ClearScene>() を展開して、
+    //   あの TU で暗黙のデフォルトコンストラクタが実体化されるため。詳細は TitleScene.h と同じ）
+    ClearScene();
+    ~ClearScene() override;
 
-	const char* GetSceneType() const { return "CLEAR"; }
+    void InitializeScene() override;
+    void Finalize() override;
+    void Update() override;
+    void Draw(SceneRenderRequests& renderRequests) override;
+
+    const char* GetSceneType() const { return "CLEAR"; }
 
 private:
-	DirectXCom* dxCommon_ = nullptr;
-	KeyInput* input_ = nullptr;
+    /// <summary>ロゴの1文字分</summary>
+    struct LogoLetter
+    {
+        std::unique_ptr<Sprite> sprite;
+        float baseWidth = 0.0f;      // 元画像の基準幅（ピクセル）
+        float extraSpacing = 0.0f;   // この文字の後ろに足す隙間（単語の区切り用）
+        float offsetX = 0.0f;        // ロゴ中心からの相対X（レイアウト結果）
+        float dropDelay = 0.0f;      // 落ち始めるまでの時間（順番はシャッフル）
+        float phase = 0.0f;          // 着地後のゆらぎの位相
+        float speedScale = 1.0f;     // ゆらぎ速度の個体差
+        float landTimer = 0.0f;      // 着地からの経過秒（つぶれの減衰に使う）
+        bool isLanded = false;
+    };
+
+    /// <summary>SCORE / TIME / COIN のラベル1個分</summary>
+    struct Label
+    {
+        std::unique_ptr<Sprite> sprite;
+        Vector2 center{};
+        Vector2 size{};
+        float popDelay = 0.0f;
+    };
+
+    /// <summary>数値の1桁分。アトラスのどのセルを出すかだけを持つ</summary>
+    struct Digit
+    {
+        std::unique_ptr<Sprite> sprite;
+        int cell = 0;        // 今フレーム出すセル番号（0-9 = 数字 / 10 = ":"）
+        int shownCell = -1;  // 前フレームのセル番号（変化を検出して弾ませる）
+        float punch = 0.0f;  // 桁が変わった瞬間の弾み。1.0 から減衰する
+    };
+
+    /// <summary>数値表示1行（SCORE / TIME / COIN）</summary>
+    struct NumberRow
+    {
+        std::vector<Digit> digits;
+        Vector2 rightCenter{};      // 一番右の桁の中心座標
+        float popDelay = 0.0f;      // 出現ディレイ
+        float countDelay = 0.0f;    // カウントアップ開始ディレイ
+        float countSeconds = 1.0f;  // 0 から目標値まで上がりきる時間
+        int target = 0;             // 目標値
+        float shown = 0.0f;         // 現在の表示値
+        bool isTime = false;        // true なら MM:SS 表記（":" のセルが入る）
+        bool isCountFinished = false;
+        float finishPunch = 0.0f;   // 上がりきった瞬間の行全体の弾み
+    };
+
+    /// <summary>打ち上げ中の花火（「シュー」の部分）。炸裂した時点で消える</summary>
+    struct Rocket
+    {
+        bool isActive = false;
+        Vector3 position{};
+        Vector3 velocity{};
+        float fuse = 0.0f;       // 残りの上昇時間。0 になったら炸裂
+        float trailAccum = 0.0f; // 軌跡の発生間隔カウンタ
+        float power = 1.0f;      // 炸裂の大きさ
+    };
+
+    // --- 生成 ---
+    void CreateLogo();
+    void CreateLabels();
+    void CreateNumbers();
+    void CreatePrompt();
+    void CreateFx();
+
+    // --- 更新 ---
+    void UpdateLogo(float deltaTime);
+    void UpdateLabels(float deltaTime);
+    void UpdateNumbers(float deltaTime);
+    void UpdatePrompt(float deltaTime);
+    void UpdateFx(float deltaTime);
+
+    void LayoutLogo();
+    void LayoutNumbers();
+
+    /// <summary>SceneContext から結果の値を読む（無ければ既定値のまま）</summary>
+    void LoadResultFromSceneContext();
+
+    /// <summary>行の桁数・表示値からアトラスのセル番号を割り当てる</summary>
+    static void AssignCells(NumberRow& row);
+
+    /// <summary>花火を1発打ち上げる。position を渡さなければ画面下からランダムに上げる</summary>
+    void LaunchRocket();
+    void LaunchRocketAt(const Vector3& burstPoint, float power);
+
+    /// <summary>粒の色を決めるベクター場 color(time, position)</summary>
+    Vector4 EvaluateColorField(float time, const Vector3& position) const;
+
+    /// <summary>仮想解像度上の座標を、カメラ前方 depth の平面上のワールド座標へ変換する</summary>
+    Vector3 ScreenToWorld(const Vector2& screenPosition, float depth) const;
+
+    void ResetTuningToDefault();
+
+    float RandomRange(float minValue, float maxValue);
+
+#ifdef USE_IMGUI
+    void DrawDebugUI();
+#endif
+
+    /// <summary>スプライトに中心座標・サイズ・不透明度・回転をまとめて反映する</summary>
+    static void ApplySprite(Sprite* sprite, const Vector2& center, const Vector2& size,
+                            float alpha, float rotation = 0.0f);
+
+    /// <summary>スプライトを生成する（失敗しても nullptr が返るだけで落ちない）</summary>
+    static std::unique_ptr<Sprite> MakeSprite(const char* texturePath, const Vector2& size,
+                                              const Vector2& anchorPoint);
+
+private:
+    KeyInput* input_ = nullptr;
+
+    std::vector<LogoLetter> logoLetters_;
+    std::vector<Label> labels_;
+    std::vector<NumberRow> numberRows_;
+    std::unique_ptr<Sprite> promptSprite_;
+
+    std::mt19937 randomEngine_;
+
+    float sceneTime_ = 0.0f;
+    float fadeAlpha_ = 0.0f;
+
+    bool isLogoBurstDone_ = false; // 全文字が着地した瞬間の花火を撃ったか
+
+    // ===============================================================
+    // 背景の花火
+    //
+    // engine のカメラを Object3dCom::GetDefaultCamera() で借りて、
+    // 正面固定（yaw / pitch / roll = 0）にしてから使う。
+    // SlimeFx のビルボードはカメラのピッチを打ち消すだけの実装なので、
+    // ピッチ 0 のここでは常に正対する。
+    // ===============================================================
+    Camera* fxCamera_ = nullptr;
+    Vector3 savedCameraTranslate_{};
+    Vector3 savedCameraRotate_{};
+
+    std::unique_ptr<SlimeFx> fx_;
+    std::vector<Rocket> rockets_;
+    float launchTimer_ = 0.0f;
+    float ambientAccum_ = 0.0f;
+
+    // --- 調整用パラメータ（ImGui からいじれる。既定値は .cpp の定数） ---
+
+    // レイアウト
+    Vector2 logoCenter_{};
+    float logoScale_ = 1.0f;
+    float logoCharHeight_ = 0.0f;
+    float logoCharSpacing_ = 0.0f;
+
+    // ロゴの演出
+    float dropSeconds_ = 0.0f;     // 1文字が落ちきるまでの時間
+    float dropStagger_ = 0.0f;     // 文字ごとの落下ディレイ
+    float dropHeight_ = 0.0f;      // 落下開始位置（基準位置からどれだけ上か）
+    float landSquash_ = 0.0f;      // 着地のつぶれ量
+    float landDamping_ = 0.0f;     // つぶれの減衰速度
+    float landFrequency_ = 0.0f;   // つぶれの振動数
+    float idleBobAmplitude_ = 0.0f;
+    float idleBobSpeed_ = 0.0f;
+    float idleJiggleAmount_ = 0.0f;
+    float idleJiggleSpeed_ = 0.0f;
+    float idleWobbleDegrees_ = 0.0f;
+
+    // 数値
+    Vector2 digitSize_{};          // 画面上の1桁のサイズ
+    float digitSpacing_ = 0.0f;    // 桁の間隔
+    float digitPunchAmount_ = 0.0f;// 桁が変わった瞬間の弾み量
+    float digitPunchDamping_ = 0.0f;
+
+    // 点滅プロンプト
+    Vector2 promptCenter_{};
+    Vector2 promptSize_{};
+    float promptDelay_ = 0.0f;
+    float promptBlinkSpeed_ = 0.0f;
+    float promptAlphaMin_ = 0.0f;
+    float promptAlphaMax_ = 1.0f;
+
+    // 花火
+    bool showFx_ = true;
+    bool fxAdditive_ = true;
+    bool fxUseColorField_ = true;
+    bool fxEnableAmbient_ = true;
+    float launchIntervalMin_ = 0.0f;
+    float launchIntervalMax_ = 0.0f;
+    float fireworkPowerMin_ = 0.0f;
+    float fireworkPowerMax_ = 0.0f;
+    float rocketGravity_ = 0.0f;
+
+    // カラー場 color(time, position)
+    float fieldScale_ = 0.0f;      // 位置の効き
+    float fieldTimeScale_ = 0.0f;  // 時間の流れる速さ
+    float fieldSwirl_ = 0.0f;      // 縞をゆがませる量
+    float fieldSaturation_ = 1.0f;
+    float fieldGain_ = 1.0f;
+    Vector3 fieldDirection_{};     // 場の勾配方向
+
+    // カメラ
+    Vector3 cameraPos_{};
 };
