@@ -250,6 +250,7 @@ private:
     // ===============================================================
 
     float fxSparkleAccum_ = 0.0f;
+    float fxVortexAccum_ = 0.0f; // マージ中の吸い込み渦
     float fxBackgroundAccum_ = 0.0f;
     float fxTrailDistance_ = 0.0f;
     Vector3 fxPrevSlimePos_{};
@@ -261,6 +262,7 @@ private:
     bool fxEnableGroundMark_ = true;
     bool fxEnableBulletTrail_ = true;
     bool fxEnableBackground_ = true;
+    bool fxAdditive_ = true; // 加算合成（false ならアルファブレンド）
     float fxSparkleInterval_ = 0.0f;
     float fxTrailStep_ = 0.0f;
     float fxBackgroundInterval_ = 0.0f;

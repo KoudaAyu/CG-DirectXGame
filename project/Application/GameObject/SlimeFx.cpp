@@ -9,6 +9,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <iostream>
 
 namespace {
 
@@ -111,14 +112,110 @@ void SlimeFx::Initialize(Object3dCom* object3dCom, Camera* camera, uint32_t capa
         objects_.push_back(std::move(object));
     }
 
+    CreateAdditivePipelineState();
+
     activeCount_ = 0;
     nextSearchIndex_ = 0;
+}
+
+void SlimeFx::CreateAdditivePipelineState()
+{
+    additivePipelineState_.Reset();
+
+    if (!object3dCom_)
+    {
+        return;
+    }
+    DirectXCom* dx = object3dCom_->GetDirectXCom();
+    if (!dx || !dx->GetDevice())
+    {
+        return;
+    }
+
+    const auto& rootSignature = object3dCom_->GetRootSignature();
+    if (!rootSignature)
+    {
+        return;
+    }
+
+    // Object3D と同じシェーダを使う（ライティングは切って使うので実質 色 x テクスチャ）
+    Microsoft::WRL::ComPtr<IDxcBlob> vertexShaderBlob = dx->CompileShader(
+        L"Resources/shaders/Object3D.VS.hlsl", L"vs_6_0", dx->GetDxcUtils().Get(),
+        dx->GetDxcCompiler(), dx->GetIncludeHandler(), std::cout);
+    Microsoft::WRL::ComPtr<IDxcBlob> pixelShaderBlob = dx->CompileShader(
+        L"Resources/shaders/Object3D.PS.hlsl", L"ps_6_0", dx->GetDxcUtils().Get(),
+        dx->GetDxcCompiler(), dx->GetIncludeHandler(), std::cout);
+    if (!vertexShaderBlob || !pixelShaderBlob)
+    {
+        return; // 失敗したらアルファブレンドの PSO にフォールバックする
+    }
+
+    // Object3D のインプットレイアウトと同じ並び
+    D3D12_INPUT_ELEMENT_DESC inputElementDescs[3]{};
+    inputElementDescs[0].SemanticName = "POSITION";
+    inputElementDescs[0].SemanticIndex = 0;
+    inputElementDescs[0].Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
+    inputElementDescs[0].AlignedByteOffset = D3D12_APPEND_ALIGNED_ELEMENT;
+    inputElementDescs[1].SemanticName = "TEXCOORD";
+    inputElementDescs[1].SemanticIndex = 0;
+    inputElementDescs[1].Format = DXGI_FORMAT_R32G32_FLOAT;
+    inputElementDescs[1].AlignedByteOffset = D3D12_APPEND_ALIGNED_ELEMENT;
+    inputElementDescs[2].SemanticName = "NORMAL";
+    inputElementDescs[2].SemanticIndex = 0;
+    inputElementDescs[2].Format = DXGI_FORMAT_R32G32B32_FLOAT;
+    inputElementDescs[2].AlignedByteOffset = D3D12_APPEND_ALIGNED_ELEMENT;
+
+    D3D12_INPUT_LAYOUT_DESC inputLayoutDesc{};
+    inputLayoutDesc.pInputElementDescs = inputElementDescs;
+    inputLayoutDesc.NumElements = _countof(inputElementDescs);
+
+    D3D12_RASTERIZER_DESC rasterizerDesc{};
+    rasterizerDesc.CullMode = D3D12_CULL_MODE_NONE;
+    rasterizerDesc.FillMode = D3D12_FILL_MODE_SOLID;
+
+    D3D12_GRAPHICS_PIPELINE_STATE_DESC desc{};
+    desc.pRootSignature = rootSignature.Get();
+    desc.InputLayout = inputLayoutDesc;
+    desc.VS = {vertexShaderBlob->GetBufferPointer(), vertexShaderBlob->GetBufferSize()};
+    desc.PS = {pixelShaderBlob->GetBufferPointer(), pixelShaderBlob->GetBufferSize()};
+
+    // ここだけが Object3D_Effect との違い: DestBlend を ONE にして加算合成にする
+    desc.BlendState.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
+    desc.BlendState.RenderTarget[0].BlendEnable = TRUE;
+    desc.BlendState.RenderTarget[0].SrcBlend = D3D12_BLEND_SRC_ALPHA;
+    desc.BlendState.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
+    desc.BlendState.RenderTarget[0].DestBlend = D3D12_BLEND_ONE;
+    desc.BlendState.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_ONE;
+    desc.BlendState.RenderTarget[0].BlendOpAlpha = D3D12_BLEND_OP_ADD;
+    desc.BlendState.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_ONE;
+
+    desc.RasterizerState = rasterizerDesc;
+    desc.NumRenderTargets = 1;
+    desc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
+    desc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+    desc.SampleDesc.Count = 1;
+    desc.SampleMask = D3D12_DEFAULT_SAMPLE_MASK;
+
+    // デプスはテストするが書き込まない（Object3D_Effect と同じ）
+    desc.DepthStencilState.DepthEnable = TRUE;
+    desc.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO;
+    desc.DepthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
+    desc.DSVFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
+
+    Microsoft::WRL::ComPtr<ID3D12PipelineState> pipelineState;
+    const HRESULT hr =
+        dx->GetDevice()->CreateGraphicsPipelineState(&desc, IID_PPV_ARGS(&pipelineState));
+    if (SUCCEEDED(hr))
+    {
+        additivePipelineState_ = pipelineState;
+    }
 }
 
 void SlimeFx::Finalize()
 {
     objects_.clear();
     particles_.clear();
+    additivePipelineState_.Reset();
     activeCount_ = 0;
     nextSearchIndex_ = 0;
 }
@@ -177,6 +274,8 @@ void SlimeFx::Emit(const SlimeFxDesc& desc)
     particle.age = 0.0f;
     particle.shape = desc.shape;
     particle.useSparkTexture = desc.useSparkTexture;
+    particle.attractTarget = desc.attractTarget;
+    particle.attractStrength = desc.attractStrength;
     particle.isParked = false;
 
     ++activeCount_;
@@ -238,6 +337,22 @@ void SlimeFx::Update(float deltaTime)
         }
         particle.velocity.y -= particle.gravity * deltaTime;
 
+        // 吸引。距離が近いほど加速度を上げて「吸い込まれる」感じを出す
+        if (particle.attractStrength > 0.0f)
+        {
+            const Vector3 toTarget = particle.attractTarget - particle.position;
+            const float distance = std::sqrt(toTarget.x * toTarget.x + toTarget.y * toTarget.y +
+                                             toTarget.z * toTarget.z);
+            if (distance > 0.01f)
+            {
+                // 1/(距離+0.6) で頭打ちさせないと中心付近で発散する
+                const float pull = particle.attractStrength / (distance + 0.6f) * deltaTime;
+                particle.velocity.x += (toTarget.x / distance) * pull;
+                particle.velocity.y += (toTarget.y / distance) * pull;
+                particle.velocity.z += (toTarget.z / distance) * pull;
+            }
+        }
+
         particle.position.x += particle.velocity.x * deltaTime;
         particle.position.y += particle.velocity.y * deltaTime;
         particle.position.z += particle.velocity.z * deltaTime;
@@ -290,8 +405,10 @@ void SlimeFx::DrawGroup(const RenderContext& ctx, bool spark)
     }
 
     const auto& rootSignature = object3dCom_->GetRootSignature();
-    // デプス書き込み無効の PSO。粒同士が隠し合わず、3D の前後関係だけ効く
-    const auto& pipelineState = object3dCom_->GetEffectPipelineState();
+    // どちらもデプス書き込み無効。粒同士が隠し合わず、3D の前後関係だけ効く
+    const auto& pipelineState = (isAdditive_ && additivePipelineState_)
+                                    ? additivePipelineState_
+                                    : object3dCom_->GetEffectPipelineState();
     if (!rootSignature || !pipelineState)
     {
         return;
@@ -377,24 +494,30 @@ void SlimeFx::EmitSparkle(std::mt19937& rng, const Vector3& center, float radius
 {
     for (int i = 0; i < count; ++i)
     {
-        // 球面上のランダムな一点
+        // 球の「内側」から湧かせて、そのまま外へ押し出す。
+        // 体積内で一様にしたいので、半径方向は cbrt(0..1) で分布させる
         const float theta = RandRange(rng, 0.0f, kPi * 2.0f);
         const float cosPhi = RandRange(rng, -1.0f, 1.0f);
         const float sinPhi = std::sqrt((std::max)(0.0f, 1.0f - cosPhi * cosPhi));
-
         const Vector3 direction = {sinPhi * std::cos(theta), cosPhi, sinPhi * std::sin(theta)};
-        const float distance = radius * (0.85f + Rand01(rng) * 0.3f);
+
+        const float depth = std::cbrt(Rand01(rng)); // 0 = 中心 / 1 = 表面
+        const float distance = radius * depth * 0.55f;
+
+        // 中心付近から出たものほど強く押し出す。体の中から染み出してくるように見える
+        const float outwardSpeed = 1.4f + (1.0f - depth) * 1.6f;
 
         SlimeFxDesc desc;
         desc.position = {center.x + direction.x * distance, center.y + direction.y * distance,
                          center.z + direction.z * distance};
-        // ふわっと上に昇りながら、外向きにも少し広がる
-        desc.velocity = {direction.x * 0.25f, 0.5f + Rand01(rng) * 0.5f, direction.z * 0.25f};
-        desc.drag = 1.2f;
+        desc.velocity = {direction.x * outwardSpeed, direction.y * outwardSpeed + 0.5f,
+                         direction.z * outwardSpeed};
+        desc.drag = 2.4f; // 表面を抜けたあたりで失速して漂う
         desc.colorBegin = color;
         desc.colorEnd = {color.x, color.y, color.z, 0.0f};
-        desc.scaleBegin = scale * (0.6f + Rand01(rng) * 0.8f);
-        desc.scaleEnd = 0.0f;
+        // 加算合成向けに「小さく生まれて、広がりながら薄れる」
+        desc.scaleBegin = scale * (0.35f + Rand01(rng) * 0.35f);
+        desc.scaleEnd = scale * (1.1f + Rand01(rng) * 0.6f);
         desc.lifeTime = lifeTime * (0.7f + Rand01(rng) * 0.6f);
         desc.useSparkTexture = true;
         Emit(desc);
@@ -526,4 +649,127 @@ void SlimeFx::EmitGroundMark(std::mt19937& rng, const Vector3& position, float s
     desc.shape = SlimeFxShape::Ground;
     desc.useSparkTexture = false;
     Emit(desc);
+}
+
+void SlimeFx::EmitSphereBurst(std::mt19937& rng, const Vector3& center, int count, float speed,
+                              float gravity, float drag, const Vector4& color, float scale,
+                              float lifeTime, bool spark)
+{
+    for (int i = 0; i < count; ++i)
+    {
+        const float theta = RandRange(rng, 0.0f, kPi * 2.0f);
+        // 真下は控えめにして、上半球寄りに散らす
+        const float cosPhi = RandRange(rng, -0.55f, 1.0f);
+        const float sinPhi = std::sqrt((std::max)(0.0f, 1.0f - cosPhi * cosPhi));
+        const Vector3 direction = {sinPhi * std::cos(theta), cosPhi, sinPhi * std::sin(theta)};
+        const float currentSpeed = speed * (0.7f + Rand01(rng) * 0.6f);
+
+        SlimeFxDesc desc;
+        desc.position = center;
+        desc.velocity = direction * currentSpeed;
+        desc.gravity = gravity;
+        desc.drag = drag;
+        desc.colorBegin = color;
+        // 消え際に色温度を落とすと火花っぽくなる
+        desc.colorEnd = {color.x * 0.7f, color.y * 0.45f, color.z * 0.3f, 0.0f};
+        desc.scaleBegin = scale * (0.8f + Rand01(rng) * 0.6f);
+        desc.scaleEnd = scale * 0.15f;
+        desc.lifeTime = lifeTime * (0.75f + Rand01(rng) * 0.5f);
+        desc.useSparkTexture = spark;
+        Emit(desc);
+    }
+}
+
+void SlimeFx::EmitVortex(std::mt19937& rng, const Vector3& center, float radius, int count,
+                         const Vector4& color, float scale, float lifeTime, float attractStrength)
+{
+    for (int i = 0; i < count; ++i)
+    {
+        const float angle = RandRange(rng, 0.0f, kPi * 2.0f);
+        const float currentRadius = radius * (0.7f + Rand01(rng) * 0.5f);
+        const Vector3 offset = {std::sin(angle) * currentRadius, RandRange(rng, -0.1f, 0.9f),
+                                std::cos(angle) * currentRadius};
+
+        // 円周の接線方向に流しておいて、そこへ中心への吸引を掛けると螺旋を描く
+        const float spin = RandRange(rng, 2.2f, 3.8f);
+        const Vector3 tangent = {std::cos(angle) * spin, 0.0f, -std::sin(angle) * spin};
+
+        SlimeFxDesc desc;
+        desc.position = center + offset;
+        desc.velocity = tangent;
+        desc.attractTarget = center;
+        desc.attractStrength = attractStrength;
+        desc.colorBegin = color;
+        desc.colorEnd = {color.x, color.y, color.z, 0.0f};
+        desc.scaleBegin = scale * (0.7f + Rand01(rng) * 0.6f);
+        desc.scaleEnd = scale * 0.2f;
+        desc.lifeTime = lifeTime * (0.8f + Rand01(rng) * 0.4f);
+        desc.useSparkTexture = true;
+        Emit(desc);
+    }
+}
+
+void SlimeFx::EmitShockwave(const Vector3& center, float scaleBegin, float scaleEnd,
+                            const Vector4& color, float lifeTime)
+{
+    SlimeFxDesc desc;
+    desc.position = center;
+    desc.velocity = {0.0f, 0.0f, 0.0f};
+    desc.colorBegin = color;
+    desc.colorEnd = {color.x, color.y, color.z, 0.0f};
+    desc.scaleBegin = scaleBegin;
+    desc.scaleEnd = scaleEnd;
+    desc.lifeTime = lifeTime;
+    desc.shape = SlimeFxShape::Ground;
+    desc.useSparkTexture = false;
+    Emit(desc);
+}
+
+void SlimeFx::EmitFirework(std::mt19937& rng, const Vector3& center, const Vector4& coreColor,
+                           const Vector4& shellColor, float power)
+{
+    // 1. 中心の閃光。短く、一気に開く
+    {
+        SlimeFxDesc desc;
+        desc.position = center;
+        desc.velocity = {0.0f, 0.0f, 0.0f};
+        desc.colorBegin = coreColor;
+        desc.colorEnd = {coreColor.x, coreColor.y, coreColor.z, 0.0f};
+        desc.scaleBegin = 0.5f * power;
+        desc.scaleEnd = 2.2f * power;
+        desc.lifeTime = 0.18f;
+        desc.useSparkTexture = false;
+        Emit(desc);
+    }
+
+    // 2. 内側の殻。速くて短い
+    EmitSphereBurst(rng, center, 16, 9.0f * power, 14.0f, 1.6f, coreColor, 0.22f * power, 0.45f,
+                    true);
+
+    // 3. 外側の殻。減速しながら重力で落ちる（これが「花火」に見せる本体）
+    EmitSphereBurst(rng, center, 22, 13.0f * power, 20.0f, 0.9f, shellColor, 0.26f * power, 0.85f,
+                    true);
+
+    // 4. 尾を引く火花。横長に潰して線に見せる
+    for (int i = 0; i < 8; ++i)
+    {
+        const float theta = RandRange(rng, 0.0f, kPi * 2.0f);
+        const float cosPhi = RandRange(rng, -0.2f, 1.0f);
+        const float sinPhi = std::sqrt((std::max)(0.0f, 1.0f - cosPhi * cosPhi));
+        const Vector3 direction = {sinPhi * std::cos(theta), cosPhi, sinPhi * std::sin(theta)};
+
+        SlimeFxDesc desc;
+        desc.position = center;
+        desc.velocity = direction * (16.0f * power * (0.8f + Rand01(rng) * 0.4f));
+        desc.gravity = 22.0f;
+        desc.drag = 2.0f;
+        desc.colorBegin = shellColor;
+        desc.colorEnd = {shellColor.x, shellColor.y, shellColor.z, 0.0f};
+        desc.scaleBegin = 0.34f * power;
+        desc.scaleEnd = 0.05f;
+        desc.scaleAspect = 2.6f;
+        desc.lifeTime = 0.5f;
+        desc.useSparkTexture = true;
+        Emit(desc);
+    }
 }

@@ -4,6 +4,8 @@
 #include "RenderContext.h"
 #include "Baziru3_Engine/Graphics/3D/Object/Object3d.h"
 
+#include <wrl.h>
+
 #include <cstdint>
 #include <memory>
 #include <random>
@@ -34,6 +36,11 @@ struct SlimeFxDesc
     float lifeTime = 0.6f;
     SlimeFxShape shape = SlimeFxShape::Billboard;
     bool useSparkTexture = false; // true: starburst（キラッ） / false: circle2（ぼんやり丸）
+
+    // 吸引。attractStrength が正のとき、毎フレーム attractTarget へ向かって加速する。
+    // 距離に反比例させているので、近づくほど速くなって「吸い込まれる」感じが出る
+    Vector3 attractTarget{0.0f, 0.0f, 0.0f};
+    float attractStrength = 0.0f;
 };
 
 /// <summary>
@@ -62,6 +69,11 @@ public:
     /// <summary>ビルボードの向きに使うカメラのピッチ（カメラの yaw / roll は 0 前提）</summary>
     void SetCameraPitch(float pitch) { cameraPitch_ = pitch; }
 
+    /// <summary>加算合成にするか。false ならアルファブレンド（Object3D_Effect PSO）</summary>
+    void SetAdditive(bool additive) { isAdditive_ = additive; }
+    bool IsAdditive() const { return isAdditive_; }
+    bool HasAdditivePipeline() const { return additivePipelineState_ != nullptr; }
+
     void Update(float deltaTime);
     void Draw(const RenderContext& ctx);
     void Clear();
@@ -79,6 +91,23 @@ public:
     void EmitBurst(std::mt19937& rng, const Vector3& center, int count, float speed,
                    float upSpeed, const Vector4& color, float scale, float lifeTime,
                    bool spark);
+
+    /// <summary>全方位（球状）に飛び散るバースト。打ち上げ花火の殻に使う</summary>
+    void EmitSphereBurst(std::mt19937& rng, const Vector3& center, int count, float speed,
+                         float gravity, float drag, const Vector4& color, float scale,
+                         float lifeTime, bool spark);
+
+    /// <summary>中心のまわりを回りながら吸い込まれていく粒（マージの渦）</summary>
+    void EmitVortex(std::mt19937& rng, const Vector3& center, float radius, int count,
+                    const Vector4& color, float scale, float lifeTime, float attractStrength);
+
+    /// <summary>地面に広がる（または縮む）リング。shockwave / 吸い込みの床表現</summary>
+    void EmitShockwave(const Vector3& center, float scaleBegin, float scaleEnd,
+                       const Vector4& color, float lifeTime);
+
+    /// <summary>プチ花火。閃光 + 2重の殻 + 尾を引く火花 + 床のリングをまとめて出す</summary>
+    void EmitFirework(std::mt19937& rng, const Vector3& center, const Vector4& coreColor,
+                      const Vector4& shellColor, float power);
 
     /// <summary>from から to へ吸い寄せられる粒（マージの吸収表現）</summary>
     void EmitConverge(std::mt19937& rng, const Vector3& from, const Vector3& to, int count,
@@ -117,6 +146,8 @@ private:
         float age = 0.0f;
         SlimeFxShape shape = SlimeFxShape::Billboard;
         bool useSparkTexture = false;
+        Vector3 attractTarget{};
+        float attractStrength = 0.0f;
     };
 
     /// <summary>XY 平面に立てた 1x1 の板を作る</summary>
@@ -124,6 +155,14 @@ private:
 
     /// <summary>同じテクスチャの粒だけまとめて描く</summary>
     void DrawGroup(const RenderContext& ctx, bool spark);
+
+    /// <summary>
+    /// 加算合成用の PSO を作る。
+    /// engine の Object3dCom が持っているのはアルファブレンドの PSO だけなので、
+    /// ルートシグネチャと Object3D のシェーダを流用して、ブレンドだけ
+    /// SRC_ALPHA / ONE に差し替えたものをここで1本作る（engine 側には手を入れない）。
+    /// </summary>
+    void CreateAdditivePipelineState();
 
     int FindFreeIndex();
 
@@ -137,6 +176,9 @@ private:
 
     uint32_t softTextureIndex_ = 0;  // ぼんやり丸
     uint32_t sparkTextureIndex_ = 0; // キラッ
+
+    Microsoft::WRL::ComPtr<ID3D12PipelineState> additivePipelineState_;
+    bool isAdditive_ = true;
 
     float cameraPitch_ = 0.0f;
     int activeCount_ = 0;

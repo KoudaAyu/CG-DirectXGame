@@ -165,8 +165,8 @@ constexpr float kThrowBiasX = -1.6f; // 右のボタン列に被らないよう�
 // パーティクル演出
 // ===================================================================
 // 粒1個につき Object3d を1個持つ（＝板ポリの頂点バッファも1個ずつ）。
-// 増やしすぎるとリソースが無駄になるので、実際に同時に出る数から少し余裕を見た値にしてある
-constexpr uint32_t kFxCapacity = 128;
+// 分裂の花火だけで一気に50個近く使うので、そこを基準に余裕を見た値
+constexpr uint32_t kFxCapacity = 192;
 
 constexpr float kFxSparkleIntervalDefault = 0.06f;    // キラキラの発生間隔（秒）
 constexpr float kFxTrailStepDefault = 0.30f;          // 移動軌跡を1個置く距離
@@ -181,6 +181,14 @@ constexpr Vector4 kFxTrailColorMerged = {1.0f, 0.82f, 0.3f, 0.5f};
 constexpr Vector4 kFxBulletColor = {0.55f, 0.95f, 1.0f, 0.75f};
 constexpr Vector4 kFxMergeColor = {1.0f, 0.88f, 0.4f, 0.95f};
 constexpr Vector4 kFxSplitColor = {1.0f, 1.0f, 1.0f, 1.0f};
+
+// 加算合成なので、色は「明るさ」として足し算される。
+// アルファブレンドのつもりで濃い色を入れると簡単に白飛びするので控えめに
+constexpr bool kFxAdditiveDefault = true;
+constexpr float kFxVortexInterval = 0.025f; // マージ中の渦の発生間隔
+constexpr Vector4 kFxVortexColor = {1.0f, 0.78f, 0.32f, 0.9f};
+constexpr Vector4 kFxFireworkCoreColor = {1.0f, 1.0f, 0.92f, 1.0f};
+constexpr Vector4 kFxFireworkShellColor = {0.65f, 0.95f, 1.0f, 1.0f};
 constexpr Vector4 kFxStrandColor = {0.7f, 0.95f, 1.0f, 0.8f};
 constexpr Vector4 kFxBackgroundColor = {0.85f, 0.95f, 1.0f, 0.35f};
 
@@ -291,9 +299,11 @@ void TitleScene::Finalize()
     {
         slimeCamera_->SetTranslate(savedCameraTranslate_);
         slimeCamera_->SetRotate(savedCameraRotate_);
-        // ゲーム終了時部品解放の順がよくわからないけど、ここでUpdate呼ぶとエラー起きる可能性があるので
-        // コメントアウトしておく
-        //slimeCamera_->Update();
+        // Camera::Update() はここでは呼ばない。
+        // 終了時は DirectXCom / CB アロケータが先に片付いている可能性があり、
+        // Update() の中でそれを触ってアクセス違反になる。
+        // 行列の再計算は Game::Update() が毎フレーム camera_->Update() を呼ぶので、
+        // ここで transform を戻しておけば次のフレームに反映される
         slimeCamera_ = nullptr;
     }
 
@@ -347,6 +357,11 @@ void TitleScene::ResetSlimeTuningToDefault()
     fxEnableGroundMark_ = true;
     fxEnableBulletTrail_ = true;
     fxEnableBackground_ = true;
+    fxAdditive_ = kFxAdditiveDefault;
+    if (fx_)
+    {
+        fx_->SetAdditive(fxAdditive_);
+    }
     fxSparkleInterval_ = kFxSparkleIntervalDefault;
     fxTrailStep_ = kFxTrailStepDefault;
     fxBackgroundInterval_ = kFxBackgroundIntervalDefault;
@@ -471,6 +486,7 @@ void TitleScene::CreateSlime()
     fx_ = std::make_unique<SlimeFx>();
     fx_->Initialize(object3dCom, slimeCamera_, kFxCapacity);
     fx_->SetCameraPitch(cameraPitch_);
+    fx_->SetAdditive(fxAdditive_);
 
     slimeTilt_ = {0.0f, 0.0f};
     isSlimeIntroPulseDone_ = false;
@@ -485,6 +501,7 @@ void TitleScene::CreateSlime()
     slimeFlashTimer_ = 0.0f;
 
     fxSparkleAccum_ = 0.0f;
+    fxVortexAccum_ = 0.0f;
     fxBackgroundAccum_ = 0.0f;
     fxTrailDistance_ = 0.0f;
     fxPrevSlimePos_ = slime_->GetPosition();
@@ -920,22 +937,30 @@ void TitleScene::EnterMerge()
 
     const Vector3 playerPos = slime_->GetPosition();
 
-    // 吸い寄せられる粒。実際の吸引は MinionManager が次の Update で始める
     if (fx_ && minions_)
     {
+        // 1. ミニオン1体ずつから、プレイヤーへ吸い寄せられる粒の筋を引く
         for (const auto& minion : minions_->GetMinions())
         {
             if (!minion || !minion->IsActive())
             {
                 continue;
             }
-            fx_->EmitConverge(randomEngine_, minion->GetPosition(), playerPos, 3, kFxMergeColor,
-                              0.15f, 0.45f);
+            fx_->EmitConverge(randomEngine_, minion->GetPosition(), playerPos, 4, kFxMergeColor,
+                              0.15f, 0.5f);
         }
+
+        // 2. 外周から巻き込む渦を一気に立ち上げる
+        fx_->EmitVortex(randomEngine_, playerPos, 3.2f, 24, kFxVortexColor, 0.22f, 0.9f, 30.0f);
+
+        // 3. 床のリングを「縮ませて」吸い込み感を出す（分裂の広がるリングと対になる）
+        fx_->EmitShockwave({playerPos.x, slimeHome_.y + 0.02f, playerPos.z}, 6.0f, 0.4f,
+                           kFxMergeColor, 0.45f);
     }
 
     slime_->ToggleMerge();
     prevMergedCount_ = 0;
+    fxVortexAccum_ = 0.0f;
 }
 
 void TitleScene::EnterSplit()
@@ -948,7 +973,7 @@ void TitleScene::EnterSplit()
     const Vector3 playerPos = slime_->GetPosition();
 
     slime_->ToggleMerge();
-    slimeFlashTimer_ = 0.12f;
+    slimeFlashTimer_ = 0.14f;
     // 糸はミニオンが少し飛び出してから張る。
     // TriggerSplit はミニオンをプレイヤーの位置に置き直してから撃ち出すので、
     // 同じフレームに張ると長さ 0 になってしまう
@@ -956,10 +981,17 @@ void TitleScene::EnterSplit()
 
     if (fx_)
     {
-        // 鋭いキラッと、粘っこい飛沫を重ねる
-        fx_->EmitBurst(randomEngine_, playerPos, 20, 5.0f, 3.2f, kFxSplitColor, 0.28f, 0.6f, true);
-        fx_->EmitBurst(randomEngine_, playerPos, 12, 2.4f, 1.0f, kFxTrailColorNormal, 0.4f, 0.5f,
+        // プチ花火。閃光 → 内側の殻 → 外側の殻 → 尾を引く火花
+        fx_->EmitFirework(randomEngine_, {playerPos.x, playerPos.y + 0.3f, playerPos.z},
+                          kFxFireworkCoreColor, kFxFireworkShellColor, 1.0f);
+
+        // 粘っこい飛沫を重ねて「スライムが弾けた」感を残す
+        fx_->EmitBurst(randomEngine_, playerPos, 14, 3.0f, 1.4f, kFxTrailColorNormal, 0.35f, 0.55f,
                        false);
+
+        // 床に広がるリング。マージの縮むリングと対になる
+        fx_->EmitShockwave({playerPos.x, slimeHome_.y + 0.02f, playerPos.z}, 0.5f, 7.0f,
+                           kFxFireworkShellColor, 0.45f);
     }
 
     prevMergedCount_ = 0;
@@ -1055,17 +1087,34 @@ void TitleScene::UpdateFx(float deltaTime)
         }
     }
 
-    // --- マージ: 1体吸収するたびに小さくバースト ---
+    // --- マージ: 吸い込みの渦と、1体吸うたびのリアクション ---
     if (minions_ && isMerged)
     {
+        // まだ吸い終わっていない間は、外周から渦を巻いて吸い込み続ける。
+        // SlimeFx 側の attractStrength が距離に反比例するので、
+        // 中心に近づくほど加速して「吸い込まれる」動きになる
+        if (!minions_->IsAllMerged())
+        {
+            fxVortexAccum_ += deltaTime;
+            while (fxVortexAccum_ >= kFxVortexInterval)
+            {
+                fxVortexAccum_ -= kFxVortexInterval;
+                fx_->EmitVortex(randomEngine_, slimePos, slimeScale * 2.6f, 2, kFxVortexColor,
+                                0.17f, 0.7f, 26.0f);
+            }
+        }
+
         const int mergedCount = minions_->GetMergedCount();
         if (mergedCount > prevMergedCount_)
         {
             const int absorbed = mergedCount - prevMergedCount_;
             for (int i = 0; i < absorbed; ++i)
             {
-                fx_->EmitBurst(randomEngine_, slimePos, 6, 2.2f, 1.4f, kFxMergeColor, 0.16f, 0.4f,
+                fx_->EmitBurst(randomEngine_, slimePos, 8, 2.6f, 1.6f, kFxMergeColor, 0.18f, 0.4f,
                                true);
+                // 吸うたびに足元へ小さくリングが広がる
+                fx_->EmitShockwave({slimePos.x, slimeHome_.y + 0.02f, slimePos.z},
+                                   slimeScale * 1.2f, slimeScale * 3.4f, kFxMergeColor, 0.3f);
             }
             prevMergedCount_ = mergedCount;
 
@@ -1431,6 +1480,18 @@ void TitleScene::DrawDebugUI()
         if (fx_)
         {
             ImGui::Text("Particles: %d / %u", fx_->GetActiveCount(), fx_->GetCapacity());
+        }
+
+        // 加算合成だと色が「明るさ」として足し算されるので、
+        // アルファブレンドに戻して見比べられるようにしてある
+        if (ImGui::Checkbox("Additive", &fxAdditive_) && fx_)
+        {
+            fx_->SetAdditive(fxAdditive_);
+        }
+        if (fx_ && !fx_->HasAdditivePipeline())
+        {
+            ImGui::SameLine();
+            ImGui::TextColored(ImVec4(1.0f, 0.5f, 0.3f, 1.0f), "(PSO 作成に失敗)");
         }
 
         ImGui::SeparatorText("Toggles");
