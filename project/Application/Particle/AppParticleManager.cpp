@@ -924,20 +924,23 @@ void AppParticleManager::EmitTargetDestroyGPUBurst(std::mt19937& randomEngine, c
 
 void AppParticleManager::EmitDodgeRollDust(std::mt19937& randomEngine, const Vector3& position, const Vector3& moveDirection, uint32_t smokeTexIndex)
 {
-	// 回避時に足元から進行方向と逆向きに吹き出す激しい土煙（20個）
-	std::uniform_real_distribution<float> spreadDist(-0.6f, 0.6f);
-	std::uniform_real_distribution<float> speedDist(1.5f, 4.5f);
-	std::uniform_real_distribution<float> scaleDist(0.4f, 0.9f);
-	std::uniform_real_distribution<float> lifeDist(0.4f, 0.8f);
+	// 回避時にプレイヤー足元後方から進行方向逆向きに吹き出す軽快な土煙（5個）
+	std::uniform_real_distribution<float> spreadDist(-0.35f, 0.35f);
+	std::uniform_real_distribution<float> speedDist(1.2f, 2.8f);
+	std::uniform_real_distribution<float> scaleDist(0.35f, 0.65f);
+	std::uniform_real_distribution<float> lifeDist(0.3f, 0.55f);
 
-	for (int i = 0; i < 20; ++i)
+	Vector3 baseSpawn = position - Vector3{ moveDirection.x * 0.45f, -0.08f, moveDirection.z * 0.45f };
+
+	for (int i = 0; i < 5; ++i)
 	{
-		Vector3 oppDir = { -moveDirection.x + spreadDist(randomEngine), 0.3f + (static_cast<float>(rand()) / RAND_MAX) * 0.5f, -moveDirection.z + spreadDist(randomEngine) };
+		Vector3 oppDir = { -moveDirection.x + spreadDist(randomEngine), 0.25f + (static_cast<float>(rand()) / RAND_MAX) * 0.35f, -moveDirection.z + spreadDist(randomEngine) };
 		float spd = speedDist(randomEngine);
 		Vector3 vel = { oppDir.x * spd, oppDir.y * spd, oppDir.z * spd };
-		Vector4 col = { 0.65f, 0.60f, 0.52f, 0.55f };
+		Vector4 col = { 0.70f, 0.65f, 0.55f, 0.45f };
 
-		EmitDustWithVelocity(randomEngine, position + Vector3{ spreadDist(randomEngine) * 0.3f, 0.1f, spreadDist(randomEngine) * 0.3f }, scaleDist(randomEngine), col, vel, lifeDist(randomEngine), smokeTexIndex);
+		Vector3 p = baseSpawn + Vector3{ spreadDist(randomEngine) * 0.2f, 0.0f, spreadDist(randomEngine) * 0.2f };
+		EmitDustWithVelocity(randomEngine, p, scaleDist(randomEngine), col, vel, lifeDist(randomEngine), smokeTexIndex);
 	}
 }
 

@@ -610,10 +610,16 @@ void GamePlayScene::UpdateParticles(float deltaTime)
 		Vector3 pPos = player_->GetPosition();
 		if (player_->IsDodging())
 		{
-			// ローリング回避中: 進行方向の逆へ激しく吹き出す土煙
-			Vector3 pRot = player_->GetRotation();
-			Vector3 dodgeDir = { std::sin(pRot.y), 0.0f, std::cos(pRot.y) };
-			appParticleManager_->EmitDodgeRollDust(particleManager->GetRandomEngine(), pPos, dodgeDir, smokeTextureIndex_);
+			// ローリング回避中: 進行方向の逆へ足元から吹き出す土煙 (0.07秒おきに放出)
+			static float dodgeDustTimer = 0.0f;
+			dodgeDustTimer += deltaTime;
+			if (dodgeDustTimer >= 0.07f)
+			{
+				Vector3 pRot = player_->GetRotation();
+				Vector3 dodgeDir = { std::sin(pRot.y), 0.0f, std::cos(pRot.y) };
+				appParticleManager_->EmitDodgeRollDust(particleManager->GetRandomEngine(), pPos, dodgeDir, smokeTextureIndex_);
+				dodgeDustTimer = 0.0f;
+			}
 		}
 		else if (player_->IsMoving())
 		{
@@ -1049,34 +1055,22 @@ void GamePlayScene::UpdateCharacters(float deltaTime)
 						}
 					}
 					
-					// 足元から全方位（8方向）に勢いよく広がる土煙の輪（キックオフ演出）
+					// 足元から全方位（8方向）に広がる軽快な土煙の輪（キックオフ演出）
 					for (int i = 0; i < 8; ++i)
 					{
 						float angle = i * (6.2831853f / 8.0f);
-						Vector3 vel = { std::cos(angle) * 2.8f, 0.4f, std::sin(angle) * 2.8f };
+						Vector3 vel = { std::cos(angle) * 2.2f, 0.25f, std::sin(angle) * 2.2f };
 						appParticleManager_->EmitDustWithVelocity(
 							particleManager->GetRandomEngine(),
-							playerPos,
-							1.5f,
-							{ 1.0f, 1.0f, 1.0f, 0.7f }, // Semi-transparent dust
+							playerPos + Vector3{ 0.0f, 0.05f, 0.0f },
+							0.65f, // プレイヤーを隠さない適正スケール
+							{ 0.85f, 0.80f, 0.75f, 0.5f },
 							vel,
-							0.35f,
-							particleTextureB
+							0.30f,
+							smokeTextureIndex_
 						);
 					}
 					prevDodge = true;
-				}
-
-				// Spawn dense, larger dust during dodge (回避中の激しい土煙)
-				for (int i = 0; i < 3; ++i)
-				{
-					appParticleManager_->EmitDust(
-						particleManager->GetRandomEngine(),
-						playerPos,
-						1.8f,
-						{ 1.0f, 1.0f, 1.0f, 0.5f },
-						particleTextureB
-					);
 				}
 			}
 			else
@@ -1084,19 +1078,19 @@ void GamePlayScene::UpdateCharacters(float deltaTime)
 				if (prevDodge)
 				{
 					// 回避終了時の着地衝撃波（土煙の放射状バースト ＆ カメラブレ）
-					TriggerCameraShake(0.15f, 0.35f);
-					for (int i = 0; i < 12; ++i)
+					TriggerCameraShake(0.12f, 0.25f);
+					for (int i = 0; i < 8; ++i)
 					{
-						float angle = i * (6.2831853f / 12.0f);
-						Vector3 vel = { std::cos(angle) * 3.2f, 0.5f, std::sin(angle) * 3.2f };
+						float angle = i * (6.2831853f / 8.0f);
+						Vector3 vel = { std::cos(angle) * 2.5f, 0.35f, std::sin(angle) * 2.5f };
 						appParticleManager_->EmitDustWithVelocity(
 							particleManager->GetRandomEngine(),
-							playerPos,
-							2.0f,
-							{ 1.0f, 1.0f, 1.0f, 0.8f },
+							playerPos + Vector3{ 0.0f, 0.05f, 0.0f },
+							0.8f, // プレイヤーを隠さない適正スケール
+							{ 0.85f, 0.80f, 0.75f, 0.5f },
 							vel,
-							0.45f,
-							particleTextureB
+							0.35f,
+							smokeTextureIndex_
 						);
 					}
 				}

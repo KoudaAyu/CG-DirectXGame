@@ -270,11 +270,11 @@ void Player::Update(float deltaTime, MouseInput* mouseInput)
         float progress = 1.0f - ratio;
         float rollAngle = progress * 6.2831853f; // 360度回転
 
-        // 地面へのくちばし・お尻の埋もれを防止するリフト包絡線
+        // 地面へのくちばし・お尻の埋もれを防止するリフト包絡線（自然で軽快な前転高さ）
         float rollSin = std::sin(rollAngle);
         float rollCos = std::cos(rollAngle);
-        float clearanceLift = 1.05f * (1.0f - rollCos) + 0.40f * std::abs(rollSin);
-        float hopOffset = std::sin(progress * 3.14159f) * 0.65f;
+        float clearanceLift = 0.30f * (1.0f - rollCos) + 0.12f * std::abs(rollSin);
+        float hopOffset = std::sin(progress * 3.14159f) * 0.20f;
 
         drawPos_ = position_;
         drawPos_.y = position_.y + clearanceLift + hopOffset;
@@ -625,8 +625,14 @@ void Player::Draw(const RenderContext& ctx)
         Vector3 flinchRot = originalRot;
         flinchRot.x -= 0.50f * ratio;
         object3d_->SetRotate(flinchRot);
-        object3d_->Update();
     }
+
+    // 描画直前に最新のカメラでトランスフォームおよびWVP行列を確実に更新（カリング誤判定による非表示を完全防止）
+    if (ctx.camera)
+    {
+        object3d_->SetCamera(ctx.camera);
+    }
+    object3d_->Update();
 
     object3dCom_->Draw(object3d_.get(), playerCtx, modelData, true);
 
