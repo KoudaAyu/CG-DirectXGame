@@ -31,11 +31,20 @@ public:
     // 合体 / 分裂トリガー
     void TriggerMerge(const Vector3& playerPos, float mergeRadius = 4.5f);
     void TriggerSplit(const Vector3& playerPos);
+    void SetAllAbsorbed(bool absorbed);
+    void SetInitialAbsorbedCount(int absorbedCount);
+
+    // 接触自動合体判定（プレイヤーに触れたミニオンを吸収合体し、吸収数を返す）
+    int CheckAndResolveMerge(const Vector3& playerPos, float playerScale);
+
+    // 全ロコロコの群れ重心および広がり半径を算出（カメラ追従用）
+    void GetGroupCenterAndSpread(const Vector3& playerPos, Vector3& outCenter, float& outSpread) const;
 
     // ゲッター / セッター
     int GetActiveCount() const;
     int GetReadyCount(const Vector3& playerPos, float maxPickupRadius = 3.5f) const;
-    int GetMergedCount() const;
+    int GetMergedCount() const { return absorbedCount_; }
+    int GetAbsorbedCount() const { return absorbedCount_; }
     int GetTotalCount() const { return static_cast<int>(minions_.size()); }
     const std::vector<std::unique_ptr<Minion>>& GetMinions() const { return minions_; }
     bool IsAllMerged() const { return isAllMerged_; }
@@ -52,14 +61,15 @@ public:
     void DrawDebug(Camera* camera);
 
 private:
-    void ResolveSeparation(const Vector3& rotation, const Vector2& stageTilt);
-    void ResolvePlayerSeparation(const Vector3& playerPos, const Vector3& playerVelocity, const Vector3& playerScale, const Vector3& playerSquash, const Vector3& playerRotation, const Vector2& stageTilt);
+    void ResolveSeparation(const Vector3& rotation, const Vector2& stageTilt, const Vector2& pivot = { 0.0f, 0.0f });
+    void ResolvePlayerSeparation(const Vector3& playerPos, const Vector3& playerVelocity, const Vector3& playerScale, const Vector3& playerSquash, const Vector3& playerRotation, const Vector2& stageTilt, const Vector2& pivot = { 0.0f, 0.0f });
 
 private:
     Object3dCom* object3dCom_ = nullptr;
     Camera* camera_ = nullptr;
     std::vector<std::unique_ptr<Minion>> minions_;
 
+    int absorbedCount_ = 0; // プレイヤーに吸収されたロコロコ（サイズ）数
     bool isMergedState_ = false;
     bool isAllMerged_ = false;
     float mergePickupRadius_ = 4.5f;
@@ -67,3 +77,4 @@ private:
     float splitUpPower_ = 7.0f;
     float separationRadius_ = 0.6f;
 };
+

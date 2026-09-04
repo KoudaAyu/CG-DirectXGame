@@ -53,8 +53,9 @@ public:
      * @brief 毎フレーム更新処理
      * @param deltaTime フレーム時間
      * @param stageTilt ステージの傾斜角 (X: ピッチ, Y: ロール)
+     * @param pivot 傾斜の回転中心 (自機水平座標)
      */
-    void Update(float deltaTime, const Vector2& stageTilt);
+    void Update(float deltaTime, const Vector2& stageTilt, const Vector2& pivot = { 0.0f, 0.0f });
 
     /**
      * @brief 描画処理

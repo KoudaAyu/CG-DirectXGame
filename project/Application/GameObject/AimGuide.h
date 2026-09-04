@@ -21,7 +21,7 @@ public:
     ~AimGuide();
 
     void Initialize(Object3dCom* object3dCom, Camera* camera);
-    void Update(const Vector3& launchPos, MouseInput* mouseInput, Camera* camera, bool isMerged, const Vector2& stageTilt = { 0.0f, 0.0f });
+    void Update(const Vector3& launchPos, MouseInput* mouseInput, Camera* camera, bool isMerged, const Vector2& stageTilt = { 0.0f, 0.0f }, const Vector2& pivot = { 0.0f, 0.0f });
     void Draw(const RenderContext& ctx);
 
     // --- ゲッター ---

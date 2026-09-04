@@ -6,6 +6,7 @@
 #include "Baziru3_Engine/Graphics/3D/Object/Object3d.h"
 #include "Baziru3_Engine/Framework/Collision/SphereCollider.h"
 #include "Application/Player/PikminPlayer.h" // SlimeParamsCPU
+#include "Application/GameObject/SlimePhysics.h"
 #include <memory>
 
 class Object3dCom;
@@ -34,7 +35,7 @@ public:
     ~Minion();
 
     void Initialize(Object3dCom* object3dCom, Camera* camera, const Vector3& spawnPos, MinionType type = MinionType::Red);
-    void Update(float deltaTime, const Vector2& stageTilt = { 0.0f, 0.0f });
+    void Update(float deltaTime, const Vector2& stageTilt = { 0.0f, 0.0f }, const Vector2& pivot = { 0.0f, 0.0f });
     void Draw(const RenderContext& ctx);
 
     // --- ステート制御 ---
@@ -65,14 +66,27 @@ public:
     // スライムパラメータの公開（共有調整用）
     SlimeParamsCPU& GetSlimeParams() { return slimeParams_; }
 
+    float GetFriction() const { return SlimePhysics::GetFriction(); }
+    void SetFriction(float f) { SlimePhysics::SetFriction(f); }
+
     // コライダーの取得
     SphereCollider* GetCollider() const { return collider_.get(); }
 
     // 衝突時の弾性リアクション
     void OnCollision(const CollisionInfo& info);
 
+    // 再合体可能か（アクティブ ＆ 転がり中 ＆ クールダウンなし）
+    bool CanMerge() const { return isActive_ && state_ == MinionState::Rolling && mergeCooldown_ <= 0.0f; }
+    void SetMergeCooldown(float cd) { mergeCooldown_ = cd; }
+    float GetMergeCooldown() const { return mergeCooldown_; }
+
+    // 大きさ（ロコロコサイズ: 最小1）
+    int GetSize() const { return size_; }
+    void SetSize(int s);
+
 private:
     void DrawSlime(const RenderContext& ctx);
+
 
 private:
     Object3dCom* object3dCom_ = nullptr;
@@ -88,11 +102,11 @@ private:
 
     MinionState state_ = MinionState::Rolling;
     MinionType type_ = MinionType::Red;
+    int size_ = 1; // ロコロコサイズ（最小1: 小は1-2、中は3-7、大は8-10）
 
     bool isActive_ = true;
     float radius_ = 0.3f;
     float tiltAccel_ = 35.0f;
-    float friction_ = 1.6f;        // 小さいの (ミニオン): 1.6
     float gravity_ = -24.0f;
     float groundY_ = 0.25f;
 
@@ -102,6 +116,7 @@ private:
     float bounceTimer_ = 0.0f;
     Vector3 prevVelocity_{ 0.0f, 0.0f, 0.0f };
     float obstacleCooldown_ = 0.0f; // 障害物（プロペラ等）の多重衝突防止クールダウン
+    float mergeCooldown_ = 0.0f;    // 分裂直後の再合体防止クールダウンタイマー
 
     // 当たり判定
     std::unique_ptr<SphereCollider> collider_;

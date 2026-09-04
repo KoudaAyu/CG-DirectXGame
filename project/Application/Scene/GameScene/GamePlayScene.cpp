@@ -10,6 +10,37 @@
 #include <imgui.h>
 #endif
 
+namespace
+{
+    // 臨界減衰スプリング補間（SmoothDamp: C2級連続の極上滑らか補間）
+    float SmoothDamp(float current, float target, float& currentVelocity, float smoothTime, float deltaTime, float maxSpeed = 10000.0f)
+    {
+        smoothTime = (std::max)(0.0001f, smoothTime);
+        float omega = 2.0f / smoothTime;
+
+        float x = omega * deltaTime;
+        float exp = 1.0f / (1.0f + x + 0.48f * x * x + 0.235f * x * x * x);
+        float change = current - target;
+        float originalTo = target;
+
+        float maxChange = maxSpeed * smoothTime;
+        change = std::clamp(change, -maxChange, maxChange);
+        target = current - change;
+
+        float temp = (currentVelocity + omega * change) * deltaTime;
+        currentVelocity = (currentVelocity - omega * temp) * exp;
+        float output = target + (change + temp) * exp;
+
+        if ((originalTo - current > 0.0f) == (output > originalTo))
+        {
+            output = originalTo;
+            currentVelocity = (output - originalTo) / (std::max)(0.0001f, deltaTime);
+        }
+
+        return output;
+    }
+}
+
 void GamePlayScene::InitializeScene()
 {
     // 0. 衝突判定マネージャーの初期化
@@ -25,12 +56,39 @@ void GamePlayScene::InitializeScene()
         mouseInput_->Initialize(dxCommon_->GetWindowAPI());
     }
 
-    // 2. カメラの初期化 (斜め見下ろし追従カメラ)
+    // 2. カメラの初期化 (プレイヤー相対座標一定モデル)
     playCamera_ = std::make_unique<Camera>();
     playCamera_->Initialize(dxCommon_);
-    playCamera_->SetTranslate({ 0.0f, 12.0f, -16.0f });
-    playCamera_->SetRotate({ 0.55f, 0.0f, 0.0f });
+    playCamera_->SetFovY(cameraFov_);
+
+    float cosPitch = std::cos(cameraPitch_);
+    float sinPitch = std::sin(cameraPitch_);
+    float cosYaw = std::cos(cameraYaw_);
+    float sinYaw = std::sin(cameraYaw_);
+    Vector3 initOffset = {
+        -cameraDistance_ * sinYaw * cosPitch,
+        cameraDistance_ * sinPitch,
+        -cameraDistance_ * cosYaw * cosPitch
+    };
+    Vector3 initLookAt = {
+        0.0f,
+        0.5f + cameraTargetOffsetY_,
+        cameraForwardOffset_
+    };
+    Vector3 initCamPos = {
+        initLookAt.x + initOffset.x,
+        initLookAt.y + initOffset.y,
+        initLookAt.z + initOffset.z
+    };
+    currentCameraPos_ = initCamPos;
+    currentCameraRot_ = { cameraPitch_, cameraYaw_, 0.0f };
+    playCamera_->SetTranslate(initCamPos);
+    playCamera_->SetRotate(currentCameraRot_);
     playCamera_->Update();
+    cameraInitialized_ = true;
+    cameraPosVelocity_ = { 0.0f, 0.0f, 0.0f };
+    cameraRotVelocity_ = { 0.0f, 0.0f, 0.0f };
+    tiltVelocity_ = { 0.0f, 0.0f };
 
     if (sceneManager_) {
         sceneManager_->SetCamera(playCamera_.get());
@@ -96,12 +154,17 @@ void GamePlayScene::InitializeScene()
 
     // 4. プレイヤーの初期化
     player_ = std::make_unique<PikminPlayer>();
-    player_->Initialize(object3dCom, playCamera_.get(), { 0.0f, 0.5f, 0.0f });
+    player_->Initialize(object3dCom, playCamera_.get(), { 0.0f, 0.2f, 0.0f });
 
-    // 5. ミニオンマネージャーの初期化（初期12体をスポーン）
+    // 5. ミニオンマネージャーの初期化（初期9体をスポーン: プレイヤー含め合計10体）
     minionManager_ = std::make_unique<MinionManager>();
     minionManager_->Initialize(object3dCom, playCamera_.get());
-    minionManager_->SpawnMinion({ 0.0f, 0.0f, -2.0f }, 12, MinionType::Red);
+    // 残り7匹の小ロコロコをステージ奥に配置
+    minionManager_->SpawnMinion({ 0.0f, 0.0f, 4.0f }, 9, MinionType::Blue);
+
+    // プレイヤーの最初の大きさは 3（中・黄色: 本体1 + 吸収2 = 3、残り7匹がフィールドで待機）
+    minionManager_->SetInitialAbsorbedCount(2);
+    player_->SetSize(3);
 
     // 6. マウス照準・放物線ガイドの初期化
     aimGuide_ = std::make_unique<AimGuide>();
@@ -144,6 +207,7 @@ void GamePlayScene::Finalize()
     playCamera_.reset();
     mouseInput_.reset();
     keyInput_.reset();
+    cameraInitialized_ = false;
     isInitialized_ = false;
 }
 
@@ -179,25 +243,30 @@ void GamePlayScene::Update()
         if (keyInput_->PushKey(DIK_D) || keyInput_->PushKey(DIK_RIGHT)) targetTilt_.y += maxTiltAngle_;
     }
 
-    float speedX = (std::abs(targetTilt_.x) > 0.001f) ? tiltSpeed_ : tiltReturnSpeed_;
-    float speedY = (std::abs(targetTilt_.y) > 0.001f) ? tiltSpeed_ : tiltReturnSpeed_;
-    currentTilt_.x += (targetTilt_.x - currentTilt_.x) * (std::min)(1.0f, deltaTime * speedX);
-    currentTilt_.y += (targetTilt_.y - currentTilt_.y) * (std::min)(1.0f, deltaTime * speedY);
+    currentTilt_.x = SmoothDamp(currentTilt_.x, targetTilt_.x, tiltVelocity_.x, tiltSmoothTime_, deltaTime);
+    currentTilt_.y = SmoothDamp(currentTilt_.y, targetTilt_.y, tiltVelocity_.y, tiltSmoothTime_, deltaTime);
 
-    // 地面プレーンの回転を傾斜角に合わせて更新 (Z回転は負で右下がり、正で左下がり)
+    Vector3 playerPos = player_ ? player_->GetPosition() : Vector3{ 0.0f, 0.0f, 0.0f };
+    Vector2 playerPivot = { playerPos.x, playerPos.z };
+
+    // 地面プレーンの回転と位置を傾斜角に合わせて更新 (Z回転は負で右下がり、正で左下がり)
+    // プレイヤーの足元 (playerPivot) をピボットとして回転させるため、平行移動オフセット P - R * P を適用
     if (groundPlane_)
     {
+        Matrix4x4 R_tilt = Multiply(MakeRotateXMatrix(currentTilt_.x), MakeRotateZMatrix(-currentTilt_.y));
+        Vector3 P = { playerPivot.x, 0.0f, playerPivot.y };
+        Vector3 RP = {
+            P.x * R_tilt.m[0][0] + P.y * R_tilt.m[1][0] + P.z * R_tilt.m[2][0],
+            P.x * R_tilt.m[0][1] + P.y * R_tilt.m[1][1] + P.z * R_tilt.m[2][1],
+            P.x * R_tilt.m[0][2] + P.y * R_tilt.m[1][2] + P.z * R_tilt.m[2][2]
+        };
+        groundPlane_->SetTranslate({ P.x - RP.x, P.y - RP.y, P.z - RP.z });
         groundPlane_->SetRotate({ currentTilt_.x, 0.0f, -currentTilt_.y });
         groundPlane_->Update();
     }
 
-    // 放物線照準ガイドの更新
-    if (aimGuide_ && player_ && playCamera_)
-    {
-        Vector3 launchOrigin = player_->GetPosition();
-        launchOrigin.y += 0.5f;
-        aimGuide_->Update(launchOrigin, mouseInput_.get(), playCamera_.get(), player_->IsMerged(), currentTilt_);
-    }
+    // 照準ガイドはLocoRoco完全準拠のため無効化
+    // if (aimGuide_ && player_ && playCamera_) ...
 
     // プレイヤーの更新（ステージ傾斜を伝達）
     if (player_)
@@ -214,30 +283,95 @@ void GamePlayScene::Update()
     // 回転プロペラ障害物の更新（自転とステージ傾斜の追従）
     for (auto& prop : propellerObstacles_)
     {
-        if (prop) prop->Update(deltaTime, currentTilt_);
+        if (prop) prop->Update(deltaTime, currentTilt_, playerPivot);
     }
 
     // 衝突判定と押し出しの更新
     CollisionManager::GetInstance()->Update();
 
-    // カメラのスムーズ追従 (Smooth Damping)
+    // カメラの群れ重心追従 (LocoRoco方式: 全ロコロコの重心と広がりを捉える)
     if (playCamera_ && player_)
     {
-        Vector3 playerPos = player_->GetPosition();
-        Vector3 targetCamPos = {
-            playerPos.x + cameraOffset_.x,
-            playerPos.y + cameraOffset_.y,
-            playerPos.z + cameraOffset_.z
-        };
-        Vector3 currentCamPos = playCamera_->GetTranslate();
-        float smoothRate = (std::min)(1.0f, deltaTime * 8.0f);
-        Vector3 newCamPos;
-        newCamPos.x = currentCamPos.x + (targetCamPos.x - currentCamPos.x) * smoothRate;
-        newCamPos.y = currentCamPos.y + (targetCamPos.y - currentCamPos.y) * smoothRate;
-        newCamPos.z = currentCamPos.z + (targetCamPos.z - currentCamPos.z) * smoothRate;
+        Vector3 focusTargetPos = player_->GetPosition();
+        float groupSpread = 0.0f;
+        if (minionManager_)
+        {
+            minionManager_->GetGroupCenterAndSpread(player_->GetPosition(), focusTargetPos, groupSpread);
+        }
 
-        playCamera_->SetTranslate(newCamPos);
-        playCamera_->SetRotate({ 0.55f, 0.0f, 0.0f });
+        Vector3 playerVel = player_->GetVelocity();
+
+        // 1. プレイヤースケールおよび群れの広がり（Spread）に応じたカメラ距離
+        // 合体巨大化時はスケールで後退し、分裂時は散らばり具合（Spread）で引いて全員を画面内に綺麗に収める
+        float scaleOffset = (player_->GetCurrentScale() - 0.4f);
+        float effectiveDist = cameraDistance_ + (std::max)(0.0f, scaleOffset) * cameraDynamicZoom_ + groupSpread * 0.75f;
+
+        // 2. カメラの見下ろし角・方位角
+        float pitch = cameraPitch_;
+        float yaw = cameraYaw_;
+
+        float cosPitch = std::cos(pitch);
+        float sinPitch = std::sin(pitch);
+        float cosYaw = std::cos(yaw);
+        float sinYaw = std::sin(yaw);
+
+        // 注視点からカメラ位置への相対オフセット（球面座標）
+        Vector3 relativeOffset = {
+            -effectiveDist * sinYaw * cosPitch,
+            effectiveDist * sinPitch,
+            -effectiveDist * cosYaw * cosPitch
+        };
+
+        // 3. 注視点（LookAt Target）と目標カメラ位置の算出
+        // 群れの重心を捉え、視界を安定確保
+        Vector3 lookAtTarget = {
+            focusTargetPos.x,
+            focusTargetPos.y + cameraTargetOffsetY_,
+            focusTargetPos.z + cameraForwardOffset_
+        };
+
+        Vector3 targetCamPos = {
+            lookAtTarget.x + relativeOffset.x,
+            lookAtTarget.y + relativeOffset.y,
+            lookAtTarget.z + relativeOffset.z
+        };
+
+        // 4. 目標カメラ回転の算出
+        // 左右移動速度に応じた微小なダイナミックバンク（ロール傾斜: 左右に曲がった感覚を強調）
+        float sideBank = -std::clamp(playerVel.x * cameraDynamicBank_, -0.05f, 0.05f);
+
+        Vector3 targetCamRot = {
+            pitch + (followStageTilt_ ? currentTilt_.x : 0.0f),
+            yaw,
+            sideBank + (followStageTilt_ ? -currentTilt_.y : 0.0f)
+        };
+
+        // 5. カメラ位置と回転の適用（臨界減衰スプリング SmoothDamp で極上のなめらかさを実現）
+        if (!cameraInitialized_)
+        {
+            currentCameraPos_ = targetCamPos;
+            currentCameraRot_ = targetCamRot;
+            cameraPosVelocity_ = { 0.0f, 0.0f, 0.0f };
+            cameraRotVelocity_ = { 0.0f, 0.0f, 0.0f };
+            cameraInitialized_ = true;
+        }
+        else
+        {
+            // X軸（左右）: ラバーストラップラグでプレイヤーが左右に自然にシフトして移動が明確化
+            currentCameraPos_.x = SmoothDamp(currentCameraPos_.x, targetCamPos.x, cameraPosVelocity_.x, cameraSideLagTime_, deltaTime);
+            // Y, Z軸: プレイヤーとの高低差・距離を一定に保ちつつ、微細な段差ショックをシルクのようにいなす
+            currentCameraPos_.y = SmoothDamp(currentCameraPos_.y, targetCamPos.y, cameraPosVelocity_.y, cameraSmoothTimePos_, deltaTime);
+            currentCameraPos_.z = SmoothDamp(currentCameraPos_.z, targetCamPos.z, cameraPosVelocity_.z, cameraSmoothTimePos_, deltaTime);
+
+            // 回転: C2級連続の超滑らかなスプリングイージング（急反転でもカクつき・ジャークが物理的にゼロ！）
+            currentCameraRot_.x = SmoothDamp(currentCameraRot_.x, targetCamRot.x, cameraRotVelocity_.x, cameraSmoothTimeRot_, deltaTime);
+            currentCameraRot_.y = SmoothDamp(currentCameraRot_.y, targetCamRot.y, cameraRotVelocity_.y, cameraSmoothTimeRot_, deltaTime);
+            currentCameraRot_.z = SmoothDamp(currentCameraRot_.z, targetCamRot.z, cameraRotVelocity_.z, cameraSmoothTimeRot_, deltaTime);
+        }
+
+        playCamera_->SetTranslate(currentCameraPos_);
+        playCamera_->SetRotate(currentCameraRot_);
+        playCamera_->SetFovY(cameraFov_);
         playCamera_->Update();
     }
 
@@ -277,11 +411,8 @@ void GamePlayScene::Draw(SceneRenderRequests& renderRequests)
         if (prop) prop->Draw(ctx);
     }
 
-    // 3. 放物線照準ガイドの描画 (地面の上に重なるように先に描画)
-    if (aimGuide_)
-    {
-        aimGuide_->Draw(ctx);
-    }
+    // 3. 放物線照準ガイドの描画 (LocoRoco完全準拠のため非表示)
+    // if (aimGuide_) { aimGuide_->Draw(ctx); }
 
     // 3. ミニオン群衆の描画
     if (minionManager_)
@@ -336,10 +467,10 @@ void GamePlayScene::DrawDebugUI()
     ImGui::Separator();
 
     // 1. 操作説明
-    ImGui::TextColored(ImVec4(1.0f, 0.9f, 0.2f, 1.0f), "[ Controls ]");
-    ImGui::BulletText("WASD / Arrows: Tilt Stage (ステージを傾ける)");
-    ImGui::BulletText("E key: Merge (LocoRoco) <-> Split (Pikmin)");
-    ImGui::BulletText("Mouse Left Click: Aim & Throw to Target (放物線投擲)");
+    ImGui::TextColored(ImVec4(1.0f, 0.9f, 0.2f, 1.0f), "[ Controls (LocoRoco 3D) ]");
+    ImGui::BulletText("WASD / Arrows: Tilt Stage (ステージを傾けて全員で転がる)");
+    ImGui::BulletText("E key: Split (弾けて全員小ロコロコに分裂)");
+    ImGui::BulletText("Contact: Auto Merge (触れ合うとポコッと自動合体)");
     ImGui::BulletText("F1 key: Toggle Collision Wireframes (当たり判定表示ON/OFF)");
     ImGui::BulletText("SPACE key: Clear Scene");
     ImGui::Separator();
@@ -350,21 +481,27 @@ void GamePlayScene::DrawDebugUI()
         bool isMerged = player_->IsMerged();
         int mergedCount = minionManager_->GetMergedCount();
         int totalCount = minionManager_->GetTotalCount();
-        if (isMerged) {
-            ImGui::Text("Player Mode: LocoRoco (Giant / Absorbed: %d / %d, Scale: %.2f)",
-                        mergedCount, totalCount, player_->GetCurrentScale());
-        } else {
-            ImGui::Text("Player Mode: Pikmin (Split / Squad, Scale: %.2f)", player_->GetCurrentScale());
+        int activeCount = minionManager_->GetActiveCount();
+
+        int currentSize = player_->GetSize();
+        const char* tierLabel = "小 (1-2) [青]";
+        ImVec4 tierColor = ImVec4(0.35f, 0.70f, 1.0f, 1.0f);
+        if (currentSize >= 8) {
+            tierLabel = "大 (8-10) [赤]";
+            tierColor = ImVec4(1.0f, 0.35f, 0.3f, 1.0f);
+        } else if (currentSize >= 3) {
+            tierLabel = "中 (3-7) [黄色]";
+            tierColor = ImVec4(1.0f, 0.90f, 0.2f, 1.0f);
         }
 
-        if (ImGui::Button(isMerged ? "SPLIT (Pikmin Mode)" : "MERGE (LocoRoco Mode)", ImVec2(280, 36)))
+        ImGui::TextColored(tierColor, "Loco Size: %d / %d  Category: %s  (Scale: %.2f)",
+                           currentSize, totalCount + 1, tierLabel, player_->GetCurrentScale());
+
+        if (ImGui::Button("SPLIT (全員分裂: E key)", ImVec2(280, 36)))
         {
-            player_->ToggleMerge();
-        }
-
-        float mergeRadius = minionManager_->GetMergePickupRadius();
-        if (ImGui::SliderFloat("Merge Radius (吸引合体半径)", &mergeRadius, 1.0f, 15.0f, "%.1f m")) {
-            minionManager_->SetMergePickupRadius(mergeRadius);
+            if (minionManager_->GetMergedCount() > 0) {
+                minionManager_->TriggerSplit(player_->GetPosition());
+            }
         }
 
         float splitPop = minionManager_->GetSplitPopPower();
@@ -417,8 +554,7 @@ void GamePlayScene::DrawDebugUI()
         if (ImGui::SliderFloat("Max Tilt Angle (deg)", &maxDeg, 5.0f, 35.0f, "%.1f")) {
             maxTiltAngle_ = maxDeg * 0.0174533f;
         }
-        ImGui::SliderFloat("Tilt Speed", &tiltSpeed_, 1.0f, 15.0f, "%.1f");
-        ImGui::SliderFloat("Tilt Return Speed", &tiltReturnSpeed_, 1.0f, 15.0f, "%.1f");
+        ImGui::SliderFloat("Tilt Smooth Time (傾斜スムーズ時間)", &tiltSmoothTime_, 0.05f, 0.40f, "%.2f s");
 
         if (player_) {
             float accel = player_->GetTiltAccel();
@@ -426,12 +562,8 @@ void GamePlayScene::DrawDebugUI()
                 player_->SetTiltAccel(accel);
             }
             float friction = player_->GetFriction();
-            if (ImGui::SliderFloat("Normal Friction (通常: 1.3)", &friction, 0.2f, 5.0f, "%.1f")) {
+            if (ImGui::SliderFloat("Slime Friction (共通摩擦係数: 1.3)", &friction, 0.2f, 5.0f, "%.1f")) {
                 player_->SetFriction(friction);
-            }
-            float mergedFriction = player_->GetMergedFriction();
-            if (ImGui::SliderFloat("Merged Friction (でかいの: 2.0)", &mergedFriction, 0.2f, 5.0f, "%.1f")) {
-                player_->SetMergedFriction(mergedFriction);
             }
         }
     }
@@ -493,6 +625,96 @@ void GamePlayScene::DrawDebugUI()
             ImGui::PopID();
         }
     }
+
+    ImGui::Separator();
+
+    // 7. カメラ視認性・相対追従調整
+    if (playCamera_ && ImGui::CollapsingHeader("Camera Settings (カメラ視認性・相対追従調整)", ImGuiTreeNodeFlags_DefaultOpen))
+    {
+        ImGui::TextColored(ImVec4(0.3f, 1.0f, 0.7f, 1.0f), "[ Critical Damped Spring (極上のなめらかさ) ]");
+        ImGui::SliderFloat("Rotation Smooth Time (角度スムーズ時間: カクつきゼロ)", &cameraSmoothTimeRot_, 0.05f, 0.50f, "%.2f s");
+        ImGui::SliderFloat("Side Lag Time (左右移動ラグ時間: 左右の視認性向上)", &cameraSideLagTime_, 0.05f, 0.40f, "%.2f s");
+        ImGui::SliderFloat("Position Smooth Time (位置スムーズ時間: 段差ショック吸収)", &cameraSmoothTimePos_, 0.02f, 0.25f, "%.2f s");
+        ImGui::SliderFloat("Tilt Smooth Time (ステージ傾斜スムーズ時間: 板の重厚感)", &tiltSmoothTime_, 0.05f, 0.40f, "%.2f s");
+        ImGui::SliderFloat("Dynamic Bank (左右移動時バンク傾斜強度)", &cameraDynamicBank_, 0.0f, 0.06f, "%.3f");
+        ImGui::Checkbox("Follow Stage Tilt (ステージの傾きにカメラ角度を連動)", &followStageTilt_);
+
+        ImGui::Separator();
+        float fovDeg = cameraFov_ * 57.2958f;
+        if (ImGui::SliderFloat("FOV (視野角 deg)", &fovDeg, 30.0f, 90.0f, "%.1f deg"))
+        {
+            cameraFov_ = fovDeg * 0.0174533f;
+        }
+
+        ImGui::SliderFloat("Distance (カメラ距離)", &cameraDistance_, 8.0f, 45.0f, "%.1f m");
+
+        float pitchDeg = cameraPitch_ * 57.2958f;
+        if (ImGui::SliderFloat("Pitch Angle (見下ろし角度 deg)", &pitchDeg, 15.0f, 85.0f, "%.1f deg"))
+        {
+            cameraPitch_ = pitchDeg * 0.0174533f;
+        }
+
+        float yawDeg = cameraYaw_ * 57.2958f;
+        if (ImGui::SliderFloat("Yaw Angle (水平旋回 deg)", &yawDeg, -180.0f, 180.0f, "%.1f deg"))
+        {
+            cameraYaw_ = yawDeg * 0.0174533f;
+        }
+
+        ImGui::SliderFloat("Target Height Y (注視点の高さ)", &cameraTargetOffsetY_, 0.0f, 5.0f, "%.1f m");
+        ImGui::SliderFloat("Forward Look Offset (前方視界オフセット)", &cameraForwardOffset_, -5.0f, 10.0f, "%.1f m");
+        ImGui::SliderFloat("Dynamic Zoom (巨大化時ズーム倍率)", &cameraDynamicZoom_, 0.0f, 8.0f, "%.1f");
+
+        ImGui::TextColored(ImVec4(1.0f, 0.85f, 0.2f, 1.0f), "Camera Presets:");
+        if (ImGui::Button("Default (広角見下ろし: 47 deg)"))
+        {
+            cameraDistance_ = 18.0f;
+            cameraPitch_ = 0.82f;
+            cameraYaw_ = 0.0f;
+            cameraFov_ = 0.85f;
+            cameraTargetOffsetY_ = 1.0f;
+            cameraForwardOffset_ = 2.0f;
+            cameraSideLagTime_ = 0.18f;
+            cameraSmoothTimeRot_ = 0.24f;
+            cameraSmoothTimePos_ = 0.08f;
+            tiltSmoothTime_ = 0.15f;
+            cameraDynamicBank_ = 0.025f;
+            cameraDynamicZoom_ = 3.0f;
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("High Overhead (高所俯瞰: 60 deg)"))
+        {
+            cameraDistance_ = 22.0f;
+            cameraPitch_ = 1.05f;
+            cameraYaw_ = 0.0f;
+            cameraFov_ = 0.90f;
+            cameraTargetOffsetY_ = 0.5f;
+            cameraForwardOffset_ = 1.0f;
+            cameraSideLagTime_ = 0.16f;
+            cameraSmoothTimeRot_ = 0.24f;
+            cameraSmoothTimePos_ = 0.08f;
+            tiltSmoothTime_ = 0.15f;
+            cameraDynamicBank_ = 0.020f;
+            cameraDynamicZoom_ = 3.5f;
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Wide Panoramic (広域パノラマ)"))
+        {
+            cameraDistance_ = 26.0f;
+            cameraPitch_ = 0.75f;
+            cameraYaw_ = 0.0f;
+            cameraFov_ = 1.00f;
+            cameraTargetOffsetY_ = 1.5f;
+            cameraForwardOffset_ = 3.0f;
+            cameraSideLagTime_ = 0.20f;
+            cameraSmoothTimeRot_ = 0.28f;
+            cameraSmoothTimePos_ = 0.10f;
+            tiltSmoothTime_ = 0.18f;
+            cameraDynamicBank_ = 0.030f;
+            cameraDynamicZoom_ = 4.0f;
+        }
+    }
+
+    ImGui::Separator();
 
     // 5. シーン遷移
     if (ImGui::Button("Go To CLEAR", ImVec2(130, 28)))

@@ -187,7 +187,7 @@ void AimGuide::Initialize(Object3dCom* object3dCom, Camera* camera) {
     }
 }
 
-void AimGuide::Update(const Vector3& launchPos, MouseInput* mouseInput, Camera* camera, bool isMerged, const Vector2& stageTilt) {
+void AimGuide::Update(const Vector3& launchPos, MouseInput* mouseInput, Camera* camera, bool isMerged, const Vector2& stageTilt, const Vector2& pivot) {
     isMerged_ = isMerged;
     camera_ = camera;
     if (reticleObject_) reticleObject_->SetCamera(camera_);
@@ -225,7 +225,7 @@ void AimGuide::Update(const Vector3& launchPos, MouseInput* mouseInput, Camera* 
         rayDir.z /= rayLength;
     }
 
-    // 4. 傾斜面との厳密な交差判定
+    // 4. 傾斜面との厳密な交差判定（自機ピボットを通る傾斜平面 N・(X - P) = 0）
     // 地面プレーン法線 N = (cos(tilt.x)*sin(tilt.y), cos(tilt.x)*cos(tilt.y), sin(tilt.x))
     float cosPitch = std::cos(stageTilt.x);
     float cosRoll = std::cos(stageTilt.y);
@@ -239,7 +239,7 @@ void AimGuide::Update(const Vector3& launchPos, MouseInput* mouseInput, Camera* 
         return;
     }
 
-    float t = -(nx * nearPos.x + ny * nearPos.y + nz * nearPos.z) / denom;
+    float t = -(nx * (nearPos.x - pivot.x) + ny * nearPos.y + nz * (nearPos.z - pivot.y)) / denom;
     if (t < 0.0f) {
         isValidTarget_ = false;
         return;
@@ -258,7 +258,7 @@ void AimGuide::Update(const Vector3& launchPos, MouseInput* mouseInput, Camera* 
         clampedTarget.x = launchPos.x + toTarget.x * ratio;
         clampedTarget.z = launchPos.z + toTarget.z * ratio;
         // 傾斜面上の厳密な高さを再計算
-        clampedTarget.y = SlimePhysics::CalculateGroundHeight(clampedTarget.x, clampedTarget.z, stageTilt);
+        clampedTarget.y = SlimePhysics::CalculateGroundHeight(clampedTarget.x, clampedTarget.z, stageTilt, pivot);
         horizontalDist = maxRange_;
     }
 

@@ -274,7 +274,7 @@ void PropellerObstacle::AutoDetectAndBuildColliders()
     detectedWingCenterY_ = sumCenterY / static_cast<float>(detectedWingCount_);
 }
 
-void PropellerObstacle::Update(float deltaTime, const Vector2& stageTilt)
+void PropellerObstacle::Update(float deltaTime, const Vector2& stageTilt, const Vector2& pivot)
 {
     if (!isInitialized_) return;
 
@@ -286,7 +286,7 @@ void PropellerObstacle::Update(float deltaTime, const Vector2& stageTilt)
     // 2. ステージ傾斜の追従（床面高さの算出）
     currentWorldPos_.x = basePosition_.x;
     currentWorldPos_.z = basePosition_.z;
-    currentWorldPos_.y = SlimePhysics::CalculateGroundHeight(basePosition_.x, basePosition_.z, stageTilt);
+    currentWorldPos_.y = SlimePhysics::CalculateGroundHeight(basePosition_.x, basePosition_.z, stageTilt, pivot);
 
     // 3. 正しい回転行列の合成:
     // 床面の傾斜行列 (Rx * Rz)

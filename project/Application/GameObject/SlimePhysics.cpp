@@ -2,21 +2,35 @@
 
 namespace SlimePhysics
 {
-    float CalculateGroundHeight(float x, float z, const Vector2& stageTilt)
+    static float sFriction = 1.3f; // スライム共通の地面摩擦係数（通常・合体・ミニオン共通）
+
+    float GetFriction()
     {
-        float cosPitch = std::cos(stageTilt.x);
+        return sFriction;
+    }
+
+    void SetFriction(float friction)
+    {
+        sFriction = friction;
+    }
+
+    float CalculateGroundHeight(float x, float z, const Vector2& stageTilt, const Vector2& pivot)
+    {
+        float relX = x - pivot.x;
+        float relZ = z - pivot.y;
+
         float cosRoll = std::cos(stageTilt.y);
         float safeCosRoll = (std::max)(cosRoll, 0.01f);
 
-        return -std::tan(stageTilt.y) * x - (std::tan(stageTilt.x) / safeCosRoll) * z;
+        return -std::tan(stageTilt.y) * relX - (std::tan(stageTilt.x) / safeCosRoll) * relZ;
     }
 
-    float CalculateGroundedCenterY(float x, float z, const Vector2& stageTilt, float baseOffset)
+    float CalculateGroundedCenterY(float x, float z, const Vector2& stageTilt, float baseOffset, const Vector2& pivot)
     {
         float cosPitch = std::cos(stageTilt.x);
         float cosRoll = std::cos(stageTilt.y);
         float ny = (std::max)(cosPitch * cosRoll, 0.01f);
-        float groundHeight = CalculateGroundHeight(x, z, stageTilt);
+        float groundHeight = CalculateGroundHeight(x, z, stageTilt, pivot);
 
         return groundHeight + baseOffset / ny;
     }

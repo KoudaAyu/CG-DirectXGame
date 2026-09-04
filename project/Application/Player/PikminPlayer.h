@@ -45,17 +45,22 @@ public:
     // パラメータ
     float GetTiltAccel() const { return tiltAccel_; }
     void SetTiltAccel(float a) { tiltAccel_ = a; }
-    float GetFriction() const { return friction_; }
-    void SetFriction(float f) { friction_ = f; }
-    float GetMergedFriction() const { return mergedFriction_; }
-    void SetMergedFriction(float f) { mergedFriction_ = f; }
+    float GetFriction() const { return SlimePhysics::GetFriction(); }
+    void SetFriction(float f) { SlimePhysics::SetFriction(f); }
+    float GetMergedFriction() const { return SlimePhysics::GetFriction(); }
+    void SetMergedFriction(float f) { SlimePhysics::SetFriction(f); }
 
     // スライムパラメータの公開（ImGui調整用）
     SlimeParamsCPU& GetSlimeParams() { return slimeParams_; }
     SphereCollider* GetCollider() const { return collider_.get(); }
     float GetCurrentScale() const { return scale_.x; }
     const Vector3& GetScale() const { return scale_; }
-    float GetBaseRadius() const { return 0.85f; }
+    float GetBaseRadius() const { return 0.4f; }
+
+    // ロコロコサイズ管理（最小1: 小 1-2, 中 3-7, 大 8-10）
+    int GetSize() const { return size_; }
+    void SetSize(int s);
+    float CalculateScaleBySize(int size) const;
 
     float CalculateMergedScale(int minionCount) const;
 
@@ -84,15 +89,14 @@ private:
     Vector3 position_{ 0.0f, 0.5f, 0.0f };
     Vector3 velocity_{ 0.0f, 0.0f, 0.0f };
     Vector3 rotation_{ 0.0f, 0.0f, 0.0f };
-    Vector3 scale_{ 1.0f, 1.0f, 1.0f };
+    Vector3 scale_{ 0.4f, 0.4f, 0.4f };
 
     bool isMerged_ = false;
 
     // パラメータ
     float tiltAccel_ = 38.0f;
-    float friction_ = 1.3f;        // デフォルト (通常サイズ): 1.3
-    float mergedFriction_ = 2.0f;  // でかいの (合体時): 2.0
     float rotationSpeed_ = 12.0f;
+    float currentYaw_ = 0.0f;
 
     // 投擲クールダウン
     float throwCooldownTimer_ = 0.0f;
@@ -100,8 +104,9 @@ private:
 
     // 合体時スケールイージング
     float mergeScaleAnimation_ = 1.0f;
-    float currentMergedScale_ = 0.8f;
+    float currentMergedScale_ = 0.4f;
     int lastAbsorbedCount_ = 0;
+    int size_ = 1; // 現在のロコロコサイズ（最小1: 1+1=2... 小 1-2, 中 3-7, 大 8-10）
 
     // スライム固有
     SlimeParamsCPU slimeParams_;

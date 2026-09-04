@@ -81,8 +81,8 @@ void PikminPlayer::Initialize(Object3dCom* object3dCom, Camera* camera, const Ve
     slimeParams_.innerGlow = 0.5f;
     slimeParams_.specularShininess = 64.0f;
 
-    // プレイヤーの当たり判定（SphereCollider）
-    collider_ = std::make_unique<SphereCollider>(0.8f, &position_, CollisionAttribute::Player);
+    // プレイヤーの当たり判定（SphereCollider: 分裂時は小ロコロコサイズ 0.35f）
+    collider_ = std::make_unique<SphereCollider>(0.35f, &position_, CollisionAttribute::Player);
     collider_->SetOnCollision([this](const CollisionInfo& info) {
         OnCollision(info);
     });
@@ -147,9 +147,33 @@ void PikminPlayer::OnCollision(const CollisionInfo& info) {
     }
 }
 
+float PikminPlayer::CalculateScaleBySize(int size) const {
+    if (size <= 1) return 0.40f;
+    // 1から10にかけて滑らかに0.40fから約1.85fへ拡大
+    return 0.40f + 0.11f * (size - 1) + 0.05f * std::pow(static_cast<float>(size - 1), 1.25f);
+}
+
+void PikminPlayer::SetSize(int s) {
+    size_ = (std::max)(1, s);
+    isMerged_ = (size_ > 1);
+    lastAbsorbedCount_ = size_ - 1;
+    currentMergedScale_ = CalculateScaleBySize(size_);
+    scale_ = { currentMergedScale_, currentMergedScale_, currentMergedScale_ };
+    slimeParams_.baseColor = SlimePhysics::GetColorBySize(size_);
+    if (collider_) {
+        collider_->SetRadius(currentMergedScale_ * 0.78f);
+    }
+    if (size_ >= 3 && giantModel_) {
+        giantModel_->SetScale(scale_);
+        giantModel_->Update();
+    } else if (normalModel_) {
+        normalModel_->SetScale(scale_);
+        normalModel_->Update();
+    }
+}
+
 float PikminPlayer::CalculateMergedScale(int minionCount) const {
-    if (minionCount <= 0) return 0.8f;
-    return 0.8f + 0.24f * std::pow(static_cast<float>(minionCount), 0.65f);
+    return CalculateScaleBySize(minionCount + 1);
 }
 
 void PikminPlayer::SetPosition(const Vector3& pos) {
@@ -177,7 +201,8 @@ void PikminPlayer::SetMerged(bool merged) {
     mergeScaleAnimation_ = 0.0f;
     if (!merged) {
         lastAbsorbedCount_ = 0;
-        currentMergedScale_ = 0.8f;
+        size_ = 1;
+        currentMergedScale_ = 0.4f;
     }
 
     // 合体/分裂時に衝撃波紋を発生させる
@@ -185,7 +210,7 @@ void PikminPlayer::SetMerged(bool merged) {
 
     // コライダー半径を初期化
     if (collider_) {
-        collider_->SetRadius(merged ? currentMergedScale_ : 0.8f);
+        collider_->SetRadius(merged ? currentMergedScale_ : 0.35f);
     }
 }
 
@@ -203,38 +228,32 @@ void PikminPlayer::Update(float deltaTime, KeyInput* keyInput, MinionManager* mi
 
     if (keyInput) {
         if (keyInput->TriggerKey(DIK_E)) {
-            ToggleMerge();
-        }
-    }
-
-    // --- マウスによる投擲 ---
-    if (!isMerged_ && mouseInput && minionManager) {
-        // マウス左クリックで目標地点へ投擲（クリック単発 または 押しっぱなし連射）
-        bool isThrowRequested = mouseInput->TriggerButton(0) || mouseInput->PushButton(0);
-        if (isThrowRequested && throwCooldownTimer_ <= 0.0f) {
-            Vector3 launchPos = position_;
-            launchPos.y += 0.5f;
-
-            if (aimGuide && aimGuide->IsTargetValid()) {
-                Vector3 targetVel = aimGuide->GetCalculatedVelocity();
-                if (minionManager->ThrowMinionWithVelocity(launchPos, targetVel)) {
-                    throwCooldownTimer_ = 0.12f; // リズミカルな連射間隔
-                }
+            // ロコロコ方式分裂: 合体中ならパァンと全員飛び散って小ロコロコに分裂！
+            if (minionManager && minionManager->GetAbsorbedCount() > 0) {
+                minionManager->TriggerSplit(position_);
+                isMerged_ = false;
+                lastAbsorbedCount_ = 0;
+                size_ = 1;
+                currentMergedScale_ = 0.4f;
+                scale_ = { 0.4f, 0.4f, 0.4f };
+                slimeParams_.baseColor = SlimePhysics::GetColorBySize(1); // 小 (1-2) は青
+                slimeParams_.impulseStrength = 0.45f;
+                slimeParams_.squashStretch = { 0.25f, -0.2f, 0.25f };
             }
         }
     }
 
     // --- ステージ傾斜による物理加速度と摩擦（ティルト移動） ---
     // stageTilt.x: ピッチ（手前/奥）、stageTilt.y: ロール（左/右）
-    float accelScale = isMerged_ ? (tiltAccel_ * 1.3f) : tiltAccel_;
+    float accelScale = isMerged_ ? (tiltAccel_ * 1.25f) : tiltAccel_;
     float accelX = std::sin(stageTilt.y) * accelScale;
     float accelZ = std::sin(stageTilt.x) * accelScale;
 
     velocity_.x += accelX * deltaTime;
     velocity_.z += accelZ * deltaTime;
 
-    // 地面摩擦によるスムーズ減速（でかいのは2.0、通常は1.3）
-    float currentFriction = isMerged_ ? mergedFriction_ : friction_;
+    // 地面摩擦によるスムーズ減速（全スライム共通摩擦係数）
+    float currentFriction = SlimePhysics::GetFriction();
     float decay = 1.0f - (std::min)(1.0f, currentFriction * deltaTime);
     velocity_.x *= decay;
     velocity_.z *= decay;
@@ -257,63 +276,49 @@ void PikminPlayer::Update(float deltaTime, KeyInput* keyInput, MinionManager* mi
     deformInput.deltaTime = deltaTime;
     deformInput.isGrounded = true;
     deformInput.isMerged = isMerged_;
-    deformInput.massScale = isMerged_ ? (currentMergedScale_ / 0.8f) : 1.0f;
+    deformInput.massScale = scale_.x;
     SlimePhysics::UpdateDeformation(slimeParams_, deformInput);
     prevVelocity_ = velocity_;
 
-    // シェーダー時間の更新
     slimeParams_.time = totalTime_;
 
-    if (isMerged_) {
-        int mergedCount = minionManager ? minionManager->GetMergedCount() : 0;
-        float targetScale = CalculateMergedScale(mergedCount);
+    // --- 大きさ（1-10）と色（小:青, 中:黄, 大:赤）の管理 ---
+    int absorbedCount = minionManager ? minionManager->GetAbsorbedCount() : 0;
+    int newSize = 1 + absorbedCount;
+    isMerged_ = (newSize > 1);
 
-        // 新たなミニオンを吸収した時に衝撃波紋パルス
-        if (mergedCount > lastAbsorbedCount_) {
-            slimeParams_.impulseStrength = (std::min)(0.5f, slimeParams_.impulseStrength + 0.15f);
-            lastAbsorbedCount_ = mergedCount;
-        }
+    if (newSize > size_) {
+        // 新たなくっつきが発生！（1+1=2、2+1=3...）
+        bool tierChanged = (size_ <= 2 && newSize >= 3) || (size_ <= 7 && newSize >= 8);
+        slimeParams_.impulseStrength = tierChanged ? 0.40f : (std::min)(0.5f, slimeParams_.impulseStrength + 0.22f);
+    }
+    size_ = newSize;
 
-        // 合体サイズの動的スムーズ補間
-        currentMergedScale_ += (targetScale - currentMergedScale_) * (std::min)(1.0f, deltaTime * 8.0f);
+    // 大きさに応じた色設定（小 1-2: 青, 中 3-7: 黄色, 大 8-10以上: 赤）
+    slimeParams_.baseColor = SlimePhysics::GetColorBySize(size_);
 
-        float currentScale = currentMergedScale_;
-        scale_ = { currentScale, currentScale, currentScale };
+    float targetScale = CalculateScaleBySize(size_);
+    currentMergedScale_ += (targetScale - currentMergedScale_) * (std::min)(1.0f, deltaTime * 10.0f);
+    float currentScale = currentMergedScale_;
+    scale_ = { currentScale, currentScale, currentScale };
 
-        // 合体時のスライムカラー（黄金色）
-        slimeParams_.baseColor = { 1.0f, 0.8f, 0.2f, 0.92f };
+    // 傾斜面の上に乗る（床にピタッと完全接地）
+    position_.y = SlimePhysics::CalculateGroundedCenterY(position_.x, position_.z, stageTilt, currentScale * 0.73f, { position_.x, position_.z });
+    if (collider_) {
+        collider_->SetRadius(currentScale * 0.78f);
+    }
 
-        // 傾斜面の上に乗る（床に沿って底面がピタッと完全接地）
-        position_.y = SlimePhysics::CalculateGroundedCenterY(position_.x, position_.z, stageTilt, currentScale * 0.73f);
-        if (collider_) {
-            collider_->SetRadius(currentScale * 0.8f);
-        }
-
-        if (giantModel_) {
-            giantModel_->SetTranslate(position_);
-            giantModel_->SetRotate(rotation_);
-            giantModel_->SetScale(scale_);
-            giantModel_->Update();
-        }
-    } else {
-        lastAbsorbedCount_ = 0;
-        currentMergedScale_ = 0.8f;
-        scale_ = { 0.8f, 0.8f, 0.8f };
-
-        // 通常時のスライムカラー（水色）
-        slimeParams_.baseColor = { 0.2f, 0.85f, 1.0f, 0.9f };
-
-        position_.y = SlimePhysics::CalculateGroundedCenterY(position_.x, position_.z, stageTilt, scale_.x * 0.73f);
-        if (collider_) {
-            collider_->SetRadius(0.8f);
-        }
-
-        if (normalModel_) {
-            normalModel_->SetTranslate(position_);
-            normalModel_->SetRotate(rotation_);
-            normalModel_->SetScale(scale_);
-            normalModel_->Update();
-        }
+    // サイズに応じたモデル選択（小 1-2: normalModel_, 中・大 3-10: giantModel_）
+    if (size_ >= 3 && giantModel_) {
+        giantModel_->SetTranslate(position_);
+        giantModel_->SetRotate(rotation_);
+        giantModel_->SetScale(scale_);
+        giantModel_->Update();
+    } else if (normalModel_) {
+        normalModel_->SetTranslate(position_);
+        normalModel_->SetRotate(rotation_);
+        normalModel_->SetScale(scale_);
+        normalModel_->Update();
     }
 }
 

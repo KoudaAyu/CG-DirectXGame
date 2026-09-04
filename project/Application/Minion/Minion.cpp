@@ -47,24 +47,14 @@ void Minion::Initialize(Object3dCom* object3dCom, Camera* camera, const Vector3&
         object3d_->Update();
     }
 
-    // タイプに応じたスライムカラー
-    switch (type_) {
-    case MinionType::Red:
-        slimeParams_.baseColor = { 1.0f, 0.3f, 0.25f, 0.88f }; // 赤スライム
-        break;
-    case MinionType::Yellow:
-        slimeParams_.baseColor = { 1.0f, 0.9f, 0.2f, 0.88f };  // 黄スライム
-        break;
-    case MinionType::Blue:
-        slimeParams_.baseColor = { 0.2f, 0.5f, 1.0f, 0.88f };  // 青スライム
-        break;
-    }
+    SetSize(1);
     slimeParams_.wobbleStrength = 0.0f;
     slimeParams_.wobbleFrequency = 6.0f;
     slimeParams_.fresnelPower = 2.5f;
     slimeParams_.envReflection = 0.4f;
     slimeParams_.innerGlow = 0.5f;
     slimeParams_.specularShininess = 48.0f;
+
 
     // ミニオン単体の当たり判定（SphereCollider）を生成・登録 (属性: Minion)
     collider_ = std::make_unique<SphereCollider>(radius_, &position_, CollisionAttribute::Minion);
@@ -176,7 +166,7 @@ void Minion::AttractTo(const Vector3& attractCenter, float attractSpeed) {
     }
 }
 
-void Minion::Update(float deltaTime, const Vector2& stageTilt) {
+void Minion::Update(float deltaTime, const Vector2& stageTilt, const Vector2& pivot) {
     if (!isActive_) {
         if (collider_) {
             collider_->SetIsEnabled(false);
@@ -196,6 +186,9 @@ void Minion::Update(float deltaTime, const Vector2& stageTilt) {
     if (obstacleCooldown_ > 0.0f) {
         obstacleCooldown_ -= deltaTime;
     }
+    if (mergeCooldown_ > 0.0f) {
+        mergeCooldown_ -= deltaTime;
+    }
 
     // 衝撃波紋のスムーズ減衰
     slimeParams_.impulseStrength *= (1.0f - deltaTime * 4.5f);
@@ -211,8 +204,8 @@ void Minion::Update(float deltaTime, const Vector2& stageTilt) {
         velocity_.x += accelX * deltaTime;
         velocity_.z += accelZ * deltaTime;
 
-        // 地面摩擦による減速
-        float decay = 1.0f - (std::min)(1.0f, friction_ * deltaTime);
+        // 地面摩擦による減速（全スライム共通摩擦係数）
+        float decay = 1.0f - (std::min)(1.0f, SlimePhysics::GetFriction() * deltaTime);
         velocity_.x *= decay;
         velocity_.z *= decay;
 
@@ -227,10 +220,10 @@ void Minion::Update(float deltaTime, const Vector2& stageTilt) {
         rotation_.z = -stageTilt.y;
 
         // 傾斜面の上に乗る（床の傾斜に沿って底面がピタッと接地）
-        position_.y = SlimePhysics::CalculateGroundedCenterY(position_.x, position_.z, stageTilt, groundY_);
-        scale_ = { 0.35f, 0.35f, 0.35f };
+        position_.y = SlimePhysics::CalculateGroundedCenterY(position_.x, position_.z, stageTilt, groundY_, pivot);
 
         // --- 液体スライムの動的変形（SlimePhysics ユーティリティで一元計算） ---
+
         SlimePhysics::DeformInput deformInput;
         deformInput.velocity = velocity_;
         deformInput.prevVelocity = prevVelocity_;
@@ -288,7 +281,7 @@ void Minion::Update(float deltaTime, const Vector2& stageTilt) {
         prevVelocity_ = velocity_;
 
         // 地面着地判定（傾いた板との接触判定）
-        float landingY = SlimePhysics::CalculateGroundedCenterY(position_.x, position_.z, stageTilt, groundY_);
+        float landingY = SlimePhysics::CalculateGroundedCenterY(position_.x, position_.z, stageTilt, groundY_, pivot);
         if (position_.y <= landingY) {
             position_.y = landingY;
             velocity_.y = 0.0f;
@@ -307,7 +300,7 @@ void Minion::Update(float deltaTime, const Vector2& stageTilt) {
     }
 
     case MinionState::Idle: {
-        position_.y = SlimePhysics::CalculateGroundedCenterY(position_.x, position_.z, stageTilt, groundY_);
+        position_.y = SlimePhysics::CalculateGroundedCenterY(position_.x, position_.z, stageTilt, groundY_, pivot);
         scale_ = { 0.35f, 0.35f, 0.35f };
         break;
     }
@@ -318,7 +311,7 @@ void Minion::Update(float deltaTime, const Vector2& stageTilt) {
     }
 
     // 傾斜面の高さ変動に対する絶対安全クランプ（角度変更時にも地面の下に100%埋まらない）
-    float currentGroundSurfaceY = SlimePhysics::CalculateGroundedCenterY(position_.x, position_.z, stageTilt, groundY_);
+    float currentGroundSurfaceY = SlimePhysics::CalculateGroundedCenterY(position_.x, position_.z, stageTilt, groundY_, pivot);
     if (position_.y < currentGroundSurfaceY) {
         position_.y = currentGroundSurfaceY;
         if (state_ == MinionState::Thrown) {
@@ -434,3 +427,22 @@ void Minion::Draw(const RenderContext& ctx) {
     if (!isActive_ || !object3d_ || !object3dCom_) return;
     DrawSlime(ctx);
 }
+
+void Minion::SetSize(int s) {
+    size_ = (std::max)(1, s);
+    float sVal = 0.40f;
+    if (size_ > 1) {
+        sVal = 0.40f + 0.11f * (size_ - 1) + 0.05f * std::pow(static_cast<float>(size_ - 1), 1.25f);
+    }
+    scale_ = { sVal, sVal, sVal };
+    radius_ = sVal * 0.78f;
+    groundY_ = sVal * 0.73f;
+    slimeParams_.baseColor = SlimePhysics::GetColorBySize(size_);
+    if (collider_) {
+        collider_->SetRadius(radius_);
+    }
+    if (object3d_) {
+        object3d_->SetScale(scale_);
+    }
+}
+

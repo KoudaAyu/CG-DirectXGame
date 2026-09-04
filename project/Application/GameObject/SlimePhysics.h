@@ -28,9 +28,10 @@ namespace SlimePhysics
      * @param x ワールドX座標
      * @param z ワールドZ座標
      * @param stageTilt ステージの傾斜角 (x: ピッチ, y: ロール)
+     * @param pivot 傾斜の回転中心（自機位置など、デフォルト: 0, 0）
      * @return 傾斜面上の正確なY座標
      */
-    float CalculateGroundHeight(float x, float z, const Vector2& stageTilt);
+    float CalculateGroundHeight(float x, float z, const Vector2& stageTilt, const Vector2& pivot = { 0.0f, 0.0f });
 
     /**
      * @brief 傾斜面上に乗るスライムの厳密な接地中心Y座標を算出
@@ -38,9 +39,10 @@ namespace SlimePhysics
      * @param z ワールドZ座標
      * @param stageTilt ステージの傾斜角
      * @param baseOffset スライム底面から中心までの高さオフセット
+     * @param pivot 傾斜の回転中心（自機位置など、デフォルト: 0, 0）
      * @return スライムの中心Y座標
      */
-    float CalculateGroundedCenterY(float x, float z, const Vector2& stageTilt, float baseOffset);
+    float CalculateGroundedCenterY(float x, float z, const Vector2& stageTilt, float baseOffset, const Vector2& pivot = { 0.0f, 0.0f });
 
     /**
      * @brief スライム変形計算用の入力パラメータ構造体
@@ -62,4 +64,34 @@ namespace SlimePhysics
      * @param[in] input 変形計算入力
      */
     void UpdateDeformation(SlimeParamsCPU& params, const DeformInput& input);
+
+    /**
+     * @brief 全スライム共通の地面摩擦係数を取得
+     */
+    float GetFriction();
+
+    /**
+     * @brief 全スライム共通の地面摩擦係数を設定
+     */
+    void SetFriction(float friction);
+
+    /**
+     * @brief ロコロコの大きさ（1-10）に応じたスライムカラーを取得
+     * 小（1-2）: 青, 中（3-7）: 黄色, 大（8-10以上）: 赤
+     */
+    inline Vector4 GetColorBySize(int size)
+    {
+        if (size <= 2)
+        {
+            return { 0.2f, 0.55f, 1.0f, 0.90f }; // 小 (1-2): 青
+        }
+        else if (size <= 7)
+        {
+            return { 1.0f, 0.90f, 0.15f, 0.92f }; // 中 (3-7): 黄色
+        }
+        else
+        {
+            return { 1.0f, 0.25f, 0.20f, 0.92f }; // 大 (8-10以上): 赤
+        }
+    }
 }
