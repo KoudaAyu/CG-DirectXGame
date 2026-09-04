@@ -46,30 +46,6 @@ void ImGuiManager::Initialize([[maybe_unused]]WindowAPI* windowAPI, [[maybe_unus
     // ImGuiのスタイルを設定
     StyleColorsDark();
 
-    // 日本語フォントの設定（日本語グリフ：JIS第1水準・第2水準漢字、ひらがな、カタカナ、全角英数記号）
-    ImGuiIO& io = ImGui::GetIO();
-    const char* fontCandidates[] = {
-        "C:\\Windows\\Fonts\\meiryo.ttc",   // メイリオ
-        "C:\\Windows\\Fonts\\msgothic.ttc", // MSゴシック
-        "C:\\Windows\\Fonts\\YuGothM.ttc"  // 游ゴシック Medium
-    };
-
-    bool fontLoaded = false;
-    for (const char* fontPath : fontCandidates)
-    {
-        if (GetFileAttributesA(fontPath) != INVALID_FILE_ATTRIBUTES)
-        {
-            io.Fonts->AddFontFromFileTTF(fontPath, 18.0f, nullptr, io.Fonts->GetGlyphRangesJapanese());
-            fontLoaded = true;
-            break;
-        }
-    }
-
-    if (!fontLoaded)
-    {
-        io.Fonts->AddFontDefault();
-    }
-
     ImGui_ImplWin32_Init(windowAPI->GetHwnd());
 
     //DirectX12用の初期化情報
@@ -219,11 +195,38 @@ void ImGuiManager::CreateContext()
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO();
-    if (io.Fonts->Fonts.empty())
+    
+    // 日本語フォントの設定（メイリオ、MSゴシック、游ゴシック）
+    io.Fonts->Clear(); // 既存のデフォルトASCIIフォントをクリア
+
+    const char* fontCandidates[] = {
+        "C:\\Windows\\Fonts\\meiryo.ttc",   // メイリオ（標準推奨）
+        "C:\\Windows\\Fonts\\msgothic.ttc", // MSゴシック
+        "C:\\Windows\\Fonts\\YuGothM.ttc"  // 游ゴシック Medium
+    };
+
+    ImFont* japaneseFont = nullptr;
+    for (const char* fontPath : fontCandidates)
+    {
+        if (GetFileAttributesA(fontPath) != INVALID_FILE_ATTRIBUTES)
+        {
+            // 日本語グリフ（JIS第1〜第2水準漢字、ひらがな、カタカナ、全角英数記号）を読み込み
+            japaneseFont = io.Fonts->AddFontFromFileTTF(fontPath, 18.0f, nullptr, io.Fonts->GetGlyphRangesJapanese());
+            if (japaneseFont)
+            {
+                break;
+            }
+        }
+    }
+
+    if (japaneseFont)
+    {
+        io.FontDefault = japaneseFont;
+    }
+    else
     {
         io.Fonts->AddFontDefault();
     }
-    
 #endif
 }
 
