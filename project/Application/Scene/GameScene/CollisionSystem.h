@@ -1,5 +1,6 @@
 #pragma once
 
+struct Vector3;
 class GamePlayScene;
 
 /// <summary>
@@ -41,6 +42,11 @@ private:
 	/// プレイヤーおよび移動敵と障害物(BoxCollider)との手動押し出し解決処理
 	/// </summary>
 	void ResolveCharacterObstacleCollisions();
+
+	/// <summary>
+	/// 障害物に着弾した際のエフェクト（跳弾スパーク・木片・ダスト煙）を発生させます
+	/// </summary>
+	void TriggerObstacleHitEffect(const Vector3& hitPos, const Vector3& bulletDir);
 
 private:
 	GamePlayScene* scene_ = nullptr;    // ゲームプレイシーンへの参照

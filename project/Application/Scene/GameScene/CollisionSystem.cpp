@@ -70,10 +70,77 @@ CollisionSystem::CollisionSystem(GamePlayScene* scene)
 void CollisionSystem::Update()
 {
 	CollisionManager::GetInstance()->Update(); // エンジンの衝突判定更新
-	ResolveBulletCollisions();      // 弾丸とキャラクターの衝突 (CCD精密判定)
-	ResolveObstacleCollisions();    // 弾丸と障害物の衝突 (Raycastによる精密判定)
+	ResolveObstacleCollisions();    // ① 弾丸と障害物の衝突を最優先判定 (障害物に着弾した弾丸は即座にFinalize)
+	ResolveBulletCollisions();      // ② 生き残った弾丸とキャラクターの衝突 (CCD精密判定 + LOS遮蔽チェック)
 	ResolveCharacterObstacleCollisions(); // キャラクターと障害物の衝突
 	ResolveContactDamage();        // プレイヤーと敵の直接接触によるダメージ
+}
+
+// 障害物に着弾した際の跳弾火花・木片・おがくず煙の共通演出処理
+void CollisionSystem::TriggerObstacleHitEffect(const Vector3& hitPos, const Vector3& bulletDir)
+{
+	if (!scene_ || !scene_->particleManager || !scene_->appParticleManager_) return;
+
+	Vector3 bDir = bulletDir;
+	float blen = std::sqrt(bDir.x * bDir.x + bDir.y * bDir.y + bDir.z * bDir.z);
+	if (blen > 1e-4f) bDir = { bDir.x / blen, bDir.y / blen, bDir.z / blen };
+	else bDir = { 0.0f, 0.0f, 1.0f };
+
+	Vector3 hitNormal = { -bDir.x, 0.4f, -bDir.z };
+	float nlen = std::sqrt(hitNormal.x * hitNormal.x + hitNormal.y * hitNormal.y + hitNormal.z * hitNormal.z);
+	if (nlen > 1e-4f) hitNormal = { hitNormal.x / nlen, hitNormal.y / nlen, hitNormal.z / nlen };
+
+	// 障壁・遮蔽物への着弾時の跳弾火花 ＆ 着弾ダストスモーク (GPU Particle Burst)
+	scene_->appParticleManager_->EmitRicochetSparks(
+		scene_->particleManager->GetRandomEngine(),
+		hitPos,
+		hitNormal,
+		scene_->particleTextureB,
+		scene_->smokeTextureIndex_
+	);
+
+	// 木片（フェンス素材テクスチャ）のバースト
+	for (int i = 0; i < 8; ++i)
+	{
+		std::uniform_real_distribution<float> colorDist(0.0f, 0.15f);
+		float r = 0.5f + colorDist(scene_->particleManager->GetRandomEngine());
+		float g = 0.35f + colorDist(scene_->particleManager->GetRandomEngine());
+		float b = 0.15f + colorDist(scene_->particleManager->GetRandomEngine());
+
+		std::uniform_real_distribution<float> chipScale(0.1f, 0.25f);
+		scene_->appParticleManager_->EmitSpark(
+			scene_->particleManager->GetRandomEngine(),
+			hitPos,
+			{ 0.0f, 0.0f, 0.0f },
+			{ r, g, b, 1.0f },
+			chipScale(scene_->particleManager->GetRandomEngine()),
+			0.5f,
+			scene_->fenceTextureIndex_
+		);
+	}
+
+	// 細かいおがくずの浮遊煙
+	for (int i = 0; i < 6; ++i)
+	{
+		std::uniform_real_distribution<float> colorDist(0.0f, 0.1f);
+		float r = 0.7f + colorDist(scene_->particleManager->GetRandomEngine());
+		float g = 0.55f + colorDist(scene_->particleManager->GetRandomEngine());
+		float b = 0.35f + colorDist(scene_->particleManager->GetRandomEngine());
+
+		std::uniform_real_distribution<float> velDist(-2.0f, 2.0f);
+		std::uniform_real_distribution<float> velUp(1.0f, 3.0f);
+		Vector3 vel = { velDist(scene_->particleManager->GetRandomEngine()), velUp(scene_->particleManager->GetRandomEngine()), velDist(scene_->particleManager->GetRandomEngine()) };
+
+		scene_->appParticleManager_->EmitDustWithVelocity(
+			scene_->particleManager->GetRandomEngine(),
+			hitPos,
+			0.6f,
+			{ r, g, b, 0.8f },
+			vel,
+			1.3f,
+			scene_->fenceTextureIndex_
+		);
+	}
 }
 
 // 弾丸とプレイヤー・敵の精密衝突判定 (CCD + 直立円柱ヒットボックス)
@@ -106,6 +173,24 @@ void CollisionSystem::ResolveBulletCollisions()
 				Vector3 hitPoint;
 				if (CheckBulletCapsuleHit(bPosPrev, bPosCurrent, kBulletRadius, enemyPos, kDuckHeight, kDuckRadius, hitPoint))
 				{
+					// ★ 障害物遮蔽チェック (Line-of-Sight): 弾丸の移動軌跡上に障害物がないか検証
+					Vector3 toHit = hitPoint - bPosPrev;
+					float hitDist = std::sqrt(toHit.x * toHit.x + toHit.y * toHit.y + toHit.z * toHit.z);
+					if (hitDist > 1e-4f)
+					{
+						Vector3 hitDir = { toHit.x / hitDist, toHit.y / hitDist, toHit.z / hitDist };
+						Collider* obsCollider = nullptr;
+						float obsDist = hitDist;
+						const uint32_t kObstacleMask = (1 << static_cast<uint32_t>(CollisionAttribute::Obstacle));
+						if (CollisionManager::GetInstance()->Raycast(bPosPrev, hitDir, hitDist, obsCollider, obsDist, kObstacleMask))
+						{
+							Vector3 obsHitPos = bPosPrev + hitDir * obsDist;
+							TriggerObstacleHitEffect(obsHitPos, bullet->GetDirection());
+							bullet->Finalize();
+							continue;
+						}
+					}
+
 					int prevHp = scene_->enemy_->GetHP();
 					scene_->enemy_->OnHit(scene_->player_ ? scene_->player_->GetPosition() : Vector3{0.0f,0.0f,0.0f});
 					int dmg = prevHp - scene_->enemy_->GetHP();
@@ -178,6 +263,24 @@ void CollisionSystem::ResolveBulletCollisions()
 				Vector3 hitPoint;
 				if (CheckBulletCapsuleHit(bPosPrev, bPosCurrent, kBulletRadius, enemyPos, kDuckHeight, kDuckRadius, hitPoint))
 				{
+					// ★ 障害物遮蔽チェック (Line-of-Sight): 弾丸の移動軌跡上に障害物がないか検証
+					Vector3 toHit = hitPoint - bPosPrev;
+					float hitDist = std::sqrt(toHit.x * toHit.x + toHit.y * toHit.y + toHit.z * toHit.z);
+					if (hitDist > 1e-4f)
+					{
+						Vector3 hitDir = { toHit.x / hitDist, toHit.y / hitDist, toHit.z / hitDist };
+						Collider* obsCollider = nullptr;
+						float obsDist = hitDist;
+						const uint32_t kObstacleMask = (1 << static_cast<uint32_t>(CollisionAttribute::Obstacle));
+						if (CollisionManager::GetInstance()->Raycast(bPosPrev, hitDir, hitDist, obsCollider, obsDist, kObstacleMask))
+						{
+							Vector3 obsHitPos = bPosPrev + hitDir * obsDist;
+							TriggerObstacleHitEffect(obsHitPos, bullet->GetDirection());
+							bullet->Finalize();
+							continue;
+						}
+					}
+
 					int prevHp = scene_->movingEnemy_->GetHP();
 					scene_->movingEnemy_->OnHit(scene_->player_ ? scene_->player_->GetPosition() : Vector3{0.0f,0.0f,0.0f});
 					int dmg = prevHp - scene_->movingEnemy_->GetHP();
@@ -252,6 +355,24 @@ void CollisionSystem::ResolveBulletCollisions()
 					Vector3 hitPoint;
 					if (CheckBulletCapsuleHit(bPosPrev, bPosCurrent, kBulletRadius, targetPos, 1.5f, target->GetRadius(), hitPoint))
 					{
+						// ★ 障害物遮蔽チェック (Line-of-Sight): 弾丸の移動軌跡上に障害物がないか検証
+						Vector3 toHit = hitPoint - bPosPrev;
+						float hitDist = std::sqrt(toHit.x * toHit.x + toHit.y * toHit.y + toHit.z * toHit.z);
+						if (hitDist > 1e-4f)
+						{
+							Vector3 hitDir = { toHit.x / hitDist, toHit.y / hitDist, toHit.z / hitDist };
+							Collider* obsCollider = nullptr;
+							float obsDist = hitDist;
+							const uint32_t kObstacleMask = (1 << static_cast<uint32_t>(CollisionAttribute::Obstacle));
+							if (CollisionManager::GetInstance()->Raycast(bPosPrev, hitDir, hitDist, obsCollider, obsDist, kObstacleMask))
+							{
+								Vector3 obsHitPos = bPosPrev + hitDir * obsDist;
+								TriggerObstacleHitEffect(obsHitPos, bullet->GetDirection());
+								bullet->Finalize();
+								break;
+							}
+						}
+
 						int prevHp = target->GetHP();
 						target->OnHit(1);
 						int dmg = prevHp - target->GetHP();
@@ -301,6 +422,25 @@ void CollisionSystem::ResolveBulletCollisions()
 				Vector3 hitPoint;
 				if (CheckBulletCapsuleHit(bPosPrev, bPosCurrent, kBulletRadius, playerPos, kDuckHeight, kDuckRadius, hitPoint))
 				{
+					// ★ 障害物遮蔽チェック (Line-of-Sight): 弾丸の移動軌跡上に障害物がないか検証
+					Vector3 toHit = hitPoint - bPosPrev;
+					float hitDist = std::sqrt(toHit.x * toHit.x + toHit.y * toHit.y + toHit.z * toHit.z);
+					if (hitDist > 1e-4f)
+					{
+						Vector3 hitDir = { toHit.x / hitDist, toHit.y / hitDist, toHit.z / hitDist };
+						Collider* obsCollider = nullptr;
+						float obsDist = hitDist;
+						const uint32_t kObstacleMask = (1 << static_cast<uint32_t>(CollisionAttribute::Obstacle));
+						if (CollisionManager::GetInstance()->Raycast(bPosPrev, hitDir, hitDist, obsCollider, obsDist, kObstacleMask))
+						{
+							// プレイヤーの手前に障害物がある！弾丸は障害物に着弾して消滅（プレイヤー貫通を100%遮断）
+							Vector3 obsHitPos = bPosPrev + hitDir * obsDist;
+							TriggerObstacleHitEffect(obsHitPos, bullet->GetDirection());
+							bullet->Finalize();
+							continue;
+						}
+					}
+
 					float prevHp = scene_->player_->GetHP();
 					scene_->player_->TakeDamage(20.0f, "HOSTILE SENTRY (AK-74M)", "5.45x39mm PS CARTRIDGE (CHEST PENETRATION)");
 					if (scene_->player_->GetHP() < prevHp)
@@ -334,11 +474,14 @@ void CollisionSystem::ResolveBulletCollisions()
 	}
 }
 
-// 弾丸と障害物（Obstacle）の精密衝突判定 (MeshColliderを使用したポリゴン精密判定)
+// 弾丸と障害物（Obstacle）の精密衝突判定 (Raycastによる精密判定)
 void CollisionSystem::ResolveObstacleCollisions()
 {
 	if (!scene_->combatSystem_) return;
 	auto& bullets = scene_->combatSystem_->GetBullets();
+
+	const uint32_t kObstacleMask = (1 << static_cast<uint32_t>(CollisionAttribute::Obstacle));
+	const float kBulletRadius = 0.12f;
 
 	for (auto& bullet : bullets)
 	{
@@ -350,77 +493,53 @@ void CollisionSystem::ResolveObstacleCollisions()
 		if (len < 1e-4f) continue;
 		Vector3 dir = { diff.x / len, diff.y / len, diff.z / len };
 
+		// 浮動小数点数誤差やすき間によるすり抜けを防ぐため、マージン (弾丸半径分) を加味した長さを検査
+		float checkLen = len + kBulletRadius;
+
 		Collider* hitCollider = nullptr;
-		float hitDist = len;
-		const uint32_t kObstacleMask = (1 << static_cast<uint32_t>(CollisionAttribute::Obstacle));
+		float hitDist = checkLen;
+		bool hasHit = false;
 
-		if (CollisionManager::GetInstance()->Raycast(bPosPrev, dir, len, hitCollider, hitDist, kObstacleMask))
+		// 1. 中心線レイキャスト
+		if (CollisionManager::GetInstance()->Raycast(bPosPrev, dir, checkLen, hitCollider, hitDist, kObstacleMask))
 		{
-			// 着弾交点
-			Vector3 hitWorldPos = bPosPrev + dir * hitDist;
-			bPos = hitWorldPos; // エフェクト発生座標を交点に設定
+			hasHit = true;
+		}
+		else
+		{
+			// 2. 弾丸の太さ（半径 0.12m）を考慮したオフセットレイキャスト（左右・上下）
+			// 障害物の角や薄いフェンスのすり抜けを完全防止
+			Vector3 right = { dir.z, 0.0f, -dir.x };
+			float rlen = std::sqrt(right.x * right.x + right.z * right.z);
+			if (rlen > 1e-4f) { right.x /= rlen; right.z /= rlen; }
+			Vector3 up = { 0.0f, 1.0f, 0.0f };
 
-			// 木製の障害物に着弾した際のおがくず（飛散）パーティクル演出
-			if (scene_->particleManager && scene_->appParticleManager_)
+			const Vector3 offsets[4] = {
+				{ right.x * kBulletRadius, right.y * kBulletRadius, right.z * kBulletRadius },
+				{ -right.x * kBulletRadius, -right.y * kBulletRadius, -right.z * kBulletRadius },
+				{ up.x * kBulletRadius, up.y * kBulletRadius, up.z * kBulletRadius },
+				{ -up.x * kBulletRadius, -up.y * kBulletRadius, -up.z * kBulletRadius }
+			};
+
+			for (const auto& off : offsets)
 			{
-				// 障壁・遮蔽物への着弾時の跳弾火花 ＆ 着弾ダストスモーク (GPU Particle Burst)
-				Vector3 bDir = bullet->GetDirection();
-				Vector3 hitNormal = { -bDir.x, 0.4f, -bDir.z };
-				float nlen = std::sqrt(hitNormal.x * hitNormal.x + hitNormal.y * hitNormal.y + hitNormal.z * hitNormal.z);
-				if (nlen > 1e-4f) hitNormal = { hitNormal.x / nlen, hitNormal.y / nlen, hitNormal.z / nlen };
-
-				scene_->appParticleManager_->EmitRicochetSparks(
-					scene_->particleManager->GetRandomEngine(),
-					bPos,
-					hitNormal,
-					scene_->particleTextureB,
-					scene_->smokeTextureIndex_
-				);
-
-				// 木片（フェンス素材テクスチャ）のバースト
-				for (int i = 0; i < 8; ++i)
+				float subDist = checkLen;
+				Collider* subCol = nullptr;
+				if (CollisionManager::GetInstance()->Raycast(bPosPrev + off, dir, checkLen, subCol, subDist, kObstacleMask))
 				{
-					std::uniform_real_distribution<float> colorDist(0.0f, 0.15f);
-					float r = 0.5f + colorDist(scene_->particleManager->GetRandomEngine());
-					float g = 0.35f + colorDist(scene_->particleManager->GetRandomEngine());
-					float b = 0.15f + colorDist(scene_->particleManager->GetRandomEngine());
-					
-					std::uniform_real_distribution<float> chipScale(0.1f, 0.25f);
-					scene_->appParticleManager_->EmitSpark(
-						scene_->particleManager->GetRandomEngine(),
-						bPos,
-						{0, 0, 0},
-						{ r, g, b, 1.0f },
-						chipScale(scene_->particleManager->GetRandomEngine()),
-						0.5f,
-						scene_->fenceTextureIndex_
-					);
-				}
-				
-				// 細かいおがくずの浮遊煙
-				for (int i = 0; i < 6; ++i)
-				{
-					std::uniform_real_distribution<float> colorDist(0.0f, 0.1f);
-					float r = 0.7f + colorDist(scene_->particleManager->GetRandomEngine());
-					float g = 0.55f + colorDist(scene_->particleManager->GetRandomEngine());
-					float b = 0.35f + colorDist(scene_->particleManager->GetRandomEngine());
-					
-					std::uniform_real_distribution<float> velDist(-2.0f, 2.0f);
-					std::uniform_real_distribution<float> velUp(1.0f, 3.0f);
-					Vector3 vel = { velDist(scene_->particleManager->GetRandomEngine()), velUp(scene_->particleManager->GetRandomEngine()), velDist(scene_->particleManager->GetRandomEngine()) };
-
-					scene_->appParticleManager_->EmitDustWithVelocity(
-						scene_->particleManager->GetRandomEngine(),
-						bPos,
-						0.6f,
-						{ r, g, b, 0.8f },
-						vel,
-						1.3f,
-						scene_->fenceTextureIndex_
-					);
+					hasHit = true;
+					hitDist = subDist;
+					hitCollider = subCol;
+					break;
 				}
 			}
+		}
 
+		if (hasHit)
+		{
+			// 着弾交点
+			Vector3 hitWorldPos = bPosPrev + dir * (std::min)(hitDist, len);
+			TriggerObstacleHitEffect(hitWorldPos, bullet->GetDirection());
 			bullet->Finalize();
 		}
 	}

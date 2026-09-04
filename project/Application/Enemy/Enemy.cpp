@@ -438,6 +438,17 @@ std::unique_ptr<Bullet> Enemy::TryShoot(const Vector3& targetPosition)
     const Vector3 forward = { toTarget.x * invLen, 0.0f, toTarget.z * invLen };
     const Vector3 spawnPos = Bullet::ComputeSpawnPosition(enemyPos, forward, bulletSpawnOffset_);
 
+    // 銃口の至近距離（前方1.5m以内）に障害物がある場合は射撃しない（壁埋まり・壁抜け発砲の防止）
+    {
+        Collider* hitCol = nullptr;
+        float checkDist = 1.5f;
+        const uint32_t kObstacleMask = (1 << static_cast<uint32_t>(CollisionAttribute::Obstacle));
+        if (CollisionManager::GetInstance()->Raycast(spawnPos, forward, checkDist, hitCol, checkDist, kObstacleMask))
+        {
+            return nullptr;
+        }
+    }
+
     auto bullet = std::make_unique<Bullet>();
     bullet->Initialize(object3dCom_, camera_, spawnPos, forward, bulletSpeed_, bulletLifeTime_, BulletOwner::Enemy);
     shotCooldownTimer_ = shotCooldown_;
