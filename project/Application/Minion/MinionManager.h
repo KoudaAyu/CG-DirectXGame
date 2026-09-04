@@ -37,6 +37,9 @@ public:
     int GetReadyCount(const Vector3& playerPos, float maxPickupRadius = 3.5f) const;
     int GetMergedCount() const;
     int GetTotalCount() const { return static_cast<int>(minions_.size()); }
+
+    /// @brief ミニオンの実体を列挙する（軌跡エフェクトなど、外から個々の状態を見たいとき用）
+    const std::vector<std::unique_ptr<Minion>>& GetMinions() const { return minions_; }
     bool IsAllMerged() const { return isAllMerged_; }
 
     float GetMergePickupRadius() const { return mergePickupRadius_; }
