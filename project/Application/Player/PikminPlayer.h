@@ -4,7 +4,7 @@
 #include "Matrix4x4.h"
 #include "RenderContext.h"
 #include "Baziru3_Engine/Graphics/3D/Object/Object3d.h"
-#include "Baziru3_Engine/Framework/Collision/SphereCollider.h"
+#include "Baziru3_Engine/Framework/Collision/MeshCollider.h"
 #include <memory>
 
 class Object3dCom;
@@ -33,6 +33,7 @@ public:
     void SetPosition(const Vector3& pos);
 
     const Vector3& GetVelocity() const { return velocity_; }
+    void SetVelocity(const Vector3& vel) { velocity_ = vel; }
     const Vector3& GetRotation() const { return rotation_; }
 
     float GetYaw() const { return rotation_.y; }
@@ -52,7 +53,9 @@ public:
 
     // スライムパラメータの公開（ImGui調整用）
     SlimeParamsCPU& GetSlimeParams() { return slimeParams_; }
-    SphereCollider* GetCollider() const { return collider_.get(); }
+    MeshCollider* GetCollider() const { return meshCollider_.get(); }
+    MeshCollider* GetMeshCollider() const { return meshCollider_.get(); }
+    Object3d* GetCurrentModel() const { return (size_ >= 3 && giantModel_) ? giantModel_.get() : normalModel_.get(); }
     float GetCurrentScale() const { return scale_.x; }
     const Vector3& GetScale() const { return scale_; }
     float GetBaseRadius() const { return 0.4f; }
@@ -114,6 +117,6 @@ private:
     Vector3 prevVelocity_{ 0.0f, 0.0f, 0.0f }; // スクワッシュ計算用の前フレーム速度
     float obstacleCooldown_ = 0.0f;  // 障害物（プロペラ等）の多重衝突防止クールダウン
 
-    // 合体時の当たり判定
-    std::unique_ptr<SphereCollider> collider_;
+    // メッシュ当たり判定 (MeshCollider)
+    std::unique_ptr<MeshCollider> meshCollider_;
 };

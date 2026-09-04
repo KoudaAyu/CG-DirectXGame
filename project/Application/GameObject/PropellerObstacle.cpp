@@ -9,13 +9,45 @@
 namespace
 {
     constexpr float kTwoPi = 6.283185307f;
-    constexpr float kHalfPi = 1.570796327f;
 
-    // 3x3 回転行列（行ベクトル形式: v * Rx * Ry * Rz）からエンジンのオイラー角 (rx, ry, rz) を正確に逆算
+    inline float Dot(const Vector3& a, const Vector3& b)
+    {
+        return a.x * b.x + a.y * b.y + a.z * b.z;
+    }
+
+    inline Vector3 Cross(const Vector3& a, const Vector3& b)
+    {
+        return {
+            a.y * b.z - a.z * b.y,
+            a.z * b.x - a.x * b.z,
+            a.x * b.y - a.y * b.x
+        };
+    }
+
+    inline float LengthSq(const Vector3& v)
+    {
+        return Dot(v, v);
+    }
+
+    inline float Length(const Vector3& v)
+    {
+        return std::sqrt(LengthSq(v));
+    }
+
+    inline Vector3 Normalize(const Vector3& v)
+    {
+        float len = Length(v);
+        if (len > 1e-5f)
+        {
+            return v * (1.0f / len);
+        }
+        return { 0.0f, 0.0f, 0.0f };
+    }
+
+    // 3x3 回転行列（行ベクトル形式: v * Rx * Ry * Rz）からエンジンのオイラー角 (rx, ry, rz) を逆算
     Vector3 MatrixToEulerXYZ(const Matrix4x4& R)
     {
         Vector3 euler;
-        // R[0][2] = -sin(ry)
         float sy = -R.m[0][2];
         sy = std::clamp(sy, -1.0f, 1.0f);
         euler.y = std::asin(sy);
@@ -28,11 +60,58 @@ namespace
         }
         else
         {
-            // ジンバルロック時のフォールバック
             euler.x = std::atan2(-R.m[2][1], R.m[1][1]);
             euler.z = 0.0f;
         }
         return euler;
+    }
+
+    // 点 p から三角形 (a, b, c) 上の最近点を算出 (Real-Time Collision Detection, Christer Ericson 準拠)
+    Vector3 ClosestPointOnTriangle(const Vector3& p, const Vector3& a, const Vector3& b, const Vector3& c)
+    {
+        Vector3 ab = b - a;
+        Vector3 ac = c - a;
+        Vector3 ap = p - a;
+        float d1 = Dot(ab, ap);
+        float d2 = Dot(ac, ap);
+        if (d1 <= 0.0f && d2 <= 0.0f) return a; // バーテックス領域 A
+
+        Vector3 bp = p - b;
+        float d3 = Dot(ab, bp);
+        float d4 = Dot(ac, bp);
+        if (d3 >= 0.0f && d4 <= d3) return b; // バーテックス領域 B
+
+        float vc = d1 * d4 - d3 * d2;
+        if (vc <= 0.0f && d1 >= 0.0f && d3 <= 0.0f)
+        {
+            float v = d1 / (d1 - d3);
+            return a + ab * v; // エッジ領域 AB
+        }
+
+        Vector3 cp = p - c;
+        float d5 = Dot(ab, cp);
+        float d6 = Dot(ac, cp);
+        if (d6 >= 0.0f && d5 <= d6) return c; // バーテックス領域 C
+
+        float vb = d5 * d2 - d1 * d6;
+        if (vb <= 0.0f && d2 >= 0.0f && d6 <= 0.0f)
+        {
+            float w = d2 / (d2 - d6);
+            return a + ac * w; // エッジ領域 AC
+        }
+
+        float va = d3 * d6 - d5 * d4;
+        if (va <= 0.0f && (d4 - d3) >= 0.0f && (d5 - d6) >= 0.0f)
+        {
+            float w = (d4 - d3) / ((d4 - d3) + (d5 - d6));
+            return b + (c - b) * w; // エッジ領域 BC
+        }
+
+        // フェース領域内部
+        float denom = 1.0f / (va + vb + vc);
+        float v = vb * denom;
+        float w = vc * denom;
+        return a + ab * v + ac * w;
     }
 }
 
@@ -63,24 +142,24 @@ void PropellerObstacle::Initialize(Object3dCom* object3dCom, Camera* camera, con
         object3d_->SetRotate({ 0.0f, 0.0f, 0.0f });
         object3d_->SetEnableLighting(true);
         object3d_->Update();
+        currentWorldMatrix_ = object3d_->GetWorldMatrix();
+        currentInvWorldMatrix_ = Inverse(currentWorldMatrix_);
     }
 
-    // 2. モデルの頂点群から羽根の枚数・寸法を自動検出し、コライダーを自動構築
-    AutoDetectAndBuildColliders();
+    // 2. エンジン標準の MeshCollider を生成・登録
+    BuildMeshCollider();
 
     isInitialized_ = true;
 }
 
-void PropellerObstacle::AutoDetectAndBuildColliders()
+void PropellerObstacle::BuildMeshCollider()
 {
-    wings_.clear();
-
     if (!object3d_) return;
 
     const auto& vertices = object3d_->GetModelData().vertices;
     if (vertices.empty()) return;
 
-    // --- ステップ1: 最大半径および中心ハブ円柱の精密測定 ---
+    // 情報表示用の寸法測定
     float maxRadius = 0.01f;
     for (const auto& vtx : vertices)
     {
@@ -89,255 +168,267 @@ void PropellerObstacle::AutoDetectAndBuildColliders()
     }
     detectedRadius_ = maxRadius;
 
-    // 中心付近の頂点群 (r < maxRadius * 0.25f) からハブ寸法を検出
     float hubRadius = 0.01f;
     float hubMinY = 1e9f, hubMaxY = -1e9f;
     int hubVertCount = 0;
-
     for (const auto& vtx : vertices)
     {
         float r = std::sqrt(vtx.position.x * vtx.position.x + vtx.position.z * vtx.position.z);
         if (r < maxRadius * 0.25f)
         {
             if (r > hubRadius) hubRadius = r;
-            if (vtx.position.y < hubMinY) hubMinY = vtx.position.y;
-            if (vtx.position.y > hubMaxY) hubMaxY = vtx.position.y;
+            hubMinY = (std::min)(hubMinY, vtx.position.y);
+            hubMaxY = (std::max)(hubMaxY, vtx.position.y);
             hubVertCount++;
         }
     }
-
-    if (hubVertCount == 0 || hubMaxY <= hubMinY)
+    if (hubVertCount > 0)
     {
-        hubRadius = maxRadius * 0.15f;
-        hubMinY = 0.0f;
-        hubMaxY = 0.4f;
+        detectedHubRadius_ = hubRadius;
+        detectedHubCenterY_ = (hubMinY + hubMaxY) * 0.5f;
     }
 
-    detectedHubRadius_ = hubRadius;
-    detectedHubCenterY_ = (hubMinY + hubMaxY) * 0.5f;
-
-    // --- ステップ2: 外側頂点による円形平均クラスタリング（羽根の枚数・基準角の精密検出） ---
-    // 外側頂点 (r > maxRadius * 0.55f) を抽出（ハブ円柱頂点を完全に除外）
-    // ※エンジンの行ベクトル形式回転 MakeRotateYMatrix(θ) では (1,0,0)*Ry = (cos θ, 0, -sin θ) となるため、
-    //   モデル空間頂点 (x, z) に一致させる角度は θ = atan2(-z, x)
-    struct AngleCluster
-    {
-        float mean = 0.0f;
-        std::vector<float> angles;
-    };
-
-    std::vector<AngleCluster> clusters;
-    constexpr float kClusterThreshold = 0.2618f; // 15度 (rad)
-
+    float wingMinY = 1e9f, wingMaxY = -1e9f;
     for (const auto& vtx : vertices)
     {
         float r = std::sqrt(vtx.position.x * vtx.position.x + vtx.position.z * vtx.position.z);
-        if (r > maxRadius * 0.55f)
+        if (r > maxRadius * 0.35f)
         {
-            float a = std::atan2(-vtx.position.z, vtx.position.x);
-            if (a < 0.0f) a += kTwoPi;
-
-            bool matched = false;
-            for (auto& cl : clusters)
-            {
-                // 円周上の角度差（ラッピング考慮）
-                float diff = std::atan2(std::sin(a - cl.mean), std::cos(a - cl.mean));
-                if (std::abs(diff) < kClusterThreshold)
-                {
-                    cl.angles.push_back(a);
-                    // 円形平均 (circular mean) の再計算
-                    float sumSin = 0.0f, sumCos = 0.0f;
-                    for (float ang : cl.angles)
-                    {
-                        sumSin += std::sin(ang);
-                        sumCos += std::cos(ang);
-                    }
-                    cl.mean = std::atan2(sumSin, sumCos);
-                    if (cl.mean < 0.0f) cl.mean += kTwoPi;
-                    matched = true;
-                    break;
-                }
-            }
-            if (!matched)
-            {
-                AngleCluster newCl;
-                newCl.mean = a;
-                newCl.angles.push_back(a);
-                clusters.push_back(newCl);
-            }
+            wingMinY = (std::min)(wingMinY, vtx.position.y);
+            wingMaxY = (std::max)(wingMaxY, vtx.position.y);
         }
     }
-
-    // 昇順にソート
-    std::sort(clusters.begin(), clusters.end(), [](const AngleCluster& a, const AngleCluster& b) {
-        return a.mean < b.mean;
-    });
-
-    std::vector<float> wingAngles;
-    if (clusters.size() >= 2 && clusters.size() <= 8)
+    if (wingMinY < wingMaxY)
     {
-        detectedWingCount_ = static_cast<int>(clusters.size());
-        for (const auto& cl : clusters)
-        {
-            wingAngles.push_back(cl.mean);
-        }
+        detectedWingThick_ = wingMaxY - wingMinY;
+        detectedWingCenterY_ = (wingMinY + wingMaxY) * 0.5f;
     }
-    else
-    {
-        // フォールバック: 十字4枚羽 (0, 90, 180, 270度)
-        detectedWingCount_ = 4;
-        wingAngles = { 0.0f, kHalfPi, 3.14159265f, 3.14159265f + kHalfPi };
-    }
+    detectedWingLen_ = (maxRadius - detectedHubRadius_) * 2.0f;
+    detectedWingCount_ = 4;
 
-    // --- ステップ3: 主軸射影による真の羽根寸法の自動抽出と精密 OBB 生成 ---
-    float sumThick = 0.0f, sumWidth = 0.0f, sumCenterY = 0.0f;
-    // 羽根を中心（原点）から先端まで伸ばし、中心ハブ部分も4本のBoxColliderの交差で美しくカバー
-    float wingLen = maxRadius;
-    float centerDistU = maxRadius * 0.5f;
-
-    for (int i = 0; i < detectedWingCount_; ++i)
-    {
-        float angle = wingAngles[i];
-        float cosA = std::cos(angle);
-        float sinA = std::sin(angle);
-
-        // この羽根に属する外側頂点 (r > maxRadius * 0.35f) を抽出
-        std::vector<Vector3> wingPts;
-        for (const auto& vtx : vertices)
-        {
-            float r = std::sqrt(vtx.position.x * vtx.position.x + vtx.position.z * vtx.position.z);
-            if (r < maxRadius * 0.35f) continue;
-
-            float va = std::atan2(-vtx.position.z, vtx.position.x);
-            float diff = std::atan2(std::sin(va - angle), std::cos(va - angle));
-            if (std::abs(diff) < (kTwoPi / static_cast<float>(detectedWingCount_)) * 0.5f)
-            {
-                wingPts.push_back({ vtx.position.x, vtx.position.y, vtx.position.z });
-            }
-        }
-
-        // 局所基底 (u: 長さ方向, v: 幅方向, y: 厚み方向) へ射影
-        float minY = 1e9f, maxY = -1e9f;
-        float minV = 1e9f, maxV = -1e9f;
-
-        for (const auto& pt : wingPts)
-        {
-            float y = pt.y;
-            if (y < minY) minY = y;
-            if (y > maxY) maxY = y;
-
-            float v = pt.x * sinA + pt.z * cosA;
-            if (v < minV) minV = v;
-            if (v > maxV) maxV = v;
-        }
-
-        float thick = (maxY > minY) ? (maxY - minY) : 0.2f;
-        float width = (maxV > minV) ? (maxV - minV) : 0.2f;
-        float centerY = (minY + maxY) * 0.5f;
-
-        sumThick += thick;
-        sumWidth += width;
-        sumCenterY += centerY;
-
-        // ワールド寸法へのスケーリング
-        auto wing = std::make_unique<Wing>();
-        wing->baseAngle = angle;
-        wing->rotationEuler = { 0.0f, angle, 0.0f };
-        wing->length = wingLen * scale_.x;
-        wing->thickness = thick * scale_.y;
-        wing->width = width * scale_.z;
-        wing->centerDistU = centerDistU * scale_.x;
-        wing->centerY = centerY * scale_.y;
-
-        // 各羽根の直方体サイズ: X軸方向に長さ、Y軸に厚み、Z軸に幅
-        Vector3 boxSize = { wing->length, wing->thickness, wing->width };
-
-        // ヒープ固定された wing->rotationEuler のアドレスを渡すことで、ポインタの永続性を保証
-        wing->collider = std::make_unique<BoxCollider>(
-            boxSize,
-            &currentWorldPos_,
-            &wing->rotationEuler,
-            CollisionAttribute::Obstacle
-        );
-
-        if (CollisionManager::GetInstance())
-        {
-            CollisionManager::GetInstance()->RegisterCollider(wing->collider.get());
-        }
-
-        wings_.push_back(std::move(wing));
-    }
-
-    detectedWingLen_ = wingLen;
-    detectedWingThick_ = sumThick / static_cast<float>(detectedWingCount_);
-    detectedWingWidth_ = sumWidth / static_cast<float>(detectedWingCount_);
-    detectedWingCenterY_ = sumCenterY / static_cast<float>(detectedWingCount_);
+    // エンジンに実装されている MeshCollider を生成して CollisionManager に登録！
+    meshCollider_ = std::make_unique<MeshCollider>(object3d_.get(), CollisionAttribute::Obstacle);
+    CollisionManager::GetInstance()->RegisterCollider(meshCollider_.get());
 }
 
 void PropellerObstacle::Update(float deltaTime, const Vector2& stageTilt, const Vector2& pivot)
 {
-    if (!isInitialized_) return;
+    if (!object3d_) return;
 
-    // 1. 自転角度の更新 (2πでラップ)
+    // 1. プロペラの自転角度の進行
     currentAngle_ += spinSpeed_ * deltaTime;
     if (currentAngle_ > kTwoPi) currentAngle_ -= kTwoPi;
-    if (currentAngle_ < -kTwoPi) currentAngle_ += kTwoPi;
+    else if (currentAngle_ < -kTwoPi) currentAngle_ += kTwoPi;
 
-    // 2. ステージ傾斜の追従（床面高さの算出）
-    currentWorldPos_.x = basePosition_.x;
-    currentWorldPos_.z = basePosition_.z;
-    currentWorldPos_.y = SlimePhysics::CalculateGroundHeight(basePosition_.x, basePosition_.z, stageTilt, pivot);
-
-    // 3. 正しい回転行列の合成:
-    // 床面の傾斜行列 (Rx * Rz)
+    // 2. ステージ傾斜の合成回転行列
     Matrix4x4 R_tilt = Multiply(MakeRotateXMatrix(stageTilt.x), MakeRotateZMatrix(-stageTilt.y));
 
-    // 4. 自動生成された各羽根の姿勢と中心位置オフセットを更新
-    for (auto& wing : wings_)
+    // 3. 自転回転行列 (ローカルY軸回転)
+    Matrix4x4 R_spin = MakeRotateYMatrix(currentAngle_);
+
+    // 4. 合成姿勢行列
+    Matrix4x4 R_combined = Multiply(R_spin, R_tilt);
+
+    // 5. ステージ傾斜に伴う配置位置の回転
+    Vector3 P = basePosition_;
+    Vector3 P_rel = { P.x - pivot.x, P.y, P.z - pivot.y };
+    Vector3 RP_rel = {
+        P_rel.x * R_tilt.m[0][0] + P_rel.y * R_tilt.m[1][0] + P_rel.z * R_tilt.m[2][0],
+        P_rel.x * R_tilt.m[0][1] + P_rel.y * R_tilt.m[1][1] + P_rel.z * R_tilt.m[2][1],
+        P_rel.x * R_tilt.m[0][2] + P_rel.y * R_tilt.m[1][2] + P_rel.z * R_tilt.m[2][2]
+    };
+    currentWorldPos_ = { RP_rel.x + pivot.x, RP_rel.y, RP_rel.z + pivot.y };
+
+    // 6. Object3d に反映
+    Vector3 euler = MatrixToEulerXYZ(R_combined);
+    object3d_->SetTranslate(currentWorldPos_);
+    object3d_->SetRotate(euler);
+    object3d_->SetScale(scale_);
+    object3d_->Update();
+
+    currentWorldMatrix_ = object3d_->GetWorldMatrix();
+    currentInvWorldMatrix_ = Inverse(currentWorldMatrix_);
+
+    // MeshCollider の更新（内部のワールド座標同期と AABBTree の更新）
+    if (meshCollider_)
     {
-        if (!wing || !wing->collider) continue;
+        meshCollider_->SetWorldPosition(currentWorldPos_);
+        meshCollider_->Update();
+    }
+}
 
-        // 羽根の総合角度 (自転 + 羽根の基準角)
-        float totalAngle = currentAngle_ + wing->baseAngle;
+bool PropellerObstacle::ResolveSlimeCollision(Vector3& slimePos, Vector3& slimeVel, float slimeRadius,
+                                             bool isMerged, Vector3& slimeSquash, float& outImpulse)
+{
+    if (!object3d_ || !meshCollider_) return false;
 
-        // 羽根の合成回転行列 (R_spin * R_tilt)
-        Matrix4x4 R_wing = Multiply(MakeRotateYMatrix(totalAngle), R_tilt);
+    // 1. スライム位置をプロペラのローカル空間へ変換
+    const Matrix4x4& invW = currentInvWorldMatrix_;
+    Vector3 localPos = {
+        slimePos.x * invW.m[0][0] + slimePos.y * invW.m[1][0] + slimePos.z * invW.m[2][0] + invW.m[3][0],
+        slimePos.x * invW.m[0][1] + slimePos.y * invW.m[1][1] + slimePos.z * invW.m[2][1] + invW.m[3][1],
+        slimePos.x * invW.m[0][2] + slimePos.y * invW.m[1][2] + slimePos.z * invW.m[2][2] + invW.m[3][2]
+    };
 
-        // エンジンのオイラー角 (Rx * Ry * Rz) に分解し、ヒープ上の rotationEuler を直接更新
-        wing->rotationEuler = MatrixToEulerXYZ(R_wing);
+    float propScale = (scale_.x + scale_.y + scale_.z) / 3.0f;
+    if (propScale < 1e-4f) return false;
+    float localRadius = slimeRadius / propScale;
 
-        // 羽根の動径中心オフセット (ローカルX軸方向 wing->centerDistU を R_wing で回転)
-        // 行ベクトル形式: v * R
-        Vector3 rotatedOffset = {
-            wing->centerDistU * R_wing.m[0][0],
-            wing->centerDistU * R_wing.m[0][1],
-            wing->centerDistU * R_wing.m[0][2]
-        };
-
-        // 床面法線（R_tiltの第1行）に沿った高さ中心オフセットと合成
-        Vector3 worldOffset = {
-            rotatedOffset.x + wing->centerY * R_tilt.m[1][0],
-            rotatedOffset.y + wing->centerY * R_tilt.m[1][1],
-            rotatedOffset.z + wing->centerY * R_tilt.m[1][2]
-        };
-
-        wing->collider->SetPositionOffset(worldOffset);
+    // 2. ブロードフェーズ判定: AABBTree のルート境界で超高速アーリーアウト
+    Vector3 rootMin, rootMax;
+    if (meshCollider_->GetAABBTree().GetRootBounds(rootMin, rootMax))
+    {
+        if (localPos.x + localRadius < rootMin.x || localPos.x - localRadius > rootMax.x ||
+            localPos.y + localRadius < rootMin.y || localPos.y - localRadius > rootMax.y ||
+            localPos.z + localRadius < rootMin.z || localPos.z - localRadius > rootMax.z)
+        {
+            return false;
+        }
     }
 
-    // 5. 3Dオブジェクトのトランスフォーム更新
-    if (object3d_)
+    // 3. ナローフェーズ判定: モデルの全ポリゴン三角形に対する点・三角形最近点テスト
+    const auto& modelData = object3d_->GetModelData();
+    const auto& vertices = modelData.vertices;
+    const auto& indices = modelData.indices;
+
+    size_t numTris = indices.empty() ? (vertices.size() / 3) : (indices.size() / 3);
+    if (numTris == 0) return false;
+
+    bool collided = false;
+    float maxPenetrationLocal = 0.0f;
+    Vector3 bestNormalLocal{ 0.0f, 1.0f, 0.0f };
+    Vector3 bestContactLocal{ 0.0f, 0.0f, 0.0f };
+
+    for (size_t t = 0; t < numTris; ++t)
     {
-        Matrix4x4 R_model = Multiply(MakeRotateYMatrix(currentAngle_), R_tilt);
-        object3d_->SetTranslate(currentWorldPos_);
-        object3d_->SetRotate(MatrixToEulerXYZ(R_model));
-        object3d_->Update();
+        Vector3 v0, v1, v2;
+        if (!indices.empty())
+        {
+            const auto& p0 = vertices[indices[t * 3 + 0]].position;
+            const auto& p1 = vertices[indices[t * 3 + 1]].position;
+            const auto& p2 = vertices[indices[t * 3 + 2]].position;
+            v0 = { p0.x, p0.y, p0.z };
+            v1 = { p1.x, p1.y, p1.z };
+            v2 = { p2.x, p2.y, p2.z };
+        }
+        else
+        {
+            const auto& p0 = vertices[t * 3 + 0].position;
+            const auto& p1 = vertices[t * 3 + 1].position;
+            const auto& p2 = vertices[t * 3 + 2].position;
+            v0 = { p0.x, p0.y, p0.z };
+            v1 = { p1.x, p1.y, p1.z };
+            v2 = { p2.x, p2.y, p2.z };
+        }
+
+        // 三角形上の最近点を算出
+        Vector3 q = ClosestPointOnTriangle(localPos, v0, v1, v2);
+        Vector3 diff = localPos - q;
+        float distSq = LengthSq(diff);
+
+        if (distSq < localRadius * localRadius)
+        {
+            float dist = std::sqrt(distSq);
+            float pen = localRadius - dist;
+            if (pen > maxPenetrationLocal)
+            {
+                maxPenetrationLocal = pen;
+                bestContactLocal = q;
+
+                if (dist > 1e-5f)
+                {
+                    bestNormalLocal = diff * (1.0f / dist);
+                }
+                else
+                {
+                    // 点が三角形と完全に重なっている場合は面法線を採用
+                    Vector3 triNorm = Cross(v1 - v0, v2 - v0);
+                    bestNormalLocal = Normalize(triNorm);
+                }
+                collided = true;
+            }
+        }
     }
+
+    if (!collided) return false;
+
+    // 4. 接触情報をワールド空間へ変換
+    const Matrix4x4& W = currentWorldMatrix_;
+    Vector3 contactWorld = {
+        bestContactLocal.x * W.m[0][0] + bestContactLocal.y * W.m[1][0] + bestContactLocal.z * W.m[2][0] + W.m[3][0],
+        bestContactLocal.x * W.m[0][1] + bestContactLocal.y * W.m[1][1] + bestContactLocal.z * W.m[2][1] + W.m[3][1],
+        bestContactLocal.x * W.m[0][2] + bestContactLocal.y * W.m[1][2] + bestContactLocal.z * W.m[2][2] + W.m[3][2]
+    };
+
+    // 法線ベクトルのワールド変換（回転成分のみ）
+    Vector3 normalWorld = {
+        bestNormalLocal.x * W.m[0][0] + bestNormalLocal.y * W.m[1][0] + bestNormalLocal.z * W.m[2][0],
+        bestNormalLocal.x * W.m[0][1] + bestNormalLocal.y * W.m[1][1] + bestNormalLocal.z * W.m[2][1],
+        bestNormalLocal.x * W.m[0][2] + bestNormalLocal.y * W.m[1][2] + bestNormalLocal.z * W.m[2][2]
+    };
+    normalWorld = Normalize(normalWorld);
+
+    float penetrationWorld = maxPenetrationLocal * propScale;
+
+    // 5. めり込みの精密押し出し解消
+    slimePos.x += normalWorld.x * penetrationWorld;
+    slimePos.y += normalWorld.y * penetrationWorld;
+    slimePos.z += normalWorld.z * penetrationWorld;
+
+    // 6. プロペラの自転による打撃・弾き飛ばし線速度の算出
+    // プロペラの回転軸（ワールド空間の上向き法線軸）
+    Vector3 upAxisWorld = { W.m[1][0], W.m[1][1], W.m[1][2] };
+    upAxisWorld = Normalize(upAxisWorld);
+
+    // プロペラ中心から接触点への動径ベクトル
+    Vector3 r = contactWorld - currentWorldPos_;
+    // 回転軸に沿った角速度ベクトル omega
+    Vector3 omega = upAxisWorld * spinSpeed_;
+    // 接触点におけるプロペラ羽根の線速度 v_blade = omega x r
+    Vector3 bladeVel = Cross(omega, r);
+
+    // 外向き動径方向ベクトル
+    Vector3 radial = { r.x, 0.0f, r.z };
+    float rLen = Length(radial);
+    Vector3 escapeDir = (rLen > 0.1f) ? (radial * (1.0f / rLen)) : normalWorld;
+
+    // 相対速度
+    Vector3 relVel = slimeVel - bladeVel;
+    float normalRelSpeed = Dot(relVel, normalWorld);
+
+    // 羽根がスライムに向かって衝突している、あるいは接近している場合
+    if (normalRelSpeed < 0.0f)
+    {
+        // 反発係数 0.85 でパカーンと打撃
+        float restitution = 0.85f;
+        slimeVel = slimeVel - normalWorld * (normalRelSpeed * (1.0f + restitution));
+    }
+
+    // 羽根の回転慣性をスライムに伝達（接線方向のスピードを加算）
+    slimeVel.x += bladeVel.x * 0.75f;
+    slimeVel.z += bladeVel.z * 0.75f;
+
+    // 外向き脱出インパルス
+    float launchSpeed = isMerged ? 6.0f : 9.5f;
+    slimeVel.x += escapeDir.x * launchSpeed;
+    slimeVel.z += escapeDir.z * launchSpeed;
+
+    // ミニオンなら小さく空中放物線を描く上向き成分
+    if (!isMerged)
+    {
+        slimeVel.y = 3.5f;
+    }
+
+    // 7. スライムの変形演出と衝撃強度
+    outImpulse = std::clamp(penetrationWorld * 3.0f + Length(bladeVel) * 0.15f, 0.35f, 1.0f);
+    slimeSquash = { 0.22f, -0.25f, 0.22f };
+
+    return true;
 }
 
 void PropellerObstacle::Draw(const RenderContext& ctx)
 {
-    if (!isInitialized_ || !object3d_) return;
-
+    if (!object3d_) return;
     object3d_->Draw(object3dCom_);
 }
 
@@ -351,21 +442,14 @@ void PropellerObstacle::SetColor(const Vector4& color)
 
 void PropellerObstacle::Finalize()
 {
-    if (!isInitialized_) return;
-
-    if (CollisionManager::GetInstance())
+    if (meshCollider_)
     {
-        for (auto& wing : wings_)
-        {
-            if (wing && wing->collider)
-            {
-                CollisionManager::GetInstance()->UnregisterCollider(wing->collider.get());
-                wing->collider.reset();
-            }
-        }
-        wings_.clear();
+        CollisionManager::GetInstance()->UnregisterCollider(meshCollider_.get());
+        meshCollider_.reset();
     }
-
-    object3d_.reset();
+    if (object3d_)
+    {
+        object3d_.reset();
+    }
     isInitialized_ = false;
 }

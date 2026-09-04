@@ -28,8 +28,8 @@ PikminPlayer::PikminPlayer() {
 }
 
 PikminPlayer::~PikminPlayer() {
-    if (collider_) {
-        CollisionManager::GetInstance()->UnregisterCollider(collider_.get());
+    if (meshCollider_) {
+        CollisionManager::GetInstance()->UnregisterCollider(meshCollider_.get());
     }
 }
 
@@ -66,11 +66,12 @@ void PikminPlayer::Initialize(Object3dCom* object3dCom, Camera* camera, const Ve
         giantModel_->Initialize(object3dCom_, giantModelData_);
         giantModel_->SetCamera(camera_);
         giantModel_->SetTranslate(position_);
-        giantModel_->SetScale({ 2.0f, 2.0f, 2.0f });
+        giantModel_->SetScale(scale_);
         giantModel_->SetColor({ 1.0f, 1.0f, 1.0f, 1.0f });
         giantModel_->SetEnableLighting(true);
         giantModel_->Update();
     }
+
 
     // スライムパラメータの初期設定（ゼリー感のあるぷるぷるスライム）
     slimeParams_.baseColor = { 0.2f, 0.85f, 1.0f, 0.9f }; // 水色スライム
@@ -81,12 +82,12 @@ void PikminPlayer::Initialize(Object3dCom* object3dCom, Camera* camera, const Ve
     slimeParams_.innerGlow = 0.5f;
     slimeParams_.specularShininess = 64.0f;
 
-    // プレイヤーの当たり判定（SphereCollider: 分裂時は小ロコロコサイズ 0.35f）
-    collider_ = std::make_unique<SphereCollider>(0.35f, &position_, CollisionAttribute::Player);
-    collider_->SetOnCollision([this](const CollisionInfo& info) {
+    // プレイヤーの当たり判定（MeshCollider: スライムモデルの精密メッシュ判定）
+    meshCollider_ = std::make_unique<MeshCollider>(normalModel_.get(), CollisionAttribute::Player);
+    meshCollider_->SetOnCollision([this](const CollisionInfo& info) {
         OnCollision(info);
     });
-    CollisionManager::GetInstance()->RegisterCollider(collider_.get());
+    CollisionManager::GetInstance()->RegisterCollider(meshCollider_.get());
 }
 
 void PikminPlayer::OnCollision(const CollisionInfo& info) {
@@ -160,8 +161,9 @@ void PikminPlayer::SetSize(int s) {
     currentMergedScale_ = CalculateScaleBySize(size_);
     scale_ = { currentMergedScale_, currentMergedScale_, currentMergedScale_ };
     slimeParams_.baseColor = SlimePhysics::GetColorBySize(size_);
-    if (collider_) {
-        collider_->SetRadius(currentMergedScale_ * 0.78f);
+    if (meshCollider_) {
+        meshCollider_->SetWorldPosition(position_);
+        meshCollider_->Update();
     }
     if (size_ >= 3 && giantModel_) {
         giantModel_->SetScale(scale_);
@@ -208,9 +210,9 @@ void PikminPlayer::SetMerged(bool merged) {
     // 合体/分裂時に衝撃波紋を発生させる
     slimeParams_.impulseStrength = 0.3f;
 
-    // コライダー半径を初期化
-    if (collider_) {
-        collider_->SetRadius(merged ? currentMergedScale_ : 0.35f);
+    if (meshCollider_) {
+        meshCollider_->SetWorldPosition(position_);
+        meshCollider_->Update();
     }
 }
 
@@ -304,23 +306,25 @@ void PikminPlayer::Update(float deltaTime, KeyInput* keyInput, MinionManager* mi
 
     // 傾斜面の上に乗る（床にピタッと完全接地）
     position_.y = SlimePhysics::CalculateGroundedCenterY(position_.x, position_.z, stageTilt, currentScale * 0.73f, { position_.x, position_.z });
-    if (collider_) {
-        collider_->SetRadius(currentScale * 0.78f);
-    }
-
-    // サイズに応じたモデル選択（小 1-2: normalModel_, 中・大 3-10: giantModel_）
-    if (size_ >= 3 && giantModel_) {
-        giantModel_->SetTranslate(position_);
-        giantModel_->SetRotate(rotation_);
-        giantModel_->SetScale(scale_);
-        giantModel_->Update();
-    } else if (normalModel_) {
+    // モデルTransformの更新（通常・巨大どちらも現在の正確なscale_で更新）
+    if (normalModel_) {
         normalModel_->SetTranslate(position_);
         normalModel_->SetRotate(rotation_);
         normalModel_->SetScale(scale_);
         normalModel_->Update();
     }
+    if (giantModel_) {
+        giantModel_->SetTranslate(position_);
+        giantModel_->SetRotate(rotation_);
+        giantModel_->SetScale(scale_);
+        giantModel_->Update();
+    }
+    if (meshCollider_) {
+        meshCollider_->SetWorldPosition(position_);
+        meshCollider_->Update();
+    }
 }
+
 
 void PikminPlayer::DrawSlime(Object3d* object, const Object3d::ModelData& modelData,
                               const RenderContext& ctx, uint32_t textureIndex)
@@ -419,16 +423,13 @@ void PikminPlayer::DrawSlime(Object3d* object, const Object3d::ModelData& modelD
 void PikminPlayer::Draw(const RenderContext& ctx) {
     if (!object3dCom_) return;
 
-    if (isMerged_) {
-        if (giantModel_) {
-            DrawSlime(giantModel_.get(), giantModelData_, ctx, giantTextureIndex_);
-        }
-    } else {
-        if (normalModel_) {
-            DrawSlime(normalModel_.get(), normalModelData_, ctx, normalTextureIndex_);
-        }
+    if (size_ >= 3 && giantModel_) {
+        DrawSlime(giantModel_.get(), giantModelData_, ctx, giantTextureIndex_);
+    } else if (normalModel_) {
+        DrawSlime(normalModel_.get(), normalModelData_, ctx, normalTextureIndex_);
     }
 }
+
 
 void PikminPlayer::DrawDebug(Camera* camera) {
 #ifdef _DEBUG

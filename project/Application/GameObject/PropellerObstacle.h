@@ -6,36 +6,23 @@
 #include "Baziru3_Engine/Core/Camera/Camera.h"
 #include "Baziru3_Engine/Core/Base/RenderContext.h"
 #include "Baziru3_Engine/Core/Base/Vector.h"
-#include "Baziru3_Engine/Framework/Collision/BoxCollider.h"
-#include "Baziru3_Engine/Framework/Collision/SphereCollider.h"
+#include "Baziru3_Engine/Framework/Collision/MeshCollider.h"
 
 class Object3dCom;
 
 /**
  * @brief 自転するプロペラ障害物ギミック (PropellerObstacle)
- * モデルの頂点群から羽根の枚数（2枚/3枚/4枚...）とサイズを自動検出し、
- * ピッタリの OBB (BoxCollider) と中心ハブ (SphereCollider) を自動生成します。
+ * エンジン標準の MeshCollider を活用し、プロペラ 3D モデルのポリゴンそのものによる
+ * 完全精密なメッシュ衝突判定・押し出し・自転弾き飛ばしを実現します。
  */
 class PropellerObstacle
 {
 public:
-    struct Wing
-    {
-        std::unique_ptr<BoxCollider> collider;
-        float baseAngle = 0.0f;                     // 羽根のローカル基準角 (rad: atan2(-z, x))
-        Vector3 rotationEuler{ 0.0f, 0.0f, 0.0f };  // コライダー追従用オイラー角
-        float length = 3.0f;                        // 羽根の長さ (ワールド寸法)
-        float thickness = 0.28f;                    // 羽根の厚み (ワールド寸法)
-        float width = 0.28f;                        // 羽根の幅 (ワールド寸法)
-        float centerDistU = 1.76f;                  // ハブ中心から羽根OBB中心までの動径距離 (ワールド寸法)
-        float centerY = 0.63f;                      // 羽根OBBの高さ中心 (ワールド寸法)
-    };
-
     PropellerObstacle() = default;
     ~PropellerObstacle();
 
     /**
-     * @brief 初期化（モデルの頂点からコライダーを自動解析・生成）
+     * @brief 初期化（モデルの読み込みと MeshCollider の生成・登録）
      * @param object3dCom 描画コンポーネント
      * @param camera カメラ
      * @param basePosition 配置位置 (ステージ上の基本XZ座標)
@@ -68,12 +55,27 @@ public:
      */
     void Finalize();
 
+    /**
+     * @brief スライムとの精密メッシュ衝突判定および押し出し・自転反発解決
+     * @param slimePos スライムのワールド座標（更新される）
+     * @param slimeVel スライムの速度（更新される）
+     * @param slimeRadius スライムの有効半径
+     * @param isMerged 巨大化合体状態かどうか
+     * @param slimeSquash スライムの変形パラメータ (出力)
+     * @param outImpulse 衝撃強度 (出力)
+     * @return 衝突が発生した場合 true
+     */
+    bool ResolveSlimeCollision(Vector3& slimePos, Vector3& slimeVel, float slimeRadius,
+                               bool isMerged, Vector3& slimeSquash, float& outImpulse);
+
     // ゲッター・セッター
     const Vector3& GetPosition() const { return currentWorldPos_; }
     const Vector3& GetScale() const { return scale_; }
     float GetSpinSpeed() const { return spinSpeed_; }
     void SetSpinSpeed(float speed) { spinSpeed_ = speed; }
     void SetColor(const Vector4& color);
+
+    MeshCollider* GetMeshCollider() const { return meshCollider_.get(); }
 
     int GetDetectedWingCount() const { return detectedWingCount_; }
     float GetDetectedRadius() const { return detectedRadius_; }
@@ -83,16 +85,15 @@ public:
     float GetDetectedWingCenterY() const { return detectedWingCenterY_; }
     float GetDetectedHubRadius() const { return detectedHubRadius_; }
 
-    const std::vector<std::unique_ptr<Wing>>& GetWings() const { return wings_; }
-
 private:
     /**
-     * @brief モデル頂点群から羽根の枚数・寸法を自動解析してコライダーを構築
+     * @brief モデル頂点群から寸法情報を解析し MeshCollider を構築
      */
-    void AutoDetectAndBuildColliders();
+    void BuildMeshCollider();
 
 private:
     std::unique_ptr<Object3d> object3d_;
+    std::unique_ptr<MeshCollider> meshCollider_;
     Object3dCom* object3dCom_ = nullptr;
 
     Vector3 basePosition_{ 0.0f, 0.0f, 0.0f };      // ステージ上の基本配置座標
@@ -100,8 +101,10 @@ private:
     Vector3 scale_{ 1.5f, 1.5f, 1.5f };
     float currentAngle_ = 0.0f;                      // 現在の自転角度 (rad)
     float spinSpeed_ = 2.5f;                         // 自転速度 (rad/s)
+    Matrix4x4 currentWorldMatrix_{};                 // 現在のワールド変換行列
+    Matrix4x4 currentInvWorldMatrix_{};              // ワールド変換の逆行列
 
-    // 自動検出されたプロペラ精密寸法 (モデル空間寸法)
+    // 自動検出されたプロペラ寸法 (情報表示用)
     float detectedRadius_ = 1.0f;
     float detectedHubRadius_ = 0.24f;
     float detectedHubCenterY_ = 0.26f;
@@ -111,8 +114,6 @@ private:
     float detectedWingCenterY_ = 0.42f;
     int detectedWingCount_ = 4;
 
-    // 動的に自動生成される羽根コライダー群 (ヒープ固定でポインタ参照の安全性を保証)
-    std::vector<std::unique_ptr<Wing>> wings_;
-
     bool isInitialized_ = false;
 };
+

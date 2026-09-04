@@ -4,7 +4,7 @@
 #include "Matrix4x4.h"
 #include "RenderContext.h"
 #include "Baziru3_Engine/Graphics/3D/Object/Object3d.h"
-#include "Baziru3_Engine/Framework/Collision/SphereCollider.h"
+#include "Baziru3_Engine/Framework/Collision/MeshCollider.h"
 #include "Application/Player/PikminPlayer.h" // SlimeParamsCPU
 #include "Application/GameObject/SlimePhysics.h"
 #include <memory>
@@ -70,7 +70,9 @@ public:
     void SetFriction(float f) { SlimePhysics::SetFriction(f); }
 
     // コライダーの取得
-    SphereCollider* GetCollider() const { return collider_.get(); }
+    MeshCollider* GetCollider() const { return meshCollider_.get(); }
+    MeshCollider* GetMeshCollider() const { return meshCollider_.get(); }
+    Object3d* GetModel() const { return object3d_.get(); }
 
     // 衝突時の弾性リアクション
     void OnCollision(const CollisionInfo& info);
@@ -118,6 +120,6 @@ private:
     float obstacleCooldown_ = 0.0f; // 障害物（プロペラ等）の多重衝突防止クールダウン
     float mergeCooldown_ = 0.0f;    // 分裂直後の再合体防止クールダウンタイマー
 
-    // 当たり判定
-    std::unique_ptr<SphereCollider> collider_;
+    // メッシュ当たり判定
+    std::unique_ptr<MeshCollider> meshCollider_;
 };

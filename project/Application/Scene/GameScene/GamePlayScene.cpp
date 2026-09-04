@@ -277,13 +277,73 @@ void GamePlayScene::Update()
     // ミニオンマネージャーの更新（ステージ傾斜を伝達）
     if (minionManager_ && player_)
     {
-        minionManager_->Update(deltaTime, player_->GetPosition(), player_->IsMerged(), player_->GetCurrentScale(), currentTilt_, player_->GetSlimeParams().squashStretch, player_->GetVelocity());
+        auto mergeResult = minionManager_->Update(deltaTime, player_->GetPosition(), player_->IsMerged(),
+                                                 player_->GetCurrentScale(), currentTilt_,
+                                                 player_->GetSlimeParams().squashStretch,
+                                                 player_->GetVelocity(), player_->GetSize());
+        if (mergeResult.playerPromoted)
+        {
+            player_->SetPosition(mergeResult.promotedPos);
+            player_->SetSize(mergeResult.promotedSize);
+            player_->GetSlimeParams().impulseStrength = 0.55f;
+            player_->GetSlimeParams().squashStretch = { 0.25f, -0.20f, 0.25f };
+        }
     }
+
 
     // 回転プロペラ障害物の更新（自転とステージ傾斜の追従）
     for (auto& prop : propellerObstacles_)
     {
         if (prop) prop->Update(deltaTime, currentTilt_, playerPivot);
+    }
+
+    // プロペラ障害物メッシュとスライム（プレイヤーおよび全ミニオン）の精密メッシュ衝突解決
+    for (auto& prop : propellerObstacles_)
+    {
+        if (!prop) continue;
+
+        // プレイヤーとの精密メッシュ衝突
+        if (player_)
+        {
+            Vector3 pPos = player_->GetPosition();
+            Vector3 pVel = player_->GetVelocity();
+            float pRadius = player_->GetCurrentScale() * 0.78f;
+            Vector3 squash = player_->GetSlimeParams().squashStretch;
+            float impulse = 0.0f;
+
+            if (prop->ResolveSlimeCollision(pPos, pVel, pRadius, player_->IsMerged(), squash, impulse))
+            {
+                player_->SetPosition(pPos);
+                player_->SetVelocity(pVel);
+                player_->GetSlimeParams().squashStretch = squash;
+                player_->GetSlimeParams().impulseStrength = (std::max)(player_->GetSlimeParams().impulseStrength, impulse);
+            }
+        }
+
+        // 各ミニオンとの精密メッシュ衝突
+        if (minionManager_)
+        {
+            for (auto& minion : minionManager_->GetMinions())
+            {
+                if (!minion || !minion->IsActive()) continue;
+
+                Vector3 mPos = minion->GetPosition();
+                Vector3 mVel = minion->GetVelocity();
+                float mRadius = minion->GetRadius();
+                Vector3 squash = minion->GetSlimeParams().squashStretch;
+                float impulse = 0.0f;
+
+                if (prop->ResolveSlimeCollision(mPos, mVel, mRadius, false, squash, impulse))
+                {
+                    mPos.y = SlimePhysics::CalculateGroundedCenterY(mPos.x, mPos.z, currentTilt_, 0.22f, playerPivot);
+                    minion->SetPosition(mPos);
+                    minion->SetVelocity(mVel);
+                    minion->SetState(MinionState::Thrown);
+                    minion->GetSlimeParams().squashStretch = squash;
+                    minion->GetSlimeParams().impulseStrength = (std::max)(minion->GetSlimeParams().impulseStrength, impulse);
+                }
+            }
+        }
     }
 
     // 衝突判定と押し出しの更新
@@ -430,33 +490,10 @@ void GamePlayScene::Draw(SceneRenderRequests& renderRequests)
 void GamePlayScene::DrawDebugUI()
 {
 #ifdef USE_IMGUI
-    // コライダーのデバッグワイヤーフレーム描画
+    // コライダーのデバッグワイヤーフレーム描画（エンジン標準の MeshCollider ワイヤーフレーム描画）
     if (playCamera_)
     {
-        // スライムはアプリ層の Multi-Sphere で正確にデバッグ描画するため、
-        // エンジン側の単一球ワイヤーフレームの重複描画を一時的にスキップ
-        if (player_ && player_->GetCollider()) player_->GetCollider()->SetIsEnabled(false);
-        if (minionManager_) {
-            for (const auto& m : minionManager_->GetMinions()) {
-                if (m && m->GetCollider()) m->GetCollider()->SetIsEnabled(false);
-            }
-        }
-
         CollisionManager::GetInstance()->DrawDebug(playCamera_.get());
-
-        if (player_ && player_->GetCollider()) player_->GetCollider()->SetIsEnabled(true);
-        if (minionManager_) {
-            for (const auto& m : minionManager_->GetMinions()) {
-                if (m && m->GetCollider()) m->GetCollider()->SetIsEnabled(true);
-            }
-        }
-
-        // アプリ層の Multi-Sphere ワイヤーフレームを描画（F1キーのデバッグ表示トグルと完全連動）
-        if (CollisionManager::GetInstance()->IsShowDebugColliders())
-        {
-            if (minionManager_) minionManager_->DrawDebug(playCamera_.get());
-            if (player_) player_->DrawDebug(playCamera_.get());
-        }
     }
 
     ImGui::SetNextWindowPos(ImVec2(20, 20), ImGuiCond_FirstUseEver);
@@ -484,6 +521,7 @@ void GamePlayScene::DrawDebugUI()
         int activeCount = minionManager_->GetActiveCount();
 
         int currentSize = player_->GetSize();
+        int maxMinionSize = minionManager_->GetMaxMinionSize();
         const char* tierLabel = "小 (1-2) [青]";
         ImVec4 tierColor = ImVec4(0.35f, 0.70f, 1.0f, 1.0f);
         if (currentSize >= 8) {
@@ -494,10 +532,17 @@ void GamePlayScene::DrawDebugUI()
             tierColor = ImVec4(1.0f, 0.90f, 0.2f, 1.0f);
         }
 
-        ImGui::TextColored(tierColor, "Loco Size: %d / %d  Category: %s  (Scale: %.2f)",
+        ImGui::TextColored(tierColor, "Main Loco Size: %d / %d  Category: %s  (Scale: %.2f)",
                            currentSize, totalCount + 1, tierLabel, player_->GetCurrentScale());
+        if (activeCount > 0) {
+            ImGui::TextColored(ImVec4(0.5f, 0.85f, 1.0f, 1.0f), "Friends in Field: %d active | Max Friend Size: %d",
+                               activeCount, maxMinionSize);
+        } else {
+            ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.2f, 1.0f), "All Friends Merged into One!");
+        }
 
         if (ImGui::Button("SPLIT (全員分裂: E key)", ImVec2(280, 36)))
+
         {
             if (minionManager_->GetMergedCount() > 0) {
                 minionManager_->TriggerSplit(player_->GetPosition());

@@ -253,8 +253,8 @@ void MinionManager::SetInitialAbsorbedCount(int absorbedCount) {
     isAllMerged_ = (absorbedCount >= total);
 }
 
-int MinionManager::CheckAndResolveMerge(const Vector3& playerPos, float playerScale) {
-    int newlyMerged = 0;
+MinionManager::MergeResult MinionManager::CheckAndResolveMerge(const Vector3& playerPos, float playerScale, int playerSize) {
+    MergeResult result;
 
     // 1. プレイヤーとミニオンの接触合体判定（水平面XZ距離で判定）
     float playerRadius = playerScale * 0.78f;
@@ -267,13 +267,13 @@ int MinionManager::CheckAndResolveMerge(const Vector3& playerPos, float playerSc
         float dz = mPos.z - playerPos.z;
         float distSq = dx * dx + dz * dz;
 
-        // スライムの扁平変形や接近吸い寄せを考慮し、十分な余裕マージン(+0.45m)を付与
-        float mergeDist = playerRadius + minion->GetRadius() + 0.45f;
+        // スライムの扁平変形や接近吸い寄せを考慮し、十分な余裕マージン(+0.50m)を付与
+        float mergeDist = playerRadius + minion->GetRadius() + 0.50f;
         if (distSq <= mergeDist * mergeDist) {
             // プレイヤーに合体！
             int mSize = minion->GetSize();
             absorbedCount_ += mSize;
-            newlyMerged += mSize;
+            result.newlyMergedCount += mSize;
             minion->SetActive(false);
         }
     }
@@ -292,15 +292,29 @@ int MinionManager::CheckAndResolveMerge(const Vector3& playerPos, float playerSc
             float dz = posA.z - posB.z;
             float distSq = dx * dx + dz * dz;
 
-            float mergeDist = minions_[i]->GetRadius() + minions_[j]->GetRadius() + 0.35f;
+            float mergeDist = minions_[i]->GetRadius() + minions_[j]->GetRadius() + 0.50f;
             if (distSq <= mergeDist * mergeDist) {
-                // ミニオンjをミニオンiに合体！
                 int combinedSize = minions_[i]->GetSize() + minions_[j]->GetSize();
-                minions_[i]->SetSize(combinedSize);
-                minions_[i]->GetSlimeParams().impulseStrength = 0.40f; // ポヨン！と合体弾性
+                Vector3 mergeCenter = { (posA.x + posB.x) * 0.5f, (posA.y + posB.y) * 0.5f, (posA.z + posB.z) * 0.5f };
 
-                // ミニオンjを非アクティブ化
-                minions_[j]->SetActive(false);
+                if (playerSize <= 1 && !result.playerPromoted) {
+                    // プレイヤーが分裂後の最小サイズ(1)のとき、最初に触れ合った仲間同士の接触点に
+                    // プレイヤー本体を昇格・合体出現させる（ロコロコ本家の完全対等システム）
+                    result.playerPromoted = true;
+                    result.promotedPos = mergeCenter;
+                    result.promotedSize = combinedSize;
+                    absorbedCount_ += (combinedSize - 1);
+                    result.newlyMergedCount += (combinedSize - 1);
+
+                    minions_[i]->SetActive(false);
+                    minions_[j]->SetActive(false);
+                } else {
+                    // すでにプレイヤーがある程度育っている場合は、仲間iに仲間jを合体させてサイズ成長
+                    minions_[i]->SetPosition(mergeCenter);
+                    minions_[i]->SetSize(combinedSize);
+                    minions_[i]->GetSlimeParams().impulseStrength = 0.50f; // ポヨン！と合体弾性
+                    minions_[j]->SetActive(false);
+                }
             }
         }
     }
@@ -316,8 +330,9 @@ int MinionManager::CheckAndResolveMerge(const Vector3& playerPos, float playerSc
     isAllMerged_ = allInactive;
     isMergedState_ = (absorbedCount_ > 0);
 
-    return newlyMerged;
+    return result;
 }
+
 
 
 void MinionManager::GetGroupCenterAndSpread(const Vector3& playerPos, Vector3& outCenter, float& outSpread) const {
@@ -381,9 +396,9 @@ bool MinionManager::ThrowMinionWithVelocity(const Vector3& launchPos, const Vect
     return false;
 }
 
-void MinionManager::Update(float deltaTime, const Vector3& playerPos, bool isMerged, float playerScale, const Vector2& stageTilt, const Vector3& playerSquash, const Vector3& playerVelocity) {
+MinionManager::MergeResult MinionManager::Update(float deltaTime, const Vector3& playerPos, bool isMerged, float playerScale, const Vector2& stageTilt, const Vector3& playerSquash, const Vector3& playerVelocity, int playerSize) {
     // 接触による自然合体判定の実行
-    CheckAndResolveMerge(playerPos, playerScale);
+    MergeResult mergeResult = CheckAndResolveMerge(playerPos, playerScale, playerSize);
 
     Vector2 pivot = { playerPos.x, playerPos.z };
 
@@ -404,7 +419,20 @@ void MinionManager::Update(float deltaTime, const Vector3& playerPos, bool isMer
         ResolvePlayerSeparation(playerPos, playerVelocity, playerScaleVec, playerSquash, rot, stageTilt, pivot);
         ResolveSeparation(rot, stageTilt, pivot);
     }
+
+    return mergeResult;
 }
+
+int MinionManager::GetMaxMinionSize() const {
+    int maxS = 0;
+    for (const auto& minion : minions_) {
+        if (minion && minion->IsActive()) {
+            maxS = (std::max)(maxS, minion->GetSize());
+        }
+    }
+    return maxS;
+}
+
 
 void MinionManager::Draw(const RenderContext& ctx) {
     for (auto& minion : minions_) {

@@ -18,8 +18,8 @@ Minion::Minion() {
 }
 
 Minion::~Minion() {
-    if (collider_) {
-        CollisionManager::GetInstance()->UnregisterCollider(collider_.get());
+    if (meshCollider_) {
+        CollisionManager::GetInstance()->UnregisterCollider(meshCollider_.get());
     }
 }
 
@@ -56,12 +56,12 @@ void Minion::Initialize(Object3dCom* object3dCom, Camera* camera, const Vector3&
     slimeParams_.specularShininess = 48.0f;
 
 
-    // ミニオン単体の当たり判定（SphereCollider）を生成・登録 (属性: Minion)
-    collider_ = std::make_unique<SphereCollider>(radius_, &position_, CollisionAttribute::Minion);
-    collider_->SetOnCollision([this](const CollisionInfo& info) {
+    // ミニオン単体の当たり判定（MeshCollider: スライムモデルの精密メッシュ判定）
+    meshCollider_ = std::make_unique<MeshCollider>(object3d_.get(), CollisionAttribute::Minion);
+    meshCollider_->SetOnCollision([this](const CollisionInfo& info) {
         OnCollision(info);
     });
-    CollisionManager::GetInstance()->RegisterCollider(collider_.get());
+    CollisionManager::GetInstance()->RegisterCollider(meshCollider_.get());
 }
 
 void Minion::OnCollision(const CollisionInfo& info) {
@@ -132,8 +132,8 @@ void Minion::OnCollision(const CollisionInfo& info) {
 
 void Minion::SetActive(bool active) {
     isActive_ = active;
-    if (collider_) {
-        collider_->SetIsEnabled(active && state_ != MinionState::Merging);
+    if (meshCollider_) {
+        meshCollider_->SetIsEnabled(active && state_ != MinionState::Merging);
     }
 }
 
@@ -149,9 +149,9 @@ void Minion::Launch(const Vector3& velocity) {
     velocity_ = velocity;
     state_ = MinionState::Thrown;
     bounceTimer_ = 0.0f;
-    scale_ = { 0.35f, 0.35f, 0.35f }; // スケールを通常サイズに確実に復帰
 
     // 投げ飛ばし時のスクワッシュ（進行方向にびよーんと引き伸ばし）
+
     slimeParams_.impulseStrength = 0.28f;
     slimeParams_.squashStretch = { 0.05f, 0.22f, 0.05f };
 }
@@ -168,16 +168,15 @@ void Minion::AttractTo(const Vector3& attractCenter, float attractSpeed) {
 
 void Minion::Update(float deltaTime, const Vector2& stageTilt, const Vector2& pivot) {
     if (!isActive_) {
-        if (collider_) {
-            collider_->SetIsEnabled(false);
+        if (meshCollider_) {
+            meshCollider_->SetIsEnabled(false);
         }
         return;
     }
 
-    if (collider_) {
+    if (meshCollider_) {
         bool isColliderActive = isActive_ && (state_ != MinionState::Merging);
-        collider_->SetIsEnabled(isColliderActive);
-        collider_->SetRadius(radius_);
+        meshCollider_->SetIsEnabled(isColliderActive);
     }
 
     bounceTimer_ += deltaTime;
@@ -257,9 +256,6 @@ void Minion::Update(float deltaTime, const Vector2& stageTilt, const Vector2& pi
         position_.y += velocity_.y * deltaTime;
         position_.z += velocity_.z * deltaTime;
 
-        // 飛翔中も通常スケールを維持
-        scale_ = { 0.35f, 0.35f, 0.35f };
-
         // 空中での姿勢（板の傾きは受けず、進行方向を向く）
         rotation_.x = 0.0f;
         rotation_.z = 0.0f;
@@ -301,9 +297,9 @@ void Minion::Update(float deltaTime, const Vector2& stageTilt, const Vector2& pi
 
     case MinionState::Idle: {
         position_.y = SlimePhysics::CalculateGroundedCenterY(position_.x, position_.z, stageTilt, groundY_, pivot);
-        scale_ = { 0.35f, 0.35f, 0.35f };
         break;
     }
+
 
     case MinionState::Carrying: {
         break;
@@ -328,6 +324,10 @@ void Minion::Update(float deltaTime, const Vector2& stageTilt, const Vector2& pi
         object3d_->SetRotate(rotation_);
         object3d_->SetScale(scale_);
         object3d_->Update();
+    }
+    if (meshCollider_) {
+        meshCollider_->SetWorldPosition(position_);
+        meshCollider_->Update();
     }
 }
 
@@ -437,12 +437,13 @@ void Minion::SetSize(int s) {
     scale_ = { sVal, sVal, sVal };
     radius_ = sVal * 0.78f;
     groundY_ = sVal * 0.73f;
-    slimeParams_.baseColor = SlimePhysics::GetColorBySize(size_);
-    if (collider_) {
-        collider_->SetRadius(radius_);
-    }
     if (object3d_) {
         object3d_->SetScale(scale_);
+        object3d_->Update();
+    }
+    if (meshCollider_) {
+        meshCollider_->SetWorldPosition(position_);
+        meshCollider_->Update();
     }
 }
 
