@@ -92,15 +92,16 @@ private:
     bool isActive_ = true;
     float radius_ = 0.3f;
     float tiltAccel_ = 35.0f;
-    float friction_ = 2.8f;
+    float friction_ = 1.6f;        // 小さいの (ミニオン): 1.6
     float gravity_ = -24.0f;
-    float groundY_ = 0.22f;
+    float groundY_ = 0.25f;
 
     // スライム固有
     SlimeParamsCPU slimeParams_;
     float totalTime_ = 0.0f;
     float bounceTimer_ = 0.0f;
     Vector3 prevVelocity_{ 0.0f, 0.0f, 0.0f };
+    float obstacleCooldown_ = 0.0f; // 障害物（プロペラ等）の多重衝突防止クールダウン
 
     // 当たり判定
     std::unique_ptr<SphereCollider> collider_;

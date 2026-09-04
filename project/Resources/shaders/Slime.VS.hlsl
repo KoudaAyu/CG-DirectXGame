@@ -59,27 +59,31 @@ float3 CalculateDeformedPosition(float3 p, float3 n)
     float wobbleStr = gSlimeParams.wobbleStrength;
     float wobbleFreq = gSlimeParams.wobbleFrequency;
 
-    // 1. ぶよぶよ波打ち変形（マルチ周波数サイン波 + 3Dノイズ）
-    float wave1 = sin(p.x * wobbleFreq + time * 3.5f) *
-                  cos(p.z * wobbleFreq * 0.8f + time * 2.7f);
-    float wave2 = sin(p.y * wobbleFreq * 1.3f + time * 4.2f) *
-                  cos(p.x * wobbleFreq * 0.6f + time * 1.8f);
-    float wave3 = noise3D(p * wobbleFreq * 0.5f + time * 1.5f) * 2.0f - 1.0f;
+    // 表面の動的波打ち変形（静止時は wobbleStr が 0 になるため完全停止）
+    float wobbleOffset = 0.0f;
+    if (wobbleStr > 0.001f)
+    {
+        float wave1 = sin(p.x * wobbleFreq + time * 3.5f) *
+                      cos(p.z * wobbleFreq * 0.8f + time * 2.7f);
+        float wave2 = sin(p.y * wobbleFreq * 1.3f + time * 4.2f) *
+                      cos(p.x * wobbleFreq * 0.6f + time * 1.8f);
+        float wave3 = noise3D(p * wobbleFreq * 0.5f + time * 1.5f) * 2.0f - 1.0f;
 
-    float wobbleOffset = (wave1 * 0.45f + wave2 * 0.35f + wave3 * 0.20f) * wobbleStr;
+        wobbleOffset = (wave1 * 0.45f + wave2 * 0.35f + wave3 * 0.20f) * wobbleStr;
+    }
 
-    // 1. 洋梨・富士山・お餅型 下膨らみ変形（Gravity Sag: 下のほうが圧倒的に大きくどっしり広がる）
-    // y が高いほど細く（最上部: ~0.72）、y が低いほど横に超ワイド（最下部: ~2.3倍）に広がる
+    // 1. スライムらしい座りの良い下膨らみ変形（ほどよく平べったく、底面に向かってどっしり安定）
+    // 最上部は低めで丸く（~0.86）、底面に向かってほどよくワイド（~1.53倍）に広がる
     float heightRatio = saturate((1.0f - p.y) * 0.5f); // 0.0(最上部) -> 1.0(最下部)
-    float sagFactor = 0.72f + heightRatio * 0.65f + (heightRatio * heightRatio) * 0.95f;
+    float sagFactor = 0.86f + heightRatio * 0.35f + (heightRatio * heightRatio) * 0.32f;
 
     float3 def = p;
     def.x *= sagFactor;
     def.z *= sagFactor;
-    // 重力による全体の沈み込み（高さを圧縮してお餅のようにどっしり座らせる）
-    def.y = p.y * 0.72f - 0.16f;
+    // 重力による適度な上下圧縮（ほどよく平べったいスライムの厚み）
+    def.y = p.y * 0.84f - 0.08f;
 
-    // 2. 傾斜・重力による内容物の流動と偏り（Fluid Mass Shift: 傾けた下り坂側がさらに巨大に広がる）
+    // 2. 傾斜・重力による内容物の流動（過度な崩れを抑えつつ、ぷにっと偏る）
     float3 squash = gSlimeParams.squashStretch;
     float2 flowVec = float2(squash.x, squash.z);
     float flowMag = length(flowVec);
@@ -87,33 +91,28 @@ float3 CalculateDeformedPosition(float3 p, float3 n)
     if (flowMag > 0.001f)
     {
         float2 flowDir = flowVec / flowMag;
-        // 頂点の傾斜方向成分（+1: 傾斜の下側・前, -1: 傾斜の上側・後ろ）
         float forwardDot = dot(p.xz, flowDir);
-        // 下部ほど、かつ傾斜下側ほど、ドサッと大きく水が溜まる
-        float bottomWeight = saturate((1.3f - p.y) * 0.70f);
-        float frontBias = 1.0f + forwardDot * 0.90f;
+        float bottomWeight = saturate((1.2f - p.y) * 0.65f);
+        float frontBias = 1.0f + forwardDot * 0.70f;
 
-        // 傾斜下側への重心移動と大膨らみ
-        float shiftDist = flowMag * bottomWeight * frontBias * 0.90f;
+        // 傾斜下側への自然な重心移動
+        float shiftDist = flowMag * bottomWeight * frontBias * 0.55f;
         def.x += flowDir.x * shiftDist;
         def.z += flowDir.y * shiftDist;
 
-        // 傾斜下側（前）に水が溜まってプックリ巨大に膨らみ、反対側（後ろ）は萎む
         if (forwardDot > -0.2f)
         {
-            float bulge = saturate(forwardDot + 0.2f) * flowMag * 0.60f * bottomWeight;
+            float bulge = saturate(forwardDot + 0.2f) * flowMag * 0.38f * bottomWeight;
             def.x += flowDir.x * bulge;
             def.z += flowDir.y * bulge;
-            // 横（側方）にも水が溜まってプクッと広がる
             float2 sideDir = float2(-flowDir.y, flowDir.x);
-            def.xz += sideDir * (dot(p.xz, sideDir) * bulge * 0.8f);
+            def.xz += sideDir * (dot(p.xz, sideDir) * bulge * 0.45f);
         }
         else
         {
-            // 後ろ側は中身が抜けてペタンコに萎む
-            float shrink = saturate(-forwardDot - 0.2f) * flowMag * 0.45f;
+            float shrink = saturate(-forwardDot - 0.2f) * flowMag * 0.28f;
             def.xz -= flowDir * shrink;
-            def.y *= (1.0f - shrink * 0.40f);
+            def.y *= (1.0f - shrink * 0.20f);
         }
     }
 
@@ -128,13 +127,13 @@ float3 CalculateDeformedPosition(float3 p, float3 n)
     def.x *= volumeCompXZ;
     def.z *= volumeCompXZ;
 
-    // 4. 底面の絶対接地平坦化（Ground Flattening: 床に沿って底面が広くペタッと完全密着）
-    if (def.y < -0.42f)
+    // 4. 底面の接地平坦化（Ground Flattening: 床に密着してペタッと広がる）
+    if (def.y < -0.52f)
     {
-        float flattenRate = saturate((-0.42f - def.y) / 0.45f);
-        def.y = lerp(def.y, -0.65f, flattenRate * 0.92f);
-        def.x *= (1.0f + flattenRate * 0.40f);
-        def.z *= (1.0f + flattenRate * 0.40f);
+        float flattenRate = saturate((-0.52f - def.y) / 0.38f);
+        def.y = lerp(def.y, -0.74f, flattenRate * 0.88f);
+        def.x *= (1.0f + flattenRate * 0.16f);
+        def.z *= (1.0f + flattenRate * 0.16f);
     }
 
     // 法線方向へ膨らませる

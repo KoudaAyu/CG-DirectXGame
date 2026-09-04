@@ -71,6 +71,7 @@
     <ClCompile Include="Application\Framework.cpp" />
     <ClCompile Include="Application\GameObject\Bullet.cpp" />
     <ClCompile Include="Application\Obstacle.cpp" />
+    <ClCompile Include="Application\GameObject\PropellerObstacle.cpp" />
     <ClCompile Include="Application\LevelEditor.cpp" />
     <ClCompile Include="Application\Particle\AppParticleManager.cpp" />
     <ClCompile Include="Application\Player\Player.cpp" />
@@ -376,6 +377,7 @@
     <ClInclude Include="Application\GameObject\SlimeMesh.h" />
     <ClInclude Include="Application\GameObject\AimGuide.h" />
     <ClInclude Include="Application\GameObject\SlimeCollision.h" />
+    <ClInclude Include="Application\GameObject\PropellerObstacle.h" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="externals\DirectXTex\DirectXTex_Desktop_2022_Win10.vcxproj">

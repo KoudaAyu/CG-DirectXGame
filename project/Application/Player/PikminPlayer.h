@@ -47,6 +47,8 @@ public:
     void SetTiltAccel(float a) { tiltAccel_ = a; }
     float GetFriction() const { return friction_; }
     void SetFriction(float f) { friction_ = f; }
+    float GetMergedFriction() const { return mergedFriction_; }
+    void SetMergedFriction(float f) { mergedFriction_ = f; }
 
     // スライムパラメータの公開（ImGui調整用）
     SlimeParamsCPU& GetSlimeParams() { return slimeParams_; }
@@ -88,7 +90,8 @@ private:
 
     // パラメータ
     float tiltAccel_ = 38.0f;
-    float friction_ = 2.6f;
+    float friction_ = 1.3f;        // デフォルト (通常サイズ): 1.3
+    float mergedFriction_ = 2.0f;  // でかいの (合体時): 2.0
     float rotationSpeed_ = 12.0f;
 
     // 投擲クールダウン
@@ -104,6 +107,7 @@ private:
     SlimeParamsCPU slimeParams_;
     float totalTime_ = 0.0f;         // シェーダーに渡す累積時間
     Vector3 prevVelocity_{ 0.0f, 0.0f, 0.0f }; // スクワッシュ計算用の前フレーム速度
+    float obstacleCooldown_ = 0.0f;  // 障害物（プロペラ等）の多重衝突防止クールダウン
 
     // 合体時の当たり判定
     std::unique_ptr<SphereCollider> collider_;

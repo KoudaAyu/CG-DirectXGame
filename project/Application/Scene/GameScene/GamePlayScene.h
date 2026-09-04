@@ -8,6 +8,7 @@
 #include "Application/Player/PikminPlayer.h"
 #include "Application/Minion/MinionManager.h"
 #include "Application/GameObject/AimGuide.h"
+#include "Application/GameObject/PropellerObstacle.h"
 #include "Baziru3_Engine/Graphics/3D/Object/Object3d.h"
 
 #include <memory>
@@ -39,6 +40,7 @@ private:
     std::unique_ptr<PikminPlayer> player_;
     std::unique_ptr<MinionManager> minionManager_;
     std::unique_ptr<AimGuide> aimGuide_;
+    std::vector<std::unique_ptr<PropellerObstacle>> propellerObstacles_;
 
     std::unique_ptr<Object3d> groundPlane_;
     Object3d::ModelData groundModelData_;

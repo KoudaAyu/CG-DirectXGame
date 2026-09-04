@@ -37,19 +37,19 @@ namespace SlimePhysics
             float speedMag = std::sqrt(input.velocity.x * input.velocity.x + input.velocity.z * input.velocity.z);
             float tiltMag = std::sqrt(input.stageTilt.x * input.stageTilt.x + input.stageTilt.y * input.stageTilt.y);
 
-            // 1. 板の傾斜による下り坂方向への内容物移動ベクトル（質量・合体状態に応じて増加）
-            float tiltFlowFactor = input.isMerged ? 2.2f : (1.6f * input.massScale);
-            float targetFlowX = std::sin(input.stageTilt.y) * tiltFlowFactor + input.velocity.x * 0.02f;
-            float targetFlowZ = std::sin(input.stageTilt.x) * tiltFlowFactor + input.velocity.z * 0.02f;
+            // 1. 板の傾斜による下り坂方向への内容物移動ベクトル（もっこり感を保つため適度に調整）
+            float tiltFlowFactor = input.isMerged ? 0.9f : (0.65f * input.massScale);
+            float targetFlowX = std::sin(input.stageTilt.y) * tiltFlowFactor + input.velocity.x * 0.012f;
+            float targetFlowZ = std::sin(input.stageTilt.x) * tiltFlowFactor + input.velocity.z * 0.012f;
 
-            // 2. 接地重力および傾斜による上下の強い平坦化（傾けるほど平たく潰れる）
-            float sag = input.isMerged ? -0.22f : -0.16f;
-            float targetSquashY = sag - (std::min)(tiltMag * 0.45f + speedMag * 0.02f, 0.35f);
+            // 2. 接地重力および傾斜による上下の潰れ（ほどよく平べったい弾力スクワッシュ）
+            float sag = input.isMerged ? -0.12f : -0.09f;
+            float targetSquashY = sag - (std::min)(tiltMag * 0.22f + speedMag * 0.015f, 0.18f);
 
             // 3. スムーズスプリング補間（流動と潰れの追従）
-            params.squashStretch.x += (targetFlowX - params.squashStretch.x) * (std::min)(1.0f, dt * 12.0f);
-            params.squashStretch.z += (targetFlowZ - params.squashStretch.z) * (std::min)(1.0f, dt * 12.0f);
-            params.squashStretch.y += (targetSquashY - params.squashStretch.y) * (std::min)(1.0f, dt * 12.0f);
+            params.squashStretch.x += (targetFlowX - params.squashStretch.x) * (std::min)(1.0f, dt * 10.0f);
+            params.squashStretch.z += (targetFlowZ - params.squashStretch.z) * (std::min)(1.0f, dt * 10.0f);
+            params.squashStretch.y += (targetSquashY - params.squashStretch.y) * (std::min)(1.0f, dt * 10.0f);
         }
         else
         {
@@ -63,5 +63,15 @@ namespace SlimePhysics
             params.squashStretch.z += (targetFlowZ - params.squashStretch.z) * (std::min)(1.0f, dt * 12.0f);
             params.squashStretch.y += (targetSquashY - params.squashStretch.y) * (std::min)(1.0f, dt * 12.0f);
         }
+
+        // 4. 移動速度および衝撃に連動した表面波打ち強度（静止時は完全にゼロにして不要な波打ちを停止）
+        float totalSpeed = std::sqrt(input.velocity.x * input.velocity.x + input.velocity.y * input.velocity.y + input.velocity.z * input.velocity.z);
+        float targetWobble = 0.0f;
+        if (totalSpeed > 0.15f || params.impulseStrength > 0.02f)
+        {
+            targetWobble = (std::min)(0.20f, totalSpeed * 0.025f + params.impulseStrength * 0.5f);
+        }
+        params.wobbleStrength += (targetWobble - params.wobbleStrength) * (std::min)(1.0f, dt * 8.0f);
+        if (params.wobbleStrength < 0.001f) params.wobbleStrength = 0.0f;
     }
 }

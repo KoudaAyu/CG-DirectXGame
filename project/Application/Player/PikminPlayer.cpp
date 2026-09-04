@@ -74,7 +74,7 @@ void PikminPlayer::Initialize(Object3dCom* object3dCom, Camera* camera, const Ve
 
     // スライムパラメータの初期設定（ゼリー感のあるぷるぷるスライム）
     slimeParams_.baseColor = { 0.2f, 0.85f, 1.0f, 0.9f }; // 水色スライム
-    slimeParams_.wobbleStrength = 0.22f;
+    slimeParams_.wobbleStrength = 0.0f;
     slimeParams_.wobbleFrequency = 5.0f;
     slimeParams_.fresnelPower = 2.5f;
     slimeParams_.envReflection = 0.5f;
@@ -90,10 +90,59 @@ void PikminPlayer::Initialize(Object3dCom* object3dCom, Camera* camera, const Ve
 }
 
 void PikminPlayer::OnCollision(const CollisionInfo& info) {
-    // 高速衝突時のみ控えめに衝撃波紋を付与（形状は急変させない）
+    if (info.other && info.other->GetAttribute() == CollisionAttribute::Obstacle) {
+        // 同一フレーム内の多重衝突および連続ヒットを防止（中心部での振動・多重加速を防止）
+        if (obstacleCooldown_ > 0.0f) return;
+
+        // 障害物（プロペラなど）の基準位置（回転中心）を正確に取得
+        Vector3 obstacleBasePos = info.other->GetWorldPosition() - info.other->GetPositionOffset();
+
+        // プロペラ中心からプレイヤーへ向かう動径ベクトル（水平面）
+        Vector3 radial = { position_.x - obstacleBasePos.x, 0.0f, position_.z - obstacleBasePos.z };
+        float rLen = std::sqrt(radial.x * radial.x + radial.z * radial.z);
+
+        Vector3 escapeDir{ 0.0f, 0.0f, 0.0f };
+
+        if (rLen > 0.2f) {
+            // 外向き動径方向へ弾き出す
+            escapeDir = { radial.x / rLen, 0.0f, radial.z / rLen };
+        } else {
+            // プロペラ回転中心へのド直撃（特異点）の場合:
+            // 進行方向の逆向き（跳ね返り反射ベクトル）を優先採用
+            Vector3 incoming = { -velocity_.x, 0.0f, -velocity_.z };
+            float incSpeed = std::sqrt(incoming.x * incoming.x + incoming.z * incoming.z);
+            if (incSpeed > 0.1f) {
+                escapeDir = { incoming.x / incSpeed, 0.0f, incoming.z / incSpeed };
+            } else if (rLen > 1e-4f) {
+                escapeDir = { radial.x / rLen, 0.0f, radial.z / rLen };
+            } else {
+                escapeDir = { 0.0f, 0.0f, -1.0f };
+            }
+        }
+
+        // 1. めり込みの強制解消（エンジン側の押し出しに加えて、外向きへ安全マージンを補正）
+        if (info.depth > 0.01f) {
+            position_.x += escapeDir.x * (info.depth * 0.5f);
+            position_.z += escapeDir.z * (info.depth * 0.5f);
+        }
+
+        // 2. 外向き脱出初速の付与（プロペラから勢いよく弾き出される慣性）
+        float launchSpeed = isMerged_ ? 6.5f : 8.5f;
+        velocity_.x = escapeDir.x * launchSpeed;
+        velocity_.z = escapeDir.z * launchSpeed;
+
+        // クールダウン設定（0.12秒間、重複ヒットを無効化）
+        obstacleCooldown_ = 0.12f;
+
+        // 衝突時のスライム変形（衝撃波紋とスクワッシュ）
+        slimeParams_.impulseStrength = (std::max)(slimeParams_.impulseStrength, 0.4f);
+        slimeParams_.squashStretch = { 0.25f, -0.2f, 0.25f };
+    }
+
+    // 高速衝突時の衝撃波紋
     float impactSpeed = std::sqrt(velocity_.x * velocity_.x + velocity_.z * velocity_.z);
-    if (impactSpeed > 2.5f) {
-        float strength = (std::min)(0.2f, impactSpeed * 0.02f);
+    if (impactSpeed > 1.5f) {
+        float strength = (std::min)(0.35f, impactSpeed * 0.03f);
         slimeParams_.impulseStrength = (std::max)(slimeParams_.impulseStrength, strength);
     }
 }
@@ -142,6 +191,9 @@ void PikminPlayer::SetMerged(bool merged) {
 
 void PikminPlayer::Update(float deltaTime, KeyInput* keyInput, MinionManager* minionManager, MouseInput* mouseInput, AimGuide* aimGuide, const Vector2& stageTilt) {
     throwCooldownTimer_ -= deltaTime;
+    if (obstacleCooldown_ > 0.0f) {
+        obstacleCooldown_ -= deltaTime;
+    }
     mergeScaleAnimation_ = (std::min)(1.0f, mergeScaleAnimation_ + deltaTime * 4.0f);
     totalTime_ += deltaTime;
 
@@ -181,8 +233,8 @@ void PikminPlayer::Update(float deltaTime, KeyInput* keyInput, MinionManager* mi
     velocity_.x += accelX * deltaTime;
     velocity_.z += accelZ * deltaTime;
 
-    // 地面摩擦によるスムーズ減速（合体時は慣性を大きくして滑らかに転がる）
-    float currentFriction = isMerged_ ? (friction_ * 0.7f) : friction_;
+    // 地面摩擦によるスムーズ減速（でかいのは2.0、通常は1.3）
+    float currentFriction = isMerged_ ? mergedFriction_ : friction_;
     float decay = 1.0f - (std::min)(1.0f, currentFriction * deltaTime);
     velocity_.x *= decay;
     velocity_.z *= decay;
@@ -232,7 +284,7 @@ void PikminPlayer::Update(float deltaTime, KeyInput* keyInput, MinionManager* mi
         slimeParams_.baseColor = { 1.0f, 0.8f, 0.2f, 0.92f };
 
         // 傾斜面の上に乗る（床に沿って底面がピタッと完全接地）
-        position_.y = SlimePhysics::CalculateGroundedCenterY(position_.x, position_.z, stageTilt, currentScale * 0.65f);
+        position_.y = SlimePhysics::CalculateGroundedCenterY(position_.x, position_.z, stageTilt, currentScale * 0.73f);
         if (collider_) {
             collider_->SetRadius(currentScale * 0.8f);
         }
@@ -251,7 +303,7 @@ void PikminPlayer::Update(float deltaTime, KeyInput* keyInput, MinionManager* mi
         // 通常時のスライムカラー（水色）
         slimeParams_.baseColor = { 0.2f, 0.85f, 1.0f, 0.9f };
 
-        position_.y = SlimePhysics::CalculateGroundedCenterY(position_.x, position_.z, stageTilt, scale_.x * 0.65f);
+        position_.y = SlimePhysics::CalculateGroundedCenterY(position_.x, position_.z, stageTilt, scale_.x * 0.73f);
         if (collider_) {
             collider_->SetRadius(0.8f);
         }

@@ -59,7 +59,7 @@ void Minion::Initialize(Object3dCom* object3dCom, Camera* camera, const Vector3&
         slimeParams_.baseColor = { 0.2f, 0.5f, 1.0f, 0.88f };  // 青スライム
         break;
     }
-    slimeParams_.wobbleStrength = 0.22f;
+    slimeParams_.wobbleStrength = 0.0f;
     slimeParams_.wobbleFrequency = 6.0f;
     slimeParams_.fresnelPower = 2.5f;
     slimeParams_.envReflection = 0.4f;
@@ -77,10 +77,65 @@ void Minion::Initialize(Object3dCom* object3dCom, Camera* camera, const Vector3&
 void Minion::OnCollision(const CollisionInfo& info) {
     if (!isActive_ || state_ == MinionState::Merging) return;
 
-    // 高速衝突時のみ控えめに衝撃波紋を付与（形状は急変させない）
+    if (info.other && info.other->GetAttribute() == CollisionAttribute::Obstacle) {
+        // 同一フレーム内の多重衝突および直後の連続ヒットを防止（中心部でのピンボール・振動を完全封殺）
+        if (obstacleCooldown_ > 0.0f) return;
+
+        // 障害物（プロペラなど）の基準位置（回転中心）を正確に取得
+        // BoxCollider の場合、GetWorldPosition() - GetPositionOffset() により中心のワールド座標を取得可能
+        Vector3 obstacleBasePos = info.other->GetWorldPosition() - info.other->GetPositionOffset();
+
+        // プロペラ中心からミニオンへ向かう動径ベクトル（水平面）
+        Vector3 radial = { position_.x - obstacleBasePos.x, 0.0f, position_.z - obstacleBasePos.z };
+        float rLen = std::sqrt(radial.x * radial.x + radial.z * radial.z);
+
+        Vector3 escapeDir{ 0.0f, 0.0f, 0.0f };
+
+        if (rLen > 0.15f) {
+            // 中心から十分に離れている場合は、純粋な外向き動径方向へ弾き出す
+            escapeDir = { radial.x / rLen, 0.0f, radial.z / rLen };
+        } else {
+            // プロペラ回転中心へのド直撃（特異点）の場合:
+            // 飛んできた入射方向の逆向き（跳ね返り反射ベクトル）を優先採用
+            Vector3 incoming = { -velocity_.x, 0.0f, -velocity_.z };
+            float incSpeed = std::sqrt(incoming.x * incoming.x + incoming.z * incoming.z);
+            if (incSpeed > 0.1f) {
+                escapeDir = { incoming.x / incSpeed, 0.0f, incoming.z / incSpeed };
+            } else if (rLen > 1e-4f) {
+                escapeDir = { radial.x / rLen, 0.0f, radial.z / rLen };
+            } else {
+                // 静止して中心にある場合の安全フォールバック（手前向き）
+                escapeDir = { 0.0f, 0.0f, -1.0f };
+            }
+        }
+
+        // 1. めり込みの強制解消（エンジン側の押し出しに加えて、外向きへ安全マージンを補正）
+        if (info.depth > 0.005f) {
+            position_.x += escapeDir.x * (info.depth * 0.5f);
+            position_.z += escapeDir.z * (info.depth * 0.5f);
+        }
+
+        // 2. 爽快な放物線バウンドによる弾き飛ばし初速を付与
+        float launchSpeed = 11.0f; // 外向き水平初速
+        velocity_.x = escapeDir.x * launchSpeed;
+        velocity_.z = escapeDir.z * launchSpeed;
+        velocity_.y = 3.8f;        // 上向き跳ね上げ初速（ポーンと小さく放物線を描く）
+
+        // 空中バウンド状態へ移行（床に着地した瞬間に自然に Rolling へ復帰）
+        state_ = MinionState::Thrown;
+
+        // クールダウン設定（0.15秒間、他の羽根からの重複ヒットや速度上書きを無効化）
+        obstacleCooldown_ = 0.15f;
+
+        // 衝突時のスライム変形（ペチャッと潰れてから弾かれる演出）
+        slimeParams_.impulseStrength = 0.35f;
+        slimeParams_.squashStretch = { 0.18f, -0.22f, 0.18f };
+    }
+
+    // 高速衝突時の衝撃波紋
     float impactSpeed = std::sqrt(velocity_.x * velocity_.x + velocity_.y * velocity_.y + velocity_.z * velocity_.z);
-    if (impactSpeed > 2.0f) {
-        float strength = (std::min)(0.15f, impactSpeed * 0.015f);
+    if (impactSpeed > 1.5f) {
+        float strength = (std::min)(0.35f, impactSpeed * 0.03f);
         slimeParams_.impulseStrength = (std::max)(slimeParams_.impulseStrength, strength);
     }
 }
@@ -137,6 +192,10 @@ void Minion::Update(float deltaTime, const Vector2& stageTilt) {
 
     bounceTimer_ += deltaTime;
     totalTime_ += deltaTime;
+
+    if (obstacleCooldown_ > 0.0f) {
+        obstacleCooldown_ -= deltaTime;
+    }
 
     // 衝撃波紋のスムーズ減衰
     slimeParams_.impulseStrength *= (1.0f - deltaTime * 4.5f);
@@ -237,10 +296,10 @@ void Minion::Update(float deltaTime, const Vector2& stageTilt) {
             velocity_.z *= 0.7f;
             state_ = MinionState::Rolling;
 
-            // 着地時の潰れスクワッシュと衝撃波紋（板にペタッと着地）
-            slimeParams_.squashStretch.y = -0.22f;
-            slimeParams_.squashStretch.x = 0.12f;
-            slimeParams_.squashStretch.z = 0.12f;
+            // 着地時の弾力スクワッシュと衝撃波紋（もっこり感を保ちつつプルンとバウンド）
+            slimeParams_.squashStretch.y = -0.10f;
+            slimeParams_.squashStretch.x = 0.05f;
+            slimeParams_.squashStretch.z = 0.05f;
             slimeParams_.impulseStrength = 0.18f;
         }
 

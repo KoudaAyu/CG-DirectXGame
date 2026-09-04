@@ -107,7 +107,21 @@ void GamePlayScene::InitializeScene()
     aimGuide_ = std::make_unique<AimGuide>();
     aimGuide_->Initialize(object3dCom, playCamera_.get());
 
-    // 7. スライム同士（Minion-Minion, Player-Minion）はアプリ層の Multi-Sphere で高精度に処理するため、
+    // 7. 回転プロペラ障害物の初期化と配置
+    propellerObstacles_.clear();
+    {
+        // プロペラ1: ステージ中央奥 (直径約3m, 時計回り回転)
+        auto prop1 = std::make_unique<PropellerObstacle>();
+        prop1->Initialize(object3dCom, playCamera_.get(), { 0.0f, 0.0f, 5.0f }, { 1.5f, 1.5f, 1.5f }, 2.5f);
+        propellerObstacles_.push_back(std::move(prop1));
+
+        // プロペラ2: ステージ左側 (直径約2.4m, 高速反時計回り回転)
+        auto prop2 = std::make_unique<PropellerObstacle>();
+        prop2->Initialize(object3dCom, playCamera_.get(), { -5.0f, 0.0f, -1.0f }, { 1.2f, 1.2f, 1.2f }, -3.2f);
+        propellerObstacles_.push_back(std::move(prop2));
+    }
+
+    // 8. スライム同士（Minion-Minion, Player-Minion）はアプリ層の Multi-Sphere で高精度に処理するため、
     // エンジン側の単一球判定の重複適用（二重押し出し）を解除
     CollisionManager::GetInstance()->SetCollisionFilter(CollisionAttribute::Minion, CollisionAttribute::Minion, false);
     CollisionManager::GetInstance()->SetCollisionFilter(CollisionAttribute::Player, CollisionAttribute::Minion, false);
@@ -117,6 +131,12 @@ void GamePlayScene::InitializeScene()
 
 void GamePlayScene::Finalize()
 {
+    for (auto& prop : propellerObstacles_)
+    {
+        if (prop) prop->Finalize();
+    }
+    propellerObstacles_.clear();
+
     aimGuide_.reset();
     groundPlane_.reset();
     minionManager_.reset();
@@ -191,6 +211,12 @@ void GamePlayScene::Update()
         minionManager_->Update(deltaTime, player_->GetPosition(), player_->IsMerged(), player_->GetCurrentScale(), currentTilt_, player_->GetSlimeParams().squashStretch, player_->GetVelocity());
     }
 
+    // 回転プロペラ障害物の更新（自転とステージ傾斜の追従）
+    for (auto& prop : propellerObstacles_)
+    {
+        if (prop) prop->Update(deltaTime, currentTilt_);
+    }
+
     // 衝突判定と押し出しの更新
     CollisionManager::GetInstance()->Update();
 
@@ -245,7 +271,13 @@ void GamePlayScene::Draw(SceneRenderRequests& renderRequests)
         object3dCom->Draw(groundPlane_.get(), groundCtx, groundModelData_, true);
     }
 
-    // 2. 放物線照準ガイドの描画 (地面の上に重なるように先に描画)
+    // 2. 回転プロペラ障害物の描画
+    for (auto& prop : propellerObstacles_)
+    {
+        if (prop) prop->Draw(ctx);
+    }
+
+    // 3. 放物線照準ガイドの描画 (地面の上に重なるように先に描画)
     if (aimGuide_)
     {
         aimGuide_->Draw(ctx);
@@ -288,9 +320,12 @@ void GamePlayScene::DrawDebugUI()
             }
         }
 
-        // アプリ層の Multi-Sphere ワイヤーフレームを描画（メッシュ変形・流動に100%一致）
-        if (minionManager_) minionManager_->DrawDebug(playCamera_.get());
-        if (player_) player_->DrawDebug(playCamera_.get());
+        // アプリ層の Multi-Sphere ワイヤーフレームを描画（F1キーのデバッグ表示トグルと完全連動）
+        if (CollisionManager::GetInstance()->IsShowDebugColliders())
+        {
+            if (minionManager_) minionManager_->DrawDebug(playCamera_.get());
+            if (player_) player_->DrawDebug(playCamera_.get());
+        }
     }
 
     ImGui::SetNextWindowPos(ImVec2(20, 20), ImGuiCond_FirstUseEver);
@@ -305,6 +340,7 @@ void GamePlayScene::DrawDebugUI()
     ImGui::BulletText("WASD / Arrows: Tilt Stage (ステージを傾ける)");
     ImGui::BulletText("E key: Merge (LocoRoco) <-> Split (Pikmin)");
     ImGui::BulletText("Mouse Left Click: Aim & Throw to Target (放物線投擲)");
+    ImGui::BulletText("F1 key: Toggle Collision Wireframes (当たり判定表示ON/OFF)");
     ImGui::BulletText("SPACE key: Clear Scene");
     ImGui::Separator();
 
@@ -390,8 +426,12 @@ void GamePlayScene::DrawDebugUI()
                 player_->SetTiltAccel(accel);
             }
             float friction = player_->GetFriction();
-            if (ImGui::SliderFloat("Slime Friction", &friction, 0.5f, 8.0f, "%.1f")) {
+            if (ImGui::SliderFloat("Normal Friction (通常: 1.3)", &friction, 0.2f, 5.0f, "%.1f")) {
                 player_->SetFriction(friction);
+            }
+            float mergedFriction = player_->GetMergedFriction();
+            if (ImGui::SliderFloat("Merged Friction (でかいの: 2.0)", &mergedFriction, 0.2f, 5.0f, "%.1f")) {
+                player_->SetMergedFriction(mergedFriction);
             }
         }
     }
@@ -427,6 +467,32 @@ void GamePlayScene::DrawDebugUI()
     }
 
     ImGui::Separator();
+
+    // 6. プロペラ障害物のデバッグ調整
+    if (!propellerObstacles_.empty() && ImGui::CollapsingHeader("Propeller Obstacles (プロペラ障害物)", ImGuiTreeNodeFlags_DefaultOpen))
+    {
+        for (size_t i = 0; i < propellerObstacles_.size(); ++i)
+        {
+            auto& prop = propellerObstacles_[i];
+            if (!prop) continue;
+            ImGui::PushID(static_cast<int>(i));
+            ImGui::Text("Propeller [%zu] Pos: (%.1f, %.1f, %.1f)", i + 1, prop->GetPosition().x, prop->GetPosition().y, prop->GetPosition().z);
+            ImGui::Text("  %d Wings | Radius: %.2fm",
+                prop->GetDetectedWingCount(),
+                prop->GetDetectedRadius() * prop->GetScale().x);
+            ImGui::Text("  OBB: Len=%.2fm, Thick=%.2fm, Width=%.2fm, Y=%.2fm",
+                prop->GetDetectedWingLength() * prop->GetScale().x,
+                prop->GetDetectedWingThickness() * prop->GetScale().y,
+                prop->GetDetectedWingWidth() * prop->GetScale().z,
+                prop->GetDetectedWingCenterY() * prop->GetScale().y);
+            float speed = prop->GetSpinSpeed();
+            if (ImGui::SliderFloat("Spin Speed (自転速度)", &speed, -15.0f, 15.0f, "%.1f rad/s"))
+            {
+                prop->SetSpinSpeed(speed);
+            }
+            ImGui::PopID();
+        }
+    }
 
     // 5. シーン遷移
     if (ImGui::Button("Go To CLEAR", ImVec2(130, 28)))
