@@ -42,6 +42,8 @@ class SpriteCom;
 class SkinningObject3dCom;
 class CombatSystem;
 class CollisionSystem;
+class EnvironmentSystem;
+class CharacterEffectController;
 struct SceneRenderRequests;
 
 /// <summary>
@@ -53,6 +55,8 @@ class GamePlayScene : public BaseScene
 {
     friend class CombatSystem;
     friend class CollisionSystem;
+    friend class EnvironmentSystem;
+    friend class CharacterEffectController;
 
 public:
     // =========================================================================
@@ -181,6 +185,8 @@ private:
     std::unique_ptr<CombatSystem> combatSystem_;
     std::unique_ptr<CollisionSystem> collisionSystem_;
     std::unique_ptr<LootSystem> lootSystem_;
+    std::unique_ptr<EnvironmentSystem> environmentSystem_;
+    std::unique_ptr<CharacterEffectController> characterEffectController_;
     std::unique_ptr<GamePlayHUD> hud_;
     std::unique_ptr<LevelEditor> levelEditor_;
 

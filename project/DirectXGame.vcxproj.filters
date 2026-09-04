@@ -106,6 +106,12 @@
     <ClCompile Include="Application\Scene\GameScene\GamePlayScene.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
+    <ClCompile Include="Application\Scene\GameScene\EnvironmentSystem.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="Application\Scene\GameScene\CharacterEffectController.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
     <ClCompile Include="Baziru3_Engine\Graphics\Light\Light.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
@@ -394,6 +400,9 @@
     <ClInclude Include="Application\Scene\GameScene\GamePlayScene.h" />
     <ClInclude Include="Application\Scene\GameScene\CollisionSystem.h" />
     <ClInclude Include="Application\Scene\GameScene\CombatSystem.h" />
+    <ClInclude Include="Application\Scene\GameScene\EnvironmentSystem.h" />
+    <ClInclude Include="Application\Scene\GameScene\CharacterEffectController.h" />
+    <ClInclude Include="Application\Config\GameConfig.h" />
     <ClInclude Include="Application\Player\Player.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>

@@ -30,6 +30,8 @@
 #include "CombatSystem.h"
 #include "Bullet.h"
 #include "CollisionSystem.h"
+#include "EnvironmentSystem.h"
+#include "CharacterEffectController.h"
 #include "Baziru3_Engine/Framework/Collision/CollisionManager.h"
 #include "Baziru3_Engine/Framework/Collision/SphereCollider.h"
 #include "Baziru3_Engine/Framework/Collision/BoxCollider.h"
@@ -81,13 +83,17 @@ void GamePlayScene::InitializeScene()
 	InitializeAudioAndParticles();
 	InitializeObstacles();
 
-	// サブシステム初期化 (LootSystem & GamePlayHUD & Combat & Collision)
+	// サブシステム初期化 (LootSystem & GamePlayHUD & Combat & Collision & Environment & Effect)
 	lootSystem_ = std::make_unique<LootSystem>();
 	lootSystem_->Initialize();
 	hud_ = std::make_unique<GamePlayHUD>();
 	hud_->Initialize();
 	combatSystem_ = std::make_unique<CombatSystem>(this);
 	collisionSystem_ = std::make_unique<CollisionSystem>(this);
+	environmentSystem_ = std::make_unique<EnvironmentSystem>(this);
+	environmentSystem_->Initialize();
+	characterEffectController_ = std::make_unique<CharacterEffectController>(this);
+	characterEffectController_->Initialize();
 	RaidStats::GetInstance().Reset();
 
 	// 視野コーン（Vision Cone）やデバッグギズモはデフォルト非表示（F1でいつでも切替可能）
@@ -429,303 +435,31 @@ float GamePlayScene::AdvanceDeltaTime()
 
 void GamePlayScene::UpdateExtractionGoal(float deltaTime)
 {
-	if (goalRing_)
+	if (environmentSystem_)
 	{
-		goalRingTransform_.rotate.y += 0.02f;
-		goalRing_->SetTransform(goalRingTransform_);
-		goalRing_->Update();
-	}
-
-	if (!player_)
-	{
-		return;
-	}
-
-	const Vector3 playerPos = player_->GetPosition();
-	const Vector3 goalPos = goalRingTransform_.translate;
-	const float dx = playerPos.x - goalPos.x;
-	const float dz = playerPos.z - goalPos.z;
-	const float dist = std::sqrt(dx * dx + dz * dz);
-	constexpr float kExtractionRadius = 2.5f;
-
-	isPlayerInExtractionZone_ = (dist <= kExtractionRadius);
-
-	if (isPlayerInExtractionZone_ && allTargetsDestroyed_)
-	{
-		if (!isGameCleared_)
-		{
-			extractionTimer_ -= deltaTime;
-			if (extractionTimer_ <= 0.0f)
-			{
-				extractionTimer_ = 0.0f;
-				isGameCleared_ = true;
-				clearCelebrateTimer_ = 0.0f;
-
-				// Initial massive blast of confetti (150 particles)
-				if (particleManager && appParticleManager_)
-				{
-					for (int i = 0; i < 150; ++i)
-					{
-						float angle = (static_cast<float>(rand()) / RAND_MAX) * 6.2831853f;
-						float speedXZ = 1.5f + (static_cast<float>(rand()) / RAND_MAX) * 4.5f;
-						Vector3 velocity = {
-							std::cos(angle) * speedXZ,
-							9.0f + (static_cast<float>(rand()) / RAND_MAX) * 11.0f,
-							std::sin(angle) * speedXZ
-						};
-						
-						Vector4 color;
-						int colorType = rand() % 4;
-						if (colorType == 0) color = { 1.0f, 0.85f, 0.15f, 1.0f };
-						else if (colorType == 1) color = { 0.1f, 0.9f, 1.0f, 1.0f };
-						else if (colorType == 2) color = { 1.0f, 0.2f, 0.8f, 1.0f };
-						else color = { 0.2f, 1.0f, 0.5f, 1.0f };
-						
-						float scale = 0.2f + (static_cast<float>(rand()) / RAND_MAX) * 0.15f;
-						float lifeTime = 1.2f + (static_cast<float>(rand()) / RAND_MAX) * 0.8f;
-
-						appParticleManager_->EmitSparkWithVelocity(
-							particleManager->GetRandomEngine(),
-							goalPos,
-							velocity,
-							color,
-							scale,
-							lifeTime,
-							particleTextureB
-						);
-					}
-				}
-			}
-		}
-	}
-	else if (!isGameCleared_)
-	{
-		extractionTimer_ = kExtractionMaxTime;
-	}
-
-	// Continuous fountain celebration after clear
-	if (isGameCleared_ && particleManager && appParticleManager_)
-	{
-		clearCelebrateTimer_ += deltaTime;
-		if (clearCelebrateTimer_ >= 0.009f)
-		{
-			// Spawn 10 celebratory confetti sparks shooting up every interval
-			for (int i = 0; i < 10; ++i)
-			{
-				float angle = (static_cast<float>(rand()) / RAND_MAX) * 6.2831853f;
-				float speedXZ = 1.0f + (static_cast<float>(rand()) / RAND_MAX) * 3.5f;
-				Vector3 velocity = {
-					std::cos(angle) * speedXZ,
-					7.0f + (static_cast<float>(rand()) / RAND_MAX) * 9.0f,
-					std::sin(angle) * speedXZ
-				};
-				
-				Vector4 color;
-				int colorType = rand() % 4;
-				if (colorType == 0) color = { 1.0f, 0.85f, 0.15f, 1.0f };
-				else if (colorType == 1) color = { 0.1f, 0.9f, 1.0f, 1.0f };
-				else if (colorType == 2) color = { 1.0f, 0.2f, 0.8f, 1.0f };
-				else color = { 0.2f, 1.0f, 0.5f, 1.0f };
-				
-				float scale = 0.18f + (static_cast<float>(rand()) / RAND_MAX) * 0.12f;
-				float lifeTime = 1.0f + (static_cast<float>(rand()) / RAND_MAX) * 0.8f;
-
-				appParticleManager_->EmitSparkWithVelocity(
-					particleManager->GetRandomEngine(),
-					goalPos,
-					velocity,
-					color,
-					scale,
-					lifeTime,
-					particleTextureB
-				);
-			}
-			clearCelebrateTimer_ = 0.0f;
-		}
+		environmentSystem_->UpdateExtractionGoal(deltaTime);
 	}
 }
 
 void GamePlayScene::UpdateEnvironment()
 {
-	if (sphere_)
+	if (environmentSystem_)
 	{
-		Sprite::Transform transformSphere = sphere_->GetTransform();
-		transformSphere.rotate.y += 0.05f; // バリア感を出すために少し速めに回転
-		
-		if (!allTargetsDestroyed_)
-		{
-			// 的が残っている間は脱出ゲートを保護する赤いバリアとして表示
-			transformSphere.translate = goalRingTransform_.translate;
-			transformSphere.translate.y = 0.5f;
-			transformSphere.scale = { 1.8f, 1.8f, 1.8f };
-
-			
-			// バリアの鼓動
-			static float barrierTimer = 0.0f;
-			barrierTimer += kFixedDeltaTime * 4.0f;
-			float pulse = 1.0f + 0.05f * std::sin(barrierTimer);
-			transformSphere.scale.x *= pulse;
-			transformSphere.scale.y *= pulse;
-			transformSphere.scale.z *= pulse;
-		}
-		else
-		{
-			// 画面外の遠くか、あるいはスケール0に設定して非表示にする
-			transformSphere.translate = { 0.0f, -100.0f, 0.0f };
-			transformSphere.scale = { 0.0f, 0.0f, 0.0f };
-		}
-		
-		sphere_->SetTransform(transformSphere);
-		sphere_->Update();
-	}
-
-
-
-	if (hitEffect_)
-	{
-		hitEffect_->SetPlaneParticleCount(emitter.count);
-		hitEffect_->Update(kFixedDeltaTime);
+		environmentSystem_->UpdateBarrier();
+		environmentSystem_->UpdateHitEffect(kFixedDeltaTime);
 	}
 }
 
 void GamePlayScene::UpdateParticles(float deltaTime)
 {
-	// 初期状態からテスト用エミッターが連続でパーティクルを出し続けるのを停止
-	/*
-	emitter.frequencyTime += deltaTime;
-	if (emitter.frequencyTime >= emitter.frequency && particleManager)
+	if (environmentSystem_)
 	{
-		auto newParticles = particleEmitter.Emit(emitter, particleManager->GetRandomEngine(), *particleManager);
-		for (auto& p : newParticles)
-		{
-			p.textureIndex = particleTextureA;
-		}
-		particleManager->AddParticles(newParticles);
-		emitter.frequencyTime -= emitter.frequency;
-	}
-	*/
-
-	// 1. プレイヤーのアクション連動GPUパーティクル (ローリング煙 ＆ 足元土埃)
-	if (particleManager && appParticleManager_ && player_ && !player_->IsDead())
-	{
-		Vector3 pPos = player_->GetPosition();
-		if (player_->IsDodging())
-		{
-			// ローリング回避中: 進行方向の逆へ足元から吹き出す土煙 (0.07秒おきに放出)
-			static float dodgeDustTimer = 0.0f;
-			dodgeDustTimer += deltaTime;
-			if (dodgeDustTimer >= GameConfig::Player::kDodgeDustInterval)
-			{
-				Vector3 pRot = player_->GetRotation();
-				Vector3 dodgeDir = { std::sin(pRot.y), 0.0f, std::cos(pRot.y) };
-				appParticleManager_->EmitDodgeRollDust(particleManager->GetRandomEngine(), pPos, dodgeDir, smokeTextureIndex_);
-				dodgeDustTimer = 0.0f;
-			}
-		}
-		else if (player_->IsMoving())
-		{
-			// 走り移動中: 足元から舞い上がる土埃
-			static float stepTimer = 0.0f;
-			stepTimer += deltaTime;
-			if (stepTimer >= GameConfig::Player::kStepDustInterval)
-			{
-				appParticleManager_->EmitFootstepDust(particleManager->GetRandomEngine(), pPos, smokeTextureIndex_);
-				stepTimer = 0.0f;
-			}
-		}
+		environmentSystem_->UpdateRiverEffects(deltaTime);
 	}
 
-	// 2. 脱出ヘリパッド稼働時の上昇光粒子流 ＆ 風圧ダスト
-	if (particleManager && appParticleManager_ && allTargetsDestroyed_)
+	if (characterEffectController_)
 	{
-		appParticleManager_->EmitHelipadBeaconMotes(particleManager->GetRandomEngine(), goalRingTransform_.translate, particleTextureB);
-
-		escapeSmokeTimer_ += deltaTime;
-		if (escapeSmokeTimer_ >= 0.06f)
-		{
-			for (int i = 0; i < 2; ++i)
-			{
-				appParticleManager_->EmitDust(
-					particleManager->GetRandomEngine(),
-					goalRingTransform_.translate,
-					1.6f,
-					{ 0.1f, 0.9f, 0.5f, 0.45f },
-					particleTextureB
-				);
-			}
-			escapeSmokeTimer_ = 0.0f;
-		}
-	}
-
-	// 3. 川 (River) エリアのさざ波・水しぶき
-	if (particleManager && appParticleManager_)
-	{
-		// (A) 川の流れに沿って流れる上品なさざ波 (0.15秒おきに放出)
-		static float riverWaveTimer = 0.0f;
-		riverWaveTimer += deltaTime;
-		if (riverWaveTimer >= GameConfig::Environment::kRiverWaveInterval)
-		{
-			appParticleManager_->EmitRiverWaveRipples(particleManager->GetRandomEngine(), particleTextureB);
-			riverWaveTimer = 0.0f;
-		}
-
-		// (B) 川面のパチパチ跳ねる水滴 (0.25秒おき)
-		static float riverSplashTimer = 0.0f;
-		riverSplashTimer += deltaTime;
-		if (riverSplashTimer >= GameConfig::Environment::kRiverSplashInterval)
-		{
-			std::uniform_real_distribution<float> rxDist(-18.0f, 18.0f);
-			std::uniform_real_distribution<float> rzDist(GameConfig::Environment::kRiverZMin, GameConfig::Environment::kRiverZMax);
-			Vector3 sPos = { rxDist(particleManager->GetRandomEngine()), GameConfig::Environment::kRiverSplashY, rzDist(particleManager->GetRandomEngine()) };
-			appParticleManager_->EmitRiverSplashDroplet(particleManager->GetRandomEngine(), sPos, particleTextureB);
-			riverSplashTimer = 0.0f;
-		}
-	}
-
-	// 敵の警戒予兆エフェクト (Suspicion Aura)
-	if (particleManager && appParticleManager_)
-	{
-		auto emitSuspicionAura = [&](const Vector3& pos, float meter) {
-			// 警戒度に応じて発生頻度を高める (15% 〜 45%)
-			int chance = static_cast<int>(15.0f + meter * 30.0f);
-			if (rand() % 100 < chance)
-			{
-				std::uniform_real_distribution<float> offsetDist(-0.35f, 0.35f);
-				Vector3 spawnPos = pos + Vector3{ offsetDist(particleManager->GetRandomEngine()), 1.3f, offsetDist(particleManager->GetRandomEngine()) };
-				
-				std::uniform_real_distribution<float> velY(0.5f, 1.3f);
-				std::uniform_real_distribution<float> velXZ(-0.2f, 0.2f);
-				Vector3 vel = { velXZ(particleManager->GetRandomEngine()), velY(particleManager->GetRandomEngine()), velXZ(particleManager->GetRandomEngine()) };
-
-				// 警戒度に応じた色（黄色〜オレンジ）
-				Vector4 color = { 1.0f, 0.9f - (meter * 0.3f), 0.15f, 0.75f };
-
-				appParticleManager_->EmitDustWithVelocity(
-					particleManager->GetRandomEngine(),
-					spawnPos,
-					0.85f, // はっきり見えるサイズに拡大
-					color,
-					vel,
-					1.15f, // 寿命を長くして頭上へ立ち上らせる
-					particleTextureB
-				);
-			}
-		};
-
-		if (enemy_ && !enemy_->IsDead() && enemy_->GetDetectionMeter() > 0.0f && enemy_->GetAIState() != Enemy::AIState::Chase)
-		{
-			emitSuspicionAura(enemy_->GetPosition(), enemy_->GetDetectionMeter());
-		}
-
-		if (movingEnemy_ && !movingEnemy_->IsDead() && movingEnemy_->GetDetectionMeter() > 0.0f && movingEnemy_->GetAIState() != MovingEnemy::AIState::Chase)
-		{
-			emitSuspicionAura(movingEnemy_->GetPosition(), movingEnemy_->GetDetectionMeter());
-		}
-	}
-
-	if (appParticleManager_)
-	{
-		appParticleManager_->Update(deltaTime, player_ ? player_->GetPosition() : Vector3{ 0.0f, 0.0f, 0.0f });
+		characterEffectController_->Update(deltaTime);
 	}
 }
 

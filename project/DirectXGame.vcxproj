@@ -76,6 +76,8 @@
     <ClCompile Include="Application\Scene\GameScene\GamePlayScene.cpp" />
     <ClCompile Include="Application\Scene\GameScene\CollisionSystem.cpp" />
     <ClCompile Include="Application\Scene\GameScene\CombatSystem.cpp" />
+    <ClCompile Include="Application\Scene\GameScene\EnvironmentSystem.cpp" />
+    <ClCompile Include="Application\Scene\GameScene\CharacterEffectController.cpp" />
     <ClCompile Include="Application\Scene\GameScene\LootSystem.cpp" />
     <ClCompile Include="Application\Scene\GameScene\GamePlayHUD.cpp" />
     <ClCompile Include="Application\Scene\GameScene\Target.cpp" />
@@ -315,6 +317,9 @@
     <ClInclude Include="Application\Scene\GameScene\GamePlayScene.h" />
     <ClInclude Include="Application\Scene\GameScene\CollisionSystem.h" />
     <ClInclude Include="Application\Scene\GameScene\CombatSystem.h" />
+    <ClInclude Include="Application\Scene\GameScene\EnvironmentSystem.h" />
+    <ClInclude Include="Application\Scene\GameScene\CharacterEffectController.h" />
+    <ClInclude Include="Application\Config\GameConfig.h" />
     <ClInclude Include="Application\Scene\ClearScene\ClearScene.h" />
     <ClInclude Include="Baziru3_Engine\Framework\Particle\ParticleEmitter.h" />
     <ClInclude Include="Baziru3_Engine\Framework\Particle\ParticleManager.h" />
