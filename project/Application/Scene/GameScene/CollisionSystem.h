@@ -48,6 +48,11 @@ private:
 	/// </summary>
 	void TriggerObstacleHitEffect(const Vector3& hitPos, const Vector3& bulletDir);
 
+	/// <summary>
+	/// シーン内の全障害物（Obstacle）とレイの精密交差判定を行います（OBB直接交差判定）
+	/// </summary>
+	bool RaycastObstacles(const Vector3& rayStart, const Vector3& rayDir, float maxDist, float& outHitDist, Vector3& outHitPoint);
+
 private:
 	GamePlayScene* scene_ = nullptr;    // ゲームプレイシーンへの参照
 };

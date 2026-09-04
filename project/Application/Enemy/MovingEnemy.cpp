@@ -970,10 +970,12 @@ std::unique_ptr<Bullet> MovingEnemy::TryShoot(const Vector3& targetPosition)
     {
         Collider* hitCol = nullptr;
         float checkDist = 1.5f;
-        const uint32_t kObstacleMask = (1 << static_cast<uint32_t>(CollisionAttribute::Obstacle));
-        if (CollisionManager::GetInstance()->Raycast(spawnPos, forward, checkDist, hitCol, checkDist, kObstacleMask))
+        if (CollisionManager::GetInstance()->Raycast(spawnPos, forward, checkDist, hitCol, checkDist))
         {
-            return nullptr;
+            if (hitCol && hitCol->GetAttribute() == CollisionAttribute::Obstacle)
+            {
+                return nullptr;
+            }
         }
     }
 

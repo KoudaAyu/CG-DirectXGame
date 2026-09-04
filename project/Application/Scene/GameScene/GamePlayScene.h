@@ -135,6 +135,11 @@ public:
     /// </summary>
     void AddFloatingText(const Vector3& worldPos, const std::string& text, const Vector4& color, bool isCritical = false);
 
+    /// <summary>
+    /// 配置されている全障害物リストの取得
+    /// </summary>
+    const std::vector<std::unique_ptr<Obstacle>>& GetObstacles() const { return obstacles_; }
+
 private:
     // --- 内部初期化 & 更新メソッド ---
     float AdvanceDeltaTime();

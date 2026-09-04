@@ -14,8 +14,97 @@
 #include "Baziru3_Engine/Framework/Collision/CapsuleCollider.h"
 #include "CombatSystem.h"
 #include "RaidStats.h"
+#include "Matrix4x4.h"
 #include <cmath>
 #include <algorithm>
+
+// 線分/レイ [rayStart, rayDir * maxDist] と OBB (中心 boxCenter, サイズ boxSize, 回転 boxRot) との精密交差判定
+static bool CheckRayBoxIntersection(
+	const Vector3& rayStart,
+	const Vector3& rayDir,
+	float maxDist,
+	const Vector3& boxCenter,
+	const Vector3& boxSize,
+	const Vector3& boxRot,
+	float& outDist)
+{
+	Vector3 extents = { boxSize.x * 0.5f, boxSize.y * 0.5f, boxSize.z * 0.5f };
+
+	// 回転行列 R を計算する
+	Matrix4x4 R = Multiply(MakeRotateXMatrix(boxRot.x), Multiply(MakeRotateYMatrix(boxRot.y), MakeRotateZMatrix(boxRot.z)));
+
+	// ボックスのローカル軸（X, Y, Z）
+	Vector3 axisX = { R.m[0][0], R.m[0][1], R.m[0][2] };
+	Vector3 axisY = { R.m[1][0], R.m[1][1], R.m[1][2] };
+	Vector3 axisZ = { R.m[2][0], R.m[2][1], R.m[2][2] };
+
+	// レイの始点と方向をローカル空間に変換
+	Vector3 offset = { rayStart.x - boxCenter.x, rayStart.y - boxCenter.y, rayStart.z - boxCenter.z };
+	Vector3 localStart = {
+		offset.x * axisX.x + offset.y * axisX.y + offset.z * axisX.z,
+		offset.x * axisY.x + offset.y * axisY.y + offset.z * axisY.z,
+		offset.x * axisZ.x + offset.y * axisZ.y + offset.z * axisZ.z
+	};
+	Vector3 localDir = {
+		rayDir.x * axisX.x + rayDir.y * axisX.y + rayDir.z * axisX.z,
+		rayDir.x * axisY.x + rayDir.y * axisY.y + rayDir.z * axisY.z,
+		rayDir.x * axisZ.x + rayDir.y * axisZ.y + rayDir.z * axisZ.z
+	};
+
+	float tmin = 0.0f;
+	float tmax = maxDist;
+
+	// X軸
+	if (std::abs(localDir.x) < 1e-6f)
+	{
+		if (localStart.x < -extents.x || localStart.x > extents.x) return false;
+	}
+	else
+	{
+		float ood = 1.0f / localDir.x;
+		float t1 = (-extents.x - localStart.x) * ood;
+		float t2 = (extents.x - localStart.x) * ood;
+		if (t1 > t2) std::swap(t1, t2);
+		tmin = (std::max)(tmin, t1);
+		tmax = (std::min)(tmax, t2);
+		if (tmin > tmax) return false;
+	}
+
+	// Y軸
+	if (std::abs(localDir.y) < 1e-6f)
+	{
+		if (localStart.y < -extents.y || localStart.y > extents.y) return false;
+	}
+	else
+	{
+		float ood = 1.0f / localDir.y;
+		float t1 = (-extents.y - localStart.y) * ood;
+		float t2 = (extents.y - localStart.y) * ood;
+		if (t1 > t2) std::swap(t1, t2);
+		tmin = (std::max)(tmin, t1);
+		tmax = (std::min)(tmax, t2);
+		if (tmin > tmax) return false;
+	}
+
+	// Z軸
+	if (std::abs(localDir.z) < 1e-6f)
+	{
+		if (localStart.z < -extents.z || localStart.z > extents.z) return false;
+	}
+	else
+	{
+		float ood = 1.0f / localDir.z;
+		float t1 = (-extents.z - localStart.z) * ood;
+		float t2 = (extents.z - localStart.z) * ood;
+		if (t1 > t2) std::swap(t1, t2);
+		tmin = (std::max)(tmin, t1);
+		tmax = (std::min)(tmax, t2);
+		if (tmin > tmax) return false;
+	}
+
+	outDist = tmin;
+	return true;
+}
 
 // 弾丸の移動線分 (start -> end, 半径 bulletRadius) とキャラクターの直立円柱 (center, height, radius) との精密連続衝突判定 (CCD)
 static bool CheckBulletCapsuleHit(const Vector3& start, const Vector3& end, float bulletRadius, const Vector3& charPos, float charHeight, float charRadius, Vector3& outHitPoint)
@@ -143,6 +232,69 @@ void CollisionSystem::TriggerObstacleHitEffect(const Vector3& hitPos, const Vect
 	}
 }
 
+// シーン内の全障害物（Obstacle）とレイの精密交差判定（直接OBBレイキャスト + エンジン側判定の二重ハイブリッド）
+bool CollisionSystem::RaycastObstacles(const Vector3& rayStart, const Vector3& rayDir, float maxDist, float& outHitDist, Vector3& outHitPoint)
+{
+	if (!scene_) return false;
+
+	bool hit = false;
+	float closestDist = maxDist;
+
+	// 1. アプリケーション層で管理する全障害物（Obstacle）のBoxColliderと直接OBB交差判定
+	for (const auto& obs : scene_->GetObstacles())
+	{
+		if (!obs) continue;
+
+		// メインコライダー
+		BoxCollider* col = obs->GetCollider();
+		if (col && col->IsEnabled())
+		{
+			float dist = 0.0f;
+			if (CheckRayBoxIntersection(rayStart, rayDir, closestDist, col->GetWorldPosition(), col->GetSize(), col->GetWorldRotation(), dist))
+			{
+				closestDist = dist;
+				hit = true;
+			}
+		}
+
+		// 追加コライダー（フェンス2枚目や脚・欄干など）
+		for (const auto& extra : obs->GetExtraColliders())
+		{
+			if (extra && extra->IsEnabled())
+			{
+				float dist = 0.0f;
+				if (CheckRayBoxIntersection(rayStart, rayDir, closestDist, extra->GetWorldPosition(), extra->GetSize(), extra->GetWorldRotation(), dist))
+				{
+					closestDist = dist;
+					hit = true;
+				}
+			}
+		}
+	}
+
+	// 2. エンジン側の CollisionManager::Raycast もフォールバックとして併用（マスク 4: Obstacle）
+	{
+		Collider* engHitCol = nullptr;
+		float engHitDist = closestDist;
+		const uint32_t kObstacleAttr = static_cast<uint32_t>(CollisionAttribute::Obstacle); // 値 4
+		if (CollisionManager::GetInstance()->Raycast(rayStart, rayDir, closestDist, engHitCol, engHitDist, kObstacleAttr))
+		{
+			if (engHitCol && engHitCol->GetAttribute() == CollisionAttribute::Obstacle)
+			{
+				closestDist = engHitDist;
+				hit = true;
+			}
+		}
+	}
+
+	if (hit)
+	{
+		outHitDist = closestDist;
+		outHitPoint = { rayStart.x + rayDir.x * closestDist, rayStart.y + rayDir.y * closestDist, rayStart.z + rayDir.z * closestDist };
+	}
+	return hit;
+}
+
 // 弾丸とプレイヤー・敵の精密衝突判定 (CCD + 直立円柱ヒットボックス)
 void CollisionSystem::ResolveBulletCollisions()
 {
@@ -174,17 +326,15 @@ void CollisionSystem::ResolveBulletCollisions()
 				if (CheckBulletCapsuleHit(bPosPrev, bPosCurrent, kBulletRadius, enemyPos, kDuckHeight, kDuckRadius, hitPoint))
 				{
 					// ★ 障害物遮蔽チェック (Line-of-Sight): 弾丸の移動軌跡上に障害物がないか検証
-					Vector3 toHit = hitPoint - bPosPrev;
+					Vector3 toHit = { hitPoint.x - bPosPrev.x, hitPoint.y - bPosPrev.y, hitPoint.z - bPosPrev.z };
 					float hitDist = std::sqrt(toHit.x * toHit.x + toHit.y * toHit.y + toHit.z * toHit.z);
 					if (hitDist > 1e-4f)
 					{
 						Vector3 hitDir = { toHit.x / hitDist, toHit.y / hitDist, toHit.z / hitDist };
-						Collider* obsCollider = nullptr;
 						float obsDist = hitDist;
-						const uint32_t kObstacleMask = (1 << static_cast<uint32_t>(CollisionAttribute::Obstacle));
-						if (CollisionManager::GetInstance()->Raycast(bPosPrev, hitDir, hitDist, obsCollider, obsDist, kObstacleMask))
+						Vector3 obsHitPos{};
+						if (RaycastObstacles(bPosPrev, hitDir, hitDist, obsDist, obsHitPos))
 						{
-							Vector3 obsHitPos = bPosPrev + hitDir * obsDist;
 							TriggerObstacleHitEffect(obsHitPos, bullet->GetDirection());
 							bullet->Finalize();
 							continue;
@@ -264,17 +414,15 @@ void CollisionSystem::ResolveBulletCollisions()
 				if (CheckBulletCapsuleHit(bPosPrev, bPosCurrent, kBulletRadius, enemyPos, kDuckHeight, kDuckRadius, hitPoint))
 				{
 					// ★ 障害物遮蔽チェック (Line-of-Sight): 弾丸の移動軌跡上に障害物がないか検証
-					Vector3 toHit = hitPoint - bPosPrev;
+					Vector3 toHit = { hitPoint.x - bPosPrev.x, hitPoint.y - bPosPrev.y, hitPoint.z - bPosPrev.z };
 					float hitDist = std::sqrt(toHit.x * toHit.x + toHit.y * toHit.y + toHit.z * toHit.z);
 					if (hitDist > 1e-4f)
 					{
 						Vector3 hitDir = { toHit.x / hitDist, toHit.y / hitDist, toHit.z / hitDist };
-						Collider* obsCollider = nullptr;
 						float obsDist = hitDist;
-						const uint32_t kObstacleMask = (1 << static_cast<uint32_t>(CollisionAttribute::Obstacle));
-						if (CollisionManager::GetInstance()->Raycast(bPosPrev, hitDir, hitDist, obsCollider, obsDist, kObstacleMask))
+						Vector3 obsHitPos{};
+						if (RaycastObstacles(bPosPrev, hitDir, hitDist, obsDist, obsHitPos))
 						{
-							Vector3 obsHitPos = bPosPrev + hitDir * obsDist;
 							TriggerObstacleHitEffect(obsHitPos, bullet->GetDirection());
 							bullet->Finalize();
 							continue;
@@ -356,17 +504,15 @@ void CollisionSystem::ResolveBulletCollisions()
 					if (CheckBulletCapsuleHit(bPosPrev, bPosCurrent, kBulletRadius, targetPos, 1.5f, target->GetRadius(), hitPoint))
 					{
 						// ★ 障害物遮蔽チェック (Line-of-Sight): 弾丸の移動軌跡上に障害物がないか検証
-						Vector3 toHit = hitPoint - bPosPrev;
+						Vector3 toHit = { hitPoint.x - bPosPrev.x, hitPoint.y - bPosPrev.y, hitPoint.z - bPosPrev.z };
 						float hitDist = std::sqrt(toHit.x * toHit.x + toHit.y * toHit.y + toHit.z * toHit.z);
 						if (hitDist > 1e-4f)
 						{
 							Vector3 hitDir = { toHit.x / hitDist, toHit.y / hitDist, toHit.z / hitDist };
-							Collider* obsCollider = nullptr;
 							float obsDist = hitDist;
-							const uint32_t kObstacleMask = (1 << static_cast<uint32_t>(CollisionAttribute::Obstacle));
-							if (CollisionManager::GetInstance()->Raycast(bPosPrev, hitDir, hitDist, obsCollider, obsDist, kObstacleMask))
+							Vector3 obsHitPos{};
+							if (RaycastObstacles(bPosPrev, hitDir, hitDist, obsDist, obsHitPos))
 							{
-								Vector3 obsHitPos = bPosPrev + hitDir * obsDist;
 								TriggerObstacleHitEffect(obsHitPos, bullet->GetDirection());
 								bullet->Finalize();
 								break;
@@ -423,18 +569,16 @@ void CollisionSystem::ResolveBulletCollisions()
 				if (CheckBulletCapsuleHit(bPosPrev, bPosCurrent, kBulletRadius, playerPos, kDuckHeight, kDuckRadius, hitPoint))
 				{
 					// ★ 障害物遮蔽チェック (Line-of-Sight): 弾丸の移動軌跡上に障害物がないか検証
-					Vector3 toHit = hitPoint - bPosPrev;
+					Vector3 toHit = { hitPoint.x - bPosPrev.x, hitPoint.y - bPosPrev.y, hitPoint.z - bPosPrev.z };
 					float hitDist = std::sqrt(toHit.x * toHit.x + toHit.y * toHit.y + toHit.z * toHit.z);
 					if (hitDist > 1e-4f)
 					{
 						Vector3 hitDir = { toHit.x / hitDist, toHit.y / hitDist, toHit.z / hitDist };
-						Collider* obsCollider = nullptr;
 						float obsDist = hitDist;
-						const uint32_t kObstacleMask = (1 << static_cast<uint32_t>(CollisionAttribute::Obstacle));
-						if (CollisionManager::GetInstance()->Raycast(bPosPrev, hitDir, hitDist, obsCollider, obsDist, kObstacleMask))
+						Vector3 obsHitPos{};
+						if (RaycastObstacles(bPosPrev, hitDir, hitDist, obsDist, obsHitPos))
 						{
 							// プレイヤーの手前に障害物がある！弾丸は障害物に着弾して消滅（プレイヤー貫通を100%遮断）
-							Vector3 obsHitPos = bPosPrev + hitDir * obsDist;
 							TriggerObstacleHitEffect(obsHitPos, bullet->GetDirection());
 							bullet->Finalize();
 							continue;
@@ -474,13 +618,12 @@ void CollisionSystem::ResolveBulletCollisions()
 	}
 }
 
-// 弾丸と障害物（Obstacle）の精密衝突判定 (Raycastによる精密判定)
+// 弾丸と障害物（Obstacle）の精密衝突判定 (RaycastObstaclesによる確実な判定)
 void CollisionSystem::ResolveObstacleCollisions()
 {
 	if (!scene_->combatSystem_) return;
 	auto& bullets = scene_->combatSystem_->GetBullets();
 
-	const uint32_t kObstacleMask = (1 << static_cast<uint32_t>(CollisionAttribute::Obstacle));
 	const float kBulletRadius = 0.12f;
 
 	for (auto& bullet : bullets)
@@ -488,7 +631,7 @@ void CollisionSystem::ResolveObstacleCollisions()
 		if (!bullet || bullet->IsDead()) continue;
 		Vector3 bPosPrev = bullet->GetPrevPosition();
 		Vector3 bPos = bullet->GetPosition();
-		Vector3 diff = bPos - bPosPrev;
+		Vector3 diff = { bPos.x - bPosPrev.x, bPos.y - bPosPrev.y, bPos.z - bPosPrev.z };
 		float len = std::sqrt(diff.x * diff.x + diff.y * diff.y + diff.z * diff.z);
 		if (len < 1e-4f) continue;
 		Vector3 dir = { diff.x / len, diff.y / len, diff.z / len };
@@ -496,12 +639,12 @@ void CollisionSystem::ResolveObstacleCollisions()
 		// 浮動小数点数誤差やすき間によるすり抜けを防ぐため、マージン (弾丸半径分) を加味した長さを検査
 		float checkLen = len + kBulletRadius;
 
-		Collider* hitCollider = nullptr;
 		float hitDist = checkLen;
+		Vector3 hitPos{};
 		bool hasHit = false;
 
 		// 1. 中心線レイキャスト
-		if (CollisionManager::GetInstance()->Raycast(bPosPrev, dir, checkLen, hitCollider, hitDist, kObstacleMask))
+		if (RaycastObstacles(bPosPrev, dir, checkLen, hitDist, hitPos))
 		{
 			hasHit = true;
 		}
@@ -524,12 +667,13 @@ void CollisionSystem::ResolveObstacleCollisions()
 			for (const auto& off : offsets)
 			{
 				float subDist = checkLen;
-				Collider* subCol = nullptr;
-				if (CollisionManager::GetInstance()->Raycast(bPosPrev + off, dir, checkLen, subCol, subDist, kObstacleMask))
+				Vector3 subHitPos{};
+				Vector3 startOff = { bPosPrev.x + off.x, bPosPrev.y + off.y, bPosPrev.z + off.z };
+				if (RaycastObstacles(startOff, dir, checkLen, subDist, subHitPos))
 				{
 					hasHit = true;
 					hitDist = subDist;
-					hitCollider = subCol;
+					hitPos = subHitPos;
 					break;
 				}
 			}
@@ -537,9 +681,8 @@ void CollisionSystem::ResolveObstacleCollisions()
 
 		if (hasHit)
 		{
-			// 着弾交点
-			Vector3 hitWorldPos = bPosPrev + dir * (std::min)(hitDist, len);
-			TriggerObstacleHitEffect(hitWorldPos, bullet->GetDirection());
+			// 着弾エフェクト発生
+			TriggerObstacleHitEffect(hitPos, bullet->GetDirection());
 			bullet->Finalize();
 		}
 	}
