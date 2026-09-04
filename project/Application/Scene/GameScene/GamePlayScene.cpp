@@ -5,6 +5,7 @@
 #include "Baziru3_Engine/Framework/Collision/CollisionManager.h"
 #include "TextureManager.h"
 #include "RenderContext.h"
+#include "Application/GameObject/SlimePhysics.h"
 
 #ifdef USE_IMGUI
 #include <imgui.h>
@@ -372,6 +373,10 @@ void GamePlayScene::Update()
             minionManager_->GetGroupCenterAndSpread(player_->GetPosition(), rawFocusPos, rawSpread);
         }
 
+        // ★重要: 注視点の高さ Y を、傾斜面上の適正な高さに安定化！
+        // 坂下に転がったミニオンのせいで注視点が沈み込み、カメラが地面すれすれ・床に接近するのを完全防止
+        rawFocusPos.y = SlimePhysics::CalculateGroundedCenterY(rawFocusPos.x, rawFocusPos.z, currentTilt_, 0.5f, playerPivot);
+
         Vector3 playerVel = player_->GetVelocity();
 
         // 初回初期化
@@ -395,9 +400,10 @@ void GamePlayScene::Update()
 
         // 1. プレイヤースケールおよび群れの広がり（Spread）に応じた目標カメラ距離
         // 合体時の急激なズーム変化を防止するため、広がりの重みをマイルド化(0.35f)し、
-        // 距離そのものを SmoothDamp で優雅に補間
+        // かつ最低カメラ距離（18.5f）を下限ガード（ゆったり見晴らせる高さ）
         float scaleOffset = (player_->GetCurrentScale() - 0.4f);
         float targetDist = cameraDistance_ + (std::max)(0.0f, scaleOffset) * cameraDynamicZoom_ + currentGroupSpread_ * 0.35f;
+        targetDist = (std::max)(18.5f, targetDist); // 最低距離ガード
 
         if (!cameraInitialized_)
         {
@@ -409,7 +415,7 @@ void GamePlayScene::Update()
             currentCameraDist_ = SmoothDamp(currentCameraDist_, targetDist, cameraDistVelocity_, cameraZoomSmoothTime_, deltaTime);
         }
 
-        float effectiveDist = currentCameraDist_;
+        float effectiveDist = (std::max)(18.5f, currentCameraDist_);
 
         // 2. カメラの見下ろし角・方位角
         float pitch = cameraPitch_;
@@ -440,6 +446,15 @@ void GamePlayScene::Update()
             lookAtTarget.y + relativeOffset.y,
             lookAtTarget.z + relativeOffset.z
         };
+
+        // ★★★ カメラの最低地上高クリアランスガード（ステージ接近・めり込み防止） ★★★
+        // カメラ直下の傾斜面（ステージ）高さを算出し、常に十分な高度（地面から最低9.5m上空）を維持
+        float groundYAtTargetCam = SlimePhysics::CalculateGroundHeight(targetCamPos.x, targetCamPos.z, currentTilt_, playerPivot);
+        float minTargetCamY = groundYAtTargetCam + 9.5f;
+        if (targetCamPos.y < minTargetCamY)
+        {
+            targetCamPos.y = minTargetCamY;
+        }
 
         // 4. 目標カメラ回転の算出
         // 左右移動速度に応じた微小なダイナミックバンク（ロール傾斜: 左右に曲がった感覚を強調）
@@ -472,6 +487,16 @@ void GamePlayScene::Update()
             currentCameraRot_.x = SmoothDamp(currentCameraRot_.x, targetCamRot.x, cameraRotVelocity_.x, cameraSmoothTimeRot_, deltaTime);
             currentCameraRot_.y = SmoothDamp(currentCameraRot_.y, targetCamRot.y, cameraRotVelocity_.y, cameraSmoothTimeRot_, deltaTime);
             currentCameraRot_.z = SmoothDamp(currentCameraRot_.z, targetCamRot.z, cameraRotVelocity_.z, cameraSmoothTimeRot_, deltaTime);
+        }
+
+        // ★★★ 最終補間後位置に対する絶対安全クリアランスガード ★★★
+        // 補間スプリングのオーバーシュートや激しい板の傾きでも、ステージに異様に近づくことを100%遮断（最低地上高8.5m）
+        float currentGroundAtCam = SlimePhysics::CalculateGroundHeight(currentCameraPos_.x, currentCameraPos_.z, currentTilt_, playerPivot);
+        float absoluteMinCamY = currentGroundAtCam + 8.5f;
+        if (currentCameraPos_.y < absoluteMinCamY)
+        {
+            currentCameraPos_.y = absoluteMinCamY;
+            if (cameraPosVelocity_.y < 0.0f) cameraPosVelocity_.y = 0.0f;
         }
 
         playCamera_->SetTranslate(currentCameraPos_);

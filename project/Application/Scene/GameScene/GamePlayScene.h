@@ -47,11 +47,11 @@ private:
     uint32_t groundTextureIndex_ = 0;
 
     // --- カメラ制御パラメータ (プレイヤー相対座標一定モデル) ---
-    float cameraDistance_ = 18.0f;        // プレイヤーからのカメラ距離
-    float cameraPitch_ = 0.82f;           // 見下ろし角度 (rad, 0.82 rad ≈ 47.0度)
+    float cameraDistance_ = 21.0f;        // プレイヤーからのカメラ距離（ゆったり見晴らせる高さ）
+    float cameraPitch_ = 0.93f;           // 見下ろし角度 (rad, 0.93 rad ≈ 53.3度: 上空俯瞰視点)
     float cameraYaw_ = 0.0f;             // 方位角 (rad)
     float cameraFov_ = 0.85f;            // 垂直視野角 (rad, 0.85 rad ≈ 48.7度)
-    float cameraTargetOffsetY_ = 1.0f;   // プレイヤー足元からの注視点高さ
+    float cameraTargetOffsetY_ = 1.2f;   // プレイヤー足元からの注視点高さ
     float cameraForwardOffset_ = 2.0f;   // 前方視界確保用の注視点Z前進オフセット
     float cameraDynamicZoom_ = 1.6f;     // 合体巨大化時のカメラ後退倍率（過剰なズーム変動を抑制）
     bool followStageTilt_ = false;       // ステージ傾斜にカメラ回転を連動させるか
@@ -63,7 +63,7 @@ private:
     float tiltSmoothTime_ = 0.15f;       // ステージ傾斜の補間スムーズ時間 (秒: 重厚で滑らかな板の傾き)
 
     // ズーム（距離・広がり・重心）の急変を防止するスムーズダンピングパラメータ
-    float currentCameraDist_ = 18.0f;     // 現在の補間カメラ距離
+    float currentCameraDist_ = 21.0f;     // 現在の補間カメラ距離
     float cameraDistVelocity_ = 0.0f;    // カメラ距離の補間速度
     float cameraZoomSmoothTime_ = 0.55f; // カメラ距離（ズーム）の追従スムーズ時間（合体・分裂時の急激なズーム変動を優雅に緩和）
     float currentGroupSpread_ = 0.0f;    // 補間された群れの広がり
@@ -73,8 +73,8 @@ private:
     Vector3 focusPosVelocity_{ 0.0f, 0.0f, 0.0f }; // 注視点追従速度
     float focusSmoothTime_ = 0.20f;      // 注視点スムーズ時間（重心ジャンプの防止）
 
-    Vector3 currentCameraPos_{ 0.0f, 15.0f, -10.0f }; // 現在の補間カメラ位置
-    Vector3 currentCameraRot_{ 0.82f, 0.0f, 0.0f };   // 現在の補間カメラ回転
+    Vector3 currentCameraPos_{ 0.0f, 18.0f, -12.0f }; // 現在の補間カメラ位置
+    Vector3 currentCameraRot_{ 0.93f, 0.0f, 0.0f };   // 現在の補間カメラ回転
     Vector3 cameraPosVelocity_{ 0.0f, 0.0f, 0.0f };   // カメラ位置の追従速度
     Vector3 cameraRotVelocity_{ 0.0f, 0.0f, 0.0f };   // カメラ角度の追従角速度
     Vector2 tiltVelocity_{ 0.0f, 0.0f };              // ステージ傾斜の角速度

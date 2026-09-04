@@ -353,16 +353,33 @@ void MinionManager::GetGroupCenterAndSpread(const Vector3& playerPos, Vector3& o
     Vector3 sumPos = playerPos;
     int count = 1; // プレイヤー自身も含める
 
+    // プレイヤーから極端に遠くへ吹っ飛んだミニオンが重心を異常に引っ張らないよう保護（半径16m以内を優先）
+    const float kMaxInfluenceRadiusSq = 16.0f * 16.0f;
+
     for (const auto& minion : minions_) {
         if (minion && minion->IsActive()) {
-            sumPos += minion->GetPosition();
-            count++;
+            Vector3 mPos = minion->GetPosition();
+            float dx = mPos.x - playerPos.x;
+            float dz = mPos.z - playerPos.z;
+            float distSq = dx * dx + dz * dz;
+
+            if (distSq <= kMaxInfluenceRadiusSq) {
+                sumPos += mPos;
+                count++;
+            } else {
+                // 遠方のミニオンは影響半径の境界位置で重心に寄与させる
+                float factor = 16.0f / std::sqrt(distSq);
+                sumPos.x += playerPos.x + dx * factor;
+                sumPos.y += playerPos.y;
+                sumPos.z += playerPos.z + dz * factor;
+                count++;
+            }
         }
     }
 
-    outCenter = { sumPos.x / count, sumPos.y / count, sumPos.z / count };
+    outCenter = { sumPos.x / count, playerPos.y, sumPos.z / count };
 
-    // 重心からの最大距離（広がり幅）を計算
+    // 重心からの最大距離（広がり幅）を計算（最大14mでクランプ）
     float maxDistSq = 0.0f;
     Vector3 diffPlayer = playerPos - outCenter;
     maxDistSq = (std::max)(maxDistSq, diffPlayer.x * diffPlayer.x + diffPlayer.z * diffPlayer.z);
@@ -377,7 +394,7 @@ void MinionManager::GetGroupCenterAndSpread(const Vector3& playerPos, Vector3& o
         }
     }
 
-    outSpread = std::sqrt(maxDistSq);
+    outSpread = (std::min)(14.0f, std::sqrt(maxDistSq));
 }
 
 bool MinionManager::ThrowMinionWithVelocity(const Vector3& launchPos, const Vector3& velocity) {
