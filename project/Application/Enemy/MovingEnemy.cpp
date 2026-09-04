@@ -106,6 +106,15 @@ void MovingEnemy::Initialize(Object3dCom* object3dCom, Camera* camera)
     state_ = AIState::Patrol;
     movingToB_ = true;
 
+    // デフォルトのスプライン巡回パスを設定（川の手前の監視エリアを巡る4点）
+    std::vector<Vector3> defaultPatrol = {
+        { -8.0f, 0.0f, 25.0f },
+        { -2.0f, 0.0f, 27.5f },
+        {  4.0f, 0.0f, 26.0f },
+        {  9.0f, 0.0f, 28.0f }
+    };
+    SetPatrolPath(defaultPatrol, false, 2.0f); // PingPong往復、秒速2.0m
+
     behaviorTree_ = std::make_unique<BaziruEngine::AI::BehaviorTree>();
     if (behaviorTree_->LoadFromJSON("test_cover_tree.json"))
     {
@@ -114,6 +123,47 @@ void MovingEnemy::Initialize(Object3dCom* object3dCom, Camera* camera)
     else
     {
         OutputDebugStringA("[MovingEnemy] Failed to load test_cover_tree.json\n");
+    }
+}
+
+void MovingEnemy::SetPatrolPath(const std::vector<Vector3>& points, bool isLoop, float speed)
+{
+    if (points.size() < 2) return;
+
+    if (!splinePath_)
+    {
+        splinePath_ = std::make_unique<BaziruEngine::SplinePath>();
+    }
+    splinePath_->SetPoints(points);
+    splinePath_->SetLoop(isLoop);
+    splinePath_->BuildDistanceTable(20);
+
+    const auto mode = isLoop ? BaziruEngine::SplinePlayMode::Loop : BaziruEngine::SplinePlayMode::PingPong;
+
+    if (!splineFollower_)
+    {
+        splineFollower_ = std::make_unique<BaziruEngine::SplineFollower>(
+            splinePath_.get(),
+            speed,
+            mode
+        );
+        splineFollower_->SetAlignRotation(true);
+    }
+    else
+    {
+        splineFollower_->SetPath(splinePath_.get());
+        splineFollower_->SetSpeed(speed);
+        splineFollower_->SetPlayMode(mode);
+        splineFollower_->Restart();
+    }
+
+    useSplinePatrol_ = true;
+
+    // スプラインの始点に敵座標を同期
+    position_ = splineFollower_->GetPosition();
+    if (object3d_)
+    {
+        object3d_->SetTranslate(position_);
     }
 }
 
@@ -185,9 +235,17 @@ void MovingEnemy::Update(WindowAPI* windowAPI, const Vector3* targetPosition, co
             movingToB_ = true;
             detectionMeter_ = 0.0f;
             alertTimer_ = 0.0f;
-            if (object3d_)
+            if (splineFollower_)
+            {
+                splineFollower_->Restart();
+                position_ = splineFollower_->GetPosition();
+            }
+            else
             {
                 position_ = patrolA_;
+            }
+            if (object3d_)
+            {
                 object3d_->SetTranslate(position_);
                 object3d_->SetColor({ 1.0f, 1.0f, 1.0f, 1.0f });
             }
@@ -276,6 +334,7 @@ void MovingEnemy::Update(WindowAPI* windowAPI, const Vector3* targetPosition, co
             if (state_ != AIState::Chase)
             {
                 state_ = AIState::Chase;
+                if (splineFollower_) splineFollower_->Pause();
                 alertTimer_ = 1.0f; // 「！」マーク表示タイマー開始
                 object3d_->SetColor({ 1.0f, 0.9f, 0.6f, 1.0f }); // 発見時に警戒色
             }
@@ -291,6 +350,7 @@ void MovingEnemy::Update(WindowAPI* windowAPI, const Vector3* targetPosition, co
         if (state_ == AIState::Chase)
         {
             state_ = AIState::Investigate;
+            if (splineFollower_) splineFollower_->Pause();
             investigateTarget_ = lastSeenPlayerPosition_;
             searchTimer_ = 4.0f; // 4秒間捜索
             alertTimer_ = 1.0f;  // 「？」マーク
@@ -311,30 +371,53 @@ void MovingEnemy::Update(WindowAPI* windowAPI, const Vector3* targetPosition, co
     if (state_ == AIState::Patrol)
     {
         if (hitFlashTimer_ <= 0.0f) object3d_->SetColor({ 1.2f, 0.4f, 0.4f, 1.0f });
-        // パトロール移動
-        Vector3 dest = movingToB_ ? patrolB_ : patrolA_;
-        float dx = dest.x - currentPos.x;
-        float dz = dest.z - currentPos.z;
-        float distToDest = std::sqrt(dx * dx + dz * dz);
 
-        if (distToDest < 0.2f)
+        if (useSplinePatrol_ && splineFollower_)
         {
-            movingToB_ = !movingToB_;
-            dest = movingToB_ ? patrolB_ : patrolA_;
-            dx = dest.x - currentPos.x;
-            dz = dest.z - currentPos.z;
-            distToDest = std::sqrt(dx * dx + dz * dz);
-        }
+            if (!splineFollower_->IsPlaying())
+            {
+                splineFollower_->Resume();
+            }
 
-        FaceTarget(dest, deltaTime);
-
-        if (distToDest > 0.0f)
-        {
-            float vx = (dx / distToDest) * moveSpeed_ * frameScale;
-            float vz = (dz / distToDest) * moveSpeed_ * frameScale;
-            position_.x += vx;
-            position_.z += vz;
+            splineFollower_->Update(deltaTime);
+            position_ = splineFollower_->GetPosition();
             object3d_->SetTranslate(position_);
+
+            // スプライン接線（進行方向）を向く
+            const Vector3 tangent = splineFollower_->GetTangent();
+            if (std::abs(tangent.x) > 1e-4f || std::abs(tangent.z) > 1e-4f)
+            {
+                Vector3 lookTarget = { position_.x + tangent.x, position_.y, position_.z + tangent.z };
+                FaceTarget(lookTarget, deltaTime);
+            }
+        }
+        else
+        {
+            // パトロール移動（フォールバック）
+            Vector3 dest = movingToB_ ? patrolB_ : patrolA_;
+            float dx = dest.x - currentPos.x;
+            float dz = dest.z - currentPos.z;
+            float distToDest = std::sqrt(dx * dx + dz * dz);
+
+            if (distToDest < 0.2f)
+            {
+                movingToB_ = !movingToB_;
+                dest = movingToB_ ? patrolB_ : patrolA_;
+                dx = dest.x - currentPos.x;
+                dz = dest.z - currentPos.z;
+                distToDest = std::sqrt(dx * dx + dz * dz);
+            }
+
+            FaceTarget(dest, deltaTime);
+
+            if (distToDest > 0.0f)
+            {
+                float vx = (dx / distToDest) * moveSpeed_ * frameScale;
+                float vz = (dz / distToDest) * moveSpeed_ * frameScale;
+                position_.x += vx;
+                position_.z += vz;
+                object3d_->SetTranslate(position_);
+            }
         }
     }
     else if (state_ == AIState::Investigate)
@@ -361,6 +444,29 @@ void MovingEnemy::Update(WindowAPI* windowAPI, const Vector3* targetPosition, co
         {
             state_ = AIState::Patrol; // パトロールへ戻る
             object3d_->SetColor({ 1.2f, 0.4f, 0.4f, 1.0f });
+
+            // スプラインパトロール復帰時、現在地に最も近いパス上の地点を同期
+            if (splineFollower_ && splinePath_ && splinePath_->GetTotalLength() > 0.0f)
+            {
+                float totalLen = splinePath_->GetTotalLength();
+                float bestDist = 0.0f;
+                float minSqDist = 999999.0f;
+                const float step = 0.5f;
+                for (float d = 0.0f; d <= totalLen; d += step)
+                {
+                    auto sample = splinePath_->EvaluateByDistance(d);
+                    float diffX = sample.position.x - position_.x;
+                    float diffZ = sample.position.z - position_.z;
+                    float sq = diffX * diffX + diffZ * diffZ;
+                    if (sq < minSqDist)
+                    {
+                        minSqDist = sq;
+                        bestDist = d;
+                    }
+                }
+                splineFollower_->SetDistance(bestDist);
+                splineFollower_->Resume();
+            }
         }
     }
     else if (state_ == AIState::Chase)
@@ -927,6 +1033,7 @@ void MovingEnemy::OnHit(const Vector3& attackerPos)
     if (state_ != AIState::Chase)
     {
         state_ = AIState::Investigate;
+        if (splineFollower_) splineFollower_->Pause();
         investigateTarget_ = attackerPos;
         searchTimer_ = 4.0f;
         alertTimer_ = 0.8f;
@@ -937,6 +1044,15 @@ void MovingEnemy::OnHit(const Vector3& attackerPos)
 
 void MovingEnemy::Finalize()
 {
+    if (splineFollower_)
+    {
+        splineFollower_->Stop();
+        splineFollower_.reset();
+    }
+    if (splinePath_)
+    {
+        splinePath_.reset();
+    }
     if (collider_)
     {
         CollisionManager::GetInstance()->UnregisterCollider(collider_.get());
@@ -1010,6 +1126,7 @@ void MovingEnemy::HearNoise(const Vector3& noisePosition)
     }
 
     state_ = AIState::Investigate;
+    if (splineFollower_) splineFollower_->Pause();
     investigateTarget_ = noisePosition;
     searchTimer_ = 4.0f; // 4秒間捜索
     alertTimer_ = 1.0f;  // 「？」マーク表示タイマー
@@ -1022,6 +1139,7 @@ void MovingEnemy::AlertEnemy(const Vector3& targetPos)
     if (state_ != AIState::Chase)
     {
         state_ = AIState::Chase;
+        if (splineFollower_) splineFollower_->Pause();
         alertTimer_ = 1.0f; // 「！」マーク表示タイマー
         detectionMeter_ = 1.0f;
         lastSeenPlayerPosition_ = targetPos;

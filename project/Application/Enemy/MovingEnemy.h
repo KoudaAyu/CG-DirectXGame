@@ -6,6 +6,8 @@
 #include "RenderContext.h"
 #include "Baziru3_Engine/Framework/Collision/SphereCollider.h"
 #include "Baziru3_Engine/Framework/Collision/CollisionManager.h"
+#include "SplinePath.h"
+#include "SplineFollower.h"
 
 class Bullet;
 class Sprite;
@@ -54,6 +56,11 @@ public:
     // 視覚コーンの向き（回転角）を取得する
     float GetYaw() const { return object3d_ ? object3d_->GetRotate().y : 0.0f; }
 
+    // スプライン巡回移動システム
+    void SetPatrolPath(const std::vector<Vector3>& points, bool isLoop = true, float speed = 2.2f);
+    BaziruEngine::SplineFollower* GetSplineFollower() const { return splineFollower_.get(); }
+    BaziruEngine::SplinePath* GetSplinePath() const { return splinePath_.get(); }
+
     // 音源検知のトリガー
     void HearNoise(const Vector3& noisePosition);
     void AlertEnemy(const Vector3& targetPos);
@@ -96,6 +103,11 @@ private:
     Vector3 patrolB_ = { 5.0f, 0.0f, 26.0f };
     bool movingToB_ = true;
     float moveSpeed_ = 0.035f; // 歩き速度
+
+    // スプライン巡回制御
+    std::unique_ptr<BaziruEngine::SplinePath> splinePath_;
+    std::unique_ptr<BaziruEngine::SplineFollower> splineFollower_;
+    bool useSplinePatrol_ = true;
 
     // --- AI索敵追加パラメータ ---
     float detectionMeter_ = 0.0f; // 0.0f (未感知) 〜 1.0f (発見)

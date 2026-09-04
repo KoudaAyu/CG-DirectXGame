@@ -158,6 +158,15 @@ void GamePlayScene::InitializeCharacters()
 	{
 		movingEnemy_ = std::make_unique<MovingEnemy>();
 		movingEnemy_->Initialize(object3dCom, camera_);
+
+		// エンジン層のスプライン曲線等速移動システムを活用した戦術巡回ルート（敵陣地エリアを巡るCatmull-Rom曲線）
+		std::vector<Vector3> patrolSpline = {
+			{ -10.0f, 0.0f, 25.0f },
+			{  -3.0f, 0.0f, 27.5f },
+			{   3.0f, 0.0f, 25.5f },
+			{  10.0f, 0.0f, 27.0f }
+		};
+		movingEnemy_->SetPatrolPath(patrolSpline, false, 2.0f); // 往復PingPong巡回
 	}
 }
 

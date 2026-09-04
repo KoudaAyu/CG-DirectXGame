@@ -26,12 +26,15 @@ public:
 
 	void Run();
 
+	void SetSceneFactory(std::unique_ptr<AbstractSceneFactory> factory) { sceneFactory_ = std::move(factory); }
+	AbstractSceneFactory* GetSceneFactory() const { return sceneFactory_.get(); }
+
 private:
 	bool endRequest = false;
 
 	std::unique_ptr<Game> game = nullptr;
 
-	//シーンファクトリー
-	AbstractSceneFactory* sceneFactory = nullptr;
+	// シーンファクトリー
+	std::unique_ptr<AbstractSceneFactory> sceneFactory_;
 };
 
