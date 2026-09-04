@@ -10,6 +10,8 @@
 
 class KeyInput;
 class MouseInput;
+class Camera;
+class PikminPlayer;
 struct SceneRenderRequests;
 
 /// <summary>
@@ -32,6 +34,10 @@ public:
 
         Count, // 番兵（項目数）
     };
+
+    // PikminPlayer / Camera を unique_ptr で持つので、デストラクタは .cpp 側で定義する
+    // （ヘッダに実装を置くと不完全型のままデストラクタが要求されてしまう）
+    ~TitleScene() override;
 
     void InitializeScene() override;
     void Finalize() override;
@@ -90,6 +96,15 @@ private:
 
     void ResetTuningToDefault();
 
+    // --- タイトルスライム（3D） ---
+    void CreateSlime();
+    void UpdateSlime(float deltaTime);
+    void ResetSlimeTuningToDefault();
+
+    /// <summary>マウスカーソルとスライムの地面平面との交点をワールド座標で返す</summary>
+    /// <param name="outValid">交点が求まったら true</param>
+    Vector3 GetMouseGroundPoint(bool& outValid) const;
+
 #ifdef USE_IMGUI
     void DrawDebugUI();
 #endif
@@ -131,4 +146,34 @@ private:
 
     bool isManualRequested_ = false;
     bool isExitRequested_ = false;
+
+    // ===============================================================
+    // タイトルスライム（3D）
+    //
+    // ゲーム側の PikminPlayer をそのまま流用している。
+    // Update() の引数は全部ポインタなので、入力系を nullptr で渡すと
+    // 「ステージの傾き（stageTilt）だけで動くスライム」になる。
+    // タイトルではその傾きを「目標地点へ向ける P 制御」で自動生成していて、
+    // マウスカーソルを追いかけてぷるぷる転がってくる。
+    // ===============================================================
+
+    /// <summary>タイトル専用カメラ。SceneManager には登録しない（破棄後の参照を避けるため）</summary>
+    std::unique_ptr<Camera> slimeCamera_;
+    std::unique_ptr<PikminPlayer> slime_;
+
+    Vector2 slimeTilt_{};            // 現在のステージ傾き（.x = ピッチ→Z加速 / .y = ロール→X加速）
+    bool isSlimeIntroPulseDone_ = false; // ロゴ登場に合わせた波紋を撃ったか
+    bool wasAnyButtonHovered_ = false;   // ホバーに入った瞬間を取るための前フレーム値
+
+    // --- 調整用パラメータ（ImGui からいじれる） ---
+    bool showSlime_ = true;
+    Vector3 cameraPos_{};        // タイトルカメラの位置
+    float cameraPitch_ = 0.0f;   // タイトルカメラの見下ろし角（ラジアン）
+    Vector3 slimeHome_{};        // スライムの定位置（ここを中心にうろつく）
+    float slimeRoamRadius_ = 0.0f; // 定位置から離れられる最大距離
+    float slimeTiltGain_ = 0.0f;   // 目標地点までの距離 → 傾きの変換係数
+    float slimeMaxTilt_ = 0.0f;    // 傾きの上限（ラジアン）
+    float slimeFollowRate_ = 0.0f; // マウス追従の強さ 0..1
+    bool slimeOverrideColor_ = false; // PikminPlayer が毎フレーム塗る色を上書きするか
+    Vector4 slimeColor_{};
 };

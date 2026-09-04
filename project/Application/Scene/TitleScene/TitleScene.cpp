@@ -6,7 +6,12 @@
 #include "WindowsAPI.h"
 
 #include "Baziru3_Engine/Core/IO/Mouse/MouseInput.h"
+#include "Baziru3_Engine/Framework/Collision/CollisionManager.h"
 #include "Baziru3_Engine/Graphics/Graphics/SceneRenderRequests.h"
+
+#include "Application/Player/PikminPlayer.h"
+#include "Camera.h"
+#include "RenderContext.h"
 
 #include <algorithm>
 #include <cmath>
@@ -102,6 +107,42 @@ constexpr float kButtonPulseAmount = 0.03f;  // ホバー中のぷにぷに変�
 constexpr float kButtonWobbleSpeed = 4.0f;   // ホバー中の傾きゆれ速度
 constexpr float kButtonWobbleDegrees = 2.0f; // ホバー中の傾きゆれ角度（度）
 
+// ===================================================================
+// タイトルスライム（3D）
+//
+// ゲーム側の PikminPlayer をそのまま置いている。
+// Slime 用の RootSignature / PSO は engine の PipelineStateManager が
+// 起動時に登録しているので、GAMEPLAY 以外のシーンからでもそのまま使える。
+// ===================================================================
+constexpr bool kShowSlimeDefault = true;
+
+// カメラの既定値。仮想解像度 1280x720 で、スライムがロゴの真下あたり
+// （画面座標でだいたい 400, 470）に来るように逆算してある
+constexpr Vector3 kCameraPosDefault = {1.53f, 3.0f, -10.0f};
+constexpr float kCameraPitchDefault = 0.171f; // 見下ろし角（ラジアン）
+
+constexpr Vector3 kSlimeHomeDefault = {0.0f, 0.0f, 0.0f};
+constexpr float kSlimeRoamRadiusDefault = 2.4f;  // 定位置から離れられる距離（UI に被らせない）
+constexpr float kSlimeTiltGainDefault = 0.16f;   // 目標までの距離 → 傾き
+constexpr float kSlimeMaxTiltDefault = 0.30f;    // 傾きの上限（ラジアン）
+constexpr float kSlimeFollowRateDefault = 0.85f; // マウス追従の強さ 0..1
+
+constexpr float kSlimeTiltAccel = 16.0f; // タイトル用のゆるい加速（ゲーム側は 38）
+constexpr float kSlimeFriction = 2.0f;   // 減衰。小さいほど行き過ぎて揺り戻す
+constexpr float kSlimeTiltLerpRate = 6.0f; // 傾きの追従速度（1/秒）
+
+constexpr float kSlimeIdleDriftRadius = 0.8f; // 何もしていないときのうろつき幅
+constexpr float kSlimeIdleDriftSpeed = 0.35f; // うろつきの速さ（rad/秒）
+
+constexpr float kSlimeIntroImpulse = 0.5f;  // ロゴが出そろった瞬間の波紋
+constexpr float kSlimeHoverImpulse = 0.22f; // ボタンに乗った瞬間の波紋
+
+constexpr Vector4 kSlimeColorDefault = {0.2f, 0.85f, 1.0f, 0.9f};
+
+// ロゴの最後の文字が出きる時刻。ここに波紋を合わせる
+constexpr float kSlimeIntroPulseTime =
+    kPopStagger * static_cast<float>(kTitleCharCount - 1) + kPopSeconds;
+
 constexpr float kPi = 3.14159265358979323846f;
 
 /// <summary>度をラジアンに</summary>
@@ -134,6 +175,10 @@ float Hash01(uint32_t value)
 
 } // namespace
 
+// unique_ptr が持つ型（PikminPlayer / Camera）の完全な定義が要るので、
+// デストラクタはヘッダではなくここで定義する
+TitleScene::~TitleScene() = default;
+
 // ===================================================================
 // 初期化 / 終了
 // ===================================================================
@@ -153,6 +198,7 @@ void TitleScene::InitializeScene()
 
     CreateTitleLetters();
     CreateButtons();
+    CreateSlime();
 
     sceneTime_ = 0.0f;
     fadeAlpha_ = 0.0f;
@@ -185,6 +231,10 @@ void TitleScene::Finalize()
         }
     }
 
+    // PikminPlayer のデストラクタが CollisionManager から自分を外してくれる
+    slime_.reset();
+    slimeCamera_.reset();
+
     delete input_;
     input_ = nullptr;
 
@@ -203,6 +253,28 @@ void TitleScene::ResetTuningToDefault()
     jiggleAmount_ = kJiggleAmountDefault;
     jiggleSpeed_ = kJiggleSpeedDefault;
     wobbleDegrees_ = kWobbleDegreesDefault;
+
+    ResetSlimeTuningToDefault();
+}
+
+void TitleScene::ResetSlimeTuningToDefault()
+{
+    showSlime_ = kShowSlimeDefault;
+    cameraPos_ = kCameraPosDefault;
+    cameraPitch_ = kCameraPitchDefault;
+    slimeHome_ = kSlimeHomeDefault;
+    slimeRoamRadius_ = kSlimeRoamRadiusDefault;
+    slimeTiltGain_ = kSlimeTiltGainDefault;
+    slimeMaxTilt_ = kSlimeMaxTiltDefault;
+    slimeFollowRate_ = kSlimeFollowRateDefault;
+    slimeOverrideColor_ = false;
+    slimeColor_ = kSlimeColorDefault;
+
+    if (slime_)
+    {
+        slime_->SetTiltAccel(kSlimeTiltAccel);
+        slime_->SetFriction(kSlimeFriction);
+    }
 }
 
 void TitleScene::CreateTitleLetters()
@@ -251,6 +323,47 @@ void TitleScene::CreateButtons()
         button.base = MakeSprite(kButtonAssets[i].base, kButtonSize, {0.5f, 0.5f});
         button.light = MakeSprite(kButtonAssets[i].light, kButtonSize, {0.5f, 0.5f});
     }
+}
+
+void TitleScene::CreateSlime()
+{
+    Object3dCom* object3dCom = GetObject3dCom();
+    if (!dxCommon_ || !object3dCom)
+    {
+        return;
+    }
+
+    // タイトル専用カメラ。
+    // SceneManager::SetCamera() はあえて呼ばない。呼ぶとシーンを抜けたあとも
+    // 破棄済みカメラへのポインタが SceneManager 側に残ってしまうため。
+    // スカイボックスは engine 側のカメラで描かれるが、背景なので問題ない。
+    slimeCamera_ = std::make_unique<Camera>();
+    slimeCamera_->Initialize(dxCommon_);
+    slimeCamera_->SetTranslate(cameraPos_);
+    slimeCamera_->SetRotate({cameraPitch_, 0.0f, 0.0f});
+    slimeCamera_->Update();
+
+    // PikminPlayer::Initialize が SphereCollider を登録するので、先に器を初期化しておく
+    CollisionManager::GetInstance()->Initialize();
+
+    slime_ = std::make_unique<PikminPlayer>();
+    slime_->Initialize(object3dCom, slimeCamera_.get(), slimeHome_);
+
+    // タイトル用にゆったりした挙動へ振り直す（ゲーム側の既定値には触らない）
+    slime_->SetTiltAccel(kSlimeTiltAccel);
+    slime_->SetFriction(kSlimeFriction);
+
+    // 見た目もタイトル向けに少し盛る（ここは Update() に上書きされない）
+    SlimeParamsCPU& params = slime_->GetSlimeParams();
+    params.wobbleStrength = 0.24f;
+    params.wobbleFrequency = 4.4f;
+    params.fresnelPower = 2.2f;
+    params.envReflection = 0.55f;
+    params.innerGlow = 0.55f;
+
+    slimeTilt_ = {0.0f, 0.0f};
+    isSlimeIntroPulseDone_ = false;
+    wasAnyButtonHovered_ = false;
 }
 
 void TitleScene::LayoutTitleLetters()
@@ -313,6 +426,9 @@ void TitleScene::Update()
     UpdateFadeIn(deltaTime);
     UpdateTitleLetters(deltaTime);
     UpdateButtons(deltaTime);
+
+    // ボタンのホバー状態を見てから動かすので、UpdateButtons の後ろに置くこと
+    UpdateSlime(deltaTime);
 
     // Space キーでもゲーム開始（従来のショートカットを残しておく）
     if (input_ && input_->TriggerKey(DIK_SPACE))
@@ -423,11 +539,155 @@ void TitleScene::UpdateButtons(float deltaTime)
     }
 }
 
+void TitleScene::UpdateSlime(float deltaTime)
+{
+    if (!slime_ || !slimeCamera_)
+    {
+        return;
+    }
+
+    // カメラは ImGui でいじれるので毎フレーム反映する。
+    // Update() を呼ばないと GPU 側の定数バッファが確保されず、
+    // Slime の PS がカメラ位置を読めない（＝フレネルと環境反射が死ぬ）
+    slimeCamera_->SetTranslate(cameraPos_);
+    slimeCamera_->SetRotate({cameraPitch_, 0.0f, 0.0f});
+    slimeCamera_->Update();
+
+    // --- 目標地点を決める ---
+    // ベースはゆっくりしたリサージュのうろつき
+    Vector3 target = slimeHome_;
+    target.x += std::sin(sceneTime_ * kSlimeIdleDriftSpeed) * kSlimeIdleDriftRadius;
+    target.z += std::sin(sceneTime_ * kSlimeIdleDriftSpeed * 1.37f + 1.1f) *
+                kSlimeIdleDriftRadius * 0.6f;
+
+    // マウスが画面内にあれば、そっちへ寄っていく
+    bool hasMouseTarget = false;
+    const Vector3 mouseGround = GetMouseGroundPoint(hasMouseTarget);
+    if (hasMouseTarget && slimeFollowRate_ > 0.0f)
+    {
+        target.x += (mouseGround.x - target.x) * slimeFollowRate_;
+        target.z += (mouseGround.z - target.z) * slimeFollowRate_;
+    }
+
+    // 定位置から離れすぎないように制限する（ボタンの上まで行かせない）
+    float offsetX = target.x - slimeHome_.x;
+    float offsetZ = target.z - slimeHome_.z;
+    const float distance = std::sqrt(offsetX * offsetX + offsetZ * offsetZ);
+    if (distance > slimeRoamRadius_ && distance > 1e-4f)
+    {
+        const float shrink = slimeRoamRadius_ / distance;
+        offsetX *= shrink;
+        offsetZ *= shrink;
+    }
+    target = {slimeHome_.x + offsetX, slimeHome_.y, slimeHome_.z + offsetZ};
+
+    // --- 目標地点へ向けてステージを傾ける（P 制御） ---
+    // PikminPlayer::Update() の実装では
+    //   stageTilt.y -> X 方向の加速度 / stageTilt.x -> Z 方向の加速度
+    // 加速度と摩擦がバネダンパになるので、行き過ぎて揺り戻す動きが自然に出る
+    const Vector3& position = slime_->GetPosition();
+    const float targetTiltY =
+        std::clamp((target.x - position.x) * slimeTiltGain_, -slimeMaxTilt_, slimeMaxTilt_);
+    const float targetTiltX =
+        std::clamp((target.z - position.z) * slimeTiltGain_, -slimeMaxTilt_, slimeMaxTilt_);
+
+    slimeTilt_.x = Approach(slimeTilt_.x, targetTiltX, kSlimeTiltLerpRate, deltaTime);
+    slimeTilt_.y = Approach(slimeTilt_.y, targetTiltY, kSlimeTiltLerpRate, deltaTime);
+
+    // 入力系は全部 nullptr で渡す。
+    // こうすると E キーの合体トグルも投擲も走らず、傾きだけで動く状態になる
+    slime_->Update(deltaTime, nullptr, nullptr, nullptr, nullptr, slimeTilt_);
+
+    // PikminPlayer::Update() は毎フレーム baseColor を塗り直すので、
+    // 色を変えたいときは「後がけ」する必要がある
+    SlimeParamsCPU& params = slime_->GetSlimeParams();
+    if (slimeOverrideColor_)
+    {
+        params.baseColor = slimeColor_;
+    }
+
+    // --- ロゴが出そろった瞬間に波紋を1発 ---
+    if (!isSlimeIntroPulseDone_ && sceneTime_ >= kSlimeIntroPulseTime)
+    {
+        params.impulseStrength = kSlimeIntroImpulse;
+        isSlimeIntroPulseDone_ = true;
+    }
+
+    // --- ボタンに乗った瞬間にも小さく波紋 ---
+    bool isAnyHovered = false;
+    for (const Button& button : buttons_)
+    {
+        isAnyHovered = isAnyHovered || button.isHovered;
+    }
+    if (isAnyHovered && !wasAnyButtonHovered_)
+    {
+        params.impulseStrength = (std::max)(params.impulseStrength, kSlimeHoverImpulse);
+    }
+    wasAnyButtonHovered_ = isAnyHovered;
+}
+
+Vector3 TitleScene::GetMouseGroundPoint(bool& outValid) const
+{
+    outValid = false;
+    Vector3 result = slimeHome_;
+
+    if (!slimeCamera_)
+    {
+        return result;
+    }
+
+    const float screenWidth = static_cast<float>(WindowAPI::GetClientWidth());
+    const float screenHeight = static_cast<float>(WindowAPI::GetClientHeight());
+
+    const Vector2 mouse = GetMousePositionOnUI();
+    if (mouse.x < 0.0f || mouse.y < 0.0f || mouse.x > screenWidth || mouse.y > screenHeight)
+    {
+        return result; // 画面の外。うろつきだけに任せる
+    }
+
+    const float ndcX = (mouse.x / screenWidth) * 2.0f - 1.0f;
+    const float ndcY = 1.0f - (mouse.y / screenHeight) * 2.0f;
+
+    // カメラ空間でのレイ方向
+    const float tanHalfFov = std::tan(slimeCamera_->GetFovY() * 0.5f);
+    const Vector3 rayInCamera = {ndcX * tanHalfFov * slimeCamera_->GetAspectRatio(),
+                                 ndcY * tanHalfFov, 1.0f};
+
+    // タイトルカメラはピッチ（X軸回転）しか使っていないので、その分だけ回してワールドに戻す
+    const float cosPitch = std::cos(cameraPitch_);
+    const float sinPitch = std::sin(cameraPitch_);
+    const Vector3 rayInWorld = {rayInCamera.x,
+                                rayInCamera.y * cosPitch - rayInCamera.z * sinPitch,
+                                rayInCamera.y * sinPitch + rayInCamera.z * cosPitch};
+
+    if (rayInWorld.y > -1e-4f)
+    {
+        return result; // 地平線より上を指している
+    }
+
+    const float rayLength = (slimeHome_.y - cameraPos_.y) / rayInWorld.y;
+    if (rayLength <= 0.0f)
+    {
+        return result;
+    }
+
+    result = {cameraPos_.x + rayInWorld.x * rayLength, slimeHome_.y,
+              cameraPos_.z + rayInWorld.z * rayLength};
+    outValid = true;
+    return result;
+}
+
 void TitleScene::DecideMenu(MenuItem item)
 {
     switch (item)
     {
     case MenuItem::Start:
+        // 合体させてからゲームへ。ChangeScene はフェードアウトの予約なので、
+        // 暗転していく間に「ぷるんと膨らんで黄金色になる」ところが見える
+        if (slime_ && !slime_->IsMerged())
+        {
+            slime_->ToggleMerge();
+        }
         SceneManager::GetInstance()->ChangeScene("GAMEPLAY");
         break;
 
@@ -450,7 +710,7 @@ void TitleScene::DecideMenu(MenuItem item)
 // 描画
 // ===================================================================
 
-void TitleScene::Draw(SceneRenderRequests& /*renderRequests*/)
+void TitleScene::Draw(SceneRenderRequests& renderRequests)
 {
     if (!dxCommon_ || !dxCommon_->GetCommandList())
     {
@@ -461,6 +721,22 @@ void TitleScene::Draw(SceneRenderRequests& /*renderRequests*/)
 
     // 背景スカイボックスの描画
     SceneManager::GetInstance()->DrawSkybox(commandList);
+
+    // --- 3D スライム ---
+    // UI より先に描いて背面に置く。
+    // ここはオフスクリーンパスの中なので、ポストプロセスが乗る
+    if (showSlime_ && slime_ && slimeCamera_)
+    {
+        // これを立てるとエンジン側のデバッグ用 plane が出なくなり、
+        // 代わりにパーティクル描画が有効になる
+        renderRequests.sceneDrawn = true;
+
+        RenderContext ctx;
+        ctx.commandList = commandList;
+        ctx.camera = slimeCamera_.get();
+        ctx.light = GetLight();
+        slime_->Draw(ctx);
+    }
 
     // UI の描画。Sprite::Draw() が内部で RootSignature / PSO を張り直すので、
     // ここで 2D を描いても後続の 3D 描画には影響しない
@@ -518,6 +794,75 @@ void TitleScene::DrawDebugUI()
         {
             sceneTime_ = 0.0f;
             fadeAlpha_ = 0.0f;
+            isSlimeIntroPulseDone_ = false;
+        }
+    }
+
+    if (ImGui::CollapsingHeader("Title Slime", ImGuiTreeNodeFlags_DefaultOpen))
+    {
+        ImGui::Checkbox("Show Slime", &showSlime_);
+
+        if (slime_)
+        {
+            const Vector3& position = slime_->GetPosition();
+            ImGui::Text("Pos  : %.2f, %.2f, %.2f", position.x, position.y, position.z);
+            ImGui::Text("Tilt : pitch %.1f deg / roll %.1f deg", slimeTilt_.x * 57.2958f,
+                        slimeTilt_.y * 57.2958f);
+        }
+
+        ImGui::SeparatorText("Camera");
+        ImGui::DragFloat3("Camera Pos", &cameraPos_.x, 0.05f, -30.0f, 30.0f, "%.2f");
+        ImGui::SliderFloat("Camera Pitch", &cameraPitch_, -0.6f, 1.2f, "%.3f rad");
+
+        ImGui::SeparatorText("Movement");
+        ImGui::DragFloat3("Home", &slimeHome_.x, 0.05f, -20.0f, 20.0f, "%.2f");
+        ImGui::SliderFloat("Roam Radius", &slimeRoamRadius_, 0.0f, 8.0f, "%.2f");
+        ImGui::SliderFloat("Follow Mouse", &slimeFollowRate_, 0.0f, 1.0f, "%.2f");
+        ImGui::SliderFloat("Tilt Gain", &slimeTiltGain_, 0.01f, 0.6f, "%.3f");
+        ImGui::SliderFloat("Max Tilt", &slimeMaxTilt_, 0.02f, 0.8f, "%.3f rad");
+
+        if (slime_)
+        {
+            float tiltAccel = slime_->GetTiltAccel();
+            if (ImGui::SliderFloat("Tilt Accel", &tiltAccel, 2.0f, 60.0f, "%.1f"))
+            {
+                slime_->SetTiltAccel(tiltAccel);
+            }
+            float friction = slime_->GetFriction();
+            if (ImGui::SliderFloat("Friction", &friction, 0.5f, 8.0f, "%.2f"))
+            {
+                slime_->SetFriction(friction);
+            }
+
+            ImGui::SeparatorText("Look");
+            SlimeParamsCPU& params = slime_->GetSlimeParams();
+            ImGui::SliderFloat("Wobble Strength", &params.wobbleStrength, 0.0f, 0.5f, "%.3f");
+            ImGui::SliderFloat("Wobble Frequency", &params.wobbleFrequency, 1.0f, 15.0f, "%.1f");
+            ImGui::SliderFloat("Fresnel Power", &params.fresnelPower, 0.5f, 6.0f, "%.1f");
+            ImGui::SliderFloat("Env Reflection", &params.envReflection, 0.0f, 1.0f, "%.2f");
+            ImGui::SliderFloat("Inner Glow", &params.innerGlow, 0.0f, 1.0f, "%.2f");
+            ImGui::SliderFloat("Shininess", &params.specularShininess, 8.0f, 128.0f, "%.0f");
+
+            // PikminPlayer::Update() が毎フレーム色を塗り直すので、
+            // チェックを外している間はゲーム側と同じ色になる
+            ImGui::Checkbox("Override Color", &slimeOverrideColor_);
+            ImGui::ColorEdit4("Slime Color", &slimeColor_.x);
+
+            ImGui::SeparatorText("Test");
+            if (ImGui::Button("Impulse Ripple", ImVec2(140.0f, 0.0f)))
+            {
+                params.impulseStrength = kSlimeIntroImpulse;
+            }
+            ImGui::SameLine();
+            if (ImGui::Button(slime_->IsMerged() ? "Split" : "Merge", ImVec2(140.0f, 0.0f)))
+            {
+                slime_->ToggleMerge();
+            }
+        }
+
+        if (ImGui::Button("Reset Slime", ImVec2(140.0f, 0.0f)))
+        {
+            ResetSlimeTuningToDefault();
         }
     }
 
