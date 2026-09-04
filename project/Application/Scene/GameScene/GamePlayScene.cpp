@@ -90,6 +90,13 @@ void GamePlayScene::InitializeScene()
     cameraRotVelocity_ = { 0.0f, 0.0f, 0.0f };
     tiltVelocity_ = { 0.0f, 0.0f };
 
+    currentCameraDist_ = cameraDistance_;
+    cameraDistVelocity_ = 0.0f;
+    currentGroupSpread_ = 0.0f;
+    groupSpreadVelocity_ = 0.0f;
+    currentFocusPos_ = { 0.0f, 0.5f, 0.0f };
+    focusPosVelocity_ = { 0.0f, 0.0f, 0.0f };
+
     if (sceneManager_) {
         sceneManager_->SetCamera(playCamera_.get());
     }
@@ -288,6 +295,12 @@ void GamePlayScene::Update()
             player_->GetSlimeParams().impulseStrength = 0.55f;
             player_->GetSlimeParams().squashStretch = { 0.25f, -0.20f, 0.25f };
         }
+        else if (mergeResult.newlyMergedCount > 0)
+        {
+            player_->SetSize(player_->GetSize() + mergeResult.newlyMergedCount);
+            player_->GetSlimeParams().impulseStrength = 0.45f;
+            player_->GetSlimeParams().squashStretch = { 0.20f, -0.15f, 0.20f };
+        }
     }
 
 
@@ -352,19 +365,51 @@ void GamePlayScene::Update()
     // カメラの群れ重心追従 (LocoRoco方式: 全ロコロコの重心と広がりを捉える)
     if (playCamera_ && player_)
     {
-        Vector3 focusTargetPos = player_->GetPosition();
-        float groupSpread = 0.0f;
+        Vector3 rawFocusPos = player_->GetPosition();
+        float rawSpread = 0.0f;
         if (minionManager_)
         {
-            minionManager_->GetGroupCenterAndSpread(player_->GetPosition(), focusTargetPos, groupSpread);
+            minionManager_->GetGroupCenterAndSpread(player_->GetPosition(), rawFocusPos, rawSpread);
         }
 
         Vector3 playerVel = player_->GetVelocity();
 
-        // 1. プレイヤースケールおよび群れの広がり（Spread）に応じたカメラ距離
-        // 合体巨大化時はスケールで後退し、分裂時は散らばり具合（Spread）で引いて全員を画面内に綺麗に収める
+        // 初回初期化
+        if (!cameraInitialized_)
+        {
+            currentFocusPos_ = rawFocusPos;
+            currentGroupSpread_ = rawSpread;
+            focusPosVelocity_ = { 0.0f, 0.0f, 0.0f };
+            groupSpreadVelocity_ = 0.0f;
+        }
+        else
+        {
+            // 注視点中心のスムーズ補間（ミニオン合体による重心の瞬間ジャンプを防止）
+            currentFocusPos_.x = SmoothDamp(currentFocusPos_.x, rawFocusPos.x, focusPosVelocity_.x, focusSmoothTime_, deltaTime);
+            currentFocusPos_.y = SmoothDamp(currentFocusPos_.y, rawFocusPos.y, focusPosVelocity_.y, focusSmoothTime_, deltaTime);
+            currentFocusPos_.z = SmoothDamp(currentFocusPos_.z, rawFocusPos.z, focusPosVelocity_.z, focusSmoothTime_, deltaTime);
+
+            // 群れの広がりのスムーズ補間（合体でミニオンが消えたときの急激なズームインを完全に緩和）
+            currentGroupSpread_ = SmoothDamp(currentGroupSpread_, rawSpread, groupSpreadVelocity_, groupSpreadSmoothTime_, deltaTime);
+        }
+
+        // 1. プレイヤースケールおよび群れの広がり（Spread）に応じた目標カメラ距離
+        // 合体時の急激なズーム変化を防止するため、広がりの重みをマイルド化(0.35f)し、
+        // 距離そのものを SmoothDamp で優雅に補間
         float scaleOffset = (player_->GetCurrentScale() - 0.4f);
-        float effectiveDist = cameraDistance_ + (std::max)(0.0f, scaleOffset) * cameraDynamicZoom_ + groupSpread * 0.75f;
+        float targetDist = cameraDistance_ + (std::max)(0.0f, scaleOffset) * cameraDynamicZoom_ + currentGroupSpread_ * 0.35f;
+
+        if (!cameraInitialized_)
+        {
+            currentCameraDist_ = targetDist;
+            cameraDistVelocity_ = 0.0f;
+        }
+        else
+        {
+            currentCameraDist_ = SmoothDamp(currentCameraDist_, targetDist, cameraDistVelocity_, cameraZoomSmoothTime_, deltaTime);
+        }
+
+        float effectiveDist = currentCameraDist_;
 
         // 2. カメラの見下ろし角・方位角
         float pitch = cameraPitch_;
@@ -383,11 +428,11 @@ void GamePlayScene::Update()
         };
 
         // 3. 注視点（LookAt Target）と目標カメラ位置の算出
-        // 群れの重心を捉え、視界を安定確保
+        // 滑らかに補間された注視点を基準にし、視界を安定確保
         Vector3 lookAtTarget = {
-            focusTargetPos.x,
-            focusTargetPos.y + cameraTargetOffsetY_,
-            focusTargetPos.z + cameraForwardOffset_
+            currentFocusPos_.x,
+            currentFocusPos_.y + cameraTargetOffsetY_,
+            currentFocusPos_.z + cameraForwardOffset_
         };
 
         Vector3 targetCamPos = {

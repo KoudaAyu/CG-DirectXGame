@@ -194,38 +194,52 @@ void MinionManager::TriggerMerge(const Vector3& playerPos, float mergeRadius) {
     }
 }
 
-void MinionManager::TriggerSplit(const Vector3& playerPos) {
+void MinionManager::TriggerSplit(const Vector3& playerPos, int splitCount) {
+    (void)splitCount;
     isMergedState_ = false;
     isAllMerged_ = false;
     absorbedCount_ = 0;
 
-    int total = static_cast<int>(minions_.size());
-    if (total <= 0) return;
+    int totalMinions = static_cast<int>(minions_.size());
+    if (totalMinions == 0) return;
 
-    float angleStep = (2.0f * kPi) / static_cast<float>(total);
+    float angleStep = (2.0f * kPi) / static_cast<float>(totalMinions);
 
-    for (int index = 0; index < total; ++index) {
+    for (size_t index = 0; index < minions_.size(); ++index) {
         auto& minion = minions_[index];
         if (!minion) continue;
 
+        bool wasInactive = !minion->IsActive();
         minion->SetSize(1);
         minion->SetActive(true);
-        minion->SetPosition(playerPos);
-        // 分裂直後の即時再合体を防止するクールダウン（0.65秒）
-        minion->SetMergeCooldown(0.65f);
+        // 分裂直後の即時再合体を防止する適度なクールダウン（0.40秒）
+        minion->SetMergeCooldown(0.40f);
 
-        float angle = angleStep * index + ((std::rand() % 100) / 100.0f - 0.5f) * 0.35f;
-        float popSpeed = splitPopPower_ + ((std::rand() % 100) / 100.0f - 0.5f) * (splitPopPower_ * 0.25f);
-        float upSpeed = splitUpPower_ + ((std::rand() % 100) / 100.0f - 0.5f) * (splitUpPower_ * 0.25f);
+        Vector3 mPos = minion->GetPosition();
+        float distToPlayerSq = (mPos.x - playerPos.x) * (mPos.x - playerPos.x) + (mPos.z - playerPos.z) * (mPos.z - playerPos.z);
 
-        Vector3 launchVel = {
-            std::sin(angle) * popSpeed,
-            upSpeed,
-            std::cos(angle) * popSpeed
-        };
-        minion->Launch(launchVel);
+        // プレイヤーに吸収されていたスライム、または近傍にいたスライムはプレイヤー中心から放射状にパァン！と弾き出す
+        if (wasInactive || distToPlayerSq < 2.5f * 2.5f) {
+            minion->SetPosition(playerPos);
+
+            float angle = angleStep * index + ((std::rand() % 100) / 100.0f - 0.5f) * 0.35f;
+            float popSpeed = splitPopPower_ + ((std::rand() % 100) / 100.0f - 0.5f) * (splitPopPower_ * 0.25f);
+            float upSpeed = splitUpPower_ + ((std::rand() % 100) / 100.0f - 0.5f) * (splitUpPower_ * 0.25f);
+
+            Vector3 launchVel = {
+                std::sin(angle) * popSpeed,
+                upSpeed,
+                std::cos(angle) * popSpeed
+            };
+            minion->Launch(launchVel);
+        } else {
+            // もともと離れた位置にいた仲間スライムは、その場で上方向に小さくポヨンとホップ
+            Vector3 jumpVel = { 0.0f, splitUpPower_ * 0.6f, 0.0f };
+            minion->Launch(jumpVel);
+        }
     }
 }
+
 
 void MinionManager::SetAllAbsorbed(bool absorbed) {
     for (auto& minion : minions_) {

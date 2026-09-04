@@ -37,7 +37,7 @@ public:
 
     // 合体 / 分裂トリガー
     void TriggerMerge(const Vector3& playerPos, float mergeRadius = 4.5f);
-    void TriggerSplit(const Vector3& playerPos);
+    void TriggerSplit(const Vector3& playerPos, int splitCount = 10);
     void SetAllAbsorbed(bool absorbed);
     void SetInitialAbsorbedCount(int absorbedCount);
 

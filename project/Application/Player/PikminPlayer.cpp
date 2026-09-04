@@ -231,16 +231,11 @@ void PikminPlayer::Update(float deltaTime, KeyInput* keyInput, MinionManager* mi
     if (keyInput) {
         if (keyInput->TriggerKey(DIK_E)) {
             // ロコロコ方式分裂: 合体中ならパァンと全員飛び散って小ロコロコに分裂！
-            if (minionManager && minionManager->GetAbsorbedCount() > 0) {
-                minionManager->TriggerSplit(position_);
-                isMerged_ = false;
-                lastAbsorbedCount_ = 0;
-                size_ = 1;
-                currentMergedScale_ = 0.4f;
-                scale_ = { 0.4f, 0.4f, 0.4f };
-                slimeParams_.baseColor = SlimePhysics::GetColorBySize(1); // 小 (1-2) は青
-                slimeParams_.impulseStrength = 0.45f;
-                slimeParams_.squashStretch = { 0.25f, -0.2f, 0.25f };
+            if (minionManager && (size_ > 1 || minionManager->GetAbsorbedCount() > 0)) {
+                minionManager->TriggerSplit(position_, size_);
+                SetSize(1);
+                slimeParams_.impulseStrength = 0.55f;
+                slimeParams_.squashStretch = { 0.35f, -0.25f, 0.35f };
             }
         }
     }

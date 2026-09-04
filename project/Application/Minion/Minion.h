@@ -77,8 +77,8 @@ public:
     // 衝突時の弾性リアクション
     void OnCollision(const CollisionInfo& info);
 
-    // 再合体可能か（アクティブ ＆ 転がり中 ＆ クールダウンなし）
-    bool CanMerge() const { return isActive_ && state_ == MinionState::Rolling && mergeCooldown_ <= 0.0f; }
+    // 再合体可能か（アクティブ ＆ クールダウンなし）
+    bool CanMerge() const { return isActive_ && mergeCooldown_ <= 0.0f; }
     void SetMergeCooldown(float cd) { mergeCooldown_ = cd; }
     float GetMergeCooldown() const { return mergeCooldown_; }
 

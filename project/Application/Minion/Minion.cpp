@@ -437,6 +437,7 @@ void Minion::SetSize(int s) {
     scale_ = { sVal, sVal, sVal };
     radius_ = sVal * 0.78f;
     groundY_ = sVal * 0.73f;
+    slimeParams_.baseColor = SlimePhysics::GetColorBySize(size_);
     if (object3d_) {
         object3d_->SetScale(scale_);
         object3d_->Update();
