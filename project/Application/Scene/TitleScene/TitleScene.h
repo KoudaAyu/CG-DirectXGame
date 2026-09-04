@@ -6,12 +6,15 @@
 
 #include <cstdint>
 #include <memory>
+#include <random>
 #include <vector>
 
 class KeyInput;
 class MouseInput;
 class Camera;
 class PikminPlayer;
+class MinionManager;
+class SlimeFx;
 struct SceneRenderRequests;
 
 /// <summary>
@@ -35,8 +38,15 @@ public:
         Count, // 番兵（項目数）
     };
 
-    // PikminPlayer / Camera を unique_ptr で持つので、デストラクタは .cpp 側で定義する
-    // （ヘッダに実装を置くと不完全型のままデストラクタが要求されてしまう）
+    // PikminPlayer / MinionManager / SlimeFx を前方宣言のまま unique_ptr で持っているので、
+    // コンストラクタとデストラクタは両方 .cpp 側で定義する。
+    //
+    // デストラクタだけでは足りない: SceneRegistration.cpp の
+    // REGISTER_SCENE(TitleScene, "TITLE") が std::make_unique<TitleScene>() を展開するため、
+    // あの TU で暗黙のデフォルトコンストラクタが実体化される。
+    // コンストラクタは「途中のメンバ構築が例外を投げたら構築済みメンバを破棄する」経路を持つので、
+    // そこで ~unique_ptr<SlimeFx> が実体化され、不完全型の static_assert に引っかかる。
+    TitleScene();
     ~TitleScene() override;
 
     void InitializeScene() override;
@@ -105,6 +115,17 @@ private:
     /// <param name="outValid">交点が求まったら true</param>
     Vector3 GetMouseGroundPoint(bool& outValid) const;
 
+    // --- 自動デモ ---
+    void UpdateDemo(float deltaTime);
+    void EnterMerge();
+    void EnterSplit();
+    void DoThrow();
+
+    // --- パーティクル演出 ---
+    void UpdateFx(float deltaTime);
+
+    float RandomRange(float minValue, float maxValue);
+
 #ifdef USE_IMGUI
     void DrawDebugUI();
 #endif
@@ -157,9 +178,23 @@ private:
     // マウスカーソルを追いかけてぷるぷる転がってくる。
     // ===============================================================
 
-    /// <summary>タイトル専用カメラ。SceneManager には登録しない（破棄後の参照を避けるため）</summary>
-    std::unique_ptr<Camera> slimeCamera_;
+    /// <summary>
+    /// engine 側のカメラを借りて使う（所有しない）。
+    /// Object3dCom::GetDefaultCamera() から取る。これは Game が
+    /// ParticleManager と SkyBox にも渡しているのと同じカメラなので、
+    /// スライム・スカイボックス・パーティクルの視点が自動的に揃う。
+    /// SceneManager::GetCamera() は GAMEPLAY を経由すると解放済みの
+    /// playCamera_ を指しているので、そちらは使わない。
+    /// </summary>
+    Camera* slimeCamera_ = nullptr;
+    Vector3 savedCameraTranslate_{}; // シーンを抜けるときに戻すための退避
+    Vector3 savedCameraRotate_{};
+
     std::unique_ptr<PikminPlayer> slime_;
+    std::unique_ptr<MinionManager> minions_;
+    std::unique_ptr<SlimeFx> fx_;
+
+    std::mt19937 randomEngine_;
 
     Vector2 slimeTilt_{};            // 現在のステージ傾き（.x = ピッチ→Z加速 / .y = ロール→X加速）
     bool isSlimeIntroPulseDone_ = false; // ロゴ登場に合わせた波紋を撃ったか
@@ -176,4 +211,57 @@ private:
     float slimeFollowRate_ = 0.0f; // マウス追従の強さ 0..1
     bool slimeOverrideColor_ = false; // PikminPlayer が毎フレーム塗る色を上書きするか
     Vector4 slimeColor_{};
+
+    // ===============================================================
+    // 自動デモ
+    //
+    // ゲーム中にプレイヤーがやること（転がる / 投げる / 合体 / 分裂）を
+    // 気ままに繰り返す。マウスを動かすとスライムがそっちに寄ってくるので、
+    // 「勝手に遊んでいるところに手を出せる」感じになる。
+    // ===============================================================
+
+    /// <summary>デモの状態。Merge / Split は瞬間のイベントなので状態は2つだけ</summary>
+    enum class DemoState
+    {
+        Roam,    // 分裂状態。うろつきながらミニオンを投げる
+        Rolling, // 合体状態。黄金の巨大スライムでゆったり転がる
+    };
+
+    DemoState demoState_ = DemoState::Roam;
+    float demoTimer_ = 0.0f;
+    float demoDuration_ = 0.0f;
+    float throwTimer_ = 0.0f;
+    int prevMergedCount_ = 0;
+    int strandDelayFrames_ = 0;    // 分裂の数フレーム後に「粘りの糸」を出すためのカウンタ
+    float slimeFlashTimer_ = 0.0f; // 分裂の瞬間の白フラッシュ
+
+    // --- 調整用 ---
+    bool isDemoEnabled_ = true;
+    int minionSpawnCount_ = 0;
+    float demoRoamSecondsMin_ = 0.0f;
+    float demoRoamSecondsMax_ = 0.0f;
+    float demoRollSecondsMin_ = 0.0f;
+    float demoRollSecondsMax_ = 0.0f;
+    float demoThrowIntervalMin_ = 0.0f;
+    float demoThrowIntervalMax_ = 0.0f;
+
+    // ===============================================================
+    // パーティクル演出（SlimeFx）
+    // ===============================================================
+
+    float fxSparkleAccum_ = 0.0f;
+    float fxBackgroundAccum_ = 0.0f;
+    float fxTrailDistance_ = 0.0f;
+    Vector3 fxPrevSlimePos_{};
+
+    // --- 調整用 ---
+    bool showFx_ = true;
+    bool fxEnableSparkle_ = true;
+    bool fxEnableTrail_ = true;
+    bool fxEnableGroundMark_ = true;
+    bool fxEnableBulletTrail_ = true;
+    bool fxEnableBackground_ = true;
+    float fxSparkleInterval_ = 0.0f;
+    float fxTrailStep_ = 0.0f;
+    float fxBackgroundInterval_ = 0.0f;
 };

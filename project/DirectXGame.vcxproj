@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|x64">
@@ -128,6 +128,7 @@
     <ClCompile Include="Application\Player\PikminPlayer.cpp" />
     <ClCompile Include="Application\GameObject\SlimeMesh.cpp" />
     <ClCompile Include="Application\GameObject\AimGuide.cpp" />
+    <ClCompile Include="Application\GameObject\SlimeFx.cpp" />
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="Resources\shaders\Slime.VS.hlsl">
@@ -372,6 +373,7 @@
     <ClInclude Include="Application\Player\PikminPlayer.h" />
     <ClInclude Include="Application\GameObject\SlimeMesh.h" />
     <ClInclude Include="Application\GameObject\AimGuide.h" />
+    <ClInclude Include="Application\GameObject\SlimeFx.h" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="externals\DirectXTex\DirectXTex_Desktop_2022_Win10.vcxproj">
