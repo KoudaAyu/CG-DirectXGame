@@ -11,7 +11,7 @@
 
 class KeyInput;
 class Camera;
-class SlimeFx;
+class FireworkFx;
 struct SceneRenderRequests;
 
 /// <summary>
@@ -23,7 +23,8 @@ struct SceneRenderRequests;
 ///   - SCORE / TIME / COIN ラベル … タイトルのボタンと同じく EaseOutBack でぽぽぽっと登場
 ///   - 数値 … 1枚のアトラス画像から桁ごとに切り出し、0 からカウントアップする
 ///   - "PRESS SPACE TO CONTINUE" … α を往復させて点滅
-///   - 背景 … SlimeFx で打ち上げ花火。色は color(time, position) のベクター場から毎フレーム引く
+///   - 背景 … FireworkFx（バッチ描画）で打ち上げ花火。色は color(time, position) の
+///            ベクター場から粒ごとに毎フレーム引き直す。炸裂後も軌跡を撒き続ける
 ///
 /// スコアなどの値は SceneContext（SceneManager の key-value）から読む。
 /// キーは kResultScoreKey / kResultTimeKey / kResultCoinKey（.cpp 冒頭）。
@@ -33,7 +34,7 @@ struct SceneRenderRequests;
 class ClearScene : public BaseScene
 {
 public:
-    // SlimeFx を前方宣言のまま unique_ptr で持っているので、
+    // FireworkFx を前方宣言のまま unique_ptr で持っているので、
     // コンストラクタとデストラクタは両方 .cpp 側で定義する。
     // （SceneRegistration.cpp の REGISTER_SCENE が make_unique<ClearScene>() を展開して、
     //   あの TU で暗黙のデフォルトコンストラクタが実体化されるため。詳細は TitleScene.h と同じ）
@@ -144,6 +145,9 @@ private:
     void LaunchRocket();
     void LaunchRocketAt(const Vector3& burstPoint, float power);
 
+    /// <summary>この1発を「柳」にするか抽選する</summary>
+    bool RollWillow();
+
     /// <summary>粒の色を決めるベクター場 color(time, position)。2つの場をブレンドしたもの</summary>
     Vector4 EvaluateColorField(float time, const Vector3& position) const;
 
@@ -189,14 +193,18 @@ private:
     //
     // engine のカメラを Object3dCom::GetDefaultCamera() で借りて、
     // 正面固定（yaw / pitch / roll = 0）にしてから使う。
-    // SlimeFx のビルボードはカメラのピッチを打ち消すだけの実装なので、
-    // ピッチ 0 のここでは常に正対する。
+    //
+    // 描画は SlimeFx ではなく FireworkFx（バッチ描画）。
+    // SlimeFx は粒1個 = Object3d 1個で、頂点バッファのコミット粒度 64KB と
+    // 定数バッファの 1フレーム 2.67MB 枠に当たるため 1000粒あたりが天井。
+    // FireworkFx は全粒を1本の頂点バッファに展開してドローコール2回で描くので、
+    // 4096粒でも頂点 640KB / 定数バッファ1個で済む。
     // ===============================================================
     Camera* fxCamera_ = nullptr;
     Vector3 savedCameraTranslate_{};
     Vector3 savedCameraRotate_{};
 
-    std::unique_ptr<SlimeFx> fx_;
+    std::unique_ptr<FireworkFx> fx_;
     std::vector<Rocket> rockets_;
     float launchTimer_ = 0.0f;
     float ambientAccum_ = 0.0f;
@@ -251,6 +259,9 @@ private:
     bool fxAdditive_ = true;
     bool fxUseColorField_ = true;
     bool fxEnableAmbient_ = true;
+    bool fxEnableTrail_ = true;   // 炸裂後の軌跡
+    float fxTrailDensity_ = 1.0f; // 軌跡の濃さ（1.0 で既定）
+    float willowRatio_ = 0.0f;    // 「柳」を引く確率 0..1
     float launchIntervalMin_ = 0.0f;
     float launchIntervalMax_ = 0.0f;
     float fireworkPowerMin_ = 0.0f;

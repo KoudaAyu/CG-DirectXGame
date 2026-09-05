@@ -3,11 +3,10 @@
 #include "Camera.h"
 #include "DirectXCom.h"
 #include "KeyInput.h"
-#include "RenderContext.h"
 #include "SceneManager.h"
 #include "WindowsAPI.h"
 
-#include "Application/GameObject/SlimeFx.h"
+#include "Application/GameObject/FireworkFx.h"
 #include "Baziru3_Engine/Graphics/3D/Object/Object3dCom.h"
 #include "Baziru3_Engine/Graphics/Graphics/SceneRenderRequests.h"
 
@@ -148,8 +147,8 @@ struct RowLayout
 
 constexpr RowLayout kRowLayouts[kRowCount] = {
     {{10.0f, 0.0f},   {190.0f, 56.0f}, {190.0f, 80.0f},  5, false}, // SCORE
-    {{0.0f, 150.0f},  {160.0f, 56.0f}, {180.0f, 230.0f}, 5, true }, // TIME (MM:SS)
-    {{5.0f, 300.0f},  {170.0f, 56.0f}, {170.0f, 380.0f}, 3, false}, // COIN
+    {{0.0f, 155.0f},  {160.0f, 56.0f}, {180.0f, 230.0f}, 5, true }, // TIME (MM:SS)
+    {{5.0f, 305.0f},  {170.0f, 56.0f}, {170.0f, 380.0f}, 3, false}, // COIN
 };
 
 constexpr Vector2 kDigitSizeDefault = {56.0f, 72.0f};
@@ -204,15 +203,21 @@ constexpr float kPromptAlphaMaxDefault = 1.0f;
 // ===================================================================
 // 背景の花火
 // ===================================================================
-// 花火1発で 47粒（閃光1 + 内殻16 + 外殻22 + 尾8）使う。
-// 同時に3〜4発（141）+ 上昇軌跡（約76）+ 環境の粒（約20）でピーク 250 前後。
-// 粒1個につき Object3d が1個（＝頂点／インデックスバッファも1個）なので、
-// シーン入場時の生成コストとの兼ね合いでこのくらいに抑えている
-constexpr uint32_t kFxCapacity = 384;
+// FireworkFx はバッチ描画（全粒を1本の頂点バッファに展開してドローコール2回）なので、
+// 粒数を増やしてもコストは頂点バッファのサイズと CPU の展開だけ。
+//   4096粒 = 頂点 4096 x 4 x 40B ≒ 640KB、定数バッファは1フレーム1個
+// 炸裂後の軌跡が粒を大量に使う。柳1発で 700粒前後、菊で 500粒前後。
+// 同時に3発ぶん重なっても届くようにこの値にしてある
+constexpr uint32_t kFxCapacity = 4096;
 constexpr int kMaxRockets = 4;
 
 constexpr bool kFxAdditiveDefault = true;
 constexpr bool kFxUseColorFieldDefault = true;
+constexpr bool kFxTrailDefault = true;
+constexpr float kFxTrailDensityDefault = 1.0f;
+
+// 「柳」を引く確率。0 で全部が菊、1 で全部が柳
+constexpr float kWillowRatioDefault = 0.35f;
 
 constexpr float kLaunchIntervalMinDefault = 0.55f;
 constexpr float kLaunchIntervalMaxDefault = 1.30f;
@@ -315,7 +320,7 @@ Vector2 CellLeftTop(int cell)
 
 } // namespace
 
-// unique_ptr が持つ型（SlimeFx）の完全な定義が要るので、
+// unique_ptr が持つ型（FireworkFx）の完全な定義が要るので、
 // コンストラクタとデストラクタはヘッダではなくここで定義する
 ClearScene::ClearScene() = default;
 ClearScene::~ClearScene() = default;
@@ -452,6 +457,9 @@ void ClearScene::ResetTuningToDefault()
     fxAdditive_ = kFxAdditiveDefault;
     fxUseColorField_ = kFxUseColorFieldDefault;
     fxEnableAmbient_ = true;
+    fxEnableTrail_ = kFxTrailDefault;
+    fxTrailDensity_ = kFxTrailDensityDefault;
+    willowRatio_ = kWillowRatioDefault;
     launchIntervalMin_ = kLaunchIntervalMinDefault;
     launchIntervalMax_ = kLaunchIntervalMaxDefault;
     fireworkPowerMin_ = kFireworkPowerMinDefault;
@@ -599,10 +607,9 @@ void ClearScene::CreateFx()
         savedCameraRotate_ = fxCamera_->GetRotate();
     }
 
-    fx_ = std::make_unique<SlimeFx>();
-    fx_->Initialize(object3dCom, fxCamera_, kFxCapacity);
+    fx_ = std::make_unique<FireworkFx>();
+    fx_->Initialize(dxCommon_, fxCamera_, kFxCapacity);
     fx_->SetAdditive(fxAdditive_);
-    fx_->SetCameraPitch(0.0f); // カメラは正面固定なので板は常に正対する
 
     // 粒の色を決めるベクター場を登録する。
     // useColorField を立てた粒だけが、毎フレームここを通って塗り直される
@@ -998,9 +1005,10 @@ void ClearScene::UpdatePrompt(float /*deltaTime*/)
 // 背景の花火
 //
 // 「シューーー」= 上昇中のロケットが軌跡の粒を置き続ける
-// 「パン！」    = 頂点で SlimeFx::EmitFirework（閃光 + 2重の殻 + 尾を引く火花）
+// 「パン！」    = 頂点で FireworkFx::EmitFirework（閃光 + 殻 + 尾を引く火花）。
+//                殻の粒はさらに軌跡を撒き続けるので、開いたあとも線が残る
 //
-// 粒の色は SlimeFx に登録したカラー場から毎フレーム引き直される。
+// 粒の色は FireworkFx に登録したカラー場から毎フレーム引き直される。
 // 場は位置にも依存するので、同じ1発の中でも殻が開くにつれて色が散っていく。
 // ===================================================================
 
@@ -1022,7 +1030,8 @@ void ClearScene::UpdateFx(float deltaTime)
     }
 
     fx_->SetAdditive(fxAdditive_);
-    fx_->SetCameraPitch(0.0f); // 正面固定なので板は常に正対する
+    fx_->SetTrailEnabled(fxEnableTrail_);
+    fx_->SetTrailDensity(fxTrailDensity_);
 
     if (!showFx_)
     {
@@ -1057,7 +1066,7 @@ void ClearScene::UpdateFx(float deltaTime)
         {
             rocket.trailAccum -= kRocketTrailInterval;
 
-            SlimeFxDesc desc;
+            FireworkFxDesc desc;
             desc.position = rocket.position;
             desc.position.x += RandomRange(-0.05f, 0.05f);
             desc.position.z += RandomRange(-0.05f, 0.05f);
@@ -1079,7 +1088,8 @@ void ClearScene::UpdateFx(float deltaTime)
         if (rocket.fuse <= 0.0f)
         {
             fx_->EmitFirework(randomEngine_, rocket.position, kFireworkCoreColor,
-                              kFireworkShellColor, rocket.power, fxUseColorField_);
+                              kFireworkShellColor, rocket.power, fxUseColorField_,
+                              RollWillow() ? FireworkStyle::Willow : FireworkStyle::Normal);
             rocket.isActive = false;
         }
     }
@@ -1092,7 +1102,7 @@ void ClearScene::UpdateFx(float deltaTime)
         {
             ambientAccum_ -= kAmbientInterval;
 
-            SlimeFxDesc desc;
+            FireworkFxDesc desc;
             desc.position = {RandomRange(-kBurstXRange, kBurstXRange), RandomRange(-5.5f, -3.0f),
                              RandomRange(kBurstZMin, kBurstZMax)};
             desc.velocity = {RandomRange(-0.15f, 0.15f), RandomRange(0.5f, 1.1f), 0.0f};
@@ -1109,6 +1119,12 @@ void ClearScene::UpdateFx(float deltaTime)
     }
 
     fx_->Update(deltaTime);
+}
+
+bool ClearScene::RollWillow()
+{
+    // 1発ごとに菊か柳かを引く。連発しても同じ絵が続かないようにするため
+    return RandomRange(0.0f, 1.0f) < willowRatio_;
 }
 
 void ClearScene::LaunchRocket()
@@ -1267,12 +1283,9 @@ void ClearScene::Draw(SceneRenderRequests& renderRequests)
         // これを立てるとエンジン側のデバッグ用 plane が出なくなる
         renderRequests.sceneDrawn = true;
 
-        RenderContext ctx;
-        ctx.commandList = commandList;
-        ctx.camera = fxCamera_;
-        ctx.light = GetLight();
-
-        fx_->Draw(ctx);
+        // FireworkFx は自前のルートシグネチャ / PSO / 頂点バッファで完結しているので、
+        // コマンドリストを渡すだけでいい（ライトもカメラ CBV も要らない）
+        fx_->Draw(commandList);
     }
 
     // --- UI ---
@@ -1485,15 +1498,24 @@ void ClearScene::DrawDebugUI()
         ImGui::Checkbox("Ambient", &fxEnableAmbient_);
 
         ImGui::Checkbox("Use Color Field", &fxUseColorField_);
-        if (fx_ && !fx_->HasAdditivePipeline())
+        ImGui::SameLine();
+        ImGui::Checkbox("Trail", &fxEnableTrail_);
+
+        if (fx_ && !fx_->IsReady())
         {
-            ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.3f, 1.0f),
-                               "加算合成 PSO の作成に失敗（アルファブレンドで描画中）");
+            ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.3f, 1.0f),
+                               "FireworkFx の初期化に失敗（シェーダか PSO）。何も描画されません");
         }
 
         if (fx_)
         {
+            const float usage = fx_->GetCapacity() > 0
+                                    ? static_cast<float>(fx_->GetActiveCount()) /
+                                          static_cast<float>(fx_->GetCapacity())
+                                    : 0.0f;
             ImGui::Text("Particles : %d / %u", fx_->GetActiveCount(), fx_->GetCapacity());
+            ImGui::ProgressBar(usage, ImVec2(-1.0f, 0.0f));
+            ImGui::Text("Quads drawn : %u  (draw calls : 2)", fx_->GetDrawnQuadCount());
         }
 
         int activeRockets = 0;
@@ -1511,9 +1533,23 @@ void ClearScene::DrawDebugUI()
         ImGui::DragFloatRange2("Power", &fireworkPowerMin_, &fireworkPowerMax_, 0.02f, 0.2f, 3.0f);
         ImGui::DragFloat("Rocket Gravity", &rocketGravity_, 0.1f, 1.0f, 40.0f);
 
+        ImGui::SeparatorText("Style / Trail");
+        ImGui::SliderFloat("Willow Ratio", &willowRatio_, 0.0f, 1.0f, "%.2f");
+        ImGui::TextWrapped("0 = 全部が菊（開いてすぐ散る） / 1 = 全部が柳（垂れ下がって長く尾を引く）");
+        ImGui::DragFloat("Trail Density", &fxTrailDensity_, 0.02f, 0.1f, 3.0f);
+
         if (ImGui::Button("Launch Now"))
         {
             LaunchRocket();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Launch Willow") && fx_)
+        {
+            // 柳だけを1発、画面中央あたりに
+            fx_->EmitFirework(randomEngine_, {RandomRange(-3.0f, 3.0f), 2.0f, 0.0f},
+                              kFireworkCoreColor, kFireworkShellColor,
+                              RandomRange(fireworkPowerMin_, fireworkPowerMax_),
+                              fxUseColorField_, FireworkStyle::Willow);
         }
         ImGui::SameLine();
         if (ImGui::Button("Clear Particles") && fx_)
