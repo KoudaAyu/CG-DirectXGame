@@ -204,8 +204,8 @@ constexpr bool kFxUseColorFieldDefault = true;
 
 constexpr float kLaunchIntervalMinDefault = 0.55f;
 constexpr float kLaunchIntervalMaxDefault = 1.30f;
-constexpr float kFireworkPowerMinDefault = 0.85f;
-constexpr float kFireworkPowerMaxDefault = 1.45f;
+constexpr float kFireworkPowerMinDefault = 1.05f;
+constexpr float kFireworkPowerMaxDefault = 2.56f;
 constexpr float kRocketGravityDefault = 9.5f;
 
 constexpr float kRocketTrailInterval = 0.016f; // 「シュー」の軌跡の刻み
@@ -226,10 +226,10 @@ constexpr float kAmbientInterval = 0.30f;
 constexpr float kAmbientLifeTime = 6.0f;
 
 // カラー場 color(time, position) の既定値
-constexpr float kFieldScaleDefault = 0.16f;
-constexpr float kFieldTimeScaleDefault = 0.11f;
-constexpr float kFieldSwirlDefault = 0.22f;
-constexpr float kFieldSaturationDefault = 1.0f;
+constexpr float kFieldScaleDefault = 0.05f;
+constexpr float kFieldTimeScaleDefault = 0.04f;
+constexpr float kFieldSwirlDefault = 0.1f;
+constexpr float kFieldSaturationDefault = 0.8f;
 constexpr float kFieldGainDefault = 0.95f;
 constexpr Vector3 kFieldDirectionDefault = {1.0f, 0.75f, 0.45f};
 
