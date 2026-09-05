@@ -55,7 +55,8 @@ private:
         float baseWidth = 0.0f;      // 元画像の基準幅（ピクセル）
         float extraSpacing = 0.0f;   // この文字の後ろに足す隙間（単語の区切り用）
         float offsetX = 0.0f;        // ロゴ中心からの相対X（レイアウト結果）
-        float dropDelay = 0.0f;      // 落ち始めるまでの時間（順番はシャッフル）
+        int dropOrder = 0;           // 何番目に落ちてくるか（シャッフルで決まる）
+        float dropDelay = 0.0f;      // 落ち始めるまでの時間（dropOrder * dropStagger_）
         float phase = 0.0f;          // 着地後のゆらぎの位相
         float speedScale = 1.0f;     // ゆらぎ速度の個体差
         float landTimer = 0.0f;      // 着地からの経過秒（つぶれの減衰に使う）
@@ -66,7 +67,7 @@ private:
     struct Label
     {
         std::unique_ptr<Sprite> sprite;
-        Vector2 center{};
+        Vector2 offset{};   // リザルトグループ原点からの相対座標
         Vector2 size{};
         float popDelay = 0.0f;
     };
@@ -84,7 +85,7 @@ private:
     struct NumberRow
     {
         std::vector<Digit> digits;
-        Vector2 rightCenter{};      // 一番右の桁の中心座標
+        Vector2 rightOffset{};      // 一番右の桁の中心（グループ原点からの相対座標）
         float popDelay = 0.0f;      // 出現ディレイ
         float countDelay = 0.0f;    // カウントアップ開始ディレイ
         float countSeconds = 1.0f;  // 0 から目標値まで上がりきる時間
@@ -123,6 +124,16 @@ private:
     void LayoutLogo();
     void LayoutNumbers();
 
+    /// <summary>
+    /// 登場の順番を組み直す。
+    /// ロゴ → SCORE ラベル → SCORE 数値 → TIME ラベル → TIME 数値
+    ///      → COIN ラベル → COIN 数値 → PRESS SPACE を等間隔に並べる
+    /// </summary>
+    void RebuildTimeline();
+
+    /// <summary>リザルトグループ原点を足して、実際の画面座標にする</summary>
+    Vector2 GroupToScreen(const Vector2& offset) const;
+
     /// <summary>SceneContext から結果の値を読む（無ければ既定値のまま）</summary>
     void LoadResultFromSceneContext();
 
@@ -133,8 +144,11 @@ private:
     void LaunchRocket();
     void LaunchRocketAt(const Vector3& burstPoint, float power);
 
-    /// <summary>粒の色を決めるベクター場 color(time, position)</summary>
+    /// <summary>粒の色を決めるベクター場 color(time, position)。2つの場をブレンドしたもの</summary>
     Vector4 EvaluateColorField(float time, const Vector3& position) const;
+
+    /// <summary>2つ目の場。金 → 赤 → 紫 を巡回するグラデーション</summary>
+    Vector3 EvaluateEmberPalette(float time, const Vector3& position) const;
 
     /// <summary>仮想解像度上の座標を、カメラ前方 depth の平面上のワールド座標へ変換する</summary>
     Vector3 ScreenToWorld(const Vector2& screenPosition, float depth) const;
@@ -214,8 +228,18 @@ private:
     float digitPunchAmount_ = 0.0f;// 桁が変わった瞬間の弾み量
     float digitPunchDamping_ = 0.0f;
 
+    // リザルトのグループ（SCORE / TIME / COIN / PRESS SPACE）。
+    // ここを動かすと4つまとめてずれる。個々の相対位置は Label::offset /
+    // NumberRow::rightOffset / promptOffset_ が持っている
+    Vector2 resultGroupOrigin_{};
+
+    // 登場の順番
+    float sequenceBeginOffset_ = 0.0f; // ロゴが出そろってから最初のラベルが出るまで
+    float sequenceStep_ = 0.0f;        // 次の要素が出るまでの間隔
+    float promptExtraDelay_ = 0.0f;    // 数値が上がりきるのを待つための追加ディレイ
+
     // 点滅プロンプト
-    Vector2 promptCenter_{};
+    Vector2 promptOffset_{};
     Vector2 promptSize_{};
     float promptDelay_ = 0.0f;
     float promptBlinkSpeed_ = 0.0f;
@@ -234,12 +258,19 @@ private:
     float rocketGravity_ = 0.0f;
 
     // カラー場 color(time, position)
+    // 1つ目は虹のコサインパレット、2つ目は金→赤→紫。emberBlend_ で混ぜる
     float fieldScale_ = 0.0f;      // 位置の効き
     float fieldTimeScale_ = 0.0f;  // 時間の流れる速さ
     float fieldSwirl_ = 0.0f;      // 縞をゆがませる量
     float fieldSaturation_ = 1.0f;
     float fieldGain_ = 1.0f;
     Vector3 fieldDirection_{};     // 場の勾配方向
+
+    float emberBlend_ = 0.0f;      // 2つ目の場をどれだけ混ぜるか 0..1
+    float emberScale_ = 0.0f;
+    float emberTimeScale_ = 0.0f;
+    float emberSwirl_ = 0.0f;
+    Vector3 emberDirection_{};
 
     // カメラ
     Vector3 cameraPos_{};

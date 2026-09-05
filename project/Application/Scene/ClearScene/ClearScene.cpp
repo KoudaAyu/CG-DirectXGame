@@ -127,26 +127,35 @@ constexpr float kLogoScaleDefault = 1.0f;
 constexpr float kLogoCharHeightDefault = 94.0f;
 constexpr float kLogoCharSpacingDefault = 5.0f;
 
-// 1行分のレイアウト（ラベルの中心 / ラベルのサイズ / 数値の右端の桁の中心 / 桁数）
+// ===================================================================
+// リザルトのグループ
+//
+// SCORE / TIME / COIN / PRESS SPACE は1つのまとまりとして扱う。
+// 下の座標はすべて「グループ原点からの相対」で、
+// resultGroupOrigin_ を動かすと4つまとめてずれる。
+// ===================================================================
+constexpr Vector2 kResultGroupOriginDefault = {1000.0f, 150.0f};
+
+// 1行分のレイアウト（ラベル / ラベルのサイズ / 数値の右端の桁 / 桁数）。座標はグループ相対
 struct RowLayout
 {
-    Vector2 labelCenter;
+    Vector2 labelOffset;
     Vector2 labelSize;
-    Vector2 valueRightCenter;
+    Vector2 valueRightOffset;
     int digitCount;
     bool isTime;
 };
 
 constexpr RowLayout kRowLayouts[kRowCount] = {
-    {{830.0f, 100.0f}, {190.0f, 56.0f}, {1010.0f, 180.0f}, 5, false}, // SCORE
-    {{820.0f, 250.0f}, {160.0f, 56.0f}, {1000.0f, 330.0f}, 5, true }, // TIME (MM:SS)
-    {{825.0f, 400.0f}, {170.0f, 56.0f}, {990.0f, 480.0f},  3, false}, // COIN
+    {{10.0f, 0.0f},   {190.0f, 56.0f}, {190.0f, 80.0f},  5, false}, // SCORE
+    {{0.0f, 150.0f},  {160.0f, 56.0f}, {180.0f, 230.0f}, 5, true }, // TIME (MM:SS)
+    {{5.0f, 300.0f},  {170.0f, 56.0f}, {170.0f, 380.0f}, 3, false}, // COIN
 };
 
 constexpr Vector2 kDigitSizeDefault = {56.0f, 72.0f};
 constexpr float kDigitSpacingDefault = 4.0f;
 
-constexpr Vector2 kPromptCenterDefault = {790.0f, 600.0f};
+constexpr Vector2 kPromptOffsetDefault = {-30.0f, 500.0f}; // グループ相対
 constexpr Vector2 kPromptSizeDefault = {520.0f, 62.0f};
 
 // ===================================================================
@@ -171,15 +180,18 @@ constexpr float kIdleJiggleSpeedDefault = 3.2f;
 constexpr float kIdleWobbleDegreesDefault = 2.5f;
 
 // ラベル・数値の登場
-constexpr float kLogoTotalSeconds =
-    kDropStaggerDefault * static_cast<float>(kLogoCharCount - 1) + kDropSecondsDefault;
+constexpr float kPopSeconds = 0.36f;          // 1個が出きるまで
+constexpr float kCountBeginOffset = 0.10f;    // 数値が出てからカウントが回り出すまで
+constexpr float kCountSecondsDefault = 0.55f; // 0 から目標値まで上がりきる時間
 
-constexpr float kPopSeconds = 0.36f;             // 1個が出きるまで
-constexpr float kLabelPopStagger = 0.13f;        // 行ごとのディレイ
-constexpr float kLabelPopBeginOffset = 0.20f;    // ロゴが出そろってからラベルが出るまで
-constexpr float kValuePopOffset = 0.12f;         // ラベルの少しあとに数値が出る
-constexpr float kCountBeginOffset = 0.10f;       // 数値が出てからカウントが回り出すまで
-constexpr float kCountSecondsDefault = 1.15f;    // 0 から目標値まで上がりきる時間
+// 登場の順番。ロゴが出そろったあと、下の7つが sequenceStep_ 秒おきに次々と出る
+//   0: SCORE ラベル / 1: SCORE 数値 / 2: TIME ラベル / 3: TIME 数値
+//   4: COIN ラベル  / 5: COIN 数値  / 6: PRESS SPACE
+constexpr float kSequenceBeginOffsetDefault = 0.35f;
+constexpr float kSequenceStepDefault = 0.63f;
+constexpr float kPromptExtraDelayDefault = 0.35f; // 最後の数値が上がりきるのを待つ分
+
+constexpr int kSequenceSlotPrompt = 6;
 
 constexpr float kDigitPunchAmountDefault = 0.30f; // 桁が変わった瞬間の弾み
 constexpr float kDigitPunchDampingDefault = 11.0f;
@@ -232,6 +244,20 @@ constexpr float kFieldSwirlDefault = 0.1f;
 constexpr float kFieldSaturationDefault = 0.8f;
 constexpr float kFieldGainDefault = 0.95f;
 constexpr Vector3 kFieldDirectionDefault = {1.0f, 0.75f, 0.45f};
+
+// 2つ目の場（金 → 赤 → 紫）。1つ目と相関しないように向きも速さも変えてある
+constexpr float kEmberBlendDefault = 0.55f;
+constexpr float kEmberScaleDefault = 0.09f;
+constexpr float kEmberTimeScaleDefault = 0.07f;
+constexpr float kEmberSwirlDefault = 0.35f;
+constexpr Vector3 kEmberDirectionDefault = {-0.6f, 1.0f, 0.3f};
+
+// 巡回グラデーションの3ストップ。紫から金へ戻るので継ぎ目が出ない
+constexpr Vector3 kEmberStops[3] = {
+    {1.00f, 0.78f, 0.25f}, // 金
+    {1.00f, 0.22f, 0.12f}, // 赤
+    {0.62f, 0.16f, 0.85f}, // 紫
+};
 
 // カメラ。正面固定（yaw / pitch / roll = 0）で、z = 0 の平面が画面いっぱいになる位置
 constexpr Vector3 kCameraPosDefault = {0.0f, 0.0f, -20.0f};
@@ -410,18 +436,17 @@ void ClearScene::ResetTuningToDefault()
     digitPunchAmount_ = kDigitPunchAmountDefault;
     digitPunchDamping_ = kDigitPunchDampingDefault;
 
-    promptCenter_ = kPromptCenterDefault;
+    resultGroupOrigin_ = kResultGroupOriginDefault;
+
+    sequenceBeginOffset_ = kSequenceBeginOffsetDefault;
+    sequenceStep_ = kSequenceStepDefault;
+    promptExtraDelay_ = kPromptExtraDelayDefault;
+
+    promptOffset_ = kPromptOffsetDefault;
     promptSize_ = kPromptSizeDefault;
     promptBlinkSpeed_ = kPromptBlinkSpeedDefault;
     promptAlphaMin_ = kPromptAlphaMinDefault;
     promptAlphaMax_ = kPromptAlphaMaxDefault;
-
-    // 一番下の行が上がりきってから出す
-    const float lastCountEnd = kLogoTotalSeconds + kLabelPopBeginOffset +
-                               kLabelPopStagger * static_cast<float>(kRowCount - 1) +
-                               kValuePopOffset + kPopSeconds + kCountBeginOffset +
-                               kCountSecondsDefault;
-    promptDelay_ = lastCountEnd + 0.30f;
 
     showFx_ = true;
     fxAdditive_ = kFxAdditiveDefault;
@@ -439,6 +464,12 @@ void ClearScene::ResetTuningToDefault()
     fieldSaturation_ = kFieldSaturationDefault;
     fieldGain_ = kFieldGainDefault;
     fieldDirection_ = kFieldDirectionDefault;
+
+    emberBlend_ = kEmberBlendDefault;
+    emberScale_ = kEmberScaleDefault;
+    emberTimeScale_ = kEmberTimeScaleDefault;
+    emberSwirl_ = kEmberSwirlDefault;
+    emberDirection_ = kEmberDirectionDefault;
 
     cameraPos_ = kCameraPosDefault;
 }
@@ -485,8 +516,9 @@ void ClearScene::CreateLogo()
 
     for (size_t k = 0; k < order.size(); ++k)
     {
-        logoLetters_[static_cast<size_t>(order[k])].dropDelay =
-            dropStagger_ * static_cast<float>(k);
+        // 実際のディレイは RebuildTimeline() が dropStagger_ から作る。
+        // ここでは順番だけ覚えておく（ImGui で間隔をいじってもすぐ効くように）
+        logoLetters_[static_cast<size_t>(order[k])].dropOrder = static_cast<int>(k);
     }
 
     LayoutLogo();
@@ -500,10 +532,8 @@ void ClearScene::CreateLabels()
     for (int i = 0; i < kRowCount; ++i)
     {
         Label& label = labels_[static_cast<size_t>(i)];
-        label.center = kRowLayouts[i].labelCenter;
+        label.offset = kRowLayouts[i].labelOffset;
         label.size = kRowLayouts[i].labelSize;
-        label.popDelay = kLogoTotalSeconds + kLabelPopBeginOffset +
-                         kLabelPopStagger * static_cast<float>(i);
         label.sprite = MakeSprite(kLabelTextures[i], label.size, {0.5f, 0.5f});
     }
 }
@@ -517,16 +547,12 @@ void ClearScene::CreateNumbers()
     {
         NumberRow& row = numberRows_[static_cast<size_t>(i)];
         row.isTime = kRowLayouts[i].isTime;
-        row.rightCenter = kRowLayouts[i].valueRightCenter;
+        row.rightOffset = kRowLayouts[i].valueRightOffset;
         row.countSeconds = kCountSecondsDefault;
         row.shown = 0.0f;
         row.target = 0;
         row.isCountFinished = false;
         row.finishPunch = 0.0f;
-
-        row.popDelay = kLogoTotalSeconds + kLabelPopBeginOffset +
-                       kLabelPopStagger * static_cast<float>(i) + kValuePopOffset;
-        row.countDelay = row.popDelay + kPopSeconds + kCountBeginOffset;
 
         row.digits.resize(static_cast<size_t>(kRowLayouts[i].digitCount));
         for (Digit& digit : row.digits)
@@ -545,6 +571,8 @@ void ClearScene::CreateNumbers()
 
         AssignCells(row);
     }
+
+    RebuildTimeline();
 }
 
 void ClearScene::CreatePrompt()
@@ -634,14 +662,53 @@ void ClearScene::LayoutNumbers()
     {
         if (i < static_cast<int>(numberRows_.size()))
         {
-            numberRows_[static_cast<size_t>(i)].rightCenter = kRowLayouts[i].valueRightCenter;
+            numberRows_[static_cast<size_t>(i)].rightOffset = kRowLayouts[i].valueRightOffset;
         }
         if (i < static_cast<int>(labels_.size()))
         {
-            labels_[static_cast<size_t>(i)].center = kRowLayouts[i].labelCenter;
+            labels_[static_cast<size_t>(i)].offset = kRowLayouts[i].labelOffset;
             labels_[static_cast<size_t>(i)].size = kRowLayouts[i].labelSize;
         }
     }
+
+    resultGroupOrigin_ = kResultGroupOriginDefault;
+    promptOffset_ = kPromptOffsetDefault;
+}
+
+void ClearScene::RebuildTimeline()
+{
+    // 落下ディレイを順番から作り直しつつ、ロゴが出そろう時刻を求める
+    float logoEnd = 0.0f;
+    for (LogoLetter& letter : logoLetters_)
+    {
+        letter.dropDelay = dropStagger_ * static_cast<float>(letter.dropOrder);
+        logoEnd = (std::max)(logoEnd, letter.dropDelay + dropSeconds_);
+    }
+
+    const float base = logoEnd + sequenceBeginOffset_;
+    const auto slotTime = [&](int slot) {
+        return base + sequenceStep_ * static_cast<float>(slot);
+    };
+
+    // ラベル → 数値 → ラベル → 数値 … と交互に並べる
+    for (size_t i = 0; i < labels_.size(); ++i)
+    {
+        labels_[i].popDelay = slotTime(static_cast<int>(i) * 2);
+    }
+    for (size_t i = 0; i < numberRows_.size(); ++i)
+    {
+        NumberRow& row = numberRows_[i];
+        row.popDelay = slotTime(static_cast<int>(i) * 2 + 1);
+        row.countDelay = row.popDelay + kCountBeginOffset;
+    }
+
+    // 最後の数値が上がりきるのを少し待ってからプロンプトを出す
+    promptDelay_ = slotTime(kSequenceSlotPrompt) + promptExtraDelay_;
+}
+
+Vector2 ClearScene::GroupToScreen(const Vector2& offset) const
+{
+    return {resultGroupOrigin_.x + offset.x, resultGroupOrigin_.y + offset.y};
 }
 
 void ClearScene::AssignCells(NumberRow& row)
@@ -702,6 +769,9 @@ void ClearScene::Update()
     {
         fadeAlpha_ = std::clamp(fadeAlpha_ + deltaTime / kFadeInSeconds, 0.0f, 1.0f);
     }
+
+    // 調整パラメータが変わっても追従できるよう、毎フレーム組み直す（要素数が少ないので安い）
+    RebuildTimeline();
 
     UpdateLogo(deltaTime);
     UpdateLabels(deltaTime);
@@ -820,7 +890,7 @@ void ClearScene::UpdateLabels(float /*deltaTime*/)
         const float popScale = (popRaw <= 0.0f) ? 0.0f : EaseOutBack(popRaw);
 
         const Vector2 size = {label.size.x * popScale, label.size.y * popScale};
-        ApplySprite(label.sprite.get(), label.center, size, fadeAlpha_ * popRaw);
+        ApplySprite(label.sprite.get(), GroupToScreen(label.offset), size, fadeAlpha_ * popRaw);
     }
 }
 
@@ -829,6 +899,9 @@ void ClearScene::UpdateNumbers(float deltaTime)
     for (size_t rowIndex = 0; rowIndex < numberRows_.size(); ++rowIndex)
     {
         NumberRow& row = numberRows_[rowIndex];
+
+        // グループ原点を足した、実際の画面座標
+        const Vector2 rowCenter = GroupToScreen(row.rightOffset);
 
         // --- 登場 ---
         const float popRaw = std::clamp((sceneTime_ - row.popDelay) / kPopSeconds, 0.0f, 1.0f);
@@ -850,7 +923,7 @@ void ClearScene::UpdateNumbers(float deltaTime)
             // 上がりきった行の後ろで1発上げる
             if (showFx_)
             {
-                LaunchRocketAt(ScreenToWorld(row.rightCenter, -cameraPos_.z),
+                LaunchRocketAt(ScreenToWorld(rowCenter, -cameraPos_.z),
                                RandomRange(fireworkPowerMin_, fireworkPowerMax_));
             }
         }
@@ -861,7 +934,7 @@ void ClearScene::UpdateNumbers(float deltaTime)
 
         // --- 桁を右から並べる ---
         // ":" だけ横幅が狭いので、右端から幅を積み上げて中心を決める
-        float cursorRight = row.rightCenter.x + digitSize_.x * 0.5f;
+        float cursorRight = rowCenter.x + digitSize_.x * 0.5f;
 
         for (int i = static_cast<int>(row.digits.size()) - 1; i >= 0; --i)
         {
@@ -894,8 +967,7 @@ void ClearScene::UpdateNumbers(float deltaTime)
             const float scaleX = 1.0f - digitPunchAmount_ * punch * 0.55f;
 
             const Vector2 size = {width * scaleX * popScale, digitSize_.y * scaleY * popScale};
-            ApplySprite(digit.sprite.get(), {centerX, row.rightCenter.y}, size,
-                        fadeAlpha_ * popRaw);
+            ApplySprite(digit.sprite.get(), {centerX, rowCenter.y}, size, fadeAlpha_ * popRaw);
         }
     }
 }
@@ -907,9 +979,11 @@ void ClearScene::UpdatePrompt(float /*deltaTime*/)
         return;
     }
 
+    const Vector2 center = GroupToScreen(promptOffset_);
+
     if (sceneTime_ < promptDelay_)
     {
-        ApplySprite(promptSprite_.get(), promptCenter_, promptSize_, 0.0f);
+        ApplySprite(promptSprite_.get(), center, promptSize_, 0.0f);
         return;
     }
 
@@ -917,7 +991,7 @@ void ClearScene::UpdatePrompt(float /*deltaTime*/)
     const float blink = (std::sin((sceneTime_ - promptDelay_) * promptBlinkSpeed_) * 0.5f) + 0.5f;
     const float alpha = promptAlphaMin_ + (promptAlphaMax_ - promptAlphaMin_) * blink;
 
-    ApplySprite(promptSprite_.get(), promptCenter_, promptSize_, fadeAlpha_ * alpha);
+    ApplySprite(promptSprite_.get(), center, promptSize_, fadeAlpha_ * alpha);
 }
 
 // ===================================================================
@@ -1113,12 +1187,46 @@ Vector4 ClearScene::EvaluateColorField(float time, const Vector3& position) cons
     green = luma + (green - luma) * fieldSaturation_;
     blue = luma + (blue - luma) * fieldSaturation_;
 
+    // 2つ目の場（金 → 赤 → 紫）を重ねる。
+    // 加算ではなく線形補間で混ぜているので、混ぜても明るさが暴れない
+    if (emberBlend_ > 0.0f)
+    {
+        const Vector3 ember = EvaluateEmberPalette(time, position);
+        red = red + (ember.x - red) * emberBlend_;
+        green = green + (ember.y - green) * emberBlend_;
+        blue = blue + (ember.z - blue) * emberBlend_;
+    }
+
     // 加算合成では色が「明るさ」として足されるので、上限を切っておく
     red = std::clamp(red * fieldGain_, 0.0f, 1.0f);
     green = std::clamp(green * fieldGain_, 0.0f, 1.0f);
     blue = std::clamp(blue * fieldGain_, 0.0f, 1.0f);
 
     return {red, green, blue, 1.0f};
+}
+
+Vector3 ClearScene::EvaluateEmberPalette(float time, const Vector3& position) const
+{
+    // 1つ目の場と相関しないよう、向きも速さも swirl の軸も変えてある
+    float v = (position.x * emberDirection_.x + position.y * emberDirection_.y +
+               position.z * emberDirection_.z) *
+              emberScale_;
+    v += time * emberTimeScale_;
+    v += std::sin(position.x * 0.38f - time * 0.45f) * emberSwirl_;
+
+    // 0..1 に畳んでから 金 → 赤 → 紫 → 金 の巡回グラデにする。
+    // 紫から金へ戻るので、どこにも継ぎ目が出ない
+    const float phase = v - std::floor(v);
+    const float scaled = phase * 3.0f;
+    const int index = (std::min)(2, static_cast<int>(scaled));
+    float t = scaled - static_cast<float>(index);
+    t = t * t * (3.0f - 2.0f * t); // smoothstep。境目のにじみを自然にする
+
+    const Vector3& from = kEmberStops[index];
+    const Vector3& to = kEmberStops[(index + 1) % 3];
+
+    return {from.x + (to.x - from.x) * t, from.y + (to.y - from.y) * t,
+            from.z + (to.z - from.z) * t};
 }
 
 Vector3 ClearScene::ScreenToWorld(const Vector2& screenPosition, float depth) const
@@ -1250,7 +1358,7 @@ void ClearScene::DrawDebugUI()
             for (size_t k = 0; k < order.size(); ++k)
             {
                 LogoLetter& letter = logoLetters_[static_cast<size_t>(order[k])];
-                letter.dropDelay = dropStagger_ * static_cast<float>(k);
+                letter.dropOrder = static_cast<int>(k);
                 letter.isLanded = false;
                 letter.landTimer = 0.0f;
             }
@@ -1267,6 +1375,40 @@ void ClearScene::DrawDebugUI()
                 }
             }
         }
+    }
+
+    if (ImGui::CollapsingHeader("Result Group", ImGuiTreeNodeFlags_DefaultOpen))
+    {
+        ImGui::TextWrapped("SCORE / TIME / COIN / PRESS SPACE はこの原点にぶら下がっています。"
+                           "ここを動かすと4つまとめてずれます。");
+        ImGui::DragFloat2("Group Origin", &resultGroupOrigin_.x, 1.0f);
+        if (ImGui::Button("Reset Group Origin"))
+        {
+            resultGroupOrigin_ = kResultGroupOriginDefault;
+        }
+    }
+
+    if (ImGui::CollapsingHeader("Sequence"))
+    {
+        ImGui::TextWrapped("ロゴ → SCORE ラベル → SCORE 数値 → TIME ラベル → TIME 数値 "
+                           "→ COIN ラベル → COIN 数値 → PRESS SPACE の順に出ます。");
+        ImGui::DragFloat("Begin Offset", &sequenceBeginOffset_, 0.01f, 0.0f, 2.0f);
+        ImGui::DragFloat("Step", &sequenceStep_, 0.01f, 0.05f, 1.5f);
+        ImGui::DragFloat("Prompt Extra Delay", &promptExtraDelay_, 0.01f, 0.0f, 2.0f);
+
+        ImGui::Separator();
+        ImGui::Text("Scene Time : %.2f s", sceneTime_);
+        static const char* kSlotNames[] = {"SCORE label", "SCORE value", "TIME label",
+                                           "TIME value",  "COIN label",  "COIN value"};
+        for (size_t i = 0; i < labels_.size(); ++i)
+        {
+            ImGui::Text("%-12s %.2f s", kSlotNames[i * 2], labels_[i].popDelay);
+            if (i < numberRows_.size())
+            {
+                ImGui::Text("%-12s %.2f s", kSlotNames[i * 2 + 1], numberRows_[i].popDelay);
+            }
+        }
+        ImGui::Text("%-12s %.2f s", "PRESS SPACE", promptDelay_);
     }
 
     if (ImGui::CollapsingHeader("Logo"))
@@ -1301,17 +1443,17 @@ void ClearScene::DrawDebugUI()
         ImGui::DragFloat("Punch Amount", &digitPunchAmount_, 0.01f, 0.0f, 1.0f);
         ImGui::DragFloat("Punch Damping", &digitPunchDamping_, 0.2f, 1.0f, 40.0f);
 
-        ImGui::SeparatorText("Rows");
+        ImGui::SeparatorText("Rows (グループ原点からの相対座標)");
         static const char* kRowNames[kRowCount] = {"SCORE", "TIME", "COIN"};
         for (size_t i = 0; i < numberRows_.size(); ++i)
         {
             ImGui::PushID(static_cast<int>(i));
             ImGui::Text("%s", kRowNames[i]);
-            ImGui::DragFloat2("Value Right", &numberRows_[i].rightCenter.x, 1.0f);
+            ImGui::DragFloat2("Value Offset", &numberRows_[i].rightOffset.x, 1.0f);
             ImGui::DragFloat("Count Seconds", &numberRows_[i].countSeconds, 0.02f, 0.1f, 6.0f);
             if (i < labels_.size())
             {
-                ImGui::DragFloat2("Label Center", &labels_[i].center.x, 1.0f);
+                ImGui::DragFloat2("Label Offset", &labels_[i].offset.x, 1.0f);
                 ImGui::DragFloat2("Label Size", &labels_[i].size.x, 1.0f, 10.0f, 600.0f);
             }
             ImGui::Separator();
@@ -1326,9 +1468,9 @@ void ClearScene::DrawDebugUI()
 
     if (ImGui::CollapsingHeader("Prompt"))
     {
-        ImGui::DragFloat2("Prompt Center", &promptCenter_.x, 1.0f);
+        ImGui::DragFloat2("Prompt Offset", &promptOffset_.x, 1.0f);
         ImGui::DragFloat2("Prompt Size", &promptSize_.x, 1.0f, 10.0f, 900.0f);
-        ImGui::DragFloat("Appear Delay", &promptDelay_, 0.05f, 0.0f, 12.0f);
+        ImGui::Text("Appear at %.2f s (Sequence で調整)", promptDelay_);
         ImGui::DragFloat("Blink Speed", &promptBlinkSpeed_, 0.05f, 0.2f, 15.0f);
         ImGui::DragFloatRange2("Alpha Range", &promptAlphaMin_, &promptAlphaMax_, 0.01f, 0.0f,
                                1.0f);
@@ -1392,17 +1534,42 @@ void ClearScene::DrawDebugUI()
         ImGui::DragFloat("Time Scale", &fieldTimeScale_, 0.005f, -1.0f, 1.0f);
         ImGui::DragFloat("Swirl", &fieldSwirl_, 0.01f, 0.0f, 2.0f);
         ImGui::DragFloat("Saturation", &fieldSaturation_, 0.01f, 0.0f, 1.5f);
+
+        ImGui::SeparatorText("Field B (金 -> 赤 -> 紫)");
+        ImGui::DragFloat("Blend", &emberBlend_, 0.01f, 0.0f, 1.0f);
+        ImGui::DragFloat3("B Direction", &emberDirection_.x, 0.01f, -2.0f, 2.0f);
+        ImGui::DragFloat("B Position Scale", &emberScale_, 0.005f, 0.0f, 1.0f);
+        ImGui::DragFloat("B Time Scale", &emberTimeScale_, 0.005f, -1.0f, 1.0f);
+        ImGui::DragFloat("B Swirl", &emberSwirl_, 0.01f, 0.0f, 2.0f);
+
+        ImGui::SeparatorText("Output");
         ImGui::DragFloat("Gain", &fieldGain_, 0.01f, 0.0f, 2.0f);
 
         // 今この瞬間の場を、画面を横切る5点でサンプルして並べる
         const float now = fx_ ? fx_->GetElapsedTime() : sceneTime_;
-        ImGui::Text("Preview (y = 1.5, z = 0)");
+
+        ImGui::Text("Blended (y = 1.5, z = 0)");
         for (int i = 0; i < 5; ++i)
         {
             const float x = -6.0f + 3.0f * static_cast<float>(i);
             const Vector4 color = EvaluateColorField(now, {x, 1.5f, 0.0f});
             ImGui::PushID(i);
             ImGui::ColorButton("##field", ImVec4(color.x, color.y, color.z, 1.0f),
+                               ImGuiColorEditFlags_NoTooltip, ImVec2(48.0f, 24.0f));
+            ImGui::PopID();
+            if (i < 4)
+            {
+                ImGui::SameLine();
+            }
+        }
+
+        ImGui::Text("Field B only");
+        for (int i = 0; i < 5; ++i)
+        {
+            const float x = -6.0f + 3.0f * static_cast<float>(i);
+            const Vector3 ember = EvaluateEmberPalette(now, {x, 1.5f, 0.0f});
+            ImGui::PushID(100 + i);
+            ImGui::ColorButton("##ember", ImVec4(ember.x, ember.y, ember.z, 1.0f),
                                ImGuiColorEditFlags_NoTooltip, ImVec2(48.0f, 24.0f));
             ImGui::PopID();
             if (i < 4)
