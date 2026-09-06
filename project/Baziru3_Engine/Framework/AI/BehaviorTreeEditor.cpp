@@ -41,8 +41,12 @@ BehaviorTreeEditor::BehaviorTreeEditor() {
                 settingsJson["view"]["zoom"] = 1.0f;
                 if (settingsJson.contains("view"))
                 {
-                    settingsJson["view"]["scroll"]["x"] = 0.0f;
+                    settingsJson["view"]["scroll"]["x"] = -124.5f;
                     settingsJson["view"]["scroll"]["y"] = 0.0f;
+                    settingsJson["view"]["visible_rect"]["min"]["x"] = -124.5f;
+                    settingsJson["view"]["visible_rect"]["min"]["y"] = 0.0f;
+                    settingsJson["view"]["visible_rect"]["max"]["x"] = 609.5f;
+                    settingsJson["view"]["visible_rect"]["max"]["y"] = 574.0f;
                 }
                 std::ofstream saveFile(settingsPath);
                 saveFile << settingsJson.dump(2);

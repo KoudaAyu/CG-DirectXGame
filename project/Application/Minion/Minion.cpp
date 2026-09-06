@@ -212,6 +212,9 @@ void Minion::Update(float deltaTime, const Vector2& stageTilt, const Vector2& pi
         position_.x += velocity_.x * deltaTime;
         position_.z += velocity_.z * deltaTime;
 
+        // 地形メッシュの壁・垂直面との衝突押し出し
+        SlimePhysics::ResolveWallCollision(position_, velocity_, 0.22f);
+
         // 傾斜面・地面メッシュの上に乗る
         bool hasGround = false;
         Vector3 groundNormal{ 0.0f, 1.0f, 0.0f };
@@ -223,14 +226,25 @@ void Minion::Update(float deltaTime, const Vector2& stageTilt, const Vector2& pi
             state_ = MinionState::Thrown;
             velocity_.y = 0.0f;
         } else {
+            // --- 急斜面スロープスライディング＆登坂制限 ---
+            float slopeHorizLen = std::sqrt(groundNormal.x * groundNormal.x + groundNormal.z * groundNormal.z);
+            if (groundNormal.y < 0.82f && slopeHorizLen > 0.01f) {
+                Vector2 slopeDown = { groundNormal.x / slopeHorizLen, groundNormal.z / slopeHorizLen };
+                float slideStrength = (1.0f - groundNormal.y) * 22.0f;
+                velocity_.x += slopeDown.x * slideStrength * deltaTime;
+                velocity_.z += slopeDown.y * slideStrength * deltaTime;
+
+                float velDotDown = velocity_.x * slopeDown.x + velocity_.z * slopeDown.y;
+                if (velDotDown < 0.0f) {
+                    float cancelFactor = std::clamp((0.82f - groundNormal.y) / 0.18f, 0.0f, 1.0f);
+                    velocity_.x -= slopeDown.x * (velDotDown * cancelFactor);
+                    velocity_.z -= slopeDown.y * (velDotDown * cancelFactor);
+                }
+            }
+
             float dy = targetGroundY - position_.y;
-            float maxStepUp = 0.6f;
-            if (dy > maxStepUp) {
-                // 登れない急な段差・上の足場: 瞬間移動させず水平速度を減衰
-                velocity_.x *= 0.5f;
-                velocity_.z *= 0.5f;
-            } else if (dy > 0.0f) {
-                // 床が下から上がった場合: 瞬時に接地高さへ（埋まりを物理的に100%防止）
+            if (dy > 0.0f) {
+                // 床が下から上がった場合: 瞬時に接地高さへ（埋まり・すり抜けを物理的に100%防止）
                 position_.y = targetGroundY;
             } else {
                 position_.y += dy * (std::min)(1.0f, deltaTime * 35.0f);
@@ -279,6 +293,9 @@ void Minion::Update(float deltaTime, const Vector2& stageTilt, const Vector2& pi
         position_.y += velocity_.y * deltaTime;
         position_.z += velocity_.z * deltaTime;
 
+        // 地形メッシュの壁・垂直面との衝突押し出し
+        SlimePhysics::ResolveWallCollision(position_, velocity_, 0.22f);
+
         // 空中での姿勢（板の傾きは受けず、進行方向を向く）
         rotation_.x = 0.0f;
         rotation_.z = 0.0f;
@@ -299,12 +316,12 @@ void Minion::Update(float deltaTime, const Vector2& stageTilt, const Vector2& pi
         SlimePhysics::UpdateDeformation(slimeParams_, airDeformInput);
         prevVelocity_ = velocity_;
 
-        // 地面着地判定（傾いた板・メッシュとの接触判定）
+        // 地面着地判定（傾いた板・メッシュとの接触判定: 落下中のみ着地）
         bool hasLandingGround = false;
         Vector3 landingNormal{ 0.0f, 1.0f, 0.0f };
         float landingY = SlimePhysics::CalculateGroundedCenterYEx(
-            position_.x, position_.z, position_.y, stageTilt, groundY_, &hasLandingGround, &landingNormal, pivot);
-        if (hasLandingGround && position_.y <= landingY) {
+            position_.x, position_.z, position_.y, stageTilt, groundY_, &hasLandingGround, &landingNormal, pivot, false);
+        if (hasLandingGround && velocity_.y <= 0.0f && position_.y <= landingY) {
             position_.y = landingY;
             velocity_.y = 0.0f;
             velocity_.x *= 0.7f;
@@ -335,10 +352,7 @@ void Minion::Update(float deltaTime, const Vector2& stageTilt, const Vector2& pi
             position_.x, position_.z, position_.y, stageTilt, groundY_, &hasGround, &idleNormal, pivot);
         if (hasGround) {
             float dy = targetY - position_.y;
-            float maxStepUp = 0.6f;
-            if (dy > maxStepUp) {
-                // 上の足場への瞬間移動を防止
-            } else if (dy > 0.0f) {
+            if (dy > 0.0f) {
                 position_.y = targetY;
             } else {
                 position_.y += dy * (std::min)(1.0f, deltaTime * 25.0f);

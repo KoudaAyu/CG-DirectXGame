@@ -1511,10 +1511,16 @@ void ed::EditorContext::End()
 
         m_DrawList->AddRectFilled(VIEW_POS, VIEW_POS + VIEW_SIZE, GetColor(StyleColor_Bg));
 
-        for (float x = fmodf(offset.x, GRID_SX); x < VIEW_SIZE.x; x += GRID_SX)
-            m_DrawList->AddLine(ImVec2(x, 0.0f) + VIEW_POS, ImVec2(x, VIEW_SIZE.y) + VIEW_POS, GRID_COLOR);
-        for (float y = fmodf(offset.y, GRID_SY); y < VIEW_SIZE.y; y += GRID_SY)
-            m_DrawList->AddLine(ImVec2(0.0f, y) + VIEW_POS, ImVec2(VIEW_SIZE.x, y) + VIEW_POS, GRID_COLOR);
+        // 異常な極小ズームや巨大領域による無限ループ描画（数千万本のライン生成によるFPS激減・フリーズ）を完全に防止
+        float lineCountX = VIEW_SIZE.x / GRID_SX;
+        float lineCountY = VIEW_SIZE.y / GRID_SY;
+        if (m_Canvas.ViewScale() >= 0.05f && lineCountX > 0.0f && lineCountX < 300.0f && lineCountY > 0.0f && lineCountY < 300.0f)
+        {
+            for (float x = fmodf(offset.x, GRID_SX); x < VIEW_SIZE.x; x += GRID_SX)
+                m_DrawList->AddLine(ImVec2(x, 0.0f) + VIEW_POS, ImVec2(x, VIEW_SIZE.y) + VIEW_POS, GRID_COLOR);
+            for (float y = fmodf(offset.y, GRID_SY); y < VIEW_SIZE.y; y += GRID_SY)
+                m_DrawList->AddLine(ImVec2(0.0f, y) + VIEW_POS, ImVec2(VIEW_SIZE.x, y) + VIEW_POS, GRID_COLOR);
+        }
     }
 # endif
 
@@ -2183,10 +2189,12 @@ void ed::EditorContext::LoadSettings()
 {
     ed::Settings::Parse(m_Config.Load(), m_Settings);
 
-    if (ImRect_IsEmpty(m_Settings.m_VisibleRect))
+    float w = m_Settings.m_VisibleRect.GetWidth();
+    float h = m_Settings.m_VisibleRect.GetHeight();
+    if (ImRect_IsEmpty(m_Settings.m_VisibleRect) || w > 50000.0f || h > 50000.0f || w <= 0.0f || h <= 0.0f || m_Settings.m_ViewZoom < 0.05f)
     {
-        m_NavigateAction.m_Scroll = m_Settings.m_ViewScroll;
-        m_NavigateAction.m_Zoom   = m_Settings.m_ViewZoom;
+        m_NavigateAction.m_Scroll = (m_Settings.m_ViewZoom >= 0.05f) ? m_Settings.m_ViewScroll : ImVec2(-124.5f, 0.0f);
+        m_NavigateAction.m_Zoom   = (m_Settings.m_ViewZoom >= 0.05f && m_Settings.m_ViewZoom <= 10.0f) ? m_Settings.m_ViewZoom : 1.0f;
     }
     else
     {

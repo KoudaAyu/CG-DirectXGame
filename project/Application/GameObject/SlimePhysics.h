@@ -50,10 +50,10 @@ namespace SlimePhysics
     /**
      * @brief 地面メッシュまたは傾斜面上の厳密な高さを算出（現在のY座標を基準にレイキャストを行い、有無および法線を判定）
      */
-    float CalculateGroundHeightEx(float x, float z, float currentY, const Vector2& stageTilt, bool* outHasGround = nullptr, Vector3* outNormal = nullptr, const Vector2& pivot = { 0.0f, 0.0f });
+    float CalculateGroundHeightEx(float x, float z, float currentY, const Vector2& stageTilt, bool* outHasGround = nullptr, Vector3* outNormal = nullptr, const Vector2& pivot = { 0.0f, 0.0f }, bool isGrounded = true, float baseOffset = 0.0f);
     inline float CalculateGroundHeightEx(float x, float z, float currentY, const Vector2& stageTilt, bool* outHasGround, const Vector2& pivot)
     {
-        return CalculateGroundHeightEx(x, z, currentY, stageTilt, outHasGround, nullptr, pivot);
+        return CalculateGroundHeightEx(x, z, currentY, stageTilt, outHasGround, nullptr, pivot, true, 0.0f);
     }
 
     /**
@@ -70,16 +70,26 @@ namespace SlimePhysics
     /**
      * @brief 接地中心Y座標を算出（落下・空中判定および法線出力フラグ付き）
      */
-    float CalculateGroundedCenterYEx(float x, float z, float currentY, const Vector2& stageTilt, float baseOffset, bool* outHasGround = nullptr, Vector3* outNormal = nullptr, const Vector2& pivot = { 0.0f, 0.0f });
+    float CalculateGroundedCenterYEx(float x, float z, float currentY, const Vector2& stageTilt, float baseOffset, bool* outHasGround = nullptr, Vector3* outNormal = nullptr, const Vector2& pivot = { 0.0f, 0.0f }, bool isGrounded = true);
     inline float CalculateGroundedCenterYEx(float x, float z, float currentY, const Vector2& stageTilt, float baseOffset, bool* outHasGround, const Vector2& pivot)
     {
-        return CalculateGroundedCenterYEx(x, z, currentY, stageTilt, baseOffset, outHasGround, nullptr, pivot);
+        return CalculateGroundedCenterYEx(x, z, currentY, stageTilt, baseOffset, outHasGround, nullptr, pivot, true);
     }
 
     /**
      * @brief 接地地点の法線ベクトルを取得
      */
     Vector3 GetGroundNormal(float x, float z, const Vector2& stageTilt, const Vector2& pivot = { 0.0f, 0.0f });
+
+    /**
+     * @brief 地形メッシュの壁・垂直面との水平押し出し衝突判定
+     * @param[in,out] position オブジェクトのワールド座標（めり込み分が押し出される）
+     * @param[in,out] velocity オブジェクトの移動速度（壁向き成分が相殺される）
+     * @param radius オブジェクトの衝突半径
+     * @param heightOffset 判定中心の高さオフセット（通常 0.0f）
+     * @return 壁に衝突して押し出しが発生した場合は true
+     */
+    bool ResolveWallCollision(Vector3& position, Vector3& velocity, float radius, float heightOffset = 0.0f);
 
     /**
      * @brief スライム変形計算用の入力パラメータ構造体

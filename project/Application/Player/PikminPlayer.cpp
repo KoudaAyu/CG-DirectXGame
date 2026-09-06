@@ -290,13 +290,17 @@ void PikminPlayer::Update(float deltaTime, KeyInput* keyInput, MinionManager* mi
     float currentScale = currentMergedScale_;
     scale_ = { currentScale, currentScale, currentScale };
 
+    // 地形メッシュの壁・垂直面との衝突押し出し（角や壁へのめり込み・テレポートを防止）
+    float colRadius = currentScale * 0.45f;
+    SlimePhysics::ResolveWallCollision(position_, velocity_, colRadius);
+
     // --- 垂直重力とリアルタイム地形・落下物理 ---
     const float kGravity = -32.0f; // 重力加速度
     bool hasGround = false;
     Vector3 groundNormal{ 0.0f, 1.0f, 0.0f };
     float baseOffset = currentScale * 0.73f;
     float targetGroundedY = SlimePhysics::CalculateGroundedCenterYEx(
-        position_.x, position_.z, position_.y, stageTilt, baseOffset, &hasGround, &groundNormal, { position_.x, position_.z });
+        position_.x, position_.z, position_.y, stageTilt, baseOffset, &hasGround, &groundNormal, { position_.x, position_.z }, isGrounded_);
 
     if (!isGrounded_) {
         // 空中状態: 純粋な鉛直重力で落下
@@ -313,8 +317,19 @@ void PikminPlayer::Update(float deltaTime, KeyInput* keyInput, MinionManager* mi
             rotation_.y = std::atan2(velocity_.x, velocity_.z);
         }
 
-        // 着地判定（足元に地面があり、地面より下に到達した場合）
-        if (hasGround && position_.y <= targetGroundedY) {
+        // 頭上の天井・高層足場との衝突チェック（ジャンプ上昇中に上の床を突き抜けるのを防止）
+        if (velocity_.y > 0.0f) {
+            float topGroundY = SlimePhysics::CalculateGroundHeight(position_.x, position_.z, stageTilt, { position_.x, position_.z });
+            // もし最上階の床がプレイヤーの頭上直近にあり、頭が衝突した場合
+            if (topGroundY > position_.y && position_.y + baseOffset >= topGroundY) {
+                position_.y = topGroundY - baseOffset;
+                velocity_.y = -1.0f; // 頭をぶつけて下へ跳ね返る
+                slimeParams_.squashStretch = { 0.15f, -0.15f, 0.15f };
+            }
+        }
+
+        // 着地判定（足元に地面があり、落下中であり、地面より下に到達した場合）
+        if (hasGround && velocity_.y <= 0.0f && position_.y <= targetGroundedY) {
             position_.y = targetGroundedY;
             float impactSpeed = -velocity_.y;
             isGrounded_ = true;
@@ -338,19 +353,33 @@ void PikminPlayer::Update(float deltaTime, KeyInput* keyInput, MinionManager* mi
             // 足元に地面がなくなった（島の外へ飛び出した！） -> 空中落下へ！
             isGrounded_ = false;
         } else {
+            // --- 急斜面スロープスライディング＆登坂制限 ---
+            // 急斜面（groundNormal.y < 0.82f, 傾斜約35度以上）では下り坂方向へ重力滑走を発生させ、上り登坂を制限
+            float slopeHorizLen = std::sqrt(groundNormal.x * groundNormal.x + groundNormal.z * groundNormal.z);
+            if (groundNormal.y < 0.82f && slopeHorizLen > 0.01f) {
+                Vector2 slopeDown = { groundNormal.x / slopeHorizLen, groundNormal.z / slopeHorizLen };
+                // 傾斜が急なほど強く下へ滑り落ちる力
+                float slideStrength = (1.0f - groundNormal.y) * 22.0f;
+                velocity_.x += slopeDown.x * slideStrength * deltaTime;
+                velocity_.z += slopeDown.y * slideStrength * deltaTime;
+
+                // 上り坂方向（slopeDownと逆方向）への移動速度を抑制・相殺（急斜面を登れないようにする）
+                float velDotDown = velocity_.x * slopeDown.x + velocity_.z * slopeDown.y;
+                if (velDotDown < 0.0f) {
+                    float cancelFactor = std::clamp((0.82f - groundNormal.y) / 0.18f, 0.0f, 1.0f);
+                    velocity_.x -= slopeDown.x * (velDotDown * cancelFactor);
+                    velocity_.z -= slopeDown.y * (velDotDown * cancelFactor);
+                }
+            }
+
             float dy = targetGroundedY - position_.y;
             if (dy < -4.0f) {
                 // 大きな段差・崖から飛び出した -> 空中落下へ！
                 isGrounded_ = false;
             } else {
                 // 地面の上に常に乗る（傾斜で床が持ち上がっても絶対に埋まらない！）
-                float maxStepUp = (std::max)(0.8f, scale_.x * 1.0f);
-                if (dy > maxStepUp) {
-                    // 登れない急な段差・壁・上の足場: 瞬間移動させず壁として水平速度を減衰
-                    velocity_.x *= 0.5f;
-                    velocity_.z *= 0.5f;
-                } else if (dy > 0.0f) {
-                    // 通常の緩やかな斜面・低い段差: 瞬時に接地高さへ（埋まりを物理的に100%防止）
+                if (dy > 0.0f) {
+                    // 床が下から押し上げてくる場合: 瞬時に接地高さへ（傾斜時の埋まり・すり抜けを物理的に100%防止）
                     position_.y = targetGroundedY;
                     velocity_.y = 0.0f;
                 } else {
