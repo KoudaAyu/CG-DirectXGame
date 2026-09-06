@@ -2,6 +2,7 @@
 
 #include "Baziru3_Engine/Core/Base/Vector.h"
 #include "Baziru3_Engine/Graphics/3D/Object/Object3d.h"
+#include "Baziru3_Engine/Framework/Collision/MeshCollider.h"
 #include <algorithm>
 #include <cmath>
 
@@ -24,17 +25,39 @@ struct SlimeParamsCPU
 namespace SlimePhysics
 {
     /**
-     * @brief 傾斜面（地面プレーン）上の厳密な高さを算出
+     * @brief 3D地面メッシュ（Object3d & MeshCollider）を登録してポリゴン地形接地を有効化
+     */
+    void SetGroundMesh(Object3d* groundObject, MeshCollider* groundCollider);
+
+    /**
+     * @brief 登録された地面メッシュを解除
+     */
+    void ClearGroundMesh();
+
+    /// @brief currentY を無視して最上面の地面高さを検索する際の特殊値
+    constexpr float kIgnoreCurrentY = -99999.0f;
+
+    /**
+     * @brief 地面メッシュまたは傾斜面上の厳密な高さを算出
      * @param x ワールドX座標
      * @param z ワールドZ座標
      * @param stageTilt ステージの傾斜角 (x: ピッチ, y: ロール)
      * @param pivot 傾斜の回転中心（自機位置など、デフォルト: 0, 0）
-     * @return 傾斜面上の正確なY座標
+     * @return 傾斜面・3D地形メッシュ上の正確なY座標
      */
     float CalculateGroundHeight(float x, float z, const Vector2& stageTilt, const Vector2& pivot = { 0.0f, 0.0f });
 
     /**
-     * @brief 傾斜面上に乗るスライムの厳密な接地中心Y座標を算出
+     * @brief 地面メッシュまたは傾斜面上の厳密な高さを算出（現在のY座標を基準にレイキャストを行い、有無および法線を判定）
+     */
+    float CalculateGroundHeightEx(float x, float z, float currentY, const Vector2& stageTilt, bool* outHasGround = nullptr, Vector3* outNormal = nullptr, const Vector2& pivot = { 0.0f, 0.0f });
+    inline float CalculateGroundHeightEx(float x, float z, float currentY, const Vector2& stageTilt, bool* outHasGround, const Vector2& pivot)
+    {
+        return CalculateGroundHeightEx(x, z, currentY, stageTilt, outHasGround, nullptr, pivot);
+    }
+
+    /**
+     * @brief 地面メッシュまたは傾斜面上に乗るスライムの厳密な接地中心Y座標を算出
      * @param x ワールドX座標
      * @param z ワールドZ座標
      * @param stageTilt ステージの傾斜角
@@ -43,6 +66,20 @@ namespace SlimePhysics
      * @return スライムの中心Y座標
      */
     float CalculateGroundedCenterY(float x, float z, const Vector2& stageTilt, float baseOffset, const Vector2& pivot = { 0.0f, 0.0f });
+
+    /**
+     * @brief 接地中心Y座標を算出（落下・空中判定および法線出力フラグ付き）
+     */
+    float CalculateGroundedCenterYEx(float x, float z, float currentY, const Vector2& stageTilt, float baseOffset, bool* outHasGround = nullptr, Vector3* outNormal = nullptr, const Vector2& pivot = { 0.0f, 0.0f });
+    inline float CalculateGroundedCenterYEx(float x, float z, float currentY, const Vector2& stageTilt, float baseOffset, bool* outHasGround, const Vector2& pivot)
+    {
+        return CalculateGroundedCenterYEx(x, z, currentY, stageTilt, baseOffset, outHasGround, nullptr, pivot);
+    }
+
+    /**
+     * @brief 接地地点の法線ベクトルを取得
+     */
+    Vector3 GetGroundNormal(float x, float z, const Vector2& stageTilt, const Vector2& pivot = { 0.0f, 0.0f });
 
     /**
      * @brief スライム変形計算用の入力パラメータ構造体

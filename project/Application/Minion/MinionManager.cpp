@@ -99,9 +99,12 @@ void MinionManager::ResolveSeparation(const Vector3& rotation, const Vector2& st
             if (SlimeCollision::ResolveCollision(posA, scaleA, squashA, 0.5f,
                                                  posB, scaleB, squashB, 0.5f,
                                                  impulse, rotation, rotation, stageNormal)) {
-                // 傾斜面上の厳密な接地中心に再クランプ
-                posA.y = SlimePhysics::CalculateGroundedCenterY(posA.x, posA.z, stageTilt, 0.22f, pivot);
-                posB.y = SlimePhysics::CalculateGroundedCenterY(posB.x, posB.z, stageTilt, 0.22f, pivot);
+                // 傾斜面上の厳密な接地中心に再クランプ（接地中かつ地面が存在する場合のみ）
+                bool hasGroundA = false, hasGroundB = false;
+                float gyA = SlimePhysics::CalculateGroundedCenterYEx(posA.x, posA.z, posA.y, stageTilt, 0.22f, &hasGroundA, pivot);
+                float gyB = SlimePhysics::CalculateGroundedCenterYEx(posB.x, posB.z, posB.y, stageTilt, 0.22f, &hasGroundB, pivot);
+                if (hasGroundA && minions_[i]->GetState() == MinionState::Rolling) posA.y = gyA;
+                if (hasGroundB && minions_[j]->GetState() == MinionState::Rolling) posB.y = gyB;
 
                 minions_[i]->SetPosition(posA);
                 minions_[j]->SetPosition(posB);
@@ -153,7 +156,9 @@ void MinionManager::ResolvePlayerSeparation(const Vector3& playerPos, const Vect
         if (SlimeCollision::ResolveCollision(pPos, playerScale, playerSquash, 0.0f,
                                              mPos, mScale, mSquash, 1.0f,
                                              impulse, playerRotation, mRot, stageNormal)) {
-            mPos.y = SlimePhysics::CalculateGroundedCenterY(mPos.x, mPos.z, stageTilt, 0.22f, pivot);
+            bool hasGM = false;
+            float gyM = SlimePhysics::CalculateGroundedCenterYEx(mPos.x, mPos.z, mPos.y, stageTilt, 0.22f, &hasGM, pivot);
+            if (hasGM && minion->GetState() == MinionState::Rolling) mPos.y = gyM;
             minion->SetPosition(mPos);
 
             // プレイヤーからの押し出し速度をミニオンに伝達（巨大プレイヤーの突進・接触による弾き飛ばし）

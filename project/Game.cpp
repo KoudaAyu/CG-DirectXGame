@@ -309,12 +309,15 @@ void Game::Update() {
   object3d_->Update();
 
 #ifdef USE_IMGUI
-  if (debugUI) {
+  if (debugUI && s_showImGui) {
     debugUI->Update();
   }
 #endif // USE_IMGUI
 
   inputManager.Update();
+  if (inputManager.TriggerKey(DIK_F3)) {
+    ToggleImGuiVisible();
+  }
 
   // Update mouse input and move cursor sprite
   mouseInput.Update();
@@ -526,10 +529,13 @@ void Game::Draw() {
   }
 
 #ifdef USE_IMGUI
-  if (imguiManager)
+  if (imguiManager) {
     imguiManager->Render();
-  ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(),
-                                dx->GetCommandList().Get());
+    if (s_showImGui) {
+      ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(),
+                                    dx->GetCommandList().Get());
+    }
+  }
 #endif
 
   dx->PostDraw();

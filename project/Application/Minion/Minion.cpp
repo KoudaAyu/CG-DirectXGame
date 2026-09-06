@@ -212,14 +212,37 @@ void Minion::Update(float deltaTime, const Vector2& stageTilt, const Vector2& pi
         position_.x += velocity_.x * deltaTime;
         position_.z += velocity_.z * deltaTime;
 
-        // 床の傾斜に沿った姿勢（まな板の上に密着して床に沿って潰れる）
-        // Y軸回転を0に固定することで、オイラー角の積による法線ズレ・底面浮きを100%防止
-        rotation_.x = stageTilt.x;
-        rotation_.y = 0.0f;
-        rotation_.z = -stageTilt.y;
+        // 傾斜面・地面メッシュの上に乗る
+        bool hasGround = false;
+        Vector3 groundNormal{ 0.0f, 1.0f, 0.0f };
+        float targetGroundY = SlimePhysics::CalculateGroundedCenterYEx(
+            position_.x, position_.z, position_.y, stageTilt, groundY_, &hasGround, &groundNormal, pivot);
 
-        // 傾斜面の上に乗る（床の傾斜に沿って底面がピタッと接地）
-        position_.y = SlimePhysics::CalculateGroundedCenterY(position_.x, position_.z, stageTilt, groundY_, pivot);
+        if (!hasGround || (targetGroundY - position_.y < -4.0f)) {
+            // 段差から飛び出した、または足元に地面がない -> 空中落下状態へ自然に移行！
+            state_ = MinionState::Thrown;
+            velocity_.y = 0.0f;
+        } else {
+            float dy = targetGroundY - position_.y;
+            float maxStepUp = 0.6f;
+            if (dy > maxStepUp) {
+                // 登れない急な段差・上の足場: 瞬間移動させず水平速度を減衰
+                velocity_.x *= 0.5f;
+                velocity_.z *= 0.5f;
+            } else if (dy > 0.0f) {
+                // 床が下から上がった場合: 瞬時に接地高さへ（埋まりを物理的に100%防止）
+                position_.y = targetGroundY;
+            } else {
+                position_.y += dy * (std::min)(1.0f, deltaTime * 35.0f);
+            }
+
+            // 床の傾斜および局所地形法線に正しく沿って密着
+            float targetRotX = std::atan2(groundNormal.z, groundNormal.y);
+            float targetRotZ = -std::atan2(groundNormal.x, groundNormal.y);
+            rotation_.x += (targetRotX - rotation_.x) * (std::min)(1.0f, deltaTime * 20.0f);
+            rotation_.y = 0.0f;
+            rotation_.z += (targetRotZ - rotation_.z) * (std::min)(1.0f, deltaTime * 20.0f);
+        }
 
         // --- 液体スライムの動的変形（SlimePhysics ユーティリティで一元計算） ---
 
@@ -276,9 +299,12 @@ void Minion::Update(float deltaTime, const Vector2& stageTilt, const Vector2& pi
         SlimePhysics::UpdateDeformation(slimeParams_, airDeformInput);
         prevVelocity_ = velocity_;
 
-        // 地面着地判定（傾いた板との接触判定）
-        float landingY = SlimePhysics::CalculateGroundedCenterY(position_.x, position_.z, stageTilt, groundY_, pivot);
-        if (position_.y <= landingY) {
+        // 地面着地判定（傾いた板・メッシュとの接触判定）
+        bool hasLandingGround = false;
+        Vector3 landingNormal{ 0.0f, 1.0f, 0.0f };
+        float landingY = SlimePhysics::CalculateGroundedCenterYEx(
+            position_.x, position_.z, position_.y, stageTilt, groundY_, &hasLandingGround, &landingNormal, pivot);
+        if (hasLandingGround && position_.y <= landingY) {
             position_.y = landingY;
             velocity_.y = 0.0f;
             velocity_.x *= 0.7f;
@@ -292,11 +318,37 @@ void Minion::Update(float deltaTime, const Vector2& stageTilt, const Vector2& pi
             slimeParams_.impulseStrength = 0.18f;
         }
 
+        // 奈落落下セーフティ
+        if (position_.y < -120.0f) {
+            position_ = { 0.0f, 4.0f, 0.0f };
+            velocity_ = { 0.0f, 0.0f, 0.0f };
+            state_ = MinionState::Rolling;
+        }
+
         break;
     }
 
     case MinionState::Idle: {
-        position_.y = SlimePhysics::CalculateGroundedCenterY(position_.x, position_.z, stageTilt, groundY_, pivot);
+        bool hasGround = false;
+        Vector3 idleNormal{ 0.0f, 1.0f, 0.0f };
+        float targetY = SlimePhysics::CalculateGroundedCenterYEx(
+            position_.x, position_.z, position_.y, stageTilt, groundY_, &hasGround, &idleNormal, pivot);
+        if (hasGround) {
+            float dy = targetY - position_.y;
+            float maxStepUp = 0.6f;
+            if (dy > maxStepUp) {
+                // 上の足場への瞬間移動を防止
+            } else if (dy > 0.0f) {
+                position_.y = targetY;
+            } else {
+                position_.y += dy * (std::min)(1.0f, deltaTime * 25.0f);
+            }
+            float targetRotX = std::atan2(idleNormal.z, idleNormal.y);
+            float targetRotZ = -std::atan2(idleNormal.x, idleNormal.y);
+            rotation_.x += (targetRotX - rotation_.x) * (std::min)(1.0f, deltaTime * 20.0f);
+            rotation_.y = 0.0f;
+            rotation_.z += (targetRotZ - rotation_.z) * (std::min)(1.0f, deltaTime * 20.0f);
+        }
         break;
     }
 
@@ -304,16 +356,6 @@ void Minion::Update(float deltaTime, const Vector2& stageTilt, const Vector2& pi
     case MinionState::Carrying: {
         break;
     }
-    }
-
-    // 傾斜面の高さ変動に対する絶対安全クランプ（角度変更時にも地面の下に100%埋まらない）
-    float currentGroundSurfaceY = SlimePhysics::CalculateGroundedCenterY(position_.x, position_.z, stageTilt, groundY_, pivot);
-    if (position_.y < currentGroundSurfaceY) {
-        position_.y = currentGroundSurfaceY;
-        if (state_ == MinionState::Thrown) {
-            velocity_.y = 0.0f;
-            state_ = MinionState::Rolling;
-        }
     }
 
     // シェーダー時間の更新

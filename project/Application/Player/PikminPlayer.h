@@ -95,7 +95,12 @@ private:
     Vector3 scale_{ 0.4f, 0.4f, 0.4f };
 
     bool isMerged_ = false;
+    bool isGrounded_ = false;
 
+public:
+    bool IsGrounded() const { return isGrounded_; }
+
+private:
     // パラメータ
     float tiltAccel_ = 38.0f;
     float rotationSpeed_ = 12.0f;

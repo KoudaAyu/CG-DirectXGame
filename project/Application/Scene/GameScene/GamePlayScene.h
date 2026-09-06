@@ -10,6 +10,7 @@
 #include "Application/GameObject/AimGuide.h"
 #include "Application/GameObject/PropellerObstacle.h"
 #include "Baziru3_Engine/Graphics/3D/Object/Object3d.h"
+#include "Baziru3_Engine/Framework/Collision/MeshCollider.h"
 
 #include <memory>
 
@@ -43,8 +44,10 @@ private:
     std::vector<std::unique_ptr<PropellerObstacle>> propellerObstacles_;
 
     std::unique_ptr<Object3d> groundPlane_;
+    std::unique_ptr<MeshCollider> groundCollider_;
     Object3d::ModelData groundModelData_;
     uint32_t groundTextureIndex_ = 0;
+    float groundScale_ = 0.25f; // 地面ステージの縮小スケール (適度な広さ: 幅約75m)
 
     // --- カメラ制御パラメータ (プレイヤー相対座標一定モデル) ---
     float cameraDistance_ = 21.0f;        // プレイヤーからのカメラ距離（ゆったり見晴らせる高さ）

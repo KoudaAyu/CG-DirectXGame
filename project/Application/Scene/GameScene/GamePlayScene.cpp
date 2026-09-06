@@ -6,6 +6,7 @@
 #include "TextureManager.h"
 #include "RenderContext.h"
 #include "Application/GameObject/SlimePhysics.h"
+#include "Game.h"
 
 #ifdef USE_IMGUI
 #include <imgui.h>
@@ -103,62 +104,44 @@ void GamePlayScene::InitializeScene()
     }
 
     Object3dCom* object3dCom = GetObject3dCom();
+    if (object3dCom) {
+        object3dCom->SetDefaultCamera(playCamera_.get());
+    }
 
-    // 3. 地面グリッドメッシュの動的生成（広大なチェッカーボードグリッド）
+    // 3. 地面モデル（startLand.obj / startLand.mtl）の読み込みと初期化
+    groundModelData_ = Object3d::LoadObjFile("Resources/10days", "startLand.obj");
+
+    // 広大な地形メッシュのバウンディング半径を十分大きく設定（視錐台誤カリングを完全に防止）
+    groundModelData_.boundingRadius = 10000.0f;
+
+    if (!groundModelData_.material.textureFilePath.empty())
     {
-        const int gridN = 41; // 41x41 高解像度グリッド
-        const float uvTile = 40.0f; // UV繰り返し回数（チェッカーボード模様用）
-
-        groundModelData_.vertices.clear();
-        groundModelData_.indices.clear();
-
-        // 頂点の生成
-        for (int iz = 0; iz < gridN; ++iz) {
-            for (int ix = 0; ix < gridN; ++ix) {
-                float x = -1.0f + 2.0f * static_cast<float>(ix) / (gridN - 1);
-                float z = -1.0f + 2.0f * static_cast<float>(iz) / (gridN - 1);
-                float u = static_cast<float>(ix) / (gridN - 1) * uvTile;
-                float v = static_cast<float>(iz) / (gridN - 1) * uvTile;
-
-                Sprite::VertexData vtx{};
-                vtx.position = { x, 0.0f, z, 1.0f };
-                vtx.texcoord = { u, v };
-                vtx.normal = { 0.0f, 1.0f, 0.0f };
-                groundModelData_.vertices.push_back(vtx);
-            }
-        }
-
-        // インデックスの生成（2三角形 / セル）
-        for (int iz = 0; iz < gridN - 1; ++iz) {
-            for (int ix = 0; ix < gridN - 1; ++ix) {
-                uint32_t bl = static_cast<uint32_t>(iz * gridN + ix);
-                uint32_t br = bl + 1;
-                uint32_t tl = bl + static_cast<uint32_t>(gridN);
-                uint32_t tr = tl + 1;
-                groundModelData_.indices.push_back(bl);
-                groundModelData_.indices.push_back(tl);
-                groundModelData_.indices.push_back(br);
-                groundModelData_.indices.push_back(br);
-                groundModelData_.indices.push_back(tl);
-                groundModelData_.indices.push_back(tr);
-            }
-        }
-
-        groundTextureIndex_ = TextureManager::GetInstance()->Load("Resources/checkerBoard.png");
+        groundTextureIndex_ = TextureManager::GetInstance()->Load(groundModelData_.material.textureFilePath);
+        groundModelData_.material.textureIndex = groundTextureIndex_;
+    }
+    else
+    {
+        groundTextureIndex_ = TextureManager::GetInstance()->Load("Resources/10days/checkerBoard.png");
         groundModelData_.material.textureIndex = groundTextureIndex_;
     }
 
     groundPlane_ = std::make_unique<Object3d>();
     if (groundPlane_) {
         groundPlane_->Initialize(object3dCom, groundModelData_);
+        // 地面モデルをカメラと完全同期させ、描画・WVP変換行列と当たり判定のズレを完全に解消
         groundPlane_->SetCamera(playCamera_.get());
         groundPlane_->SetTranslate({ 0.0f, 0.0f, 0.0f });
-        groundPlane_->SetScale({ 100.0f, 1.0f, 100.0f });
+        groundPlane_->SetScale({ groundScale_, groundScale_, groundScale_ });
         groundPlane_->SetRotate({ 0.0f, 0.0f, 0.0f });
-        groundPlane_->SetColor({ 0.45f, 0.82f, 0.45f, 1.0f }); // 鮮やかな草原カラー
+        groundPlane_->SetColor({ 0.55f, 0.85f, 0.50f, 1.0f }); // 鮮やかな草原カラー
         groundPlane_->SetEnableLighting(true);
         groundPlane_->Update();
     }
+
+    // 地面メッシュコライダーの生成・登録と SlimePhysics への地形メッシュ登録
+    groundCollider_ = std::make_unique<MeshCollider>(groundPlane_.get(), CollisionAttribute::Obstacle);
+    CollisionManager::GetInstance()->RegisterCollider(groundCollider_.get());
+    SlimePhysics::SetGroundMesh(groundPlane_.get(), groundCollider_.get());
 
     // 4. プレイヤーの初期化
     player_ = std::make_unique<PikminPlayer>();
@@ -178,8 +161,9 @@ void GamePlayScene::InitializeScene()
     aimGuide_ = std::make_unique<AimGuide>();
     aimGuide_->Initialize(object3dCom, playCamera_.get());
 
-    // 7. 回転プロペラ障害物の初期化と配置
+    // 7. 回転プロペラ障害物の初期化と配置（※ユーザー要望により一時的に無効化）
     propellerObstacles_.clear();
+    /*
     {
         // プロペラ1: ステージ中央奥 (直径約3m, 時計回り回転)
         auto prop1 = std::make_unique<PropellerObstacle>();
@@ -191,6 +175,7 @@ void GamePlayScene::InitializeScene()
         prop2->Initialize(object3dCom, playCamera_.get(), { -5.0f, 0.0f, -1.0f }, { 1.2f, 1.2f, 1.2f }, -3.2f);
         propellerObstacles_.push_back(std::move(prop2));
     }
+    */
 
     // 8. スライム同士（Minion-Minion, Player-Minion）はアプリ層の Multi-Sphere で高精度に処理するため、
     // エンジン側の単一球判定の重複適用（二重押し出し）を解除
@@ -209,12 +194,22 @@ void GamePlayScene::Finalize()
     propellerObstacles_.clear();
 
     aimGuide_.reset();
+    SlimePhysics::ClearGroundMesh();
+    if (groundCollider_)
+    {
+        CollisionManager::GetInstance()->UnregisterCollider(groundCollider_.get());
+        groundCollider_.reset();
+    }
     groundPlane_.reset();
     minionManager_.reset();
     player_.reset();
     playCamera_.reset();
     mouseInput_.reset();
     keyInput_.reset();
+    if (auto* object3dCom = GetObject3dCom())
+    {
+        object3dCom->SetDefaultCamera(nullptr);
+    }
     cameraInitialized_ = false;
     isInitialized_ = false;
 }
@@ -227,10 +222,17 @@ void GamePlayScene::Update()
     {
         keyInput_->Update();
 
-        // SPACEキーでクリアシーンへ遷移
-        if (keyInput_->TriggerKey(DIK_SPACE))
+        // ENTERキーでクリアシーンへ遷移（SPACEキーはスライムのジャンプに割り当て）
+        if (keyInput_->TriggerKey(DIK_RETURN))
         {
             SceneManager::GetInstance()->ChangeScene("CLEAR");
+        }
+
+        // F1キーで当たり判定ワイヤーフレーム表示/非表示をトグル
+        if (keyInput_->TriggerKey(DIK_F1))
+        {
+            bool showColliders = CollisionManager::GetInstance()->IsShowDebugColliders();
+            CollisionManager::GetInstance()->SetShowDebugColliders(!showColliders);
         }
     }
 
@@ -257,20 +259,19 @@ void GamePlayScene::Update()
     Vector3 playerPos = player_ ? player_->GetPosition() : Vector3{ 0.0f, 0.0f, 0.0f };
     Vector2 playerPivot = { playerPos.x, playerPos.z };
 
-    // 地面プレーンの回転と位置を傾斜角に合わせて更新 (Z回転は負で右下がり、正で左下がり)
-    // プレイヤーの足元 (playerPivot) をピボットとして回転させるため、平行移動オフセット P - R * P を適用
+    // 地面プレーンの回転を傾斜角に合わせて更新 (原点中心の回転により、平行移動ズレ・足元抜けを完全にゼロ化)
     if (groundPlane_)
     {
-        Matrix4x4 R_tilt = Multiply(MakeRotateXMatrix(currentTilt_.x), MakeRotateZMatrix(-currentTilt_.y));
-        Vector3 P = { playerPivot.x, 0.0f, playerPivot.y };
-        Vector3 RP = {
-            P.x * R_tilt.m[0][0] + P.y * R_tilt.m[1][0] + P.z * R_tilt.m[2][0],
-            P.x * R_tilt.m[0][1] + P.y * R_tilt.m[1][1] + P.z * R_tilt.m[2][1],
-            P.x * R_tilt.m[0][2] + P.y * R_tilt.m[1][2] + P.z * R_tilt.m[2][2]
-        };
-        groundPlane_->SetTranslate({ P.x - RP.x, P.y - RP.y, P.z - RP.z });
+        groundPlane_->SetTranslate({ 0.0f, 0.0f, 0.0f });
+        groundPlane_->SetScale({ groundScale_, groundScale_, groundScale_ });
         groundPlane_->SetRotate({ currentTilt_.x, 0.0f, -currentTilt_.y });
         groundPlane_->Update();
+
+        if (groundCollider_)
+        {
+            groundCollider_->SetWorldPosition({ 0.0f, 0.0f, 0.0f });
+            groundCollider_->Update();
+        }
     }
 
     // 照準ガイドはLocoRoco完全準拠のため無効化
@@ -349,7 +350,6 @@ void GamePlayScene::Update()
 
                 if (prop->ResolveSlimeCollision(mPos, mVel, mRadius, false, squash, impulse))
                 {
-                    mPos.y = SlimePhysics::CalculateGroundedCenterY(mPos.x, mPos.z, currentTilt_, 0.22f, playerPivot);
                     minion->SetPosition(mPos);
                     minion->SetVelocity(mVel);
                     minion->SetState(MinionState::Thrown);
@@ -373,9 +373,8 @@ void GamePlayScene::Update()
             minionManager_->GetGroupCenterAndSpread(player_->GetPosition(), rawFocusPos, rawSpread);
         }
 
-        // ★重要: 注視点の高さ Y を、傾斜面上の適正な高さに安定化！
-        // 坂下に転がったミニオンのせいで注視点が沈み込み、カメラが地面すれすれ・床に接近するのを完全防止
-        rawFocusPos.y = SlimePhysics::CalculateGroundedCenterY(rawFocusPos.x, rawFocusPos.z, currentTilt_, 0.5f, playerPivot);
+        // 注視点の高さ Y: プレイヤーと群れの自然な高さを追従
+        rawFocusPos.y = (std::max)(player_->GetPosition().y + 0.3f, rawFocusPos.y);
 
         Vector3 playerVel = player_->GetVelocity();
 
@@ -505,6 +504,12 @@ void GamePlayScene::Update()
         playCamera_->Update();
     }
 
+    // カメラの最新ViewProjection行列に合わせて、地面メッシュのWVP定数バッファを同期更新
+    if (groundPlane_)
+    {
+        groundPlane_->Update();
+    }
+
     DrawDebugUI();
 }
 
@@ -559,12 +564,15 @@ void GamePlayScene::Draw(SceneRenderRequests& renderRequests)
 
 void GamePlayScene::DrawDebugUI()
 {
-#ifdef USE_IMGUI
     // コライダーのデバッグワイヤーフレーム描画（エンジン標準の MeshCollider ワイヤーフレーム描画）
     if (playCamera_)
     {
         CollisionManager::GetInstance()->DrawDebug(playCamera_.get());
     }
+
+#ifdef USE_IMGUI
+    // F3キーで全ImGuiが非表示に設定されている場合は描画スキップ
+    if (!Game::IsImGuiVisible()) return;
 
     ImGui::SetNextWindowPos(ImVec2(20, 20), ImGuiCond_FirstUseEver);
     ImGui::SetNextWindowSize(ImVec2(460, 480), ImGuiCond_FirstUseEver);
@@ -579,6 +587,7 @@ void GamePlayScene::DrawDebugUI()
     ImGui::BulletText("E key: Split (弾けて全員小ロコロコに分裂)");
     ImGui::BulletText("Contact: Auto Merge (触れ合うとポコッと自動合体)");
     ImGui::BulletText("F1 key: Toggle Collision Wireframes (当たり判定表示ON/OFF)");
+    ImGui::BulletText("F3 key: Toggle All ImGui (全ImGui表示/非表示)");
     ImGui::BulletText("SPACE key: Clear Scene");
     ImGui::Separator();
 
@@ -670,6 +679,7 @@ void GamePlayScene::DrawDebugUI()
             maxTiltAngle_ = maxDeg * 0.0174533f;
         }
         ImGui::SliderFloat("Tilt Smooth Time (傾斜スムーズ時間)", &tiltSmoothTime_, 0.05f, 0.40f, "%.2f s");
+        ImGui::SliderFloat("Ground Scale (地面縮小スケール)", &groundScale_, 0.05f, 1.0f, "%.2f");
 
         if (player_) {
             float accel = player_->GetTiltAccel();

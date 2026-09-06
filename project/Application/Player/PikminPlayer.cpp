@@ -238,9 +238,20 @@ void PikminPlayer::Update(float deltaTime, KeyInput* keyInput, MinionManager* mi
                 slimeParams_.squashStretch = { 0.35f, -0.25f, 0.35f };
             }
         }
+
+        // ジャンプ入力 (SPACEキー: 接地時のみジャンプ可能)
+        if (keyInput->TriggerKey(DIK_SPACE)) {
+            if (isGrounded_) {
+                velocity_.y = 13.0f; // ジャンプ初速
+                isGrounded_ = false;
+                // ジャンプ時の縦伸び（スライムストレッチ）
+                slimeParams_.squashStretch = { -0.15f, 0.30f, -0.15f };
+                slimeParams_.impulseStrength = 0.28f;
+            }
+        }
     }
 
-    // --- ステージ傾斜による物理加速度と摩擦（ティルト移動） ---
+    // --- 水平移動（ティルト加速度と慣性） ---
     // stageTilt.x: ピッチ（手前/奥）、stageTilt.y: ロール（左/右）
     float accelScale = isMerged_ ? (tiltAccel_ * 1.25f) : tiltAccel_;
     float accelX = std::sin(stageTilt.y) * accelScale;
@@ -249,35 +260,15 @@ void PikminPlayer::Update(float deltaTime, KeyInput* keyInput, MinionManager* mi
     velocity_.x += accelX * deltaTime;
     velocity_.z += accelZ * deltaTime;
 
-    // 地面摩擦によるスムーズ減速（全スライム共通摩擦係数）
-    float currentFriction = SlimePhysics::GetFriction();
+    // 摩擦減速（空中では摩擦を大幅低減して滑らかに慣性飛行）
+    float currentFriction = isGrounded_ ? SlimePhysics::GetFriction() : (SlimePhysics::GetFriction() * 0.15f);
     float decay = 1.0f - (std::min)(1.0f, currentFriction * deltaTime);
     velocity_.x *= decay;
     velocity_.z *= decay;
 
-    // 物理位置の更新
+    // 水平位置の更新
     position_.x += velocity_.x * deltaTime;
     position_.z += velocity_.z * deltaTime;
-
-    // 床の傾斜に沿った姿勢（まな板の上に密着して床に沿って潰れる）
-    // Y軸回転を0に固定することで、オイラー角の積による法線ズレ・底面浮きを100%防止
-    rotation_.x = stageTilt.x;
-    rotation_.y = 0.0f;
-    rotation_.z = -stageTilt.y;
-
-    // --- 液体スライムの動的変形（SlimePhysics ユーティリティで一元計算） ---
-    SlimePhysics::DeformInput deformInput;
-    deformInput.velocity = velocity_;
-    deformInput.prevVelocity = prevVelocity_;
-    deformInput.stageTilt = stageTilt;
-    deformInput.deltaTime = deltaTime;
-    deformInput.isGrounded = true;
-    deformInput.isMerged = isMerged_;
-    deformInput.massScale = scale_.x;
-    SlimePhysics::UpdateDeformation(slimeParams_, deformInput);
-    prevVelocity_ = velocity_;
-
-    slimeParams_.time = totalTime_;
 
     // --- 大きさ（1-10）と色（小:青, 中:黄, 大:赤）の管理 ---
     int absorbedCount = minionManager ? minionManager->GetAbsorbedCount() : 0;
@@ -299,8 +290,105 @@ void PikminPlayer::Update(float deltaTime, KeyInput* keyInput, MinionManager* mi
     float currentScale = currentMergedScale_;
     scale_ = { currentScale, currentScale, currentScale };
 
-    // 傾斜面の上に乗る（床にピタッと完全接地）
-    position_.y = SlimePhysics::CalculateGroundedCenterY(position_.x, position_.z, stageTilt, currentScale * 0.73f, { position_.x, position_.z });
+    // --- 垂直重力とリアルタイム地形・落下物理 ---
+    const float kGravity = -32.0f; // 重力加速度
+    bool hasGround = false;
+    Vector3 groundNormal{ 0.0f, 1.0f, 0.0f };
+    float baseOffset = currentScale * 0.73f;
+    float targetGroundedY = SlimePhysics::CalculateGroundedCenterYEx(
+        position_.x, position_.z, position_.y, stageTilt, baseOffset, &hasGround, &groundNormal, { position_.x, position_.z });
+
+    if (!isGrounded_) {
+        // 空中状態: 純粋な鉛直重力で落下
+        velocity_.y += kGravity * deltaTime;
+        if (velocity_.y < -45.0f) velocity_.y = -45.0f; // 終端落下速度制限
+
+        position_.y += velocity_.y * deltaTime;
+
+        // 空中での姿勢: 進行方向を向く
+        rotation_.x = 0.0f;
+        rotation_.z = 0.0f;
+        float horizSpeed = std::sqrt(velocity_.x * velocity_.x + velocity_.z * velocity_.z);
+        if (horizSpeed > 0.3f) {
+            rotation_.y = std::atan2(velocity_.x, velocity_.z);
+        }
+
+        // 着地判定（足元に地面があり、地面より下に到達した場合）
+        if (hasGround && position_.y <= targetGroundedY) {
+            position_.y = targetGroundedY;
+            float impactSpeed = -velocity_.y;
+            isGrounded_ = true;
+
+            // スライム特有の弾性着地バウンド
+            if (impactSpeed > 7.0f) {
+                velocity_.y = impactSpeed * 0.22f; // 小バウンド
+                isGrounded_ = false;
+            } else {
+                velocity_.y = 0.0f;
+            }
+
+            // 着地時の弾力スクワッシュ（ぷるんと潰れて復元）
+            float squashAmount = std::clamp(impactSpeed * 0.02f, 0.08f, 0.35f);
+            slimeParams_.squashStretch = { squashAmount * 0.5f, -squashAmount, squashAmount * 0.5f };
+            slimeParams_.impulseStrength = std::clamp(impactSpeed * 0.04f, 0.15f, 0.60f);
+        }
+    } else {
+        // 接地状態: 地面スロープへの密着追従
+        if (!hasGround) {
+            // 足元に地面がなくなった（島の外へ飛び出した！） -> 空中落下へ！
+            isGrounded_ = false;
+        } else {
+            float dy = targetGroundedY - position_.y;
+            if (dy < -4.0f) {
+                // 大きな段差・崖から飛び出した -> 空中落下へ！
+                isGrounded_ = false;
+            } else {
+                // 地面の上に常に乗る（傾斜で床が持ち上がっても絶対に埋まらない！）
+                float maxStepUp = (std::max)(0.8f, scale_.x * 1.0f);
+                if (dy > maxStepUp) {
+                    // 登れない急な段差・壁・上の足場: 瞬間移動させず壁として水平速度を減衰
+                    velocity_.x *= 0.5f;
+                    velocity_.z *= 0.5f;
+                } else if (dy > 0.0f) {
+                    // 通常の緩やかな斜面・低い段差: 瞬時に接地高さへ（埋まりを物理的に100%防止）
+                    position_.y = targetGroundedY;
+                    velocity_.y = 0.0f;
+                } else {
+                    // 床が下がった場合: 滑らかに密着追従
+                    position_.y += dy * (std::min)(1.0f, deltaTime * 40.0f);
+                    velocity_.y = 0.0f;
+                }
+            }
+        }
+
+        // 接地中の姿勢（局所地形法線に正しく沿って密着）
+        float targetRotX = std::atan2(groundNormal.z, groundNormal.y);
+        float targetRotZ = -std::atan2(groundNormal.x, groundNormal.y);
+        rotation_.x += (targetRotX - rotation_.x) * (std::min)(1.0f, deltaTime * 20.0f);
+        rotation_.y = 0.0f;
+        rotation_.z += (targetRotZ - rotation_.z) * (std::min)(1.0f, deltaTime * 20.0f);
+    }
+
+    // 奈落への落下防止セーフティ（万が一島の外へ真っ逆さまに落ちた場合は安全に復帰）
+    if (position_.y < -120.0f) {
+        position_ = { 0.0f, 4.0f, 0.0f };
+        velocity_ = { 0.0f, 0.0f, 0.0f };
+        isGrounded_ = false;
+    }
+
+    // --- 液体スライムの動的変形（空中/接地状態を正しく反映） ---
+    SlimePhysics::DeformInput deformInput;
+    deformInput.velocity = velocity_;
+    deformInput.prevVelocity = prevVelocity_;
+    deformInput.stageTilt = stageTilt;
+    deformInput.deltaTime = deltaTime;
+    deformInput.isGrounded = isGrounded_;
+    deformInput.isMerged = isMerged_;
+    deformInput.massScale = scale_.x;
+    SlimePhysics::UpdateDeformation(slimeParams_, deformInput);
+    prevVelocity_ = velocity_;
+
+    slimeParams_.time = totalTime_;
     // モデルTransformの更新（通常・巨大どちらも現在の正確なscale_で更新）
     if (normalModel_) {
         normalModel_->SetTranslate(position_);
