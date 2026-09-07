@@ -55,6 +55,8 @@ public:
     int GetMergedCount() const { return absorbedCount_; }
     int GetAbsorbedCount() const { return absorbedCount_; }
     int GetTotalCount() const { return static_cast<int>(minions_.size()); }
+
+    /// @brief ミニオンの実体を列挙する（軌跡エフェクトなど、外から個々の状態を見たいとき用）
     const std::vector<std::unique_ptr<Minion>>& GetMinions() const { return minions_; }
     bool IsAllMerged() const { return isAllMerged_; }
 

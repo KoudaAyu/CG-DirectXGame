@@ -166,6 +166,12 @@
     <ClCompile Include="Baziru3_Engine\Framework\Collision\MeshCollider.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Framework\Spline\SplinePath.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Framework\Spline\SplineFollower.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
     <ClCompile Include="Baziru3_Engine\Graphics\SkyBox\SkyBox.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
@@ -298,6 +304,9 @@
     <ClCompile Include="Application\GameObject\SlimeCollision.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
+    <ClCompile Include="Application\GameObject\SlimeFx.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="Resources\shaders\Slime.VS.hlsl">
@@ -369,6 +378,10 @@
     <ClInclude Include="Baziru3_Engine\Framework\Collision\CapsuleCollider.h" />
     <ClInclude Include="Baziru3_Engine\Framework\Collision\Collider.h" />
     <ClInclude Include="Baziru3_Engine\Framework\Collision\CollisionManager.h" />
+    <ClInclude Include="Baziru3_Engine\Framework\Collision\AABBTree.h" />
+    <ClInclude Include="Baziru3_Engine\Framework\Collision\MeshCollider.h" />
+    <ClInclude Include="Baziru3_Engine\Framework\Spline\SplinePath.h" />
+    <ClInclude Include="Baziru3_Engine\Framework\Spline\SplineFollower.h" />
     <ClInclude Include="Baziru3_Engine\Framework\Collision\SphereCollider.h" />
     <ClInclude Include="Baziru3_Engine\Framework\Audio\Sound.h" />
     <ClInclude Include="Baziru3_Engine\Core\Base\MappedResource.h" />
@@ -527,6 +540,9 @@
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
     <ClInclude Include="Application\GameObject\SlimeCollision.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="Application\GameObject\SlimeFx.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
   </ItemGroup>

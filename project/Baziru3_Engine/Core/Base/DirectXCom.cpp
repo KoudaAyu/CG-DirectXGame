@@ -526,14 +526,47 @@ void DirectXCom::CerateScissorRect()
 
 void DirectXCom::CreateDxcCompiler()
 {
+	// COMが未初期化だった場合に対する安全初期化ガード
+	HRESULT comHr = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+	(void)comHr;
 
-	//dxcCompilerを初期化
-	hr = (DxcCreateInstance(CLSID_DxcUtils, IID_PPV_ARGS(&dxcUtils)));
-	assert(SUCCEEDED(hr));
-	hr = (DxcCreateInstance(CLSID_DxcCompiler, IID_PPV_ARGS(&dxcCompiler)));
-	assert(SUCCEEDED(hr));
+	// dxcompiler.dll から直接 DxcCreateInstance を取得して呼び出す（COMレジストリ依存を回避）
+	HMODULE hDxc = LoadLibraryA("dxcompiler.dll");
+	DxcCreateInstanceProc pfnDxcCreateInstance = nullptr;
+	if (hDxc)
+	{
+		pfnDxcCreateInstance = reinterpret_cast<DxcCreateInstanceProc>(GetProcAddress(hDxc, "DxcCreateInstance"));
+	}
 
-	//現時点ではincludeしないが、includeに対応する為の設定を行う
+	auto callDxcCreate = [&](REFCLSID rclsid, REFIID riid, LPVOID* ppv) -> HRESULT {
+		if (pfnDxcCreateInstance)
+		{
+			return pfnDxcCreateInstance(rclsid, riid, ppv);
+		}
+		return DxcCreateInstance(rclsid, riid, ppv);
+	};
+
+	// 1. DxcUtilsの初期化
+	hr = callDxcCreate(CLSID_DxcUtils, IID_PPV_ARGS(&dxcUtils));
+	if (FAILED(hr))
+	{
+		char msg[512];
+		sprintf_s(msg, "DxcCreateInstance(CLSID_DxcUtils) failed!\nHRESULT: 0x%08X\n\nPossible cause:\n- dxcompiler.dll is missing or outdated in exe directory\n- Windows SDK is missing or incompatible", hr);
+		MessageBoxA(nullptr, msg, "DirectX Shader Compiler Error", MB_OK | MB_ICONERROR);
+		assert(SUCCEEDED(hr));
+	}
+
+	// 2. DxcCompilerの初期化
+	hr = callDxcCreate(CLSID_DxcCompiler, IID_PPV_ARGS(&dxcCompiler));
+	if (FAILED(hr))
+	{
+		char msg[512];
+		sprintf_s(msg, "DxcCreateInstance(CLSID_DxcCompiler) failed!\nHRESULT: 0x%08X", hr);
+		MessageBoxA(nullptr, msg, "DirectX Shader Compiler Error", MB_OK | MB_ICONERROR);
+		assert(SUCCEEDED(hr));
+	}
+
+	// 3. 現時点ではincludeしないが、includeに対応する為の設定を行う
 	hr = (dxcUtils->CreateDefaultIncludeHandler(&includeHandler));
 	assert(SUCCEEDED(hr));
 }

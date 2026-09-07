@@ -99,10 +99,15 @@ void SceneManager::DrawSceneSelectorUI() {
   ImGui::NewLine();
 
   // シーン共有データ（Context）の表示
-  if (!sceneContextData_.empty()) {
+  if (!sceneContextData_.empty() || !sceneAnyData_.empty()) {
     if (ImGui::CollapsingHeader("Scene Context Data", ImGuiTreeNodeFlags_DefaultOpen)) {
       for (const auto& [k, v] : sceneContextData_) {
         ImGui::Text("  [%s] = %s", k.c_str(), v.c_str());
+      }
+      for (const auto& [k, v] : sceneAnyData_) {
+        if (sceneContextData_.find(k) == sceneContextData_.end()) {
+          ImGui::Text("  [%s] = (type: %s)", k.c_str(), v.type().name());
+        }
       }
     }
   }
