@@ -360,10 +360,16 @@ void MinionManager::GetGroupCenterAndSpread(const Vector3& playerPos, Vector3& o
 
     // プレイヤーから極端に遠くへ吹っ飛んだミニオンが重心を異常に引っ張らないよう保護（半径16m以内を優先）
     const float kMaxInfluenceRadiusSq = 16.0f * 16.0f;
+    // ステージ外に落下した個体をカメラ追従から除外する閾値
+    const float kFallOffThresholdY = -1.0f;
 
     for (const auto& minion : minions_) {
         if (minion && minion->IsActive()) {
             Vector3 mPos = minion->GetPosition();
+
+            // 奈落に落ちた個体はカメラ制御から完全に無視
+            if (mPos.y < kFallOffThresholdY) continue;
+
             float dx = mPos.x - playerPos.x;
             float dz = mPos.z - playerPos.z;
             float distSq = dx * dx + dz * dz;
@@ -391,7 +397,12 @@ void MinionManager::GetGroupCenterAndSpread(const Vector3& playerPos, Vector3& o
 
     for (const auto& minion : minions_) {
         if (minion && minion->IsActive()) {
-            Vector3 diff = minion->GetPosition() - outCenter;
+            Vector3 mPos = minion->GetPosition();
+
+            // 落下した個体は広がり計算からも除外
+            if (mPos.y < kFallOffThresholdY) continue;
+
+            Vector3 diff = mPos - outCenter;
             float distSq = diff.x * diff.x + diff.z * diff.z;
             if (distSq > maxDistSq) {
                 maxDistSq = distSq;

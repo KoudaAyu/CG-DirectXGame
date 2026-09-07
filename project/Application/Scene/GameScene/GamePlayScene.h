@@ -63,7 +63,7 @@ private:
     float cameraSideLagTime_ = 0.20f;    // カメラX（左右）追従スムーズ時間 (秒: 心地よいラバーストラップ感)
     float cameraSmoothTimeRot_ = 0.24f;  // カメラ角度補間スムーズ時間 (秒: カクつきゼロの優雅な旋回)
     float cameraDynamicBank_ = 0.025f;   // 左右移動時の微小ロールバンク強度 (rad/(m/s))
-    float tiltSmoothTime_ = 0.15f;       // ステージ傾斜の補間スムーズ時間 (秒: 重厚で滑らかな板の傾き)
+    float tiltSmoothTime_ = 0.35f;       // ステージ傾斜の補間スムーズ時間 (秒: 重厚で滑らかな板の傾き)
 
     // ズーム（距離・広がり・重心）の急変を防止するスムーズダンピングパラメータ
     float currentCameraDist_ = 21.0f;     // 現在の補間カメラ距離

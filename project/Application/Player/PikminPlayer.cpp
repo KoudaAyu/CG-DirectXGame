@@ -290,15 +290,15 @@ void PikminPlayer::Update(float deltaTime, KeyInput* keyInput, MinionManager* mi
     float currentScale = currentMergedScale_;
     scale_ = { currentScale, currentScale, currentScale };
 
-    // 地形メッシュの壁・垂直面との衝突押し出し（角や壁へのめり込み・テレポートを防止）
-    float colRadius = currentScale * 0.45f;
+    // 地形メッシュの壁・垂直面との衝突押し出し（スライムの見た目の横幅に合わせてめり込みを防止）
+    float colRadius = currentScale * 0.95f;
     SlimePhysics::ResolveWallCollision(position_, velocity_, colRadius);
 
     // --- 垂直重力とリアルタイム地形・落下物理 ---
     const float kGravity = -32.0f; // 重力加速度
     bool hasGround = false;
     Vector3 groundNormal{ 0.0f, 1.0f, 0.0f };
-    float baseOffset = currentScale * 0.73f;
+    float baseOffset = currentScale * 0.75f;
     float targetGroundedY = SlimePhysics::CalculateGroundedCenterYEx(
         position_.x, position_.z, position_.y, stageTilt, baseOffset, &hasGround, &groundNormal, { position_.x, position_.z }, isGrounded_);
 
@@ -393,9 +393,9 @@ void PikminPlayer::Update(float deltaTime, KeyInput* keyInput, MinionManager* mi
         // 接地中の姿勢（局所地形法線に正しく沿って密着）
         float targetRotX = std::atan2(groundNormal.z, groundNormal.y);
         float targetRotZ = -std::atan2(groundNormal.x, groundNormal.y);
-        rotation_.x += (targetRotX - rotation_.x) * (std::min)(1.0f, deltaTime * 20.0f);
+        rotation_.x += (targetRotX - rotation_.x) * (std::min)(1.0f, deltaTime * 35.0f);
         rotation_.y = 0.0f;
-        rotation_.z += (targetRotZ - rotation_.z) * (std::min)(1.0f, deltaTime * 20.0f);
+        rotation_.z += (targetRotZ - rotation_.z) * (std::min)(1.0f, deltaTime * 35.0f);
     }
 
     // 奈落への落下防止セーフティ（万が一島の外へ真っ逆さまに落ちた場合は安全に復帰）

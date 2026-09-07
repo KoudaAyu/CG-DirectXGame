@@ -259,17 +259,47 @@ void GamePlayScene::Update()
     Vector3 playerPos = player_ ? player_->GetPosition() : Vector3{ 0.0f, 0.0f, 0.0f };
     Vector2 playerPivot = { playerPos.x, playerPos.z };
 
-    // 地面プレーンの回転を傾斜角に合わせて更新 (原点中心の回転により、平行移動ズレ・足元抜けを完全にゼロ化)
+    // 地面プレーンの回転を傾斜角に合わせて更新
+    // プレイヤー足元を回転中心（ピボット）にすることで、傾斜時にスライム直下の
+    // 地面高さが変動しなくなり、めり込み・追従ズレを根本から解消
     if (groundPlane_)
     {
-        groundPlane_->SetTranslate({ 0.0f, 0.0f, 0.0f });
+        Vector3 rot = { currentTilt_.x, 0.0f, -currentTilt_.y };
+
+        // ピボット = プレイヤーの XZ 位置（地面上の点）
+        float px = playerPos.x;
+        float pz = playerPos.z;
+
+        // rot = {pitch(α), 0, roll(β)} の回転行列 R = Rx(α) * Rz(β) を手計算し、
+        // ピボット点を R で変換した結果との差分を平行移動に設定
+        // → ピボットが回転前後で同じワールド座標に留まる
+        float cx = std::cos(rot.x), sx = std::sin(rot.x);
+        float cz = std::cos(rot.z), sz = std::sin(rot.z);
+
+        // R = Rx(α) * Rz(β) の行列（行ベクトル v * R）:
+        //   Row0 = ( cβ,      sβ,      0  )
+        //   Row1 = (-cα·sβ,   cα·cβ,   sα )  ← pivot.y = 0 なので寄与なし
+        //   Row2 = ( sα·sβ,  -sα·cβ,   cα )
+        // pivot_rotated = px * Row0 + pz * Row2
+        float prx = px * cz + pz * (sx * sz);
+        float pry = px * sz + pz * (-sx * cz);
+        float prz = pz * cx;
+
+        Vector3 groundTranslate = {
+            px - prx,
+            0.0f - pry,
+            pz - prz
+        };
+
+        groundPlane_->SetTranslate(groundTranslate);
         groundPlane_->SetScale({ groundScale_, groundScale_, groundScale_ });
-        groundPlane_->SetRotate({ currentTilt_.x, 0.0f, -currentTilt_.y });
+        groundPlane_->SetRotate(rot);
         groundPlane_->Update();
 
         if (groundCollider_)
         {
-            groundCollider_->SetWorldPosition({ 0.0f, 0.0f, 0.0f });
+            // コライダーは groundPlane_ と同一 Object3d を参照するため
+            // translate の上書きは行わない（ピボット回転の補正を維持）
             groundCollider_->Update();
         }
     }
@@ -678,7 +708,7 @@ void GamePlayScene::DrawDebugUI()
         if (ImGui::SliderFloat("Max Tilt Angle (deg)", &maxDeg, 5.0f, 35.0f, "%.1f")) {
             maxTiltAngle_ = maxDeg * 0.0174533f;
         }
-        ImGui::SliderFloat("Tilt Smooth Time (傾斜スムーズ時間)", &tiltSmoothTime_, 0.05f, 0.40f, "%.2f s");
+        ImGui::SliderFloat("Tilt Smooth Time (傾斜スムーズ時間)", &tiltSmoothTime_, 0.05f, 1.00f, "%.2f s");
         ImGui::SliderFloat("Ground Scale (地面縮小スケール)", &groundScale_, 0.05f, 1.0f, "%.2f");
 
         if (player_) {
@@ -760,7 +790,7 @@ void GamePlayScene::DrawDebugUI()
         ImGui::SliderFloat("Rotation Smooth Time (角度スムーズ時間: カクつきゼロ)", &cameraSmoothTimeRot_, 0.05f, 0.50f, "%.2f s");
         ImGui::SliderFloat("Side Lag Time (左右移動ラグ時間: 左右の視認性向上)", &cameraSideLagTime_, 0.05f, 0.40f, "%.2f s");
         ImGui::SliderFloat("Position Smooth Time (位置スムーズ時間: 段差ショック吸収)", &cameraSmoothTimePos_, 0.02f, 0.25f, "%.2f s");
-        ImGui::SliderFloat("Tilt Smooth Time (ステージ傾斜スムーズ時間: 板の重厚感)", &tiltSmoothTime_, 0.05f, 0.40f, "%.2f s");
+        ImGui::SliderFloat("Tilt Smooth Time (ステージ傾斜スムーズ時間: 板の重厚感)", &tiltSmoothTime_, 0.05f, 1.00f, "%.2f s");
         ImGui::SliderFloat("Dynamic Bank (左右移動時バンク傾斜強度)", &cameraDynamicBank_, 0.0f, 0.06f, "%.3f");
         ImGui::Checkbox("Follow Stage Tilt (ステージの傾きにカメラ角度を連動)", &followStageTilt_);
 
@@ -801,7 +831,7 @@ void GamePlayScene::DrawDebugUI()
             cameraSideLagTime_ = 0.18f;
             cameraSmoothTimeRot_ = 0.24f;
             cameraSmoothTimePos_ = 0.08f;
-            tiltSmoothTime_ = 0.15f;
+            tiltSmoothTime_ = 0.35f;
             cameraDynamicBank_ = 0.025f;
             cameraDynamicZoom_ = 3.0f;
         }
@@ -817,7 +847,7 @@ void GamePlayScene::DrawDebugUI()
             cameraSideLagTime_ = 0.16f;
             cameraSmoothTimeRot_ = 0.24f;
             cameraSmoothTimePos_ = 0.08f;
-            tiltSmoothTime_ = 0.15f;
+            tiltSmoothTime_ = 0.35f;
             cameraDynamicBank_ = 0.020f;
             cameraDynamicZoom_ = 3.5f;
         }
@@ -833,7 +863,7 @@ void GamePlayScene::DrawDebugUI()
             cameraSideLagTime_ = 0.20f;
             cameraSmoothTimeRot_ = 0.28f;
             cameraSmoothTimePos_ = 0.10f;
-            tiltSmoothTime_ = 0.18f;
+            tiltSmoothTime_ = 0.40f;
             cameraDynamicBank_ = 0.030f;
             cameraDynamicZoom_ = 4.0f;
         }

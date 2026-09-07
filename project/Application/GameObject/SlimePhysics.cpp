@@ -300,10 +300,13 @@ namespace SlimePhysics
         float groundHeight = CalculateGroundHeightEx(x, z, footY, stageTilt, outHasGround, &norm, pivot, isGrounded, baseOffset);
         if (outNormal) *outNormal = norm;
 
-        // 斜面に対する球体の厳密な接地中心補正: CenterY = GroundHeight + baseOffset / cos(theta)
-        // 傾斜面でもスライム底面が地面にジャストフィットし、埋まり・浮きを幾何学的にゼロ化
+        // 斜面に対する球体・平べったいスライムの幾何学的接地中心補正
+        // スライムは横幅が広く（下部横半径 ~1.35倍）、傾斜時に下り坂方向へ内容物が流動するため、
+        // 傾斜角に応じて下り坂側の縁（エッジ）が地面にめり込むのを幾何学的に完全に防ぐリフト補正を適用
         float ny = (std::clamp)(norm.y, 0.25f, 1.0f);
-        return groundHeight + (baseOffset / ny);
+        float sinTheta = std::sqrt((std::max)(0.0f, 1.0f - ny * ny));
+        float effectiveOffset = baseOffset * (1.0f + 0.40f * sinTheta);
+        return groundHeight + (effectiveOffset / ny);
     }
 
     Vector3 GetGroundNormal(float x, float z, const Vector2& stageTilt, const Vector2& pivot)
@@ -314,6 +317,54 @@ namespace SlimePhysics
         return norm;
     }
 
+    // 点 p と 3D三角形 (a, b, c) の幾何学的最近接点を算出（Ericson's Point to Triangle Algorithm）
+    static inline Vector3 ClosestPointOnTriangle(const Vector3& p, const Vector3& a, const Vector3& b, const Vector3& c)
+    {
+        auto DotV3 = [](const Vector3& u, const Vector3& v) -> float {
+            return u.x * v.x + u.y * v.y + u.z * v.z;
+        };
+
+        Vector3 ab = b - a;
+        Vector3 ac = c - a;
+        Vector3 ap = p - a;
+        float d1 = DotV3(ab, ap);
+        float d2 = DotV3(ac, ap);
+        if (d1 <= 0.0f && d2 <= 0.0f) return a;
+
+        Vector3 bp = p - b;
+        float d3 = DotV3(ab, bp);
+        float d4 = DotV3(ac, bp);
+        if (d3 >= 0.0f && d4 <= d3) return b;
+
+        float vc = d1 * d4 - d3 * d2;
+        if (vc <= 0.0f && d1 >= 0.0f && d3 <= 0.0f) {
+            float v = d1 / (d1 - d3);
+            return a + ab * v;
+        }
+
+        Vector3 cp = p - c;
+        float d5 = DotV3(ab, cp);
+        float d6 = DotV3(ac, cp);
+        if (d6 >= 0.0f && d5 <= d6) return c;
+
+        float vb = d5 * d2 - d1 * d6;
+        if (vb <= 0.0f && d2 >= 0.0f && d6 <= 0.0f) {
+            float w = d2 / (d2 - d6);
+            return a + ac * w;
+        }
+
+        float va = d3 * d6 - d5 * d4;
+        if (va <= 0.0f && (d4 - d3) >= 0.0f && (d5 - d6) >= 0.0f) {
+            float w = (d4 - d3) / ((d4 - d3) + (d5 - d6));
+            return b + (c - b) * w;
+        }
+
+        float denom = 1.0f / (va + vb + vc);
+        float v = vb * denom;
+        float w = vc * denom;
+        return a + ab * v + ac * w;
+    }
+
     bool ResolveWallCollision(Vector3& position, Vector3& velocity, float radius, float heightOffset)
     {
         if (!sGroundObject || !sGroundCollider) return false;
@@ -321,115 +372,183 @@ namespace SlimePhysics
         const Matrix4x4& worldMatrix = sGroundObject->GetWorldMatrix();
         Matrix4x4 invWorld = Inverse(worldMatrix);
 
-        Vector3 waistPos = { position.x, position.y + heightOffset, position.z };
-
-        // 判定方向の準備:
-        // 進行方向（移動中の場合）+ 水平8方向（四方・対角線）
-        Vector3 testDirs[9];
-        int numDirs = 0;
-
-        float horizSpeedSq = velocity.x * velocity.x + velocity.z * velocity.z;
-        if (horizSpeedSq > 1e-4f)
-        {
-            float invSpd = 1.0f / std::sqrt(horizSpeedSq);
-            testDirs[numDirs++] = { velocity.x * invSpd, 0.0f, velocity.z * invSpd };
-        }
-
-        testDirs[numDirs++] = {  1.0f, 0.0f,  0.0f };
-        testDirs[numDirs++] = { -1.0f, 0.0f,  0.0f };
-        testDirs[numDirs++] = {  0.0f, 0.0f,  1.0f };
-        testDirs[numDirs++] = {  0.0f, 0.0f, -1.0f };
-        testDirs[numDirs++] = {  0.7071f, 0.0f,  0.7071f };
-        testDirs[numDirs++] = { -0.7071f, 0.0f,  0.7071f };
-        testDirs[numDirs++] = {  0.7071f, 0.0f, -0.7071f };
-        testDirs[numDirs++] = { -0.7071f, 0.0f, -0.7071f };
-
-        bool collided = false;
-        const float checkDist = radius + 0.15f;
-
-        for (int i = 0; i < numDirs; ++i)
-        {
-            const Vector3& dirWorld = testDirs[i];
-
-            Vector3 localStart = {
-                waistPos.x * invWorld.m[0][0] + waistPos.y * invWorld.m[1][0] + waistPos.z * invWorld.m[2][0] + invWorld.m[3][0],
-                waistPos.x * invWorld.m[0][1] + waistPos.y * invWorld.m[1][1] + waistPos.z * invWorld.m[2][1] + invWorld.m[3][1],
-                waistPos.x * invWorld.m[0][2] + waistPos.y * invWorld.m[1][2] + waistPos.z * invWorld.m[2][2] + invWorld.m[3][2]
+        auto TransformPt = [](const Vector3& p, const Matrix4x4& m) -> Vector3 {
+            return {
+                p.x * m.m[0][0] + p.y * m.m[1][0] + p.z * m.m[2][0] + m.m[3][0],
+                p.x * m.m[0][1] + p.y * m.m[1][1] + p.z * m.m[2][1] + m.m[3][1],
+                p.x * m.m[0][2] + p.y * m.m[1][2] + p.z * m.m[2][2] + m.m[3][2]
             };
+        };
 
-            Vector3 localDir = {
-                dirWorld.x * invWorld.m[0][0] + dirWorld.y * invWorld.m[1][0] + dirWorld.z * invWorld.m[2][0],
-                dirWorld.x * invWorld.m[0][1] + dirWorld.y * invWorld.m[1][1] + dirWorld.z * invWorld.m[2][1],
-                dirWorld.x * invWorld.m[0][2] + dirWorld.y * invWorld.m[1][2] + dirWorld.z * invWorld.m[2][2]
-            };
+        bool anyCollided = false;
 
-            float localDirLen = std::sqrt(localDir.x * localDir.x + localDir.y * localDir.y + localDir.z * localDir.z);
-            if (localDirLen < 1e-6f) continue;
-            localDir = localDir * (1.0f / localDirLen);
+        // 最大2回の反復解決（コーナーや直角壁での多重壁押し出しを過剰反発なしに滑らかに収束）
+        for (int iter = 0; iter < 2; ++iter)
+        {
+            Vector3 waistPos = { position.x, position.y + heightOffset, position.z };
 
-            float maxLocalDist = checkDist * localDirLen;
-            float hitDist = 0.0f;
-            Vector3 hitNormal, v0, v1, v2;
+            // 判定方向: 進行方向 + 水平8方向（四方・対角線）
+            Vector3 testDirs[9];
+            int numDirs = 0;
 
-            if (sGroundCollider->GetAABBTree().Raycast(localStart, localDir, maxLocalDist, hitDist, hitNormal, v0, v1, v2))
+            float horizSpeedSq = velocity.x * velocity.x + velocity.z * velocity.z;
+            if (horizSpeedSq > 1e-4f)
             {
-                // ヒットしたポリゴンの幾何法線
-                Vector3 e1 = v1 - v0;
-                Vector3 e2 = v2 - v0;
-                Vector3 localTriNorm = {
-                    e1.y * e2.z - e1.z * e2.y,
-                    e1.z * e2.x - e1.x * e2.z,
-                    e1.x * e2.y - e1.y * e2.x
-                };
-                float triNormLen = std::sqrt(localTriNorm.x * localTriNorm.x + localTriNorm.y * localTriNorm.y + localTriNorm.z * localTriNorm.z);
-                if (triNormLen > 1e-6f)
-                {
-                    localTriNorm = localTriNorm * (1.0f / triNormLen);
-                }
+                float invSpd = 1.0f / std::sqrt(horizSpeedSq);
+                testDirs[numDirs++] = { velocity.x * invSpd, 0.0f, velocity.z * invSpd };
+            }
 
-                // 壁判定: 急峻な面のみ壁として押し出す（localTriNorm.y < 0.55f）
-                if (localTriNorm.y < 0.55f)
+            testDirs[numDirs++] = {  1.0f, 0.0f,  0.0f };
+            testDirs[numDirs++] = { -1.0f, 0.0f,  0.0f };
+            testDirs[numDirs++] = {  0.0f, 0.0f,  1.0f };
+            testDirs[numDirs++] = {  0.0f, 0.0f, -1.0f };
+            testDirs[numDirs++] = {  0.7071f, 0.0f,  0.7071f };
+            testDirs[numDirs++] = { -0.7071f, 0.0f,  0.7071f };
+            testDirs[numDirs++] = {  0.7071f, 0.0f, -0.7071f };
+            testDirs[numDirs++] = { -0.7071f, 0.0f, -0.7071f };
+
+            // 探索範囲: radius + マージン
+            const float checkDist = radius + 0.25f;
+
+            float maxPenetration = 0.0f;
+            Vector2 bestPushDir = { 0.0f, 0.0f };
+
+            // スライムの体積（中心と足元寄り）を捉えるため2つの高さで探査
+            float yOffsets[] = { 0.0f, -radius * 0.30f };
+
+            for (float yOff : yOffsets)
+            {
+                Vector3 rayOriginWorld = { waistPos.x, waistPos.y + yOff, waistPos.z };
+                Vector3 localStart = TransformPt(rayOriginWorld, invWorld);
+
+                for (int i = 0; i < numDirs; ++i)
                 {
-                    float worldHitDist = hitDist / localDirLen;
-                    if (worldHitDist < radius)
+                    const Vector3& dirWorld = testDirs[i];
+
+                    Vector3 localDir = {
+                        dirWorld.x * invWorld.m[0][0] + dirWorld.y * invWorld.m[1][0] + dirWorld.z * invWorld.m[2][0],
+                        dirWorld.x * invWorld.m[0][1] + dirWorld.y * invWorld.m[1][1] + dirWorld.z * invWorld.m[2][1],
+                        dirWorld.x * invWorld.m[0][2] + dirWorld.y * invWorld.m[1][2] + dirWorld.z * invWorld.m[2][2]
+                    };
+
+                    float localDirLen = std::sqrt(localDir.x * localDir.x + localDir.y * localDir.y + localDir.z * localDir.z);
+                    if (localDirLen < 1e-6f) continue;
+                    localDir = localDir * (1.0f / localDirLen);
+
+                    float maxLocalDist = checkDist * localDirLen;
+                    float hitDist = 0.0f;
+                    Vector3 hitNormal, v0, v1, v2;
+
+                    if (sGroundCollider->GetAABBTree().Raycast(localStart, localDir, maxLocalDist, hitDist, hitNormal, v0, v1, v2))
                     {
-                        Vector3 worldTriNorm = {
-                            localTriNorm.x * worldMatrix.m[0][0] + localTriNorm.y * worldMatrix.m[1][0] + localTriNorm.z * worldMatrix.m[2][0],
-                            localTriNorm.x * worldMatrix.m[0][1] + localTriNorm.y * worldMatrix.m[1][1] + localTriNorm.z * worldMatrix.m[2][1],
-                            localTriNorm.x * worldMatrix.m[0][2] + localTriNorm.y * worldMatrix.m[1][2] + localTriNorm.z * worldMatrix.m[2][2]
+                        // 三角形の幾何法線
+                        Vector3 e1 = v1 - v0;
+                        Vector3 e2 = v2 - v0;
+                        Vector3 localTriNorm = {
+                            e1.y * e2.z - e1.z * e2.y,
+                            e1.z * e2.x - e1.x * e2.z,
+                            e1.x * e2.y - e1.y * e2.x
                         };
-                        float wNormLen = std::sqrt(worldTriNorm.x * worldTriNorm.x + worldTriNorm.y * worldTriNorm.y + worldTriNorm.z * worldTriNorm.z);
-                        if (wNormLen > 1e-6f)
+                        float triNormLen = std::sqrt(localTriNorm.x * localTriNorm.x + localTriNorm.y * localTriNorm.y + localTriNorm.z * localTriNorm.z);
+                        if (triNormLen > 1e-6f)
                         {
-                            worldTriNorm = worldTriNorm * (1.0f / wNormLen);
+                            localTriNorm = localTriNorm * (1.0f / triNormLen);
                         }
 
-                        Vector2 wallPush = { worldTriNorm.x, worldTriNorm.z };
-                        float pushLen = std::sqrt(wallPush.x * wallPush.x + wallPush.y * wallPush.y);
-                        if (pushLen > 1e-4f)
+                        // 壁判定: 急峻な面のみ壁として押し出す（localTriNorm.y < 0.55f）
+                        if (localTriNorm.y < 0.55f)
                         {
-                            wallPush = { wallPush.x / pushLen, wallPush.y / pushLen };
+                            Vector3 wV0 = TransformPt(v0, worldMatrix);
+                            Vector3 wV1 = TransformPt(v1, worldMatrix);
+                            Vector3 wV2 = TransformPt(v2, worldMatrix);
 
-                            float penetration = radius - worldHitDist;
-                            position.x += wallPush.x * penetration;
-                            position.z += wallPush.y * penetration;
-                            waistPos.x = position.x;
-                            waistPos.z = position.z;
+                            // スライム中心（探査点）から三角形への最近接点 Q を厳密に計算
+                            Vector3 probePos = { waistPos.x, waistPos.y + yOff, waistPos.z };
+                            Vector3 closestQ = ClosestPointOnTriangle(probePos, wV0, wV1, wV2);
 
-                            float vDotN = velocity.x * wallPush.x + velocity.z * wallPush.y;
-                            if (vDotN < 0.0f)
+                            // 最近接点とスライム中心の水平ベクトル
+                            Vector2 diffXZ = { probePos.x - closestQ.x, probePos.z - closestQ.z };
+                            float distXZ = std::sqrt(diffXZ.x * diffXZ.x + diffXZ.y * diffXZ.y);
+
+                            // 壁のワールド法線
+                            Vector3 worldTriNorm = {
+                                localTriNorm.x * worldMatrix.m[0][0] + localTriNorm.y * worldMatrix.m[1][0] + localTriNorm.z * worldMatrix.m[2][0],
+                                localTriNorm.x * worldMatrix.m[0][1] + localTriNorm.y * worldMatrix.m[1][1] + localTriNorm.z * worldMatrix.m[2][1],
+                                localTriNorm.x * worldMatrix.m[0][2] + localTriNorm.y * worldMatrix.m[1][2] + localTriNorm.z * worldMatrix.m[2][2]
+                            };
+                            float wNormLen = std::sqrt(worldTriNorm.x * worldTriNorm.x + worldTriNorm.y * worldTriNorm.y + worldTriNorm.z * worldTriNorm.z);
+                            if (wNormLen > 1e-6f)
                             {
-                                velocity.x -= wallPush.x * vDotN;
-                                velocity.z -= wallPush.y * vDotN;
+                                worldTriNorm = worldTriNorm * (1.0f / wNormLen);
                             }
-                            collided = true;
+
+                            Vector2 pushDir = { worldTriNorm.x, worldTriNorm.z };
+                            float pushLen = std::sqrt(pushDir.x * pushDir.x + pushDir.y * pushDir.y);
+                            if (pushLen > 1e-4f)
+                            {
+                                pushDir = { pushDir.x / pushLen, pushDir.y / pushLen };
+                            }
+                            else
+                            {
+                                continue;
+                            }
+
+                            // 壁平面からの符号付き垂直距離
+                            float signedDist = (probePos.x - wV0.x) * worldTriNorm.x +
+                                              (probePos.y - wV0.y) * worldTriNorm.y +
+                                              (probePos.z - wV0.z) * worldTriNorm.z;
+
+                            float penetration = 0.0f;
+                            // 幾何学的に正確なめり込み深さの算出:
+                            // 1. 壁の表面/裏側にめり込んでいる場合（符号付き距離）
+                            if (signedDist < radius && signedDist > -radius * 1.5f)
+                            {
+                                penetration = radius - (std::max)(0.0f, signedDist);
+                            }
+                            // 2. 三角形のエッジ/頂点に接している場合
+                            else if (distXZ < radius)
+                            {
+                                penetration = radius - distXZ;
+                                if (distXZ > 1e-4f)
+                                {
+                                    pushDir = { diffXZ.x / distXZ, diffXZ.y / distXZ };
+                                }
+                            }
+
+                            if (penetration > maxPenetration)
+                            {
+                                maxPenetration = penetration;
+                                bestPushDir = pushDir;
+                            }
                         }
                     }
                 }
             }
+
+            // このイテレーションで最大のめり込みを1回のみ正確に解消（多重加算による振動・ジッターを完全排除）
+            if (maxPenetration > 1e-4f)
+            {
+                position.x += bestPushDir.x * maxPenetration;
+                position.z += bestPushDir.y * maxPenetration;
+
+                // 速度の壁法線方向成分を除去（壁に沿って滑らかにスライド）
+                float vDotN = velocity.x * bestPushDir.x + velocity.z * bestPushDir.y;
+                if (vDotN < 0.0f)
+                {
+                    velocity.x -= bestPushDir.x * vDotN;
+                    velocity.z -= bestPushDir.y * vDotN;
+                }
+
+                anyCollided = true;
+            }
+            else
+            {
+                // めり込みがなければ反復終了
+                break;
+            }
         }
 
-        return collided;
+        return anyCollided;
     }
 
     void UpdateDeformation(SlimeParamsCPU& params, const DeformInput& input)

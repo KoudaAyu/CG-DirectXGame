@@ -136,8 +136,11 @@ float3 CalculateDeformedPosition(float3 p, float3 n)
         def.z *= (1.0f + flattenRate * 0.16f);
     }
 
+    // 底面付近では波打ち・衝撃波紋による地面めり込みを防止
+    float bottomDamp = saturate((def.y + 0.75f) / 0.25f);
+
     // 法線方向へ膨らませる
-    def += n * wobbleOffset;
+    def += n * (wobbleOffset * bottomDamp);
 
     // 6. 衝撃波紋（Impulse Ripple）
     float impulse = gSlimeParams.impulseStrength;
@@ -146,8 +149,11 @@ float3 CalculateDeformedPosition(float3 p, float3 n)
         float distFromBottom = saturate((p.y + 1.0f) * 0.5f);
         float ripple = sin(distFromBottom * 12.0f - time * 15.0f) * impulse;
         ripple *= exp(-distFromBottom * 3.0f);
-        def += n * ripple;
+        def += n * (ripple * bottomDamp);
     }
+
+    // 接地面（ローカル -0.75f）より下への突き抜けを防止
+    def.y = max(def.y, -0.75f);
 
     return def;
 }

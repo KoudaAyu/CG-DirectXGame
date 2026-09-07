@@ -213,7 +213,7 @@ void Minion::Update(float deltaTime, const Vector2& stageTilt, const Vector2& pi
         position_.z += velocity_.z * deltaTime;
 
         // 地形メッシュの壁・垂直面との衝突押し出し
-        SlimePhysics::ResolveWallCollision(position_, velocity_, 0.22f);
+        SlimePhysics::ResolveWallCollision(position_, velocity_, scale_.x * 0.90f);
 
         // 傾斜面・地面メッシュの上に乗る
         bool hasGround = false;
@@ -294,7 +294,7 @@ void Minion::Update(float deltaTime, const Vector2& stageTilt, const Vector2& pi
         position_.z += velocity_.z * deltaTime;
 
         // 地形メッシュの壁・垂直面との衝突押し出し
-        SlimePhysics::ResolveWallCollision(position_, velocity_, 0.22f);
+        SlimePhysics::ResolveWallCollision(position_, velocity_, scale_.x * 0.90f);
 
         // 空中での姿勢（板の傾きは受けず、進行方向を向く）
         rotation_.x = 0.0f;
@@ -492,7 +492,7 @@ void Minion::SetSize(int s) {
     }
     scale_ = { sVal, sVal, sVal };
     radius_ = sVal * 0.78f;
-    groundY_ = sVal * 0.73f;
+    groundY_ = sVal * 0.75f;
     slimeParams_.baseColor = SlimePhysics::GetColorBySize(size_);
     if (object3d_) {
         object3d_->SetScale(scale_);
