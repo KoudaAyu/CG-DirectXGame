@@ -261,33 +261,44 @@ namespace SlimePhysics
                 }
 
                 float expectedFloorY = currentY + deltaYTilt;
-                // 自力登坂・段差許容マージン（スライムのスケール baseOffset に応じて動的に拡張し、急成長時でも床を見失わない）
-                float stepMargin = (std::max)(1.6f, baseOffset * 1.6f);
+                // 自力登坂・段差許容マージン（頭上の天井を誤認しないよう最大0.40mまでに厳格制限）
+                float stepMargin = (std::min)(0.40f, (std::max)(0.15f, baseOffset * 0.40f));
                 float maxAllowedFloorY = expectedFloorY + stepMargin;
 
+                // 現在位置（足元）に最も近い床候補を探索（上空の天井はスキップ）
                 int bestIdx = -1;
+                float bestDist = 1e9f;
                 for (size_t i = 0; i < groundCandidates.size(); ++i)
                 {
                     if (groundCandidates[i].worldY <= maxAllowedFloorY)
                     {
-                        bestIdx = static_cast<int>(i);
-                        break;
+                        float dist = std::abs(groundCandidates[i].worldY - expectedFloorY);
+                        if (dist < bestDist)
+                        {
+                            bestDist = dist;
+                            bestIdx = static_cast<int>(i);
+                        }
                     }
                 }
 
-                // もし全候補が expectedFloorY + stepMargin より上にある場合（急激なサイズアップや激突でめり込んでいる場合）
-                // 最上面の床（groundCandidates[0]）がスライムの体内（baseOffset * 2.5f以内）にあれば、
-                // 沈み込みとみなして即座に最上面の床に復帰救済
+                // めり込み復帰救済:
+                // 合体や激突で足元が一時的に床下にめり込んでいる場合（全床候補が expectedFloorY + stepMargin より上にある）
                 if (bestIdx == -1 && !groundCandidates.empty())
                 {
-                    float embedRecoveryLimit = expectedFloorY + (std::max)(3.5f, baseOffset * 2.5f);
-                    if (groundCandidates[0].worldY <= embedRecoveryLimit)
+                    float ceilingY = 0.0f;
+                    float maxRecoveryY = expectedFloorY + (std::max)(3.0f, baseOffset * 2.5f);
+                    if (FindCeilingY(x, z, expectedFloorY, baseOffset * 3.0f, ceilingY))
                     {
-                        bestIdx = 0; // 最上面の床へ復帰
+                        maxRecoveryY = (std::min)(maxRecoveryY, ceilingY - 0.10f);
                     }
-                    else if (groundCandidates.back().worldY <= embedRecoveryLimit)
+
+                    for (int i = static_cast<int>(groundCandidates.size()) - 1; i >= 0; --i)
                     {
-                        bestIdx = static_cast<int>(groundCandidates.size() - 1);
+                        if (groundCandidates[i].worldY <= maxRecoveryY)
+                        {
+                            bestIdx = i;
+                            break;
+                        }
                     }
                 }
 
@@ -303,24 +314,37 @@ namespace SlimePhysics
             }
 
             // 3. 空中・落下中（isGrounded == false）の場合:
-            // 高速落下・飛び降り時および合体時のすり抜け（トンネリング）を完全に防止
-            // スライムの足元または上空まで探索範囲を広げ、着地可能な床を確実に捕捉
-            float maxAllowedLandingFloorY = currentY + (std::max)(5.0f, baseOffset * 2.2f);
+            // スライムの足元以下にある床候補の中で最も高いもの（直下の床）を着地面として選定
+            // ※ 頭上の天井に着地するのを絶対に防ぐため、currentY + 0.15f 以下に厳格制限
+            float maxAllowedLandingFloorY = currentY + 0.15f;
 
             int bestIdx = -1;
             for (size_t i = 0; i < groundCandidates.size(); ++i)
             {
                 if (groundCandidates[i].worldY <= maxAllowedLandingFloorY)
                 {
-                    bestIdx = static_cast<int>(i);
+                    bestIdx = static_cast<int>(i); // 降順ソートなので最初に見つかったものが直下の最上床
                     break;
                 }
             }
 
-            // 万一高速落下で床を突き抜けた場合でも、島内に床候補が存在するなら最上面の床に救済着地
+            // 落下中のめり込み着地救済（高速落下・合体直後のすり抜け完全防止）:
             if (bestIdx == -1 && !groundCandidates.empty())
             {
-                bestIdx = 0; // 最上面の床に安全着地
+                float ceilingY = 0.0f;
+                float maxRecoveryY = currentY + (std::max)(3.0f, baseOffset * 2.5f);
+                if (FindCeilingY(x, z, currentY, baseOffset * 3.0f, ceilingY))
+                {
+                    maxRecoveryY = (std::min)(maxRecoveryY, ceilingY - 0.10f);
+                }
+                for (int i = static_cast<int>(groundCandidates.size()) - 1; i >= 0; --i)
+                {
+                    if (groundCandidates[i].worldY <= maxRecoveryY)
+                    {
+                        bestIdx = i;
+                        break;
+                    }
+                }
             }
 
             if (bestIdx != -1)
@@ -750,6 +774,84 @@ namespace SlimePhysics
         }
 
         return anyCollided;
+    }
+
+    bool FindCeilingY(float x, float z, float startY, float maxSearchDist, float& outCeilingY)
+    {
+        if (sGroundMeshes.empty()) return false;
+
+        float nearestCeilingY = startY + maxSearchDist;
+        bool found = false;
+
+        for (const auto& entry : sGroundMeshes)
+        {
+            if (!entry.object || !entry.collider) continue;
+
+            const Matrix4x4& worldMatrix = entry.object->GetWorldMatrix();
+            Matrix4x4 invWorld = Inverse(worldMatrix);
+
+            float currentRayY = startY + 0.05f;
+            float searchLimitY = startY + maxSearchDist;
+
+            for (int iter = 0; iter < 16; ++iter)
+            {
+                if (currentRayY >= searchLimitY) break;
+
+                Vector3 rayOriginWorld = { x, currentRayY, z };
+                Vector3 rayDirWorld = { 0.0f, 1.0f, 0.0f }; // 真上向き
+
+                Vector3 localStart = {
+                    rayOriginWorld.x * invWorld.m[0][0] + rayOriginWorld.y * invWorld.m[1][0] + rayOriginWorld.z * invWorld.m[2][0] + invWorld.m[3][0],
+                    rayOriginWorld.x * invWorld.m[0][1] + rayOriginWorld.y * invWorld.m[1][1] + rayOriginWorld.z * invWorld.m[2][1] + invWorld.m[3][1],
+                    rayOriginWorld.x * invWorld.m[0][2] + rayOriginWorld.y * invWorld.m[1][2] + rayOriginWorld.z * invWorld.m[2][2] + invWorld.m[3][2]
+                };
+
+                Vector3 localDir = {
+                    rayDirWorld.x * invWorld.m[0][0] + rayDirWorld.y * invWorld.m[1][0] + rayDirWorld.z * invWorld.m[2][0],
+                    rayDirWorld.x * invWorld.m[0][1] + rayDirWorld.y * invWorld.m[1][1] + rayDirWorld.z * invWorld.m[2][1],
+                    rayDirWorld.x * invWorld.m[0][2] + rayDirWorld.y * invWorld.m[1][2] + rayDirWorld.z * invWorld.m[2][2]
+                };
+                float dirLen = std::sqrt(localDir.x * localDir.x + localDir.y * localDir.y + localDir.z * localDir.z);
+                if (dirLen > 1e-6f)
+                {
+                    localDir.x /= dirLen;
+                    localDir.y /= dirLen;
+                    localDir.z /= dirLen;
+                }
+
+                float hitDist = 0.0f;
+                Vector3 hitNormal, v0, v1, v2;
+                float remDist = searchLimitY - currentRayY;
+                if (!entry.collider->GetAABBTree().Raycast(localStart, localDir, remDist * 2.5f, hitDist, hitNormal, v0, v1, v2))
+                {
+                    break; // これ以上上にメッシュが存在しない
+                }
+
+                Vector3 localHit = {
+                    localStart.x + localDir.x * hitDist,
+                    localStart.y + localDir.y * hitDist,
+                    localStart.z + localDir.z * hitDist
+                };
+                float worldY = localHit.x * worldMatrix.m[0][1] + localHit.y * worldMatrix.m[1][1] + localHit.z * worldMatrix.m[2][1] + worldMatrix.m[3][1];
+
+                // startY より少なくとも 0.10m 以上上にある遮蔽面を天井として検出
+                if (worldY > startY + 0.10f && worldY < nearestCeilingY)
+                {
+                    nearestCeilingY = worldY;
+                    found = true;
+                }
+
+                // 次の貫通探索のため、ヒット地点より上（0.04m）からレイを再開
+                currentRayY = worldY + 0.04f;
+            }
+        }
+
+        if (found)
+        {
+            outCeilingY = nearestCeilingY;
+            return true;
+        }
+        return false;
     }
 
     void UpdateDeformation(SlimeParamsCPU& params, const DeformInput& input)

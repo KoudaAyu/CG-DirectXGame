@@ -95,10 +95,25 @@ void Slime::SetSize(int s) {
     currentMergedScale_ = scale_.x;
 
     // 巨大化・サイズ急変時のめり込み＆奈落落下を完全防止：
-    // 接地中または転がり中の場合、底面接地高さを基準にして中心Y座標を即座に補正
+    // 接地中または転がり中の場合、頭上の天井を調べ、狭い隙間ならその場で平べったく変形（Squash）してとどまる
     if (oldGroundY > 0.0f && (isGrounded_ || state_ == SlimeState::Rolling)) {
-        float diff = groundY_ - oldGroundY;
-        position_.y += diff;
+        float currentFloorY = position_.y - (oldGroundY * (1.0f + ceilingSquash_));
+        float naturalHeight = groundY_ * 2.0f;
+        float ceilingY = 0.0f;
+        if (SlimePhysics::FindCeilingY(position_.x, position_.z, currentFloorY, naturalHeight * 3.0f, ceilingY)) {
+            float clearance = ceilingY - currentFloorY;
+            if (clearance < naturalHeight && clearance > 0.05f) {
+                // 隙間にいる！即座に平べったく変形（Squash）し、その場にとどまる！
+                ceilingSquash_ = std::clamp((clearance / naturalHeight) - 1.0f, -0.75f, 0.0f);
+                position_.y = currentFloorY + (clearance * 0.5f);
+            } else {
+                float diff = groundY_ - oldGroundY;
+                position_.y += diff;
+            }
+        } else {
+            float diff = groundY_ - oldGroundY;
+            position_.y += diff;
+        }
     }
 
     if (object3d_) {
@@ -215,7 +230,7 @@ void Slime::Update(float deltaTime, const Vector2& stageTilt, const Vector2& piv
     UpdatePhysics(deltaTime, stageTilt, pivot);
 
     // 奈落への落下（自動復活は一旦無効化、落下したスライムは非アクティブ化）
-    if (position_.y < -35.0f) {
+    if (position_.y < -12.0f) {
         isActive_ = false;
     }
 
@@ -230,6 +245,15 @@ void Slime::Update(float deltaTime, const Vector2& stageTilt, const Vector2& piv
     deformInput.massScale = scale_.x;
     SlimePhysics::UpdateDeformation(slimeParams_, deformInput);
     prevVelocity_ = velocity_;
+
+    // 狭い隙間・天井による平べった変形の適用（スライムらしさ・体積保存）
+    if (ceilingSquash_ < -0.01f) {
+        slimeParams_.squashStretch.y = (std::min)(slimeParams_.squashStretch.y, ceilingSquash_);
+        float volumeCompY = (std::max)(0.20f, 1.0f + ceilingSquash_);
+        float targetExpandXZ = (1.0f / std::sqrt(volumeCompY)) - 1.0f;
+        slimeParams_.squashStretch.x = (std::max)(slimeParams_.squashStretch.x, targetExpandXZ * 0.70f);
+        slimeParams_.squashStretch.z = (std::max)(slimeParams_.squashStretch.z, targetExpandXZ * 0.70f);
+    }
 
     slimeParams_.time = totalTime_;
 
@@ -273,10 +297,12 @@ void Slime::UpdatePhysics(float deltaTime, const Vector2& stageTilt, const Vecto
         SlimePhysics::ResolveWallCollision(position_, velocity_, scale_.x * 0.92f, 0.0f, &prevPos);
 
         // 傾斜面・地面メッシュとの接地判定 (接地中なので isGrounded = true を明示的に指定)
+        // ※ 隙間で潰れている状態の接地オフセットを渡し、床面高さとの不整合を防止
+        float effectiveOffset = groundY_ * (1.0f + ceilingSquash_);
         bool hasGround = false;
         Vector3 groundNormal{ 0.0f, 1.0f, 0.0f };
         float targetGroundY = SlimePhysics::CalculateGroundedCenterYEx(
-            position_.x, position_.z, position_.y, stageTilt, groundY_, &hasGround, &groundNormal, pivot, true);
+            position_.x, position_.z, position_.y, stageTilt, effectiveOffset, &hasGround, &groundNormal, pivot, true);
 
         float cliffDropThreshold = -(std::max)(1.5f, groundY_ * 1.5f);
         if (!hasGround || (targetGroundY - position_.y < cliffDropThreshold)) {
@@ -302,11 +328,39 @@ void Slime::UpdatePhysics(float deltaTime, const Vector2& stageTilt, const Vecto
                 }
             }
 
-            float dy = targetGroundY - position_.y;
-            if (dy > 0.0f) {
-                position_.y = targetGroundY;
+            // 天井・狭い隙間のチェックとスライム平べった変形（Squash）
+            float floorY = targetGroundY - effectiveOffset;
+            float ceilingY = 0.0f;
+            float naturalHeight = groundY_ * 2.0f; // スライム本来の全高
+            if (SlimePhysics::FindCeilingY(position_.x, position_.z, floorY, naturalHeight * 3.0f, ceilingY)) {
+                float clearance = ceilingY - floorY;
+                if (clearance < naturalHeight * 1.05f && clearance > 0.05f) {
+                    // 天井に挟まれている！その場で平べったく潰れる変形を適用
+                    float targetSquash = std::clamp((clearance / naturalHeight) - 1.0f, -0.75f, 0.0f);
+                    ceilingSquash_ += (targetSquash - ceilingSquash_) * (std::min)(1.0f, deltaTime * 30.0f);
+
+                    // 中心Y座標を床と天井の中間にぴったり収める（天井突き抜け・急上昇の完全防止）
+                    float desiredCenterY = floorY + (clearance * 0.5f);
+                    position_.y = desiredCenterY;
+                } else {
+                    ceilingSquash_ += (0.0f - ceilingSquash_) * (std::min)(1.0f, deltaTime * 12.0f);
+                    float desiredCenterY = floorY + groundY_ * (1.0f + ceilingSquash_);
+                    float dy = desiredCenterY - position_.y;
+                    if (dy > 0.0f) {
+                        position_.y = desiredCenterY;
+                    } else {
+                        position_.y += dy * (std::min)(1.0f, deltaTime * 35.0f);
+                    }
+                }
             } else {
-                position_.y += dy * (std::min)(1.0f, deltaTime * 35.0f);
+                ceilingSquash_ += (0.0f - ceilingSquash_) * (std::min)(1.0f, deltaTime * 12.0f);
+                float desiredCenterY = floorY + groundY_ * (1.0f + ceilingSquash_);
+                float dy = desiredCenterY - position_.y;
+                if (dy > 0.0f) {
+                    position_.y = desiredCenterY;
+                } else {
+                    position_.y += dy * (std::min)(1.0f, deltaTime * 35.0f);
+                }
             }
             velocity_.y = 0.0f;
 
@@ -334,6 +388,18 @@ void Slime::UpdatePhysics(float deltaTime, const Vector2& stageTilt, const Vecto
         position_.x += velocity_.x * deltaTime;
         position_.y += velocity_.y * deltaTime;
         position_.z += velocity_.z * deltaTime;
+
+        // 上昇時の天井衝突判定（天井を突き破って飛び上がらないように下向きに反発）
+        if (velocity_.y > 0.0f) {
+            float ceilingY = 0.0f;
+            if (SlimePhysics::FindCeilingY(position_.x, position_.z, position_.y, groundY_ * 1.5f, ceilingY)) {
+                if (position_.y + groundY_ >= ceilingY) {
+                    position_.y = ceilingY - groundY_;
+                    velocity_.y = -velocity_.y * 0.25f; // ポヨンと下向きに反発
+                    slimeParams_.squashStretch = { 0.18f, -0.25f, 0.18f }; // 天井激突潰れ
+                }
+            }
+        }
 
         // 壁衝突（連続衝突判定 CCD 対応）
         SlimePhysics::ResolveWallCollision(position_, velocity_, scale_.x * 0.92f, 0.0f, &prevPos);

@@ -201,6 +201,13 @@ void GamePlayScene::InitializeScene()
     CollisionManager::GetInstance()->SetCollisionFilter(CollisionAttribute::Minion, CollisionAttribute::Minion, false);
     CollisionManager::GetInstance()->SetCollisionFilter(CollisionAttribute::Player, CollisionAttribute::Minion, false);
 
+    if (dxCommon_)
+    {
+        IrisTransition::GetInstance()->Initialize(dxCommon_);
+    }
+    isGameOverTransition_ = false;
+    gameOverDelayTimer_ = 0.0f;
+
     isInitialized_ = true;
 }
 
@@ -245,6 +252,14 @@ void GamePlayScene::RestartGame()
     cameraDistVelocity_ = 0.0f;
     currentGroupSpread_ = 0.0f;
     groupSpreadVelocity_ = 0.0f;
+
+    isGameOverTransition_ = false;
+    gameOverDelayTimer_ = 0.0f;
+    if (dxCommon_)
+    {
+        IrisTransition::GetInstance()->Initialize(dxCommon_);
+    }
+
     cameraInitialized_ = false;
 }
 
@@ -481,145 +496,164 @@ void GamePlayScene::Update()
     // カメラの群れ重心追従 (LocoRoco方式: 全ロコロコの重心と広がりを捉える)
     if (playCamera_ && slimeManager_)
     {
-        Vector3 rawFocusPos = { 0.0f, 0.0f, 0.0f };
-        float rawSpread = 1.0f;
-        slimeManager_->GetGroupCenterAndSpread(rawFocusPos, rawSpread);
-
-        // 注視点の高さ Y: 群れの自然な高さを追従
-        rawFocusPos.y = (std::max)(0.5f, rawFocusPos.y + 0.3f);
-
-        // 初回初期化
-        if (!cameraInitialized_)
+        int livingCount = slimeManager_->GetLivingCount();
+        if (livingCount == 0 && cameraInitialized_)
         {
-            currentFocusPos_ = rawFocusPos;
-            currentGroupSpread_ = rawSpread;
+            // ★ 全員死亡時: カメラを初期位置に戻さず、直前の位置・回転・距離のままその場に静止保持！
             focusPosVelocity_ = { 0.0f, 0.0f, 0.0f };
+            cameraPosVelocity_ = { 0.0f, 0.0f, 0.0f };
+            cameraRotVelocity_ = { 0.0f, 0.0f, 0.0f };
+            cameraDistVelocity_ = 0.0f;
             groupSpreadVelocity_ = 0.0f;
         }
         else
         {
-            // 注視点中心のスムーズ補間（合体による重心の瞬間ジャンプを防止）
-            currentFocusPos_.x = SmoothDamp(currentFocusPos_.x, rawFocusPos.x, focusPosVelocity_.x, focusSmoothTime_, deltaTime);
-            currentFocusPos_.y = SmoothDamp(currentFocusPos_.y, rawFocusPos.y, focusPosVelocity_.y, focusSmoothTime_, deltaTime);
-            currentFocusPos_.z = SmoothDamp(currentFocusPos_.z, rawFocusPos.z, focusPosVelocity_.z, focusSmoothTime_, deltaTime);
+            Vector3 rawFocusPos = { 0.0f, 0.0f, 0.0f };
+            float rawSpread = 1.0f;
+            slimeManager_->GetGroupCenterAndSpread(rawFocusPos, rawSpread);
 
-            // 群れの広がりのスムーズ補間（合体でスライムが消えたときの急激なズームインを完全に緩和）
-            currentGroupSpread_ = SmoothDamp(currentGroupSpread_, rawSpread, groupSpreadVelocity_, groupSpreadSmoothTime_, deltaTime);
-        }
+            // 注視点の高さ Y: 群れの自然な高さを追従
+            rawFocusPos.y = (std::max)(0.5f, rawFocusPos.y + 0.3f);
 
-        // スケールおよび群れの広がり（Spread）に応じた目標カメラ距離
-        float maxScale = 0.4f;
-        for (const auto& s : slimeManager_->GetSlimes()) {
-            if (s && s->IsActive()) maxScale = (std::max)(maxScale, s->GetCurrentScale());
-        }
-        float scaleOffset = (maxScale - 0.4f);
-        float spreadOffset = (std::min)(maxSpreadOffset_, currentGroupSpread_ * cameraSpreadZoom_);
-        float targetDist = cameraDistance_ + (std::max)(0.0f, scaleOffset) * cameraDynamicZoom_ + spreadOffset;
-        targetDist = std::clamp(targetDist, minCameraDist_, maxCameraDist_);
-
-        if (!cameraInitialized_)
-        {
-            currentCameraDist_ = targetDist;
-            cameraDistVelocity_ = 0.0f;
-        }
-        else
-        {
-            currentCameraDist_ = SmoothDamp(currentCameraDist_, targetDist, cameraDistVelocity_, cameraZoomSmoothTime_, deltaTime);
-        }
-
-        float effectiveDist = std::clamp(currentCameraDist_, minCameraDist_, maxCameraDist_);
-
-        // 2. カメラの見下ろし角・方位角
-        float pitch = cameraPitch_;
-        float yaw = cameraYaw_;
-
-        float cosPitch = std::cos(pitch);
-        float sinPitch = std::sin(pitch);
-        float cosYaw = std::cos(yaw);
-        float sinYaw = std::sin(yaw);
-
-        // 注視点からカメラ位置への相対オフセット（球面座標）
-        Vector3 relativeOffset = {
-            -effectiveDist * sinYaw * cosPitch,
-            effectiveDist * sinPitch,
-            -effectiveDist * cosYaw * cosPitch
-        };
-
-        // 3. 注視点（LookAt Target）と目標カメラ位置の算出
-        // 滑らかに補間された注視点を基準にし、視界を安定確保
-        Vector3 lookAtTarget = {
-            currentFocusPos_.x,
-            currentFocusPos_.y + cameraTargetOffsetY_,
-            currentFocusPos_.z + cameraForwardOffset_
-        };
-
-        Vector3 targetCamPos = {
-            lookAtTarget.x + relativeOffset.x,
-            lookAtTarget.y + relativeOffset.y,
-            lookAtTarget.z + relativeOffset.z
-        };
-
-        // ★★★ カメラの最低地上高クリアランスガード（ステージ接近・めり込み防止） ★★★
-        // カメラ直下の傾斜面（ステージ）高さを算出し、常に十分な高度（地面から最低9.5m上空）を維持
-        float groundYAtTargetCam = SlimePhysics::CalculateGroundHeight(targetCamPos.x, targetCamPos.z, currentTilt_, slimePivot);
-        float minTargetCamY = groundYAtTargetCam + 9.5f;
-        if (targetCamPos.y < minTargetCamY)
-        {
-            targetCamPos.y = minTargetCamY;
-        }
-
-        // 4. 目標カメラ回転の算出
-        // 左右移動速度に応じた微小なダイナミックバンク（ロール傾斜: 左右に曲がった感覚を強調）
-        float avgVelX = 0.0f;
-        int totalWeight = 0;
-        for (const auto& s : slimeManager_->GetSlimes()) {
-            if (s && s->IsActive()) {
-                int w = (std::max)(1, s->GetSize());
-                avgVelX += s->GetVelocity().x * static_cast<float>(w);
-                totalWeight += w;
+            // 初回初期化
+            if (!cameraInitialized_)
+            {
+                currentFocusPos_ = rawFocusPos;
+                currentGroupSpread_ = rawSpread;
+                focusPosVelocity_ = { 0.0f, 0.0f, 0.0f };
+                groupSpreadVelocity_ = 0.0f;
             }
-        }
-        if (totalWeight > 0) avgVelX /= static_cast<float>(totalWeight);
+            else
+            {
+                // 注視点中心のスムーズ補間（合体による重心の瞬間ジャンプを防止）
+                currentFocusPos_.x = SmoothDamp(currentFocusPos_.x, rawFocusPos.x, focusPosVelocity_.x, focusSmoothTime_, deltaTime);
+                currentFocusPos_.y = SmoothDamp(currentFocusPos_.y, rawFocusPos.y, focusPosVelocity_.y, focusSmoothTime_, deltaTime);
+                currentFocusPos_.z = SmoothDamp(currentFocusPos_.z, rawFocusPos.z, focusPosVelocity_.z, focusSmoothTime_, deltaTime);
 
-        float sideBank = -std::clamp(avgVelX * cameraDynamicBank_, -0.05f, 0.05f);
+                // 群れの広がりのスムーズ補間（合体でスライムが消えたときの急激なズームインを完全に緩和）
+                currentGroupSpread_ = SmoothDamp(currentGroupSpread_, rawSpread, groupSpreadVelocity_, groupSpreadSmoothTime_, deltaTime);
+            }
 
-        Vector3 targetCamRot = {
-            pitch + (followStageTilt_ ? currentTilt_.x : 0.0f),
-            yaw,
-            sideBank + (followStageTilt_ ? -currentTilt_.y : 0.0f)
-        };
+            // スケールおよび群れの広がり（Spread）に応じた目標カメラ距離
+            float maxScale = 0.4f;
+            for (const auto& s : slimeManager_->GetSlimes()) {
+                if (s && s->IsActive()) maxScale = (std::max)(maxScale, s->GetCurrentScale());
+            }
+            float scaleOffset = (maxScale - 0.4f);
+            float spreadOffset = (std::min)(maxSpreadOffset_, currentGroupSpread_ * cameraSpreadZoom_);
+            float targetDist = cameraDistance_ + (std::max)(0.0f, scaleOffset) * cameraDynamicZoom_ + spreadOffset;
+            targetDist = std::clamp(targetDist, minCameraDist_, maxCameraDist_);
 
-        // 5. カメラ位置と回転の適用（臨界減衰スプリング SmoothDamp で極上のなめらかさを実現）
-        if (!cameraInitialized_)
-        {
-            currentCameraPos_ = targetCamPos;
-            currentCameraRot_ = targetCamRot;
-            cameraPosVelocity_ = { 0.0f, 0.0f, 0.0f };
-            cameraRotVelocity_ = { 0.0f, 0.0f, 0.0f };
-            cameraInitialized_ = true;
-        }
-        else
-        {
-            // X軸（左右）: ラバーストラップラグでプレイヤーが左右に自然にシフトして移動が明確化
-            currentCameraPos_.x = SmoothDamp(currentCameraPos_.x, targetCamPos.x, cameraPosVelocity_.x, cameraSideLagTime_, deltaTime);
-            // Y, Z軸: プレイヤーとの高低差・距離を一定に保ちつつ、微細な段差ショックをシルクのようにいなす
-            currentCameraPos_.y = SmoothDamp(currentCameraPos_.y, targetCamPos.y, cameraPosVelocity_.y, cameraSmoothTimePos_, deltaTime);
-            currentCameraPos_.z = SmoothDamp(currentCameraPos_.z, targetCamPos.z, cameraPosVelocity_.z, cameraSmoothTimePos_, deltaTime);
+            if (!cameraInitialized_)
+            {
+                currentCameraDist_ = targetDist;
+                cameraDistVelocity_ = 0.0f;
+            }
+            else
+            {
+                currentCameraDist_ = SmoothDamp(currentCameraDist_, targetDist, cameraDistVelocity_, cameraZoomSmoothTime_, deltaTime);
+            }
 
-            // 回転: C2級連続の超滑らかなスプリングイージング（急反転でもカクつき・ジャークが物理的にゼロ！）
-            currentCameraRot_.x = SmoothDamp(currentCameraRot_.x, targetCamRot.x, cameraRotVelocity_.x, cameraSmoothTimeRot_, deltaTime);
-            currentCameraRot_.y = SmoothDamp(currentCameraRot_.y, targetCamRot.y, cameraRotVelocity_.y, cameraSmoothTimeRot_, deltaTime);
-            currentCameraRot_.z = SmoothDamp(currentCameraRot_.z, targetCamRot.z, cameraRotVelocity_.z, cameraSmoothTimeRot_, deltaTime);
-        }
+            float effectiveDist = std::clamp(currentCameraDist_, minCameraDist_, maxCameraDist_);
 
-        // ★★★ 最終補間後位置に対する絶対安全クリアランスガード ★★★
-        // 補間スプリングのオーバーシュートや激しい板の傾きでも、ステージに異様に近づくことを100%遮断（最低地上高8.5m）
-        float currentGroundAtCam = SlimePhysics::CalculateGroundHeight(currentCameraPos_.x, currentCameraPos_.z, currentTilt_, slimePivot);
-        float absoluteMinCamY = currentGroundAtCam + 8.5f;
-        if (currentCameraPos_.y < absoluteMinCamY)
-        {
-            currentCameraPos_.y = absoluteMinCamY;
-            if (cameraPosVelocity_.y < 0.0f) cameraPosVelocity_.y = 0.0f;
+            // 2. カメラの見下ろし角・方位角
+            float pitch = cameraPitch_;
+            float yaw = cameraYaw_;
+
+            float cosPitch = std::cos(pitch);
+            float sinPitch = std::sin(pitch);
+            float cosYaw = std::cos(yaw);
+            float sinYaw = std::sin(yaw);
+
+            // 注視点からカメラ位置への相対オフセット（球面座標）
+            Vector3 relativeOffset = {
+                -effectiveDist * sinYaw * cosPitch,
+                effectiveDist * sinPitch,
+                -effectiveDist * cosYaw * cosPitch
+            };
+
+            // 3. 注視点（LookAt Target）と目標カメラ位置の算出
+            // 滑らかに補間された注視点を基準にし、視界を安定確保
+            Vector3 lookAtTarget = {
+                currentFocusPos_.x,
+                currentFocusPos_.y + cameraTargetOffsetY_,
+                currentFocusPos_.z + cameraForwardOffset_
+            };
+
+            Vector3 targetCamPos = {
+                lookAtTarget.x + relativeOffset.x,
+                lookAtTarget.y + relativeOffset.y,
+                lookAtTarget.z + relativeOffset.z
+            };
+
+            // ★★★ カメラの最低地上高クリアランスガード（ステージ接近・めり込み防止） ★★★
+            // カメラ直下の傾斜面（ステージ）高さを算出し、常に十分な高度（地面から最低9.5m上空）を維持
+            float groundYAtTargetCam = SlimePhysics::CalculateGroundHeight(targetCamPos.x, targetCamPos.z, currentTilt_, slimePivot);
+            float minTargetCamY = groundYAtTargetCam + 9.5f;
+            if (targetCamPos.y < minTargetCamY)
+            {
+                targetCamPos.y = minTargetCamY;
+            }
+
+            // 4. カメラ位置の適用（臨界減衰スプリング SmoothDamp で極上のなめらかさを実現）
+            if (!cameraInitialized_)
+            {
+                currentCameraPos_ = targetCamPos;
+                cameraPosVelocity_ = { 0.0f, 0.0f, 0.0f };
+            }
+            else
+            {
+                currentCameraPos_.x = SmoothDamp(currentCameraPos_.x, targetCamPos.x, cameraPosVelocity_.x, cameraSideLagTime_, deltaTime);
+                currentCameraPos_.y = SmoothDamp(currentCameraPos_.y, targetCamPos.y, cameraPosVelocity_.y, cameraSmoothTimePos_, deltaTime);
+                currentCameraPos_.z = SmoothDamp(currentCameraPos_.z, targetCamPos.z, cameraPosVelocity_.z, cameraSmoothTimePos_, deltaTime);
+            }
+
+            // ★★★ 最終補間後位置に対する絶対安全クリアランスガード ★★★
+            float currentGroundAtCam = SlimePhysics::CalculateGroundHeight(currentCameraPos_.x, currentCameraPos_.z, currentTilt_, slimePivot);
+            float absoluteMinCamY = currentGroundAtCam + 8.5f;
+            if (currentCameraPos_.y < absoluteMinCamY)
+            {
+                currentCameraPos_.y = absoluteMinCamY;
+                if (cameraPosVelocity_.y < 0.0f) cameraPosVelocity_.y = 0.0f;
+            }
+
+            // 5. 目標カメラ回転の算出（常にスライム注視点を真ん中に捉える Dynamic Look-At）
+            Vector3 toTarget = lookAtTarget - currentCameraPos_;
+            float distHoriz = std::sqrt(toTarget.x * toTarget.x + toTarget.z * toTarget.z);
+            float dynamicPitch = std::atan2(-toTarget.y, (std::max)(0.1f, distHoriz));
+            float dynamicYaw = std::atan2(toTarget.x, toTarget.z);
+
+            // 左右移動速度に応じた微小なダイナミックバンク
+            float avgVelX = 0.0f;
+            int totalWeight = 0;
+            for (const auto& s : slimeManager_->GetSlimes()) {
+                if (s && s->IsActive() && s->GetPosition().y >= -5.0f) {
+                    int w = (std::max)(1, s->GetSize());
+                    avgVelX += s->GetVelocity().x * static_cast<float>(w);
+                    totalWeight += w;
+                }
+            }
+            if (totalWeight > 0) avgVelX /= static_cast<float>(totalWeight);
+            float sideBank = -std::clamp(avgVelX * cameraDynamicBank_, -0.05f, 0.05f);
+
+            Vector3 targetCamRot = {
+                dynamicPitch + (followStageTilt_ ? currentTilt_.x : 0.0f),
+                dynamicYaw,
+                sideBank + (followStageTilt_ ? -currentTilt_.y : 0.0f)
+            };
+
+            if (!cameraInitialized_)
+            {
+                currentCameraRot_ = targetCamRot;
+                cameraRotVelocity_ = { 0.0f, 0.0f, 0.0f };
+                cameraInitialized_ = true;
+            }
+            else
+            {
+                currentCameraRot_.x = SmoothDamp(currentCameraRot_.x, targetCamRot.x, cameraRotVelocity_.x, cameraSmoothTimeRot_, deltaTime);
+                currentCameraRot_.y = SmoothDamp(currentCameraRot_.y, targetCamRot.y, cameraRotVelocity_.y, cameraSmoothTimeRot_, deltaTime);
+                currentCameraRot_.z = SmoothDamp(currentCameraRot_.z, targetCamRot.z, cameraRotVelocity_.z, cameraSmoothTimeRot_, deltaTime);
+            }
         }
 
         // カメラ衝撃シェイクの減衰と適用
@@ -649,6 +683,64 @@ void GamePlayScene::Update()
         if (part.object)
         {
             part.object->Update();
+        }
+    }
+
+    // 6. トランジション（IrisTransition）の更新と生存スライム死活監視
+    IrisTransition::GetInstance()->Update(deltaTime);
+
+    if (isInitialized_ && slimeManager_)
+    {
+        int livingCount = slimeManager_->GetLivingCount();
+        if (livingCount == 0)
+        {
+            if (!isGameOverTransition_)
+            {
+                gameOverDelayTimer_ += deltaTime;
+                // スライム落下後の余韻（0.3秒）を経てアイリスアウトを開始
+                if (gameOverDelayTimer_ >= 0.3f)
+                {
+                    isGameOverTransition_ = true;
+
+                    // アイリスの中心: 最後に生存していたスライムの画面位置（または画面中央）
+                    Vector2 irisCenter = { 0.5f, 0.5f };
+                    if (playCamera_)
+                    {
+                        Matrix4x4 vp = Multiply(playCamera_->GetViewMatrix(), playCamera_->GetProjectionMatrix());
+                        float x = currentFocusPos_.x * vp.m[0][0] + currentFocusPos_.y * vp.m[1][0] + currentFocusPos_.z * vp.m[2][0] + vp.m[3][0];
+                        float y = currentFocusPos_.x * vp.m[0][1] + currentFocusPos_.y * vp.m[1][1] + currentFocusPos_.z * vp.m[2][1] + vp.m[3][1];
+                        float w = currentFocusPos_.x * vp.m[0][3] + currentFocusPos_.y * vp.m[1][3] + currentFocusPos_.z * vp.m[2][3] + vp.m[3][3];
+                        if (w > 0.05f)
+                        {
+                            float ndcX = x / w;
+                            float ndcY = y / w;
+                            float u = (ndcX + 1.0f) * 0.5f;
+                            float v = (1.0f - ndcY) * 0.5f;
+                            if (u >= 0.1f && u <= 0.9f && v >= 0.1f && v <= 0.9f)
+                            {
+                                irisCenter = { u, v };
+                            }
+                        }
+                    }
+
+                    IrisTransition::GetInstance()->StartIrisOut(1.0f, irisCenter);
+                }
+            }
+            else
+            {
+                // 暗転完了（完全黒画面）でゲームオーバーシーンへ即座に切り替え
+                if (IrisTransition::GetInstance()->IsIrisOutComplete())
+                {
+                    Fade* savedFade = SceneManager::GetInstance()->GetFadeApplication();
+                    SceneManager::GetInstance()->SetFadeApplication(nullptr);
+                    SceneManager::GetInstance()->ChangeScene("GAMEOVER");
+                    SceneManager::GetInstance()->SetFadeApplication(savedFade);
+                }
+            }
+        }
+        else
+        {
+            gameOverDelayTimer_ = 0.0f;
         }
     }
 
@@ -702,6 +794,12 @@ void GamePlayScene::Draw(SceneRenderRequests& renderRequests)
     if (slimeManager_)
     {
         slimeManager_->Draw(ctx);
+    }
+
+    // 4. 最前面アイリストランジションの描画（円形暗転マスク）
+    if (dxCommon_ && dxCommon_->GetCommandList())
+    {
+        IrisTransition::GetInstance()->Draw(dxCommon_->GetCommandList().Get());
     }
 }
 

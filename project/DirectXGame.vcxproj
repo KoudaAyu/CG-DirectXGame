@@ -133,6 +133,7 @@
     <ClCompile Include="Application\GameObject\SlimeFx.cpp" />
     <ClCompile Include="Application\GameObject\Slime.cpp" />
     <ClCompile Include="Application\GameObject\SlimeManager.cpp" />
+    <ClCompile Include="Application\GameObject\IrisTransition.cpp" />
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="Resources\shaders\Slime.VS.hlsl">
@@ -244,6 +245,7 @@
     </FxCompile>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Application\GameObject\IrisTransition.h" />
     <ClInclude Include="Application\GameObject\Slime.h" />
     <ClInclude Include="Application\GameObject\SlimeManager.h" />
     <ClInclude Include="Application\GameObject\SlimePhysics.h" />

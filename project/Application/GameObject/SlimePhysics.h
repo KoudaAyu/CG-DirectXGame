@@ -102,6 +102,17 @@ namespace SlimePhysics
     bool ResolveWallCollision(Vector3& position, Vector3& velocity, float radius, float heightOffset = 0.0f, const Vector3* prevPos = nullptr);
 
     /**
+     * @brief 真上方向へのレイキャストにより天井のY座標を探索
+     * @param x ワールドX座標
+     * @param z ワールドZ座標
+     * @param startY 探索開始のY座標（通常は床面またはスライム足元）
+     * @param maxSearchDist 最大探索距離
+     * @param[out] outCeilingY 見つかった天井のワールドY座標
+     * @return 天井が見つかった場合 true
+     */
+    bool FindCeilingY(float x, float z, float startY, float maxSearchDist, float& outCeilingY);
+
+    /**
      * @brief スライム変形計算用の入力パラメータ構造体
      */
     struct DeformInput

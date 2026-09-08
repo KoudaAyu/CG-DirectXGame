@@ -54,6 +54,8 @@ public:
 
     const Vector3& GetScale() const { return scale_; }
     float GetRadius() const { return radius_; }
+    float GetGroundY() const { return groundY_; }
+    float GetEffectiveOffset() const { return groundY_ * (1.0f + ceilingSquash_); }
 
     // 大きさ（ロコロコサイズ: 1〜10）
     int GetSize() const { return size_; }
@@ -82,6 +84,10 @@ public:
     bool CanMerge() const { return isActive_ && mergeCooldown_ <= 0.0f; }
     void SetMergeCooldown(float cd) { mergeCooldown_ = cd; }
     float GetMergeCooldown() const { return mergeCooldown_; }
+
+    // 狭い隙間・天井変形制御
+    float GetCeilingSquash() const { return ceilingSquash_; }
+    void SetCeilingSquash(float s) { ceilingSquash_ = s; }
 
     // タイトル画面専用の「大きい青い例外」
     void SetTitleException(bool isTitle);
@@ -139,4 +145,5 @@ private:
 
     Vector3 prevVelocity_{ 0.0f, 0.0f, 0.0f }; // スクワッシュ変形用の前フレーム速度
     bool isTitleException_ = false;
+    float ceilingSquash_ = 0.0f; // 狭い隙間・天井による平べった変形率
 };

@@ -40,6 +40,7 @@ public:
 
     // スライム情報取得
     int GetActiveCount() const;
+    int GetLivingCount() const;
     int GetTotalCount() const;
     int GetMaxSlimeSize() const;
     int GetTotalSize() const;
@@ -71,4 +72,9 @@ private:
     float mergeThreshold_ = 2.5f;
     float splitPopPower_ = 8.0f;
     float splitUpPower_ = 7.0f;
+
+    // 全員落下時にカメラを初期位置に戻さないための直前有効位置キャッシュ
+    Vector3 lastValidCenter_{ 0.0f, 0.5f, 0.0f };
+    float lastValidSpread_ = 1.0f;
+    float lastValidScale_ = 0.4f;
 };

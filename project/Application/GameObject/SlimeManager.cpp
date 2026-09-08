@@ -118,6 +118,7 @@ Slime* SlimeManager::SpawnSlime(const Vector3& pos, int size) {
 }
 
 void SlimeManager::SpawnSlimes(const Vector3& basePos, int count, int sizePerSlime) {
+    lastValidCenter_ = basePos;
     for (int i = 0; i < count; ++i) {
         float offsetX = ((std::rand() % 100) / 100.0f - 0.5f) * 2.0f;
         float offsetZ = ((std::rand() % 100) / 100.0f - 0.5f) * 2.0f;
@@ -128,6 +129,9 @@ void SlimeManager::SpawnSlimes(const Vector3& basePos, int count, int sizePerSli
 
 void SlimeManager::Clear() {
     slimes_.clear();
+    lastValidCenter_ = { 0.0f, 0.5f, 0.0f };
+    lastValidSpread_ = 1.0f;
+    lastValidScale_ = 0.4f;
 }
 
 void SlimeManager::TriggerStageBounce(const Vector2& stageTilt, const Vector2& pivot, float bouncePower) {
@@ -233,13 +237,17 @@ void SlimeManager::CheckAndResolveMerge(const Vector2& stageTilt, const Vector2&
                 // スライムiにスライムjが合体！
                 int combinedSize = slimes_[i]->GetSize() + slimes_[j]->GetSize();
 
-                // 合体位置: 大きい方に寄せる（半々だとめり込みやすいため）
+                // 合体元スライムたちのそれぞれの床面高さを算出
+                float floorA = posA.y - slimes_[i]->GetEffectiveOffset();
+                float floorB = posB.y - slimes_[j]->GetEffectiveOffset();
                 float totalSize = static_cast<float>(slimes_[i]->GetSize() + slimes_[j]->GetSize());
                 float weightA = static_cast<float>(slimes_[i]->GetSize()) / totalSize;
                 float weightB = static_cast<float>(slimes_[j]->GetSize()) / totalSize;
+                float baseFloorY = floorA * weightA + floorB * weightB;
+
                 Vector3 mergeCenter = {
                     posA.x * weightA + posB.x * weightB,
-                    (std::max)(posA.y, posB.y), // Y は高い方を採用（めり込み防止）
+                    baseFloorY,
                     posA.z * weightA + posB.z * weightB
                 };
 
@@ -250,20 +258,43 @@ void SlimeManager::CheckAndResolveMerge(const Vector2& stageTilt, const Vector2&
                 // slimes_[i] にサイズを集約
                 slimes_[i]->SetSize(combinedSize);
 
-                // 合体後の地面補正: 新しいスケールでの接地高さを最上空から厳密に算出して沈み込み・奈落落下を完全防止
-                float groundOffset = slimes_[i]->GetScale().x * 0.75f;
-                bool hasGround = false;
-                float calcGroundY = SlimePhysics::CalculateGroundedCenterYEx(
-                    mergeCenter.x, mergeCenter.z, SlimePhysics::kIgnoreCurrentY,
-                    stageTilt, groundOffset, &hasGround, pivot, false);
-                if (hasGround) {
-                    mergeCenter.y = (std::max)(mergeCenter.y, calcGroundY);
-                } else {
-                    mergeCenter.y += groundOffset;
-                }
-                slimes_[i]->SetPosition(mergeCenter);
+                // 合体後の自然な半径と全高
+                float newGroundY = slimes_[i]->GetGroundY();
+                float naturalHeight = newGroundY * 2.0f;
 
-                slimes_[i]->GetSlimeParams().impulseStrength = 0.50f; // ポヨン！と合体弾性
+                // 正確な床面高さを CalculateGroundHeightEx で判定
+                bool hasGround = false;
+                Vector3 groundNormal{ 0.0f, 1.0f, 0.0f };
+                float calcGroundCenterY = SlimePhysics::CalculateGroundedCenterYEx(
+                    mergeCenter.x, mergeCenter.z, baseFloorY + newGroundY,
+                    stageTilt, newGroundY, &hasGround, &groundNormal, pivot, true);
+
+                float floorY = hasGround ? (calcGroundCenterY - newGroundY) : baseFloorY;
+
+                // 頭上天井の有無を判定
+                float ceilingY = 0.0f;
+                if (SlimePhysics::FindCeilingY(mergeCenter.x, mergeCenter.z, floorY, naturalHeight * 3.0f, ceilingY)) {
+                    float clearance = ceilingY - floorY;
+                    if (clearance < naturalHeight && clearance > 0.05f) {
+                        // 狭い隙間！その場で平べったく変形（Squash）して中央に収まる
+                        float squashRatio = std::clamp((clearance / naturalHeight) - 1.0f, -0.75f, 0.0f);
+                        slimes_[i]->SetCeilingSquash(squashRatio);
+                        mergeCenter.y = floorY + (clearance * 0.5f);
+                    } else {
+                        slimes_[i]->SetCeilingSquash(0.0f);
+                        mergeCenter.y = floorY + newGroundY;
+                    }
+                } else {
+                    // 通常の平面！床面の上に正しく乗る（めり込み・奈落落下を完全防止）
+                    slimes_[i]->SetCeilingSquash(0.0f);
+                    mergeCenter.y = floorY + newGroundY;
+                }
+
+                slimes_[i]->SetPosition(mergeCenter);
+                // 合体時の急激な吹き飛び速度をリセットしてその場にとどまる
+                slimes_[i]->SetVelocity({ 0.0f, 0.0f, 0.0f });
+
+                slimes_[i]->GetSlimeParams().impulseStrength = 0.25f; // 控えめなプルプル弾性
                 anyMerged = true;
             }
         }
@@ -383,19 +414,23 @@ void SlimeManager::GetGroupCenterAndSpread(Vector3& outCenter, float& outSpread)
     Vector3 sumPos = { 0.0f, 0.0f, 0.0f };
     int totalWeight = 0;
 
+    // 1. 地上にいる生存スライム（Y >= -5.0f）でのみ重心を計算
     for (const auto& slime : slimes_) {
         if (slime && slime->IsActive()) {
-            // レベル3のスライムは同座標にレベル1スライムが3つあるのと同じ重み（質量加重平均）
-            int weight = (std::max)(1, slime->GetSize());
             Vector3 pos = slime->GetPosition();
+            if (pos.y < -5.0f) continue; // 奈落へ落下中のスライムは除外
+
+            int weight = (std::max)(1, slime->GetSize());
             sumPos += pos * static_cast<float>(weight);
             totalWeight += weight;
         }
     }
 
+    // 全員死亡・落下時（地上にスライムが0体）は、奈落へカメラを追従させたり初期位置(0,0,0)へ戻したりせず、
+    // 直前まで地上にいた位置・広がりを100%維持してカメラを静止させる！
     if (totalWeight == 0) {
-        outCenter = { 0.0f, 0.0f, 0.0f };
-        outSpread = 1.0f;
+        outCenter = lastValidCenter_;
+        outSpread = lastValidSpread_;
         return;
     }
 
@@ -406,7 +441,10 @@ void SlimeManager::GetGroupCenterAndSpread(Vector3& outCenter, float& outSpread)
     int activeSlimeCount = 0;
     for (const auto& slime : slimes_) {
         if (slime && slime->IsActive()) {
-            Vector3 diff = slime->GetPosition() - outCenter;
+            Vector3 pos = slime->GetPosition();
+            if (pos.y < -5.0f) continue;
+
+            Vector3 diff = pos - outCenter;
             float distSq = diff.x * diff.x + diff.z * diff.z;
             if (distSq > maxDistSq) {
                 maxDistSq = distSq;
@@ -421,12 +459,23 @@ void SlimeManager::GetGroupCenterAndSpread(Vector3& outCenter, float& outSpread)
     // 単一の外れ値に引っ張られすぎないよう、平均広がりと最大広がりをブレンド（群れのまとまり重視）
     float blendedSpread = avgDist * 1.4f * 0.65f + maxDist * 0.35f;
     outSpread = (std::min)(10.0f, (std::max)(0.5f, blendedSpread));
+
+    const_cast<SlimeManager*>(this)->lastValidCenter_ = outCenter;
+    const_cast<SlimeManager*>(this)->lastValidSpread_ = outSpread;
 }
 
 int SlimeManager::GetActiveCount() const {
     int count = 0;
     for (const auto& s : slimes_) {
         if (s && s->IsActive()) count++;
+    }
+    return count;
+}
+
+int SlimeManager::GetLivingCount() const {
+    int count = 0;
+    for (const auto& s : slimes_) {
+        if (s && s->IsActive() && s->GetPosition().y >= -5.0f) count++;
     }
     return count;
 }
