@@ -9,6 +9,7 @@
 #include "Application/Minion/MinionManager.h"
 #include "Application/GameObject/AimGuide.h"
 #include "Application/GameObject/PropellerObstacle.h"
+#include "Application/Enemy/EnemyManager.h"
 #include "Baziru3_Engine/Graphics/3D/Object/Object3d.h"
 #include "Baziru3_Engine/Framework/Collision/MeshCollider.h"
 
@@ -42,6 +43,7 @@ private:
     std::unique_ptr<MinionManager> minionManager_;
     std::unique_ptr<AimGuide> aimGuide_;
     std::vector<std::unique_ptr<PropellerObstacle>> propellerObstacles_;
+    std::unique_ptr<EnemyManager> enemyManager_;
 
     std::unique_ptr<Object3d> groundPlane_;
     std::unique_ptr<MeshCollider> groundCollider_;

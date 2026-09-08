@@ -182,6 +182,14 @@ void GamePlayScene::InitializeScene()
     CollisionManager::GetInstance()->SetCollisionFilter(CollisionAttribute::Minion, CollisionAttribute::Minion, false);
     CollisionManager::GetInstance()->SetCollisionFilter(CollisionAttribute::Player, CollisionAttribute::Minion, false);
 
+    // 9. 敵マネージャーの初期化
+    //    ※ Initialize() の中で Player <-> Enemy のエンジン側フィルタを切っている。
+    //      CollisionManager::Initialize() より後に呼ぶこと
+    enemyManager_ = std::make_unique<EnemyManager>();
+    enemyManager_->Initialize(object3dCom, playCamera_.get());
+    // 配置は後で相談する前提の仮スポーン（ImGui の Enemy > Clear All で消せる）
+    enemyManager_->SpawnDebugSet({ 0.0f, 0.0f, 0.0f });
+
     isInitialized_ = true;
 }
 
@@ -192,6 +200,12 @@ void GamePlayScene::Finalize()
         if (prop) prop->Finalize();
     }
     propellerObstacles_.clear();
+
+    if (enemyManager_)
+    {
+        enemyManager_->Finalize();
+        enemyManager_.reset();
+    }
 
     aimGuide_.reset();
     SlimePhysics::ClearGroundMesh();
@@ -390,6 +404,12 @@ void GamePlayScene::Update()
         }
     }
 
+    // 敵の更新（プレイヤーの塊との強弱判定・被弾ノックバックもここで解決される）
+    if (enemyManager_)
+    {
+        enemyManager_->Update(deltaTime, currentTilt_, player_.get());
+    }
+
     // 衝突判定と押し出しの更新
     CollisionManager::GetInstance()->Update();
 
@@ -579,7 +599,13 @@ void GamePlayScene::Draw(SceneRenderRequests& renderRequests)
     // 3. 放物線照準ガイドの描画 (LocoRoco完全準拠のため非表示)
     // if (aimGuide_) { aimGuide_->Draw(ctx); }
 
-    // 3. ミニオン群衆の描画
+    // 3. 敵と敵弾の描画
+    if (enemyManager_)
+    {
+        enemyManager_->Draw(ctx);
+    }
+
+    // 4. ミニオン群衆の描画
     if (minionManager_)
     {
         minionManager_->Draw(ctx);
@@ -867,6 +893,14 @@ void GamePlayScene::DrawDebugUI()
             cameraDynamicBank_ = 0.030f;
             cameraDynamicZoom_ = 4.0f;
         }
+    }
+
+    ImGui::Separator();
+
+    // 4.5 敵のデバッグパネル
+    if (enemyManager_)
+    {
+        enemyManager_->DrawImGui();
     }
 
     ImGui::Separator();
