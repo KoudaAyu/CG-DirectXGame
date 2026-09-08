@@ -118,6 +118,7 @@ void GrowthCube::Initialize(Object3dCom* object3dCom, Camera* camera, const Vect
     hoverTimer_ = 0.0f;
     currentAngle_ = 0.0f;
     collectedBySlime_ = nullptr;
+    autoRespawn_ = false;
 
     // プリミティブキューブメッシュの生成
     modelData_ = GeneratePrimitiveCube(baseSize_);

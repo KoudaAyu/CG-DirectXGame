@@ -72,9 +72,7 @@ void GamePlayScene::InitializeScene()
         cameraDistance_ * sinPitch,
         -cameraDistance_ * cosYaw * cosPitch
     };
-    float initialWeightTotal = 3.0f + 7.0f;
-    float initialCentroidZ = (3.0f * spawnBasePos_.z + 7.0f * (spawnBasePos_.z + spawnGroupOffsetZ_)) / initialWeightTotal;
-    currentFocusPos_ = { spawnBasePos_.x, 0.5f, initialCentroidZ };
+    currentFocusPos_ = { spawnBasePos_.x, 0.5f, spawnBasePos_.z };
     focusPosVelocity_ = { 0.0f, 0.0f, 0.0f };
 
     Vector3 initLookAt = {
@@ -251,16 +249,11 @@ void GamePlayScene::RespawnSlimesAtBase()
     if (!slimeManager_) return;
     slimeManager_->Clear();
 
-    // 手前にサイズ3のスライム1体（中・黄色）
+    // レベル3のスライム1体のみ生成
     slimeManager_->SpawnSlime(spawnBasePos_, 3);
-    // 奥にサイズ1の小スライム7体（青）
-    Vector3 groupPos = { spawnBasePos_.x, (std::max)(0.2f, spawnBasePos_.y - 0.2f), spawnBasePos_.z + spawnGroupOffsetZ_ };
-    slimeManager_->SpawnSlimes(groupPos, 7, 1);
 
-    // カメラ注視点もスポーン重心位置へ同期
-    float initialWeightTotal = 3.0f + 7.0f;
-    float initialCentroidZ = (3.0f * spawnBasePos_.z + 7.0f * (spawnBasePos_.z + spawnGroupOffsetZ_)) / initialWeightTotal;
-    currentFocusPos_ = { spawnBasePos_.x, 0.5f, initialCentroidZ };
+    // カメラ注視点もスポーン位置へ同期
+    currentFocusPos_ = { spawnBasePos_.x, 0.5f, spawnBasePos_.z };
     focusPosVelocity_ = { 0.0f, 0.0f, 0.0f };
 }
 
@@ -1179,7 +1172,7 @@ void GamePlayScene::DrawDebugUI()
         ImGui::SliderFloat("Dynamic Zoom (巨大化時ズーム倍率)", &cameraDynamicZoom_, 0.0f, 8.0f, "%.1f");
         ImGui::SliderFloat("Spread Zoom Rate (広がりズーム倍率)", &cameraSpreadZoom_, 0.0f, 0.40f, "%.2f");
         ImGui::SliderFloat("Max Spread Offset (広がりズーム上限)", &maxSpreadOffset_, 0.0f, 8.0f, "%.1f m");
-        ImGui::SliderFloat("Max Camera Dist (最大カメラ距離ガード)", &maxCameraDist_, 18.0f, 35.0f, "%.1f m");
+        ImGui::SliderFloat("Max Camera Dist (最大カメラ距離ガード)", &maxCameraDist_, 18.0f, 50.0f, "%.1f m");
 
         ImGui::TextColored(ImVec4(1.0f, 0.85f, 0.2f, 1.0f), "Camera Presets:");
         if (ImGui::Button("Default (広角見下ろし: 47 deg)"))

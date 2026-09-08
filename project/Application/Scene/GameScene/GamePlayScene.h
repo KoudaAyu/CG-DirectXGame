@@ -66,7 +66,7 @@ private:
     bool bridgeConnectMode_ = true; // startLandとLand1をroadCellで繋ぐモード
 
     // --- カメラ制御パラメータ (プレイヤー相対座標一定モデル) ---
-    float cameraDistance_ = 24.0f;        // プレイヤーからの基準カメラ距離（ステージ全体を見渡しやすいゆったりとした距離）
+    float cameraDistance_ = 30.0f;        // プレイヤーからの基準カメラ距離（ステージ全体を見渡しやすいゆったりとした距離）
     float cameraPitch_ = 0.93f;           // 見下ろし角度 (rad, 0.93 rad ≈ 53.3度: 上空俯瞰視点)
     float cameraYaw_ = 0.0f;             // 方位角 (rad)
     float cameraFov_ = 0.85f;            // 垂直視野角 (rad, 0.85 rad ≈ 48.7度)
@@ -75,8 +75,8 @@ private:
     float cameraDynamicZoom_ = 1.5f;     // 合体巨大化時のカメラ後退倍率
     float cameraSpreadZoom_ = 0.12f;     // 群れの広がりに対するカメラ後退倍率
     float maxSpreadOffset_ = 4.0f;       // 広がりによる追加後退の最大上限値 (m)
-    float minCameraDist_ = 18.0f;        // カメラ距離の下限ガード (m)
-    float maxCameraDist_ = 34.0f;        // カメラ距離の上限ガード (m)
+    float minCameraDist_ = 22.0f;        // カメラ距離の下限ガード (m)
+    float maxCameraDist_ = 42.0f;        // カメラ距離の上限ガード (m)
     bool followStageTilt_ = false;       // ステージ傾斜にカメラ回転を連動させるか
     // 臨界減衰スプリング（SmoothDamp）パラメータ
     float cameraSmoothTimePos_ = 0.10f;  // カメラY/Z追従スムーズ時間 (高速移動時もフレームアウトしない機敏な追従)
@@ -86,7 +86,7 @@ private:
     float tiltSmoothTime_ = 0.35f;       // ステージ傾斜の補間スムーズ時間 (秒: 重厚で滑らかな板の傾き)
 
     // ズーム（距離・広がり・重心）の急変を防止するスムーズダンピングパラメータ
-    float currentCameraDist_ = 24.0f;     // 現在の補間カメラ距離
+    float currentCameraDist_ = 30.0f;     // 現在の補間カメラ距離
     float cameraDistVelocity_ = 0.0f;    // カメラ距離の補間速度
     float cameraZoomSmoothTime_ = 0.55f; // カメラ距離（ズーム）の追従スムーズ時間（合体・分裂時の急激なズーム変動を優雅に緩和）
     float currentGroupSpread_ = 0.0f;    // 補間された群れの広がり

@@ -97,7 +97,7 @@ private:
     Vector3 collectStartPos_{ 0.0f, 0.0f, 0.0f };
     Slime* collectedBySlime_ = nullptr;
 
-    bool autoRespawn_ = true;
+    bool autoRespawn_ = false;
     float respawnTimer_ = 0.0f;
     float respawnCooldown_ = 10.0f;
 };
