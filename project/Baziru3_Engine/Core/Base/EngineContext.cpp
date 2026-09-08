@@ -262,9 +262,9 @@ void EngineContext::EndFrame(
     fade_->Draw();
   }
 
+#ifdef USE_IMGUI
   if (imguiManager_)
     imguiManager_->Render();
-#ifdef USE_IMGUI
   ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(),
                                 dx->GetCommandList().Get());
 #endif

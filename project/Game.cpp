@@ -79,8 +79,10 @@ void Game::Initialize() {
 
   object3dCom->SetDefaultCamera(camera_.get());
 
+#ifdef USE_IMGUI
   imguiManager = std::make_unique<ImGuiManager>();
   imguiManager->Initialize(window, dx);
+#endif
 
   debugCamera_.Initialize(window);
 
@@ -289,10 +291,12 @@ void Game::Update() {
     fadeApplication_->Update();
   }
 
+#ifdef USE_IMGUI
   // ImGuiにここからフレームが始まる趣旨をつたえる
   if (imguiManager) {
     imguiManager->Update();
   }
+#endif
 
   // Update scenes and engine subsystems. Use fixed timestep here (same as
   // scenes expect).
