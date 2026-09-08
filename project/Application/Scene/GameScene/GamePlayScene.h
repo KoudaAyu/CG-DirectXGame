@@ -10,6 +10,8 @@
 #include "Application/GameObject/AimGuide.h"
 #include "Application/GameObject/PropellerObstacle.h"
 #include "Application/Enemy/EnemyManager.h"
+#include "Application/GameObject/CoinManager.h"
+#include "Application/Editor/PlacementEditor.h"
 #include "Baziru3_Engine/Graphics/3D/Object/Object3d.h"
 #include "Baziru3_Engine/Framework/Collision/MeshCollider.h"
 
@@ -34,6 +36,9 @@ public:
 private:
     void DrawDebugUI();
 
+    /// @brief プレイ <-> 配置エディタ の切り替え（F2）
+    void SetEditMode(bool edit);
+
 private:
     std::unique_ptr<KeyInput> keyInput_;
     std::unique_ptr<MouseInput> mouseInput_;
@@ -44,6 +49,11 @@ private:
     std::unique_ptr<AimGuide> aimGuide_;
     std::vector<std::unique_ptr<PropellerObstacle>> propellerObstacles_;
     std::unique_ptr<EnemyManager> enemyManager_;
+    std::unique_ptr<CoinManager> coinManager_;
+    std::unique_ptr<PlacementEditor> placementEditor_;
+
+    bool isEditMode_ = false;                          //!< 配置エディタ中か
+    Vector4 groundBaseColor_{ 0.55f, 0.85f, 0.50f, 1.0f }; //!< 地面の草原カラー
 
     std::unique_ptr<Object3d> groundPlane_;
     std::unique_ptr<MeshCollider> groundCollider_;

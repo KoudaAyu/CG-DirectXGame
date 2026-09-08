@@ -48,6 +48,31 @@ public:
     void ClearAll();
 
     /**
+     * @brief 指定の敵を取り除く（配置エディタの右クリック削除用）
+     * @note Defeat() と違い、撃破演出やカウントを経由しない純粋な削除
+     */
+    void Remove(MobEnemy* enemy);
+
+    /**
+     * @brief 敵の種類を差し替える
+     * @return 差し替え後の敵。元の座標と強さを引き継いで作り直す
+     * @note MobEnemy は種類ごとにモデルが違うので、その場で書き換えられない。
+     *       消して同じ座標に作り直している。呼び出し側は古いポインタを捨てること
+     */
+    MobEnemy* ReplaceType(MobEnemy* enemy, EnemyType newType);
+
+    /**
+     * @brief 配置エディタモード
+     *
+     * true の間は
+     *   - 全個体の挙動を凍結（追跡・射撃をしない）
+     *   - 弾の発射・衝突解決・自爆処理をスキップ
+     * する。地面追従と描画は生きているので、置いた場所が実物で確認できる。
+     */
+    void SetEditorMode(bool on);
+    bool IsEditorMode() const { return editorMode_; }
+
+    /**
      * @brief 更新
      * @param deltaTime デルタタイム
      * @param stageTilt ステージ傾斜
@@ -123,6 +148,7 @@ private:
     float lastSelfDestructRadius_ = 0.0f; //!< ImGui 表示用
     int lastSelfDestructKills_ = 0;       //!< ImGui 表示用
     bool enableCollision_ = true;   //!< デバッグ用に判定を止められるように
+    bool editorMode_ = false;       //!< 配置エディタ中は挙動・弾・衝突を止める
 
     // ImGui 用
     int imguiSpawnType_ = 0;

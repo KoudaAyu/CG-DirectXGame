@@ -6,6 +6,7 @@
 #include "TextureManager.h"
 #include "RenderContext.h"
 #include "Application/GameObject/SlimePhysics.h"
+#include "Application/Editor/StageLayout.h"
 #include "Game.h"
 
 #ifdef USE_IMGUI
@@ -133,7 +134,7 @@ void GamePlayScene::InitializeScene()
         groundPlane_->SetTranslate({ 0.0f, 0.0f, 0.0f });
         groundPlane_->SetScale({ groundScale_, groundScale_, groundScale_ });
         groundPlane_->SetRotate({ 0.0f, 0.0f, 0.0f });
-        groundPlane_->SetColor({ 0.55f, 0.85f, 0.50f, 1.0f }); // 鮮やかな草原カラー
+        groundPlane_->SetColor(groundBaseColor_); // 鮮やかな草原カラー
         groundPlane_->SetEnableLighting(true);
         groundPlane_->Update();
     }
@@ -187,14 +188,65 @@ void GamePlayScene::InitializeScene()
     //      CollisionManager::Initialize() より後に呼ぶこと
     enemyManager_ = std::make_unique<EnemyManager>();
     enemyManager_->Initialize(object3dCom, playCamera_.get());
-    // 配置は後で相談する前提の仮スポーン（ImGui の Enemy > Clear All で消せる）
-    enemyManager_->SpawnDebugSet({ 0.0f, 0.0f, 0.0f });
+
+    // 10. コインマネージャーの初期化
+    coinManager_ = std::make_unique<CoinManager>();
+    coinManager_->Initialize(object3dCom, playCamera_.get());
+
+    // 11. 配置エディタの初期化と、配置データ（JSON）の読み込み
+    //     SpawnDebugSet() による仮スポーンは廃止。配置は全部 JSON から復元する
+    placementEditor_ = std::make_unique<PlacementEditor>();
+    {
+        PlacementEditor::SceneRefs refs;
+        refs.object3dCom = object3dCom;
+        refs.camera = playCamera_.get();
+        refs.enemyManager = enemyManager_.get();
+        refs.coinManager = coinManager_.get();
+        refs.player = player_.get();
+        placementEditor_->Initialize(refs);
+        placementEditor_->SetGroundBaseColor(groundBaseColor_);
+    }
+
+    {
+        StageLayout layout;
+        if (!layout.LoadFromFile(StageLayout::kDefaultPath))
+        {
+            // JSON が無い／壊れている。座標をハードコードすると地形差し替えで
+            // 全部おかしくなるので、地形を実際にレイキャストして置ける場所を探す
+            layout = StageLayout::MakeFallback();
+        }
+        placementEditor_->SetLayout(layout);
+    }
 
     isInitialized_ = true;
 }
 
 void GamePlayScene::Finalize()
 {
+    // 配置エディタを開いたまま抜けたときの取りこぼしを防ぐ。
+    // 保存対象は placementEditor_ が持つ配置データなので、
+    // プレイ中に敵が倒されていてもファイルは汚れない
+    if (placementEditor_)
+    {
+        if (isEditMode_)
+        {
+            placementEditor_->SetActive(false); // 中で自動保存される
+            isEditMode_ = false;
+        }
+        else if (placementEditor_->IsDirty())
+        {
+            placementEditor_->Save();
+        }
+        placementEditor_->Finalize();
+        placementEditor_.reset();
+    }
+
+    if (coinManager_)
+    {
+        coinManager_->Finalize();
+        coinManager_.reset();
+    }
+
     for (auto& prop : propellerObstacles_)
     {
         if (prop) prop->Finalize();
@@ -228,6 +280,29 @@ void GamePlayScene::Finalize()
     isInitialized_ = false;
 }
 
+void GamePlayScene::SetEditMode(bool edit)
+{
+    if (isEditMode_ == edit) return;
+    if (!placementEditor_) return;
+
+    isEditMode_ = edit;
+    placementEditor_->SetActive(edit);
+
+    if (edit)
+    {
+        // 配置は「傾き0のときのワールド座標」で持っているので、
+        // 編集中は板を水平に固定する。補間で傾いたままだと判定がぶれる
+        targetTilt_ = { 0.0f, 0.0f };
+        currentTilt_ = { 0.0f, 0.0f };
+        tiltVelocity_ = { 0.0f, 0.0f };
+    }
+    else
+    {
+        // プレイに戻ったらカメラの補間状態を組み直す
+        cameraInitialized_ = false;
+    }
+}
+
 void GamePlayScene::Update()
 {
     float deltaTime = 1.0f / 60.0f;
@@ -236,8 +311,15 @@ void GamePlayScene::Update()
     {
         keyInput_->Update();
 
+        // F2キーでプレイ <-> 配置エディタ を切り替え
+        if (keyInput_->TriggerKey(DIK_F2))
+        {
+            SetEditMode(!isEditMode_);
+        }
+
         // ENTERキーでクリアシーンへ遷移（SPACEキーはスライムのジャンプに割り当て）
-        if (keyInput_->TriggerKey(DIK_RETURN))
+        // 配置エディタ中は誤爆を避けるため無効
+        if (!isEditMode_ && keyInput_->TriggerKey(DIK_RETURN))
         {
             SceneManager::GetInstance()->ChangeScene("CLEAR");
         }
@@ -257,7 +339,7 @@ void GamePlayScene::Update()
 
     // --- ステージ傾斜（ティルト）の入力とスムーズ補間 ---
     targetTilt_ = { 0.0f, 0.0f };
-    if (keyInput_)
+    if (keyInput_ && !isEditMode_)
     {
         // W: 奥へ傾ける (Pitch > 0) / S: 手前へ傾ける (Pitch < 0)
         if (keyInput_->PushKey(DIK_W) || keyInput_->PushKey(DIK_UP))   targetTilt_.x += maxTiltAngle_;
@@ -267,8 +349,17 @@ void GamePlayScene::Update()
         if (keyInput_->PushKey(DIK_D) || keyInput_->PushKey(DIK_RIGHT)) targetTilt_.y += maxTiltAngle_;
     }
 
-    currentTilt_.x = SmoothDamp(currentTilt_.x, targetTilt_.x, tiltVelocity_.x, tiltSmoothTime_, deltaTime);
-    currentTilt_.y = SmoothDamp(currentTilt_.y, targetTilt_.y, tiltVelocity_.y, tiltSmoothTime_, deltaTime);
+    if (isEditMode_)
+    {
+        // 配置エディタ中は板を完全に水平へ固定する（補間させない）
+        currentTilt_ = { 0.0f, 0.0f };
+        tiltVelocity_ = { 0.0f, 0.0f };
+    }
+    else
+    {
+        currentTilt_.x = SmoothDamp(currentTilt_.x, targetTilt_.x, tiltVelocity_.x, tiltSmoothTime_, deltaTime);
+        currentTilt_.y = SmoothDamp(currentTilt_.y, targetTilt_.y, tiltVelocity_.y, tiltSmoothTime_, deltaTime);
+    }
 
     Vector3 playerPos = player_ ? player_->GetPosition() : Vector3{ 0.0f, 0.0f, 0.0f };
     Vector2 playerPivot = { playerPos.x, playerPos.z };
@@ -322,13 +413,21 @@ void GamePlayScene::Update()
     // if (aimGuide_ && player_ && playCamera_) ...
 
     // プレイヤーの更新（ステージ傾斜を伝達）
-    if (player_)
+    if (player_ && isEditMode_)
+    {
+        // 配置エディタ中は入力を一切渡さず、速度も毎フレーム殺してその場に留める。
+        // Update 自体は呼ぶので、地面追従とスライムシェーダーの時間だけは進む
+        player_->SetVelocity({ 0.0f, 0.0f, 0.0f });
+        player_->Update(deltaTime, nullptr, nullptr, nullptr, nullptr, { 0.0f, 0.0f });
+    }
+    else if (player_)
     {
         player_->Update(deltaTime, keyInput_.get(), minionManager_.get(), mouseInput_.get(), aimGuide_.get(), currentTilt_);
     }
 
     // ミニオンマネージャーの更新（ステージ傾斜を伝達）
-    if (minionManager_ && player_)
+    // 配置エディタ中はミニオンを止めて画面から消す（配置対象ではないので邪魔になる）
+    if (minionManager_ && player_ && !isEditMode_)
     {
         auto mergeResult = minionManager_->Update(deltaTime, player_->GetPosition(), player_->IsMerged(),
                                                  player_->GetCurrentScale(), currentTilt_,
@@ -407,14 +506,27 @@ void GamePlayScene::Update()
     // 敵の更新（プレイヤーの塊との強弱判定・被弾ノックバックもここで解決される）
     if (enemyManager_)
     {
-        enemyManager_->Update(deltaTime, currentTilt_, player_.get(), minionManager_.get());
+        enemyManager_->Update(deltaTime, currentTilt_, player_.get(),
+                              isEditMode_ ? nullptr : minionManager_.get());
+    }
+
+    // コインの更新（地面追従と取得判定。エディタ中は取得しない）
+    if (coinManager_)
+    {
+        coinManager_->Update(deltaTime, currentTilt_, player_.get());
     }
 
     // 衝突判定と押し出しの更新
     CollisionManager::GetInstance()->Update();
 
+    // 配置エディタ中はカメラを真上からの見下ろしに乗っ取る
+    if (isEditMode_ && placementEditor_)
+    {
+        placementEditor_->Update(deltaTime);
+    }
+
     // カメラの群れ重心追従 (LocoRoco方式: 全ロコロコの重心と広がりを捉える)
-    if (playCamera_ && player_)
+    if (!isEditMode_ && playCamera_ && player_)
     {
         Vector3 rawFocusPos = player_->GetPosition();
         float rawSpread = 0.0f;
@@ -591,7 +703,18 @@ void GamePlayScene::Draw(SceneRenderRequests& renderRequests)
         if (groundTextureIndex_ != TextureManager::kInvalidTextureIndex) {
             groundCtx.textureHandle = TextureManager::GetInstance()->GetSrvHandleGPU(groundTextureIndex_);
         }
-        object3dCom->Draw(groundPlane_.get(), groundCtx, groundModelData_, true);
+
+        // 配置エディタ中は、上段（一本道）越しに下段が見えるよう半透明で描く。
+        // 地形は1メッシュなので上段だけを透かすことはできず、全体が薄くなる
+        bool drawnTranslucent = false;
+        if (isEditMode_ && placementEditor_)
+        {
+            drawnTranslucent = placementEditor_->DrawGroundTranslucent(groundCtx, groundPlane_.get(), groundModelData_);
+        }
+        if (!drawnTranslucent)
+        {
+            object3dCom->Draw(groundPlane_.get(), groundCtx, groundModelData_, true);
+        }
     }
 
     // 2. 回転プロペラ障害物の描画
@@ -609,16 +732,29 @@ void GamePlayScene::Draw(SceneRenderRequests& renderRequests)
         enemyManager_->Draw(ctx);
     }
 
-    // 4. ミニオン群衆の描画
-    if (minionManager_)
+    // 4. コインの描画
+    if (coinManager_)
+    {
+        coinManager_->Draw(ctx);
+    }
+
+    // 5. ミニオン群衆の描画（配置エディタ中は非表示）
+    if (minionManager_ && !isEditMode_)
     {
         minionManager_->Draw(ctx);
     }
 
-    // 4. プレイヤーの描画
+    // 6. プレイヤーの描画
     if (player_)
     {
         player_->Draw(ctx);
+    }
+
+    // 7. 配置エディタのオーバーレイ（配置禁止領域・選択マーカー・カーソル）
+    //    デプス書き込みを切ってあるので、必ず一番最後に描く
+    if (isEditMode_ && placementEditor_)
+    {
+        placementEditor_->Draw(ctx);
     }
 }
 
@@ -637,6 +773,17 @@ void GamePlayScene::DrawDebugUI()
     ImGui::SetNextWindowPos(ImVec2(20, 20), ImGuiCond_FirstUseEver);
     ImGui::SetNextWindowSize(ImVec2(460, 480), ImGuiCond_FirstUseEver);
     ImGui::Begin("Pikmin x LocoRoco Debug Panel", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
+
+    // --- プレイ / 配置エディタ の切り替え（F2 と同じ）---
+    {
+        ImGui::SeparatorText("Mode");
+        ImGui::Text("Now: %s", isEditMode_ ? "EDIT (placement)" : "PLAY");
+        ImGui::SameLine();
+        if (ImGui::Button(isEditMode_ ? "Back to Play (F2)" : "Placement Editor (F2)"))
+        {
+            SetEditMode(!isEditMode_);
+        }
+    }
 
     ImGui::TextColored(ImVec4(0.2f, 1.0f, 0.4f, 1.0f), "=== [ Pikmin x LocoRoco 3D Prototype ] ===");
     ImGui::Separator();
@@ -907,6 +1054,12 @@ void GamePlayScene::DrawDebugUI()
         enemyManager_->DrawImGui();
     }
 
+    // 4.6 コインのデバッグパネル
+    if (coinManager_)
+    {
+        coinManager_->DrawImGui();
+    }
+
     ImGui::Separator();
 
     // 5. シーン遷移
@@ -926,5 +1079,11 @@ void GamePlayScene::DrawDebugUI()
     }
 
     ImGui::End();
+
+    // 配置エディタのウィンドウは別ウィンドウで出す
+    if (placementEditor_)
+    {
+        placementEditor_->DrawImGui();
+    }
 #endif
 }

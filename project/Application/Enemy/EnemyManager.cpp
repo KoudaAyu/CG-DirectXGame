@@ -122,6 +122,54 @@ void EnemyManager::ClearAll()
     }
 }
 
+void EnemyManager::Remove(MobEnemy* enemy)
+{
+    if (!enemy) return;
+
+    auto it = std::find_if(enemies_.begin(), enemies_.end(),
+                           [enemy](const std::unique_ptr<MobEnemy>& e) { return e.get() == enemy; });
+    if (it == enemies_.end()) return;
+
+    (*it)->Finalize();
+    enemies_.erase(it);
+}
+
+MobEnemy* EnemyManager::ReplaceType(MobEnemy* enemy, EnemyType newType)
+{
+    if (!enemy) return nullptr;
+    if (enemy->GetType() == newType) return enemy;
+
+    // 種類ごとにモデルもアニメーションも違うので、同じ座標・同じ強さで作り直す
+    Vector3 pos = enemy->GetStageLocalPosition();
+    int strength = enemy->GetStrength();
+    bool wasFrozen = enemy->IsFrozen();
+
+    Remove(enemy);
+
+    MobEnemy* replaced = Spawn(newType, pos, strength);
+    if (replaced) replaced->SetFrozen(wasFrozen);
+    return replaced;
+}
+
+void EnemyManager::SetEditorMode(bool on)
+{
+    editorMode_ = on;
+
+    for (auto& e : enemies_)
+    {
+        if (e) e->SetFrozen(on);
+    }
+
+    if (on)
+    {
+        // 飛んでいる弾は置き去りにせず消しておく
+        for (auto& b : bullets_)
+        {
+            if (b) b->Kill();
+        }
+    }
+}
+
 void EnemyManager::SetScaleFromStrength(EnemyBase::ScaleFromStrengthFunc func)
 {
     scaleFunc_ = std::move(func);
@@ -212,9 +260,19 @@ void EnemyManager::Update(float deltaTime, const Vector2& stageTilt, PikminPlaye
 {
     // 自爆イベントは必ず毎フレーム引き取る。
     // ここより下でリターンすると、古い座標のまま次フレームに爆発してしまう
+    // （エディタ中はプレイヤーの更新自体を止めているので発生しないが、
+    //   イベントが溜まったまま Play に戻ると古い座標で爆発するので引き取りは続ける）
     if (player)
     {
-        ResolveSelfDestruct(player);
+        PikminPlayer::SelfDestructEvent discarded;
+        if (editorMode_)
+        {
+            player->TakeSelfDestructEvent(discarded);
+        }
+        else
+        {
+            ResolveSelfDestruct(player);
+        }
     }
 
     if (!object3dCom_) return;
@@ -237,7 +295,7 @@ void EnemyManager::Update(float deltaTime, const Vector2& stageTilt, PikminPlaye
         e->Update(ctx);
 
         MobEnemy::ShootRequest req;
-        if (e->TakeShootRequest(req))
+        if (e->TakeShootRequest(req) && !editorMode_)
         {
             FireBullet(e->GetConfig(), req);
         }
@@ -249,8 +307,8 @@ void EnemyManager::Update(float deltaTime, const Vector2& stageTilt, PikminPlaye
         if (b) b->Update(deltaTime);
     }
 
-    // 3. 衝突解決
-    if (enableCollision_ && player)
+    // 3. 衝突解決（エディタ中は押し出しも撃破もしない）
+    if (enableCollision_ && player && !editorMode_)
     {
         ResolvePlayerCollisions(player, stageTilt, pivot);
         ResolveMinionCollisions(minionManager, stageTilt, pivot);

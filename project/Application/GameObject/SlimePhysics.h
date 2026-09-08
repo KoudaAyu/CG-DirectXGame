@@ -24,15 +24,51 @@ struct SlimeParamsCPU
 
 namespace SlimePhysics
 {
+    /// @brief 真下のレイキャストで見つかった「歩ける床」1枚分
+    struct GroundLayer
+    {
+        float y = 0.0f;                        //!< 床のワールドY座標
+        Vector3 normal{ 0.0f, 1.0f, 0.0f };    //!< 床のワールド法線
+    };
+
     /**
-     * @brief 3D地面メッシュ（Object3d & MeshCollider）を登録してポリゴン地形接地を有効化
+     * @brief 3D地面メッシュ（Object3d & MeshCollider）を1枚追加してポリゴン地形接地を有効化
+     * @note 地形が複数メッシュに分割されている場合は、メッシュの数だけ呼ぶ。
+     *       すべてのメッシュに同じピボット回転（ステージ傾斜）が掛かっている前提
+     */
+    void AddGroundMesh(Object3d* groundObject, MeshCollider* groundCollider);
+
+    /**
+     * @brief 登録済みの地面メッシュを全部捨ててから1枚だけ登録する（単一メッシュ用の従来API）
      */
     void SetGroundMesh(Object3d* groundObject, MeshCollider* groundCollider);
 
     /**
-     * @brief 登録された地面メッシュを解除
+     * @brief 登録された地面メッシュを全て解除
      */
     void ClearGroundMesh();
+
+    /// @brief 現在登録されている地面メッシュの枚数
+    int GetGroundMeshCount();
+
+    /**
+     * @brief (x, z) の真下にある「歩ける床」を全部取得する（Y 降順）
+     * @param x ワールドX座標
+     * @param z ワールドZ座標
+     * @param outLayers 結果の格納先（nullptr 可）
+     * @param maxLayers outLayers の要素数
+     * @return 見つかった床の総数。0 なら島の外、2以上ならそこは上下段が重なっている
+     * @note 配置エディタの「遮蔽物のあるところは配置禁止」判定に使う。
+     *       ステージ傾斜は考慮しない（傾き0の状態で問い合わせること）
+     */
+    int QueryGroundLayers(float x, float z, GroundLayer* outLayers, int maxLayers);
+
+    /**
+     * @brief 登録された地形メッシュ全体を包むワールドAABBを取得
+     * @return 地形が1枚も登録されていなければ false
+     * @note 地形の広さを表す定数がどこにも無いので、配置範囲やカメラの初期値はここから決める
+     */
+    bool GetGroundWorldBounds(Vector3& outMin, Vector3& outMax);
 
     /// @brief currentY を無視して最上面の地面高さを検索する際の特殊値
     constexpr float kIgnoreCurrentY = -99999.0f;

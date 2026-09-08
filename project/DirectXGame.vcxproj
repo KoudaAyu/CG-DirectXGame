@@ -85,6 +85,10 @@
     <ClCompile Include="Application\Enemy\MobEnemy.cpp" />
     <ClCompile Include="Application\Enemy\EnemyBullet.cpp" />
     <ClCompile Include="Application\Enemy\EnemyManager.cpp" />
+    <ClCompile Include="Application\GameObject\Coin.cpp" />
+    <ClCompile Include="Application\GameObject\CoinManager.cpp" />
+    <ClCompile Include="Application\Editor\StageLayout.cpp" />
+    <ClCompile Include="Application\Editor\PlacementEditor.cpp" />
     <ClCompile Include="Application\Scene\GameScene\GamePlayScene.cpp" />
     <ClCompile Include="Application\Scene\ClearScene\ClearScene.cpp" />
     <ClCompile Include="Baziru3_Engine\Graphics\Light\Light.cpp" />
@@ -330,6 +334,10 @@
     <ClInclude Include="Application\Enemy\MobEnemy.h" />
     <ClInclude Include="Application\Enemy\EnemyBullet.h" />
     <ClInclude Include="Application\Enemy\EnemyManager.h" />
+    <ClInclude Include="Application\GameObject\Coin.h" />
+    <ClInclude Include="Application\GameObject\CoinManager.h" />
+    <ClInclude Include="Application\Editor\StageLayout.h" />
+    <ClInclude Include="Application\Editor\PlacementEditor.h" />
     <ClInclude Include="Application\GameObject\Bullet.h" />
     <ClInclude Include="Application\Framework.h" />
     <ClInclude Include="Baziru3_Engine\Core\Base\EngineAssert.h" />

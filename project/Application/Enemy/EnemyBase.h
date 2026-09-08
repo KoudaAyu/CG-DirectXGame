@@ -106,6 +106,19 @@ public:
 
     // --- 状態 ---
     bool IsDead() const { return isDead_; }
+
+    /**
+     * @brief 挙動を凍結する（配置エディタ用）
+     * @note true の間は UpdateBehavior() を呼ばない。
+     *       地面追従・姿勢・アニメーションは動いたままなので、
+     *       エディタ上でも実物と同じ見た目で置き場所を確認できる
+     */
+    void SetFrozen(bool frozen) { isFrozen_ = frozen; }
+    bool IsFrozen() const { return isFrozen_; }
+
+    /// @brief 次のフレームに床へ即吸着させる（エディタでドラッグ移動したあと用）
+    void RequestGroundSnap() { needsGroundSnap_ = true; }
+
     void Defeat();                                    //!< 撃破（即消滅）
     void ApplyPush(const Vector3& worldDelta, const Vector2& stageTilt, const Vector2& pivot);
 
@@ -214,6 +227,7 @@ protected:
     bool isDead_ = false;
     bool isPushable_ = false;
     bool needsGroundSnap_ = true;  //!< 初回だけ最上段の床へ即吸着する
+    bool isFrozen_ = false;        //!< true の間は挙動を止める（配置エディタ用）
     bool isAnimated_ = false;
     float lifeTime_ = 0.0f;        //!< 生存時間（演出の位相に使う）
 

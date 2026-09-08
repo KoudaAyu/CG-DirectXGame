@@ -298,7 +298,11 @@ void EnemyBase::Update(const EnemyUpdateContext& ctx)
     lifeTime_ += ctx.deltaTime;
 
     // 1. 挙動（派生クラスが anchorLocal_ を動かす）
-    UpdateBehavior(ctx);
+    //    配置エディタ中は凍結して、置いた場所からその場で動かないようにする
+    if (!isFrozen_)
+    {
+        UpdateBehavior(ctx);
+    }
 
     // 2. ステージ傾斜に合わせてワールド座標を導出
     //    こうしておくと、傾けて地面が動いても敵だけ取り残されない
