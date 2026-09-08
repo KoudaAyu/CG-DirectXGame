@@ -25,12 +25,22 @@ struct SlimeParamsCPU
 namespace SlimePhysics
 {
     /**
-     * @brief 3D地面メッシュ（Object3d & MeshCollider）を登録してポリゴン地形接地を有効化
+     * @brief 3D地面メッシュ（Object3d & MeshCollider）を登録してポリゴン地形接地を有効化（単一登録）
      */
     void SetGroundMesh(Object3d* groundObject, MeshCollider* groundCollider);
 
     /**
-     * @brief 登録された地面メッシュを解除
+     * @brief 複数の3D地面メッシュ（Object3d & MeshCollider）を追加登録
+     */
+    void AddGroundMesh(Object3d* groundObject, MeshCollider* groundCollider);
+
+    /**
+     * @brief 登録されたすべての地面メッシュを解除
+     */
+    void ClearGroundMeshes();
+
+    /**
+     * @brief 登録された地面メッシュを解除（ClearGroundMeshesのエイリアス）
      */
     void ClearGroundMesh();
 

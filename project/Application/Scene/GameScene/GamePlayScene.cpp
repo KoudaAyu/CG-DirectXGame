@@ -111,40 +111,64 @@ void GamePlayScene::InitializeScene()
         object3dCom->SetDefaultCamera(playCamera_.get());
     }
 
-    // 3. 地面モデル（startLand.obj / startLand.mtl）の読み込みと初期化
-    groundModelData_ = Object3d::LoadObjFile("Resources/10days", "startLand.obj");
+    // 3. プロペラを除くステージOBJモデル群（startLand, Land1, toLandRoad, roadCell）の読み込みと配置
+    stageParts_.clear();
+    SlimePhysics::ClearGroundMeshes();
 
-    // 広大な地形メッシュのバウンディング半径を十分大きく設定（視錐台誤カリングを完全に防止）
-    groundModelData_.boundingRadius = 10000.0f;
+    auto AddStagePart = [&](const std::string& name, const std::string& objFile, const Vector3& baseOffset, const std::string& defaultTex = "Resources/10days/land.png") {
+        StagePart part;
+        part.name = name;
+        part.baseOffset = baseOffset;
+        part.modelData = Object3d::LoadObjFile("Resources/10days", objFile);
+        part.modelData.boundingRadius = 10000.0f; // 視錐台誤カリングを完全に防止
 
-    if (!groundModelData_.material.textureFilePath.empty())
+        std::string texPath = part.modelData.material.textureFilePath;
+        if (texPath.empty()) {
+            texPath = defaultTex;
+        }
+        part.textureIndex = TextureManager::GetInstance()->Load(texPath);
+        part.modelData.material.textureIndex = part.textureIndex;
+
+        part.object = std::make_unique<Object3d>();
+        if (part.object) {
+            part.object->Initialize(object3dCom, part.modelData);
+            part.object->SetCamera(playCamera_.get());
+            part.object->SetTranslate(baseOffset * groundScale_);
+            part.object->SetScale({ groundScale_, groundScale_, groundScale_ });
+            part.object->SetRotate({ 0.0f, 0.0f, 0.0f });
+            part.object->SetColor({ 0.55f, 0.85f, 0.50f, 1.0f });
+            part.object->SetEnableLighting(true);
+            part.object->Update();
+
+            part.collider = std::make_unique<MeshCollider>(part.object.get(), CollisionAttribute::Obstacle);
+            CollisionManager::GetInstance()->RegisterCollider(part.collider.get());
+            SlimePhysics::AddGroundMesh(part.object.get(), part.collider.get());
+        }
+        stageParts_.push_back(std::move(part));
+    };
+
+    // (1) 初期島: startLand.obj (マテリアル指定テクスチャ land.png)
+    AddStagePart("startLand", "startLand.obj", { 0.0f, 0.0f, 0.0f }, "Resources/10days/land.png");
+
+    // (2) 第1の島: Land1.obj (マテリアル指定テクスチャ land2.png)
+    AddStagePart("Land1", "Land1.obj", { 0.0f, 0.0f, 0.0f }, "Resources/10days/land2.png");
+
+    // (3) Land1接続路: toLandRoad.obj
+    AddStagePart("toLandRoad", "toLandRoad.obj", { 0.0f, 0.0f, 0.0f }, "Resources/10days/land.png");
+
+    // (4) 道ユニットセル: roadCell.obj (基本幅 45.563m)
+    // Blender元位置セル
+    AddStagePart("roadCell_0", "roadCell.obj", { 0.0f, 0.0f, 0.0f }, "Resources/10days/land.png");
+
+    // 橋連結モード: startLandの開口部（X ≈ -189m）まで roadCell を5ステップ連結配置し、島の間を渡れるようにする
+    if (bridgeConnectMode_)
     {
-        groundTextureIndex_ = TextureManager::GetInstance()->Load(groundModelData_.material.textureFilePath);
-        groundModelData_.material.textureIndex = groundTextureIndex_;
+        const float stepWidth = 45.563018f;
+        for (int i = 1; i <= 5; ++i)
+        {
+            AddStagePart("roadCell_" + std::to_string(i), "roadCell.obj", { stepWidth * static_cast<float>(i), 0.0f, 0.0f }, "Resources/10days/land.png");
+        }
     }
-    else
-    {
-        groundTextureIndex_ = TextureManager::GetInstance()->Load("Resources/10days/checkerBoard.png");
-        groundModelData_.material.textureIndex = groundTextureIndex_;
-    }
-
-    groundPlane_ = std::make_unique<Object3d>();
-    if (groundPlane_) {
-        groundPlane_->Initialize(object3dCom, groundModelData_);
-        // 地面モデルをカメラと完全同期させ、描画・WVP変換行列と当たり判定のズレを完全に解消
-        groundPlane_->SetCamera(playCamera_.get());
-        groundPlane_->SetTranslate({ 0.0f, 0.0f, 0.0f });
-        groundPlane_->SetScale({ groundScale_, groundScale_, groundScale_ });
-        groundPlane_->SetRotate({ 0.0f, 0.0f, 0.0f });
-        groundPlane_->SetColor({ 0.55f, 0.85f, 0.50f, 1.0f }); // 鮮やかな草原カラー
-        groundPlane_->SetEnableLighting(true);
-        groundPlane_->Update();
-    }
-
-    // 地面メッシュコライダーの生成・登録と SlimePhysics への地形メッシュ登録
-    groundCollider_ = std::make_unique<MeshCollider>(groundPlane_.get(), CollisionAttribute::Obstacle);
-    CollisionManager::GetInstance()->RegisterCollider(groundCollider_.get());
-    SlimePhysics::SetGroundMesh(groundPlane_.get(), groundCollider_.get());
 
     // 4. スライムマネージャーの初期化と初期スライム群の配置（前方に配置）
     slimeManager_ = std::make_unique<SlimeManager>();
@@ -207,13 +231,17 @@ void GamePlayScene::Finalize()
     propellerObstacles_.clear();
 
     aimGuide_.reset();
-    SlimePhysics::ClearGroundMesh();
-    if (groundCollider_)
+    SlimePhysics::ClearGroundMeshes();
+    for (auto& part : stageParts_)
     {
-        CollisionManager::GetInstance()->UnregisterCollider(groundCollider_.get());
-        groundCollider_.reset();
+        if (part.collider)
+        {
+            CollisionManager::GetInstance()->UnregisterCollider(part.collider.get());
+            part.collider.reset();
+        }
+        part.object.reset();
     }
-    groundPlane_.reset();
+    stageParts_.clear();
     slimeManager_.reset();
     playCamera_.reset();
     mouseInput_.reset();
@@ -315,10 +343,10 @@ void GamePlayScene::Update()
         shakeTilt.y = std::cos((stageShakeDuration_ - stageShakeTimer_) * 40.0f) * progress * stageShakeIntensity_ * 0.7f;
     }
 
-    // 地面プレーンの回転を傾斜角＋揺動に合わせて更新
+    // 全ステージパーツの回転を傾斜角＋揺動に合わせて更新
     // スライム群衆重心を回転中心（ピボット）にすることで、傾斜時にスライム直下の
     // 地面高さが変動しなくなり、めり込み・追従ズレを根本から解消
-    if (groundPlane_)
+    if (!stageParts_.empty())
     {
         Vector3 rot = { currentTilt_.x + shakeTilt.x, 0.0f, -currentTilt_.y + shakeTilt.y };
 
@@ -347,16 +375,30 @@ void GamePlayScene::Update()
             pz - prz
         };
 
-        groundPlane_->SetTranslate(groundTranslate);
-        groundPlane_->SetScale({ groundScale_, groundScale_, groundScale_ });
-        groundPlane_->SetRotate(rot);
-        groundPlane_->Update();
-
-        if (groundCollider_)
+        for (auto& part : stageParts_)
         {
-            // コライダーは groundPlane_ と同一 Object3d を参照するため
-            // translate の上書きは行わない（ピボット回転の補正を維持）
-            groundCollider_->Update();
+            if (!part.object) continue;
+
+            Vector3 offsetWorld = part.baseOffset * groundScale_;
+            float ox = offsetWorld.x * cz + offsetWorld.z * (sx * sz);
+            float oy = offsetWorld.x * sz + offsetWorld.z * (-sx * cz);
+            float oz = offsetWorld.z * cx;
+
+            Vector3 partTranslate = {
+                groundTranslate.x + ox,
+                groundTranslate.y + oy,
+                groundTranslate.z + oz
+            };
+
+            part.object->SetTranslate(partTranslate);
+            part.object->SetScale({ groundScale_, groundScale_, groundScale_ });
+            part.object->SetRotate(rot);
+            part.object->Update();
+
+            if (part.collider)
+            {
+                part.collider->Update();
+            }
         }
     }
 
@@ -568,10 +610,13 @@ void GamePlayScene::Update()
         playCamera_->Update();
     }
 
-    // カメラの最新ViewProjection行列に合わせて、地面メッシュのWVP定数バッファを同期更新
-    if (groundPlane_)
+    // カメラの最新ViewProjection行列に合わせて、各ステージパーツのWVP定数バッファを同期更新
+    for (auto& part : stageParts_)
     {
-        groundPlane_->Update();
+        if (part.object)
+        {
+            part.object->Update();
+        }
     }
 
     DrawDebugUI();
@@ -594,14 +639,17 @@ void GamePlayScene::Draw(SceneRenderRequests& renderRequests)
     ctx.commandList = dxCommon_->GetCommandList().Get();
     ctx.camera = playCamera_.get();
 
-    // 1. 地面の描画
-    if (groundPlane_)
+    // 1. 地面の描画（プロペラを除く全ステージOBJモデル群）
+    for (auto& part : stageParts_)
     {
-        RenderContext groundCtx = ctx;
-        if (groundTextureIndex_ != TextureManager::kInvalidTextureIndex) {
-            groundCtx.textureHandle = TextureManager::GetInstance()->GetSrvHandleGPU(groundTextureIndex_);
+        if (part.object)
+        {
+            RenderContext partCtx = ctx;
+            if (part.textureIndex != TextureManager::kInvalidTextureIndex) {
+                partCtx.textureHandle = TextureManager::GetInstance()->GetSrvHandleGPU(part.textureIndex);
+            }
+            object3dCom->Draw(part.object.get(), partCtx, part.modelData, true);
         }
-        object3dCom->Draw(groundPlane_.get(), groundCtx, groundModelData_, true);
     }
 
     // 2. 回転プロペラ障害物の描画
@@ -818,7 +866,19 @@ void GamePlayScene::DrawDebugUI()
 
     ImGui::Separator();
 
-    // 6. プロペラ障害物のデバッグ調整
+    // 6. ステージパーツ（地形モデル群）の状態表示
+    if (!stageParts_.empty() && ImGui::CollapsingHeader("Stage Parts (ステージ地形パーツ)", ImGuiTreeNodeFlags_DefaultOpen))
+    {
+        ImGui::TextColored(ImVec4(0.4f, 0.9f, 0.4f, 1.0f), "Configured Stage Parts: %zu models", stageParts_.size());
+        for (size_t i = 0; i < stageParts_.size(); ++i)
+        {
+            const auto& part = stageParts_[i];
+            ImGui::BulletText("[%zu] %s (Offset: %.1f, %.1f, %.1f)",
+                i, part.name.c_str(), part.baseOffset.x, part.baseOffset.y, part.baseOffset.z);
+        }
+    }
+
+    // 7. プロペラ障害物のデバッグ調整
     if (!propellerObstacles_.empty() && ImGui::CollapsingHeader("Propeller Obstacles (プロペラ障害物)", ImGuiTreeNodeFlags_DefaultOpen))
     {
         for (size_t i = 0; i < propellerObstacles_.size(); ++i)

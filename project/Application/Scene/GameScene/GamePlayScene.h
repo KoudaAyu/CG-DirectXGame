@@ -45,12 +45,19 @@ private:
     Vector3 spawnBasePos_{ 0.0f, 0.55f, 30.0f }; // 初期スポーン基準位置（島中央の平原: Z = 30.0f）
     float spawnGroupOffsetZ_ = 4.0f;            // 小スライム群の前方オフセット
     void RespawnSlimesAtBase();
-
-    std::unique_ptr<Object3d> groundPlane_;
-    std::unique_ptr<MeshCollider> groundCollider_;
-    Object3d::ModelData groundModelData_;
-    uint32_t groundTextureIndex_ = 0;
+    // --- ステージパーツ管理 ---
+    struct StagePart
+    {
+        std::string name;
+        std::unique_ptr<Object3d> object;
+        std::unique_ptr<MeshCollider> collider;
+        Object3d::ModelData modelData;
+        uint32_t textureIndex = 0;
+        Vector3 baseOffset{ 0.0f, 0.0f, 0.0f }; // 追加の平行移動オフセット（roadCellのステップ配置用）
+    };
+    std::vector<StagePart> stageParts_;
     float groundScale_ = 0.25f; // 地面ステージの縮小スケール (適度な広さ: 幅約75m)
+    bool bridgeConnectMode_ = true; // startLandとLand1をroadCellで繋ぐモード
 
     // --- カメラ制御パラメータ (プレイヤー相対座標一定モデル) ---
     float cameraDistance_ = 21.0f;        // プレイヤーからのカメラ距離（ゆったり見晴らせる高さ）
