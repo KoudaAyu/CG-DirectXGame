@@ -5,6 +5,9 @@ namespace SlimePhysics
 {
     static float sFriction = 1.3f; // スライム共通の地面摩擦係数（通常・合体・ミニオン共通）
 
+    // 歩行可能床と壁の排他分離境界（傾斜角約56.6度: これ未満の急峻な面を壁として押し出し、これ以上の緩やかな面を歩行可能床として判定）
+    static constexpr float kWalkableSlopeLimitNy = 0.55f;
+
     struct GroundMeshEntry
     {
         Object3d* object = nullptr;
@@ -199,8 +202,9 @@ namespace SlimePhysics
                             lastHitWorldY = worldY;
 
                             // 歩行可能地面ポリゴンか判定:
-                            // 傾斜約78度までの面をすべて地面候補として収集（急斜面や崖縁でのすり抜けを完全防止）
-                            if (localTriNorm.y >= 0.20f && worldTriNorm.y > 0.05f)
+                            // 最大登坂限界（kWalkableSlopeLimitNy）以上の緩やかな面のみを地面候補として収集
+                            // （壁判定 localTriNorm.y < kWalkableSlopeLimitNy と完全排他化し、ジッターや二重干渉を解消）
+                            if (localTriNorm.y >= kWalkableSlopeLimitNy && worldTriNorm.y > 0.10f)
                             {
                                 groundCandidates.push_back({ worldY, worldTriNorm });
                             }
@@ -545,8 +549,8 @@ namespace SlimePhysics
                                 localTriNorm = localTriNorm * (1.0f / triNormLen);
                             }
 
-                            // 壁ポリゴン（localTriNorm.y < 0.55f）のみを対象
-                            if (localTriNorm.y < 0.55f)
+                            // 壁ポリゴン（kWalkableSlopeLimitNy 未満の急斜面・垂直壁）のみを対象
+                            if (localTriNorm.y < kWalkableSlopeLimitNy)
                             {
                                 float worldHitDist = hitDist / localDirLen;
 
@@ -679,70 +683,76 @@ namespace SlimePhysics
                                 localTriNorm = localTriNorm * (1.0f / triNormLen);
                             }
 
-                            // 壁判定: 急峻な面のみ壁として押し出す（localTriNorm.y < 0.55f）
-                            if (localTriNorm.y < 0.55f)
+                            // 壁判定: 急峻な面のみ壁として押し出す（localTriNorm.y < kWalkableSlopeLimitNy）
+                            if (localTriNorm.y < kWalkableSlopeLimitNy)
                             {
                                 Vector3 wV0 = TransformPt(v0, worldMatrix);
                                 Vector3 wV1 = TransformPt(v1, worldMatrix);
                                 Vector3 wV2 = TransformPt(v2, worldMatrix);
 
-                                // スライム中心（探査点）から三角形への最近接点 Q を厳密に計算
+                                // スライム中心（探査点）から三角形への最近接点 Q を厳密に計算（面・エッジ・頂点すべて対応）
                                 Vector3 probePos = { waistPos.x, waistPos.y + yOff, waistPos.z };
                                 Vector3 closestQ = ClosestPointOnTriangle(probePos, wV0, wV1, wV2);
 
-                                // 最近接点とスライム中心の水平ベクトル
-                                Vector2 diffXZ = { probePos.x - closestQ.x, probePos.z - closestQ.z };
-                                float distXZ = std::sqrt(diffXZ.x * diffXZ.x + diffXZ.y * diffXZ.y);
+                                // 探査点と最近接点の3D差分ベクトル D = probePos - closestQ
+                                Vector3 diff3D = probePos - closestQ;
+                                float dist3DSq = diff3D.x * diff3D.x + diff3D.y * diff3D.y + diff3D.z * diff3D.z;
 
-                                // 壁のワールド法線
-                                Vector3 worldTriNorm = {
-                                    localTriNorm.x * worldMatrix.m[0][0] + localTriNorm.y * worldMatrix.m[1][0] + localTriNorm.z * worldMatrix.m[2][0],
-                                    localTriNorm.x * worldMatrix.m[0][1] + localTriNorm.y * worldMatrix.m[1][1] + localTriNorm.z * worldMatrix.m[2][1],
-                                    localTriNorm.x * worldMatrix.m[0][2] + localTriNorm.y * worldMatrix.m[1][2] + localTriNorm.z * worldMatrix.m[2][2]
-                                };
-                                float wNormLen = std::sqrt(worldTriNorm.x * worldTriNorm.x + worldTriNorm.y * worldTriNorm.y + worldTriNorm.z * worldTriNorm.z);
-                                if (wNormLen > 1e-6f)
+                                // スライム球体（半径 radius）との真の3D幾何学的交差判定（signedDist を完全廃止し最短距離で判定）
+                                if (dist3DSq < radius * radius)
                                 {
-                                    worldTriNorm = worldTriNorm * (1.0f / wNormLen);
-                                }
+                                    float dist3D = std::sqrt(dist3DSq);
+                                    float penetration = radius - dist3D; // 面・エッジ・頂点からの真のめり込み深さ
 
-                                Vector2 pushDir = { worldTriNorm.x, worldTriNorm.z };
-                                float pushLen = std::sqrt(pushDir.x * pushDir.x + pushDir.y * pushDir.y);
-                                if (pushLen > 1e-4f)
-                                {
-                                    pushDir = { pushDir.x / pushLen, pushDir.y / pushLen };
-                                }
-                                else
-                                {
-                                    continue;
-                                }
-
-                                // 壁平面からの符号付き垂直距離
-                                float signedDist = (probePos.x - wV0.x) * worldTriNorm.x +
-                                                  (probePos.y - wV0.y) * worldTriNorm.y +
-                                                  (probePos.z - wV0.z) * worldTriNorm.z;
-
-                                float penetration = 0.0f;
-                                // 幾何学的に正確なめり込み深さの算出:
-                                // 1. 壁の表面/裏側にめり込んでいる場合（符号付き距離）
-                                if (signedDist < radius && signedDist > -radius * 2.0f)
-                                {
-                                    penetration = (std::min)(radius - signedDist, radius * 1.8f);
-                                }
-                                // 2. 三角形のエッジ/頂点に接している場合
-                                else if (distXZ < radius)
-                                {
-                                    penetration = radius - distXZ;
-                                    if (distXZ > 1e-4f)
+                                    // 壁のワールド法線
+                                    Vector3 worldTriNorm = {
+                                        localTriNorm.x * worldMatrix.m[0][0] + localTriNorm.y * worldMatrix.m[1][0] + localTriNorm.z * worldMatrix.m[2][0],
+                                        localTriNorm.x * worldMatrix.m[0][1] + localTriNorm.y * worldMatrix.m[1][1] + localTriNorm.z * worldMatrix.m[2][1],
+                                        localTriNorm.x * worldMatrix.m[0][2] + localTriNorm.y * worldMatrix.m[1][2] + localTriNorm.z * worldMatrix.m[2][2]
+                                    };
+                                    float wNormLen = std::sqrt(worldTriNorm.x * worldTriNorm.x + worldTriNorm.y * worldTriNorm.y + worldTriNorm.z * worldTriNorm.z);
+                                    if (wNormLen > 1e-6f)
                                     {
-                                        pushDir = { diffXZ.x / distXZ, diffXZ.y / distXZ };
+                                        worldTriNorm = worldTriNorm * (1.0f / wNormLen);
                                     }
-                                }
 
-                                if (penetration > maxPenetration)
-                                {
-                                    maxPenetration = penetration;
-                                    bestPushDir = pushDir;
+                                    // 水平押し出し方向の算出（最近接点から離れる水平ベクトル）
+                                    Vector2 pushDir = { 0.0f, 0.0f };
+                                    Vector2 diffXZ = { diff3D.x, diff3D.z };
+                                    float lenXZ = std::sqrt(diffXZ.x * diffXZ.x + diffXZ.y * diffXZ.y);
+
+                                    if (lenXZ > 1e-4f)
+                                    {
+                                        pushDir = { diffXZ.x / lenXZ, diffXZ.y / lenXZ };
+                                    }
+                                    else
+                                    {
+                                        // 水平オフセットが極小の場合、壁ポリゴンの水平法線方向へ退避
+                                        float normXZLen = std::sqrt(worldTriNorm.x * worldTriNorm.x + worldTriNorm.z * worldTriNorm.z);
+                                        if (normXZLen > 1e-4f)
+                                        {
+                                            pushDir = { worldTriNorm.x / normXZLen, worldTriNorm.z / normXZLen };
+                                        }
+                                        else
+                                        {
+                                            continue;
+                                        }
+                                    }
+
+                                    // 三角形の裏面に入り込んでいる場合（法線と逆側にいる場合）のフェイルセーフ:
+                                    // 押し出し方向がポリゴン法線と逆を向いていたら、表面向きに補正
+                                    float dotWithNormal = pushDir.x * worldTriNorm.x + pushDir.y * worldTriNorm.z;
+                                    if (dotWithNormal < 0.0f)
+                                    {
+                                        pushDir.x = -pushDir.x;
+                                        pushDir.y = -pushDir.y;
+                                    }
+
+                                    if (penetration > maxPenetration)
+                                    {
+                                        maxPenetration = penetration;
+                                        bestPushDir = pushDir;
+                                    }
                                 }
                             }
                         }
