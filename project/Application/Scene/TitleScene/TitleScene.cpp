@@ -8,6 +8,7 @@
 #include "Baziru3_Engine/Core/IO/Mouse/MouseInput.h"
 #include "Baziru3_Engine/Framework/Collision/CollisionManager.h"
 #include "Baziru3_Engine/Graphics/Graphics/SceneRenderRequests.h"
+#include "Baziru3_Engine/Framework/Audio/AudioManager.h"
 
 #include "Application/GameObject/SlimeFx.h"
 #include "Application/Minion/MinionManager.h"
@@ -44,11 +45,13 @@ struct TitleChar
 };
 
 constexpr TitleChar kTitleChars[] = {
-    {"Resources/UI/Title/logo_char_01.png", 120.0f},
-    {"Resources/UI/Title/logo_char_02.png", 120.0f},
-    {"Resources/UI/Title/logo_char_03.png", 120.0f},
-    {"Resources/UI/Title/logo_char_04.png", 120.0f},
-    {"Resources/UI/Title/logo_char_05.png", 120.0f},
+    {"Resources/UI/Title/nyu.png", 135.0f},
+    {"Resources/UI/Title/ru.png", 90.0f},
+    {"Resources/UI/Title/nyu.png", 135.0f},
+    {"Resources/UI/Title/ru.png", 90.0f},
+    {"Resources/UI/Title/dai.png", 90.0f},
+    {"Resources/UI/Title/bou.png", 90.0f},
+    {"Resources/UI/Title/ken.png", 90.0f},
 };
 
 constexpr int kTitleCharCount = static_cast<int>(std::size(kTitleChars));
@@ -76,7 +79,7 @@ constexpr const char* kMenuLabels[] = {"START", "MANUAL", "END"};
 // ===================================================================
 constexpr Vector2 kLogoCenterDefault = {420.0f, 150.0f}; // ロゴ全体の中心
 constexpr float kLogoScaleDefault = 1.0f;
-constexpr float kCharHeightDefault = 160.0f; // 1文字の基準の高さ
+constexpr float kCharHeightDefault = 135.0f; // 1文字の基準の高さ
 constexpr float kCharSpacingDefault = 6.0f;  // 文字間隔
 
 constexpr Vector2 kButtonSize = {320.0f, 90.0f};
@@ -228,6 +231,11 @@ float Hash01(uint32_t value)
     return static_cast<float>(word) / static_cast<float>(0xFFFFFFFFu);
 }
 
+int32_t streamHandle_BGM;
+int32_t playHandle_BGM;
+
+int32_t streamHandle_ButtonHovered;
+int32_t streamHandle_ButtonClicked;
 } // namespace
 
 // unique_ptr が持つ型（PikminPlayer / MinionManager / SlimeFx）の完全な定義が要るので、
@@ -260,6 +268,14 @@ void TitleScene::InitializeScene()
     sceneTime_ = 0.0f;
     fadeAlpha_ = 0.0f;
     ClearRequests();
+
+    auto* audioMngr = SceneManager::GetInstance()->GetAudioManager();
+    if (audioMngr) {
+        streamHandle_BGM = audioMngr->Load("Resources/Audio/Blossom Park.mp3");
+        streamHandle_ButtonHovered = audioMngr->Load("Resources/Audio/TitleButtonHovered.mp3");
+        streamHandle_ButtonClicked = audioMngr->Load("Resources/Audio/TitleButtonClicked.mp3");
+        playHandle_BGM = audioMngr->Play(streamHandle_BGM);
+    }
 }
 
 void TitleScene::Finalize()
@@ -312,6 +328,11 @@ void TitleScene::Finalize()
 
     delete mouse_;
     mouse_ = nullptr;
+
+    auto* audioMngr = SceneManager::GetInstance()->GetAudioManager();
+    if (audioMngr) {
+        audioMngr->Stop(playHandle_BGM);
+    }
 }
 
 void TitleScene::ResetTuningToDefault()
@@ -645,8 +666,15 @@ void TitleScene::UpdateButtons(float deltaTime)
         const bool isPopFinished = (popRaw >= 1.0f);
 
         // 出きるまでは押せない・光らない
-        button.isHovered =
+        bool isHovered =
             acceptInput && isPopFinished && IsInside(mousePos, button.center, button.size);
+        if (isHovered && !button.isHovered) {
+            auto* audioMngr = SceneManager::GetInstance()->GetAudioManager();
+            if (audioMngr) {
+                audioMngr->Play(streamHandle_ButtonHovered);
+            }
+        }
+        button.isHovered = isHovered;
 
         // ホバー進行度。EaseOutBack を通すので、乗った瞬間に軽くオーバーシュートする
         const float target = button.isHovered ? 1.0f : 0.0f;
@@ -677,6 +705,10 @@ void TitleScene::UpdateButtons(float deltaTime)
 
         if (button.isHovered && isClicked)
         {
+            auto* audioMngr = SceneManager::GetInstance()->GetAudioManager();
+            if (audioMngr) {
+                audioMngr->Play(streamHandle_ButtonClicked);
+            }
             DecideMenu(static_cast<MenuItem>(i));
         }
     }
@@ -1249,6 +1281,7 @@ void TitleScene::DecideMenu(MenuItem item)
     case MenuItem::End:
         // TODO: 終了処理（PostQuitMessage など）をここに入れる
         isExitRequested_ = true;
+        PostQuitMessage(0);
         break;
 
     default:
