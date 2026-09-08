@@ -121,6 +121,7 @@
     <ClCompile Include="Baziru3_Engine\Framework\AI\CoverNodes.cpp" />
     <ClCompile Include="Baziru3_Engine\Framework\AI\NavMesh.cpp" />
     <ClCompile Include="Baziru3_Engine\Framework\AI\PathfindingNodes.cpp" />
+    <ClCompile Include="Baziru3_Engine\Framework\IO\JsonSafeLoader.cpp" />
     <ClCompile Include="externals\imgui-node-editor\imgui_node_editor.cpp" />
     <ClCompile Include="externals\imgui-node-editor\imgui_node_editor_api.cpp" />
     <ClCompile Include="externals\imgui-node-editor\imgui_canvas.cpp" />
@@ -367,6 +368,7 @@
     <ClInclude Include="Baziru3_Engine\Framework\AI\CoverNodes.h" />
     <ClInclude Include="Baziru3_Engine\Framework\AI\NavMesh.h" />
     <ClInclude Include="Baziru3_Engine\Framework\AI\PathfindingNodes.h" />
+    <ClInclude Include="Baziru3_Engine\Framework\IO\JsonSafeLoader.h" />
     <ClInclude Include="externals\imgui-node-editor\imgui_node_editor.h" />
     <ClInclude Include="externals\imgui-node-editor\imgui_node_editor_internal.h" />
     <ClInclude Include="externals\imgui-node-editor\imgui_node_editor_internal.inl" />
