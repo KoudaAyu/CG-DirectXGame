@@ -481,8 +481,9 @@ void GamePlayScene::Update()
             if (s && s->IsActive()) maxScale = (std::max)(maxScale, s->GetCurrentScale());
         }
         float scaleOffset = (maxScale - 0.4f);
-        float targetDist = cameraDistance_ + (std::max)(0.0f, scaleOffset) * cameraDynamicZoom_ + currentGroupSpread_ * 0.35f;
-        targetDist = (std::max)(18.5f, targetDist); // 最低距離ガード
+        float spreadOffset = (std::min)(maxSpreadOffset_, currentGroupSpread_ * cameraSpreadZoom_);
+        float targetDist = cameraDistance_ + (std::max)(0.0f, scaleOffset) * cameraDynamicZoom_ + spreadOffset;
+        targetDist = std::clamp(targetDist, minCameraDist_, maxCameraDist_);
 
         if (!cameraInitialized_)
         {
@@ -494,7 +495,7 @@ void GamePlayScene::Update()
             currentCameraDist_ = SmoothDamp(currentCameraDist_, targetDist, cameraDistVelocity_, cameraZoomSmoothTime_, deltaTime);
         }
 
-        float effectiveDist = (std::max)(18.5f, currentCameraDist_);
+        float effectiveDist = std::clamp(currentCameraDist_, minCameraDist_, maxCameraDist_);
 
         // 2. カメラの見下ろし角・方位角
         float pitch = cameraPitch_;
@@ -941,6 +942,9 @@ void GamePlayScene::DrawDebugUI()
         ImGui::SliderFloat("Target Height Y (注視点の高さ)", &cameraTargetOffsetY_, 0.0f, 5.0f, "%.1f m");
         ImGui::SliderFloat("Forward Look Offset (前方視界オフセット)", &cameraForwardOffset_, -5.0f, 10.0f, "%.1f m");
         ImGui::SliderFloat("Dynamic Zoom (巨大化時ズーム倍率)", &cameraDynamicZoom_, 0.0f, 8.0f, "%.1f");
+        ImGui::SliderFloat("Spread Zoom Rate (広がりズーム倍率)", &cameraSpreadZoom_, 0.0f, 0.40f, "%.2f");
+        ImGui::SliderFloat("Max Spread Offset (広がりズーム上限)", &maxSpreadOffset_, 0.0f, 8.0f, "%.1f m");
+        ImGui::SliderFloat("Max Camera Dist (最大カメラ距離ガード)", &maxCameraDist_, 18.0f, 35.0f, "%.1f m");
 
         ImGui::TextColored(ImVec4(1.0f, 0.85f, 0.2f, 1.0f), "Camera Presets:");
         if (ImGui::Button("Default (広角見下ろし: 47 deg)"))

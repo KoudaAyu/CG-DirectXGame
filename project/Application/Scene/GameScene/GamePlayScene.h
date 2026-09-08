@@ -60,13 +60,17 @@ private:
     bool bridgeConnectMode_ = true; // startLandとLand1をroadCellで繋ぐモード
 
     // --- カメラ制御パラメータ (プレイヤー相対座標一定モデル) ---
-    float cameraDistance_ = 21.0f;        // プレイヤーからのカメラ距離（ゆったり見晴らせる高さ）
+    float cameraDistance_ = 18.5f;        // プレイヤーからの基準カメラ距離（スライムが見やすく迫力のある距離）
     float cameraPitch_ = 0.93f;           // 見下ろし角度 (rad, 0.93 rad ≈ 53.3度: 上空俯瞰視点)
     float cameraYaw_ = 0.0f;             // 方位角 (rad)
     float cameraFov_ = 0.85f;            // 垂直視野角 (rad, 0.85 rad ≈ 48.7度)
     float cameraTargetOffsetY_ = 1.2f;   // プレイヤー足元からの注視点高さ
     float cameraForwardOffset_ = 2.0f;   // 前方視界確保用の注視点Z前進オフセット
-    float cameraDynamicZoom_ = 1.6f;     // 合体巨大化時のカメラ後退倍率（過剰なズーム変動を抑制）
+    float cameraDynamicZoom_ = 1.4f;     // 合体巨大化時のカメラ後退倍率
+    float cameraSpreadZoom_ = 0.10f;     // 群れの広がりに対するカメラ後退倍率（過剰な引きを防止）
+    float maxSpreadOffset_ = 2.0f;       // 広がりによる追加後退の最大上限値 (m)
+    float minCameraDist_ = 16.0f;        // カメラ距離の下限ガード (m)
+    float maxCameraDist_ = 23.5f;        // カメラ距離の上限ガード (m: これ以上引きにならないように保護)
     bool followStageTilt_ = false;       // ステージ傾斜にカメラ回転を連動させるか
     // 臨界減衰スプリング（SmoothDamp）パラメータ
     float cameraSmoothTimePos_ = 0.18f;  // カメラY/Z追従スムーズ時間 (秒: 急激なショックを緩和)

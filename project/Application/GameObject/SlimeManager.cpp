@@ -305,6 +305,8 @@ void SlimeManager::GetGroupCenterAndSpread(Vector3& outCenter, float& outSpread)
     outCenter = { sumPos.x / totalWeight, sumPos.y / totalWeight, sumPos.z / totalWeight };
 
     float maxDistSq = 0.0f;
+    float sumDist = 0.0f;
+    int activeSlimeCount = 0;
     for (const auto& slime : slimes_) {
         if (slime && slime->IsActive()) {
             Vector3 diff = slime->GetPosition() - outCenter;
@@ -312,10 +314,16 @@ void SlimeManager::GetGroupCenterAndSpread(Vector3& outCenter, float& outSpread)
             if (distSq > maxDistSq) {
                 maxDistSq = distSq;
             }
+            sumDist += std::sqrt(distSq);
+            activeSlimeCount++;
         }
     }
 
-    outSpread = (std::min)(14.0f, (std::max)(1.0f, std::sqrt(maxDistSq)));
+    float maxDist = std::sqrt(maxDistSq);
+    float avgDist = (activeSlimeCount > 0) ? (sumDist / static_cast<float>(activeSlimeCount)) : 0.0f;
+    // 単一の外れ値に引っ張られすぎないよう、平均広がりと最大広がりをブレンド（群れのまとまり重視）
+    float blendedSpread = avgDist * 1.4f * 0.65f + maxDist * 0.35f;
+    outSpread = (std::min)(10.0f, (std::max)(0.5f, blendedSpread));
 }
 
 int SlimeManager::GetActiveCount() const {
