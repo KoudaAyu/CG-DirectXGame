@@ -7,8 +7,10 @@
 #include <wrl.h>
 
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <random>
+#include <utility>
 #include <vector>
 
 class Object3dCom;
@@ -36,6 +38,11 @@ struct SlimeFxDesc
     float lifeTime = 0.6f;
     SlimeFxShape shape = SlimeFxShape::Billboard;
     bool useSparkTexture = false; // true: starburst（キラッ） / false: circle2（ぼんやり丸）
+
+    // true にすると、RGB を SlimeFx::SetColorField() で登録した
+    // color(time, position) の場から毎フレーム引き直す。
+    // α は colorBegin.w → colorEnd.w の補間 × 場の α なので、フェードアウトはそのまま効く
+    bool useColorField = false;
 
     // 吸引。attractStrength が正のとき、毎フレーム attractTarget へ向かって加速する。
     // 距離に反比例させているので、近づくほど速くなって「吸い込まれる」感じが出る
@@ -69,6 +76,21 @@ public:
     /// <summary>ビルボードの向きに使うカメラのピッチ（カメラの yaw / roll は 0 前提）</summary>
     void SetCameraPitch(float pitch) { cameraPitch_ = pitch; }
 
+    /// <summary>
+    /// 粒の色を決めるベクター場 color(time, position)。
+    /// 登録すると useColorField を立てた粒だけが、毎フレームこの関数で塗り直される。
+    /// time は SlimeFx::Update() の累積秒、position はその粒の現在位置（ワールド）。
+    /// 戻り値の xyz が RGB、w は α に掛かる係数。
+    /// </summary>
+    using ColorField = std::function<Vector4(float, const Vector3&)>;
+    void SetColorField(ColorField colorField) { colorField_ = std::move(colorField); }
+    void ClearColorField() { colorField_ = nullptr; }
+    bool HasColorField() const { return static_cast<bool>(colorField_); }
+
+    /// <summary>カラー場に渡している累積時間。リセットしたいときに使う</summary>
+    float GetElapsedTime() const { return elapsedTime_; }
+    void SetElapsedTime(float time) { elapsedTime_ = time; }
+
     /// <summary>加算合成にするか。false ならアルファブレンド（Object3D_Effect PSO）</summary>
     void SetAdditive(bool additive) { isAdditive_ = additive; }
     bool IsAdditive() const { return isAdditive_; }
@@ -95,7 +117,7 @@ public:
     /// <summary>全方位（球状）に飛び散るバースト。打ち上げ花火の殻に使う</summary>
     void EmitSphereBurst(std::mt19937& rng, const Vector3& center, int count, float speed,
                          float gravity, float drag, const Vector4& color, float scale,
-                         float lifeTime, bool spark);
+                         float lifeTime, bool spark, bool useColorField = false);
 
     /// <summary>中心のまわりを回りながら吸い込まれていく粒（マージの渦）</summary>
     void EmitVortex(std::mt19937& rng, const Vector3& center, float radius, int count,
@@ -107,7 +129,7 @@ public:
 
     /// <summary>プチ花火。閃光 + 2重の殻 + 尾を引く火花 + 床のリングをまとめて出す</summary>
     void EmitFirework(std::mt19937& rng, const Vector3& center, const Vector4& coreColor,
-                      const Vector4& shellColor, float power);
+                      const Vector4& shellColor, float power, bool useColorField = false);
 
     /// <summary>from から to へ吸い寄せられる粒（マージの吸収表現）</summary>
     void EmitConverge(std::mt19937& rng, const Vector3& from, const Vector3& to, int count,
@@ -146,6 +168,7 @@ private:
         float age = 0.0f;
         SlimeFxShape shape = SlimeFxShape::Billboard;
         bool useSparkTexture = false;
+        bool useColorField = false;
         Vector3 attractTarget{};
         float attractStrength = 0.0f;
     };
@@ -179,6 +202,9 @@ private:
 
     Microsoft::WRL::ComPtr<ID3D12PipelineState> additivePipelineState_;
     bool isAdditive_ = true;
+
+    ColorField colorField_;
+    float elapsedTime_ = 0.0f;
 
     float cameraPitch_ = 0.0f;
     int activeCount_ = 0;
