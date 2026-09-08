@@ -51,6 +51,15 @@ public:
 
   bool IsQuitRequested() override;
 
+  static bool IsImGuiVisible() { return s_showImGui; }
+  static void SetImGuiVisible(bool visible) { s_showImGui = visible; }
+  static void ToggleImGuiVisible() { s_showImGui = !s_showImGui; }
+
+private:
+  static inline bool s_showImGui = true;
+
+public:
+
   // 初期化関係
   bool InitializeEngine();
 

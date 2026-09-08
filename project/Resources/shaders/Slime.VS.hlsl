@@ -59,56 +59,101 @@ float3 CalculateDeformedPosition(float3 p, float3 n)
     float wobbleStr = gSlimeParams.wobbleStrength;
     float wobbleFreq = gSlimeParams.wobbleFrequency;
 
-    // 1. ぶよぶよ波打ち変形（マルチ周波数サイン波 + 3Dノイズ）
-    float wave1 = sin(p.x * wobbleFreq + time * 3.5f) *
-                  cos(p.z * wobbleFreq * 0.8f + time * 2.7f);
-    float wave2 = sin(p.y * wobbleFreq * 1.3f + time * 4.2f) *
-                  cos(p.x * wobbleFreq * 0.6f + time * 1.8f);
-    float wave3 = noise3D(p * wobbleFreq * 0.5f + time * 1.5f) * 2.0f - 1.0f;
+    // 表面の動的波打ち変形（静止時は wobbleStr が 0 になるため完全停止）
+    float wobbleOffset = 0.0f;
+    if (wobbleStr > 0.001f)
+    {
+        float wave1 = sin(p.x * wobbleFreq + time * 3.5f) *
+                      cos(p.z * wobbleFreq * 0.8f + time * 2.7f);
+        float wave2 = sin(p.y * wobbleFreq * 1.3f + time * 4.2f) *
+                      cos(p.x * wobbleFreq * 0.6f + time * 1.8f);
+        float wave3 = noise3D(p * wobbleFreq * 0.5f + time * 1.5f) * 2.0f - 1.0f;
 
-    float wobbleOffset = (wave1 * 0.45f + wave2 * 0.35f + wave3 * 0.20f) * wobbleStr;
+        wobbleOffset = (wave1 * 0.45f + wave2 * 0.35f + wave3 * 0.20f) * wobbleStr;
+    }
 
-    // 2. 重力による下膨らみ・沈み込み変形（Gravity Sag: 洋梨・お餅型）
-    float sagFactor = 1.0f + 0.32f * saturate((1.0f - p.y) * 0.5f);
+    // 1. スライムらしい座りの良い下膨らみ変形（ほどよく平べったく、底面に向かってどっしり安定）
+    // 最上部は低めで丸く（~0.86）、底面に向かってほどよくワイド（~1.53倍）に広がる
+    float heightRatio = saturate((1.0f - p.y) * 0.5f); // 0.0(最上部) -> 1.0(最下部)
+    float sagFactor = 0.86f + heightRatio * 0.35f + (heightRatio * heightRatio) * 0.32f;
+
     float3 def = p;
     def.x *= sagFactor;
     def.z *= sagFactor;
-    def.y = p.y * 0.85f - 0.08f; // 重力による下方向への沈み込み
+    // 重力による適度な上下圧縮（ほどよく平べったいスライムの厚み）
+    def.y = p.y * 0.84f - 0.08f;
 
-    // 3. 底面の接地平坦化（Ground Flattening: 地面にペタッと潰れる）
-    if (def.y < -0.55f)
+    // 2. 傾斜・重力による内容物の流動（過度な崩れを抑えつつ、ぷにっと偏る）
+    float3 squash = gSlimeParams.squashStretch;
+    float2 flowVec = float2(squash.x, squash.z);
+    float flowMag = length(flowVec);
+
+    if (flowMag > 0.001f)
     {
-        float flattenRate = saturate((-0.55f - def.y) / 0.45f);
-        def.y = lerp(def.y, -0.68f, flattenRate * 0.75f);
-        def.x *= (1.0f + flattenRate * 0.22f);
-        def.z *= (1.0f + flattenRate * 0.22f);
+        float2 flowDir = flowVec / flowMag;
+        float forwardDot = dot(p.xz, flowDir);
+        float bottomWeight = saturate((1.2f - p.y) * 0.65f);
+        float frontBias = 1.0f + forwardDot * 0.70f;
+
+        // 傾斜下側への自然な重心移動
+        float shiftDist = flowMag * bottomWeight * frontBias * 0.55f;
+        def.x += flowDir.x * shiftDist;
+        def.z += flowDir.y * shiftDist;
+
+        if (forwardDot > -0.2f)
+        {
+            float bulge = saturate(forwardDot + 0.2f) * flowMag * 0.38f * bottomWeight;
+            def.x += flowDir.x * bulge;
+            def.z += flowDir.y * bulge;
+            float2 sideDir = float2(-flowDir.y, flowDir.x);
+            def.xz += sideDir * (dot(p.xz, sideDir) * bulge * 0.45f);
+        }
+        else
+        {
+            float shrink = saturate(-forwardDot - 0.2f) * flowMag * 0.28f;
+            def.xz -= flowDir * shrink;
+            def.y *= (1.0f - shrink * 0.20f);
+        }
     }
 
-    // 4. スクワッシュ＆ストレッチ（慣性による体積保存変形）
-    float3 squash = gSlimeParams.squashStretch;
+    // 3. 体積保存スクワッシュ（上下の全体的な潰れ）
     float volumeCompY = 1.0f + squash.y;
     float volumeCompXZ = 1.0f;
     if (abs(volumeCompY) > 0.01f)
     {
         volumeCompXZ = 1.0f / sqrt(abs(volumeCompY));
     }
-
-    def.x *= (volumeCompXZ + squash.x);
     def.y *= volumeCompY;
-    def.z *= (volumeCompXZ + squash.z);
+    def.x *= volumeCompXZ;
+    def.z *= volumeCompXZ;
+
+    // 4. 底面の接地平坦化（Ground Flattening: 床に密着してペタッと広がる）
+    if (def.y < -0.52f)
+    {
+        float flattenRate = saturate((-0.52f - def.y) / 0.38f);
+        def.y = lerp(def.y, -0.74f, flattenRate * 0.88f);
+        def.x *= (1.0f + flattenRate * 0.16f);
+        def.z *= (1.0f + flattenRate * 0.16f);
+    }
+
+    // 底面付近では波打ち・衝撃波紋による地面めり込みを防止
+    float bottomDamp = saturate((def.y + 0.75f) / 0.25f);
 
     // 法線方向へ膨らませる
-    def += n * wobbleOffset;
+    def += n * (wobbleOffset * bottomDamp);
 
-    // 5. 衝撃波紋（Impulse Ripple）
+    // 6. 衝撃波紋（Impulse Ripple）
     float impulse = gSlimeParams.impulseStrength;
     if (impulse > 0.001f)
     {
         float distFromBottom = saturate((p.y + 1.0f) * 0.5f);
         float ripple = sin(distFromBottom * 12.0f - time * 15.0f) * impulse;
         ripple *= exp(-distFromBottom * 3.0f);
-        def += n * ripple;
+        def += n * (ripple * bottomDamp);
     }
+
+    // 接地面（ローカル -0.75f）より下への突き抜けを防止
+    def.y = max(def.y, -0.75f);
 
     return def;
 }

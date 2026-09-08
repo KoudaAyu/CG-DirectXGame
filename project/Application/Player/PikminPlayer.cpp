@@ -1,6 +1,8 @@
 #include "PikminPlayer.h"
 #include "Application/Minion/MinionManager.h"
 #include "Application/GameObject/SlimeMesh.h"
+#include "Application/GameObject/SlimePhysics.h"
+#include "Application/GameObject/SlimeCollision.h"
 #include "Application/GameObject/AimGuide.h"
 #include "Baziru3_Engine/Core/IO/Mouse/MouseInput.h"
 #include "Baziru3_Engine/Graphics/3D/Object/Object3dCom.h"
@@ -26,8 +28,8 @@ PikminPlayer::PikminPlayer() {
 }
 
 PikminPlayer::~PikminPlayer() {
-    if (collider_) {
-        CollisionManager::GetInstance()->UnregisterCollider(collider_.get());
+    if (meshCollider_) {
+        CollisionManager::GetInstance()->UnregisterCollider(meshCollider_.get());
     }
 }
 
@@ -64,47 +66,135 @@ void PikminPlayer::Initialize(Object3dCom* object3dCom, Camera* camera, const Ve
         giantModel_->Initialize(object3dCom_, giantModelData_);
         giantModel_->SetCamera(camera_);
         giantModel_->SetTranslate(position_);
-        giantModel_->SetScale({ 2.0f, 2.0f, 2.0f });
+        giantModel_->SetScale(scale_);
         giantModel_->SetColor({ 1.0f, 1.0f, 1.0f, 1.0f });
         giantModel_->SetEnableLighting(true);
         giantModel_->Update();
     }
 
+
     // スライムパラメータの初期設定（ゼリー感のあるぷるぷるスライム）
     slimeParams_.baseColor = { 0.2f, 0.85f, 1.0f, 0.9f }; // 水色スライム
-    slimeParams_.wobbleStrength = 0.22f;
+    slimeParams_.wobbleStrength = 0.0f;
     slimeParams_.wobbleFrequency = 5.0f;
     slimeParams_.fresnelPower = 2.5f;
     slimeParams_.envReflection = 0.5f;
     slimeParams_.innerGlow = 0.5f;
     slimeParams_.specularShininess = 64.0f;
 
-    // プレイヤーの当たり判定（SphereCollider）
-    collider_ = std::make_unique<SphereCollider>(0.8f, &position_, CollisionAttribute::Player);
-    collider_->SetOnCollision([this](const CollisionInfo& info) {
+    // プレイヤーの当たり判定（MeshCollider: スライムモデルの精密メッシュ判定）
+    meshCollider_ = std::make_unique<MeshCollider>(normalModel_.get(), CollisionAttribute::Player);
+    meshCollider_->SetOnCollision([this](const CollisionInfo& info) {
         OnCollision(info);
     });
-    CollisionManager::GetInstance()->RegisterCollider(collider_.get());
+    CollisionManager::GetInstance()->RegisterCollider(meshCollider_.get());
+}
+
+bool PikminPlayer::TakeSelfDestructEvent(SelfDestructEvent& out) {
+    if (!selfDestruct_.fired) return false;
+    out = selfDestruct_;
+    selfDestruct_.fired = false;
+    return true;
 }
 
 void PikminPlayer::OnCollision(const CollisionInfo& info) {
-    // 高速衝突時のみ控えめに衝撃波紋を付与（形状は急変させない）
+    if (info.other && info.other->GetAttribute() == CollisionAttribute::Obstacle) {
+        // 同一フレーム内の多重衝突および連続ヒットを防止（中心部での振動・多重加速を防止）
+        if (obstacleCooldown_ > 0.0f) return;
+
+        // 障害物（プロペラなど）の基準位置（回転中心）を正確に取得
+        Vector3 obstacleBasePos = info.other->GetWorldPosition() - info.other->GetPositionOffset();
+
+        // プロペラ中心からプレイヤーへ向かう動径ベクトル（水平面）
+        Vector3 radial = { position_.x - obstacleBasePos.x, 0.0f, position_.z - obstacleBasePos.z };
+        float rLen = std::sqrt(radial.x * radial.x + radial.z * radial.z);
+
+        Vector3 escapeDir{ 0.0f, 0.0f, 0.0f };
+
+        if (rLen > 0.2f) {
+            // 外向き動径方向へ弾き出す
+            escapeDir = { radial.x / rLen, 0.0f, radial.z / rLen };
+        } else {
+            // プロペラ回転中心へのド直撃（特異点）の場合:
+            // 進行方向の逆向き（跳ね返り反射ベクトル）を優先採用
+            Vector3 incoming = { -velocity_.x, 0.0f, -velocity_.z };
+            float incSpeed = std::sqrt(incoming.x * incoming.x + incoming.z * incoming.z);
+            if (incSpeed > 0.1f) {
+                escapeDir = { incoming.x / incSpeed, 0.0f, incoming.z / incSpeed };
+            } else if (rLen > 1e-4f) {
+                escapeDir = { radial.x / rLen, 0.0f, radial.z / rLen };
+            } else {
+                escapeDir = { 0.0f, 0.0f, -1.0f };
+            }
+        }
+
+        // 1. めり込みの強制解消（エンジン側の押し出しに加えて、外向きへ安全マージンを補正）
+        if (info.depth > 0.01f) {
+            position_.x += escapeDir.x * (info.depth * 0.5f);
+            position_.z += escapeDir.z * (info.depth * 0.5f);
+        }
+
+        // 2. 外向き脱出初速の付与（プロペラから勢いよく弾き出される慣性）
+        float launchSpeed = isMerged_ ? 6.5f : 8.5f;
+        velocity_.x = escapeDir.x * launchSpeed;
+        velocity_.z = escapeDir.z * launchSpeed;
+
+        // クールダウン設定（0.12秒間、重複ヒットを無効化）
+        obstacleCooldown_ = 0.12f;
+
+        // 衝突時のスライム変形（衝撃波紋とスクワッシュ）
+        slimeParams_.impulseStrength = (std::max)(slimeParams_.impulseStrength, 0.4f);
+        slimeParams_.squashStretch = { 0.25f, -0.2f, 0.25f };
+    }
+
+    // 高速衝突時の衝撃波紋
     float impactSpeed = std::sqrt(velocity_.x * velocity_.x + velocity_.z * velocity_.z);
-    if (impactSpeed > 2.5f) {
-        float strength = (std::min)(0.2f, impactSpeed * 0.02f);
+    if (impactSpeed > 1.5f) {
+        float strength = (std::min)(0.35f, impactSpeed * 0.03f);
         slimeParams_.impulseStrength = (std::max)(slimeParams_.impulseStrength, strength);
     }
 }
 
+float PikminPlayer::CalculateScaleBySize(int size) const {
+    if (size <= 1) return 0.40f;
+    // 1から10にかけて滑らかに0.40fから約1.85fへ拡大
+    return 0.40f + 0.11f * (size - 1) + 0.05f * std::pow(static_cast<float>(size - 1), 1.25f);
+}
+
+void PikminPlayer::SetSize(int s) {
+    size_ = (std::max)(1, s);
+    isMerged_ = (size_ > 1);
+    lastAbsorbedCount_ = size_ - 1;
+    currentMergedScale_ = CalculateScaleBySize(size_);
+    scale_ = { currentMergedScale_, currentMergedScale_, currentMergedScale_ };
+    slimeParams_.baseColor = SlimePhysics::GetColorBySize(size_);
+    if (meshCollider_) {
+        meshCollider_->SetWorldPosition(position_);
+        meshCollider_->Update();
+    }
+    if (size_ >= 3 && giantModel_) {
+        giantModel_->SetScale(scale_);
+        giantModel_->Update();
+    } else if (normalModel_) {
+        normalModel_->SetScale(scale_);
+        normalModel_->Update();
+    }
+}
+
 float PikminPlayer::CalculateMergedScale(int minionCount) const {
-    if (minionCount <= 0) return 0.8f;
-    return 0.8f + 0.24f * std::pow(static_cast<float>(minionCount), 0.65f);
+    return CalculateScaleBySize(minionCount + 1);
 }
 
 void PikminPlayer::SetPosition(const Vector3& pos) {
     position_ = pos;
-    if (normalModel_) normalModel_->SetTranslate(pos);
-    if (giantModel_) giantModel_->SetTranslate(pos);
+    if (normalModel_) {
+        normalModel_->SetTranslate(pos);
+        normalModel_->Update();
+    }
+    if (giantModel_) {
+        giantModel_->SetTranslate(pos);
+        giantModel_->Update();
+    }
 }
 
 Vector3 PikminPlayer::GetForwardVector() const {
@@ -120,20 +210,24 @@ void PikminPlayer::SetMerged(bool merged) {
     mergeScaleAnimation_ = 0.0f;
     if (!merged) {
         lastAbsorbedCount_ = 0;
-        currentMergedScale_ = 0.8f;
+        size_ = 1;
+        currentMergedScale_ = 0.4f;
     }
 
     // 合体/分裂時に衝撃波紋を発生させる
     slimeParams_.impulseStrength = 0.3f;
 
-    // コライダー半径を初期化
-    if (collider_) {
-        collider_->SetRadius(merged ? currentMergedScale_ : 0.8f);
+    if (meshCollider_) {
+        meshCollider_->SetWorldPosition(position_);
+        meshCollider_->Update();
     }
 }
 
 void PikminPlayer::Update(float deltaTime, KeyInput* keyInput, MinionManager* minionManager, MouseInput* mouseInput, AimGuide* aimGuide, const Vector2& stageTilt) {
     throwCooldownTimer_ -= deltaTime;
+    if (obstacleCooldown_ > 0.0f) {
+        obstacleCooldown_ -= deltaTime;
+    }
     mergeScaleAnimation_ = (std::min)(1.0f, mergeScaleAnimation_ + deltaTime * 4.0f);
     totalTime_ += deltaTime;
 
@@ -143,152 +237,218 @@ void PikminPlayer::Update(float deltaTime, KeyInput* keyInput, MinionManager* mi
 
     if (keyInput) {
         if (keyInput->TriggerKey(DIK_E)) {
-            ToggleMerge();
+            // ロコロコ方式分裂: 合体中ならパァンと全員飛び散って小ロコロコに分裂！
+            if (minionManager && (size_ > 1 || minionManager->GetAbsorbedCount() > 0)) {
+                // 自爆イベントを記録（EnemyManager が拾って周りの敵を強さ問わず倒す）
+                selfDestruct_.fired = true;
+                selfDestruct_.position = position_;
+                selfDestruct_.sizeBefore = size_;
+
+                minionManager->TriggerSplit(position_, size_);
+                SetSize(1);
+                slimeParams_.impulseStrength = 0.55f;
+                slimeParams_.squashStretch = { 0.35f, -0.25f, 0.35f };
+            }
         }
-    }
 
-    // --- マウスによる投擲 ---
-    if (!isMerged_ && mouseInput && minionManager) {
-        // マウス左クリックで目標地点へ投擲（クリック単発 または 押しっぱなし連射）
-        bool isThrowRequested = mouseInput->TriggerButton(0) || mouseInput->PushButton(0);
-        if (isThrowRequested && throwCooldownTimer_ <= 0.0f) {
-            Vector3 launchPos = position_;
-            launchPos.y += 0.5f;
-
-            if (aimGuide && aimGuide->IsTargetValid()) {
-                Vector3 targetVel = aimGuide->GetCalculatedVelocity();
-                if (minionManager->ThrowMinionWithVelocity(launchPos, targetVel)) {
-                    throwCooldownTimer_ = 0.12f; // リズミカルな連射間隔
-                }
+        // ジャンプ入力 (SPACEキー: 接地時のみジャンプ可能)
+        if (keyInput->TriggerKey(DIK_SPACE)) {
+            if (isGrounded_) {
+                velocity_.y = 13.0f; // ジャンプ初速
+                isGrounded_ = false;
+                // ジャンプ時の縦伸び（スライムストレッチ）
+                slimeParams_.squashStretch = { -0.15f, 0.30f, -0.15f };
+                slimeParams_.impulseStrength = 0.28f;
             }
         }
     }
 
-    // --- ステージ傾斜による物理加速度と摩擦（ティルト移動） ---
+    // --- 水平移動（ティルト加速度と慣性） ---
     // stageTilt.x: ピッチ（手前/奥）、stageTilt.y: ロール（左/右）
-    float accelScale = isMerged_ ? (tiltAccel_ * 1.3f) : tiltAccel_;
+    float accelScale = isMerged_ ? (tiltAccel_ * 1.25f) : tiltAccel_;
     float accelX = std::sin(stageTilt.y) * accelScale;
     float accelZ = std::sin(stageTilt.x) * accelScale;
 
     velocity_.x += accelX * deltaTime;
     velocity_.z += accelZ * deltaTime;
 
-    // 地面摩擦によるスムーズ減速（合体時は慣性を大きくして滑らかに転がる）
-    float currentFriction = isMerged_ ? (friction_ * 0.7f) : friction_;
+    // 摩擦減速（空中では摩擦を大幅低減して滑らかに慣性飛行）
+    float currentFriction = isGrounded_ ? SlimePhysics::GetFriction() : (SlimePhysics::GetFriction() * 0.15f);
     float decay = 1.0f - (std::min)(1.0f, currentFriction * deltaTime);
     velocity_.x *= decay;
     velocity_.z *= decay;
 
-    // 物理位置の更新
+    // 水平位置の更新
     position_.x += velocity_.x * deltaTime;
     position_.z += velocity_.z * deltaTime;
 
-    // スライムとしての滑走（回転せず滑る・重力変形は常に下向き）
-    // X,Z軸の回転は行わない（スライムは球体のように転がらない）
-    rotation_.x = 0.0f;
-    rotation_.z = 0.0f;
+    // --- 大きさ（1-10）と色（小:青, 中:黄, 大:赤）の管理 ---
+    int absorbedCount = minionManager ? minionManager->GetAbsorbedCount() : 0;
+    int newSize = 1 + absorbedCount;
+    isMerged_ = (newSize > 1);
 
-    // 進行方向への緩やかな向き変え（ヌルッとした旋回）
-    float speed = std::sqrt(velocity_.x * velocity_.x + velocity_.z * velocity_.z);
-    if (speed > 0.3f) {
-        float targetYaw = std::atan2(velocity_.x, velocity_.z);
-        float diff = targetYaw - rotation_.y;
-        while (diff > kPi) diff -= 2.0f * kPi;
-        while (diff < -kPi) diff += 2.0f * kPi;
-        rotation_.y += diff * (std::min)(1.0f, 4.0f * deltaTime);
+    if (newSize > size_) {
+        // 新たなくっつきが発生！（1+1=2、2+1=3...）
+        bool tierChanged = (size_ <= 2 && newSize >= 3) || (size_ <= 7 && newSize >= 8);
+        slimeParams_.impulseStrength = tierChanged ? 0.40f : (std::min)(0.5f, slimeParams_.impulseStrength + 0.22f);
     }
+    size_ = newSize;
 
-    // --- ゼリースライムの動的変形（スクワッシュ＆ストレッチ＆慣性バウンス） ---
-    Vector3 currentVelocity = velocity_;
-    Vector3 accel = {
-        (currentVelocity.x - prevVelocity_.x) / (std::max)(deltaTime, 0.001f),
-        0.0f,
-        (currentVelocity.z - prevVelocity_.z) / (std::max)(deltaTime, 0.001f)
-    };
-    prevVelocity_ = currentVelocity;
+    // 大きさに応じた色設定（小 1-2: 青, 中 3-7: 黄色, 大 8-10以上: 赤）
+    slimeParams_.baseColor = SlimePhysics::GetColorBySize(size_);
 
-    float speedMag = std::sqrt(currentVelocity.x * currentVelocity.x + currentVelocity.z * currentVelocity.z);
-    float accelMag = std::sqrt(accel.x * accel.x + accel.z * accel.z);
+    float targetScale = CalculateScaleBySize(size_);
+    currentMergedScale_ += (targetScale - currentMergedScale_) * (std::min)(1.0f, deltaTime * 10.0f);
+    float currentScale = currentMergedScale_;
+    scale_ = { currentScale, currentScale, currentScale };
 
-    // 転がり進行方向への伸びと上下潰れ（合体時はより顕著に）
-    float stretchRate = isMerged_ ? 0.03f : 0.022f;
-    float speedStretch = (std::min)(speedMag * stretchRate, 0.28f);
-    float accelSquash = (std::min)(accelMag * 0.006f, 0.22f);
-    float sag = isMerged_ ? -0.16f : -0.12f; // 接地重力によるポテッとした強い潰れ
+    // 地形メッシュの壁・垂直面との衝突押し出し（スライムの見た目の横幅に合わせてめり込みを防止）
+    float colRadius = currentScale * 0.95f;
+    SlimePhysics::ResolveWallCollision(position_, velocity_, colRadius);
 
-    float targetSquashY = sag - accelSquash * 0.6f - speedStretch * 0.45f;
-    float targetSquashXZ = speedStretch * 0.75f + accelSquash * 0.45f - sag * 0.6f;
+    // --- 垂直重力とリアルタイム地形・落下物理 ---
+    const float kGravity = -32.0f; // 重力加速度
+    bool hasGround = false;
+    Vector3 groundNormal{ 0.0f, 1.0f, 0.0f };
+    float baseOffset = currentScale * 0.75f;
+    float targetGroundedY = SlimePhysics::CalculateGroundedCenterYEx(
+        position_.x, position_.z, position_.y, stageTilt, baseOffset, &hasGround, &groundNormal, { position_.x, position_.z }, isGrounded_);
 
-    // 合体・分裂アニメーション時の弾むスクワッシュ
-    if (mergeScaleAnimation_ < 0.5f) {
-        float t = mergeScaleAnimation_ * 2.0f;
-        float bounce = std::sin(t * kPi * 2.0f) * 0.35f * (1.0f - t);
-        targetSquashY += bounce;
-        targetSquashXZ -= bounce * 0.5f;
-    }
+    if (!isGrounded_) {
+        // 空中状態: 純粋な鉛直重力で落下
+        velocity_.y += kGravity * deltaTime;
+        if (velocity_.y < -45.0f) velocity_.y = -45.0f; // 終端落下速度制限
 
-    // スムーズスプリング補間
-    slimeParams_.squashStretch.y += (targetSquashY - slimeParams_.squashStretch.y) * (std::min)(1.0f, deltaTime * 10.0f);
-    slimeParams_.squashStretch.x += (targetSquashXZ - slimeParams_.squashStretch.x) * (std::min)(1.0f, deltaTime * 10.0f);
-    slimeParams_.squashStretch.z += (targetSquashXZ - slimeParams_.squashStretch.z) * (std::min)(1.0f, deltaTime * 10.0f);
+        position_.y += velocity_.y * deltaTime;
 
-    // シェーダー時間の更新
-    slimeParams_.time = totalTime_;
-
-    if (isMerged_) {
-        int mergedCount = minionManager ? minionManager->GetMergedCount() : 0;
-        float targetScale = CalculateMergedScale(mergedCount);
-
-        // 新たなミニオンを吸収した時に衝撃波紋パルス
-        if (mergedCount > lastAbsorbedCount_) {
-            slimeParams_.impulseStrength = (std::min)(0.5f, slimeParams_.impulseStrength + 0.15f);
-            lastAbsorbedCount_ = mergedCount;
+        // 空中での姿勢: 進行方向を向く
+        rotation_.x = 0.0f;
+        rotation_.z = 0.0f;
+        float horizSpeed = std::sqrt(velocity_.x * velocity_.x + velocity_.z * velocity_.z);
+        if (horizSpeed > 0.3f) {
+            rotation_.y = std::atan2(velocity_.x, velocity_.z);
         }
 
-        // 合体サイズの動的スムーズ補間
-        currentMergedScale_ += (targetScale - currentMergedScale_) * (std::min)(1.0f, deltaTime * 8.0f);
-
-        float currentScale = currentMergedScale_;
-        scale_ = { currentScale, currentScale, currentScale };
-
-        // 合体時のスライムカラー（黄金色）
-        slimeParams_.baseColor = { 1.0f, 0.8f, 0.2f, 0.92f };
-
-        // 傾斜面の上に乗る（まな板の上のスライム：底面が地面にピタッと接地）
-        float groundHeight = -position_.z * std::sin(stageTilt.x) - position_.x * std::sin(stageTilt.y);
-        position_.y = groundHeight + currentScale * 0.70f;
-        if (collider_) {
-            collider_->SetRadius(currentScale * 0.8f);
+        // 頭上の天井・高層足場との衝突チェック（ジャンプ上昇中に上の床を突き抜けるのを防止）
+        if (velocity_.y > 0.0f) {
+            float topGroundY = SlimePhysics::CalculateGroundHeight(position_.x, position_.z, stageTilt, { position_.x, position_.z });
+            // もし最上階の床がプレイヤーの頭上直近にあり、頭が衝突した場合
+            if (topGroundY > position_.y && position_.y + baseOffset >= topGroundY) {
+                position_.y = topGroundY - baseOffset;
+                velocity_.y = -1.0f; // 頭をぶつけて下へ跳ね返る
+                slimeParams_.squashStretch = { 0.15f, -0.15f, 0.15f };
+            }
         }
 
-        if (giantModel_) {
-            giantModel_->SetTranslate(position_);
-            giantModel_->SetRotate(rotation_);
-            giantModel_->SetScale(scale_);
-            giantModel_->Update();
+        // 着地判定（足元に地面があり、落下中であり、地面より下に到達した場合）
+        if (hasGround && velocity_.y <= 0.0f && position_.y <= targetGroundedY) {
+            position_.y = targetGroundedY;
+            float impactSpeed = -velocity_.y;
+            isGrounded_ = true;
+
+            // スライム特有の弾性着地バウンド
+            if (impactSpeed > 7.0f) {
+                velocity_.y = impactSpeed * 0.22f; // 小バウンド
+                isGrounded_ = false;
+            } else {
+                velocity_.y = 0.0f;
+            }
+
+            // 着地時の弾力スクワッシュ（ぷるんと潰れて復元）
+            float squashAmount = std::clamp(impactSpeed * 0.02f, 0.08f, 0.35f);
+            slimeParams_.squashStretch = { squashAmount * 0.5f, -squashAmount, squashAmount * 0.5f };
+            slimeParams_.impulseStrength = std::clamp(impactSpeed * 0.04f, 0.15f, 0.60f);
         }
     } else {
-        lastAbsorbedCount_ = 0;
-        currentMergedScale_ = 0.8f;
-        scale_ = { 0.8f, 0.8f, 0.8f };
+        // 接地状態: 地面スロープへの密着追従
+        if (!hasGround) {
+            // 足元に地面がなくなった（島の外へ飛び出した！） -> 空中落下へ！
+            isGrounded_ = false;
+        } else {
+            // --- 急斜面スロープスライディング＆登坂制限 ---
+            // 急斜面（groundNormal.y < 0.82f, 傾斜約35度以上）では下り坂方向へ重力滑走を発生させ、上り登坂を制限
+            float slopeHorizLen = std::sqrt(groundNormal.x * groundNormal.x + groundNormal.z * groundNormal.z);
+            if (groundNormal.y < 0.82f && slopeHorizLen > 0.01f) {
+                Vector2 slopeDown = { groundNormal.x / slopeHorizLen, groundNormal.z / slopeHorizLen };
+                // 傾斜が急なほど強く下へ滑り落ちる力
+                float slideStrength = (1.0f - groundNormal.y) * 22.0f;
+                velocity_.x += slopeDown.x * slideStrength * deltaTime;
+                velocity_.z += slopeDown.y * slideStrength * deltaTime;
 
-        // 通常時のスライムカラー（水色）
-        slimeParams_.baseColor = { 0.2f, 0.85f, 1.0f, 0.9f };
+                // 上り坂方向（slopeDownと逆方向）への移動速度を抑制・相殺（急斜面を登れないようにする）
+                float velDotDown = velocity_.x * slopeDown.x + velocity_.z * slopeDown.y;
+                if (velDotDown < 0.0f) {
+                    float cancelFactor = std::clamp((0.82f - groundNormal.y) / 0.18f, 0.0f, 1.0f);
+                    velocity_.x -= slopeDown.x * (velDotDown * cancelFactor);
+                    velocity_.z -= slopeDown.y * (velDotDown * cancelFactor);
+                }
+            }
 
-        float groundHeight = -position_.z * std::sin(stageTilt.x) - position_.x * std::sin(stageTilt.y);
-        position_.y = groundHeight + scale_.x * 0.70f;
-        if (collider_) {
-            collider_->SetRadius(0.8f);
+            float dy = targetGroundedY - position_.y;
+            if (dy < -4.0f) {
+                // 大きな段差・崖から飛び出した -> 空中落下へ！
+                isGrounded_ = false;
+            } else {
+                // 地面の上に常に乗る（傾斜で床が持ち上がっても絶対に埋まらない！）
+                if (dy > 0.0f) {
+                    // 床が下から押し上げてくる場合: 瞬時に接地高さへ（傾斜時の埋まり・すり抜けを物理的に100%防止）
+                    position_.y = targetGroundedY;
+                    velocity_.y = 0.0f;
+                } else {
+                    // 床が下がった場合: 滑らかに密着追従
+                    position_.y += dy * (std::min)(1.0f, deltaTime * 40.0f);
+                    velocity_.y = 0.0f;
+                }
+            }
         }
 
-        if (normalModel_) {
-            normalModel_->SetTranslate(position_);
-            normalModel_->SetRotate(rotation_);
-            normalModel_->SetScale(scale_);
-            normalModel_->Update();
-        }
+        // 接地中の姿勢（局所地形法線に正しく沿って密着）
+        float targetRotX = std::atan2(groundNormal.z, groundNormal.y);
+        float targetRotZ = -std::atan2(groundNormal.x, groundNormal.y);
+        rotation_.x += (targetRotX - rotation_.x) * (std::min)(1.0f, deltaTime * 35.0f);
+        rotation_.y = 0.0f;
+        rotation_.z += (targetRotZ - rotation_.z) * (std::min)(1.0f, deltaTime * 35.0f);
+    }
+
+    // 奈落への落下防止セーフティ（万が一島の外へ真っ逆さまに落ちた場合は安全に復帰）
+    if (position_.y < -120.0f) {
+        position_ = { 0.0f, 4.0f, 0.0f };
+        velocity_ = { 0.0f, 0.0f, 0.0f };
+        isGrounded_ = false;
+    }
+
+    // --- 液体スライムの動的変形（空中/接地状態を正しく反映） ---
+    SlimePhysics::DeformInput deformInput;
+    deformInput.velocity = velocity_;
+    deformInput.prevVelocity = prevVelocity_;
+    deformInput.stageTilt = stageTilt;
+    deformInput.deltaTime = deltaTime;
+    deformInput.isGrounded = isGrounded_;
+    deformInput.isMerged = isMerged_;
+    deformInput.massScale = scale_.x;
+    SlimePhysics::UpdateDeformation(slimeParams_, deformInput);
+    prevVelocity_ = velocity_;
+
+    slimeParams_.time = totalTime_;
+    // モデルTransformの更新（通常・巨大どちらも現在の正確なscale_で更新）
+    if (normalModel_) {
+        normalModel_->SetTranslate(position_);
+        normalModel_->SetRotate(rotation_);
+        normalModel_->SetScale(scale_);
+        normalModel_->Update();
+    }
+    if (giantModel_) {
+        giantModel_->SetTranslate(position_);
+        giantModel_->SetRotate(rotation_);
+        giantModel_->SetScale(scale_);
+        giantModel_->Update();
+    }
+    if (meshCollider_) {
+        meshCollider_->SetWorldPosition(position_);
+        meshCollider_->Update();
     }
 }
+
 
 void PikminPlayer::DrawSlime(Object3d* object, const Object3d::ModelData& modelData,
                               const RenderContext& ctx, uint32_t textureIndex)
@@ -387,13 +547,20 @@ void PikminPlayer::DrawSlime(Object3d* object, const Object3d::ModelData& modelD
 void PikminPlayer::Draw(const RenderContext& ctx) {
     if (!object3dCom_) return;
 
-    if (isMerged_) {
-        if (giantModel_) {
-            DrawSlime(giantModel_.get(), giantModelData_, ctx, giantTextureIndex_);
-        }
-    } else {
-        if (normalModel_) {
-            DrawSlime(normalModel_.get(), normalModelData_, ctx, normalTextureIndex_);
-        }
+    if (size_ >= 3 && giantModel_) {
+        DrawSlime(giantModel_.get(), giantModelData_, ctx, giantTextureIndex_);
+    } else if (normalModel_) {
+        DrawSlime(normalModel_.get(), normalModelData_, ctx, normalTextureIndex_);
     }
+}
+
+
+void PikminPlayer::DrawDebug(Camera* camera) {
+#ifdef _DEBUG
+    if (camera) {
+        auto shape = SlimeCollision::BuildMultiSphere(position_, scale_, slimeParams_.squashStretch, rotation_);
+        uint32_t color = isMerged_ ? 0xFF00D7FF : 0xFFFFFF00; // 金色 or 水色 (ABGR/ImGui)
+        SlimeCollision::DrawDebugMultiSphere(shape, camera, color);
+    }
+#endif
 }

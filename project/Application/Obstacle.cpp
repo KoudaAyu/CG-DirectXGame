@@ -22,15 +22,7 @@ void Obstacle::Initialize(Object3dCom* object3dCom, Camera* camera, const Vector
     rot1_ = { 0.0f, 0.785398f, 0.0f };
     rot2_ = { 0.0f, -0.785398f, 0.0f };
 
-    // 1枚のフェンス板のサイズ (正確な対角線の幅4.24fと、すり抜けを防ぐ厚み0.4fに再調整)
-    Vector3 boxSize = { 4.24f * radius_, 2.0f * radius_, 0.4f * radius_ };
-    
-    collider_ = std::make_unique<BoxCollider>(boxSize, &position_, &rot1_, CollisionAttribute::Obstacle);
-    collider2_ = std::make_unique<BoxCollider>(boxSize, &position_, &rot2_, CollisionAttribute::Obstacle);
-    CollisionManager::GetInstance()->RegisterCollider(collider_.get());
-    CollisionManager::GetInstance()->RegisterCollider(collider2_.get());
-    
-    // 物理押し出し用BoxColliderも登録してNavMeshの歩行可能判定に含めます（Raycast判定時は無視されます）
+    // エンジン既存の MeshCollider によるポリゴン精密判定
     meshCollider_ = std::make_unique<MeshCollider>(object3d_.get(), CollisionAttribute::Obstacle);
     CollisionManager::GetInstance()->RegisterCollider(meshCollider_.get());
 
@@ -57,11 +49,6 @@ void Obstacle::Initialize(Object3dCom* object3dCom, Camera* camera, const Vector
     object3d_->SetTranslate(position_);
     object3d_->SetScale(scale);
     object3d_->SetRotate(rotate);
-
-    rot1_ = rotate;
-    Vector3 boxSize = { 2.0f * scale.x, 2.0f * scale.y, 2.0f * scale.z };
-    collider_ = std::make_unique<BoxCollider>(boxSize, &position_, &rot1_, CollisionAttribute::Obstacle);
-    CollisionManager::GetInstance()->RegisterCollider(collider_.get());
 
     meshCollider_ = std::make_unique<MeshCollider>(object3d_.get(), CollisionAttribute::Obstacle);
     CollisionManager::GetInstance()->RegisterCollider(meshCollider_.get());

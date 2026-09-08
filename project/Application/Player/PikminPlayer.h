@@ -4,7 +4,7 @@
 #include "Matrix4x4.h"
 #include "RenderContext.h"
 #include "Baziru3_Engine/Graphics/3D/Object/Object3d.h"
-#include "Baziru3_Engine/Framework/Collision/SphereCollider.h"
+#include "Baziru3_Engine/Framework/Collision/MeshCollider.h"
 #include <memory>
 
 class Object3dCom;
@@ -14,21 +14,7 @@ class MouseInput;
 class MinionManager;
 class AimGuide;
 
-/// @brief スライム用GPU定数バッファのCPU側構造体（Slime.hlsli の SlimeParams と一致させる）
-struct SlimeParamsCPU
-{
-    float time = 0.0f;
-    float wobbleStrength = 0.12f;
-    float wobbleFrequency = 4.0f;
-    float impulseStrength = 0.0f;
-    Vector3 squashStretch{ 0.0f, 0.0f, 0.0f };
-    float padding1 = 0.0f;
-    Vector4 baseColor{ 0.2f, 0.85f, 1.0f, 0.9f };
-    float fresnelPower = 3.0f;
-    float envReflection = 0.4f;
-    float innerGlow = 0.4f;
-    float specularShininess = 64.0f;
-};
+#include "Application/GameObject/SlimePhysics.h"
 
 /**
  * @brief ピクミン×ロコロコ プレイヤーキャラクター（スライム描画版）
@@ -46,6 +32,10 @@ public:
     const Vector3& GetPosition() const { return position_; }
     void SetPosition(const Vector3& pos);
 
+    const Vector3& GetVelocity() const { return velocity_; }
+    void SetVelocity(const Vector3& vel) { velocity_ = vel; }
+    const Vector3& GetRotation() const { return rotation_; }
+
     float GetYaw() const { return rotation_.y; }
     Vector3 GetForwardVector() const;
 
@@ -56,18 +46,48 @@ public:
     // パラメータ
     float GetTiltAccel() const { return tiltAccel_; }
     void SetTiltAccel(float a) { tiltAccel_ = a; }
-    float GetFriction() const { return friction_; }
-    void SetFriction(float f) { friction_ = f; }
+    float GetFriction() const { return SlimePhysics::GetFriction(); }
+    void SetFriction(float f) { SlimePhysics::SetFriction(f); }
+    float GetMergedFriction() const { return SlimePhysics::GetFriction(); }
+    void SetMergedFriction(float f) { SlimePhysics::SetFriction(f); }
 
     // スライムパラメータの公開（ImGui調整用）
     SlimeParamsCPU& GetSlimeParams() { return slimeParams_; }
-    SphereCollider* GetCollider() const { return collider_.get(); }
+    MeshCollider* GetCollider() const { return meshCollider_.get(); }
+    MeshCollider* GetMeshCollider() const { return meshCollider_.get(); }
+    Object3d* GetCurrentModel() const { return (size_ >= 3 && giantModel_) ? giantModel_.get() : normalModel_.get(); }
     float GetCurrentScale() const { return scale_.x; }
+    const Vector3& GetScale() const { return scale_; }
+    float GetBaseRadius() const { return 0.4f; }
+
+    // ロコロコサイズ管理（最小1: 小 1-2, 中 3-7, 大 8-10）
+    int GetSize() const { return size_; }
+    void SetSize(int s);
+    float CalculateScaleBySize(int size) const;
 
     float CalculateMergedScale(int minionCount) const;
 
+    /// @brief 自爆（E キーによる分裂）が起きたことを外へ伝えるイベント
+    struct SelfDestructEvent
+    {
+        bool fired = false;                    //!< このフレームに自爆したか
+        Vector3 position{ 0.0f, 0.0f, 0.0f };  //!< 爆心（分裂した瞬間の位置）
+        int sizeBefore = 1;                    //!< 分裂前の塊サイズ。爆風の広さに使う
+    };
+
+    /**
+     * @brief 自爆イベントを取り出してクリアする
+     * @param[out] out 取り出したイベント
+     * @return 自爆していれば true
+     * @note 1回の自爆につき1回だけ true を返す。拾い手は1箇所にすること
+     */
+    bool TakeSelfDestructEvent(SelfDestructEvent& out);
+
     // 衝突時の弾性リアクション
     void OnCollision(const CollisionInfo& info);
+
+    // デバッグ多重球描画
+    void DrawDebug(Camera* camera);
 
 private:
     void DrawSlime(Object3d* object, const Object3d::ModelData& modelData,
@@ -88,14 +108,19 @@ private:
     Vector3 position_{ 0.0f, 0.5f, 0.0f };
     Vector3 velocity_{ 0.0f, 0.0f, 0.0f };
     Vector3 rotation_{ 0.0f, 0.0f, 0.0f };
-    Vector3 scale_{ 1.0f, 1.0f, 1.0f };
+    Vector3 scale_{ 0.4f, 0.4f, 0.4f };
 
     bool isMerged_ = false;
+    bool isGrounded_ = false;
 
+public:
+    bool IsGrounded() const { return isGrounded_; }
+
+private:
     // パラメータ
     float tiltAccel_ = 38.0f;
-    float friction_ = 2.6f;
     float rotationSpeed_ = 12.0f;
+    float currentYaw_ = 0.0f;
 
     // 投擲クールダウン
     float throwCooldownTimer_ = 0.0f;
@@ -103,14 +128,19 @@ private:
 
     // 合体時スケールイージング
     float mergeScaleAnimation_ = 1.0f;
-    float currentMergedScale_ = 0.8f;
+    float currentMergedScale_ = 0.4f;
     int lastAbsorbedCount_ = 0;
+    int size_ = 1; // 現在のロコロコサイズ（最小1: 1+1=2... 小 1-2, 中 3-7, 大 8-10）
+
+    // 自爆（E キー分裂）イベント
+    SelfDestructEvent selfDestruct_;
 
     // スライム固有
     SlimeParamsCPU slimeParams_;
     float totalTime_ = 0.0f;         // シェーダーに渡す累積時間
     Vector3 prevVelocity_{ 0.0f, 0.0f, 0.0f }; // スクワッシュ計算用の前フレーム速度
+    float obstacleCooldown_ = 0.0f;  // 障害物（プロペラ等）の多重衝突防止クールダウン
 
-    // 合体時の当たり判定
-    std::unique_ptr<SphereCollider> collider_;
+    // メッシュ当たり判定 (MeshCollider)
+    std::unique_ptr<MeshCollider> meshCollider_;
 };
