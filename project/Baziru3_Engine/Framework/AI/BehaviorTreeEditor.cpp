@@ -1,4 +1,5 @@
 #include "BehaviorTreeEditor.h"
+#include "../IO/JsonSafeLoader.h"
 #include <fstream>
 #include <sstream>
 #include <algorithm>
@@ -12,45 +13,40 @@ namespace BaziruEngine::AI {
 // ==========================================
 
 BehaviorTreeEditor::BehaviorTreeEditor() {
-    // Sanitize settings files to prevent infinite grid loop freeze from corrupted zoom (< 0.1f or > 10.0f)
+    // Sanitize settings files to prevent crude_json crash/assert and infinite grid loop freeze (< 0.1f or > 10.0f)
     const std::vector<std::string> pathsToCheck = { "bt_editor_layout.json", "project/bt_editor_layout.json" };
     for (const auto& settingsPath : pathsToCheck)
     {
-        std::ifstream checkFile(settingsPath);
-        if (checkFile.is_open())
+        if (std::filesystem::exists(settingsPath))
         {
             nlohmann::json settingsJson;
-            bool needReset = false;
-            try {
-                checkFile >> settingsJson;
+            if (!BaziruEngine::IO::JsonSafeLoader::LoadSafe(settingsPath, settingsJson))
+            {
+                // 構文不正または破損していた場合は安全な空オブジェクトで初期化
+                BaziruEngine::IO::JsonSafeLoader::SaveSafe(settingsPath, nlohmann::json::object(), 2);
+            }
+            else
+            {
+                bool needReset = false;
                 if (settingsJson.contains("view") && settingsJson["view"].contains("zoom"))
                 {
-                    float zoom = settingsJson["view"]["zoom"];
+                    float zoom = BaziruEngine::IO::JsonSafeLoader::SafeGet<float>(settingsJson["view"], "zoom", 1.0f);
                     if (zoom < 0.1f || zoom > 10.0f || std::isnan(zoom))
                     {
                         needReset = true;
                     }
                 }
-            } catch (...) {
-                // Ignore parse errors
-            }
-            checkFile.close();
 
-            if (needReset)
-            {
-                settingsJson["view"]["zoom"] = 1.0f;
-                if (settingsJson.contains("view"))
+                if (needReset)
                 {
-                    settingsJson["view"]["scroll"]["x"] = -124.5f;
-                    settingsJson["view"]["scroll"]["y"] = 0.0f;
-                    settingsJson["view"]["visible_rect"]["min"]["x"] = -124.5f;
-                    settingsJson["view"]["visible_rect"]["min"]["y"] = 0.0f;
-                    settingsJson["view"]["visible_rect"]["max"]["x"] = 609.5f;
-                    settingsJson["view"]["visible_rect"]["max"]["y"] = 574.0f;
+                    settingsJson["view"]["zoom"] = 1.0f;
+                    if (settingsJson.contains("view"))
+                    {
+                        settingsJson["view"]["scroll"]["x"] = 0.0f;
+                        settingsJson["view"]["scroll"]["y"] = 0.0f;
+                    }
+                    BaziruEngine::IO::JsonSafeLoader::SaveSafe(settingsPath, settingsJson, 2);
                 }
-                std::ofstream saveFile(settingsPath);
-                saveFile << settingsJson.dump(2);
-                saveFile.close();
             }
         }
     }
@@ -214,12 +210,11 @@ bool BehaviorTreeEditor::SaveTree(const std::string& filePath) {
     // 2. 木構造の解析とシリアライズ
     nlohmann::json rootJson = BuildTreeJSON(rootNode);
 
-    // 3. JSONファイルへ書き出し
-    std::ofstream file(filePath);
-    if (!file.is_open()) return false;
-
-    file << rootJson.dump(2); // インデント2文字で出力
-    file.close();
+    // 3. 安全な書き出し（アトミック保存）
+    if (!BaziruEngine::IO::JsonSafeLoader::SaveSafe(filePath, rootJson, 2)) {
+        OutputDebugStringA(("[BT Editor] Error: Failed to safely save tree to: " + filePath + "\n").c_str());
+        return false;
+    }
 
     currentLoadedPath_ = filePath;
     OutputDebugStringA(("[BT Editor] Successfully saved tree to: " + filePath + "\n").c_str());
@@ -228,6 +223,7 @@ bool BehaviorTreeEditor::SaveTree(const std::string& filePath) {
 
 // ロード時の再帰用ヘルパ（JSON構造からエディタノードとリンクを復元）
 EditorNode* BehaviorTreeEditor::LoadNodeRecursive(const nlohmann::json& nodeJson, ImVec2 pos, EditorPin* parentOutputPin) {
+    if (!nodeJson.is_object()) return nullptr;
     if (!nodeJson.contains("Type") || !nodeJson["Type"].is_string()) return nullptr;
 
     std::string typeName = nodeJson["Type"];
@@ -269,31 +265,35 @@ bool BehaviorTreeEditor::LoadTree(const std::string& filePath) {
     // コンテキストを設定してクラッシュを防止
     ed::SetCurrentEditor(editorContext_);
 
-    std::ifstream file(filePath);
-    if (!file.is_open()) {
-        // ファイルがない場合は初期のダミールートノードを生成しておく
+    nlohmann::json fallbackRoot = {
+        {"Type", "SequenceNode"},
+        {"Children", nlohmann::json::array()}
+    };
+
+    nlohmann::json rootJson;
+    bool loadOk = BaziruEngine::IO::JsonSafeLoader::LoadSafe(filePath, rootJson, fallbackRoot);
+
+    if (!loadOk) {
+        // ファイルがない・破損している場合は初期のダミールートノードを生成して安全にフォールスルー
         ClearEditorState();
         CreateEditorNode("SequenceNode", ImVec2(400, 100));
         currentLoadedPath_ = filePath;
         ed::SetCurrentEditor(nullptr);
+        OutputDebugStringA(("[BT Editor] Generated fallback sequence node for: " + filePath + "\n").c_str());
         return false;
     }
-
-    nlohmann::json rootJson;
-    try {
-        file >> rootJson;
-    } catch (...) {
-        file.close();
-        ed::SetCurrentEditor(nullptr);
-        return false;
-    }
-    file.close();
 
     // エディタ状態のクリーンアップ
     ClearEditorState();
 
     // 再帰的にロードを実行して画面上に構築
-    LoadNodeRecursive(rootJson, ImVec2(400, 100), nullptr);
+    try {
+        LoadNodeRecursive(rootJson, ImVec2(400, 100), nullptr);
+    } catch (...) {
+        OutputDebugStringA("[BT Editor] Exception during LoadNodeRecursive. Fallback to default node.\n");
+        ClearEditorState();
+        CreateEditorNode("SequenceNode", ImVec2(400, 100));
+    }
 
     currentLoadedPath_ = filePath;
     OutputDebugStringA(("[BT Editor] Successfully loaded tree from: " + filePath + "\n").c_str());
