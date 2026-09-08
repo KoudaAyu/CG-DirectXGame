@@ -103,7 +103,7 @@ void Game::Initialize() {
   textureIndexModelTex = TextureManager::GetInstance()->Load(
       modelData.material.textureFilePath); // Load model texture
   textureIndexSkybox_ = TextureManager::GetInstance()->Load(
-      "Resources/CG4/dds/CG4_test.dds"); // Load skybox texture
+      "Resources/CG4/dds/skybox.dds"); // Load skybox texture
   SceneManager::GetInstance()->SetSkyboxTextureIndex(textureIndexSkybox_);
 
   // OffScreenRendering の初期化
