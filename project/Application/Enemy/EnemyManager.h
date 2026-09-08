@@ -12,6 +12,7 @@
 class Object3dCom;
 class Camera;
 class PikminPlayer;
+class MinionManager;
 
 /**
  * @brief モブ敵と敵弾をまとめて管理する
@@ -51,8 +52,10 @@ public:
      * @param deltaTime デルタタイム
      * @param stageTilt ステージ傾斜
      * @param player プレイヤー（衝突解決のため位置・速度が書き換わる）
+     * @param minionManager 小スライム群（省略可。渡すと小スライムも強さ判定で敵と戦う）
      */
-    void Update(float deltaTime, const Vector2& stageTilt, PikminPlayer* player);
+    void Update(float deltaTime, const Vector2& stageTilt, PikminPlayer* player,
+                MinionManager* minionManager = nullptr);
 
     void Draw(const RenderContext& ctx);
 
@@ -68,6 +71,9 @@ public:
     float GetBounceSpeed() const { return bounceSpeed_; }
     void SetBulletKnockback(float s) { bulletKnockback_ = s; }
     float GetBulletKnockback() const { return bulletKnockback_; }
+
+    /// @brief 自爆の爆風半径 = base + perSize * (分裂前サイズ - 1)
+    void SetSelfDestructRadius(float base, float perSize) { selfDestructBaseRadius_ = base; selfDestructPerSize_ = perSize; }
 
     int GetAliveCount() const;
     int GetActiveBulletCount() const;
@@ -86,6 +92,12 @@ private:
     /// @brief 敵弾 vs プレイヤーの塊
     void ResolveBulletCollisions(PikminPlayer* player);
 
+    /// @brief 小スライム（ミニオン）vs 全敵。判定ルールはプレイヤー本体と同じ
+    void ResolveMinionCollisions(MinionManager* minionManager, const Vector2& stageTilt, const Vector2& pivot);
+
+    /// @brief プレイヤーの自爆で、爆風内の敵を強さ問わず倒す
+    void ResolveSelfDestruct(PikminPlayer* player);
+
     /// @brief 現在のステージ傾斜での床面法線
     static Vector3 CalcStageNormal(const Vector2& stageTilt);
 
@@ -103,8 +115,13 @@ private:
 
     std::mt19937 rng_{ std::random_device{}() };
 
-    float bounceSpeed_ = 13.0f;     //!< 強い敵にぶつかったときの吹っ飛び初速
-    float bulletKnockback_ = 9.0f;  //!< 被弾時のノックバック初速
+    float bounceSpeed_ = 13.0f;        //!< 強い敵にぶつかったときの吹っ飛び初速
+    float bulletKnockback_ = 9.0f;     //!< 被弾時のノックバック初速
+    float minionBounceSpeed_ = 9.0f;   //!< 小スライムが強い敵に弾かれるときの初速
+    float selfDestructBaseRadius_ = 4.0f; //!< 自爆の爆風半径（サイズ1のとき）
+    float selfDestructPerSize_ = 0.8f;    //!< 分裂前サイズ1つあたりの爆風半径の伸び
+    float lastSelfDestructRadius_ = 0.0f; //!< ImGui 表示用
+    int lastSelfDestructKills_ = 0;       //!< ImGui 表示用
     bool enableCollision_ = true;   //!< デバッグ用に判定を止められるように
 
     // ImGui 用

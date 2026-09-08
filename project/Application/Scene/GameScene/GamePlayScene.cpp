@@ -407,7 +407,7 @@ void GamePlayScene::Update()
     // 敵の更新（プレイヤーの塊との強弱判定・被弾ノックバックもここで解決される）
     if (enemyManager_)
     {
-        enemyManager_->Update(deltaTime, currentTilt_, player_.get());
+        enemyManager_->Update(deltaTime, currentTilt_, player_.get(), minionManager_.get());
     }
 
     // 衝突判定と押し出しの更新
@@ -579,6 +579,10 @@ void GamePlayScene::Draw(SceneRenderRequests& renderRequests)
     RenderContext ctx;
     ctx.commandList = dxCommon_->GetCommandList().Get();
     ctx.camera = playCamera_.get();
+    // ライトを入れておかないと Object3dCom::Draw() が b1 に アドレス0 を張ってしまう。
+    // スキニング経路（Object3d::Draw()）は自前でライトを解決するので、
+    // 入れておかないと敵だけ陰影が変わる
+    ctx.light = SceneManager::GetInstance()->GetLight();
 
     // 1. 地面の描画
     if (groundPlane_)

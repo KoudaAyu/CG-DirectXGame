@@ -58,6 +58,16 @@ struct MobEnemyConfig
     // --- スポーン時の強さ範囲（ランダム）---
     int strengthMin = 1;
     int strengthMax = 5;
+
+    // --- アニメーション ---
+    // gltf のクリップ名。モデルごとに大文字小文字も名前もバラバラなのでここで対応づける。
+    // 空文字なら「そのクリップは無い」扱い（Idle にフォールバックする）
+    bool useAnimation = true;
+    const char* clipIdle = "";    //!< 待機
+    const char* clipWalk = "";    //!< 移動中
+    const char* clipAttack = "";  //!< 発射の瞬間（ワンショット）
+    const char* clipAlert = "";   //!< プレイヤーを見つけて構えている状態
+    float animSpeed = 1.0f;
 };
 
 /// @brief 種類ごとの設定を取得（書き換え可能。ImGui から調整する用）
@@ -96,6 +106,10 @@ public:
 
 protected:
     ModelSpec GetModelSpec() const override;
+
+    /// @brief 今の状態でループさせるべきクリップ名を返す（移動中 / 警戒中 / 待機）
+    const char* PickBaseClip() const;
+
     void OnInitialized() override;
     void UpdateBehavior(const EnemyUpdateContext& ctx) override;
     Vector3 GetRenderScale() const override;

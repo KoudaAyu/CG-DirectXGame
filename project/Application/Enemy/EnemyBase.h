@@ -7,8 +7,9 @@
 #include "Baziru3_Engine/Core/Base/Vector.h"
 #include "Baziru3_Engine/Core/Base/RenderContext.h"
 #include "Baziru3_Engine/Graphics/3D/Object/Object3d.h"
-#include "Baziru3_Engine/Framework/Collision/SphereCollider.h"
+#include "Baziru3_Engine/Framework/Collision/BoxCollider.h"
 #include "Application/Enemy/EnemyCollision.h"
+#include "Application/Enemy/EnemyAnimation.h"
 
 class Object3dCom;
 class Camera;
@@ -38,11 +39,11 @@ struct EnemyUpdateContext
  * @brief 敵キャラクター共通基底
  *
  * ここが持つのは「どの敵にも要る土台」だけ:
- *   - モデル読み込みと描画
+ *   - モデル読み込みと描画（スキニングアニメーション対応）
  *   - ステージ傾斜フレーム <-> ワールド座標の変換（傾けても地面から取り残されない）
  *   - 地面高さへの吸着と、地形法線に沿った姿勢
  *   - 強さ（strength）と、そこから見た目スケールを決める関数（差し替え可能）
- *   - CollisionAttribute::Enemy の SphereCollider 登録（ミニオン・障害物との押し合い用）
+ *   - 当たり判定の形状データ（押し出しは EnemyManager が自前でやる）
  *   - 撃破処理
  *
  * 個々の挙動（徘徊・追跡・射撃）は UpdateBehavior() を override して書く。
@@ -51,6 +52,9 @@ struct EnemyUpdateContext
  * @note 座標は「ステージローカル（傾き0のときのワールド座標）」を正とし、
  *       毎フレーム StageLocalToWorld() で実際のワールド座標を導出する。
  *       挙動を書くときは anchorLocal_ を動かすこと。
+ *
+ * @note コライダーは **トリガー登録のみ**。エンジン側の押し出しは使わない。
+ *       理由は EnemyManager::Initialize() のコメントを参照。
  */
 class EnemyBase
 {
@@ -114,18 +118,24 @@ public:
 
     // --- 当たり判定 ---
     EnemyCollision::EnemyBody MakeHitBody() const;
-    SphereCollider* GetCollider() const { return collider_.get(); }
+    BoxCollider* GetCollider() const { return collider_.get(); }
 
-    void SetHitShape(EnemyCollision::HitShape shape) { hitShape_ = shape; }
+    void SetHitShape(EnemyCollision::HitShape shape) { hitShape_ = shape; RefreshCollider(); }
     EnemyCollision::HitShape GetHitShape() const { return hitShape_; }
 
     /// @brief ヒットボックスの大きさ（モデルローカル単位。実寸は scale_ 倍される）
     void SetHitRadiusRatio(float r) { hitRadiusRatio_ = r; RefreshCollider(); }
     float GetHitRadiusRatio() const { return hitRadiusRatio_; }
-    void SetHitHalfRatio(const Vector3& r) { hitHalfRatio_ = r; }
+    void SetHitHalfRatio(const Vector3& r) { hitHalfRatio_ = r; RefreshCollider(); }
     const Vector3& GetHitHalfRatio() const { return hitHalfRatio_; }
     void SetHitOffsetRatio(float y) { hitOffsetRatio_ = y; RefreshCollider(); }
     float GetHitOffsetRatio() const { return hitOffsetRatio_; }
+
+    /// @brief ヒットボックス中心のワールド座標（モデル原点は足元にあるので少し持ち上げる）
+    Vector3 GetHitCenter() const;
+
+    /// @brief デバッグ表示用のヒットボックス全長
+    Vector3 GetHitBoxFullSize() const;
 
     /**
      * @brief GetModelSpec() を読み直して、スケール・当たり判定の設定を反映し直す
@@ -133,8 +143,10 @@ public:
      */
     void RefreshFromSpec();
 
-    /// @brief ヒットボックス中心のワールド座標（モデル原点は足元にあるので少し持ち上げる）
-    Vector3 GetHitCenter() const;
+    // --- アニメーション ---
+    bool IsAnimated() const { return isAnimated_; }
+    EnemyAnimator& GetAnimator() { return animator_; }
+    const EnemyAnimator& GetAnimator() const { return animator_; }
 
     virtual EnemyType GetType() const = 0;
     virtual const char* GetTypeName() const = 0;
@@ -152,6 +164,7 @@ protected:
         float hitOffsetRatio = 0.5f;                //!< ヒットボックス中心の高さ（モデルローカル単位）
         EnemyCollision::HitShape hitShape = EnemyCollision::HitShape::Sphere;
         bool isPushable = false;                    //!< プレイヤーに押されて動くか
+        bool useAnimation = true;                   //!< スキニングアニメーションを使うか
         Vector4 tintColor{ 1.0f, 1.0f, 1.0f, 1.0f };
     };
 
@@ -179,7 +192,11 @@ protected:
     Object3dCom* object3dCom_ = nullptr;
     Camera* camera_ = nullptr;
 
-    std::unique_ptr<Object3d> object3d_;
+    // アニメーション付きの敵はプール（EnemyAnimation.h）から借りるので所有しない。
+    // 静的メッシュのときだけ ownedObject_ が実体を持つ
+    Object3d* object3d_ = nullptr;
+    std::unique_ptr<Object3d> ownedObject_;
+    const EnemyAnimationAsset* animAsset_ = nullptr;
     Object3d::ModelData modelData_;
 
     Vector3 anchorLocal_{ 0.0f, 0.0f, 0.0f }; //!< ステージローカル座標（挙動はここを動かす）
@@ -197,6 +214,7 @@ protected:
     bool isDead_ = false;
     bool isPushable_ = false;
     bool needsGroundSnap_ = true;  //!< 初回だけ最上段の床へ即吸着する
+    bool isAnimated_ = false;
     float lifeTime_ = 0.0f;        //!< 生存時間（演出の位相に使う）
 
     EnemyCollision::HitShape hitShape_ = EnemyCollision::HitShape::Sphere;
@@ -205,5 +223,6 @@ protected:
     float hitOffsetRatio_ = 0.5f;
 
     ScaleFromStrengthFunc scaleFunc_; //!< 空なら既定関数が使われる
-    std::unique_ptr<SphereCollider> collider_;
+    EnemyAnimator animator_;
+    std::unique_ptr<BoxCollider> collider_;
 };

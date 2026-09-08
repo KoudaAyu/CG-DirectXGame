@@ -90,6 +90,13 @@ void PikminPlayer::Initialize(Object3dCom* object3dCom, Camera* camera, const Ve
     CollisionManager::GetInstance()->RegisterCollider(meshCollider_.get());
 }
 
+bool PikminPlayer::TakeSelfDestructEvent(SelfDestructEvent& out) {
+    if (!selfDestruct_.fired) return false;
+    out = selfDestruct_;
+    selfDestruct_.fired = false;
+    return true;
+}
+
 void PikminPlayer::OnCollision(const CollisionInfo& info) {
     if (info.other && info.other->GetAttribute() == CollisionAttribute::Obstacle) {
         // 同一フレーム内の多重衝突および連続ヒットを防止（中心部での振動・多重加速を防止）
@@ -232,6 +239,11 @@ void PikminPlayer::Update(float deltaTime, KeyInput* keyInput, MinionManager* mi
         if (keyInput->TriggerKey(DIK_E)) {
             // ロコロコ方式分裂: 合体中ならパァンと全員飛び散って小ロコロコに分裂！
             if (minionManager && (size_ > 1 || minionManager->GetAbsorbedCount() > 0)) {
+                // 自爆イベントを記録（EnemyManager が拾って周りの敵を強さ問わず倒す）
+                selfDestruct_.fired = true;
+                selfDestruct_.position = position_;
+                selfDestruct_.sizeBefore = size_;
+
                 minionManager->TriggerSplit(position_, size_);
                 SetSize(1);
                 slimeParams_.impulseStrength = 0.55f;

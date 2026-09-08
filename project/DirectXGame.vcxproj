@@ -80,6 +80,7 @@
     <ClCompile Include="Application\Enemy\Enemy.cpp" />
     <ClCompile Include="Application\Enemy\MovingEnemy.cpp" />
     <ClCompile Include="Application\Enemy\EnemyCollision.cpp" />
+    <ClCompile Include="Application\Enemy\EnemyAnimation.cpp" />
     <ClCompile Include="Application\Enemy\EnemyBase.cpp" />
     <ClCompile Include="Application\Enemy\MobEnemy.cpp" />
     <ClCompile Include="Application\Enemy\EnemyBullet.cpp" />
@@ -324,6 +325,7 @@
     <ClInclude Include="Application\Enemy\Enemy.h" />
     <ClInclude Include="Application\Enemy\MovingEnemy.h" />
     <ClInclude Include="Application\Enemy\EnemyCollision.h" />
+    <ClInclude Include="Application\Enemy\EnemyAnimation.h" />
     <ClInclude Include="Application\Enemy\EnemyBase.h" />
     <ClInclude Include="Application\Enemy\MobEnemy.h" />
     <ClInclude Include="Application\Enemy\EnemyBullet.h" />

@@ -39,6 +39,10 @@ namespace
             c.idleWobble = 0.06f;
             c.strengthMin = 3;
             c.strengthMax = 20;
+            c.clipIdle = "wait";
+            c.clipWalk = "walk";
+            c.clipAttack = "attack";
+            c.clipAlert = "discovery";
             break;
 
         case EnemyType::FlowerClover:
@@ -60,6 +64,10 @@ namespace
             c.idleWobble = 0.045f;
             c.strengthMin = 5;
             c.strengthMax = 15;
+            c.clipIdle = "Idle";
+            c.clipWalk = "";          // 地面に固定なので移動クリップは使わない
+            c.clipAttack = "Attack";
+            c.clipAlert = "Attack_Wait";
             break;
 
         case EnemyType::FlowerLotus:
@@ -94,6 +102,10 @@ namespace
             c.bulletColor = { 1.0f, 0.55f, 0.85f, 1.0f };
             c.strengthMin = 5;
             c.strengthMax = 15;
+            c.clipIdle = "Idle";
+            c.clipWalk = "Walk";
+            c.clipAttack = "Attack";
+            c.clipAlert = "Attack_Wait";
             break;
 
         case EnemyType::FlowerSunward:
@@ -124,6 +136,11 @@ namespace
             c.bulletColor = { 1.0f, 0.85f, 0.30f, 1.0f };
             c.strengthMin = 5;
             c.strengthMax = 15;
+            c.clipIdle = "Idle";
+            c.clipWalk = "";
+            c.clipAttack = "Attack";
+            c.clipAlert = "Attack_Wait";
+            // "Death" クリップもあるが、今の仕様は撃破＝即消滅なので使っていない
             break;
 
         default:
@@ -176,6 +193,7 @@ EnemyBase::ModelSpec MobEnemy::GetModelSpec() const
     spec.hitOffsetRatio = c.hitOffsetRatio;
     spec.hitShape = c.hitShape;
     spec.isPushable = c.isPushable;
+    spec.useAnimation = c.useAnimation;
     spec.tintColor = c.tintColor;
     return spec;
 }
@@ -185,6 +203,28 @@ void MobEnemy::OnInitialized()
     const MobEnemyConfig& c = GetConfig();
     shootTimer_ = c.shootInterval * 0.5f + RandomJitter(c.shootIntervalJitter);
     hopPhase_ = RandomJitter(kPi);
+
+    if (IsAnimated())
+    {
+        // 同じ種類が並んでも動きが揃わないよう、再生速度を少しだけばらす
+        animator_.SetSpeed(c.animSpeed * (1.0f + RandomJitter(0.08f)));
+        animator_.Play(c.clipIdle);
+    }
+}
+
+const char* MobEnemy::PickBaseClip() const
+{
+    const MobEnemyConfig& c = GetConfig();
+
+    if (moveAmount_ > 0.01f && c.clipWalk && c.clipWalk[0] != 0)
+    {
+        return c.clipWalk;
+    }
+    if (isChasing_ && c.clipAlert && c.clipAlert[0] != 0)
+    {
+        return c.clipAlert;
+    }
+    return c.clipIdle;
 }
 
 bool MobEnemy::TakeShootRequest(ShootRequest& out)
@@ -296,10 +336,28 @@ void MobEnemy::UpdateBehavior(const EnemyUpdateContext& ctx)
             }
         }
     }
+
+    // --- アニメーションの状態選択 ---
+    if (IsAnimated())
+    {
+        const char* base = PickBaseClip();
+        if (shootRequest_.fire && c.clipAttack && c.clipAttack[0] != 0)
+        {
+            // 発射の瞬間だけ攻撃モーションを1回。終わったら base に戻る
+            animator_.PlayOneShot(c.clipAttack, base ? base : "");
+        }
+        else
+        {
+            animator_.Play(base ? base : "");
+        }
+    }
 }
 
 Vector3 MobEnemy::GetRenderScale() const
 {
+    // アニメーションが動いているならホップ演出は要らない
+    if (IsAnimated()) return scale_;
+
     const MobEnemyConfig& c = GetConfig();
 
     // アニメーションが入るまでの繋ぎ。動いているときはスクワッシュ、止まっているときは呼吸
@@ -319,6 +377,8 @@ Vector3 MobEnemy::GetRenderScale() const
 
 float MobEnemy::GetVisualOffsetY() const
 {
+    if (IsAnimated()) return 0.0f;
+
     const MobEnemyConfig& c = GetConfig();
     if (c.hopHeight <= 0.0f || moveAmount_ <= 0.01f) return 0.0f;
 

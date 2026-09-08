@@ -2,6 +2,7 @@
 #include "EnemyManager.h"
 
 #include "Application/Player/PikminPlayer.h"
+#include "Application/Minion/MinionManager.h"
 #include "Baziru3_Engine/Framework/Collision/CollisionManager.h"
 #include "Baziru3_Engine/Graphics/3D/Object/Object3dCom.h"
 
@@ -31,20 +32,31 @@ void EnemyManager::Initialize(Object3dCom* object3dCom, Camera* camera)
     enemies_.clear();
     bullets_.clear();
 
-    // プレイヤーの塊 vs 敵は EnemyCollision で「強弱つき」に解決するので、
-    // エンジン側の単純な押し出しは切っておく（二重押し出し防止）。
-    // ミニオン・障害物とはエンジンの押し出しをそのまま使う。
-    CollisionManager::GetInstance()->SetCollisionFilter(CollisionAttribute::Player, CollisionAttribute::Enemy, false);
+    // 敵まわりの当たり判定はすべて EnemyCollision で自前解決する。
+    // エンジン側の押し出しは全部切っておく:
+    //   - Player / Minion とは「強さ比較」で結果が変わるので、単純な押し出しでは足りない
+    //   - Obstacle（地面の MeshCollider）に押されると敵の座標が勝手に書き換わり、
+    //     こちらの地面追従と喧嘩して最終的に島の外へ押し出され、奈落へ落ちていた
+    if (auto* cm = CollisionManager::GetInstance())
+    {
+        cm->SetCollisionFilter(CollisionAttribute::Player, CollisionAttribute::Enemy, false);
+        cm->SetCollisionFilter(CollisionAttribute::Minion, CollisionAttribute::Enemy, false);
+        cm->SetCollisionFilter(CollisionAttribute::Bullet, CollisionAttribute::Enemy, false);
+        cm->SetCollisionFilter(CollisionAttribute::Obstacle, CollisionAttribute::Enemy, false);
+    }
 }
 
 void EnemyManager::Finalize()
 {
-    // Initialize() で切った Player <-> Enemy のフィルタを戻しておく。
+    // Initialize() で切ったフィルタを戻しておく。
     // CollisionManager はシーンより長生きするシングルトンなので、
     // 切りっぱなしにすると次のシーンに影響が残る
-    if (CollisionManager::GetInstance())
+    if (auto* cm = CollisionManager::GetInstance())
     {
-        CollisionManager::GetInstance()->SetCollisionFilter(CollisionAttribute::Player, CollisionAttribute::Enemy, true);
+        cm->SetCollisionFilter(CollisionAttribute::Player, CollisionAttribute::Enemy, true);
+        cm->SetCollisionFilter(CollisionAttribute::Minion, CollisionAttribute::Enemy, true);
+        cm->SetCollisionFilter(CollisionAttribute::Bullet, CollisionAttribute::Enemy, true);
+        cm->SetCollisionFilter(CollisionAttribute::Obstacle, CollisionAttribute::Enemy, true);
     }
 
     for (auto& e : enemies_)
@@ -195,8 +207,16 @@ Vector3 EnemyManager::CalcStageNormal(const Vector2& stageTilt)
     return (len > 1e-5f) ? n * (1.0f / len) : Vector3{ 0.0f, 1.0f, 0.0f };
 }
 
-void EnemyManager::Update(float deltaTime, const Vector2& stageTilt, PikminPlayer* player)
+void EnemyManager::Update(float deltaTime, const Vector2& stageTilt, PikminPlayer* player,
+                          MinionManager* minionManager)
 {
+    // 自爆イベントは必ず毎フレーム引き取る。
+    // ここより下でリターンすると、古い座標のまま次フレームに爆発してしまう
+    if (player)
+    {
+        ResolveSelfDestruct(player);
+    }
+
     if (!object3dCom_) return;
 
     Vector3 playerPos = player ? player->GetPosition() : Vector3{ 0.0f, 0.0f, 0.0f };
@@ -233,6 +253,7 @@ void EnemyManager::Update(float deltaTime, const Vector2& stageTilt, PikminPlaye
     if (enableCollision_ && player)
     {
         ResolvePlayerCollisions(player, stageTilt, pivot);
+        ResolveMinionCollisions(minionManager, stageTilt, pivot);
         ResolveBulletCollisions(player);
     }
 
@@ -305,6 +326,125 @@ void EnemyManager::ResolvePlayerCollisions(PikminPlayer* player, const Vector2& 
         player->SetPosition(slime.position);
         player->SetVelocity(velocity);
     }
+}
+
+void EnemyManager::ResolveMinionCollisions(MinionManager* minionManager, const Vector2& stageTilt, const Vector2& pivot)
+{
+    if (!minionManager) return;
+
+    // 判定ルールはプレイヤー本体とまったく同じ。
+    // 小スライムの「強さ」は Minion::GetSize()（含まれる最小単位スライムの数）
+    const Vector3 planeNormal = CalcStageNormal(stageTilt);
+
+    for (const auto& minionPtr : minionManager->GetMinions())
+    {
+        Minion* minion = minionPtr.get();
+        if (!minion || !minion->IsActive()) continue;
+
+        // 吸い込まれている最中の子は判定から外す（位置が補間で飛ぶため）
+        if (minion->GetState() == MinionState::Merging) continue;
+
+        EnemyCollision::SlimeBody slime;
+        slime.position = minion->GetPosition();
+        slime.scale = minion->GetScale();
+        slime.squashStretch = minion->GetSlimeParams().squashStretch;
+        slime.baseRadius = 1.0f;
+        slime.strength = minion->GetSize();
+
+        Vector3 velocity = minion->GetVelocity();
+        bool changed = false;
+        bool bounced = false;
+
+        for (auto& e : enemies_)
+        {
+            if (!e || e->IsDead()) continue;
+
+            auto result = EnemyCollision::ResolvePlayerVsEnemy(slime, velocity, e->MakeHitBody(),
+                                                               minionBounceSpeed_, planeNormal);
+            if (!result.hit) continue;
+
+            auto& params = minion->GetSlimeParams();
+            params.impulseStrength = (std::max)(params.impulseStrength, result.impulse);
+
+            switch (result.outcome)
+            {
+            case EnemyCollision::HitOutcome::EnemyDefeated:
+                e->Defeat();
+                params.squashStretch = { 0.16f, -0.12f, 0.16f };
+                break;
+
+            case EnemyCollision::HitOutcome::PlayerBounced:
+                changed = true;
+                bounced = true;
+                break;
+
+            case EnemyCollision::HitOutcome::Standoff:
+                changed = true;
+                break;
+
+            default:
+                break;
+            }
+
+            if (result.outcome != EnemyCollision::HitOutcome::EnemyDefeated &&
+                (result.enemyPush.x != 0.0f || result.enemyPush.z != 0.0f))
+            {
+                e->ApplyPush(result.enemyPush, stageTilt, pivot);
+            }
+        }
+
+        if (changed)
+        {
+            minion->SetPosition(slime.position);
+
+            // 接触が続いているあいだ毎フレーム Launch すると、いつまでも着地できない。
+            // まだ飛んでいない子だけ弾き飛ばす
+            if (bounced && minion->GetState() != MinionState::Thrown)
+            {
+                // Launch() は Thrown 状態にして放物線を描かせる。弾かれた感じが出る
+                minion->Launch(velocity);
+                // Launch() が squashStretch を上書きするので、演出はこの後に掛ける
+                minion->GetSlimeParams().squashStretch = { 0.28f, -0.22f, 0.28f };
+            }
+            else
+            {
+                minion->SetVelocity(velocity);
+            }
+        }
+    }
+}
+
+void EnemyManager::ResolveSelfDestruct(PikminPlayer* player)
+{
+    PikminPlayer::SelfDestructEvent ev;
+    if (!player->TakeSelfDestructEvent(ev)) return;
+
+    // 分裂前の塊が大きいほど爆風も広い
+    float radius = selfDestructBaseRadius_
+                 + selfDestructPerSize_ * static_cast<float>((std::max)(1, ev.sizeBefore) - 1);
+    float radiusSq = radius * radius;
+
+    int kills = 0;
+    for (auto& e : enemies_)
+    {
+        if (!e || e->IsDead()) continue;
+
+        Vector3 center = e->GetHitCenter();
+        float dx = center.x - ev.position.x;
+        float dz = center.z - ev.position.z;
+        float dy = center.y - ev.position.y;
+
+        // 水平は爆風半径、縦はゆるめに見る（背の高い花も巻き込む）
+        if (dx * dx + dz * dz > radiusSq) continue;
+        if (std::abs(dy) > radius + 2.0f) continue;
+
+        // 自爆は強さ問わず倒せる
+        e->Defeat();
+        ++kills;
+    }
+
+    lastSelfDestructRadius_ = radius;
+    lastSelfDestructKills_ = kills;
 }
 
 void EnemyManager::ResolveBulletCollisions(PikminPlayer* player)
@@ -393,11 +533,18 @@ void EnemyManager::DrawImGui()
 #ifdef USE_IMGUI
     if (!ImGui::CollapsingHeader("Enemy")) return;
 
-    ImGui::Text("Alive: %d   Bullets: %d / %d pooled",
-                GetAliveCount(), GetActiveBulletCount(), static_cast<int>(bullets_.size()));
+    ImGui::Text("Alive: %d   Bullets: %d / %d pooled   SkinnedObj pool: %d",
+                GetAliveCount(), GetActiveBulletCount(), static_cast<int>(bullets_.size()),
+                GetSkinnedObject3dPoolTotal());
     ImGui::Checkbox("Enable Collision", &enableCollision_);
     ImGui::DragFloat("Bounce Speed", &bounceSpeed_, 0.1f, 0.0f, 40.0f);
+    ImGui::DragFloat("Minion Bounce Speed", &minionBounceSpeed_, 0.1f, 0.0f, 40.0f);
     ImGui::DragFloat("Bullet Knockback", &bulletKnockback_, 0.1f, 0.0f, 40.0f);
+
+    ImGui::SeparatorText("Self Destruct (E key)");
+    ImGui::DragFloat("Blast Radius (size 1)", &selfDestructBaseRadius_, 0.05f, 0.0f, 40.0f);
+    ImGui::DragFloat("Blast Radius / size", &selfDestructPerSize_, 0.05f, 0.0f, 10.0f);
+    ImGui::Text("Last blast: r=%.2f  kills=%d", lastSelfDestructRadius_, lastSelfDestructKills_);
 
     ImGui::SeparatorText("Spawn");
     ImGui::Combo("Type##spawn", &imguiSpawnType_, kTypeNames, IM_ARRAYSIZE(kTypeNames));
@@ -484,8 +631,14 @@ void EnemyManager::DrawImGui()
             ImGui::DragFloat("Muzzle Height", &c.muzzleHeightRatio, 0.01f, 0.0f, 4.0f);
         }
 
-        ImGui::DragInt("Strength Min", &c.strengthMin, 0.1f, 1, 20);
-        ImGui::DragInt("Strength Max", &c.strengthMax, 0.1f, 1, 20);
+        ImGui::DragInt("Strength Min", &c.strengthMin, 0.1f, 1, 30);
+        ImGui::DragInt("Strength Max", &c.strengthMax, 0.1f, 1, 30);
+
+        ImGui::Checkbox("Use Animation", &c.useAnimation);
+        ImGui::DragFloat("Anim Speed", &c.animSpeed, 0.01f, 0.05f, 5.0f);
+        ImGui::TextDisabled("clips: idle=%s / walk=%s / attack=%s / alert=%s",
+                            c.clipIdle, c.clipWalk, c.clipAttack, c.clipAlert);
+        ImGui::TextDisabled("Use Animation の切り替えは次にスポーンする個体から効きます");
 
         if (ImGui::Button("Apply To Existing", ImVec2(200, 26)))
         {
@@ -509,9 +662,11 @@ void EnemyManager::DrawImGui()
             MobEnemy* e = enemies_[i].get();
             if (!e) continue;
             const Vector3& p = e->GetPosition();
-            ImGui::Text("[%2zu] %-14s STR %2d  scale %.2f  pos(%.1f, %.1f, %.1f) %s",
+            ImGui::Text("[%2zu] %-14s STR %2d  scale %.2f  pos(%.1f, %.1f, %.1f) %s %s",
                         i, e->GetTypeName(), e->GetStrength(), e->GetScale().x,
-                        p.x, p.y, p.z, e->IsChasing() ? "<chase>" : "");
+                        p.x, p.y, p.z,
+                        e->IsChasing() ? "<chase>" : "",
+                        e->IsAnimated() ? e->GetAnimator().GetCurrentClipName() : "[static]");
         }
     }
     ImGui::EndChild();

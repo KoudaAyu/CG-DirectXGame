@@ -67,6 +67,22 @@ public:
 
     float CalculateMergedScale(int minionCount) const;
 
+    /// @brief 自爆（E キーによる分裂）が起きたことを外へ伝えるイベント
+    struct SelfDestructEvent
+    {
+        bool fired = false;                    //!< このフレームに自爆したか
+        Vector3 position{ 0.0f, 0.0f, 0.0f };  //!< 爆心（分裂した瞬間の位置）
+        int sizeBefore = 1;                    //!< 分裂前の塊サイズ。爆風の広さに使う
+    };
+
+    /**
+     * @brief 自爆イベントを取り出してクリアする
+     * @param[out] out 取り出したイベント
+     * @return 自爆していれば true
+     * @note 1回の自爆につき1回だけ true を返す。拾い手は1箇所にすること
+     */
+    bool TakeSelfDestructEvent(SelfDestructEvent& out);
+
     // 衝突時の弾性リアクション
     void OnCollision(const CollisionInfo& info);
 
@@ -115,6 +131,9 @@ private:
     float currentMergedScale_ = 0.4f;
     int lastAbsorbedCount_ = 0;
     int size_ = 1; // 現在のロコロコサイズ（最小1: 1+1=2... 小 1-2, 中 3-7, 大 8-10）
+
+    // 自爆（E キー分裂）イベント
+    SelfDestructEvent selfDestruct_;
 
     // スライム固有
     SlimeParamsCPU slimeParams_;

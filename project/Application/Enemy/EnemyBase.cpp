@@ -73,6 +73,13 @@ EnemyBase::~EnemyBase()
     {
         CollisionManager::GetInstance()->UnregisterCollider(collider_.get());
     }
+
+    // 借りていた Object3d はプールへ返す（破棄すると SRV ディスクリプタが戻らない）
+    if (animAsset_ && object3d_ && !ownedObject_)
+    {
+        ReleaseSkinnedObject3d(animAsset_, object3d_);
+        object3d_ = nullptr;
+    }
 }
 
 void EnemyBase::Initialize(Object3dCom* object3dCom, Camera* camera, const Vector3& stageLocalPos, int strength)
@@ -91,26 +98,62 @@ void EnemyBase::Initialize(Object3dCom* object3dCom, Camera* camera, const Vecto
     isPushable_ = spec.isPushable;
 
     // --- モデル読み込み ---
-    // .obj は LoadObjFile、それ以外（.gltf など）は Assimp 経由の LoadModelFile
     const std::string& file = spec.fileName;
     bool isObj = (file.size() >= 4) && (file.compare(file.size() - 4, 4, ".obj") == 0);
-    modelData_ = isObj ? Object3d::LoadObjFile(spec.directory, file)
-                       : Object3d::LoadModelFile(spec.directory, file);
 
-    // バウンディング半径を実測して視錐台カリングの誤判定を防ぐ
-    float maxLenSq = 0.0f;
-    for (const auto& v : modelData_.vertices)
+    const EnemyAnimationAsset* animAsset = nullptr;
+    if (spec.useAnimation && !isObj)
     {
-        float lenSq = v.position.x * v.position.x + v.position.y * v.position.y + v.position.z * v.position.z;
-        maxLenSq = (std::max)(maxLenSq, lenSq);
+        animAsset = LoadEnemyAnimationAsset(spec.directory, file);
+        if (animAsset && !animAsset->valid)
+        {
+            animAsset = nullptr; // スキン or クリップが無い。静的メッシュとして扱う
+        }
     }
-    modelData_.boundingRadius = (maxLenSq > 0.0f) ? std::sqrt(maxLenSq) : 2.0f;
 
-    object3d_ = std::make_unique<Object3d>();
-    object3d_->Initialize(object3dCom_, modelData_); // テクスチャは material.textureFilePath から自動ロードされる
+    animAsset_ = nullptr;
+    isAnimated_ = false;
+
+    if (animAsset)
+    {
+        // スキン付きは Object3d をプールから借りる。
+        // SetupAnimation() が確保する SRV ディスクリプタを engine 側が解放できないため、
+        // 作っては捨てるとヒープを食い潰す（EnemyAnimation.h のコメント参照）
+        object3d_ = AcquireSkinnedObject3d(animAsset, object3dCom_, camera_);
+        if (object3d_)
+        {
+            animAsset_ = animAsset;
+            modelData_ = animAsset->object3dModel;
+            animator_.Initialize(object3d_, animAsset);
+            isAnimated_ = animator_.IsValid();
+        }
+    }
+
+    if (!object3d_)
+    {
+        // 静的メッシュ（アニメ無し、または資産の読み込みに失敗）
+        modelData_ = isObj ? Object3d::LoadObjFile(spec.directory, file)
+                           : Object3d::LoadModelFile(spec.directory, file);
+
+        // バウンディング半径を実測して視錐台カリングの誤判定を防ぐ
+        float maxLenSq = 0.0f;
+        for (const auto& v : modelData_.vertices)
+        {
+            float lenSq = v.position.x * v.position.x + v.position.y * v.position.y + v.position.z * v.position.z;
+            maxLenSq = (std::max)(maxLenSq, lenSq);
+        }
+        modelData_.boundingRadius = (maxLenSq > 0.0f) ? std::sqrt(maxLenSq) : 2.0f;
+
+        ownedObject_ = std::make_unique<Object3d>();
+        ownedObject_->Initialize(object3dCom_, modelData_); // テクスチャは material.textureFilePath から自動ロードされる
+        object3d_ = ownedObject_.get();
+    }
+
     object3d_->SetCamera(camera_);
     object3d_->SetColor(spec.tintColor);
     object3d_->SetEnableLighting(true);
+    // デバッグ用ワイヤーフレームは既定 ON。敵ぶんだけ2パス目が増えるので切っておく
+    object3d_->SetAllowWireframeOverlay(false);
 
     // --- 配置と強さ ---
     anchorLocal_ = stageLocalPos;
@@ -130,11 +173,13 @@ void EnemyBase::Initialize(Object3dCom* object3dCom, Camera* camera, const Vecto
     object3d_->Update();
 
     // --- コライダー ---
-    // プレイヤーの塊との判定は EnemyCollision で個別に解決するので、
-    // ここで登録するのは主にミニオン・障害物との押し合い用
-    // （Player <-> Enemy のフィルタは EnemyManager::Initialize() で切ってある）
-    collider_ = std::make_unique<SphereCollider>(scale_.x * hitRadiusRatio_, &position_, CollisionAttribute::Enemy);
+    // **トリガー登録のみ**。エンジン側の押し出しは使わない（EnemyManager で属性フィルタも切っている）。
+    // Sphere ではなく Box にしてあるのは、CollisionManager::Update() の冒頭にある
+    // 「Sphere コライダーを近くの Object3d のスケールへ自動同期する」処理に
+    // 半径とオフセットを毎フレーム上書きされてしまうため。
+    collider_ = std::make_unique<BoxCollider>(GetHitBoxFullSize(), &position_, &rotation_, CollisionAttribute::Enemy);
     collider_->SetPositionOffset({ 0.0f, scale_.y * hitOffsetRatio_, 0.0f });
+    collider_->SetIsTrigger(true);
     if (CollisionManager::GetInstance())
     {
         CollisionManager::GetInstance()->RegisterCollider(collider_.get());
@@ -165,6 +210,12 @@ void EnemyBase::SetStrengthInternal(int strength, bool refreshCollider)
     }
 }
 
+void EnemyBase::SetScaleFromStrength(ScaleFromStrengthFunc func)
+{
+    scaleFunc_ = std::move(func);
+    SetStrength(strength_);
+}
+
 void EnemyBase::RefreshFromSpec()
 {
     const ModelSpec spec = GetModelSpec();
@@ -180,17 +231,24 @@ void EnemyBase::RefreshFromSpec()
     SetStrengthInternal(strength_, true);
 }
 
-void EnemyBase::SetScaleFromStrength(ScaleFromStrengthFunc func)
+Vector3 EnemyBase::GetHitBoxFullSize() const
 {
-    scaleFunc_ = std::move(func);
-    SetStrength(strength_);
+    if (hitShape_ == EnemyCollision::HitShape::AABB)
+    {
+        return { scale_.x * hitHalfRatio_.x * 2.0f,
+                 scale_.y * hitHalfRatio_.y * 2.0f,
+                 scale_.z * hitHalfRatio_.z * 2.0f };
+    }
+
+    float d = scale_.x * hitRadiusRatio_ * 2.0f;
+    return { d, d, d };
 }
 
 void EnemyBase::RefreshCollider()
 {
     if (collider_)
     {
-        collider_->SetRadius(scale_.x * hitRadiusRatio_);
+        collider_->SetSize(GetHitBoxFullSize());
         collider_->SetPositionOffset({ 0.0f, scale_.y * hitOffsetRatio_, 0.0f });
     }
 }
@@ -253,30 +311,6 @@ void EnemyBase::Update(const EnemyUpdateContext& ctx)
     Vector3 normal{ 0.0f, 1.0f, 0.0f };
     float groundedY = position_.y;
 
-    // 初回だけ「currentY を無視して最上段の床」を取る。
-    // そうしないと、地形が高い場所にスポーンさせたときに
-    // 自力登坂限界 (kMaxStepUp = 0.35m) で床が候補から外れて落下してしまう。
-    if (needsGroundSnap_)
-    {
-        float snapY = SlimePhysics::CalculateGroundedCenterYEx(
-            position_.x, position_.z, SlimePhysics::kIgnoreCurrentY, ctx.stageTilt, groundOffset_,
-            &hasGround, &normal, ctx.pivot, false);
-
-        if (hasGround)
-        {
-            position_.y = snapY;
-            groundNormal_ = normal;
-            rotation_.x = std::atan2(groundNormal_.z, groundNormal_.y);
-            rotation_.z = -std::atan2(groundNormal_.x, groundNormal_.y);
-            needsGroundSnap_ = false;
-        }
-        else if (lifeTime_ > 0.5f)
-        {
-            // 地面が見つからないまま。以降は通常処理（落下）に任せる
-            needsGroundSnap_ = false;
-        }
-    }
-
     if (!needsGroundSnap_)
     {
         groundedY = SlimePhysics::CalculateGroundedCenterYEx(
@@ -284,20 +318,56 @@ void EnemyBase::Update(const EnemyUpdateContext& ctx)
             &hasGround, &normal, ctx.pivot, true);
     }
 
-    if (needsGroundSnap_)
+    // 通常の問い合わせで床が見つからないケースは2つある:
+    //   (a) 本当に島の外に出た
+    //   (b) 自力登坂限界 (kMaxStepUp = 0.35m) に引っかかって、
+    //       足元の床が候補から外されただけ（坂を上る／スポーン直後など）
+    // (b) で落下させてしまうと敵が勝手に奈落へ消えるので、
+    // currentY を無視して最上段の床を取り直す。それでも駄目なら本当に足場が無い
+    if (!hasGround)
     {
-        // 初回スナップ待ち。位置は動かさない
+        // 初回は「最上段の床」、以降は「頭より下で一番高い床」を取り直す。
+        //   初回 : どの高さの地形にスポーンさせても確実に乗せたいので currentY を無視する
+        //   以降 : currentY を無視すると、崖下にいる敵が上の段へ吸い上げられてしまう。
+        //          isGrounded = false の分岐なら「頭より下で一番高い床」を選ぶので安全
+        float currentYArg = needsGroundSnap_ ? SlimePhysics::kIgnoreCurrentY : position_.y;
+
+        float snapY = SlimePhysics::CalculateGroundedCenterYEx(
+            position_.x, position_.z, currentYArg, ctx.stageTilt, groundOffset_,
+            &hasGround, &normal, ctx.pivot, false);
+
+        if (hasGround)
+        {
+            if (needsGroundSnap_)
+            {
+                // 初回はワープさせて即座に地面へ乗せる
+                position_.y = snapY;
+                groundNormal_ = normal;
+                rotation_.x = std::atan2(groundNormal_.z, groundNormal_.y);
+                rotation_.z = -std::atan2(groundNormal_.x, groundNormal_.y);
+                needsGroundSnap_ = false;
+            }
+            groundedY = snapY;
+        }
     }
-    else if (hasGround)
+    else
+    {
+        needsGroundSnap_ = false;
+    }
+
+    if (hasGround)
     {
         // 段差でワープしないよう少しだけ補間して追従
         float follow = (std::min)(1.0f, ctx.deltaTime * 30.0f);
         position_.y += (groundedY - position_.y) * follow;
         groundNormal_ = normal;
     }
-    else
+    else if (lifeTime_ > 0.3f)
     {
-        // 足場が無い（島の外へ出た）。落下させて奈落で消す
+        // 足場が無い（島の外へ出た）。落下させて奈落で消す。
+        // スポーン直後は地形メッシュの AABB ツリーがまだ組まれていないことがあるので、
+        // 最初の 0.3 秒はその場に浮かせたまま様子を見る
+        needsGroundSnap_ = false;
         position_.y -= 18.0f * ctx.deltaTime;
         if (position_.y < -80.0f)
         {
@@ -314,7 +384,17 @@ void EnemyBase::Update(const EnemyUpdateContext& ctx)
     rotation_.z += (targetRotZ - rotation_.z) * lerp;
     rotation_.y = yaw_;
 
-    // 5. 描画オブジェクトとコライダーへ反映
+    // 5. アニメーション（Object3d::Update() の前にポーズを流し込む）
+    if (isAnimated_)
+    {
+        animator_.Update(ctx.deltaTime);
+        if (!object3d_->IsCulled())
+        {
+            animator_.ApplyToSkeleton();
+        }
+    }
+
+    // 6. 描画オブジェクトとコライダーへ反映
     Vector3 visualPos = position_;
     visualPos.y += GetVisualOffsetY();
 
@@ -331,8 +411,16 @@ void EnemyBase::Draw(const RenderContext& ctx)
 {
     if (isDead_ || !object3d_) return;
 
-    // Object3d::Draw(ctx) が modelData_.material.textureIndex からテクスチャを解決してくれる
-    object3d_->Draw(ctx);
+    if (isAnimated_)
+    {
+        // 引数なしの Draw() だけがスキニング経路（SkinningObject3dCom）へ入る。
+        // Draw(const RenderContext&) は通常の Object3dCom 固定なので使えない
+        object3d_->Draw();
+    }
+    else
+    {
+        object3d_->Draw(ctx);
+    }
 }
 
 void EnemyBase::Finalize()
@@ -342,6 +430,14 @@ void EnemyBase::Finalize()
         CollisionManager::GetInstance()->UnregisterCollider(collider_.get());
     }
     collider_.reset();
-    object3d_.reset();
+
+    if (animAsset_ && object3d_ && !ownedObject_)
+    {
+        ReleaseSkinnedObject3d(animAsset_, object3d_);
+    }
+    object3d_ = nullptr;
+    ownedObject_.reset();
+    animAsset_ = nullptr;
+    isAnimated_ = false;
     isDead_ = true;
 }
