@@ -82,12 +82,6 @@ public:
     void SetMergeCooldown(float cd) { mergeCooldown_ = cd; }
     float GetMergeCooldown() const { return mergeCooldown_; }
 
-    // 内包する子スライムたち（合体・分裂用）
-    const std::vector<Slime*>& GetAbsorbedChildren() const { return absorbedChildren_; }
-    std::vector<Slime*>& GetAbsorbedChildren() { return absorbedChildren_; }
-    void AddAbsorbedChild(Slime* child) { absorbedChildren_.push_back(child); }
-    void ClearAbsorbedChildren() { absorbedChildren_.clear(); }
-
     // タイトル画面専用の「大きい青い例外」
     void SetTitleException(bool isTitle);
     bool IsTitleException() const { return isTitleException_; }
@@ -140,7 +134,6 @@ private:
 
     SlimeParamsCPU slimeParams_;
 
-    std::vector<Slime*> absorbedChildren_;
     std::unique_ptr<MeshCollider> meshCollider_;
 
     Vector3 prevVelocity_{ 0.0f, 0.0f, 0.0f }; // スクワッシュ変形用の前フレーム速度

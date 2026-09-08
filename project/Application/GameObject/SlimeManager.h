@@ -52,6 +52,8 @@ public:
     float GetSplitUpPower() const { return splitUpPower_; }
     void SetSplitUpPower(float p) { splitUpPower_ = p; }
 
+    static constexpr int kMaxSlimes = 30;
+
 private:
     void ResolveSeparation(const Vector3& rotation, const Vector2& stageTilt, const Vector2& pivot);
     void CheckAndResolveMerge(const Vector2& stageTilt, const Vector2& pivot);

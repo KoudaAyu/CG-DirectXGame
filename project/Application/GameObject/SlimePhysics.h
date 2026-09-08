@@ -89,7 +89,7 @@ namespace SlimePhysics
      * @param heightOffset 判定中心の高さオフセット（通常 0.0f）
      * @return 壁に衝突して押し出しが発生した場合は true
      */
-    bool ResolveWallCollision(Vector3& position, Vector3& velocity, float radius, float heightOffset = 0.0f);
+    bool ResolveWallCollision(Vector3& position, Vector3& velocity, float radius, float heightOffset = 0.0f, const Vector3* prevPos = nullptr);
 
     /**
      * @brief スライム変形計算用の入力パラメータ構造体

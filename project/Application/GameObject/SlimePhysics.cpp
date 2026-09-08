@@ -367,7 +367,8 @@ namespace SlimePhysics
 
         float vc = d1 * d4 - d3 * d2;
         if (vc <= 0.0f && d1 >= 0.0f && d3 <= 0.0f) {
-            float v = d1 / (d1 - d3);
+            float denom = d1 - d3;
+            float v = (std::abs(denom) > 1e-7f) ? (d1 / denom) : 0.0f;
             return a + ab * v;
         }
 
@@ -378,23 +379,31 @@ namespace SlimePhysics
 
         float vb = d5 * d2 - d1 * d6;
         if (vb <= 0.0f && d2 >= 0.0f && d6 <= 0.0f) {
-            float w = d2 / (d2 - d6);
+            float denom = d2 - d6;
+            float w = (std::abs(denom) > 1e-7f) ? (d2 / denom) : 0.0f;
             return a + ac * w;
         }
 
         float va = d3 * d6 - d5 * d4;
         if (va <= 0.0f && (d4 - d3) >= 0.0f && (d5 - d6) >= 0.0f) {
-            float w = (d4 - d3) / ((d4 - d3) + (d5 - d6));
+            float denom = (d4 - d3) + (d5 - d6);
+            float w = (std::abs(denom) > 1e-7f) ? ((d4 - d3) / denom) : 0.0f;
             return b + (c - b) * w;
         }
 
-        float denom = 1.0f / (va + vb + vc);
+        float denomSum = va + vb + vc;
+        if (std::abs(denomSum) < 1e-7f) {
+            // 縮退三角形（面積0・同一直線上の頂点等）の場合は三角形の重心を安全に返す
+            return (a + b + c) * (1.0f / 3.0f);
+        }
+
+        float denom = 1.0f / denomSum;
         float v = vb * denom;
         float w = vc * denom;
         return a + ab * v + ac * w;
     }
 
-    bool ResolveWallCollision(Vector3& position, Vector3& velocity, float radius, float heightOffset)
+    bool ResolveWallCollision(Vector3& position, Vector3& velocity, float radius, float heightOffset, const Vector3* prevPos)
     {
         if (!sGroundObject || !sGroundCollider) return false;
 
@@ -411,7 +420,130 @@ namespace SlimePhysics
 
         bool anyCollided = false;
 
-        // 最大2回の反復解決（コーナーや直角壁での多重壁押し出しを過剰反発なしに滑らかに収束）
+        // =========================================================================
+        // Phase 1: 連続衝突判定（CCD: Continuous Collision Detection）
+        // 前フレーム位置（prevPos）から現在位置（position）への移動経路をスイープ探査し、
+        // 薄い壁や高速移動（吹き飛び・落下）による1フレームでの壁すり抜けを完全防止
+        // =========================================================================
+        if (prevPos)
+        {
+            Vector3 moveWorld = position - *prevPos;
+            float moveDistWorld = std::sqrt(moveWorld.x * moveWorld.x + moveWorld.y * moveWorld.y + moveWorld.z * moveWorld.z);
+
+            if (moveDistWorld > 1e-4f)
+            {
+                Vector3 dirWorld = moveWorld * (1.0f / moveDistWorld);
+
+                // 横幅（左右）および高さをカバーする4本の探査レイ（中心、左右、上方）
+                Vector3 perpHoriz = { -dirWorld.z, 0.0f, dirWorld.x };
+                float perpLen = std::sqrt(perpHoriz.x * perpHoriz.x + perpHoriz.z * perpHoriz.z);
+                if (perpLen > 1e-4f)
+                {
+                    perpHoriz = perpHoriz * ((radius * 0.55f) / perpLen);
+                }
+                else
+                {
+                    perpHoriz = { radius * 0.55f, 0.0f, 0.0f };
+                }
+
+                Vector3 sweepOrigins[4] = {
+                    { prevPos->x, prevPos->y + heightOffset, prevPos->z },
+                    { prevPos->x + perpHoriz.x, prevPos->y + heightOffset, prevPos->z + perpHoriz.z },
+                    { prevPos->x - perpHoriz.x, prevPos->y + heightOffset, prevPos->z - perpHoriz.z },
+                    { prevPos->x, prevPos->y + heightOffset + radius * 0.35f, prevPos->z }
+                };
+
+                float minEarliestHit = moveDistWorld + radius * 0.95f;
+                Vector3 bestHitWallNorm{ 0.0f, 0.0f, 0.0f };
+                bool hitSweepWall = false;
+
+                for (const auto& rayStartWorld : sweepOrigins)
+                {
+                    Vector3 localStart = TransformPt(rayStartWorld, invWorld);
+                    Vector3 localDir = {
+                        dirWorld.x * invWorld.m[0][0] + dirWorld.y * invWorld.m[1][0] + dirWorld.z * invWorld.m[2][0],
+                        dirWorld.x * invWorld.m[0][1] + dirWorld.y * invWorld.m[1][1] + dirWorld.z * invWorld.m[2][1],
+                        dirWorld.x * invWorld.m[0][2] + dirWorld.y * invWorld.m[1][2] + dirWorld.z * invWorld.m[2][2]
+                    };
+                    float localDirLen = std::sqrt(localDir.x * localDir.x + localDir.y * localDir.y + localDir.z * localDir.z);
+                    if (localDirLen < 1e-6f) continue;
+                    localDir = localDir * (1.0f / localDirLen);
+
+                    float sweepMaxDistWorld = moveDistWorld + radius * 0.95f;
+                    float maxLocalDist = sweepMaxDistWorld * localDirLen;
+                    float hitDist = 0.0f;
+                    Vector3 hitNormal, v0, v1, v2;
+
+                    if (sGroundCollider->GetAABBTree().Raycast(localStart, localDir, maxLocalDist, hitDist, hitNormal, v0, v1, v2))
+                    {
+                        Vector3 e1 = v1 - v0;
+                        Vector3 e2 = v2 - v0;
+                        Vector3 localTriNorm = {
+                            e1.y * e2.z - e1.z * e2.y,
+                            e1.z * e2.x - e1.x * e2.z,
+                            e1.x * e2.y - e1.y * e2.x
+                        };
+                        float triNormLen = std::sqrt(localTriNorm.x * localTriNorm.x + localTriNorm.y * localTriNorm.y + localTriNorm.z * localTriNorm.z);
+                        if (triNormLen > 1e-6f)
+                        {
+                            localTriNorm = localTriNorm * (1.0f / triNormLen);
+                        }
+
+                        // 壁ポリゴン（localTriNorm.y < 0.55f）のみを対象
+                        if (localTriNorm.y < 0.55f)
+                        {
+                            float worldHitDist = hitDist / localDirLen;
+
+                            Vector3 worldTriNorm = {
+                                localTriNorm.x * worldMatrix.m[0][0] + localTriNorm.y * worldMatrix.m[1][0] + localTriNorm.z * worldMatrix.m[2][0],
+                                localTriNorm.x * worldMatrix.m[0][1] + localTriNorm.y * worldMatrix.m[1][1] + localTriNorm.z * worldMatrix.m[2][1],
+                                localTriNorm.x * worldMatrix.m[0][2] + localTriNorm.y * worldMatrix.m[1][2] + localTriNorm.z * worldMatrix.m[2][2]
+                            };
+                            float wNormLen = std::sqrt(worldTriNorm.x * worldTriNorm.x + worldTriNorm.y * worldTriNorm.y + worldTriNorm.z * worldTriNorm.z);
+                            if (wNormLen > 1e-6f)
+                            {
+                                worldTriNorm = worldTriNorm * (1.0f / wNormLen);
+                            }
+                            if (worldTriNorm.x * dirWorld.x + worldTriNorm.y * dirWorld.y + worldTriNorm.z * dirWorld.z > 0.0f)
+                            {
+                                worldTriNorm = worldTriNorm * -1.0f;
+                            }
+
+                            if (worldHitDist < minEarliestHit)
+                            {
+                                minEarliestHit = worldHitDist;
+                                bestHitWallNorm = worldTriNorm;
+                                hitSweepWall = true;
+                            }
+                        }
+                    }
+                }
+
+                if (hitSweepWall)
+                {
+                    // 壁手前にクランプ（安全停止位置）
+                    float safeAdvance = (std::max)(0.0f, minEarliestHit - radius * 0.95f);
+                    position = *prevPos + dirWorld * safeAdvance;
+
+                    // 壁法線方向への微小オフセット
+                    position += bestHitWallNorm * 0.02f;
+
+                    // 壁に向かう速度成分を除去
+                    float vDotN = velocity.x * bestHitWallNorm.x + velocity.y * bestHitWallNorm.y + velocity.z * bestHitWallNorm.z;
+                    if (vDotN < 0.0f)
+                    {
+                        velocity.x -= bestHitWallNorm.x * vDotN;
+                        velocity.y -= bestHitWallNorm.y * vDotN;
+                        velocity.z -= bestHitWallNorm.z * vDotN;
+                    }
+                    anyCollided = true;
+                }
+            }
+        }
+
+        // =========================================================================
+        // Phase 2: 離散近接・めり込み押し出し（多方向探査と反復緩和）
+        // =========================================================================
         for (int iter = 0; iter < 2; ++iter)
         {
             Vector3 waistPos = { position.x, position.y + heightOffset, position.z };
@@ -436,13 +568,13 @@ namespace SlimePhysics
             testDirs[numDirs++] = {  0.7071f, 0.0f, -0.7071f };
             testDirs[numDirs++] = { -0.7071f, 0.0f, -0.7071f };
 
-            // 探索範囲: radius + マージン
-            const float checkDist = radius + 0.25f;
+            // 探索範囲: radius + マージン（深めり込み時でも確実に捕捉）
+            const float checkDist = radius + (std::max)(0.45f, radius * 0.6f);
 
             float maxPenetration = 0.0f;
             Vector2 bestPushDir = { 0.0f, 0.0f };
 
-            // スライムの体積（中心とやや上方）を捉えるため2つの高さで探査（地下地形への誤ヒットを防止）
+            // スライムの体積（中心とやや上方）を捉えるため2つの高さで探査
             float yOffsets[] = { 0.0f, radius * 0.20f };
 
             for (float yOff : yOffsets)
@@ -530,9 +662,9 @@ namespace SlimePhysics
                             float penetration = 0.0f;
                             // 幾何学的に正確なめり込み深さの算出:
                             // 1. 壁の表面/裏側にめり込んでいる場合（符号付き距離）
-                            if (signedDist < radius && signedDist > -radius * 1.5f)
+                            if (signedDist < radius && signedDist > -radius * 2.0f)
                             {
-                                penetration = radius - (std::max)(0.0f, signedDist);
+                                penetration = (std::min)(radius - signedDist, radius * 1.8f);
                             }
                             // 2. 三角形のエッジ/頂点に接している場合
                             else if (distXZ < radius)

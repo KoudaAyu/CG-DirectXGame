@@ -267,12 +267,13 @@ void Slime::UpdatePhysics(float deltaTime, const Vector2& stageTilt, const Vecto
         velocity_.x *= decay;
         velocity_.z *= decay;
 
+        Vector3 prevPos = position_;
         // 水平位置更新
         position_.x += velocity_.x * deltaTime;
         position_.z += velocity_.z * deltaTime;
 
-        // 壁メッシュとの衝突解決
-        SlimePhysics::ResolveWallCollision(position_, velocity_, scale_.x * 0.92f);
+        // 壁メッシュとの衝突解決（連続衝突判定 CCD 対応）
+        SlimePhysics::ResolveWallCollision(position_, velocity_, scale_.x * 0.92f, 0.0f, &prevPos);
 
         // 傾斜面・地面メッシュとの接地判定 (接地中なので isGrounded = true を明示的に指定)
         bool hasGround = false;
@@ -337,8 +338,8 @@ void Slime::UpdatePhysics(float deltaTime, const Vector2& stageTilt, const Vecto
         position_.y += velocity_.y * deltaTime;
         position_.z += velocity_.z * deltaTime;
 
-        // 壁衝突
-        SlimePhysics::ResolveWallCollision(position_, velocity_, scale_.x * 0.92f);
+        // 壁衝突（連続衝突判定 CCD 対応）
+        SlimePhysics::ResolveWallCollision(position_, velocity_, scale_.x * 0.92f, 0.0f, &prevPos);
 
         // 空中での姿勢: 進行方向を向く
         rotation_.x = 0.0f;
@@ -423,6 +424,9 @@ void Slime::DrawSlime(const RenderContext& ctx) {
     object3d_->PrepareConstantBuffers(dx);
 
     auto slimeAlloc = cbAllocator->Allocate(sizeof(SlimeParamsCPU));
+    if (!slimeAlloc.cpuAddress) {
+        return; // 定数バッファ枯渇時のクラッシュ防止
+    }
     std::memcpy(slimeAlloc.cpuAddress, &slimeParams_, sizeof(SlimeParamsCPU));
 
     ctx.commandList->SetGraphicsRootSignature(rootSig.Get());
@@ -442,9 +446,10 @@ void Slime::DrawSlime(const RenderContext& ctx) {
         texHandle = TextureManager::GetInstance()->GetSrvHandleGPU(
             TextureManager::GetInstance()->GetTextureIndexByFilePath("Resources/uvChecker.png"));
     }
-    if (texHandle.ptr != 0) {
-        ctx.commandList->SetGraphicsRootDescriptorTable(2, texHandle);
+    if (texHandle.ptr == 0) {
+        return; // メインテクスチャが無効な場合は未バインド描画によるGPUクラッシュを防ぐため中断
     }
+    ctx.commandList->SetGraphicsRootDescriptorTable(2, texHandle);
 
     // 3: SlimeParams
     ctx.commandList->SetGraphicsRootConstantBufferView(3, slimeAlloc.gpuAddress);
@@ -466,8 +471,9 @@ void Slime::DrawSlime(const RenderContext& ctx) {
     D3D12_GPU_DESCRIPTOR_HANDLE skyboxHandle{};
     if (skyboxIndex != TextureManager::kInvalidTextureIndex) {
         skyboxHandle = TextureManager::GetInstance()->GetSrvHandleGPU(skyboxIndex);
-    } else {
-        skyboxHandle = texHandle;
+    }
+    if (skyboxHandle.ptr == 0) {
+        skyboxHandle = texHandle; // フォールバック
     }
     if (skyboxHandle.ptr != 0) {
         ctx.commandList->SetGraphicsRootDescriptorTable(6, skyboxHandle);

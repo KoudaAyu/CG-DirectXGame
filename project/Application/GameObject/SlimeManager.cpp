@@ -17,6 +17,9 @@ void SlimeManager::Initialize(Object3dCom* object3dCom, Camera* camera) {
 }
 
 Slime* SlimeManager::SpawnSlime(const Vector3& pos, int size) {
+    if (static_cast<int>(slimes_.size()) >= kMaxSlimes) {
+        return nullptr; // 最大スライム数超過によるリソース枯渇を防止
+    }
     auto slime = std::make_unique<Slime>();
     slime->Initialize(object3dCom_, camera_, pos, size);
     slimes_.push_back(std::move(slime));
@@ -71,36 +74,38 @@ void SlimeManager::TriggerSplit() {
 
         if (currentSize > 1) {
             Vector3 sPos = slime->GetPosition();
-            int spawnCount = currentSize - 1; // 親以外の分裂数
+            int desiredCount = currentSize - 1; // 親以外の分裂数
+            int availableSlots = kMaxSlimes - static_cast<int>(slimes_.size() + newSlimes.size());
+            int spawnCount = (std::min)(desiredCount, (std::max)(0, availableSlots));
 
-            // 内包していた子スライムの参照をクリア（もう使わない）
-            slime->ClearAbsorbedChildren();
-
-            // 親スライム自身をサイズ1に戻す
-            slime->SetSize(1);
+            // 親スライム自身を、分裂しきれなかった余剰サイズがあればそのサイズに、全部分裂できた場合はサイズ1に戻す
+            int parentNewSize = 1 + (desiredCount - spawnCount);
+            slime->SetSize(parentNewSize);
             slime->SetMergeCooldown(0.40f);
             Vector3 jumpVel = { 0.0f, splitUpPower_ * 0.6f, 0.0f };
             slime->Launch(jumpVel);
 
-            // (currentSize - 1) 個の新しいサイズ1スライムを親の位置から放射状に発射
-            float angleStep = (2.0f * kPi) / static_cast<float>(spawnCount);
-            for (int i = 0; i < spawnCount; ++i) {
-                auto newSlime = std::make_unique<Slime>();
-                newSlime->Initialize(object3dCom_, camera_, sPos, 1);
-                newSlime->SetMergeCooldown(0.40f);
+            if (spawnCount > 0) {
+                // spawnCount 個の新しいサイズ1スライムを親の位置から放射状に発射
+                float angleStep = (2.0f * kPi) / static_cast<float>(spawnCount);
+                for (int i = 0; i < spawnCount; ++i) {
+                    auto newSlime = std::make_unique<Slime>();
+                    newSlime->Initialize(object3dCom_, camera_, sPos, 1);
+                    newSlime->SetMergeCooldown(0.40f);
 
-                float angle = angleStep * i + ((std::rand() % 100) / 100.0f - 0.5f) * 0.35f;
-                float popSpeed = splitPopPower_ + ((std::rand() % 100) / 100.0f - 0.5f) * (splitPopPower_ * 0.25f);
-                float upSpeed = splitUpPower_ + ((std::rand() % 100) / 100.0f - 0.5f) * (splitUpPower_ * 0.25f);
+                    float angle = angleStep * i + ((std::rand() % 100) / 100.0f - 0.5f) * 0.35f;
+                    float popSpeed = splitPopPower_ + ((std::rand() % 100) / 100.0f - 0.5f) * (splitPopPower_ * 0.25f);
+                    float upSpeed = splitUpPower_ + ((std::rand() % 100) / 100.0f - 0.5f) * (splitUpPower_ * 0.25f);
 
-                Vector3 launchVel = {
-                    std::sin(angle) * popSpeed,
-                    upSpeed,
-                    std::cos(angle) * popSpeed
-                };
-                newSlime->Launch(launchVel);
+                    Vector3 launchVel = {
+                        std::sin(angle) * popSpeed,
+                        upSpeed,
+                        std::cos(angle) * popSpeed
+                    };
+                    newSlime->Launch(launchVel);
 
-                newSlimes.push_back(std::move(newSlime));
+                    newSlimes.push_back(std::move(newSlime));
+                }
             }
         } else {
             // もともとサイズ1の単独スライムは、周囲の分裂の波紋に合わせてその場で小さくホップ
@@ -118,6 +123,7 @@ void SlimeManager::TriggerSplit() {
 
 void SlimeManager::CheckAndResolveMerge(const Vector2& stageTilt, const Vector2& pivot) {
     size_t count = slimes_.size();
+    bool anyMerged = false;
     for (size_t i = 0; i < count; ++i) {
         if (!slimes_[i] || !slimes_[i]->CanMerge()) continue;
 
@@ -147,7 +153,6 @@ void SlimeManager::CheckAndResolveMerge(const Vector2& stageTilt, const Vector2&
                 };
 
                 // slimes_[j] を非アクティブに
-                slimes_[j]->ClearAbsorbedChildren();
                 slimes_[j]->SetActive(false);
                 slimes_[j]->SetSize(1);
 
@@ -168,8 +173,17 @@ void SlimeManager::CheckAndResolveMerge(const Vector2& stageTilt, const Vector2&
                 slimes_[i]->SetPosition(mergeCenter);
 
                 slimes_[i]->GetSlimeParams().impulseStrength = 0.50f; // ポヨン！と合体弾性
+                anyMerged = true;
             }
         }
+    }
+
+    // 非アクティブになったスライムを完全に破棄・解放（ゾンビオブジェクト累積とリソースリークの完全防止）
+    if (anyMerged) {
+        slimes_.erase(
+            std::remove_if(slimes_.begin(), slimes_.end(),
+                [](const std::unique_ptr<Slime>& s) { return !s || !s->IsActive(); }),
+            slimes_.end());
     }
 }
 

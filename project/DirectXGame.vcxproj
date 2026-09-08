@@ -126,9 +126,6 @@
     <ClCompile Include="externals\imgui-node-editor\imgui_node_editor_api.cpp" />
     <ClCompile Include="externals\imgui-node-editor\imgui_canvas.cpp" />
     <ClCompile Include="externals\imgui-node-editor\crude_json.cpp" />
-    <ClCompile Include="Application\Minion\Minion.cpp" />
-    <ClCompile Include="Application\Minion\MinionManager.cpp" />
-    <ClCompile Include="Application\Player\PikminPlayer.cpp" />
     <ClCompile Include="Application\GameObject\SlimeMesh.cpp" />
     <ClCompile Include="Application\GameObject\SlimePhysics.cpp" />
     <ClCompile Include="Application\GameObject\AimGuide.cpp" />
@@ -380,9 +377,6 @@
     <ClInclude Include="externals\imgui-node-editor\imgui_node_editor_internal.inl" />
     <ClInclude Include="externals\imgui-node-editor\imgui_canvas.h" />
     <ClInclude Include="externals\imgui-node-editor\crude_json.h" />
-    <ClInclude Include="Application\Minion\Minion.h" />
-    <ClInclude Include="Application\Minion\MinionManager.h" />
-    <ClInclude Include="Application\Player\PikminPlayer.h" />
     <ClInclude Include="Application\GameObject\SlimeMesh.h" />
     <ClInclude Include="Application\GameObject\AimGuide.h" />
     <ClInclude Include="Application\GameObject\SlimeCollision.h" />
