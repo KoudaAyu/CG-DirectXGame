@@ -76,6 +76,7 @@ float Slime::CalculateScaleBySize(int s) const {
 }
 
 void Slime::SetSize(int s) {
+    float oldGroundY = groundY_;
     if (isTitleException_) {
         size_ = 1;
         scale_ = { 0.8f, 0.8f, 0.8f };
@@ -93,8 +94,16 @@ void Slime::SetSize(int s) {
 
     currentMergedScale_ = scale_.x;
 
+    // 巨大化・サイズ急変時のめり込み＆奈落落下を完全防止：
+    // 接地中または転がり中の場合、底面接地高さを基準にして中心Y座標を即座に補正
+    if (oldGroundY > 0.0f && (isGrounded_ || state_ == SlimeState::Rolling)) {
+        float diff = groundY_ - oldGroundY;
+        position_.y += diff;
+    }
+
     if (object3d_) {
         object3d_->SetScale(scale_);
+        object3d_->SetTranslate(position_);
         object3d_->Update();
     }
     if (meshCollider_) {
@@ -271,7 +280,8 @@ void Slime::UpdatePhysics(float deltaTime, const Vector2& stageTilt, const Vecto
         float targetGroundY = SlimePhysics::CalculateGroundedCenterYEx(
             position_.x, position_.z, position_.y, stageTilt, groundY_, &hasGround, &groundNormal, pivot, true);
 
-        if (!hasGround || (targetGroundY - position_.y < -1.5f)) {
+        float cliffDropThreshold = -(std::max)(1.5f, groundY_ * 1.5f);
+        if (!hasGround || (targetGroundY - position_.y < cliffDropThreshold)) {
             // 足場から飛び出した（崖や段差からの飛び降り） -> 空中放物線状態へ移行
             state_ = SlimeState::Thrown;
             isGrounded_ = false;

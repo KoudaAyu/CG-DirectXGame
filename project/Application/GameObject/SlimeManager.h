@@ -54,7 +54,7 @@ public:
 
 private:
     void ResolveSeparation(const Vector3& rotation, const Vector2& stageTilt, const Vector2& pivot);
-    void CheckAndResolveMerge();
+    void CheckAndResolveMerge(const Vector2& stageTilt, const Vector2& pivot);
 
 private:
     Object3dCom* object3dCom_ = nullptr;

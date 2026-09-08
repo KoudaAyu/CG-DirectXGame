@@ -116,7 +116,7 @@ void SlimeManager::TriggerSplit() {
     }
 }
 
-void SlimeManager::CheckAndResolveMerge() {
+void SlimeManager::CheckAndResolveMerge(const Vector2& stageTilt, const Vector2& pivot) {
     size_t count = slimes_.size();
     for (size_t i = 0; i < count; ++i) {
         if (!slimes_[i] || !slimes_[i]->CanMerge()) continue;
@@ -153,19 +153,19 @@ void SlimeManager::CheckAndResolveMerge() {
 
                 // slimes_[i] にサイズを集約
                 slimes_[i]->SetSize(combinedSize);
-                slimes_[i]->SetPosition(mergeCenter);
 
-                // 合体後の地面補正: 新しいスケールでの接地高さを再計算して沈み込みを防止
-                float newGroundY = mergeCenter.y; // フォールバック
-                bool hasGround = false;
+                // 合体後の地面補正: 新しいスケールでの接地高さを最上空から厳密に算出して沈み込み・奈落落下を完全防止
                 float groundOffset = slimes_[i]->GetScale().x * 0.75f;
+                bool hasGround = false;
                 float calcGroundY = SlimePhysics::CalculateGroundedCenterYEx(
-                    mergeCenter.x, mergeCenter.z, mergeCenter.y,
-                    { 0.0f, 0.0f }, groundOffset, &hasGround, { mergeCenter.x, mergeCenter.z }, false);
-                if (hasGround && calcGroundY > mergeCenter.y) {
-                    mergeCenter.y = calcGroundY;
-                    slimes_[i]->SetPosition(mergeCenter);
+                    mergeCenter.x, mergeCenter.z, SlimePhysics::kIgnoreCurrentY,
+                    stageTilt, groundOffset, &hasGround, pivot, false);
+                if (hasGround) {
+                    mergeCenter.y = (std::max)(mergeCenter.y, calcGroundY);
+                } else {
+                    mergeCenter.y += groundOffset;
                 }
+                slimes_[i]->SetPosition(mergeCenter);
 
                 slimes_[i]->GetSlimeParams().impulseStrength = 0.50f; // ポヨン！と合体弾性
             }
@@ -240,17 +240,19 @@ void SlimeManager::Update(float deltaTime, KeyInput* keyInput, const Vector2& st
         }
     }
 
-    // 合体判定
-    if (mergeRequested_) {
-        CheckAndResolveMerge();
-        mergeRequested_ = false;
-    }
-
     // 重心ピボット
     Vector3 center;
     float spread;
     GetGroupCenterAndSpread(center, spread);
     Vector2 pivot = { center.x, center.z };
+
+    // 合体判定
+    if (mergeRequested_) {
+        CheckAndResolveMerge(stageTilt, pivot);
+        mergeRequested_ = false;
+        GetGroupCenterAndSpread(center, spread);
+        pivot = { center.x, center.z };
+    }
 
     // 各スライムの物理更新
     for (auto& slime : slimes_) {

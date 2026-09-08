@@ -232,9 +232,9 @@ namespace SlimePhysics
                 }
 
                 float expectedFloorY = currentY + deltaYTilt;
-                // 自力登坂・段差許容マージン（1.2mに拡大してステージ急傾斜やバウンスでの誤判定・床抜けを防止）
-                const float kMaxStepUp = 1.2f;
-                float maxAllowedFloorY = expectedFloorY + kMaxStepUp;
+                // 自力登坂・段差許容マージン（スライムのスケール baseOffset に応じて動的に拡張し、急成長時でも床を見失わない）
+                float stepMargin = (std::max)(1.6f, baseOffset * 1.6f);
+                float maxAllowedFloorY = expectedFloorY + stepMargin;
 
                 int bestIdx = -1;
                 for (size_t i = 0; i < groundCandidates.size(); ++i)
@@ -246,11 +246,17 @@ namespace SlimePhysics
                     }
                 }
 
-                // もし全候補が expectedFloorY + kMaxStepUp より上にある場合でも、
-                // 最下段の床がスライムのすぐ上（2.5m以内）にあれば、めり込みとみなして救済
+                // もし全候補が expectedFloorY + stepMargin より上にある場合（急激なサイズアップや激突でめり込んでいる場合）
+                // 最上面の床（groundCandidates[0]）がスライムの体内（baseOffset * 2.5f以内）にあれば、
+                // 沈み込みとみなして即座に最上面の床に復帰救済
                 if (bestIdx == -1 && !groundCandidates.empty())
                 {
-                    if (groundCandidates.back().worldY <= expectedFloorY + 2.5f)
+                    float embedRecoveryLimit = expectedFloorY + (std::max)(3.5f, baseOffset * 2.5f);
+                    if (groundCandidates[0].worldY <= embedRecoveryLimit)
+                    {
+                        bestIdx = 0; // 最上面の床へ復帰
+                    }
+                    else if (groundCandidates.back().worldY <= embedRecoveryLimit)
                     {
                         bestIdx = static_cast<int>(groundCandidates.size() - 1);
                     }
@@ -268,9 +274,9 @@ namespace SlimePhysics
             }
 
             // 3. 空中・落下中（isGrounded == false）の場合:
-            // 高速落下・飛び降り時のすり抜け（トンネリング）を完全に防止
-            // スライムの足元または上空（最大5.0m）まで探索範囲を広げ、着地可能な床を確実に捕捉
-            float maxAllowedLandingFloorY = currentY + 5.0f;
+            // 高速落下・飛び降り時および合体時のすり抜け（トンネリング）を完全に防止
+            // スライムの足元または上空まで探索範囲を広げ、着地可能な床を確実に捕捉
+            float maxAllowedLandingFloorY = currentY + (std::max)(5.0f, baseOffset * 2.2f);
 
             int bestIdx = -1;
             for (size_t i = 0; i < groundCandidates.size(); ++i)
@@ -282,10 +288,10 @@ namespace SlimePhysics
                 }
             }
 
-            // 万一高速落下で床を突き抜けた場合でも、島内に床候補が存在するなら最下段の床に救済着地
+            // 万一高速落下で床を突き抜けた場合でも、島内に床候補が存在するなら最上面の床に救済着地
             if (bestIdx == -1 && !groundCandidates.empty())
             {
-                bestIdx = static_cast<int>(groundCandidates.size() - 1);
+                bestIdx = 0; // 最上面の床に安全着地
             }
 
             if (bestIdx != -1)
@@ -436,8 +442,8 @@ namespace SlimePhysics
             float maxPenetration = 0.0f;
             Vector2 bestPushDir = { 0.0f, 0.0f };
 
-            // スライムの体積（中心と足元寄り）を捉えるため2つの高さで探査
-            float yOffsets[] = { 0.0f, -radius * 0.30f };
+            // スライムの体積（中心とやや上方）を捉えるため2つの高さで探査（地下地形への誤ヒットを防止）
+            float yOffsets[] = { 0.0f, radius * 0.20f };
 
             for (float yOff : yOffsets)
             {
