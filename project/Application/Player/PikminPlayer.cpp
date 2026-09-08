@@ -155,6 +155,7 @@ float PikminPlayer::CalculateScaleBySize(int size) const {
 }
 
 void PikminPlayer::SetSize(int s) {
+    if (isTitleException_) return;
     size_ = (std::max)(1, s);
     isMerged_ = (size_ > 1);
     lastAbsorbedCount_ = size_ - 1;
@@ -199,6 +200,7 @@ void PikminPlayer::ToggleMerge() {
 }
 
 void PikminPlayer::SetMerged(bool merged) {
+    if (isTitleException_) return;
     isMerged_ = merged;
     mergeScaleAnimation_ = 0.0f;
     if (!merged) {
@@ -231,11 +233,18 @@ void PikminPlayer::Update(float deltaTime, KeyInput* keyInput, MinionManager* mi
     if (keyInput) {
         if (keyInput->TriggerKey(DIK_E)) {
             // ロコロコ方式分裂: 合体中ならパァンと全員飛び散って小ロコロコに分裂！
-            if (minionManager && (size_ > 1 || minionManager->GetAbsorbedCount() > 0)) {
+            if (minionManager && (size_ > 1 || minionManager->GetAbsorbedCount() > 0 || minionManager->GetMaxMinionSize() > 1)) {
                 minionManager->TriggerSplit(position_, size_);
                 SetSize(1);
                 slimeParams_.impulseStrength = 0.55f;
                 slimeParams_.squashStretch = { 0.35f, -0.25f, 0.35f };
+            }
+        }
+
+        if (keyInput->TriggerKey(DIK_F)) {
+            // ロコロコ方式合体: Fキーで閾値内の小ロコロコを吸着・合体（くっつく）
+            if (minionManager) {
+                minionManager->RequestMerge();
             }
         }
 
@@ -271,24 +280,35 @@ void PikminPlayer::Update(float deltaTime, KeyInput* keyInput, MinionManager* mi
     position_.z += velocity_.z * deltaTime;
 
     // --- 大きさ（1-10）と色（小:青, 中:黄, 大:赤）の管理 ---
-    int absorbedCount = minionManager ? minionManager->GetAbsorbedCount() : 0;
-    int newSize = 1 + absorbedCount;
-    isMerged_ = (newSize > 1);
+    if (isTitleException_) {
+        // タイトル画面専用の「大きい青い例外」:
+        // 分裂せず、常に大きなサイズ(0.8f)かつ鮮やかな水色スライムとして存在
+        size_ = 1;
+        isMerged_ = false;
+        scale_ = { 0.8f, 0.8f, 0.8f };
+        currentMergedScale_ = 0.8f;
+        slimeParams_.baseColor = { 0.2f, 0.85f, 1.0f, 0.95f };
+    } else {
+        int absorbedCount = minionManager ? minionManager->GetAbsorbedCount() : 0;
+        int newSize = 1 + absorbedCount;
+        isMerged_ = (newSize > 1);
 
-    if (newSize > size_) {
-        // 新たなくっつきが発生！（1+1=2、2+1=3...）
-        bool tierChanged = (size_ <= 2 && newSize >= 3) || (size_ <= 7 && newSize >= 8);
-        slimeParams_.impulseStrength = tierChanged ? 0.40f : (std::min)(0.5f, slimeParams_.impulseStrength + 0.22f);
+        if (newSize > size_) {
+            // 新たなくっつきが発生！（1+1=2、2+1=3...）
+            bool tierChanged = (size_ <= 2 && newSize >= 3) || (size_ <= 7 && newSize >= 8);
+            slimeParams_.impulseStrength = tierChanged ? 0.40f : (std::min)(0.5f, slimeParams_.impulseStrength + 0.22f);
+        }
+        size_ = newSize;
+
+        // 大きさに応じた色設定（小 1-2: 青, 中 3-7: 黄色, 大 8-10以上: 赤）
+        slimeParams_.baseColor = SlimePhysics::GetColorBySize(size_);
+
+        float targetScale = CalculateScaleBySize(size_);
+        currentMergedScale_ += (targetScale - currentMergedScale_) * (std::min)(1.0f, deltaTime * 10.0f);
+        scale_ = { currentMergedScale_, currentMergedScale_, currentMergedScale_ };
     }
-    size_ = newSize;
 
-    // 大きさに応じた色設定（小 1-2: 青, 中 3-7: 黄色, 大 8-10以上: 赤）
-    slimeParams_.baseColor = SlimePhysics::GetColorBySize(size_);
-
-    float targetScale = CalculateScaleBySize(size_);
-    currentMergedScale_ += (targetScale - currentMergedScale_) * (std::min)(1.0f, deltaTime * 10.0f);
-    float currentScale = currentMergedScale_;
-    scale_ = { currentScale, currentScale, currentScale };
+    float currentScale = scale_.x;
 
     // 地形メッシュの壁・垂直面との衝突押し出し（スライムの見た目の横幅に合わせてめり込みを防止）
     float colRadius = currentScale * 0.95f;
@@ -535,7 +555,7 @@ void PikminPlayer::DrawSlime(Object3d* object, const Object3d::ModelData& modelD
 void PikminPlayer::Draw(const RenderContext& ctx) {
     if (!object3dCom_) return;
 
-    if (size_ >= 3 && giantModel_) {
+    if (!isTitleException_ && size_ >= 3 && giantModel_) {
         DrawSlime(giantModel_.get(), giantModelData_, ctx, giantTextureIndex_);
     } else if (normalModel_) {
         DrawSlime(normalModel_.get(), normalModelData_, ctx, normalTextureIndex_);

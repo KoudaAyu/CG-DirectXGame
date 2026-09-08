@@ -5,8 +5,7 @@
 #include "KeyInput.h"
 #include "Baziru3_Engine/Core/IO/Mouse/MouseInput.h"
 #include "Baziru3_Engine/Graphics/Graphics/SceneRenderRequests.h"
-#include "Application/Player/PikminPlayer.h"
-#include "Application/Minion/MinionManager.h"
+#include "Application/GameObject/SlimeManager.h"
 #include "Application/GameObject/AimGuide.h"
 #include "Application/GameObject/PropellerObstacle.h"
 #include "Baziru3_Engine/Graphics/3D/Object/Object3d.h"
@@ -38,10 +37,14 @@ private:
     std::unique_ptr<MouseInput> mouseInput_;
     std::unique_ptr<Camera> playCamera_;
 
-    std::unique_ptr<PikminPlayer> player_;
-    std::unique_ptr<MinionManager> minionManager_;
+    std::unique_ptr<SlimeManager> slimeManager_;
     std::unique_ptr<AimGuide> aimGuide_;
     std::vector<std::unique_ptr<PropellerObstacle>> propellerObstacles_;
+
+    // --- スライム初期スポーン位置 ---
+    Vector3 spawnBasePos_{ 0.0f, 0.55f, 30.0f }; // 初期スポーン基準位置（島中央の平原: Z = 30.0f）
+    float spawnGroupOffsetZ_ = 4.0f;            // 小スライム群の前方オフセット
+    void RespawnSlimesAtBase();
 
     std::unique_ptr<Object3d> groundPlane_;
     std::unique_ptr<MeshCollider> groundCollider_;
@@ -87,6 +90,16 @@ private:
     Vector2 currentTilt_{ 0.0f, 0.0f };  // X: Pitch (手前/奥), Y: Roll (左/右)
     Vector2 targetTilt_{ 0.0f, 0.0f };
     float maxTiltAngle_ = 0.28f;         // 最大傾斜角 (約16度, rad)
+
+    // ステージ揺らし（バウンス・シェイク）パラメータ
+    float stageBounceOffset_ = 0.0f;     // ステージの瞬間垂直浮上量 (m)
+    float stageBounceVelocity_ = 0.0f;   // ステージ垂直バウンス速度
+    float stageShakeTimer_ = 0.0f;       // ステージ回転シェイク減衰タイマー
+    float stageShakeDuration_ = 0.28f;   // シェイク持続時間
+    float stageShakeIntensity_ = 0.035f; // シェイク回転強度 (rad)
+    Vector3 cameraShakeOffset_{ 0.0f, 0.0f, 0.0f }; // カメラ衝撃オフセット
+    float cameraShakeIntensity_ = 0.0f;  // カメラ衝撃強度
+    float stageShakeCooldown_ = 0.0f;    // 連打防止クールダウン
 
     bool isInitialized_ = false;
 };

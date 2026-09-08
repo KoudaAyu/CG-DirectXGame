@@ -134,6 +134,8 @@
     <ClCompile Include="Application\GameObject\AimGuide.cpp" />
     <ClCompile Include="Application\GameObject\SlimeCollision.cpp" />
     <ClCompile Include="Application\GameObject\SlimeFx.cpp" />
+    <ClCompile Include="Application\GameObject\Slime.cpp" />
+    <ClCompile Include="Application\GameObject\SlimeManager.cpp" />
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="Resources\shaders\Slime.VS.hlsl">
@@ -245,6 +247,8 @@
     </FxCompile>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Application\GameObject\Slime.h" />
+    <ClInclude Include="Application\GameObject\SlimeManager.h" />
     <ClInclude Include="Application\GameObject\SlimePhysics.h" />
     <ClInclude Include="Baziru3_Engine\Framework\Collision\SoftBodyDeformer.h" />
     <ClInclude Include="Baziru3_Engine\Framework\Collision\CollisionShapes.h" />

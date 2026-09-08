@@ -10,8 +10,7 @@
 #include "Baziru3_Engine/Graphics/Graphics/SceneRenderRequests.h"
 
 #include "Application/GameObject/SlimeFx.h"
-#include "Application/Minion/MinionManager.h"
-#include "Application/Player/PikminPlayer.h"
+#include "Application/GameObject/Slime.h"
 #include "Baziru3_Engine/Graphics/3D/Object/Object3dCom.h"
 #include "Camera.h"
 #include "RenderContext.h"
@@ -143,10 +142,10 @@ constexpr float kSlimeHoverImpulse = 0.22f; // ボタンに乗った瞬間の波
 constexpr Vector4 kSlimeColorDefault = {0.2f, 0.85f, 1.0f, 0.9f};
 
 // ===================================================================
-// 自動デモ
+// 自動デモ（タイトル画面は「大きい青い例外」のため既定では無効・ミニオン数0）
 // ===================================================================
-constexpr bool kDemoEnabledDefault = true;
-constexpr int kMinionSpawnCountDefault = 8;
+constexpr bool kDemoEnabledDefault = false;
+constexpr int kMinionSpawnCountDefault = 0;
 
 constexpr float kDemoRoamSecondsMinDefault = 4.0f; // 分裂状態でうろつく時間
 constexpr float kDemoRoamSecondsMaxDefault = 7.0f;
@@ -288,9 +287,8 @@ void TitleScene::Finalize()
         }
     }
 
-    // PikminPlayer / Minion のデストラクタが CollisionManager から自分を外してくれる
+    // Slime のデストラクタが CollisionManager から自分を外してくれる
     fx_.reset();
-    minions_.reset();
     slime_.reset();
 
     // 借りていた engine カメラを元の位置に戻す。
@@ -455,33 +453,20 @@ void TitleScene::CreateSlime()
     slimeCamera_->SetRotate({cameraPitch_, 0.0f, 0.0f});
     slimeCamera_->Update();
 
-    // PikminPlayer / Minion の Initialize が SphereCollider を登録するので、先に器を初期化しておく
+    // Slime の Initialize がコライダーを登録するので、先に器を初期化しておく
     CollisionManager::GetInstance()->Initialize();
 
-    slime_ = std::make_unique<PikminPlayer>();
-    slime_->Initialize(object3dCom, slimeCamera_, slimeHome_);
+    slime_ = std::make_unique<Slime>();
+    slime_->Initialize(object3dCom, slimeCamera_, slimeHome_, 1);
+    slime_->SetTitleException(true); // タイトル画面専用の「大きい青い例外」
 
-    // タイトル用にゆったりした挙動へ振り直す（ゲーム側の既定値には触らない）
-    slime_->SetTiltAccel(kSlimeTiltAccel);
-    slime_->SetFriction(kSlimeFriction);
-
-    // 見た目もタイトル向けに少し盛る（ここは Update() に上書きされない）
+    // 見た目もタイトル向けに少し盛る
     SlimeParamsCPU& params = slime_->GetSlimeParams();
     params.wobbleStrength = 0.24f;
     params.wobbleFrequency = 4.4f;
     params.fresnelPower = 2.2f;
     params.envReflection = 0.55f;
     params.innerGlow = 0.55f;
-
-    // ミニオン。合体のたびに全員吸えるよう、吸引半径はタイトル用に広く取る。
-    // こうしておくと Merge -> Split のループで毎回プレイヤーの足元に集め直されるので、
-    // 群れが画面外へ散らばっていかない
-    minions_ = std::make_unique<MinionManager>();
-    minions_->Initialize(object3dCom, slimeCamera_);
-    minions_->SetMergePickupRadius(40.0f);
-    minions_->SetSplitPopPower(6.0f);
-    minions_->SetSplitUpPower(6.0f);
-    minions_->SpawnMinion(slimeHome_, minionSpawnCount_, MinionType::Red);
 
     fx_ = std::make_unique<SlimeFx>();
     fx_->Initialize(object3dCom, slimeCamera_, kFxCapacity);
@@ -717,41 +702,6 @@ void TitleScene::UpdateSlime(float deltaTime)
         target.x += (mouseGround.x - target.x) * slimeFollowRate_;
         target.z += (mouseGround.z - target.z) * slimeFollowRate_;
     }
-    else if (minions_ && !slime_->IsMerged())
-    {
-        // マウスが画面外のときは、一番近い転がり中のミニオンへ寄っていく。
-        // 見た目がピクミンっぽくなるのと、投擲は「手元 3.5m 以内のミニオン」しか
-        // 掴めない実装なので、こうしておくとデモの投擲が枯れない
-        const Vector3& position = slime_->GetPosition();
-        const Minion* nearest = nullptr;
-        float nearestDistanceSq = 1e9f;
-
-        for (const auto& minion : minions_->GetMinions())
-        {
-            if (!minion || !minion->IsActive())
-            {
-                continue;
-            }
-            if (minion->GetState() != MinionState::Rolling)
-            {
-                continue;
-            }
-            const Vector3 diff = minion->GetPosition() - position;
-            const float distanceSq = diff.x * diff.x + diff.z * diff.z;
-            if (distanceSq < nearestDistanceSq)
-            {
-                nearestDistanceSq = distanceSq;
-                nearest = minion.get();
-            }
-        }
-
-        if (nearest)
-        {
-            const Vector3& minionPos = nearest->GetPosition();
-            target.x += (minionPos.x - target.x) * 0.6f;
-            target.z += (minionPos.z - target.z) * 0.6f;
-        }
-    }
 
     // 定位置から離れすぎないように制限する（ボタンの上まで行かせない）
     float offsetX = target.x - slimeHome_.x;
@@ -766,9 +716,6 @@ void TitleScene::UpdateSlime(float deltaTime)
     target = {slimeHome_.x + offsetX, slimeHome_.y, slimeHome_.z + offsetZ};
 
     // --- 目標地点へ向けてステージを傾ける（P 制御） ---
-    // PikminPlayer::Update() の実装では
-    //   stageTilt.y -> X 方向の加速度 / stageTilt.x -> Z 方向の加速度
-    // 加速度と摩擦がバネダンパになるので、行き過ぎて揺り戻す動きが自然に出る
     const Vector3& position = slime_->GetPosition();
     const float targetTiltY =
         std::clamp((target.x - position.x) * slimeTiltGain_, -slimeMaxTilt_, slimeMaxTilt_);
@@ -778,12 +725,9 @@ void TitleScene::UpdateSlime(float deltaTime)
     slimeTilt_.x = Approach(slimeTilt_.x, targetTiltX, kSlimeTiltLerpRate, deltaTime);
     slimeTilt_.y = Approach(slimeTilt_.y, targetTiltY, kSlimeTiltLerpRate, deltaTime);
 
-    // 入力系は全部 nullptr で渡す。
-    // こうすると E キーの合体トグルも投擲も走らず、傾きだけで動く状態になる
-    slime_->Update(deltaTime, nullptr, nullptr, nullptr, nullptr, slimeTilt_);
+    // 傾きだけで動く
+    slime_->Update(deltaTime, slimeTilt_, { slimeHome_.x, slimeHome_.z });
 
-    // PikminPlayer::Update() は毎フレーム baseColor を塗り直すので、
-    // 色を変えたいときは「後がけ」する必要がある
     SlimeParamsCPU& params = slime_->GetSlimeParams();
     if (slimeOverrideColor_)
     {
@@ -798,14 +742,6 @@ void TitleScene::UpdateSlime(float deltaTime)
         params.baseColor.x += (1.0f - params.baseColor.x) * flash;
         params.baseColor.y += (1.0f - params.baseColor.y) * flash;
         params.baseColor.z += (1.0f - params.baseColor.z) * flash;
-    }
-
-    // ミニオンの更新。MinionManager は isMerged の変化を見て
-    // 自分で TriggerMerge / TriggerSplit を呼ぶので、ここでは渡すだけでいい
-    if (minions_)
-    {
-        minions_->Update(deltaTime, slime_->GetPosition(), slime_->IsMerged(),
-                         slime_->GetCurrentScale(), slimeTilt_);
     }
 
     // --- ロゴが出そろった瞬間に波紋を1発 ---
@@ -841,160 +777,19 @@ void TitleScene::UpdateSlime(float deltaTime)
 
 void TitleScene::UpdateDemo(float deltaTime)
 {
-    if (!isDemoEnabled_ || !slime_ || !minions_)
-    {
-        return;
-    }
-
-    // START を押したあとのフェードアウト中は触らない。
-    // せっかく合体した状態が分裂に戻ってしまうため
-    if (SceneManager::GetInstance()->IsTransitioning())
-    {
-        return;
-    }
-
-    demoTimer_ += deltaTime;
-
-    switch (demoState_)
-    {
-    case DemoState::Roam:
-        throwTimer_ -= deltaTime;
-        if (throwTimer_ <= 0.0f)
-        {
-            DoThrow();
-            throwTimer_ = RandomRange(demoThrowIntervalMin_, demoThrowIntervalMax_);
-        }
-
-        if (demoTimer_ >= demoDuration_)
-        {
-            EnterMerge();
-            demoState_ = DemoState::Rolling;
-            demoTimer_ = 0.0f;
-            demoDuration_ = RandomRange(demoRollSecondsMin_, demoRollSecondsMax_);
-        }
-        break;
-
-    case DemoState::Rolling:
-        if (demoTimer_ >= demoDuration_)
-        {
-            EnterSplit();
-            demoState_ = DemoState::Roam;
-            demoTimer_ = 0.0f;
-            demoDuration_ = RandomRange(demoRoamSecondsMin_, demoRoamSecondsMax_);
-            throwTimer_ = 1.0f;
-        }
-        break;
-
-    default:
-        break;
-    }
+    (void)deltaTime;
 }
 
 void TitleScene::DoThrow()
 {
-    if (!slime_ || !minions_ || slime_->IsMerged())
-    {
-        return;
-    }
-
-    Vector3 launchPos = slime_->GetPosition();
-    launchPos.y += 0.5f;
-
-    // 着弾点は定位置の左寄りにばらけさせる（右のボタン列に被らせない）
-    const Vector3 target = {
-        slimeHome_.x + kThrowBiasX + RandomRange(-kThrowRangeX * 0.5f, kThrowRangeX * 0.5f),
-        slimeHome_.y,
-        slimeHome_.z + RandomRange(-kThrowRangeZ * 0.5f, kThrowRangeZ * 0.5f)};
-
-    // 飛行時間を決め打ちして初速を逆算する（AimGuide と同じやり方）
-    const float flightTime = kThrowFlightTime;
-    const Vector3 velocity = {
-        (target.x - launchPos.x) / flightTime,
-        ((target.y - launchPos.y) - 0.5f * kThrowGravity * flightTime * flightTime) / flightTime,
-        (target.z - launchPos.z) / flightTime};
-
-    if (!minions_->ThrowMinionWithVelocity(launchPos, velocity))
-    {
-        return; // 手元にミニオンが居なかった。次の機会に任せる
-    }
-
-    if (fx_)
-    {
-        fx_->EmitBurst(randomEngine_, launchPos, 6, 1.6f, 1.2f, kFxBulletColor, 0.16f, 0.32f, false);
-    }
-
-    // 投げた反動でぷるっと震える
-    SlimeParamsCPU& params = slime_->GetSlimeParams();
-    params.impulseStrength = (std::max)(params.impulseStrength, 0.18f);
 }
 
 void TitleScene::EnterMerge()
 {
-    if (!slime_ || slime_->IsMerged())
-    {
-        return;
-    }
-
-    const Vector3 playerPos = slime_->GetPosition();
-
-    if (fx_ && minions_)
-    {
-        // 1. ミニオン1体ずつから、プレイヤーへ吸い寄せられる粒の筋を引く
-        for (const auto& minion : minions_->GetMinions())
-        {
-            if (!minion || !minion->IsActive())
-            {
-                continue;
-            }
-            fx_->EmitConverge(randomEngine_, minion->GetPosition(), playerPos, 4, kFxMergeColor,
-                              0.15f, 0.5f);
-        }
-
-        // 2. 外周から巻き込む渦を一気に立ち上げる
-        fx_->EmitVortex(randomEngine_, playerPos, 3.2f, 24, kFxVortexColor, 0.22f, 0.9f, 30.0f);
-
-        // 3. 床のリングを「縮ませて」吸い込み感を出す（分裂の広がるリングと対になる）
-        fx_->EmitShockwave({playerPos.x, slimeHome_.y + 0.02f, playerPos.z}, 6.0f, 0.4f,
-                           kFxMergeColor, 0.45f);
-    }
-
-    slime_->ToggleMerge();
-    prevMergedCount_ = 0;
-    fxVortexAccum_ = 0.0f;
 }
 
 void TitleScene::EnterSplit()
 {
-    if (!slime_ || !slime_->IsMerged())
-    {
-        return;
-    }
-
-    const Vector3 playerPos = slime_->GetPosition();
-
-    slime_->ToggleMerge();
-    slimeFlashTimer_ = 0.14f;
-    // 糸はミニオンが少し飛び出してから張る。
-    // TriggerSplit はミニオンをプレイヤーの位置に置き直してから撃ち出すので、
-    // 同じフレームに張ると長さ 0 になってしまう
-    strandDelayFrames_ = 4;
-
-    if (fx_)
-    {
-        // プチ花火。閃光 → 内側の殻 → 外側の殻 → 尾を引く火花
-        fx_->EmitFirework(randomEngine_, {playerPos.x, playerPos.y + 0.3f, playerPos.z},
-                          kFxFireworkCoreColor, kFxFireworkShellColor, 1.0f);
-
-        // 粘っこい飛沫を重ねて「スライムが弾けた」感を残す
-        fx_->EmitBurst(randomEngine_, playerPos, 14, 3.0f, 1.4f, kFxTrailColorNormal, 0.35f, 0.55f,
-                       false);
-
-        // 床に広がるリング。マージの縮むリングと対になる
-        fx_->EmitShockwave({playerPos.x, slimeHome_.y + 0.02f, playerPos.z}, 0.5f, 7.0f,
-                           kFxFireworkShellColor, 0.45f);
-    }
-
-    prevMergedCount_ = 0;
 }
 
 // ===================================================================
@@ -1067,86 +862,6 @@ void TitleScene::UpdateFx(float deltaTime)
         fxTrailDistance_ = 0.0f;
     }
     fxPrevSlimePos_ = slimePos;
-
-    // --- 弾軌跡 ---
-    if (fxEnableBulletTrail_ && minions_)
-    {
-        for (const auto& minion : minions_->GetMinions())
-        {
-            if (!minion || !minion->IsActive())
-            {
-                continue;
-            }
-            if (minion->GetState() != MinionState::Thrown)
-            {
-                continue;
-            }
-            // 速度 0 で置いていくので、飛んだ跡がそのまま線として残る
-            fx_->EmitDroplet(randomEngine_, minion->GetPosition(), {0.0f, 0.0f, 0.0f},
-                             kFxBulletColor, 0.13f, 0.28f);
-        }
-    }
-
-    // --- マージ: 吸い込みの渦と、1体吸うたびのリアクション ---
-    if (minions_ && isMerged)
-    {
-        // まだ吸い終わっていない間は、外周から渦を巻いて吸い込み続ける。
-        // SlimeFx 側の attractStrength が距離に反比例するので、
-        // 中心に近づくほど加速して「吸い込まれる」動きになる
-        if (!minions_->IsAllMerged())
-        {
-            fxVortexAccum_ += deltaTime;
-            while (fxVortexAccum_ >= kFxVortexInterval)
-            {
-                fxVortexAccum_ -= kFxVortexInterval;
-                fx_->EmitVortex(randomEngine_, slimePos, slimeScale * 2.6f, 2, kFxVortexColor,
-                                0.17f, 0.7f, 26.0f);
-            }
-        }
-
-        const int mergedCount = minions_->GetMergedCount();
-        if (mergedCount > prevMergedCount_)
-        {
-            const int absorbed = mergedCount - prevMergedCount_;
-            for (int i = 0; i < absorbed; ++i)
-            {
-                fx_->EmitBurst(randomEngine_, slimePos, 8, 2.6f, 1.6f, kFxMergeColor, 0.18f, 0.4f,
-                               true);
-                // 吸うたびに足元へ小さくリングが広がる
-                fx_->EmitShockwave({slimePos.x, slimeHome_.y + 0.02f, slimePos.z},
-                                   slimeScale * 1.2f, slimeScale * 3.4f, kFxMergeColor, 0.3f);
-            }
-            prevMergedCount_ = mergedCount;
-
-            // 表面全体がぶるっと震える（波紋とは質の違う揺れ）
-            SlimeParamsCPU& params = slime_->GetSlimeParams();
-            params.wobbleStrength = (std::min)(0.45f, params.wobbleStrength + 0.06f);
-        }
-    }
-    else if (!isMerged)
-    {
-        // 跳ね上げた wobble を少しずつ元へ戻す
-        SlimeParamsCPU& params = slime_->GetSlimeParams();
-        params.wobbleStrength += (0.24f - params.wobbleStrength) * (std::min)(1.0f, deltaTime * 2.0f);
-    }
-
-    // --- 分裂の少しあと: 親子を結ぶ「粘りの糸」 ---
-    if (strandDelayFrames_ > 0)
-    {
-        --strandDelayFrames_;
-        if (strandDelayFrames_ == 0 && minions_)
-        {
-            for (const auto& minion : minions_->GetMinions())
-            {
-                if (!minion || !minion->IsActive())
-                {
-                    continue;
-                }
-                fx_->EmitStrand(randomEngine_, slimePos, minion->GetPosition(), 4, kFxStrandColor,
-                                0.12f, 0.22f);
-            }
-        }
-    }
 
     // --- 背景 ---
     if (fxEnableBackground_)
@@ -1285,13 +1000,9 @@ void TitleScene::Draw(SceneRenderRequests& renderRequests)
         ctx.camera = slimeCamera_;
         ctx.light = GetLight();
 
-        // デプスを書くもの（ミニオン → スライム）を先に、
+        // デプスを書くもの（スライム）を先に、
         // デプスを書かないパーティクルを最後に描く。
         // こうするとパーティクルは前後関係だけ正しく効いて、粒同士は隠し合わない
-        if (minions_)
-        {
-            minions_->Draw(ctx);
-        }
         if (slime_)
         {
             slime_->Draw(ctx);
@@ -1436,11 +1147,6 @@ void TitleScene::DrawDebugUI()
 
         const char* stateName = (demoState_ == DemoState::Rolling) ? "Rolling (merged)" : "Roam (split)";
         ImGui::Text("State  : %s  %.1f / %.1f s", stateName, demoTimer_, demoDuration_);
-        if (minions_)
-        {
-            ImGui::Text("Minions: %d active / %d merged / %d total", minions_->GetActiveCount(),
-                        minions_->GetMergedCount(), minions_->GetTotalCount());
-        }
         ImGui::Text("Throw in : %.2f s", throwTimer_);
 
         ImGui::SeparatorText("Timing");

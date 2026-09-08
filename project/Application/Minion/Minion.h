@@ -86,6 +86,12 @@ public:
     int GetSize() const { return size_; }
     void SetSize(int s);
 
+    // 内包する子ミニオンの管理（合体時・分裂時用）
+    const std::vector<Minion*>& GetAbsorbedMinions() const { return absorbedMinions_; }
+    std::vector<Minion*>& GetAbsorbedMinions() { return absorbedMinions_; }
+    void AddAbsorbedMinion(Minion* child) { absorbedMinions_.push_back(child); }
+    void ClearAbsorbedMinions() { absorbedMinions_.clear(); }
+
 private:
     void DrawSlime(const RenderContext& ctx);
 
@@ -119,6 +125,9 @@ private:
     Vector3 prevVelocity_{ 0.0f, 0.0f, 0.0f };
     float obstacleCooldown_ = 0.0f; // 障害物（プロペラ等）の多重衝突防止クールダウン
     float mergeCooldown_ = 0.0f;    // 分裂直後の再合体防止クールダウンタイマー
+
+    // 合体により内包した子ミニオンたち
+    std::vector<Minion*> absorbedMinions_;
 
     // メッシュ当たり判定
     std::unique_ptr<MeshCollider> meshCollider_;

@@ -24,7 +24,7 @@ public:
     ~MinionManager() = default;
 
     void Initialize(Object3dCom* object3dCom, Camera* camera);
-    MergeResult Update(float deltaTime, const Vector3& playerPos, bool isMerged, float playerScale = 0.8f, const Vector2& stageTilt = { 0.0f, 0.0f }, const Vector3& playerSquash = { 0.0f, 0.0f, 0.0f }, const Vector3& playerVelocity = { 0.0f, 0.0f, 0.0f }, int playerSize = 1);
+    MergeResult Update(float deltaTime, const Vector3& playerPos, bool isMerged, float playerScale = 0.8f, const Vector2& stageTilt = { 0.0f, 0.0f }, const Vector3& playerSquash = { 0.0f, 0.0f, 0.0f }, const Vector3& playerVelocity = { 0.0f, 0.0f, 0.0f }, int playerSize = 1, bool mergeRequested = false);
     void Draw(const RenderContext& ctx);
 
     // --- 群衆の操作 ---
@@ -38,6 +38,7 @@ public:
     // 合体 / 分裂トリガー
     void TriggerMerge(const Vector3& playerPos, float mergeRadius = 4.5f);
     void TriggerSplit(const Vector3& playerPos, int splitCount = 10);
+    void RequestMerge() { mergeRequested_ = true; }
     void SetAllAbsorbed(bool absorbed);
     void SetInitialAbsorbedCount(int absorbedCount);
 
@@ -60,6 +61,9 @@ public:
     const std::vector<std::unique_ptr<Minion>>& GetMinions() const { return minions_; }
     bool IsAllMerged() const { return isAllMerged_; }
 
+    float GetMergeThreshold() const { return mergeThreshold_; }
+    void SetMergeThreshold(float t) { mergeThreshold_ = t; }
+
     float GetMergePickupRadius() const { return mergePickupRadius_; }
     void SetMergePickupRadius(float r) { mergePickupRadius_ = r; }
 
@@ -79,10 +83,13 @@ private:
     Object3dCom* object3dCom_ = nullptr;
     Camera* camera_ = nullptr;
     std::vector<std::unique_ptr<Minion>> minions_;
+    std::vector<Minion*> playerAbsorbedMinions_; // プレイヤー本体に吸収されている子ミニオンたち
 
     int absorbedCount_ = 0; // プレイヤーに吸収されたロコロコ（サイズ）数
     bool isMergedState_ = false;
     bool isAllMerged_ = false;
+    bool mergeRequested_ = false;
+    float mergeThreshold_ = 2.5f; // Fキー押下時に合体（くっつく）可能な距離閾値
     float mergePickupRadius_ = 4.5f;
     float splitPopPower_ = 8.0f;
     float splitUpPower_ = 7.0f;

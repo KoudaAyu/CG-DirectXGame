@@ -12,8 +12,7 @@
 class KeyInput;
 class MouseInput;
 class Camera;
-class PikminPlayer;
-class MinionManager;
+class Slime;
 class SlimeFx;
 struct SceneRenderRequests;
 
@@ -190,8 +189,7 @@ private:
     Vector3 savedCameraTranslate_{}; // シーンを抜けるときに戻すための退避
     Vector3 savedCameraRotate_{};
 
-    std::unique_ptr<PikminPlayer> slime_;
-    std::unique_ptr<MinionManager> minions_;
+    std::unique_ptr<Slime> slime_;
     std::unique_ptr<SlimeFx> fx_;
 
     std::mt19937 randomEngine_;

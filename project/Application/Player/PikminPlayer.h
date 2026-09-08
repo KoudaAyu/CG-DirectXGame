@@ -65,6 +65,10 @@ public:
     void SetSize(int s);
     float CalculateScaleBySize(int size) const;
 
+    // タイトル画面専用フラグ（「大きい青い例外」: 分裂せず、常に大きく鮮やかな青いスライム）
+    void SetTitleException(bool isException) { isTitleException_ = isException; }
+    bool IsTitleException() const { return isTitleException_; }
+
     float CalculateMergedScale(int minionCount) const;
 
     // 衝突時の弾性リアクション
@@ -96,6 +100,7 @@ private:
 
     bool isMerged_ = false;
     bool isGrounded_ = false;
+    bool isTitleException_ = false;
 
 public:
     bool IsGrounded() const { return isGrounded_; }

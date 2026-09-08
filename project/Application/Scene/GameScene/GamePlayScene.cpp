@@ -72,10 +72,15 @@ void GamePlayScene::InitializeScene()
         cameraDistance_ * sinPitch,
         -cameraDistance_ * cosYaw * cosPitch
     };
+    float initialWeightTotal = 3.0f + 7.0f;
+    float initialCentroidZ = (3.0f * spawnBasePos_.z + 7.0f * (spawnBasePos_.z + spawnGroupOffsetZ_)) / initialWeightTotal;
+    currentFocusPos_ = { spawnBasePos_.x, 0.5f, initialCentroidZ };
+    focusPosVelocity_ = { 0.0f, 0.0f, 0.0f };
+
     Vector3 initLookAt = {
-        0.0f,
-        0.5f + cameraTargetOffsetY_,
-        cameraForwardOffset_
+        currentFocusPos_.x,
+        currentFocusPos_.y + cameraTargetOffsetY_,
+        currentFocusPos_.z + cameraForwardOffset_
     };
     Vector3 initCamPos = {
         initLookAt.x + initOffset.x,
@@ -96,8 +101,6 @@ void GamePlayScene::InitializeScene()
     cameraDistVelocity_ = 0.0f;
     currentGroupSpread_ = 0.0f;
     groupSpreadVelocity_ = 0.0f;
-    currentFocusPos_ = { 0.0f, 0.5f, 0.0f };
-    focusPosVelocity_ = { 0.0f, 0.0f, 0.0f };
 
     if (sceneManager_) {
         sceneManager_->SetCamera(playCamera_.get());
@@ -143,19 +146,11 @@ void GamePlayScene::InitializeScene()
     CollisionManager::GetInstance()->RegisterCollider(groundCollider_.get());
     SlimePhysics::SetGroundMesh(groundPlane_.get(), groundCollider_.get());
 
-    // 4. プレイヤーの初期化
-    player_ = std::make_unique<PikminPlayer>();
-    player_->Initialize(object3dCom, playCamera_.get(), { 0.0f, 0.2f, 0.0f });
+    // 4. スライムマネージャーの初期化と初期スライム群の配置（前方に配置）
+    slimeManager_ = std::make_unique<SlimeManager>();
+    slimeManager_->Initialize(object3dCom, playCamera_.get());
 
-    // 5. ミニオンマネージャーの初期化（初期9体をスポーン: プレイヤー含め合計10体）
-    minionManager_ = std::make_unique<MinionManager>();
-    minionManager_->Initialize(object3dCom, playCamera_.get());
-    // 残り7匹の小ロコロコをステージ奥に配置
-    minionManager_->SpawnMinion({ 0.0f, 0.0f, 4.0f }, 9, MinionType::Blue);
-
-    // プレイヤーの最初の大きさは 3（中・黄色: 本体1 + 吸収2 = 3、残り7匹がフィールドで待機）
-    minionManager_->SetInitialAbsorbedCount(2);
-    player_->SetSize(3);
+    RespawnSlimesAtBase();
 
     // 6. マウス照準・放物線ガイドの初期化
     aimGuide_ = std::make_unique<AimGuide>();
@@ -185,6 +180,24 @@ void GamePlayScene::InitializeScene()
     isInitialized_ = true;
 }
 
+void GamePlayScene::RespawnSlimesAtBase()
+{
+    if (!slimeManager_) return;
+    slimeManager_->Clear();
+
+    // 手前にサイズ3のスライム1体（中・黄色）
+    slimeManager_->SpawnSlime(spawnBasePos_, 3);
+    // 奥にサイズ1の小スライム7体（青）
+    Vector3 groupPos = { spawnBasePos_.x, (std::max)(0.2f, spawnBasePos_.y - 0.2f), spawnBasePos_.z + spawnGroupOffsetZ_ };
+    slimeManager_->SpawnSlimes(groupPos, 7, 1);
+
+    // カメラ注視点もスポーン重心位置へ同期
+    float initialWeightTotal = 3.0f + 7.0f;
+    float initialCentroidZ = (3.0f * spawnBasePos_.z + 7.0f * (spawnBasePos_.z + spawnGroupOffsetZ_)) / initialWeightTotal;
+    currentFocusPos_ = { spawnBasePos_.x, 0.5f, initialCentroidZ };
+    focusPosVelocity_ = { 0.0f, 0.0f, 0.0f };
+}
+
 void GamePlayScene::Finalize()
 {
     for (auto& prop : propellerObstacles_)
@@ -201,8 +214,7 @@ void GamePlayScene::Finalize()
         groundCollider_.reset();
     }
     groundPlane_.reset();
-    minionManager_.reset();
-    player_.reset();
+    slimeManager_.reset();
     playCamera_.reset();
     mouseInput_.reset();
     keyInput_.reset();
@@ -222,7 +234,7 @@ void GamePlayScene::Update()
     {
         keyInput_->Update();
 
-        // ENTERキーでクリアシーンへ遷移（SPACEキーはスライムのジャンプに割り当て）
+        // ENTERキーでクリアシーンへ遷移（SPACEキーはステージ揺らしジャンプに割り当て）
         if (keyInput_->TriggerKey(DIK_RETURN))
         {
             SceneManager::GetInstance()->ChangeScene("CLEAR");
@@ -256,19 +268,63 @@ void GamePlayScene::Update()
     currentTilt_.x = SmoothDamp(currentTilt_.x, targetTilt_.x, tiltVelocity_.x, tiltSmoothTime_, deltaTime);
     currentTilt_.y = SmoothDamp(currentTilt_.y, targetTilt_.y, tiltVelocity_.y, tiltSmoothTime_, deltaTime);
 
-    Vector3 playerPos = player_ ? player_->GetPosition() : Vector3{ 0.0f, 0.0f, 0.0f };
-    Vector2 playerPivot = { playerPos.x, playerPos.z };
+    Vector3 slimeCenter = currentFocusPos_;
+    Vector2 slimePivot = { slimeCenter.x, slimeCenter.z };
 
-    // 地面プレーンの回転を傾斜角に合わせて更新
-    // プレイヤー足元を回転中心（ピボット）にすることで、傾斜時にスライム直下の
+    // --- SPACEキーによるステージ揺らし（バウンス・シェイク）ジャンプ ---
+    if (stageShakeCooldown_ > 0.0f)
+    {
+        stageShakeCooldown_ -= deltaTime;
+    }
+
+    if (keyInput_ && keyInput_->TriggerKey(DIK_SPACE) && stageShakeCooldown_ <= 0.0f)
+    {
+        stageShakeCooldown_ = 0.22f;          // 連打防止クールダウン
+        stageBounceVelocity_ = 11.0f;         // ステージ上向き突き上げ初速 (ボヨン！)
+        stageShakeTimer_ = stageShakeDuration_; // ステージ回転揺動開始
+        cameraShakeIntensity_ = 0.35f;        // カメラ衝撃シェイク強度
+
+        // スライム群衆のステージ突き上げジャンプ（接地スライムのみが床法線方向に打ち上げられる）
+        if (slimeManager_)
+        {
+            slimeManager_->TriggerStageBounce(currentTilt_, slimePivot, 13.5f);
+        }
+    }
+
+    // ステージ垂直バウンス（減衰バネ運動: 突き上がった後、弾力をもって元の高さに美しく収束）
+    float bounceK = 360.0f;    // バネ定数
+    float bounceDamp = 22.0f;  // 減衰係数
+    float bounceAccel = -bounceK * stageBounceOffset_ - bounceDamp * stageBounceVelocity_;
+    stageBounceVelocity_ += bounceAccel * deltaTime;
+    stageBounceOffset_ += stageBounceVelocity_ * deltaTime;
+    if (std::abs(stageBounceOffset_) < 0.001f && std::abs(stageBounceVelocity_) < 0.01f)
+    {
+        stageBounceOffset_ = 0.0f;
+        stageBounceVelocity_ = 0.0f;
+    }
+
+    // ステージ回転揺動（シェイク: ドンと突いたときの微小な振動）
+    Vector2 shakeTilt = { 0.0f, 0.0f };
+    if (stageShakeTimer_ > 0.0f)
+    {
+        stageShakeTimer_ -= deltaTime;
+        float progress = (std::max)(0.0f, stageShakeTimer_ / stageShakeDuration_);
+        // 高周波減衰振動
+        float wave = std::sin((stageShakeDuration_ - stageShakeTimer_) * 48.0f) * progress;
+        shakeTilt.x = wave * stageShakeIntensity_;
+        shakeTilt.y = std::cos((stageShakeDuration_ - stageShakeTimer_) * 40.0f) * progress * stageShakeIntensity_ * 0.7f;
+    }
+
+    // 地面プレーンの回転を傾斜角＋揺動に合わせて更新
+    // スライム群衆重心を回転中心（ピボット）にすることで、傾斜時にスライム直下の
     // 地面高さが変動しなくなり、めり込み・追従ズレを根本から解消
     if (groundPlane_)
     {
-        Vector3 rot = { currentTilt_.x, 0.0f, -currentTilt_.y };
+        Vector3 rot = { currentTilt_.x + shakeTilt.x, 0.0f, -currentTilt_.y + shakeTilt.y };
 
-        // ピボット = プレイヤーの XZ 位置（地面上の点）
-        float px = playerPos.x;
-        float pz = playerPos.z;
+        // ピボット = スライム重心の XZ 位置
+        float px = slimeCenter.x;
+        float pz = slimeCenter.z;
 
         // rot = {pitch(α), 0, roll(β)} の回転行列 R = Rx(α) * Rz(β) を手計算し、
         // ピボット点を R で変換した結果との差分を平行移動に設定
@@ -287,7 +343,7 @@ void GamePlayScene::Update()
 
         Vector3 groundTranslate = {
             px - prx,
-            0.0f - pry,
+            0.0f - pry + stageBounceOffset_,
             pz - prz
         };
 
@@ -307,85 +363,40 @@ void GamePlayScene::Update()
     // 照準ガイドはLocoRoco完全準拠のため無効化
     // if (aimGuide_ && player_ && playCamera_) ...
 
-    // プレイヤーの更新（ステージ傾斜を伝達）
-    if (player_)
+    // スライム群衆の更新（全スライムの入力、物理、合体、分裂、衝突分離）
+    if (slimeManager_)
     {
-        player_->Update(deltaTime, keyInput_.get(), minionManager_.get(), mouseInput_.get(), aimGuide_.get(), currentTilt_);
+        slimeManager_->Update(deltaTime, keyInput_.get(), currentTilt_);
     }
-
-    // ミニオンマネージャーの更新（ステージ傾斜を伝達）
-    if (minionManager_ && player_)
-    {
-        auto mergeResult = minionManager_->Update(deltaTime, player_->GetPosition(), player_->IsMerged(),
-                                                 player_->GetCurrentScale(), currentTilt_,
-                                                 player_->GetSlimeParams().squashStretch,
-                                                 player_->GetVelocity(), player_->GetSize());
-        if (mergeResult.playerPromoted)
-        {
-            player_->SetPosition(mergeResult.promotedPos);
-            player_->SetSize(mergeResult.promotedSize);
-            player_->GetSlimeParams().impulseStrength = 0.55f;
-            player_->GetSlimeParams().squashStretch = { 0.25f, -0.20f, 0.25f };
-        }
-        else if (mergeResult.newlyMergedCount > 0)
-        {
-            player_->SetSize(player_->GetSize() + mergeResult.newlyMergedCount);
-            player_->GetSlimeParams().impulseStrength = 0.45f;
-            player_->GetSlimeParams().squashStretch = { 0.20f, -0.15f, 0.20f };
-        }
-    }
-
 
     // 回転プロペラ障害物の更新（自転とステージ傾斜の追従）
     for (auto& prop : propellerObstacles_)
     {
-        if (prop) prop->Update(deltaTime, currentTilt_, playerPivot);
+        if (prop) prop->Update(deltaTime, currentTilt_, slimePivot);
     }
 
-    // プロペラ障害物メッシュとスライム（プレイヤーおよび全ミニオン）の精密メッシュ衝突解決
+    // プロペラ障害物メッシュと全スライムの精密メッシュ衝突解決
     for (auto& prop : propellerObstacles_)
     {
-        if (!prop) continue;
+        if (!prop || !slimeManager_) continue;
 
-        // プレイヤーとの精密メッシュ衝突
-        if (player_)
+        for (auto& slime : slimeManager_->GetSlimes())
         {
-            Vector3 pPos = player_->GetPosition();
-            Vector3 pVel = player_->GetVelocity();
-            float pRadius = player_->GetCurrentScale() * 0.78f;
-            Vector3 squash = player_->GetSlimeParams().squashStretch;
+            if (!slime || !slime->IsActive()) continue;
+
+            Vector3 sPos = slime->GetPosition();
+            Vector3 sVel = slime->GetVelocity();
+            float sRadius = slime->GetRadius();
+            Vector3 squash = slime->GetSlimeParams().squashStretch;
             float impulse = 0.0f;
 
-            if (prop->ResolveSlimeCollision(pPos, pVel, pRadius, player_->IsMerged(), squash, impulse))
+            if (prop->ResolveSlimeCollision(sPos, sVel, sRadius, slime->IsMerged(), squash, impulse))
             {
-                player_->SetPosition(pPos);
-                player_->SetVelocity(pVel);
-                player_->GetSlimeParams().squashStretch = squash;
-                player_->GetSlimeParams().impulseStrength = (std::max)(player_->GetSlimeParams().impulseStrength, impulse);
-            }
-        }
-
-        // 各ミニオンとの精密メッシュ衝突
-        if (minionManager_)
-        {
-            for (auto& minion : minionManager_->GetMinions())
-            {
-                if (!minion || !minion->IsActive()) continue;
-
-                Vector3 mPos = minion->GetPosition();
-                Vector3 mVel = minion->GetVelocity();
-                float mRadius = minion->GetRadius();
-                Vector3 squash = minion->GetSlimeParams().squashStretch;
-                float impulse = 0.0f;
-
-                if (prop->ResolveSlimeCollision(mPos, mVel, mRadius, false, squash, impulse))
-                {
-                    minion->SetPosition(mPos);
-                    minion->SetVelocity(mVel);
-                    minion->SetState(MinionState::Thrown);
-                    minion->GetSlimeParams().squashStretch = squash;
-                    minion->GetSlimeParams().impulseStrength = (std::max)(minion->GetSlimeParams().impulseStrength, impulse);
-                }
+                slime->SetPosition(sPos);
+                slime->SetVelocity(sVel);
+                slime->SetState(SlimeState::Thrown);
+                slime->GetSlimeParams().squashStretch = squash;
+                slime->GetSlimeParams().impulseStrength = (std::max)(slime->GetSlimeParams().impulseStrength, impulse);
             }
         }
     }
@@ -394,19 +405,14 @@ void GamePlayScene::Update()
     CollisionManager::GetInstance()->Update();
 
     // カメラの群れ重心追従 (LocoRoco方式: 全ロコロコの重心と広がりを捉える)
-    if (playCamera_ && player_)
+    if (playCamera_ && slimeManager_)
     {
-        Vector3 rawFocusPos = player_->GetPosition();
-        float rawSpread = 0.0f;
-        if (minionManager_)
-        {
-            minionManager_->GetGroupCenterAndSpread(player_->GetPosition(), rawFocusPos, rawSpread);
-        }
+        Vector3 rawFocusPos = { 0.0f, 0.0f, 0.0f };
+        float rawSpread = 1.0f;
+        slimeManager_->GetGroupCenterAndSpread(rawFocusPos, rawSpread);
 
-        // 注視点の高さ Y: プレイヤーと群れの自然な高さを追従
-        rawFocusPos.y = (std::max)(player_->GetPosition().y + 0.3f, rawFocusPos.y);
-
-        Vector3 playerVel = player_->GetVelocity();
+        // 注視点の高さ Y: 群れの自然な高さを追従
+        rawFocusPos.y = (std::max)(0.5f, rawFocusPos.y + 0.3f);
 
         // 初回初期化
         if (!cameraInitialized_)
@@ -418,19 +424,21 @@ void GamePlayScene::Update()
         }
         else
         {
-            // 注視点中心のスムーズ補間（ミニオン合体による重心の瞬間ジャンプを防止）
+            // 注視点中心のスムーズ補間（合体による重心の瞬間ジャンプを防止）
             currentFocusPos_.x = SmoothDamp(currentFocusPos_.x, rawFocusPos.x, focusPosVelocity_.x, focusSmoothTime_, deltaTime);
             currentFocusPos_.y = SmoothDamp(currentFocusPos_.y, rawFocusPos.y, focusPosVelocity_.y, focusSmoothTime_, deltaTime);
             currentFocusPos_.z = SmoothDamp(currentFocusPos_.z, rawFocusPos.z, focusPosVelocity_.z, focusSmoothTime_, deltaTime);
 
-            // 群れの広がりのスムーズ補間（合体でミニオンが消えたときの急激なズームインを完全に緩和）
+            // 群れの広がりのスムーズ補間（合体でスライムが消えたときの急激なズームインを完全に緩和）
             currentGroupSpread_ = SmoothDamp(currentGroupSpread_, rawSpread, groupSpreadVelocity_, groupSpreadSmoothTime_, deltaTime);
         }
 
-        // 1. プレイヤースケールおよび群れの広がり（Spread）に応じた目標カメラ距離
-        // 合体時の急激なズーム変化を防止するため、広がりの重みをマイルド化(0.35f)し、
-        // かつ最低カメラ距離（18.5f）を下限ガード（ゆったり見晴らせる高さ）
-        float scaleOffset = (player_->GetCurrentScale() - 0.4f);
+        // スケールおよび群れの広がり（Spread）に応じた目標カメラ距離
+        float maxScale = 0.4f;
+        for (const auto& s : slimeManager_->GetSlimes()) {
+            if (s && s->IsActive()) maxScale = (std::max)(maxScale, s->GetCurrentScale());
+        }
+        float scaleOffset = (maxScale - 0.4f);
         float targetDist = cameraDistance_ + (std::max)(0.0f, scaleOffset) * cameraDynamicZoom_ + currentGroupSpread_ * 0.35f;
         targetDist = (std::max)(18.5f, targetDist); // 最低距離ガード
 
@@ -478,7 +486,7 @@ void GamePlayScene::Update()
 
         // ★★★ カメラの最低地上高クリアランスガード（ステージ接近・めり込み防止） ★★★
         // カメラ直下の傾斜面（ステージ）高さを算出し、常に十分な高度（地面から最低9.5m上空）を維持
-        float groundYAtTargetCam = SlimePhysics::CalculateGroundHeight(targetCamPos.x, targetCamPos.z, currentTilt_, playerPivot);
+        float groundYAtTargetCam = SlimePhysics::CalculateGroundHeight(targetCamPos.x, targetCamPos.z, currentTilt_, slimePivot);
         float minTargetCamY = groundYAtTargetCam + 9.5f;
         if (targetCamPos.y < minTargetCamY)
         {
@@ -487,7 +495,18 @@ void GamePlayScene::Update()
 
         // 4. 目標カメラ回転の算出
         // 左右移動速度に応じた微小なダイナミックバンク（ロール傾斜: 左右に曲がった感覚を強調）
-        float sideBank = -std::clamp(playerVel.x * cameraDynamicBank_, -0.05f, 0.05f);
+        float avgVelX = 0.0f;
+        int totalWeight = 0;
+        for (const auto& s : slimeManager_->GetSlimes()) {
+            if (s && s->IsActive()) {
+                int w = (std::max)(1, s->GetSize());
+                avgVelX += s->GetVelocity().x * static_cast<float>(w);
+                totalWeight += w;
+            }
+        }
+        if (totalWeight > 0) avgVelX /= static_cast<float>(totalWeight);
+
+        float sideBank = -std::clamp(avgVelX * cameraDynamicBank_, -0.05f, 0.05f);
 
         Vector3 targetCamRot = {
             pitch + (followStageTilt_ ? currentTilt_.x : 0.0f),
@@ -520,7 +539,7 @@ void GamePlayScene::Update()
 
         // ★★★ 最終補間後位置に対する絶対安全クリアランスガード ★★★
         // 補間スプリングのオーバーシュートや激しい板の傾きでも、ステージに異様に近づくことを100%遮断（最低地上高8.5m）
-        float currentGroundAtCam = SlimePhysics::CalculateGroundHeight(currentCameraPos_.x, currentCameraPos_.z, currentTilt_, playerPivot);
+        float currentGroundAtCam = SlimePhysics::CalculateGroundHeight(currentCameraPos_.x, currentCameraPos_.z, currentTilt_, slimePivot);
         float absoluteMinCamY = currentGroundAtCam + 8.5f;
         if (currentCameraPos_.y < absoluteMinCamY)
         {
@@ -528,7 +547,22 @@ void GamePlayScene::Update()
             if (cameraPosVelocity_.y < 0.0f) cameraPosVelocity_.y = 0.0f;
         }
 
-        playCamera_->SetTranslate(currentCameraPos_);
+        // カメラ衝撃シェイクの減衰と適用
+        if (cameraShakeIntensity_ > 0.001f)
+        {
+            cameraShakeIntensity_ *= (1.0f - (std::min)(1.0f, deltaTime * 12.0f));
+            float camWaveY = std::sin(stageShakeTimer_ * 55.0f) * cameraShakeIntensity_;
+            float camWaveX = std::cos(stageShakeTimer_ * 45.0f) * cameraShakeIntensity_ * 0.5f;
+            cameraShakeOffset_ = { camWaveX, camWaveY, 0.0f };
+        }
+        else
+        {
+            cameraShakeIntensity_ = 0.0f;
+            cameraShakeOffset_ = { 0.0f, 0.0f, 0.0f };
+        }
+
+        Vector3 finalCamPos = currentCameraPos_ + cameraShakeOffset_;
+        playCamera_->SetTranslate(finalCamPos);
         playCamera_->SetRotate(currentCameraRot_);
         playCamera_->SetFovY(cameraFov_);
         playCamera_->Update();
@@ -579,25 +613,23 @@ void GamePlayScene::Draw(SceneRenderRequests& renderRequests)
     // 3. 放物線照準ガイドの描画 (LocoRoco完全準拠のため非表示)
     // if (aimGuide_) { aimGuide_->Draw(ctx); }
 
-    // 3. ミニオン群衆の描画
-    if (minionManager_)
+    // 3. 全スライムの描画
+    if (slimeManager_)
     {
-        minionManager_->Draw(ctx);
-    }
-
-    // 4. プレイヤーの描画
-    if (player_)
-    {
-        player_->Draw(ctx);
+        slimeManager_->Draw(ctx);
     }
 }
 
 void GamePlayScene::DrawDebugUI()
 {
-    // コライダーのデバッグワイヤーフレーム描画（エンジン標準の MeshCollider ワイヤーフレーム描画）
+    // コライダーのデバッグワイヤーフレーム描画
     if (playCamera_)
     {
         CollisionManager::GetInstance()->DrawDebug(playCamera_.get());
+        if (slimeManager_)
+        {
+            slimeManager_->DrawDebug(playCamera_.get());
+        }
     }
 
 #ifdef USE_IMGUI
@@ -614,85 +646,103 @@ void GamePlayScene::DrawDebugUI()
     // 1. 操作説明
     ImGui::TextColored(ImVec4(1.0f, 0.9f, 0.2f, 1.0f), "[ Controls (LocoRoco 3D) ]");
     ImGui::BulletText("WASD / Arrows: Tilt Stage (ステージを傾けて全員で転がる)");
+    ImGui::BulletText("SPACE key: Stage Shake Jump (ステージをドンと揺らして一斉ジャンプ！)");
     ImGui::BulletText("E key: Split (弾けて全員小ロコロコに分裂)");
-    ImGui::BulletText("Contact: Auto Merge (触れ合うとポコッと自動合体)");
+    ImGui::BulletText("F key: Merge / Stick (閾値内の仲間スライムを合体・くっつける)");
+    ImGui::BulletText("Contact: Bounce & Separation (通常接触時は弾性反発・くっつかない)");
     ImGui::BulletText("F1 key: Toggle Collision Wireframes (当たり判定表示ON/OFF)");
     ImGui::BulletText("F3 key: Toggle All ImGui (全ImGui表示/非表示)");
-    ImGui::BulletText("SPACE key: Clear Scene");
     ImGui::Separator();
 
-    // 2. ステート表示 & 合体トグル
-    if (player_ && minionManager_)
+    // 2. スライム状態表示 & 合体/分裂コントロール
+    if (slimeManager_)
     {
-        bool isMerged = player_->IsMerged();
-        int mergedCount = minionManager_->GetMergedCount();
-        int totalCount = minionManager_->GetTotalCount();
-        int activeCount = minionManager_->GetActiveCount();
+        int totalCount = slimeManager_->GetTotalCount();
+        int activeCount = slimeManager_->GetActiveCount();
+        int maxSlimeSize = slimeManager_->GetMaxSlimeSize();
+        int totalSize = slimeManager_->GetTotalSize();
 
-        int currentSize = player_->GetSize();
-        int maxMinionSize = minionManager_->GetMaxMinionSize();
         const char* tierLabel = "小 (1-2) [青]";
         ImVec4 tierColor = ImVec4(0.35f, 0.70f, 1.0f, 1.0f);
-        if (currentSize >= 8) {
+        if (maxSlimeSize >= 8) {
             tierLabel = "大 (8-10) [赤]";
             tierColor = ImVec4(1.0f, 0.35f, 0.3f, 1.0f);
-        } else if (currentSize >= 3) {
+        } else if (maxSlimeSize >= 3) {
             tierLabel = "中 (3-7) [黄色]";
             tierColor = ImVec4(1.0f, 0.90f, 0.2f, 1.0f);
         }
 
-        ImGui::TextColored(tierColor, "Main Loco Size: %d / %d  Category: %s  (Scale: %.2f)",
-                           currentSize, totalCount + 1, tierLabel, player_->GetCurrentScale());
-        if (activeCount > 0) {
-            ImGui::TextColored(ImVec4(0.5f, 0.85f, 1.0f, 1.0f), "Friends in Field: %d active | Max Friend Size: %d",
-                               activeCount, maxMinionSize);
-        } else {
-            ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.2f, 1.0f), "All Friends Merged into One!");
-        }
+        ImGui::TextColored(tierColor, "Max Slime Size: %d | Total Mass: %d | Category: %s",
+                           maxSlimeSize, totalSize, tierLabel);
+        ImGui::TextColored(ImVec4(0.5f, 0.85f, 1.0f, 1.0f), "Active Slimes in Field: %d / %d",
+                           activeCount, totalCount);
 
-        if (ImGui::Button("SPLIT (全員分裂: E key)", ImVec2(280, 36)))
-
+        if (ImGui::Button("STAGE SHAKE JUMP (ステージ揺らしジャンプ: SPACE key)", ImVec2(485, 36)))
         {
-            if (minionManager_->GetMergedCount() > 0) {
-                minionManager_->TriggerSplit(player_->GetPosition());
+            if (stageShakeCooldown_ <= 0.0f)
+            {
+                stageShakeCooldown_ = 0.22f;
+                stageBounceVelocity_ = 11.0f;
+                stageShakeTimer_ = stageShakeDuration_;
+                cameraShakeIntensity_ = 0.35f;
+                Vector3 cPos = currentFocusPos_;
+                slimeManager_->TriggerStageBounce(currentTilt_, { cPos.x, cPos.z }, 13.5f);
             }
         }
 
-        float splitPop = minionManager_->GetSplitPopPower();
+        if (ImGui::Button("SPLIT (全員分裂: E key)", ImVec2(240, 36)))
+        {
+            slimeManager_->TriggerSplit();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("MERGE (合体: F key)", ImVec2(240, 36)))
+        {
+            slimeManager_->RequestMerge();
+        }
+
+        float mergeThreshold = slimeManager_->GetMergeThreshold();
+        if (ImGui::SliderFloat("Merge Threshold (合体距離閾値)", &mergeThreshold, 0.5f, 10.0f, "%.2f m")) {
+            slimeManager_->SetMergeThreshold(mergeThreshold);
+        }
+
+        float splitPop = slimeManager_->GetSplitPopPower();
         if (ImGui::SliderFloat("Split Pop Power (はじけ水平威力)", &splitPop, 1.0f, 30.0f, "%.1f")) {
-            minionManager_->SetSplitPopPower(splitPop);
+            slimeManager_->SetSplitPopPower(splitPop);
         }
 
-        float splitUp = minionManager_->GetSplitUpPower();
+        float splitUp = slimeManager_->GetSplitUpPower();
         if (ImGui::SliderFloat("Split Up Power (はじけ上昇威力)", &splitUp, 1.0f, 25.0f, "%.1f")) {
-            minionManager_->SetSplitUpPower(splitUp);
+            slimeManager_->SetSplitUpPower(splitUp);
         }
-    }
 
-    ImGui::Separator();
+        ImGui::Separator();
 
-    // 3. ミニオン群衆管理
-    if (minionManager_ && player_)
-    {
-        int activeCount = minionManager_->GetActiveCount();
-        int readyCount = minionManager_->GetReadyCount(player_->GetPosition());
-        int totalCount = minionManager_->GetTotalCount();
-        ImGui::Text("Minions: %d Ready to Throw | %d Active | %d Total", readyCount, activeCount, totalCount);
+        // 3. スライムスポーン管理
+        ImGui::Text("Spawn Controls:");
+        ImGui::DragFloat3("Spawn Base Pos (基準位置)", &spawnBasePos_.x, 0.2f, -50.0f, 50.0f, "%.1f m");
+        ImGui::SliderFloat("Group Forward Offset (群れ前方オフセット)", &spawnGroupOffsetZ_, 1.0f, 10.0f, "%.1f m");
+
+        if (ImGui::Button("Respawn at Base Pos (初期配置で再生成)", ImVec2(280, 30))) {
+            RespawnSlimesAtBase();
+        }
+
+        Vector3 spawnCenter = spawnBasePos_;
+        if (playCamera_) spawnCenter = currentFocusPos_;
 
         if (ImGui::Button("+1 Spawn")) {
-            minionManager_->SpawnMinion(player_->GetPosition(), 1);
+            slimeManager_->SpawnSlime(spawnCenter, 1);
         }
         ImGui::SameLine();
         if (ImGui::Button("+5 Spawn")) {
-            minionManager_->SpawnMinion(player_->GetPosition(), 5);
+            slimeManager_->SpawnSlimes(spawnCenter, 5, 1);
         }
         ImGui::SameLine();
         if (ImGui::Button("+10 Spawn")) {
-            minionManager_->SpawnMinion(player_->GetPosition(), 10);
+            slimeManager_->SpawnSlimes(spawnCenter, 10, 1);
         }
         ImGui::SameLine();
         if (ImGui::Button("Clear All")) {
-            minionManager_->ClearMinions();
+            slimeManager_->Clear();
         }
     }
 
@@ -709,46 +759,59 @@ void GamePlayScene::DrawDebugUI()
             maxTiltAngle_ = maxDeg * 0.0174533f;
         }
         ImGui::SliderFloat("Tilt Smooth Time (傾斜スムーズ時間)", &tiltSmoothTime_, 0.05f, 1.00f, "%.2f s");
+        ImGui::SliderFloat("Stage Shake Intensity (揺れ強度)", &stageShakeIntensity_, 0.005f, 0.10f, "%.3f rad");
+        ImGui::SliderFloat("Stage Shake Duration (揺れ持続時間)", &stageShakeDuration_, 0.10f, 0.60f, "%.2f s");
         ImGui::SliderFloat("Ground Scale (地面縮小スケール)", &groundScale_, 0.05f, 1.0f, "%.2f");
 
-        if (player_) {
-            float accel = player_->GetTiltAccel();
-            if (ImGui::SliderFloat("Slime Tilt Accel", &accel, 10.0f, 60.0f, "%.1f")) {
-                player_->SetTiltAccel(accel);
-            }
-            float friction = player_->GetFriction();
-            if (ImGui::SliderFloat("Slime Friction (共通摩擦係数: 1.3)", &friction, 0.2f, 5.0f, "%.1f")) {
-                player_->SetFriction(friction);
-            }
+        float friction = SlimePhysics::GetFriction();
+        if (ImGui::SliderFloat("Slime Friction (共通摩擦係数: 1.3)", &friction, 0.2f, 5.0f, "%.1f")) {
+            SlimePhysics::SetFriction(friction);
         }
     }
 
     ImGui::Separator();
 
-    // 5. プレイヤー調整
-    if (player_)
+    // 5. スライム見た目調整
+    if (slimeManager_ && !slimeManager_->GetSlimes().empty())
     {
-
-        // --- スライム表現パラメータ調整 ---
-        auto& slimeParams = player_->GetSlimeParams();
+        // 先頭スライムのパラメータを参照・調整し、全スライムへ反映可能
+        auto& firstSlimeParams = slimeManager_->GetSlimes().front()->GetSlimeParams();
         if (ImGui::CollapsingHeader("Slime Jelly & Wobble Params (ぷるぷる弾性調整)", ImGuiTreeNodeFlags_DefaultOpen))
         {
-            ImGui::SliderFloat("Wobble Strength (表面ぷるぷる強度)", &slimeParams.wobbleStrength, 0.0f, 0.5f, "%.3f");
-            ImGui::SliderFloat("Wobble Frequency (揺れ周波数)", &slimeParams.wobbleFrequency, 1.0f, 15.0f, "%.1f");
-            ImGui::SliderFloat("Fresnel Power (エッジ発光)", &slimeParams.fresnelPower, 0.5f, 6.0f, "%.1f");
-            ImGui::SliderFloat("Env Reflection (環境反射)", &slimeParams.envReflection, 0.0f, 1.0f, "%.2f");
-            ImGui::SliderFloat("Inner Glow (内側グロー)", &slimeParams.innerGlow, 0.0f, 1.0f, "%.2f");
-            ImGui::SliderFloat("Shininess (ハイライト光沢)", &slimeParams.specularShininess, 8.0f, 128.0f, "%.0f");
+            float wobbleStr = firstSlimeParams.wobbleStrength;
+            if (ImGui::SliderFloat("Wobble Strength (表面ぷるぷる強度)", &wobbleStr, 0.0f, 0.5f, "%.3f")) {
+                for (auto& s : slimeManager_->GetSlimes()) if (s) s->GetSlimeParams().wobbleStrength = wobbleStr;
+            }
+            float wobbleFreq = firstSlimeParams.wobbleFrequency;
+            if (ImGui::SliderFloat("Wobble Frequency (揺れ周波数)", &wobbleFreq, 1.0f, 15.0f, "%.1f")) {
+                for (auto& s : slimeManager_->GetSlimes()) if (s) s->GetSlimeParams().wobbleFrequency = wobbleFreq;
+            }
+            float fresnel = firstSlimeParams.fresnelPower;
+            if (ImGui::SliderFloat("Fresnel Power (エッジ発光)", &fresnel, 0.5f, 6.0f, "%.1f")) {
+                for (auto& s : slimeManager_->GetSlimes()) if (s) s->GetSlimeParams().fresnelPower = fresnel;
+            }
+            float envRef = firstSlimeParams.envReflection;
+            if (ImGui::SliderFloat("Env Reflection (環境反射)", &envRef, 0.0f, 1.0f, "%.2f")) {
+                for (auto& s : slimeManager_->GetSlimes()) if (s) s->GetSlimeParams().envReflection = envRef;
+            }
+            float glow = firstSlimeParams.innerGlow;
+            if (ImGui::SliderFloat("Inner Glow (内側グロー)", &glow, 0.0f, 1.0f, "%.2f")) {
+                for (auto& s : slimeManager_->GetSlimes()) if (s) s->GetSlimeParams().innerGlow = glow;
+            }
+            float shininess = firstSlimeParams.specularShininess;
+            if (ImGui::SliderFloat("Shininess (ハイライト光沢)", &shininess, 8.0f, 128.0f, "%.0f")) {
+                for (auto& s : slimeManager_->GetSlimes()) if (s) s->GetSlimeParams().specularShininess = shininess;
+            }
 
-            float color[4] = { slimeParams.baseColor.x, slimeParams.baseColor.y, slimeParams.baseColor.z, slimeParams.baseColor.w };
+            float color[4] = { firstSlimeParams.baseColor.x, firstSlimeParams.baseColor.y, firstSlimeParams.baseColor.z, firstSlimeParams.baseColor.w };
             if (ImGui::ColorEdit4("Slime Color", color))
             {
-                slimeParams.baseColor = { color[0], color[1], color[2], color[3] };
+                for (auto& s : slimeManager_->GetSlimes()) if (s) s->GetSlimeParams().baseColor = { color[0], color[1], color[2], color[3] };
             }
 
             if (ImGui::Button("Trigger Impulse Ripple (衝撃波紋テスト)"))
             {
-                slimeParams.impulseStrength = 0.5f;
+                for (auto& s : slimeManager_->GetSlimes()) if (s) s->GetSlimeParams().impulseStrength = 0.5f;
             }
         }
     }
