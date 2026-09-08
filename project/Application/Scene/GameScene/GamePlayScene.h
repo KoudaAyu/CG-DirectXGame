@@ -11,8 +11,10 @@
 #include "Baziru3_Engine/Graphics/3D/Object/Object3d.h"
 #include "Baziru3_Engine/Framework/Collision/MeshCollider.h"
 #include "Application/GameObject/IrisTransition.h"
+#include "Application/GameObject/GrowthCube.h"
 
 #include <memory>
+#include <vector>
 
 /**
  * @brief ピクミン×ロコロコ ゲームプレイシーン (GamePlayScene)
@@ -32,6 +34,7 @@ public:
 
 private:
     void DrawDebugUI();
+    void ResetGrowthCubes();
 
 private:
     std::unique_ptr<KeyInput> keyInput_;
@@ -41,6 +44,7 @@ private:
     std::unique_ptr<SlimeManager> slimeManager_;
     std::unique_ptr<AimGuide> aimGuide_;
     std::vector<std::unique_ptr<PropellerObstacle>> propellerObstacles_;
+    std::vector<std::unique_ptr<GrowthCube>> growthCubes_;
 
     // --- スライム初期スポーン位置 ---
     Vector3 spawnBasePos_{ 0.0f, 0.55f, 30.0f }; // 初期スポーン基準位置（島中央の平原: Z = 30.0f）

@@ -135,6 +135,7 @@
     <ClCompile Include="Application\GameObject\Slime.cpp" />
     <ClCompile Include="Application\GameObject\SlimeManager.cpp" />
     <ClCompile Include="Application\GameObject\IrisTransition.cpp" />
+    <ClCompile Include="Application\GameObject\GrowthCube.cpp" />
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="Resources\shaders\Slime.VS.hlsl">
@@ -386,6 +387,7 @@
     <ClInclude Include="Application\GameObject\SlimeCollision.h" />
     <ClInclude Include="Application\GameObject\PropellerObstacle.h" />
     <ClInclude Include="Application\GameObject\SlimeFx.h" />
+    <ClInclude Include="Application\GameObject\GrowthCube.h" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="externals\DirectXTex\DirectXTex_Desktop_2022_Win10.vcxproj">

@@ -208,7 +208,42 @@ void GamePlayScene::InitializeScene()
     isGameOverTransition_ = false;
     gameOverDelayTimer_ = 0.0f;
 
+    // 9. プリミティブ生成による成長キューブアイテム (GrowthCube) の初期化・配置
+    growthCubes_.clear();
+    {
+        // キューブ1: 小スライム群の前方（まっすぐ進むとすぐ取れる位置）
+        auto cube1 = std::make_unique<GrowthCube>();
+        cube1->Initialize(object3dCom, playCamera_.get(), { spawnBasePos_.x, spawnBasePos_.y + 0.15f, spawnBasePos_.z + 8.0f }, 0.85f);
+        growthCubes_.push_back(std::move(cube1));
+
+        // キューブ2: スタート平原の左側
+        auto cube2 = std::make_unique<GrowthCube>();
+        cube2->Initialize(object3dCom, playCamera_.get(), { spawnBasePos_.x - 3.8f, spawnBasePos_.y + 0.15f, spawnBasePos_.z + 3.0f }, 0.80f);
+        growthCubes_.push_back(std::move(cube2));
+
+        // キューブ3: スタート平原の右側
+        auto cube3 = std::make_unique<GrowthCube>();
+        cube3->Initialize(object3dCom, playCamera_.get(), { spawnBasePos_.x + 3.8f, spawnBasePos_.y + 0.15f, spawnBasePos_.z + 3.0f }, 0.80f);
+        growthCubes_.push_back(std::move(cube3));
+
+        // キューブ4: 通路・橋の手前（Z=48m）
+        auto cube4 = std::make_unique<GrowthCube>();
+        cube4->Initialize(object3dCom, playCamera_.get(), { spawnBasePos_.x, spawnBasePos_.y + 0.15f, spawnBasePos_.z + 18.0f }, 0.90f);
+        growthCubes_.push_back(std::move(cube4));
+    }
+
     isInitialized_ = true;
+}
+
+void GamePlayScene::ResetGrowthCubes()
+{
+    for (auto& cube : growthCubes_)
+    {
+        if (cube)
+        {
+            cube->Respawn();
+        }
+    }
 }
 
 void GamePlayScene::RespawnSlimesAtBase()
@@ -233,6 +268,9 @@ void GamePlayScene::RestartGame()
 {
     // スライム群を初期配置で再生成
     RespawnSlimesAtBase();
+
+    // 成長キューブを再出現
+    ResetGrowthCubes();
 
     // ステージ傾斜を水平にリセット
     currentTilt_ = { 0.0f, 0.0f };
@@ -487,6 +525,15 @@ void GamePlayScene::Update()
                 slime->GetSlimeParams().squashStretch = squash;
                 slime->GetSlimeParams().impulseStrength = (std::max)(slime->GetSlimeParams().impulseStrength, impulse);
             }
+        }
+    }
+
+    // 成長キューブアイテム (GrowthCube) の更新（浮遊、自転、ステージ傾斜追従、スライム当たり判定、巨大化）
+    for (auto& cube : growthCubes_)
+    {
+        if (cube)
+        {
+            cube->Update(deltaTime, currentTilt_, slimePivot, slimeManager_.get());
         }
     }
 
@@ -787,8 +834,14 @@ void GamePlayScene::Draw(SceneRenderRequests& renderRequests)
         }
     }
 
-    // 3. 放物線照準ガイドの描画 (LocoRoco完全準拠のため非表示)
-    // if (aimGuide_) { aimGuide_->Draw(ctx); }
+    // 2.5. プリミティブ成長キューブアイテムの描画
+    for (auto& cube : growthCubes_)
+    {
+        if (cube)
+        {
+            cube->Draw(ctx);
+        }
+    }
 
     // 3. 全スライムの描画
     if (slimeManager_)
@@ -926,6 +979,54 @@ void GamePlayScene::DrawDebugUI()
         ImGui::SameLine();
         if (ImGui::Button("Clear All")) {
             slimeManager_->Clear();
+        }
+    }
+
+    ImGui::Separator();
+
+    // 3.5. 成長キューブアイテム (Growth Cubes)
+    if (ImGui::CollapsingHeader("Growth Cubes (成長キューブアイテム)", ImGuiTreeNodeFlags_DefaultOpen))
+    {
+        ImGui::TextColored(ImVec4(1.0f, 0.85f, 0.2f, 1.0f), "Primitive-Generated Collectable Cubes:");
+        ImGui::Text("Active Cubes: %zu", growthCubes_.size());
+
+        if (ImGui::Button("Respawn All Cubes (全キューブ復活)", ImVec2(240, 28)))
+        {
+            ResetGrowthCubes();
+        }
+
+        ImGui::SameLine();
+        if (ImGui::Button("Spawn Cube At Camera Target", ImVec2(220, 28)))
+        {
+            auto newCube = std::make_unique<GrowthCube>();
+            Vector3 pos = currentFocusPos_;
+            pos.y += 0.5f;
+            pos.z += 2.0f;
+            newCube->Initialize(GetObject3dCom(), playCamera_.get(), pos, 0.85f);
+            growthCubes_.push_back(std::move(newCube));
+        }
+
+        for (size_t i = 0; i < growthCubes_.size(); ++i)
+        {
+            if (!growthCubes_[i]) continue;
+            auto state = growthCubes_[i]->GetState();
+            const char* stateStr = "Active (出現中)";
+            ImVec4 stateColor = ImVec4(0.2f, 1.0f, 0.4f, 1.0f);
+            if (state == GrowthCube::State::Collecting) {
+                stateStr = "Collecting (取得演出中)";
+                stateColor = ImVec4(1.0f, 0.8f, 0.2f, 1.0f);
+            } else if (state == GrowthCube::State::Inactive) {
+                stateStr = "Inactive (取得済み)";
+                stateColor = ImVec4(0.7f, 0.7f, 0.7f, 1.0f);
+            }
+
+            ImGui::Text("Cube [%zu]: %s", i, stateStr);
+            ImGui::SameLine();
+            std::string respawnBtnId = "Respawn##" + std::to_string(i);
+            if (ImGui::SmallButton(respawnBtnId.c_str()))
+            {
+                growthCubes_[i]->Respawn();
+            }
         }
     }
 
