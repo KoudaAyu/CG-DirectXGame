@@ -4,6 +4,7 @@
 #include <functional>
 #include <memory>
 #include <nlohmann/json.hpp>
+#include <Windows.h>
 
 namespace BaziruEngine::AI {
 
@@ -28,9 +29,17 @@ public:
     // typeName: JSONに記述するノード名（例: "MoveToCoverTask"）
     template<typename T>
     void RegisterNode(const std::string& typeName) {
-        creators_[typeName] = [](const nlohmann::json& nodeJson) {
+        creators_[typeName] = [typeName](const nlohmann::json& nodeJson) -> std::shared_ptr<BehaviorNode> {
             auto node = std::make_shared<T>();
-            node->Deserialize(nodeJson); // ロード時にノード特有のパラメータ解析を行う
+            try {
+                node->Deserialize(nodeJson); // ロード時にノード特有のパラメータ解析を行う
+            } catch (const std::exception& e) {
+                std::string warn = "[BehaviorNodeFactory Warning] Exception during Deserialize for node '" + typeName + "': " + e.what() + ". Using default parameters.\n";
+                OutputDebugStringA(warn.c_str());
+            } catch (...) {
+                std::string warn = "[BehaviorNodeFactory Warning] Unknown exception during Deserialize for node '" + typeName + "'. Using default parameters.\n";
+                OutputDebugStringA(warn.c_str());
+            }
             return node;
         };
     }

@@ -342,3 +342,11 @@ logs/
 # D3D12 PSO Cache (Driver/hardware-specific)
 **/PsoCache.bin
 
+# Editor layout and temporary JSON caches
+**/bt_editor_layout.json
+**/NodeEditor.json
+**/camera_sync.json
+*.json.bak
+*.json.tmp
+
+
