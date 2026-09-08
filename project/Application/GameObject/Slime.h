@@ -30,6 +30,7 @@ public:
     void Initialize(Object3dCom* object3dCom, Camera* camera, const Vector3& startPos, int initialSize = 1);
     void Update(float deltaTime, const Vector2& stageTilt = { 0.0f, 0.0f }, const Vector2& pivot = { 0.0f, 0.0f });
     void Draw(const RenderContext& ctx);
+    void DrawXRay(const RenderContext& ctx, ID3D12PipelineState* xRayPSO);
     void DrawDebug(Camera* camera);
 
     // 物理アクション

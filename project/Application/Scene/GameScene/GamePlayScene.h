@@ -45,6 +45,7 @@ private:
     Vector3 spawnBasePos_{ 0.0f, 0.55f, 30.0f }; // 初期スポーン基準位置（島中央の平原: Z = 30.0f）
     float spawnGroupOffsetZ_ = 4.0f;            // 小スライム群の前方オフセット
     void RespawnSlimesAtBase();
+    void RestartGame();
     // --- ステージパーツ管理 ---
     struct StagePart
     {

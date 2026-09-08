@@ -222,6 +222,32 @@ void GamePlayScene::RespawnSlimesAtBase()
     focusPosVelocity_ = { 0.0f, 0.0f, 0.0f };
 }
 
+void GamePlayScene::RestartGame()
+{
+    // スライム群を初期配置で再生成
+    RespawnSlimesAtBase();
+
+    // ステージ傾斜を水平にリセット
+    currentTilt_ = { 0.0f, 0.0f };
+    targetTilt_ = { 0.0f, 0.0f };
+    tiltVelocity_ = { 0.0f, 0.0f };
+
+    // ステージ揺らし・バウンスをリセット
+    stageBounceOffset_ = 0.0f;
+    stageBounceVelocity_ = 0.0f;
+    stageShakeTimer_ = 0.0f;
+    stageShakeCooldown_ = 0.0f;
+    cameraShakeIntensity_ = 0.0f;
+    cameraShakeOffset_ = { 0.0f, 0.0f, 0.0f };
+
+    // カメラのズーム・広がり追従を初期化
+    currentCameraDist_ = cameraDistance_;
+    cameraDistVelocity_ = 0.0f;
+    currentGroupSpread_ = 0.0f;
+    groupSpreadVelocity_ = 0.0f;
+    cameraInitialized_ = false;
+}
+
 void GamePlayScene::Finalize()
 {
     for (auto& prop : propellerObstacles_)
@@ -266,6 +292,12 @@ void GamePlayScene::Update()
         if (keyInput_->TriggerKey(DIK_RETURN))
         {
             SceneManager::GetInstance()->ChangeScene("CLEAR");
+        }
+
+        // Rキーで再スタート（初期配置でスライムを再生成、ステージ傾斜・カメラを初期化）
+        if (keyInput_->TriggerKey(DIK_R))
+        {
+            RestartGame();
         }
 
         // F1キーで当たり判定ワイヤーフレーム表示/非表示をトグル
@@ -649,6 +681,7 @@ void GamePlayScene::Draw(SceneRenderRequests& renderRequests)
             if (part.textureIndex != TextureManager::kInvalidTextureIndex) {
                 partCtx.textureHandle = TextureManager::GetInstance()->GetSrvHandleGPU(part.textureIndex);
             }
+
             object3dCom->Draw(part.object.get(), partCtx, part.modelData, true);
         }
     }
@@ -656,7 +689,10 @@ void GamePlayScene::Draw(SceneRenderRequests& renderRequests)
     // 2. 回転プロペラ障害物の描画
     for (auto& prop : propellerObstacles_)
     {
-        if (prop) prop->Draw(ctx);
+        if (prop)
+        {
+            prop->Draw(ctx);
+        }
     }
 
     // 3. 放物線照準ガイドの描画 (LocoRoco完全準拠のため非表示)
@@ -771,8 +807,8 @@ void GamePlayScene::DrawDebugUI()
         ImGui::DragFloat3("Spawn Base Pos (基準位置)", &spawnBasePos_.x, 0.2f, -50.0f, 50.0f, "%.1f m");
         ImGui::SliderFloat("Group Forward Offset (群れ前方オフセット)", &spawnGroupOffsetZ_, 1.0f, 10.0f, "%.1f m");
 
-        if (ImGui::Button("Respawn at Base Pos (初期配置で再生成)", ImVec2(280, 30))) {
-            RespawnSlimesAtBase();
+        if (ImGui::Button("Restart Game [R] (再スタート)", ImVec2(280, 30))) {
+            RestartGame();
         }
 
         Vector3 spawnCenter = spawnBasePos_;
@@ -996,9 +1032,10 @@ void GamePlayScene::DrawDebugUI()
         }
     }
 
+
     ImGui::Separator();
 
-    // 5. シーン遷移
+    // 6. シーン遷移
     if (ImGui::Button("Go To CLEAR", ImVec2(130, 28)))
     {
         SceneManager::GetInstance()->ChangeScene("CLEAR");

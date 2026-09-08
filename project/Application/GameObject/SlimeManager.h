@@ -3,6 +3,8 @@
 #include "Slime.h"
 #include <vector>
 #include <memory>
+#include <d3d12.h>
+#include <wrl.h>
 
 class Object3dCom;
 class Camera;
@@ -57,11 +59,13 @@ public:
 private:
     void ResolveSeparation(const Vector3& rotation, const Vector2& stageTilt, const Vector2& pivot);
     void CheckAndResolveMerge(const Vector2& stageTilt, const Vector2& pivot);
+    void CreateXRayPipeline();
 
 private:
     Object3dCom* object3dCom_ = nullptr;
     Camera* camera_ = nullptr;
     std::vector<std::unique_ptr<Slime>> slimes_;
+    Microsoft::WRL::ComPtr<ID3D12PipelineState> xRayPSO_;
 
     bool mergeRequested_ = false;
     float mergeThreshold_ = 2.5f;

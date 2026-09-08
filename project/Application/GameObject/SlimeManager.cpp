@@ -2,9 +2,13 @@
 #include "Application/GameObject/SlimeCollision.h"
 #include "Application/GameObject/SlimePhysics.h"
 #include "Baziru3_Engine/Core/Base/KeyInput.h"
+#include "Baziru3_Engine/Graphics/3D/Object/Object3dCom.h"
+#include "DirectXCom.h"
+#include "Baziru3_Engine/Core/Base/Pipeline/PipelineStateManager.h"
 #include <cmath>
 #include <cstdlib>
 #include <algorithm>
+#include <iostream>
 
 namespace {
     constexpr float kPi = 3.14159265358979323846f;
@@ -14,6 +18,93 @@ void SlimeManager::Initialize(Object3dCom* object3dCom, Camera* camera) {
     object3dCom_ = object3dCom;
     camera_ = camera;
     slimes_.clear();
+
+    CreateXRayPipeline();
+}
+
+void SlimeManager::CreateXRayPipeline() {
+    if (!object3dCom_) return;
+    DirectXCom* dxCommon = object3dCom_->GetDirectXCom();
+    if (!dxCommon) return;
+
+    auto rootSig = PipelineStateManager::GetInstance()->GetRootSignature("Slime");
+    if (!rootSig) {
+        OutputDebugStringA("SlimeManager: Slime root signature not found.\n");
+        return;
+    }
+
+    // 遮蔽スライム専用ピクセルシェーダーと頂点シェーダーのコンパイル
+    Microsoft::WRL::ComPtr<IDxcBlob> vsBlob = dxCommon->CompileShader(
+        L"Resources/shaders/Slime.VS.hlsl", L"vs_6_0",
+        dxCommon->GetDxcUtils().Get(), dxCommon->GetDxcCompiler(), dxCommon->GetIncludeHandler(), std::cout);
+
+    Microsoft::WRL::ComPtr<IDxcBlob> psBlob = dxCommon->CompileShader(
+        L"Resources/shaders/SlimeXRay.PS.hlsl", L"ps_6_0",
+        dxCommon->GetDxcUtils().Get(), dxCommon->GetDxcCompiler(), dxCommon->GetIncludeHandler(), std::cout);
+
+    if (!vsBlob || !psBlob) {
+        OutputDebugStringA("SlimeManager: Failed to compile shaders for SlimeXRay PSO.\n");
+        return;
+    }
+
+    // インプットレイアウト
+    D3D12_INPUT_ELEMENT_DESC inputElementDescs[3]{};
+    inputElementDescs[0].SemanticName = "POSITION";
+    inputElementDescs[0].SemanticIndex = 0;
+    inputElementDescs[0].Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
+    inputElementDescs[0].AlignedByteOffset = D3D12_APPEND_ALIGNED_ELEMENT;
+
+    inputElementDescs[1].SemanticName = "TEXCOORD";
+    inputElementDescs[1].SemanticIndex = 0;
+    inputElementDescs[1].Format = DXGI_FORMAT_R32G32_FLOAT;
+    inputElementDescs[1].AlignedByteOffset = D3D12_APPEND_ALIGNED_ELEMENT;
+
+    inputElementDescs[2].SemanticName = "NORMAL";
+    inputElementDescs[2].SemanticIndex = 0;
+    inputElementDescs[2].Format = DXGI_FORMAT_R32G32B32_FLOAT;
+    inputElementDescs[2].AlignedByteOffset = D3D12_APPEND_ALIGNED_ELEMENT;
+
+    D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc{};
+    psoDesc.pRootSignature = rootSig.Get();
+    psoDesc.InputLayout = { inputElementDescs, _countof(inputElementDescs) };
+    psoDesc.VS = { vsBlob->GetBufferPointer(), vsBlob->GetBufferSize() };
+    psoDesc.PS = { psBlob->GetBufferPointer(), psBlob->GetBufferSize() };
+
+    // 半透明αブレンド
+    psoDesc.BlendState.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
+    psoDesc.BlendState.RenderTarget[0].BlendEnable = TRUE;
+    psoDesc.BlendState.RenderTarget[0].SrcBlend = D3D12_BLEND_SRC_ALPHA;
+    psoDesc.BlendState.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
+    psoDesc.BlendState.RenderTarget[0].DestBlend = D3D12_BLEND_INV_SRC_ALPHA;
+    psoDesc.BlendState.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_ONE;
+    psoDesc.BlendState.RenderTarget[0].BlendOpAlpha = D3D12_BLEND_OP_ADD;
+    psoDesc.BlendState.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_ZERO;
+
+    // スライム表面ポリゴンのみ描画（裏面ポリゴンが自身に合格するのを防ぐ）
+    psoDesc.RasterizerState.FillMode = D3D12_FILL_MODE_SOLID;
+    psoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_BACK;
+    psoDesc.RasterizerState.FrontCounterClockwise = FALSE;
+    psoDesc.RasterizerState.DepthClipEnable = TRUE;
+
+    psoDesc.NumRenderTargets = 1;
+    psoDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
+    psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+    psoDesc.SampleDesc.Count = 1;
+    psoDesc.SampleMask = D3D12_DEFAULT_SAMPLE_MASK;
+
+    // 遮蔽時判定: 現在の深度バッファ値より奥にあるピクセルのみ描画 (GREATER)
+    // 深度書き込みは行わない (ZERO)
+    psoDesc.DepthStencilState.DepthEnable = TRUE;
+    psoDesc.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO;
+    psoDesc.DepthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_GREATER;
+    psoDesc.DSVFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
+
+    HRESULT hr = dxCommon->GetDevice()->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&xRayPSO_));
+    if (FAILED(hr)) {
+        OutputDebugStringA("SlimeManager: Failed to create SlimeXRay PSO.\n");
+    } else {
+        OutputDebugStringA("SlimeManager: Created SlimeXRay PSO successfully.\n");
+    }
 }
 
 Slime* SlimeManager::SpawnSlime(const Vector3& pos, int size) {
@@ -275,6 +366,12 @@ void SlimeManager::Update(float deltaTime, KeyInput* keyInput, const Vector2& st
         }
     }
 
+    // 非アクティブ（奈落落下など）になったスライムをリストから除外
+    slimes_.erase(
+        std::remove_if(slimes_.begin(), slimes_.end(),
+            [](const std::unique_ptr<Slime>& s) { return !s || !s->IsActive(); }),
+        slimes_.end());
+
     // スライム同士の衝突分離（2パス）
     Vector3 rot = { stageTilt.x, 0.0f, -stageTilt.y };
     for (int iter = 0; iter < 2; ++iter) {
@@ -359,8 +456,21 @@ int SlimeManager::GetTotalSize() const {
 }
 
 void SlimeManager::Draw(const RenderContext& ctx) {
+    // 1. 遮蔽時 X-Ray 描画（障害物の裏に隠れたスライムを描画）
+    // ※ 通常描画の前に実行することで、スライム自身のポリゴン深度との自己干渉を完全防止！
+    //    デプスバッファにはステージや障害物の深度しか入っていないため、
+    //    手前に何もない平地では GREATER テストが 100% 不合格となり、白浮きが絶対に発生しない。
+    if (xRayPSO_) {
+        for (auto& slime : slimes_) {
+            if (slime && slime->IsActive()) {
+                slime->DrawXRay(ctx, xRayPSO_.Get());
+            }
+        }
+    }
+
+    // 2. 通常描画（手前に遮蔽物のない可視スライムを描画）
     for (auto& slime : slimes_) {
-        if (slime) {
+        if (slime && slime->IsActive()) {
             slime->Draw(ctx);
         }
     }

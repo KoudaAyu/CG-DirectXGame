@@ -50,6 +50,8 @@ public:
      */
     void Draw(const RenderContext& ctx);
 
+    Object3d* GetObject3d() const { return object3d_.get(); }
+
     /**
      * @brief 終了・解放処理（コライダーの登録解除）
      */

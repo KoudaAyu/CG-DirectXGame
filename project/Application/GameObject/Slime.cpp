@@ -214,12 +214,9 @@ void Slime::Update(float deltaTime, const Vector2& stageTilt, const Vector2& piv
 
     UpdatePhysics(deltaTime, stageTilt, pivot);
 
-    // 奈落への落下防止セーフティ（島から落下した場合は安全に上空から復帰）
+    // 奈落への落下（自動復活は一旦無効化、落下したスライムは非アクティブ化）
     if (position_.y < -35.0f) {
-        position_ = { spawnPos_.x, spawnPos_.y + 2.5f, spawnPos_.z };
-        velocity_ = { 0.0f, 0.0f, 0.0f };
-        isGrounded_ = false;
-        state_ = SlimeState::Thrown;
+        isActive_ = false;
     }
 
     // --- 液体スライムの動的変形（空中/接地状態を正しく反映） ---
@@ -474,6 +471,83 @@ void Slime::DrawSlime(const RenderContext& ctx) {
     }
     if (skyboxHandle.ptr == 0) {
         skyboxHandle = texHandle; // フォールバック
+    }
+    if (skyboxHandle.ptr != 0) {
+        ctx.commandList->SetGraphicsRootDescriptorTable(6, skyboxHandle);
+    }
+
+    auto vbv = object3d_->GetVertexBufferView();
+    ctx.commandList->IASetVertexBuffers(0, 1, &vbv);
+    ctx.commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+    if (object3d_->HasIndexBuffer()) {
+        auto ibv = object3d_->GetIndexBufferView();
+        ctx.commandList->IASetIndexBuffer(&ibv);
+        ctx.commandList->DrawIndexedInstanced(static_cast<UINT>(modelData_.indices.size()), 1, 0, 0, 0);
+    } else {
+        ctx.commandList->DrawInstanced(static_cast<UINT>(modelData_.vertices.size()), 1, 0, 0);
+    }
+}
+
+void Slime::DrawXRay(const RenderContext& ctx, ID3D12PipelineState* xRayPSO) {
+    if (!isActive_ || !object3d_ || !object3dCom_ || !ctx.commandList || !xRayPSO) return;
+
+    DirectXCom* dx = object3dCom_->GetDirectXCom();
+    if (!dx) return;
+
+    auto* cbAllocator = dx->GetCBAllocator();
+    if (!cbAllocator) return;
+
+    auto rootSig = PipelineStateManager::GetInstance()->GetRootSignature("Slime");
+    if (!rootSig) return;
+
+    auto slimeAlloc = cbAllocator->Allocate(sizeof(SlimeParamsCPU));
+    if (!slimeAlloc.cpuAddress) return;
+    std::memcpy(slimeAlloc.cpuAddress, &slimeParams_, sizeof(SlimeParamsCPU));
+
+    ctx.commandList->SetGraphicsRootSignature(rootSig.Get());
+    ctx.commandList->SetPipelineState(xRayPSO);
+
+    // 0: Material
+    ctx.commandList->SetGraphicsRootConstantBufferView(0, object3d_->GetMaterialGPUAddress());
+
+    // 1: TransformationMatrix
+    ctx.commandList->SetGraphicsRootConstantBufferView(1, object3d_->GetTransformationMatrixGPUAddress());
+
+    // 2: Main Texture
+    D3D12_GPU_DESCRIPTOR_HANDLE texHandle{};
+    if (textureIndex_ != TextureManager::kInvalidTextureIndex) {
+        texHandle = TextureManager::GetInstance()->GetSrvHandleGPU(textureIndex_);
+    } else {
+        texHandle = TextureManager::GetInstance()->GetSrvHandleGPU(
+            TextureManager::GetInstance()->GetTextureIndexByFilePath("Resources/uvChecker.png"));
+    }
+    if (texHandle.ptr == 0) return;
+    ctx.commandList->SetGraphicsRootDescriptorTable(2, texHandle);
+
+    // 3: SlimeParams
+    ctx.commandList->SetGraphicsRootConstantBufferView(3, slimeAlloc.gpuAddress);
+
+    // 4: DirectionalLight
+    if (ctx.light && ctx.light->GetDirectionalLightResource()) {
+        ctx.commandList->SetGraphicsRootConstantBufferView(4, ctx.light->GetDirectionalLightResource()->GetGPUVirtualAddress());
+    } else {
+        ctx.commandList->SetGraphicsRootConstantBufferView(4, object3d_->GetDirectionalLightGPUAddress());
+    }
+
+    // 5: Camera
+    if (ctx.camera && ctx.camera->GetCameraGpuAddress() != 0) {
+        ctx.commandList->SetGraphicsRootConstantBufferView(5, ctx.camera->GetCameraGpuAddress());
+    }
+
+    // 6: Cube Environment Map
+    uint32_t skyboxIndex = SceneManager::GetInstance()->GetSkyboxTextureIndex();
+    D3D12_GPU_DESCRIPTOR_HANDLE skyboxHandle{};
+    if (skyboxIndex != TextureManager::kInvalidTextureIndex) {
+        skyboxHandle = TextureManager::GetInstance()->GetSrvHandleGPU(skyboxIndex);
+    }
+    if (skyboxHandle.ptr == 0) {
+        skyboxHandle = texHandle;
     }
     if (skyboxHandle.ptr != 0) {
         ctx.commandList->SetGraphicsRootDescriptorTable(6, skyboxHandle);
