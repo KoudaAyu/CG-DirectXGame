@@ -16,7 +16,9 @@
 #include "ModelManager.h"
 #include <cassert>
 #include <memory>
+#ifdef USE_IMGUI
 #include "externals/imgui/imgui.h"
+#endif
 
 namespace {
 static std::unique_ptr<SceneManager> &SceneManagerStorage() {
@@ -69,6 +71,7 @@ std::vector<std::string> SceneManager::GetAvailableSceneNames() const {
 }
 
 void SceneManager::DrawSceneSelectorUI() {
+#ifdef USE_IMGUI
   ImGui::Begin("Engine Scene Manager");
   ImGui::TextColored(ImVec4(0.2f, 0.85f, 1.0f, 1.0f), "Current Scene: %s", currentSceneName_.c_str());
   
@@ -113,6 +116,7 @@ void SceneManager::DrawSceneSelectorUI() {
   }
 
   ImGui::End();
+#endif
 }
 
 SceneManager *SceneManager::GetInstance() {
@@ -195,8 +199,10 @@ void SceneManager::Update(float deltaTime) {
     scene_->Update();
   }
 
+#ifdef USE_IMGUI
   // ImGui デバッグUIの描画
   DrawSceneSelectorUI();
+#endif
 
   // Engine-level subsystems: update particle manager so that scenes may
   // add particle definitions but the engine performs simulation.

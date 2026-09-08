@@ -11,7 +11,9 @@
 #include "Baziru3_Engine/Graphics/Shapes/Sphere/Sphere.h"
 #include "Baziru3_Engine/Graphics/3D/Object/Object3d.h"
 #include "Matrix4x4.h"
+#ifdef USE_IMGUI
 #include <imgui.h>
+#endif
 #include <cmath>
 #include <algorithm>
 #include <vector>
@@ -37,7 +39,7 @@ namespace CollisionDebugDraw
 
     void Draw(const std::vector<Collider*>& colliders, Camera* camera)
     {
-#ifdef _DEBUG
+#if defined(_DEBUG) && defined(USE_IMGUI)
         if (!camera) return;
 
         ImGuiIO& io = ImGui::GetIO();
