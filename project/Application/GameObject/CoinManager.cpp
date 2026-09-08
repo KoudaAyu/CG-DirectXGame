@@ -223,7 +223,7 @@ void CoinManager::RefreshFromConfig()
         {
             obj->SetColor(cfg.color);
         }
-        if (wasCollected) c->Collect();
+        if (wasCollected) c->CollectSilently();
     }
 }
 
@@ -234,9 +234,15 @@ void CoinManager::Update(float deltaTime, const Vector2& stageTilt, PikminPlayer
     Vector3 playerPos = player ? player->GetPosition() : Vector3{ 0.0f, 0.0f, 0.0f };
     Vector2 pivot{ playerPos.x, playerPos.z };
 
+    // 取得イベントは1フレームだけ。拾い手（GamePlayScene）は毎フレーム見る
+    collectEvents_.clear();
+
     for (auto& c : coins_)
     {
-        if (!c || c->IsCollected()) continue;
+        if (!c) continue;
+        // 取得済みでも、上昇しながら縮んで消えきるまでは更新を回す。
+        // そのあいだ GamePlaySceneFx がパーティクルを出し続ける
+        if (c->IsCollected() && !c->IsVanishing()) continue;
         c->Update(deltaTime, stageTilt, pivot, cfg.spinSpeed, cfg.bobHeight, cfg.bobSpeed, cfg.heightOffset);
     }
 
@@ -263,6 +269,9 @@ void CoinManager::Update(float deltaTime, const Vector2& stageTilt, PikminPlayer
 
         c->Collect();
         ++collectedCount_;
+
+        // 取得の演出と SE はシーン側（GamePlayScene::Update）で拾う
+        collectEvents_.push_back(c->GetPosition());
     }
 }
 

@@ -97,6 +97,13 @@ bool PikminPlayer::TakeSelfDestructEvent(SelfDestructEvent& out) {
     return true;
 }
 
+bool PikminPlayer::TakeFxEvents(FxEvents& out) {
+    if (!fxEvents_.jumped && !fxEvents_.split) return false;
+    out = fxEvents_;
+    fxEvents_ = FxEvents{};
+    return true;
+}
+
 void PikminPlayer::OnCollision(const CollisionInfo& info) {
     if (info.other && info.other->GetAttribute() == CollisionAttribute::Obstacle) {
         // 同一フレーム内の多重衝突および連続ヒットを防止（中心部での振動・多重加速を防止）
@@ -244,6 +251,12 @@ void PikminPlayer::Update(float deltaTime, KeyInput* keyInput, MinionManager* mi
                 selfDestruct_.position = position_;
                 selfDestruct_.sizeBefore = size_;
 
+                // 演出・SE 用（EnemyManager が拾う上のイベントとは別枠）。
+                // SE は GamePlayScene::Update() でマークしてある
+                fxEvents_.split = true;
+                fxEvents_.splitPosition = position_;
+                fxEvents_.splitSizeBefore = size_;
+
                 minionManager->TriggerSplit(position_, size_);
                 SetSize(1);
                 slimeParams_.impulseStrength = 0.55f;
@@ -256,6 +269,9 @@ void PikminPlayer::Update(float deltaTime, KeyInput* keyInput, MinionManager* mi
             if (isGrounded_) {
                 velocity_.y = 13.0f; // ジャンプ初速
                 isGrounded_ = false;
+
+                // SE は GamePlayScene::Update() でマークしてある
+                fxEvents_.jumped = true;
                 // ジャンプ時の縦伸び（スライムストレッチ）
                 slimeParams_.squashStretch = { -0.15f, 0.30f, -0.15f };
                 slimeParams_.impulseStrength = 0.28f;

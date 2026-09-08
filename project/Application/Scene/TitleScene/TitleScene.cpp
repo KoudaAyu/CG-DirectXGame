@@ -463,6 +463,12 @@ void TitleScene::CreateSlime()
     // ここを動かすとスライム・背景・エフェクトの視点がまとめて揃う。
     // SceneManager::GetCamera() は GAMEPLAY を経由すると解放済みの playCamera_ を
     // 指すことがあるので、そちらではなく Object3dCom 経由で取る。
+    // 【バグ修正メモ】ここが nullptr だと return してしまい、
+    // 「タイトルシーンを再度読み込むとスライムが消える」状態になっていた。
+    // 原因は GamePlayScene::Finalize() が SetDefaultCamera(nullptr) していたこと。
+    // 現在は GamePlayScene 側が「入る前のカメラ」を控えて戻すようにしてある。
+    // SceneManager::GetCamera() は GAMEPLAY を抜けたあと解放済みの playCamera_ を
+    // 指しうるので、フォールバックには使わないこと
     slimeCamera_ = object3dCom->GetDefaultCamera();
     if (!slimeCamera_)
     {

@@ -83,6 +83,25 @@ public:
      */
     bool TakeSelfDestructEvent(SelfDestructEvent& out);
 
+    /// @brief 演出・SE 用の1フレームイベント
+    struct FxEvents
+    {
+        bool jumped = false;                        //!< SPACE キーでジャンプした
+        bool split = false;                         //!< E キーで分裂（自爆）した
+        Vector3 splitPosition{ 0.0f, 0.0f, 0.0f };  //!< 分裂した瞬間の位置
+        int splitSizeBefore = 1;                    //!< 分裂前の塊サイズ
+    };
+
+    /**
+     * @brief 演出・SE 用のイベントを取り出してクリアする
+     * @param[out] out 取り出したイベント
+     * @return 何か起きていれば true
+     * @note TakeSelfDestructEvent() とは別枠。
+     *       あちらは EnemyManager が1箇所で拾ってしまうので、
+     *       演出・SE 側はこちらを使う（拾い手が競合しない）
+     */
+    bool TakeFxEvents(FxEvents& out);
+
     // 衝突時の弾性リアクション
     void OnCollision(const CollisionInfo& info);
 
@@ -134,6 +153,9 @@ private:
 
     // 自爆（E キー分裂）イベント
     SelfDestructEvent selfDestruct_;
+
+    // 演出・SE 用のイベント（自爆イベントとは別枠）
+    FxEvents fxEvents_;
 
     // スライム固有
     SlimeParamsCPU slimeParams_;

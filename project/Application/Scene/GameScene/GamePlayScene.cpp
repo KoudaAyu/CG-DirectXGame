@@ -101,11 +101,18 @@ void GamePlayScene::InitializeScene()
     focusPosVelocity_ = { 0.0f, 0.0f, 0.0f };
 
     if (sceneManager_) {
+        // 抜けるときに戻せるよう、入る前の値を控えておく
+        previousSceneCamera_ = sceneManager_->GetCamera();
         sceneManager_->SetCamera(playCamera_.get());
     }
 
     Object3dCom* object3dCom = GetObject3dCom();
     if (object3dCom) {
+        // 【重要】ここで控えたものを Finalize() で必ず戻す。
+        // 入る前の値は Game が握っている engine カメラで、
+        // TitleScene / ClearScene はこれを GetDefaultCamera() で借りている。
+        // nullptr のまま抜けると、あちらのスライムや花火が出なくなる
+        previousDefaultCamera_ = object3dCom->GetDefaultCamera();
         object3dCom->SetDefaultCamera(playCamera_.get());
     }
 
@@ -193,7 +200,21 @@ void GamePlayScene::InitializeScene()
     coinManager_ = std::make_unique<CoinManager>();
     coinManager_->Initialize(object3dCom, playCamera_.get());
 
-    // 11. 配置エディタの初期化と、配置データ（JSON）の読み込み
+    // 11. 演出（パーティクル）と HUD の初期化
+    //     中身は GamePlaySceneFX.cpp / GamePlaySceneHUD.cpp にある。
+    //     このシーンは「イベントを拾って渡す」だけに留めている
+    fx_ = std::make_unique<GamePlaySceneFx>();
+    fx_->Initialize(dxCommon_, playCamera_.get());
+
+    hud_ = std::make_unique<GamePlaySceneHud>();
+    hud_->Initialize();
+
+    score_ = 0;
+    elapsedSeconds_ = 0.0f;
+    shakeTrauma_ = 0.0f;
+    shakeTime_ = 0.0f;
+
+    // 12. 配置エディタの初期化と、配置データ（JSON）の読み込み
     //     SpawnDebugSet() による仮スポーンは廃止。配置は全部 JSON から復元する
     placementEditor_ = std::make_unique<PlacementEditor>();
     {
@@ -223,6 +244,17 @@ void GamePlayScene::InitializeScene()
 
 void GamePlayScene::Finalize()
 {
+    if (hud_)
+    {
+        hud_->Finalize();
+        hud_.reset();
+    }
+    if (fx_)
+    {
+        fx_->Finalize();
+        fx_.reset();
+    }
+
     // 配置エディタを開いたまま抜けたときの取りこぼしを防ぐ。
     // 保存対象は placementEditor_ が持つ配置データなので、
     // プレイ中に敵が倒されていてもファイルは汚れない
@@ -272,10 +304,23 @@ void GamePlayScene::Finalize()
     playCamera_.reset();
     mouseInput_.reset();
     keyInput_.reset();
+    // 【バグ修正】以前はここで nullptr にしていたため、
+    //   TITLE を再度読み込むとスライムが消える
+    //   CLEAR を再度読み込むと花火が消える
+    // という状態になっていた。どちらも Object3dCom::GetDefaultCamera() を
+    // 借りているので、入る前の値（＝ Game が握っている engine カメラ）へ必ず戻す
     if (auto* object3dCom = GetObject3dCom())
     {
-        object3dCom->SetDefaultCamera(nullptr);
+        object3dCom->SetDefaultCamera(previousDefaultCamera_);
     }
+    if (sceneManager_ && previousSceneCamera_)
+    {
+        // SceneManager 側も戻す。ここが解放済みの playCamera_ を指したままだと、
+        // 次のシーンが SceneManager::GetCamera() を触った瞬間に落ちる
+        sceneManager_->SetCamera(previousSceneCamera_);
+    }
+    previousDefaultCamera_ = nullptr;
+    previousSceneCamera_ = nullptr;
     cameraInitialized_ = false;
     isInitialized_ = false;
 }
@@ -321,6 +366,11 @@ void GamePlayScene::Update()
         // 配置エディタ中は誤爆を避けるため無効
         if (!isEditMode_ && keyInput_->TriggerKey(DIK_RETURN))
         {
+            // リザルトへ値を渡す。ClearScene が同じキーを読む
+            SetSceneDataInt("result.score", score_);
+            SetSceneDataFloat("result.time", elapsedSeconds_);
+            SetSceneDataInt("result.coin", coinManager_ ? coinManager_->GetCollectedCount() : 0);
+
             SceneManager::GetInstance()->ChangeScene("CLEAR");
         }
 
@@ -433,6 +483,11 @@ void GamePlayScene::Update()
                                                  player_->GetCurrentScale(), currentTilt_,
                                                  player_->GetSlimeParams().squashStretch,
                                                  player_->GetVelocity(), player_->GetSize());
+        if (mergeResult.playerPromoted || mergeResult.newlyMergedCount > 0)
+        {
+            // TODO(SE): プレイヤーの合体音（ミニオンを吸収した音）をここで鳴らす
+        }
+
         if (mergeResult.playerPromoted)
         {
             player_->SetPosition(mergeResult.promotedPos);
@@ -666,13 +721,205 @@ void GamePlayScene::Update()
         playCamera_->Update();
     }
 
+    // カメラシェイク（カメラ本体へオフセットを載せ直す。補間の基準は汚さない）
+    UpdateCameraShake(deltaTime);
+
     // カメラの最新ViewProjection行列に合わせて、地面メッシュのWVP定数バッファを同期更新
     if (groundPlane_)
     {
         groundPlane_->Update();
     }
 
+    // 演出と HUD。中身は GamePlaySceneFX.cpp / GamePlaySceneHUD.cpp
+    UpdateFxAndHud(deltaTime);
+
     DrawDebugUI();
+}
+
+void GamePlayScene::AddCameraShake(float trauma)
+{
+    shakeTrauma_ = (std::min)(1.0f, shakeTrauma_ + trauma);
+}
+
+void GamePlayScene::UpdateCameraShake(float deltaTime)
+{
+    if (!playCamera_) return;
+
+    shakeTime_ += deltaTime;
+    shakeTrauma_ = (std::max)(0.0f, shakeTrauma_ - shakeDecay_ * deltaTime);
+    if (shakeTrauma_ <= 0.0001f) return;
+
+    // trauma の2乗にすると、減衰の終わりぎわがすっと収まる
+    const float amount = shakeTrauma_ * shakeTrauma_;
+
+    // 位相と周期をずらした sin を重ねて疑似ノイズにする。
+    // 乱数を使わないので、同じ時刻なら必ず同じ揺れになる（デバッグしやすい）
+    const float t = shakeTime_ * shakeFrequency_;
+    const float nx = std::sin(t * 1.00f) * 0.6f + std::sin(t * 2.37f + 1.7f) * 0.4f;
+    const float ny = std::sin(t * 1.31f + 2.4f) * 0.6f + std::sin(t * 2.71f + 0.3f) * 0.4f;
+    const float nz = std::sin(t * 0.87f + 4.1f) * 0.6f + std::sin(t * 1.93f + 5.2f) * 0.4f;
+
+    const Vector3 shakenPos = {
+        currentCameraPos_.x + nx * shakeAmplitude_ * amount,
+        currentCameraPos_.y + ny * shakeAmplitude_ * amount,
+        currentCameraPos_.z + nz * shakeAmplitude_ * amount * 0.5f,
+    };
+    const Vector3 shakenRot = {
+        currentCameraRot_.x + ny * shakeRollAmount_ * amount * 0.4f,
+        currentCameraRot_.y + nx * shakeRollAmount_ * amount * 0.4f,
+        currentCameraRot_.z + nz * shakeRollAmount_ * amount,
+    };
+
+    playCamera_->SetTranslate(shakenPos);
+    playCamera_->SetRotate(shakenRot);
+    playCamera_->Update();
+}
+
+int GamePlayScene::CalculateLifeCount() const
+{
+    // 残機 ＝ スライムの数 ＝ プレイヤーの塊サイズ（吸収ぶんを含む）
+    //                        + フィールドに残っているミニオンの強さの合計
+    int life = player_ ? player_->GetSize() : 0;
+
+    if (minionManager_)
+    {
+        for (const auto& minionPtr : minionManager_->GetMinions())
+        {
+            const Minion* minion = minionPtr.get();
+            if (!minion || !minion->IsActive()) continue; // 吸収された子は非アクティブ
+            life += minion->GetSize();
+        }
+    }
+    return life;
+}
+
+// ===================================================================
+// 演出と HUD へのイベントの流し込み
+//
+// 演出そのものは GamePlaySceneFX.cpp、UI そのものは GamePlaySceneHUD.cpp。
+// ここは「誰が何をしたか」を拾って渡すだけ。
+// SE を入れる場所も、まとめてここにマークしてある
+// ===================================================================
+void GamePlayScene::UpdateFxAndHud(float deltaTime)
+{
+    if (!isEditMode_)
+    {
+        elapsedSeconds_ += deltaTime;
+    }
+
+    const Vector3 playerPos = player_ ? player_->GetPosition() : Vector3{ 0.0f, 0.0f, 0.0f };
+    const float playerRadius = player_ ? player_->GetCurrentScale() * 0.78f : 0.5f;
+    const Vector4 playerColor = player_ ? player_->GetSlimeParams().baseColor
+                                        : Vector4{ 0.2f, 0.85f, 1.0f, 1.0f };
+
+    // --- 敵まわりのイベント ---
+    if (enemyManager_ && !isEditMode_)
+    {
+        // 撃破。スコアの増分は「このフレームに倒された敵の強さの合計」の二乗
+        int defeatedStrengthSum = 0;
+        for (const auto& ev : enemyManager_->GetDefeatEvents())
+        {
+            defeatedStrengthSum += ev.strength;
+            if (fx_) fx_->EmitEnemyDefeat(ev.position, ev.strength);
+        }
+
+        if (defeatedStrengthSum > 0)
+        {
+            const int gain = defeatedStrengthSum * defeatedStrengthSum;
+            score_ += gain;
+
+            // 増分をプレイヤーの頭の上に浮かばせる
+            if (hud_)
+            {
+                hud_->PushScorePopup(gain, { playerPos.x,
+                                             playerPos.y + playerRadius * hud_->popupOffsetY_,
+                                             playerPos.z });
+            }
+        }
+
+        // 倒せなかった接触（跳ね返された／押し合った）
+        for (const auto& ev : enemyManager_->GetHitEvents())
+        {
+            if (fx_) fx_->EmitEnemyHitSplash(ev.position, playerColor);
+
+            // 軽くカメラを揺らす
+            AddCameraShake(shakeOnEnemyHit_);
+
+            // TODO(SE): 敵とプレイヤー（ミニオン）の衝突音をここで鳴らす
+            //           ev.isPlayer で本体とミニオンを鳴らし分けられる
+        }
+    }
+
+    // --- プレイヤーのイベント（ジャンプ / 自爆）---
+    if (player_)
+    {
+        PikminPlayer::FxEvents ev;
+        if (player_->TakeFxEvents(ev))
+        {
+            if (ev.jumped)
+            {
+                // TODO(SE): プレイヤーのジャンプ音をここで鳴らす
+            }
+
+            if (ev.split)
+            {
+                if (fx_) fx_->EmitPlayerSplit(ev.splitPosition, ev.splitSizeBefore);
+
+                // やや強めにカメラを揺らす
+                AddCameraShake(shakeOnSelfDestruct_);
+
+                // TODO(SE): プレイヤーの自爆（E キー分裂）音をここで鳴らす
+            }
+        }
+    }
+
+    // --- コイン取得 ---
+    if (coinManager_)
+    {
+        for (const Vector3& position : coinManager_->GetCollectEvents())
+        {
+            (void)position;
+            // 光は CoinManager 側のコインが「消えきる」まで、
+            // GamePlaySceneFx::UpdateCoins() が出し続ける
+
+            // TODO(SE): コイン取得音をここで鳴らす
+        }
+    }
+
+    // --- 常時出ている演出 ---
+    if (fx_)
+    {
+        fx_->UpdateAll(deltaTime, playerPos, player_.get(), minionManager_.get(),
+                       coinManager_.get(), enemyManager_.get());
+    }
+
+    // --- HUD ---
+    if (hud_)
+    {
+        GamePlaySceneHud::FrameInput frame;
+        frame.camera = playCamera_.get();
+        frame.player = player_.get();
+        frame.minionManager = minionManager_.get();
+        frame.enemyManager = enemyManager_.get();
+        frame.score = score_;
+        frame.elapsedSeconds = elapsedSeconds_;
+        frame.coin = coinManager_ ? coinManager_->GetCollectedCount() : 0;
+        frame.life = CalculateLifeCount();
+        frame.showHeadNumbers = !isEditMode_;
+
+        hud_->Update(deltaTime, frame);
+
+        if (hud_->TakeLifeLostEvent())
+        {
+            // TODO(SE): プレイヤーの残機（スライムの数）が減ったときの音をここで鳴らす
+        }
+
+        if (hud_->TakeCounterTickEvent())
+        {
+            // TODO(SE): カウンター（スコア・コイン）が増えていくときの音をここで鳴らす
+            //           クリアシーン側の同じ音は ClearScene::UpdateNumbers() にマークしてある
+        }
+    }
 }
 
 void GamePlayScene::Draw(SceneRenderRequests& renderRequests)
@@ -750,11 +997,25 @@ void GamePlayScene::Draw(SceneRenderRequests& renderRequests)
         player_->Draw(ctx);
     }
 
-    // 7. 配置エディタのオーバーレイ（配置禁止領域・選択マーカー・カーソル）
-    //    デプス書き込みを切ってあるので、必ず一番最後に描く
+    // 7. パーティクル演出
+    //    PSO はデプステスト有・書き込み無なので、デプスを書くものを全部描いたあとに
+    if (fx_)
+    {
+        fx_->Draw(ctx.commandList);
+    }
+
+    // 8. 配置エディタのオーバーレイ（配置禁止領域・選択マーカー・カーソル）
+    //    デプス書き込みを切ってあるので、3D の中では一番最後に描く
     if (isEditMode_ && placementEditor_)
     {
         placementEditor_->Draw(ctx);
+    }
+
+    // 9. HUD（2D）
+    //    Sprite の PSO はデプス無効なので、最後に描けば必ず手前に来る
+    if (hud_)
+    {
+        hud_->Draw(ctx.commandList);
     }
 }
 
@@ -773,6 +1034,38 @@ void GamePlayScene::DrawDebugUI()
     ImGui::SetNextWindowPos(ImVec2(20, 20), ImGuiCond_FirstUseEver);
     ImGui::SetNextWindowSize(ImVec2(460, 480), ImGuiCond_FirstUseEver);
     ImGui::Begin("Pikmin x LocoRoco Debug Panel", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
+
+    // --- 演出 / HUD / カメラシェイク ---
+    if (fx_) fx_->DrawImGui();
+    if (hud_) hud_->DrawImGui();
+
+    if (ImGui::CollapsingHeader("Camera Shake"))
+    {
+        ImGui::Text("Trauma: %.3f", shakeTrauma_);
+        ImGui::DragFloat("Decay", &shakeDecay_, 0.05f, 0.1f, 12.0f);
+        ImGui::DragFloat("Amplitude (m)", &shakeAmplitude_, 0.01f, 0.0f, 3.0f);
+        ImGui::DragFloat("Roll (rad)", &shakeRollAmount_, 0.005f, 0.0f, 0.5f);
+        ImGui::DragFloat("Frequency", &shakeFrequency_, 0.5f, 1.0f, 90.0f);
+        ImGui::DragFloat("On Enemy Hit", &shakeOnEnemyHit_, 0.01f, 0.0f, 1.0f);
+        ImGui::DragFloat("On Self Destruct", &shakeOnSelfDestruct_, 0.01f, 0.0f, 1.0f);
+        if (ImGui::Button("Shake (hit)")) AddCameraShake(shakeOnEnemyHit_);
+        ImGui::SameLine();
+        if (ImGui::Button("Shake (self destruct)")) AddCameraShake(shakeOnSelfDestruct_);
+    }
+
+    if (ImGui::CollapsingHeader("Result"))
+    {
+        ImGui::Text("Score: %d", score_);
+        ImGui::Text("Time : %.1f s", elapsedSeconds_);
+        ImGui::Text("Coin : %d", coinManager_ ? coinManager_->GetCollectedCount() : 0);
+        ImGui::Text("Life : %d", CalculateLifeCount());
+        ImGui::DragInt("Score (debug)", &score_, 10.0f, 0, 999999);
+        if (ImGui::Button("Reset Score / Time"))
+        {
+            score_ = 0;
+            elapsedSeconds_ = 0.0f;
+        }
+    }
 
     // --- プレイ / 配置エディタ の切り替え（F2 と同じ）---
     {

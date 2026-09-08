@@ -1,10 +1,15 @@
+#define NOMINMAX
 #include "Application/GameObject/Coin.h"
 
 #include "Baziru3_Engine/Graphics/3D/Object/Object3dCom.h"
 #include "Application/GameObject/SlimePhysics.h"
 #include "Application/Enemy/EnemyBase.h"
 
+#include <algorithm>
 #include <cmath>
+
+float Coin::sVanishSeconds_ = 0.55f;
+float Coin::sVanishRiseSpeed_ = 3.2f;
 
 Coin::~Coin()
 {
@@ -30,13 +35,69 @@ void Coin::Initialize(Object3dCom* object3dCom, Camera* camera,
 
     needsGroundSnap_ = true;
     isCollected_ = false;
+    isVanishing_ = false;
+    vanishTimer_ = 0.0f;
     lifeTime_ = 0.0f;
+}
+
+void Coin::Collect()
+{
+    if (isCollected_) return;
+
+    isCollected_ = true;
+
+    // その場で消さず、上昇しながら縮んでいく。
+    // 消えきるまで GamePlaySceneFx がパーティクルを出し続ける
+    isVanishing_ = true;
+    vanishTimer_ = 0.0f;
+    vanishBaseScale_ = scale_;
+}
+
+void Coin::Revive()
+{
+    isCollected_ = false;
+    isVanishing_ = false;
+    vanishTimer_ = 0.0f;
+    needsGroundSnap_ = true;
+    if (object3d_)
+    {
+        object3d_->SetScale({ scale_, scale_, scale_ });
+        object3d_->Update();
+    }
 }
 
 void Coin::Update(float deltaTime, const Vector2& stageTilt, const Vector2& pivot,
                   float spinSpeed, float bobHeight, float bobSpeed, float heightOffset)
 {
-    if (!object3d_ || isCollected_) return;
+    if (!object3d_) return;
+
+    // --- 取得演出（上昇しながら縮んで消える）---
+    if (isCollected_)
+    {
+        if (!isVanishing_) return;
+
+        vanishTimer_ += deltaTime;
+        const float duration = (std::max)(0.05f, sVanishSeconds_);
+        const float t = std::clamp(vanishTimer_ / duration, 0.0f, 1.0f);
+
+        position_.y += sVanishRiseSpeed_ * deltaTime;
+
+        // 取られた瞬間だけくるっと速く回る
+        spin_ += spinSpeed * (1.0f + 3.0f * (1.0f - t)) * deltaTime;
+        rotation_.y = spin_;
+
+        const float shrink = vanishBaseScale_ * (1.0f - t) * (1.0f - t);
+        object3d_->SetTranslate(position_);
+        object3d_->SetRotate(rotation_);
+        object3d_->SetScale({ shrink, shrink, shrink });
+        object3d_->Update();
+
+        if (t >= 1.0f)
+        {
+            isVanishing_ = false;
+        }
+        return;
+    }
 
     lifeTime_ += deltaTime;
     spin_ += spinSpeed * deltaTime;
@@ -97,7 +158,11 @@ void Coin::Update(float deltaTime, const Vector2& stageTilt, const Vector2& pivo
 
 void Coin::Draw(const RenderContext& ctx)
 {
-    if (!object3d_ || isCollected_) return;
+    if (!object3d_) return;
+
+    // 取得後も、消えきるまでは描く
+    if (isCollected_ && !isVanishing_) return;
+
     object3d_->Draw(ctx);
 }
 

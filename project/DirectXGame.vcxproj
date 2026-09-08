@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|x64">
@@ -90,6 +90,9 @@
     <ClCompile Include="Application\Editor\StageLayout.cpp" />
     <ClCompile Include="Application\Editor\PlacementEditor.cpp" />
     <ClCompile Include="Application\Scene\GameScene\GamePlayScene.cpp" />
+    <ClCompile Include="Application\Scene\GameScene\GamePlaySceneFX.cpp" />
+    <ClCompile Include="Application\Scene\GameScene\GamePlaySceneHUD.cpp" />
+    <ClCompile Include="Application\UI\NumberDisplay.cpp" />
     <ClCompile Include="Application\Scene\ClearScene\ClearScene.cpp" />
     <ClCompile Include="Baziru3_Engine\Graphics\Light\Light.cpp" />
     <ClCompile Include="Baziru3_Engine\Graphics\Light\CascadingShadowMap.cpp" />
@@ -356,6 +359,9 @@
     <ClInclude Include="Baziru3_Engine\Core\Base\EngineContext.h" />
     <ClInclude Include="Game.h" />
     <ClInclude Include="Application\Scene\GameScene\GamePlayScene.h" />
+    <ClInclude Include="Application\Scene\GameScene\GamePlaySceneFX.h" />
+    <ClInclude Include="Application\Scene\GameScene\GamePlaySceneHUD.h" />
+    <ClInclude Include="Application\UI\NumberDisplay.h" />
     <ClInclude Include="Application\Scene\GameScene\CollisionSystem.h" />
     <ClInclude Include="Application\Scene\GameScene\CombatSystem.h" />
     <ClInclude Include="Application\Scene\ClearScene\ClearScene.h" />

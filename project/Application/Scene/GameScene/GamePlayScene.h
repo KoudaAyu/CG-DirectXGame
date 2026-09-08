@@ -12,6 +12,8 @@
 #include "Application/Enemy/EnemyManager.h"
 #include "Application/GameObject/CoinManager.h"
 #include "Application/Editor/PlacementEditor.h"
+#include "Application/Scene/GameScene/GamePlaySceneFX.h"
+#include "Application/Scene/GameScene/GamePlaySceneHUD.h"
 #include "Baziru3_Engine/Graphics/3D/Object/Object3d.h"
 #include "Baziru3_Engine/Framework/Collision/MeshCollider.h"
 
@@ -36,6 +38,20 @@ public:
 private:
     void DrawDebugUI();
 
+    /// @brief カメラシェイクを足す（0..1。足しこまれて上限 1.0 でクランプ）
+    void AddCameraShake(float trauma);
+
+    /// @brief カメラシェイクの減衰と、カメラへのオフセット適用
+    /// @note currentCameraPos_ / currentCameraRot_ 自体は汚さない。
+    ///       汚すと次フレームの SmoothDamp の基準がぶれて揺れが残り続ける
+    void UpdateCameraShake(float deltaTime);
+
+    /// @brief 残機 ＝ スライムの数 ＝ プレイヤーの塊サイズ + フィールドのミニオンの強さの合計
+    int CalculateLifeCount() const;
+
+    /// @brief 演出・HUD へイベントを流し込む（実装は GamePlaySceneFX / HUD 側）
+    void UpdateFxAndHud(float deltaTime);
+
     /// @brief プレイ <-> 配置エディタ の切り替え（F2）
     void SetEditMode(bool edit);
 
@@ -51,6 +67,31 @@ private:
     std::unique_ptr<EnemyManager> enemyManager_;
     std::unique_ptr<CoinManager> coinManager_;
     std::unique_ptr<PlacementEditor> placementEditor_;
+
+    // 演出と HUD。中身はそれぞれ GamePlaySceneFX.cpp / GamePlaySceneHUD.cpp にある
+    std::unique_ptr<GamePlaySceneFx> fx_;
+    std::unique_ptr<GamePlaySceneHud> hud_;
+
+    // シーンに入る前のカメラ。抜けるときに必ず戻す。
+    // ここを nullptr のままにして抜けると、TITLE / CLEAR が
+    // Object3dCom::GetDefaultCamera() を借りられず、
+    // スライムや花火が「2回目以降だけ出ない」状態になる
+    Camera* previousDefaultCamera_ = nullptr;
+    Camera* previousSceneCamera_ = nullptr;
+
+    // --- リザルト（CLEAR へ渡す値）---
+    int score_ = 0;                //!< 敵を倒したときに増える
+    float elapsedSeconds_ = 0.0f;  //!< 経過時間（秒）
+
+    // --- カメラシェイク ---
+    float shakeTrauma_ = 0.0f;        //!< 0..1。時間で減衰する
+    float shakeTime_ = 0.0f;          //!< 疑似ノイズの位相
+    float shakeDecay_ = 2.2f;         //!< 1秒あたりの減衰量
+    float shakeAmplitude_ = 0.55f;    //!< trauma 1.0 のときの最大ずれ (m)
+    float shakeRollAmount_ = 0.05f;   //!< trauma 1.0 のときの最大ロール (rad)
+    float shakeFrequency_ = 26.0f;    //!< 揺れの速さ
+    float shakeOnEnemyHit_ = 0.32f;   //!< 敵と衝突したとき（軽め）
+    float shakeOnSelfDestruct_ = 0.8f;//!< プレイヤー自爆（やや強め）
 
     bool isEditMode_ = false;                          //!< 配置エディタ中か
     Vector4 groundBaseColor_{ 0.55f, 0.85f, 0.50f, 1.0f }; //!< 地面の草原カラー

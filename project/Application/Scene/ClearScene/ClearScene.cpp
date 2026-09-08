@@ -600,6 +600,12 @@ void ClearScene::CreateFx()
     // Game がスカイボックスにもパーティクルにも同じカメラを渡しているので、
     // これを使っておけば視点がずれない。
     // SceneManager::GetCamera() は GAMEPLAY を経由すると解放済みを指すので使わない
+    // 【バグ修正メモ】ここが nullptr になると Draw() の if (fx_ && fxCamera_) を通らず、
+    // 「クリアシーンを再度読み込むと花火が消える」状態になっていた。
+    // 原因は GamePlayScene::Finalize() が SetDefaultCamera(nullptr) していたこと。
+    // 現在は GamePlayScene 側が「入る前のカメラ」を控えて戻すようにしてある。
+    // SceneManager::GetCamera() は GAMEPLAY を抜けたあと解放済みの playCamera_ を
+    // 指しうるので、フォールバックには使わないこと
     fxCamera_ = object3dCom->GetDefaultCamera();
     if (fxCamera_)
     {
@@ -958,6 +964,10 @@ void ClearScene::UpdateNumbers(float deltaTime)
                 if (digit.shownCell >= 0)
                 {
                     digit.punch = 1.0f;
+
+                    // TODO(SE): カウンターが増えていくときの音をここで鳴らす
+                    //           （ゲームプレイシーン側の同じ音は
+                    //             GamePlayScene::Update() にマークしてある）
                 }
                 digit.shownCell = digit.cell;
 

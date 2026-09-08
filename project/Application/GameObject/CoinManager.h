@@ -83,6 +83,12 @@ public:
 
     const std::vector<std::unique_ptr<Coin>>& GetCoins() const { return coins_; }
 
+    /**
+     * @brief このフレームに取得されたコインのワールド座標
+     * @note Update() の頭でクリアされる。演出と SE のトリガに使う
+     */
+    const std::vector<Vector3>& GetCollectEvents() const { return collectEvents_; }
+
     static CoinConfig& GetConfig();
 
 private:
@@ -97,6 +103,7 @@ private:
     bool meshReady_ = false;
 
     std::vector<std::unique_ptr<Coin>> coins_;
+    std::vector<Vector3> collectEvents_; //!< このフレームに取得されたコインの座標
     int collectedCount_ = 0;
     bool editorMode_ = false;
 };

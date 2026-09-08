@@ -20,6 +20,10 @@ class Camera;
  *
  * @note 座標は EnemyBase と同じく「ステージローカル（傾き0のときのワールド座標）」を正とし、
  *       毎フレーム StageLocalToWorld 相当の変換でワールド座標を導出する。
+ *
+ * @note 取得されると、その場で消えるのではなく
+ *       「上昇しながら小さくなって消える」演出に入る（IsVanishing() が true の間）。
+ *       GamePlaySceneFx はそのあいだパーティクルを出し続ける。
  */
 class Coin
 {
@@ -55,8 +59,17 @@ public:
 
     // --- 状態 ---
     bool IsCollected() const { return isCollected_; }
-    void Collect() { isCollected_ = true; }
-    void Revive() { isCollected_ = false; }
+
+    /// @brief 取得された。上昇しながら小さくなって消える演出に入る
+    void Collect();
+
+    /// @brief 取得済みで、まだ消えきっていない（＝演出とパーティクルが続いている）
+    bool IsVanishing() const { return isVanishing_; }
+
+    /// @brief 演出なしで「取得済み」にする（設定を変えて作り直したときの状態復元用）
+    void CollectSilently() { isCollected_ = true; isVanishing_ = false; vanishTimer_ = 0.0f; }
+
+    void Revive();
 
     // --- 座標 ---
     const Vector3& GetPosition() const { return position_; }
@@ -68,9 +81,20 @@ public:
     void SetScale(float s) { scale_ = s; }
     float GetScale() const { return scale_; }
 
+    /// @brief 消えるまでの時間 (秒)
+    static float GetVanishSeconds() { return sVanishSeconds_; }
+    static void SetVanishSeconds(float s) { sVanishSeconds_ = s; }
+
+    /// @brief 消えながら上昇する速さ (m/s)
+    static float GetVanishRiseSpeed() { return sVanishRiseSpeed_; }
+    static void SetVanishRiseSpeed(float s) { sVanishRiseSpeed_ = s; }
+
     Object3d* GetObject3d() const { return object3d_.get(); }
 
 private:
+    static float sVanishSeconds_;   //!< 取得 -> 完全に消えるまでの時間
+    static float sVanishRiseSpeed_; //!< 消えながら上る速さ
+
     std::unique_ptr<Object3d> object3d_;
 
     Vector3 anchorLocal_{ 0.0f, 0.0f, 0.0f }; //!< ステージローカル座標（配置データの正）
@@ -83,4 +107,9 @@ private:
     float lifeTime_ = 0.0f;  //!< ふわふわの位相に使う
     bool isCollected_ = false;
     bool needsGroundSnap_ = true;
+
+    // 取得演出
+    bool isVanishing_ = false;
+    float vanishTimer_ = 0.0f;
+    float vanishBaseScale_ = 1.0f;
 };

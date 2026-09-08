@@ -217,6 +217,9 @@ const Object3d::ModelData* EnemyManager::GetOrLoadBulletModel(const MobEnemyConf
 
 void EnemyManager::FireBullet(const MobEnemyConfig& config, const MobEnemy::ShootRequest& request)
 {
+    // TODO(SE): 敵の弾の発射音をここで鳴らす
+    //           request.origin が発射位置、request.direction が向き
+
     std::string key;
     const Object3d::ModelData* model = GetOrLoadBulletModel(config, key);
     if (!model) return;
@@ -258,6 +261,10 @@ Vector3 EnemyManager::CalcStageNormal(const Vector2& stageTilt)
 void EnemyManager::Update(float deltaTime, const Vector2& stageTilt, PikminPlayer* player,
                           MinionManager* minionManager)
 {
+    // 演出・SE 用のイベントは1フレームぶんだけ持つ
+    defeatEvents_.clear();
+    hitEvents_.clear();
+
     // 自爆イベントは必ず毎フレーム引き取る。
     // ここより下でリターンすると、古い座標のまま次フレームに爆発してしまう
     // （エディタ中はプレイヤーの更新自体を止めているので発生しないが、
@@ -348,22 +355,31 @@ void EnemyManager::ResolvePlayerCollisions(PikminPlayer* player, const Vector2& 
         auto& params = player->GetSlimeParams();
         params.impulseStrength = (std::max)(params.impulseStrength, result.impulse);
 
+        // 演出用。衝突点はスライム中心と敵のヒットボックス中心の中点で近似する
+        const Vector3 enemyCenter = e->GetHitCenter();
+        const Vector3 contact = { (slime.position.x + enemyCenter.x) * 0.5f,
+                                  (slime.position.y + enemyCenter.y) * 0.5f,
+                                  (slime.position.z + enemyCenter.z) * 0.5f };
+
         switch (result.outcome)
         {
         case EnemyCollision::HitOutcome::EnemyDefeated:
             // プレイヤーのほうが強い。押し戻さずに突き抜けて倒す
+            defeatEvents_.push_back({ enemyCenter, e->GetStrength() });
             e->Defeat();
             params.squashStretch = { 0.18f, -0.14f, 0.18f };
             break;
 
         case EnemyCollision::HitOutcome::PlayerBounced:
             // 敵のほうが強い。跳ね飛ばされる
+            hitEvents_.push_back({ contact, true });
             params.squashStretch = { 0.32f, -0.26f, 0.32f };
             changed = true;
             break;
 
         case EnemyCollision::HitOutcome::Standoff:
             // 同じ強さ。押し合うだけ
+            hitEvents_.push_back({ contact, true });
             changed = true;
             break;
 
@@ -424,19 +440,27 @@ void EnemyManager::ResolveMinionCollisions(MinionManager* minionManager, const V
             auto& params = minion->GetSlimeParams();
             params.impulseStrength = (std::max)(params.impulseStrength, result.impulse);
 
+            const Vector3 enemyCenter = e->GetHitCenter();
+            const Vector3 contact = { (slime.position.x + enemyCenter.x) * 0.5f,
+                                      (slime.position.y + enemyCenter.y) * 0.5f,
+                                      (slime.position.z + enemyCenter.z) * 0.5f };
+
             switch (result.outcome)
             {
             case EnemyCollision::HitOutcome::EnemyDefeated:
+                defeatEvents_.push_back({ enemyCenter, e->GetStrength() });
                 e->Defeat();
                 params.squashStretch = { 0.16f, -0.12f, 0.16f };
                 break;
 
             case EnemyCollision::HitOutcome::PlayerBounced:
+                hitEvents_.push_back({ contact, false });
                 changed = true;
                 bounced = true;
                 break;
 
             case EnemyCollision::HitOutcome::Standoff:
+                hitEvents_.push_back({ contact, false });
                 changed = true;
                 break;
 
@@ -497,6 +521,7 @@ void EnemyManager::ResolveSelfDestruct(PikminPlayer* player)
         if (std::abs(dy) > radius + 2.0f) continue;
 
         // 自爆は強さ問わず倒せる
+        defeatEvents_.push_back({ center, e->GetStrength() });
         e->Defeat();
         ++kills;
     }

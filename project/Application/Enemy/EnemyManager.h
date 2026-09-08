@@ -100,6 +100,30 @@ public:
     /// @brief 自爆の爆風半径 = base + perSize * (分裂前サイズ - 1)
     void SetSelfDestructRadius(float base, float perSize) { selfDestructBaseRadius_ = base; selfDestructPerSize_ = perSize; }
 
+    // ===============================================================
+    // 演出・SE 用の1フレームイベント
+    //
+    // Update() の頭でクリアされる。拾い手（GamePlayScene）は毎フレーム見る。
+    // ここでは演出を持たず、座標と強さだけを渡す
+    // ===============================================================
+
+    /// @brief このフレームに倒された敵
+    struct DefeatEvent
+    {
+        Vector3 position{ 0.0f, 0.0f, 0.0f }; //!< ヒットボックス中心のワールド座標
+        int strength = 1;                     //!< 倒された敵の強さ
+    };
+
+    /// @brief 倒せなかった接触（跳ね返された／押し合った）
+    struct HitEvent
+    {
+        Vector3 position{ 0.0f, 0.0f, 0.0f }; //!< 接触点のワールド座標（中点で近似）
+        bool isPlayer = true;                 //!< true: プレイヤー本体 / false: ミニオン
+    };
+
+    const std::vector<DefeatEvent>& GetDefeatEvents() const { return defeatEvents_; }
+    const std::vector<HitEvent>& GetHitEvents() const { return hitEvents_; }
+
     int GetAliveCount() const;
     int GetActiveBulletCount() const;
     const std::vector<std::unique_ptr<MobEnemy>>& GetEnemies() const { return enemies_; }
@@ -135,6 +159,9 @@ private:
     std::vector<std::unique_ptr<MobEnemy>> enemies_;
     std::vector<std::unique_ptr<EnemyBullet>> bullets_;
     std::unordered_map<std::string, Object3d::ModelData> bulletModels_;
+
+    std::vector<DefeatEvent> defeatEvents_; //!< このフレームに倒された敵
+    std::vector<HitEvent> hitEvents_;       //!< このフレームの「倒せなかった接触」
 
     EnemyBase::ScaleFromStrengthFunc scaleFunc_; //!< 空なら EnemyBase の既定
 
