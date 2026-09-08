@@ -37,8 +37,8 @@ namespace
             c.hopHeight = 0.16f;
             c.hopSpeed = 8.0f;
             c.idleWobble = 0.06f;
-            c.strengthMin = 1;
-            c.strengthMax = 5;
+            c.strengthMin = 3;
+            c.strengthMax = 20;
             break;
 
         case EnemyType::FlowerClover:
@@ -58,8 +58,8 @@ namespace
             c.turnSpeed = 3.0f;
             c.hopHeight = 0.0f;
             c.idleWobble = 0.045f;
-            c.strengthMin = 2;
-            c.strengthMax = 7;
+            c.strengthMin = 5;
+            c.strengthMax = 15;
             break;
 
         case EnemyType::FlowerLotus:
@@ -92,8 +92,8 @@ namespace
             c.bulletDirectory = "Resources/Enemy/FlowerLotus";
             c.bulletFileName = "Lotus_Bullet.gltf";
             c.bulletColor = { 1.0f, 0.55f, 0.85f, 1.0f };
-            c.strengthMin = 2;
-            c.strengthMax = 8;
+            c.strengthMin = 5;
+            c.strengthMax = 15;
             break;
 
         case EnemyType::FlowerSunward:
@@ -122,8 +122,8 @@ namespace
             c.bulletDirectory = "Resources/Enemy/FlowerSunward";
             c.bulletFileName = "Sunward_Bullet.gltf";
             c.bulletColor = { 1.0f, 0.85f, 0.30f, 1.0f };
-            c.strengthMin = 3;
-            c.strengthMax = 9;
+            c.strengthMin = 5;
+            c.strengthMax = 15;
             break;
 
         default:
