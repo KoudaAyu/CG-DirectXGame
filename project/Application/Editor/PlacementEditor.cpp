@@ -932,11 +932,16 @@ void PlacementEditor::PlaceAt(const Vector3& world)
 
         const int index = std::clamp(terrainMeshIndex_, 0, static_cast<int>(catalog.size()) - 1);
 
+        // 【重要】AddPart() ではなく AddPartCenteredAt() を使うこと。
+        // この obj 群はローカル原点がメッシュから大きく外れていて
+        //（Land1 はスケール 0.25 で 168m ずれる）、
+        // クリック位置を原点として置くと島が画面外に出る
+        //
         // 位置は XZ だけ。Y は 0 に置く（JSON を手で書けば効く）
-        StageTerrain::Part* added = refs_.terrain->AddPart(catalog[static_cast<size_t>(index)],
-                                                           { world.x, 0.0f, world.z },
-                                                           terrainNewRotationY_, terrainNewScale_,
-                                                           terrainNewBossTrigger_);
+        StageTerrain::Part* added = refs_.terrain->AddPartCenteredAt(
+            catalog[static_cast<size_t>(index)],
+            { world.x, 0.0f, world.z },
+            terrainNewRotationY_, terrainNewScale_, terrainNewBossTrigger_);
         if (!added)
         {
             std::snprintf(statusText_, sizeof(statusText_), "Failed to load mesh: %s",
@@ -1205,7 +1210,14 @@ void PlacementEditor::RebuildOverlay()
     overlayCellCount_ = 0;
 
     Vector3 bmin, bmax;
-    if (!SlimePhysics::GetGroundWorldBounds(bmin, bmax)) return;
+    if (!SlimePhysics::GetGroundWorldBounds(bmin, bmax))
+    {
+        // 地形が1枚も無い（Clear terrain の直後など）。
+        // 基準平面を 0 に戻しておかないと、前の地形の高さが残ったまま
+        // 1枚目のクリック位置がずれる
+        planeY_ = 0.0f;
+        return;
+    }
 
     float cell = (std::max)(0.25f, overlayCellSize_);
 
@@ -1776,23 +1788,30 @@ void PlacementEditor::DrawImGui()
     case SelectionKind::Terrain:
         if (selectedTerrain_ && refs_.terrain)
         {
+            const Vector3 center = selectedTerrain_->HandlePosition();
+
             ImGui::Text("Terrain: %s", selectedTerrain_->mesh.c_str());
-            ImGui::Text("Pos: (%.2f, %.2f, %.2f)",
+            // Origin はモデル原点（JSON の値）。Center は見た目の中心（ハンドルの位置）。
+            // この obj 群は原点がメッシュから大きく外れているので、両方出さないと混乱する
+            ImGui::Text("Origin: (%.2f, %.2f, %.2f)",
                         selectedTerrain_->position.x, selectedTerrain_->position.y,
                         selectedTerrain_->position.z);
+            ImGui::Text("Center: (%.2f, %.2f)  <- handle", center.x, center.z);
             ImGui::Text("Bounds XZ: %.1f x %.1f",
                         selectedTerrain_->worldMax.x - selectedTerrain_->worldMin.x,
                         selectedTerrain_->worldMax.z - selectedTerrain_->worldMin.z);
 
-            // XZ は数値でも動かせるようにしておく（微調整用）
-            float px = selectedTerrain_->position.x;
-            float pz = selectedTerrain_->position.z;
+            // XZ は数値でも動かせるようにしておく（微調整用）。
+            // 基準は**見た目の中心**にする。ドラッグでハンドルを動かすのと同じ感覚になるし、
+            // モデル原点を直接いじらせると数百単位の値になって扱いづらい
+            float cx = center.x;
+            float cz = center.z;
             bool moved = false;
-            moved |= ImGui::DragFloat("Pos X", &px, 0.1f, -2000.0f, 2000.0f);
-            moved |= ImGui::DragFloat("Pos Z", &pz, 0.1f, -2000.0f, 2000.0f);
+            moved |= ImGui::DragFloat("Center X", &cx, 0.1f, -2000.0f, 2000.0f);
+            moved |= ImGui::DragFloat("Center Z", &cz, 0.1f, -2000.0f, 2000.0f);
             if (moved)
             {
-                refs_.terrain->SetPartPositionXZ(selectedTerrain_, px, pz);
+                refs_.terrain->SetPartCenterXZ(selectedTerrain_, cx, cz);
                 OnTerrainChanged();
             }
 
@@ -1856,9 +1875,11 @@ void PlacementEditor::DrawImGui()
                 StageTerrain::Part* part = parts[static_cast<size_t>(i)].get();
                 if (!part) continue;
 
-                char label[160];
-                std::snprintf(label, sizeof(label), "%d: %s%s##terrain%d",
-                              i, part->mesh.c_str(), part->bossTrigger ? "  [BOSS]" : "", i);
+                const Vector3 handle = part->HandlePosition();
+                char label[192];
+                std::snprintf(label, sizeof(label), "%d: %s%s  (%.0f, %.0f)##terrain%d",
+                              i, part->mesh.c_str(), part->bossTrigger ? "  [BOSS]" : "",
+                              handle.x, handle.z, i);
 
                 if (ImGui::Selectable(label, part == selectedTerrain_))
                 {
@@ -1867,7 +1888,6 @@ void PlacementEditor::DrawImGui()
                     selectedTerrain_ = part;
 
                     // 選んだパーツを画面の真ん中へ持ってくる
-                    const Vector3 handle = part->HandlePosition();
                     camX_ = handle.x;
                     camZ_ = handle.z;
                 }

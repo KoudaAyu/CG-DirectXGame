@@ -386,6 +386,32 @@ StageTerrain::Part* StageTerrain::AddPart(const std::string& mesh, const Vector3
     return raw;
 }
 
+StageTerrain::Part* StageTerrain::AddPartCenteredAt(const std::string& mesh, const Vector3& centerXZ,
+                                                    float rotationY, float scale, bool bossTrigger,
+                                                    const std::string& texture)
+{
+    // いったん原点を centerXZ に置いて作る。
+    // CreatePart() の中で AABB が計算されるので、そこから
+    // 「原点と見た目の中心のずれ」が分かる
+    Part* part = AddPart(mesh, centerXZ, rotationY, scale, bossTrigger, texture);
+    if (!part) return nullptr;
+
+    SetPartCenterXZ(part, centerXZ.x, centerXZ.z);
+    return part;
+}
+
+void StageTerrain::SetPartCenterXZ(Part* part, float centerX, float centerZ)
+{
+    if (!part) return;
+
+    // ローカル原点はメッシュの中心とは限らない（この obj 群は数百単位でずれている）。
+    // いまの中心とのずれぶんだけ原点を動かせば、見た目の中心が狙った場所に来る
+    const Vector3 handle = part->HandlePosition();
+    SetPartPositionXZ(part,
+                      part->position.x + (centerX - handle.x),
+                      part->position.z + (centerZ - handle.z));
+}
+
 void StageTerrain::RemovePart(Part* part)
 {
     if (!part) return;

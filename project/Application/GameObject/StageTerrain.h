@@ -106,13 +106,36 @@ public:
     // --- 編集 ---
 
     /**
-     * @brief パーツを1枚足す
+     * @brief パーツを1枚足す（position は **モデル原点** の置き場所）
      * @param mesh Resources/10days 配下の obj ファイル名
+     * @param position モデル原点をどこに置くか。JSON の値と1対1
      * @return 追加されたパーツ。読み込みに失敗したら nullptr
+     *
+     * @warning **この obj 群はローカル原点がメッシュから大きく外れている。**
+     *          例: Land1.obj のローカル中心は (-613.9, 7.2, 280.2)。
+     *          スケール 0.25 だと、原点を (0,0) に置いた瞬間に
+     *          島の実体は (-153.5, +70.0) に現れる（168m 先）。
+     *          「クリックしたところに置く」用途では
+     *          必ず AddPartCenteredAt() のほうを使うこと
      */
     Part* AddPart(const std::string& mesh, const Vector3& position,
                   float rotationY = 0.0f, float scale = 0.25f,
                   bool bossTrigger = false, const std::string& texture = "");
+
+    /**
+     * @brief パーツを1枚足す（**見た目の中心**が centerXZ に来るように置く）
+     * @param centerXZ ワールド AABB の XZ 中心を持ってきたい場所（y は無視）
+     * @return 追加されたパーツ。読み込みに失敗したら nullptr
+     *
+     * 配置エディタのクリック配置はこちらを使う。
+     * ローカル原点のずれを吸収するので、「クリックしたところに島が出る」
+     */
+    Part* AddPartCenteredAt(const std::string& mesh, const Vector3& centerXZ,
+                            float rotationY = 0.0f, float scale = 0.25f,
+                            bool bossTrigger = false, const std::string& texture = "");
+
+    /// @brief 見た目の中心（ワールド AABB の XZ 中心）が centerXZ に来るよう置き直す
+    void SetPartCenterXZ(Part* part, float centerX, float centerZ);
 
     void RemovePart(Part* part);
     void ClearParts();
