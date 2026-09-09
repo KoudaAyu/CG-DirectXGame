@@ -74,6 +74,11 @@ private:
     /// @brief プレイ <-> 配置エディタ の切り替え（F2）
     void SetEditMode(bool edit);
 
+#if defined(_DEBUG) || defined(USE_IMGUI)
+    /// @brief デバッグカメラの更新（F4 / C キーでトグル）
+    void UpdateDebugCamera(float deltaTime);
+#endif
+
 private:
     std::unique_ptr<KeyInput> keyInput_;
     std::unique_ptr<MouseInput> mouseInput_;
@@ -201,4 +206,11 @@ private:
     // ゲームオーバー演出（Iris Out）
     bool isGameOverTransition_ = false;
     float gameOverDelayTimer_ = 0.0f;
+
+    // --- デバッグカメラ ---
+    bool isDebugCamera_ = false;
+    Vector3 debugCameraPos_{ 0.0f, 20.0f, -20.0f };
+    Vector3 debugCameraRot_{ 0.6f, 0.0f, 0.0f };
+    float debugCameraSpeed_ = 30.0f;
+    float debugCameraRotSpeed_ = 0.003f;
 };

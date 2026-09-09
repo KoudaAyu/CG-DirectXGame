@@ -214,6 +214,9 @@ std::unique_ptr<StageTerrain::Part> StageTerrain::CreatePart(const std::string& 
     part->object->SetRotate({ 0.0f, part->rotationY, 0.0f });
     part->object->SetColor(baseColor_);
     part->object->SetEnableLighting(true);
+    // 地面メッシュの環境マップ反射を無効化
+    part->object->SetReflectionFactor(0.0f);
+    part->object->SetFresnelF0(0.0f);
     part->object->Update();
 
     part->collider = std::make_unique<MeshCollider>(part->object.get(), CollisionAttribute::Obstacle);

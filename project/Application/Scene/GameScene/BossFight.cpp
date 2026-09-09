@@ -811,6 +811,7 @@ void BossFight::Draw(const RenderContext& ctx)
 {
     if (boss_ && !boss_->IsDead())
     {
+        boss_->DrawShadow(ctx);
         boss_->Draw(ctx);
     }
 

@@ -571,10 +571,17 @@ void EnemyManager::ResolveBulletCollisions(SlimeManager* slimeManager)
 
 void EnemyManager::Draw(const RenderContext& ctx)
 {
+    // 0. 全敵の足元丸影を描画（地面に半透明ブレンド）
     for (auto& e : enemies_)
     {
-        if (e) e->Draw(ctx);
+        if (e && !e->IsDead()) e->DrawShadow(ctx);
     }
+    // 1. 敵本体の描画
+    for (auto& e : enemies_)
+    {
+        if (e && !e->IsDead()) e->Draw(ctx);
+    }
+    // 2. 弾の描画
     for (auto& b : bullets_)
     {
         if (b) b->Draw(ctx);
@@ -690,6 +697,10 @@ void EnemyManager::DrawImGui()
             c.hitShape = (shape == 1) ? EnemyCollision::HitShape::AABB : EnemyCollision::HitShape::Sphere;
         }
 
+        if (c.canMove)
+        {
+            ImGui::Checkbox("Prevent Fall (Cliff Safe)", &c.preventFall);
+        }
         ImGui::DragFloat("Move Speed", &c.moveSpeed, 0.05f, 0.0f, 20.0f);
         ImGui::DragFloat("Chase Range", &c.chaseRange, 0.1f, 0.0f, 60.0f);
         ImGui::DragFloat("Lose Range", &c.loseRange, 0.1f, 0.0f, 80.0f);
@@ -736,11 +747,13 @@ void EnemyManager::DrawImGui()
             MobEnemy* e = enemies_[i].get();
             if (!e) continue;
             const Vector3& p = e->GetPosition();
-            ImGui::Text("[%2zu] %-14s STR %2d  scale %.2f  pos(%.1f, %.1f, %.1f) %s %s",
-                        i, e->GetTypeName(), e->GetStrength(), e->GetScale().x,
+            ImGui::Text("[%2zu] %-12s S:%2d p(%.1f, %.1f, %.1f) %s %s [%s] t=%.1fs",
+                        i, e->GetTypeName(), e->GetStrength(),
                         p.x, p.y, p.z,
-                        e->IsChasing() ? "<chase>" : "",
-                        e->IsAnimated() ? e->GetAnimator().GetCurrentClipName() : "[static]");
+                        e->IsChasing() ? "<chase>" : "       ",
+                        e->HasGround() ? "GND:OK" : "NO-GND!",
+                        e->IsAnimated() ? e->GetAnimator().GetCurrentClipName() : "static",
+                        e->GetLifeTime());
         }
     }
     ImGui::EndChild();

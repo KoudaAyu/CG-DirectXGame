@@ -66,6 +66,10 @@ void Slime::Initialize(Object3dCom* object3dCom, Camera* camera, const Vector3& 
     });
     CollisionManager::GetInstance()->RegisterCollider(meshCollider_.get());
 
+    // 足元の丸影（ドロップシャドウ）
+    shadow_ = std::make_unique<CharacterShadow>();
+    shadow_->Initialize(object3dCom_, camera_);
+
     SetSize(initialSize);
 }
 
@@ -270,6 +274,13 @@ void Slime::Update(float deltaTime, const Vector2& stageTilt, const Vector2& piv
         meshCollider_->SetWorldPosition(position_);
         meshCollider_->Update();
     }
+
+    // 足元の丸影更新
+    if (shadow_) {
+        float footOffset = groundY_ * (1.0f + ceilingSquash_);
+        float shadowRadius = scale_.x * 0.95f;
+        shadow_->Update(position_, shadowRadius, footOffset, stageTilt, pivot);
+    }
 }
 
 void Slime::UpdatePhysics(float deltaTime, const Vector2& stageTilt, const Vector2& pivot) {
@@ -463,8 +474,18 @@ void Slime::UpdatePhysics(float deltaTime, const Vector2& stageTilt, const Vecto
     }
 }
 
+void Slime::DrawShadow(const RenderContext& ctx) {
+    if (!isActive_ || !shadow_) return;
+    shadow_->Draw(ctx);
+    shadowDrawnThisFrame_ = true;
+}
+
 void Slime::Draw(const RenderContext& ctx) {
     if (!isActive_ || !object3d_ || !object3dCom_) return;
+    if (!shadowDrawnThisFrame_ && shadow_) {
+        shadow_->Draw(ctx);
+    }
+    shadowDrawnThisFrame_ = false;
     DrawSlime(ctx);
 }
 

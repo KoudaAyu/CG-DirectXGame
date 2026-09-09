@@ -5,6 +5,7 @@
 #include "Baziru3_Engine/Graphics/3D/Object/Object3dCom.h"
 #include "Baziru3_Engine/Framework/Collision/CollisionManager.h"
 #include "Application/GameObject/SlimePhysics.h"
+#include "Application/GameObject/SlimeMesh.h"
 
 #include <algorithm>
 #include <cmath>
@@ -178,6 +179,10 @@ void EnemyBase::Initialize(Object3dCom* object3dCom, Camera* camera, const Vecto
     // 「Sphere コライダーを近くの Object3d のスケールへ自動同期する」処理に
     // 半径とオフセットを毎フレーム上書きされてしまうため。
     collider_ = std::make_unique<BoxCollider>(GetHitBoxFullSize(), &position_, &rotation_, CollisionAttribute::Enemy);
+
+    // 足元の丸影（ドロップシャドウ）
+    shadow_ = std::make_unique<CharacterShadow>();
+    shadow_->Initialize(object3dCom_, camera_);
     collider_->SetPositionOffset({ 0.0f, scale_.y * hitOffsetRatio_, 0.0f });
     collider_->SetIsTrigger(true);
     if (CollisionManager::GetInstance())
@@ -315,29 +320,23 @@ void EnemyBase::Update(const EnemyUpdateContext& ctx)
     Vector3 normal{ 0.0f, 1.0f, 0.0f };
     float groundedY = position_.y;
 
+    // 傾斜による床の上下変位を正確に反映するため、現在の傾斜角から導出した world.y を基準高さとする
+    float referenceY = (needsGroundSnap_ || position_.y < SlimePhysics::GetVoidY()) ? world.y : world.y;
+
     if (!needsGroundSnap_)
     {
         groundedY = SlimePhysics::CalculateGroundedCenterYEx(
-            position_.x, position_.z, position_.y, ctx.stageTilt, groundOffset_,
+            position_.x, position_.z, referenceY, ctx.stageTilt, groundOffset_,
             &hasGround, &normal, ctx.pivot, true);
     }
 
-    // 通常の問い合わせで床が見つからないケースは2つある:
-    //   (a) 本当に島の外に出た
-    //   (b) 自力登坂限界 (kMaxStepUp = 0.35m) に引っかかって、
-    //       足元の床が候補から外されただけ（坂を上る／スポーン直後など）
-    // (b) で落下させてしまうと敵が勝手に奈落へ消えるので、
-    // currentY を無視して最上段の床を取り直す。それでも駄目なら本当に足場が無い
+    // 通常の問い合わせで床が見つからない場合のフォールバック:
+    // ステージ傾斜や激しい揺らしで足元床との相対高さが離れても、確実に足元の島を捕捉する
     if (!hasGround)
     {
-        // 初回は「最上段の床」、以降は「頭より下で一番高い床」を取り直す。
-        //   初回 : どの高さの地形にスポーンさせても確実に乗せたいので currentY を無視する
-        //   以降 : currentY を無視すると、崖下にいる敵が上の段へ吸い上げられてしまう。
-        //          isGrounded = false の分岐なら「頭より下で一番高い床」を選ぶので安全
-        float currentYArg = needsGroundSnap_ ? SlimePhysics::kIgnoreCurrentY : position_.y;
-
+        // 最上段の床を問い合わせる（kIgnoreCurrentY）
         float snapY = SlimePhysics::CalculateGroundedCenterYEx(
-            position_.x, position_.z, currentYArg, ctx.stageTilt, groundOffset_,
+            position_.x, position_.z, SlimePhysics::kIgnoreCurrentY, ctx.stageTilt, groundOffset_,
             &hasGround, &normal, ctx.pivot, false);
 
         if (hasGround)
@@ -359,14 +358,20 @@ void EnemyBase::Update(const EnemyUpdateContext& ctx)
         needsGroundSnap_ = false;
     }
 
+    hasGroundLastFrame_ = hasGround;
+
     if (hasGround)
     {
         // 段差でワープしないよう少しだけ補間して追従
-        float follow = (std::min)(1.0f, ctx.deltaTime * 30.0f);
+        float follow = (std::min)(1.0f, ctx.deltaTime * 35.0f);
         position_.y += (groundedY - position_.y) * follow;
         groundNormal_ = normal;
+
+        // 接地した正確な床高さに合わせてステージローカル高さ anchorLocal_.y を同期
+        Vector3 localCurrent = StageWorldToLocal({ position_.x, position_.y, position_.z }, ctx.stageTilt, ctx.pivot);
+        anchorLocal_.y = localCurrent.y;
     }
-    else if (lifeTime_ > 0.3f)
+    else if (lifeTime_ > 0.6f)
     {
         // 足場が無い（島の外へ出た）。落下させて奈落で消す。
         // スポーン直後は地形メッシュの AABB ツリーがまだ組まれていないことがあるので、
@@ -409,11 +414,32 @@ void EnemyBase::Update(const EnemyUpdateContext& ctx)
     object3d_->Update();
 
     RefreshCollider();
+
+    // 足元の丸影更新
+    if (shadow_)
+    {
+        Vector3 renderScale = GetRenderScale();
+        float shadowRadius = (std::max)(renderScale.x, renderScale.z) * 0.90f;
+        shadow_->Update(position_, shadowRadius, groundOffset_, ctx.stageTilt, ctx.pivot);
+    }
+}
+
+void EnemyBase::DrawShadow(const RenderContext& ctx)
+{
+    if (isDead_ || !shadow_) return;
+    shadow_->Draw(ctx);
+    shadowDrawnThisFrame_ = true;
 }
 
 void EnemyBase::Draw(const RenderContext& ctx)
 {
-    if (isDead_ || !object3d_) return;
+    if (isDead_) return;
+    if (!shadowDrawnThisFrame_ && shadow_)
+    {
+        shadow_->Draw(ctx);
+    }
+    shadowDrawnThisFrame_ = false;
+    if (!object3d_) return;
 
     if (isAnimated_)
     {
@@ -441,6 +467,7 @@ void EnemyBase::Finalize()
     }
     object3d_ = nullptr;
     ownedObject_.reset();
+    shadow_.reset();
     animAsset_ = nullptr;
     isAnimated_ = false;
     isDead_ = true;

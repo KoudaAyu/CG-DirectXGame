@@ -558,19 +558,20 @@ void GamePlayScene::Update()
     {
         keyInput_->Update();
 
-#ifdef USE_IMGUI
-        // F2キーでプレイ <-> 配置エディタ を切り替え
-        //
-        // 【Release では無効】USE_IMGUI は Debug と Development にしか定義されていない
-        //（DirectXGame.vcxproj の PreprocessorDefinitions を参照）。
-        // 製品ビルドで配置エディタに入られると詰むので、キーごと消してある
+#if defined(_DEBUG) || defined(USE_IMGUI)
+        // Rキーで再スタート（初期配置でスライムを再生成、ステージ傾斜・カメラを初期化、デバッグ専用）
+        if (keyInput_->TriggerKey(DIK_R))
+        {
+            RestartGame();
+        }
+
+        // F2キーでプレイ <-> 配置エディタ を切り替え（デバッグ専用）
         if (keyInput_->TriggerKey(DIK_F2))
         {
             SetEditMode(!isEditMode_);
         }
-#endif
 
-        // ENTERキーでクリアシーンへ遷移（SPACEキーはスライムのジャンプに割り当て）
+        // ENTERキーでクリアシーンへ強制遷移（デバッグスキップ用）
         // 配置エディタ中は誤爆を避けるため無効
         if (!isEditMode_ && keyInput_->TriggerKey(DIK_RETURN))
         {
@@ -580,21 +581,24 @@ void GamePlayScene::Update()
             SceneManager::GetInstance()->ChangeScene("CLEAR");
         }
 
-#ifdef USE_IMGUI
-        // Rキーで再スタート（初期配置でスライムを再生成、ステージ傾斜・カメラを初期化）
-        // 【Release では無効】理由は上の F2 と同じ（デバッグ用のショートカット）
-        if (keyInput_->TriggerKey(DIK_R))
-        {
-            RestartGame();
-        }
-#endif
-
-        // F1キーで当たり判定ワイヤーフレーム表示/非表示をトグル
+        // F1キーで当たり判定ワイヤーフレーム表示/非表示をトグル（デバッグ専用）
         if (keyInput_->TriggerKey(DIK_F1))
         {
             bool showColliders = CollisionManager::GetInstance()->IsShowDebugColliders();
             CollisionManager::GetInstance()->SetShowDebugColliders(!showColliders);
         }
+
+        // F4 または C キーでデバッグカメラをトグル（デバッグ専用）
+        if (keyInput_->TriggerKey(DIK_F4) || keyInput_->TriggerKey(DIK_C))
+        {
+            isDebugCamera_ = !isDebugCamera_;
+            if (isDebugCamera_ && playCamera_)
+            {
+                debugCameraPos_ = playCamera_->GetTranslate();
+                debugCameraRot_ = playCamera_->GetRotate();
+            }
+        }
+#endif
     }
 
     if (mouseInput_)
@@ -614,7 +618,7 @@ void GamePlayScene::Update()
     // targetTilt_ に入れれば、カメラをどれだけ回しても
     // 「W = 画面奥へ転がる」が保たれる
     targetTilt_ = { 0.0f, 0.0f };
-    if (keyInput_ && !isEditMode_)
+    if (keyInput_ && !isEditMode_ && !isDebugCamera_)
     {
         float inputForward = 0.0f; // W で +1（画面奥）
         float inputRight = 0.0f;   // D で +1（画面右）
@@ -844,13 +848,20 @@ void GamePlayScene::Update()
     // 衝突判定と押し出しの更新
     CollisionManager::GetInstance()->Update();
 
-    // 配置エディタ中はカメラを真上からの見下ろしに乗っ取る
+#if defined(_DEBUG) || defined(USE_IMGUI)
+    // 配置エディタ中はカメラを真上からの見下ろしに乗っ取る（デバッグ専用）
     if (isEditMode_ && placementEditor_)
     {
         placementEditor_->Update(deltaTime);
     }
 
-    // カメラの群れ重心追従 (LocoRoco方式: 全ロコロコの重心と広がりを捉える)
+    // デバッグカメラまたは通常カメラの群れ重心追従
+    if (isDebugCamera_)
+    {
+        UpdateDebugCamera(deltaTime);
+    }
+    else
+#endif
     if (!isEditMode_ && playCamera_ && slimeManager_)
     {
         int livingCount = slimeManager_->GetLivingCount();
@@ -1074,10 +1085,10 @@ void GamePlayScene::Update()
         playCamera_->SetRotate(finalCamRot);
         playCamera_->SetFovY(cameraFov_);
         playCamera_->Update();
-    }
 
-    // カメラシェイク（カメラ本体へオフセットを載せ直す。補間の基準は汚さない）
-    UpdateCameraShake(deltaTime);
+        // カメラシェイク（カメラ本体へオフセットを載せ直す。補間の基準は汚さない）
+        UpdateCameraShake(deltaTime);
+    }
 
     // カメラの最新ViewProjection行列に合わせて、各ステージパーツのWVP定数バッファを同期更新
     if (stageTerrain_)
@@ -1247,6 +1258,114 @@ void GamePlayScene::UpdateCameraShake(float deltaTime)
     playCamera_->SetRotate(shakenRot);
     playCamera_->Update();
 }
+
+#if defined(_DEBUG) || defined(USE_IMGUI)
+void GamePlayScene::UpdateDebugCamera(float deltaTime)
+{
+    if (!playCamera_ || !keyInput_) return;
+
+    // --- 移動速度 ---
+    float speed = debugCameraSpeed_;
+    // Shiftキーで高速ブースト（3倍速）
+    if (keyInput_->PushKey(DIK_LSHIFT) || keyInput_->PushKey(DIK_RSHIFT))
+    {
+        speed *= 3.0f;
+    }
+    // Altキーでスロー（0.25倍速、精密操作）
+    if (keyInput_->PushKey(DIK_LALT) || keyInput_->PushKey(DIK_RALT))
+    {
+        speed *= 0.25f;
+    }
+
+    // --- 視点回転 ---
+    bool rotating = false;
+#ifdef USE_IMGUI
+    ImGuiIO& io = ImGui::GetIO();
+    // ImGui のウィンドウ操作中でなければマウス右ドラッグで視点回転
+    if (ImGui::IsMouseDown(ImGuiMouseButton_Right) && !io.WantCaptureMouse)
+    {
+        debugCameraRot_.y += io.MouseDelta.x * debugCameraRotSpeed_;
+        debugCameraRot_.x += io.MouseDelta.y * debugCameraRotSpeed_;
+        rotating = true;
+    }
+    // マウスホイールで移動速度をスムーズに加減速
+    if (std::abs(io.MouseWheel) > 0.01f && !io.WantCaptureMouse)
+    {
+        debugCameraSpeed_ += io.MouseWheel * 5.0f;
+        debugCameraSpeed_ = std::clamp(debugCameraSpeed_, 2.0f, 250.0f);
+    }
+#endif
+
+    if (!rotating && mouseInput_)
+    {
+        if (mouseInput_->PushButton(1)) // 右クリック押下中
+        {
+            debugCameraRot_.y += static_cast<float>(mouseInput_->GetMoveX()) * debugCameraRotSpeed_;
+            debugCameraRot_.x += static_cast<float>(mouseInput_->GetMoveY()) * debugCameraRotSpeed_;
+        }
+    }
+
+    // 矢印キーによるキーボード視点回転（マウスを使わない場合用）
+    float keyRotSpeed = 2.0f * deltaTime;
+    if (keyInput_->PushKey(DIK_UP))    debugCameraRot_.x -= keyRotSpeed;
+    if (keyInput_->PushKey(DIK_DOWN))  debugCameraRot_.x += keyRotSpeed;
+    if (keyInput_->PushKey(DIK_LEFT))  debugCameraRot_.y -= keyRotSpeed;
+    if (keyInput_->PushKey(DIK_RIGHT)) debugCameraRot_.y += keyRotSpeed;
+
+    // Pitch の制限（真上・真下を行き過ぎないようにクランプ）
+    constexpr float kMaxPitch = 1.55f; // ~88.8度
+    debugCameraRot_.x = std::clamp(debugCameraRot_.x, -kMaxPitch, kMaxPitch);
+
+    // Yaw の正規化 (-pi .. pi)
+    constexpr float kPi = 3.14159265358979323846f;
+    while (debugCameraRot_.y < -kPi) debugCameraRot_.y += kPi * 2.0f;
+    while (debugCameraRot_.y > kPi)  debugCameraRot_.y -= kPi * 2.0f;
+    debugCameraRot_.z = 0.0f;
+
+    // --- カメラの向きに基づいた移動ベクトルの算出 ---
+    float cy = std::cos(debugCameraRot_.y);
+    float sy = std::sin(debugCameraRot_.y);
+    float cp = std::cos(debugCameraRot_.x);
+    float sp = std::sin(debugCameraRot_.x);
+
+    // 視線方向（3D Forward）
+    Vector3 forward = { sy * cp, -sp, cy * cp };
+    // 水平右方向（Horizontal Right）
+    Vector3 right = { cy, 0.0f, -sy };
+
+    Vector3 moveDir{ 0.0f, 0.0f, 0.0f };
+
+    // W / S: 視線方向へ前進 / 後退
+    if (keyInput_->PushKey(DIK_W)) { moveDir.x += forward.x; moveDir.y += forward.y; moveDir.z += forward.z; }
+    if (keyInput_->PushKey(DIK_S)) { moveDir.x -= forward.x; moveDir.y -= forward.y; moveDir.z -= forward.z; }
+
+    // A / D: 左右へ水平スライド
+    if (keyInput_->PushKey(DIK_D)) { moveDir.x += right.x; moveDir.y += right.y; moveDir.z += right.z; }
+    if (keyInput_->PushKey(DIK_A)) { moveDir.x -= right.x; moveDir.y -= right.y; moveDir.z -= right.z; }
+
+    // Space / E: 上昇
+    if (keyInput_->PushKey(DIK_SPACE) || keyInput_->PushKey(DIK_E)) moveDir.y += 1.0f;
+
+    // Left Ctrl / Q: 下降
+    if (keyInput_->PushKey(DIK_LCONTROL) || keyInput_->PushKey(DIK_Q)) moveDir.y -= 1.0f;
+
+    float lenSq = moveDir.x * moveDir.x + moveDir.y * moveDir.y + moveDir.z * moveDir.z;
+    if (lenSq > 1e-6f)
+    {
+        float invLen = 1.0f / std::sqrt(lenSq);
+        debugCameraPos_ += moveDir * (invLen * speed * deltaTime);
+    }
+
+    // カメラへ適用
+    appliedCameraPos_ = debugCameraPos_;
+    appliedCameraRot_ = debugCameraRot_;
+
+    playCamera_->SetTranslate(debugCameraPos_);
+    playCamera_->SetRotate(debugCameraRot_);
+    playCamera_->SetFovY(cameraFov_);
+    playCamera_->Update();
+}
+#endif
 
 int GamePlayScene::CalculateLifeCount() const
 {
@@ -1561,6 +1680,7 @@ void GamePlayScene::Draw(SceneRenderRequests& renderRequests)
 
 void GamePlayScene::DrawDebugUI()
 {
+#if defined(_DEBUG) || defined(USE_IMGUI)
     // コライダーのデバッグワイヤーフレーム描画
     if (playCamera_)
     {
@@ -1637,14 +1757,35 @@ void GamePlayScene::DrawDebugUI()
         }
     }
 
-    // --- プレイ / 配置エディタ の切り替え（F2 と同じ）---
+    // --- プレイ / 配置エディタ / デバッグカメラ の切り替え ---
     {
         ImGui::SeparatorText("Mode");
-        ImGui::Text("Now: %s", isEditMode_ ? "EDIT (placement)" : "PLAY");
-        ImGui::SameLine();
+        ImGui::Text("Now: %s%s", isEditMode_ ? "EDIT (placement)" : "PLAY",
+                    isDebugCamera_ ? " [DEBUG CAMERA ACTIVE]" : "");
         if (ImGui::Button(isEditMode_ ? "Back to Play (F2)" : "Placement Editor (F2)"))
         {
             SetEditMode(!isEditMode_);
+        }
+        ImGui::SameLine();
+        if (ImGui::Checkbox("Debug Camera (F4 / C)", &isDebugCamera_))
+        {
+            if (isDebugCamera_ && playCamera_)
+            {
+                debugCameraPos_ = playCamera_->GetTranslate();
+                debugCameraRot_ = playCamera_->GetRotate();
+            }
+        }
+
+        if (isDebugCamera_)
+        {
+            ImGui::Indent();
+            ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.2f, 1.0f), "Debug Camera Active!");
+            ImGui::Text("Pos: (%.1f, %.1f, %.1f) | Pitch: %.1f deg, Yaw: %.1f deg",
+                        debugCameraPos_.x, debugCameraPos_.y, debugCameraPos_.z,
+                        debugCameraRot_.x * 57.2957795f, debugCameraRot_.y * 57.2957795f);
+            ImGui::DragFloat("Cam Speed", &debugCameraSpeed_, 1.0f, 2.0f, 250.0f);
+            ImGui::TextDisabled("Controls: WASD=Fly | QE/Space/Ctrl=Up/Down | RightDrag/Arrows=Look | Shift=Boost");
+            ImGui::Unindent();
         }
     }
 
@@ -1654,6 +1795,7 @@ void GamePlayScene::DrawDebugUI()
     // 1. 操作説明
     ImGui::TextColored(ImVec4(1.0f, 0.9f, 0.2f, 1.0f), "[ Controls (LocoRoco 3D) ]");
     ImGui::BulletText("WASD / Arrows: Tilt Stage (ステージを傾けて全員で転がる)");
+    ImGui::BulletText("F4 / C key: Toggle Free Debug Camera (自由デバッグカメラON/OFF)");
     ImGui::BulletText("SPACE key: Stage Shake Jump (ステージをドンと揺らして一斉ジャンプ！)");
     ImGui::BulletText("E key: Split (弾けて全員小ロコロコに分裂)");
     ImGui::BulletText("F key: Merge / Stick (閾値内の仲間スライムを合体・くっつける)");
@@ -2043,5 +2185,6 @@ void GamePlayScene::DrawDebugUI()
     {
         placementEditor_->DrawImGui();
     }
-#endif
+#endif // USE_IMGUI
+#endif // _DEBUG || USE_IMGUI
 }

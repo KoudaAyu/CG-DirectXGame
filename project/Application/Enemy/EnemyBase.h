@@ -10,6 +10,7 @@
 #include "Baziru3_Engine/Framework/Collision/BoxCollider.h"
 #include "Application/Enemy/EnemyCollision.h"
 #include "Application/Enemy/EnemyAnimation.h"
+#include "Application/GameObject/SlimeMesh.h"
 
 class Object3dCom;
 class Camera;
@@ -98,6 +99,7 @@ public:
 
     void Update(const EnemyUpdateContext& ctx);
     void Draw(const RenderContext& ctx);
+    void DrawShadow(const RenderContext& ctx);
     void Finalize();
 
     // --- 強さ ---
@@ -107,6 +109,8 @@ public:
 
     // --- 状態 ---
     bool IsDead() const { return isDead_; }
+    bool HasGround() const { return hasGroundLastFrame_; }
+    float GetLifeTime() const { return lifeTime_; }
 
     /**
      * @brief 挙動を凍結する（配置エディタ用）
@@ -226,6 +230,7 @@ protected:
 
     int strength_ = 1;
     bool isDead_ = false;
+    bool hasGroundLastFrame_ = false;
     bool isPushable_ = false;
     bool needsGroundSnap_ = true;  //!< 初回だけ最上段の床へ即吸着する
     bool isFrozen_ = false;        //!< true の間は挙動を止める（配置エディタ用）
@@ -240,4 +245,7 @@ protected:
     ScaleFromStrengthFunc scaleFunc_; //!< 空なら既定関数が使われる
     EnemyAnimator animator_;
     std::unique_ptr<BoxCollider> collider_;
+
+    std::unique_ptr<CharacterShadow> shadow_;
+    bool shadowDrawnThisFrame_ = false;
 };

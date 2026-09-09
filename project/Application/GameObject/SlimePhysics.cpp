@@ -542,6 +542,12 @@ namespace SlimePhysics
         return norm;
     }
 
+    float CalculateGroundHeight(float x, float z, float currentY, const Vector2& stageTilt, bool* outHasGround, Vector3* outNormal, const Vector2& pivot)
+    {
+        float footY = (currentY != kIgnoreCurrentY) ? currentY : kIgnoreCurrentY;
+        return CalculateGroundHeightEx(x, z, footY, stageTilt, outHasGround, outNormal, pivot, false, 0.0f);
+    }
+
     // 点 p と 3D三角形 (a, b, c) の幾何学的最近接点を算出（Ericson's Point to Triangle Algorithm）
     static inline Vector3 ClosestPointOnTriangle(const Vector3& p, const Vector3& a, const Vector3& b, const Vector3& c)
     {

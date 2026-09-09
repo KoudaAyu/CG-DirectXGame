@@ -46,7 +46,7 @@ PixelShaderOutput main(VertexShaderOutput input)
     float4 textureColor = gTexture.Sample(gSample, uv);
     output.color = gMaterial.color * textureColor;
 
-    if (textureColor.a <= 0.1f || output.color.a == 0.0f)
+    if (textureColor.a <= 0.01f || output.color.a == 0.0f)
     {
         discard;
     }
@@ -74,13 +74,21 @@ PixelShaderOutput main(VertexShaderOutput input)
             specularPow = pow(RdotV, gMaterial.shininess);
         }
 
-        // diffuse (half-Lambert approximation kept)
+        // diffuse (half-Lambert with reduced ambient floor)
         float32_t diffuseFactor = pow(NdotL * 0.5f + 0.5f, 2.0f);
+        // 環境光寄与を軽減（暗い面をより暗くする）
+        float32_t ambientReduction = 0.65f;
+        diffuseFactor = lerp(diffuseFactor * ambientReduction, diffuseFactor, NdotL);
         float32_t3 diffuse = gMaterial.color.rgb * textureColor.rgb * gDirectionalLight.color.rgb * diffuseFactor * gDirectionalLight.intensity;
 
-        float32_t3 specular = gDirectionalLight.color.rgb * gDirectionalLight.intensity * specularPow * saturate(NdotL);
+        float32_t3 specular = gDirectionalLight.color.rgb * gDirectionalLight.intensity * specularPow * saturate(NdotL) * 0.15f;
 
-        output.color.rgb = diffuse + specular;
+        // セルフシャドウ：ワールド法線Yが下を向くほど暗くする（下面の陰影強調）
+        float32_t worldNormalY = normalize(input.normal).y;
+        float32_t selfShadow = saturate(worldNormalY * 0.5f + 0.5f); // 0(真下) ~ 1(真上)
+        selfShadow = lerp(0.35f, 1.0f, selfShadow); // 下面は最大65%暗くなる
+
+        output.color.rgb = (diffuse + specular) * selfShadow;
 
         // Environment Mapping with Fresnel (Schlick's approximation)
         float32_t3 R_env = reflect(-V, N);

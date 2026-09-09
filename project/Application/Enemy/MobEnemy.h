@@ -30,6 +30,7 @@ struct MobEnemyConfig
     bool canMove = false;             //!< 動きまわるか
     bool canShoot = false;            //!< 弾を撃つか
     bool isPushable = false;          //!< プレイヤーに押されて動くか
+    bool preventFall = true;          //!< 崖落ち防止（足場の端や急な段差で自発的に落ちないようにする）
     float moveSpeed = 2.0f;           //!< 追跡速度 (m/s)
     float chaseRange = 9.0f;          //!< この距離まで近づかれたら追いかけ始める
     float loseRange = 14.0f;          //!< この距離まで離れられたら諦める（ヒステリシス）
@@ -116,6 +117,9 @@ protected:
     float GetVisualOffsetY() const override;
 
 private:
+    /// @brief 指定のローカル移動量が崖落ち・急な落差・高すぎる段差にならないか判定する
+    bool IsStepSafe(const Vector3& stepLocal, const EnemyUpdateContext& ctx) const;
+
     EnemyType type_ = EnemyType::Slime;
 
     bool isChasing_ = false;

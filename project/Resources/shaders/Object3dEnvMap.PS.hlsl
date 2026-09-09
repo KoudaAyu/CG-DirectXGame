@@ -72,17 +72,25 @@ PixelShaderOutput main(VertexShaderOutput input)
             specularPow = pow(RdotV, gMaterial.shininess);
         }
 
-        // diffuse (half-Lambert approximation kept)
+        // diffuse (half-Lambert with reduced ambient floor)
         float32_t diffuseFactor = pow(NdotL * 0.5f + 0.5f, 2.0f);
+        // 環境光寄与を軽減（暗い面をより暗くする）
+        float32_t ambientReduction = 0.65f;
+        diffuseFactor = lerp(diffuseFactor * ambientReduction, diffuseFactor, NdotL);
         float32_t3 diffuse = gMaterial.color.rgb * textureColor.rgb * gDirectionalLight.color.rgb * diffuseFactor * gDirectionalLight.intensity;
 
-        float32_t3 specular = gDirectionalLight.color.rgb * gDirectionalLight.intensity * specularPow * saturate(NdotL);
+        float32_t3 specular = gDirectionalLight.color.rgb * gDirectionalLight.intensity * specularPow * saturate(NdotL) * 0.15f;
+
+        // セルフシャドウ：ワールド法線Yが下を向くほど暗くする（下面の陰影強調）
+        float32_t worldNormalY = normalize(input.normal).y;
+        float32_t selfShadow = saturate(worldNormalY * 0.5f + 0.5f);
+        selfShadow = lerp(0.35f, 1.0f, selfShadow);
 
         // --- Environment Mapping ---
         float32_t3 R_env = reflect(-V, N);
         float32_t3 reflectionColor = gEnvironmentMap.Sample(gSample, R_env).rgb * 0.3f;
 
-        output.color.rgb = diffuse + specular + reflectionColor;
+        output.color.rgb = (diffuse + specular + reflectionColor) * selfShadow;
     }
 
     return output;
