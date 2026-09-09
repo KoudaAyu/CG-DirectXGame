@@ -5,6 +5,7 @@
 #include "DirectXCom.h"
 #include "SceneManager.h"
 #include "Baziru3_Engine/Graphics/Graphics/SceneRenderRequests.h"
+#include "Application/GameObject/IrisTransition.h"
 
 #ifdef USE_IMGUI
 #include <imgui.h>
@@ -19,6 +20,8 @@ public:
 		{
 			input_ = new KeyInput();
 			input_->Initialize(dxCommon_->GetWindowAPI());
+			IrisTransition::GetInstance()->Initialize(dxCommon_);
+			IrisTransition::GetInstance()->StartIrisIn(1.0f, Vector2{ 0.5f, 0.5f });
 		}
 	}
 
@@ -30,6 +33,8 @@ public:
 
 	void Update() override
 	{
+		IrisTransition::GetInstance()->Update(1.0f / 60.0f);
+
 		if (input_)
 		{
 			input_->Update();
@@ -76,6 +81,7 @@ public:
 		if (dxCommon_ && dxCommon_->GetCommandList())
 		{
 			SceneManager::GetInstance()->DrawSkybox(dxCommon_->GetCommandList().Get());
+			IrisTransition::GetInstance()->Draw(dxCommon_->GetCommandList().Get());
 		}
 	}
 

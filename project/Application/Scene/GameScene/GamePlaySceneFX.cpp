@@ -3,8 +3,7 @@
 
 #include "Application/GameObject/FireworkFx.h"
 #include "Application/GameObject/CoinManager.h"
-#include "Application/Player/PikminPlayer.h"
-#include "Application/Minion/MinionManager.h"
+#include "Application/GameObject/SlimeManager.h"
 #include "Application/Enemy/EnemyManager.h"
 
 #include <algorithm>
@@ -286,7 +285,7 @@ void GamePlaySceneFx::EmitFootRing(const Vector3& center, float radius, const Ve
     }
 }
 
-void GamePlaySceneFx::UpdatePlayer(float deltaTime, PikminPlayer* player)
+void GamePlaySceneFx::UpdatePlayer(float deltaTime, Slime* player)
 {
     if (!fx_ || !player) return;
 
@@ -371,24 +370,28 @@ void GamePlaySceneFx::UpdatePlayer(float deltaTime, PikminPlayer* player)
     hasPrevPlayerPos_ = true;
 }
 
-void GamePlaySceneFx::UpdateMinions(float deltaTime, MinionManager* minionManager)
+void GamePlaySceneFx::UpdateMinions(float deltaTime, SlimeManager* slimeManager)
 {
-    if (!fx_ || !minionManager || !enableSlimeGlow_) return;
+    if (!fx_ || !slimeManager || !enableSlimeGlow_) return;
+
+    // 代表（一番大きい個体）は UpdatePlayer() が別に光らせているので、ここでは除く
+    const Slime* leader = slimeManager->GetLeader();
 
     // 光らせる対象を先に集める。ここでランダムに1体選んで1粒ずつ出す
     struct Target { Vector3 position; float radius; Vector4 color; };
     std::vector<Target> targets;
-    targets.reserve(minionManager->GetMinions().size());
+    targets.reserve(slimeManager->GetSlimes().size());
 
-    for (const auto& minionPtr : minionManager->GetMinions())
+    for (const auto& slimePtr : slimeManager->GetSlimes())
     {
-        Minion* minion = minionPtr.get();
-        if (!minion || !minion->IsActive()) continue;
-        if (minion->GetState() == MinionState::Merging) continue; // 吸われている最中は座標が飛ぶ
+        const Slime* slime = slimePtr.get();
+        if (!slime || !slime->IsActive()) continue;
+        if (slime == leader) continue;
+        if (slime->GetState() == SlimeState::Merging) continue; // 吸われている最中は座標が飛ぶ
 
-        targets.push_back({ minion->GetPosition(),
-                            (std::max)(0.15f, minion->GetRadius()),
-                            minion->GetSlimeParams().baseColor });
+        targets.push_back({ slime->GetPosition(),
+                            (std::max)(0.15f, slime->GetRadius()),
+                            slime->GetSlimeParams().baseColor });
     }
 
     if (targets.empty())
@@ -725,14 +728,14 @@ void GamePlaySceneFx::Update(float deltaTime)
     if (fx_) fx_->Update(deltaTime);
 }
 
-void GamePlaySceneFx::UpdateAll(float deltaTime, const Vector3& focusCenter, PikminPlayer* player,
-                                MinionManager* minionManager, CoinManager* coinManager,
+void GamePlaySceneFx::UpdateAll(float deltaTime, const Vector3& focusCenter, Slime* player,
+                                SlimeManager* slimeManager, CoinManager* coinManager,
                                 EnemyManager* enemyManager)
 {
     BeginFrame(focusCenter);
     UpdateAmbient(deltaTime);
     UpdatePlayer(deltaTime, player);
-    UpdateMinions(deltaTime, minionManager);
+    UpdateMinions(deltaTime, slimeManager);
     UpdateCoins(deltaTime, coinManager);
     UpdateEnemies(deltaTime, enemyManager);
     Update(deltaTime);

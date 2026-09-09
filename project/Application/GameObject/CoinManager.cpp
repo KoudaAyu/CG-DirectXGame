@@ -2,7 +2,7 @@
 
 #include "Baziru3_Engine/Graphics/3D/Object/Object3dCom.h"
 #include "Baziru3_Engine/Graphics/2D/Texture/TextureManager.h"
-#include "Application/Player/PikminPlayer.h"
+#include "Application/GameObject/SlimeManager.h"
 
 #include <algorithm>
 #include <cmath>
@@ -227,11 +227,13 @@ void CoinManager::RefreshFromConfig()
     }
 }
 
-void CoinManager::Update(float deltaTime, const Vector2& stageTilt, PikminPlayer* player)
+void CoinManager::Update(float deltaTime, const Vector2& stageTilt, SlimeManager* slimeManager)
 {
     const CoinConfig& cfg = GetConfig();
 
-    Vector3 playerPos = player ? player->GetPosition() : Vector3{ 0.0f, 0.0f, 0.0f };
+    // コインの回転・上下動の傾斜ピボットは群れの代表（一番大きい個体）を基準にする
+    const Slime* leader = slimeManager ? slimeManager->GetLeader() : nullptr;
+    Vector3 playerPos = leader ? leader->GetPosition() : Vector3{ 0.0f, 0.0f, 0.0f };
     Vector2 pivot{ playerPos.x, playerPos.z };
 
     // 取得イベントは1フレームだけ。拾い手（GamePlayScene）は毎フレーム見る
@@ -246,26 +248,42 @@ void CoinManager::Update(float deltaTime, const Vector2& stageTilt, PikminPlayer
         c->Update(deltaTime, stageTilt, pivot, cfg.spinSpeed, cfg.bobHeight, cfg.bobSpeed, cfg.heightOffset);
     }
 
-    // エディタ中は取得しない。置いた瞬間にプレイヤーの足元で消えると配置できない
-    if (editorMode_ || !player) return;
+    // エディタ中は取得しない。置いた瞬間にスライムの足元で消えると配置できない
+    if (editorMode_ || !slimeManager) return;
 
-    // 見た目半径の規約は SlimeCollision と同じ（scale * 0.78）
-    float playerRadius = player->GetCurrentScale() * 0.78f;
-    float hitDist = playerRadius + cfg.collectRadius;
-    float hitDistSq = hitDist * hitDist;
-
+    // ロコロコ準拠: 代表だけでなく、どのスライムでもコインを拾える。
+    // 判定半径は個体ごとに違うのでスライム側のループの中で出す
     for (auto& c : coins_)
     {
         if (!c || c->IsCollected()) continue;
 
         const Vector3& cp = c->GetPosition();
-        float dx = cp.x - playerPos.x;
-        float dz = cp.z - playerPos.z;
-        if (dx * dx + dz * dz > hitDistSq) continue;
+        bool picked = false;
 
-        // 高さも見る。これが無いと、上下段が重なっているところで
-        // 17m 下のコインを真上から取れてしまう
-        if (std::abs(cp.y - playerPos.y) > cfg.collectHeight) continue;
+        for (const auto& slimePtr : slimeManager->GetSlimes())
+        {
+            const Slime* s = slimePtr.get();
+            if (!s || !s->IsActive()) continue;
+
+            const Vector3& sPos = s->GetPosition();
+
+            // 見た目半径の規約は SlimeCollision と同じ（scale * 0.78）
+            float slimeRadius = s->GetCurrentScale() * 0.78f;
+            float hitDist = slimeRadius + cfg.collectRadius;
+
+            float dx = cp.x - sPos.x;
+            float dz = cp.z - sPos.z;
+            if (dx * dx + dz * dz > hitDist * hitDist) continue;
+
+            // 高さも見る。これが無いと、上下段が重なっているところで
+            // 17m 下のコインを真上から取れてしまう
+            if (std::abs(cp.y - sPos.y) > cfg.collectHeight) continue;
+
+            picked = true;
+            break;
+        }
+
+        if (!picked) continue;
 
         c->Collect();
         ++collectedCount_;

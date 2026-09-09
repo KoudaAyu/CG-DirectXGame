@@ -44,7 +44,12 @@ namespace SlimePhysics
     void SetGroundMesh(Object3d* groundObject, MeshCollider* groundCollider);
 
     /**
-     * @brief 登録された地面メッシュを全て解除
+     * @brief 登録されたすべての地面メッシュを解除
+     */
+    void ClearGroundMeshes();
+
+    /**
+     * @brief 登録された地面メッシュを全て解除（ClearGroundMeshes のエイリアス）
      */
     void ClearGroundMesh();
 
@@ -107,9 +112,9 @@ namespace SlimePhysics
      * @brief 接地中心Y座標を算出（落下・空中判定および法線出力フラグ付き）
      */
     float CalculateGroundedCenterYEx(float x, float z, float currentY, const Vector2& stageTilt, float baseOffset, bool* outHasGround = nullptr, Vector3* outNormal = nullptr, const Vector2& pivot = { 0.0f, 0.0f }, bool isGrounded = true);
-    inline float CalculateGroundedCenterYEx(float x, float z, float currentY, const Vector2& stageTilt, float baseOffset, bool* outHasGround, const Vector2& pivot)
+    inline float CalculateGroundedCenterYEx(float x, float z, float currentY, const Vector2& stageTilt, float baseOffset, bool* outHasGround, const Vector2& pivot, bool isGrounded = true)
     {
-        return CalculateGroundedCenterYEx(x, z, currentY, stageTilt, baseOffset, outHasGround, nullptr, pivot, true);
+        return CalculateGroundedCenterYEx(x, z, currentY, stageTilt, baseOffset, outHasGround, nullptr, pivot, isGrounded);
     }
 
     /**
@@ -125,7 +130,29 @@ namespace SlimePhysics
      * @param heightOffset 判定中心の高さオフセット（通常 0.0f）
      * @return 壁に衝突して押し出しが発生した場合は true
      */
-    bool ResolveWallCollision(Vector3& position, Vector3& velocity, float radius, float heightOffset = 0.0f);
+    bool ResolveWallCollision(Vector3& position, Vector3& velocity, float radius, float heightOffset = 0.0f, const Vector3* prevPos = nullptr);
+
+    /**
+     * @brief 「ここより下に落ちたら奈落」とみなすワールドY座標
+     * @param margin 地形の最下端からさらに何m下を奈落とみなすか
+     * @return 地形が登録されていれば「地形AABBの最下端 - margin」、未登録なら -12.0f
+     * @note ここを定数で決め打ちすると、上下2段の地形に差し替えた瞬間に
+     *       「下段に乗っただけで奈落判定されて死ぬ」ようになる。
+     *       実際 startLand は下段が y = -12.9 付近にあり、
+     *       決め打ちの -12.0f だと乗った瞬間に全滅していた
+     */
+    float GetVoidY(float margin = 8.0f);
+
+    /**
+     * @brief 真上方向へのレイキャストにより天井のY座標を探索
+     * @param x ワールドX座標
+     * @param z ワールドZ座標
+     * @param startY 探索開始のY座標（通常は床面またはスライム足元）
+     * @param maxSearchDist 最大探索距離
+     * @param[out] outCeilingY 見つかった天井のワールドY座標
+     * @return 天井が見つかった場合 true
+     */
+    bool FindCeilingY(float x, float z, float startY, float maxSearchDist, float& outCeilingY);
 
     /**
      * @brief スライム変形計算用の入力パラメータ構造体

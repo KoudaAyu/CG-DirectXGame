@@ -10,8 +10,8 @@
 #include "Application/UI/NumberDisplay.h"
 
 class Camera;
-class PikminPlayer;
-class MinionManager;
+class Slime;
+class SlimeManager;
 class EnemyManager;
 
 /**
@@ -38,14 +38,14 @@ public:
     struct FrameInput
     {
         Camera* camera = nullptr;
-        PikminPlayer* player = nullptr;
-        MinionManager* minionManager = nullptr;
+        Slime* player = nullptr;              //!< 群れの代表（SlimeManager::GetLeader()）
+        SlimeManager* slimeManager = nullptr; //!< スライム群全体（頭上の数字用）
         EnemyManager* enemyManager = nullptr;
 
         int score = 0;
         float elapsedSeconds = 0.0f;
         int coin = 0;
-        int life = 0;              //!< 残機 ＝ プレイヤーとミニオンの強さの合計
+        int life = 0;              //!< 残機 ＝ 全スライムのサイズ合計
         bool showHeadNumbers = true;
     };
 

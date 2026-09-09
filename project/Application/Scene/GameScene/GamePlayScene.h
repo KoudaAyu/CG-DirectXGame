@@ -5,8 +5,7 @@
 #include "KeyInput.h"
 #include "Baziru3_Engine/Core/IO/Mouse/MouseInput.h"
 #include "Baziru3_Engine/Graphics/Graphics/SceneRenderRequests.h"
-#include "Application/Player/PikminPlayer.h"
-#include "Application/Minion/MinionManager.h"
+#include "Application/GameObject/SlimeManager.h"
 #include "Application/GameObject/AimGuide.h"
 #include "Application/GameObject/PropellerObstacle.h"
 #include "Application/Enemy/EnemyManager.h"
@@ -16,8 +15,11 @@
 #include "Application/Scene/GameScene/GamePlaySceneHUD.h"
 #include "Baziru3_Engine/Graphics/3D/Object/Object3d.h"
 #include "Baziru3_Engine/Framework/Collision/MeshCollider.h"
+#include "Application/GameObject/IrisTransition.h"
+#include "Application/GameObject/GrowthCube.h"
 
 #include <memory>
+#include <vector>
 
 /**
  * @brief ピクミン×ロコロコ ゲームプレイシーン (GamePlayScene)
@@ -37,6 +39,7 @@ public:
 
 private:
     void DrawDebugUI();
+    void ResetGrowthCubes();
 
     /// @brief カメラシェイクを足す（0..1。足しこまれて上限 1.0 でクランプ）
     void AddCameraShake(float trauma);
@@ -60,8 +63,7 @@ private:
     std::unique_ptr<MouseInput> mouseInput_;
     std::unique_ptr<Camera> playCamera_;
 
-    std::unique_ptr<PikminPlayer> player_;
-    std::unique_ptr<MinionManager> minionManager_;
+    std::unique_ptr<SlimeManager> slimeManager_;
     std::unique_ptr<AimGuide> aimGuide_;
     std::vector<std::unique_ptr<PropellerObstacle>> propellerObstacles_;
     std::unique_ptr<EnemyManager> enemyManager_;
@@ -96,30 +98,50 @@ private:
     bool isEditMode_ = false;                          //!< 配置エディタ中か
     Vector4 groundBaseColor_{ 0.55f, 0.85f, 0.50f, 1.0f }; //!< 地面の草原カラー
 
-    std::unique_ptr<Object3d> groundPlane_;
-    std::unique_ptr<MeshCollider> groundCollider_;
-    Object3d::ModelData groundModelData_;
-    uint32_t groundTextureIndex_ = 0;
+    // 触れると1段階大きくなるキューブ（TakanagaDev 由来）
+    std::vector<std::unique_ptr<GrowthCube>> growthCubes_;
+
+    // --- スライム初期スポーン位置 ---
+    Vector3 spawnBasePos_{ 0.0f, 0.55f, 30.0f }; // 初期スポーン基準位置（島中央の平原: Z = 30.0f）
+    float spawnGroupOffsetZ_ = 4.0f;            // 小スライム群の前方オフセット
+    void RespawnSlimesAtBase();
+    void RestartGame();
+    // --- ステージパーツ管理 ---
+    struct StagePart
+    {
+        std::string name;
+        std::unique_ptr<Object3d> object;
+        std::unique_ptr<MeshCollider> collider;
+        Object3d::ModelData modelData;
+        uint32_t textureIndex = 0;
+        Vector3 baseOffset{ 0.0f, 0.0f, 0.0f }; // 追加の平行移動オフセット（roadCellのステップ配置用）
+    };
+    std::vector<StagePart> stageParts_;
     float groundScale_ = 0.25f; // 地面ステージの縮小スケール (適度な広さ: 幅約75m)
+    bool bridgeConnectMode_ = true; // startLandとLand1をroadCellで繋ぐモード
 
     // --- カメラ制御パラメータ (プレイヤー相対座標一定モデル) ---
-    float cameraDistance_ = 21.0f;        // プレイヤーからのカメラ距離（ゆったり見晴らせる高さ）
+    float cameraDistance_ = 30.0f;        // プレイヤーからの基準カメラ距離（ステージ全体を見渡しやすいゆったりとした距離）
     float cameraPitch_ = 0.93f;           // 見下ろし角度 (rad, 0.93 rad ≈ 53.3度: 上空俯瞰視点)
     float cameraYaw_ = 0.0f;             // 方位角 (rad)
     float cameraFov_ = 0.85f;            // 垂直視野角 (rad, 0.85 rad ≈ 48.7度)
-    float cameraTargetOffsetY_ = 1.2f;   // プレイヤー足元からの注視点高さ
-    float cameraForwardOffset_ = 2.0f;   // 前方視界確保用の注視点Z前進オフセット
-    float cameraDynamicZoom_ = 1.6f;     // 合体巨大化時のカメラ後退倍率（過剰なズーム変動を抑制）
+    float cameraTargetOffsetY_ = 0.8f;   // プレイヤー足元からの注視点高さ
+    float cameraForwardOffset_ = 0.5f;   // 注視点Z前進オフセット（スライムを画面中央にしっかりと捉える）
+    float cameraDynamicZoom_ = 1.5f;     // 合体巨大化時のカメラ後退倍率
+    float cameraSpreadZoom_ = 0.12f;     // 群れの広がりに対するカメラ後退倍率
+    float maxSpreadOffset_ = 4.0f;       // 広がりによる追加後退の最大上限値 (m)
+    float minCameraDist_ = 22.0f;        // カメラ距離の下限ガード (m)
+    float maxCameraDist_ = 42.0f;        // カメラ距離の上限ガード (m)
     bool followStageTilt_ = false;       // ステージ傾斜にカメラ回転を連動させるか
     // 臨界減衰スプリング（SmoothDamp）パラメータ
-    float cameraSmoothTimePos_ = 0.18f;  // カメラY/Z追従スムーズ時間 (秒: 急激なショックを緩和)
-    float cameraSideLagTime_ = 0.20f;    // カメラX（左右）追従スムーズ時間 (秒: 心地よいラバーストラップ感)
-    float cameraSmoothTimeRot_ = 0.24f;  // カメラ角度補間スムーズ時間 (秒: カクつきゼロの優雅な旋回)
+    float cameraSmoothTimePos_ = 0.10f;  // カメラY/Z追従スムーズ時間 (高速移動時もフレームアウトしない機敏な追従)
+    float cameraSideLagTime_ = 0.10f;    // カメラX（左右）追従スムーズ時間
+    float cameraSmoothTimeRot_ = 0.20f;  // カメラ角度補間スムーズ時間
     float cameraDynamicBank_ = 0.025f;   // 左右移動時の微小ロールバンク強度 (rad/(m/s))
     float tiltSmoothTime_ = 0.35f;       // ステージ傾斜の補間スムーズ時間 (秒: 重厚で滑らかな板の傾き)
 
     // ズーム（距離・広がり・重心）の急変を防止するスムーズダンピングパラメータ
-    float currentCameraDist_ = 21.0f;     // 現在の補間カメラ距離
+    float currentCameraDist_ = 30.0f;     // 現在の補間カメラ距離
     float cameraDistVelocity_ = 0.0f;    // カメラ距離の補間速度
     float cameraZoomSmoothTime_ = 0.55f; // カメラ距離（ズーム）の追従スムーズ時間（合体・分裂時の急激なズーム変動を優雅に緩和）
     float currentGroupSpread_ = 0.0f;    // 補間された群れの広がり
@@ -127,7 +149,7 @@ private:
     float groupSpreadSmoothTime_ = 0.60f;// 群れの広がり収縮のスムーズ時間（合体でミニオンが消えたときの急ズームを防止）
     Vector3 currentFocusPos_{ 0.0f, 0.0f, 0.0f }; // 補間注視点位置
     Vector3 focusPosVelocity_{ 0.0f, 0.0f, 0.0f }; // 注視点追従速度
-    float focusSmoothTime_ = 0.20f;      // 注視点スムーズ時間（重心ジャンプの防止）
+    float focusSmoothTime_ = 0.10f;      // 注視点スムーズ時間（機敏な重心追従）
 
     Vector3 currentCameraPos_{ 0.0f, 18.0f, -12.0f }; // 現在の補間カメラ位置
     Vector3 currentCameraRot_{ 0.93f, 0.0f, 0.0f };   // 現在の補間カメラ回転
@@ -141,5 +163,19 @@ private:
     Vector2 targetTilt_{ 0.0f, 0.0f };
     float maxTiltAngle_ = 0.28f;         // 最大傾斜角 (約16度, rad)
 
+    // ステージ揺らし（バウンス・シェイク）パラメータ
+    float stageBounceOffset_ = 0.0f;     // ステージの瞬間垂直浮上量 (m)
+    float stageBounceVelocity_ = 0.0f;   // ステージ垂直バウンス速度
+    float stageShakeTimer_ = 0.0f;       // ステージ回転シェイク減衰タイマー
+    float stageShakeDuration_ = 0.28f;   // シェイク持続時間
+    float stageShakeIntensity_ = 0.035f; // シェイク回転強度 (rad)
+    Vector3 cameraShakeOffset_{ 0.0f, 0.0f, 0.0f }; // カメラ衝撃オフセット
+    float cameraShakeIntensity_ = 0.0f;  // カメラ衝撃強度
+    float stageShakeCooldown_ = 0.0f;    // 連打防止クールダウン
+
     bool isInitialized_ = false;
+
+    // ゲームオーバー演出（Iris Out）
+    bool isGameOverTransition_ = false;
+    float gameOverDelayTimer_ = 0.0f;
 };

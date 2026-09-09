@@ -2,8 +2,7 @@
 #include "Application/Scene/GameScene/GamePlaySceneHUD.h"
 
 #include "Camera.h"
-#include "Application/Player/PikminPlayer.h"
-#include "Application/Minion/MinionManager.h"
+#include "Application/GameObject/SlimeManager.h"
 #include "Application/Enemy/EnemyManager.h"
 
 #include <algorithm>
@@ -398,7 +397,7 @@ void GamePlaySceneHud::UpdateHeadNumbers(const FrameInput& input)
 
     const Camera& camera = *input.camera;
 
-    // --- プレイヤー ---
+    // --- 代表スライム（一番大きい個体）---
     if (input.player)
     {
         const float radius = input.player->GetCurrentScale() * 0.78f;
@@ -406,18 +405,21 @@ void GamePlaySceneHud::UpdateHeadNumbers(const FrameInput& input)
                         input.player->GetSize(), { 1.0f, 1.0f, 1.0f, 1.0f });
     }
 
-    // --- ミニオン ---
-    if (input.minionManager)
+    // --- 代表以外のスライム ---
+    if (input.slimeManager)
     {
-        for (const auto& minionPtr : input.minionManager->GetMinions())
-        {
-            Minion* minion = minionPtr.get();
-            if (!minion || !minion->IsActive()) continue;
-            if (minion->GetState() == MinionState::Merging) continue;
+        const Slime* leader = input.player;
 
-            PlaceHeadNumber(camera, minion->GetPosition(),
-                            minion->GetRadius() * headOffsetMinion_,
-                            minion->GetSize(), { 1.0f, 1.0f, 1.0f, 1.0f });
+        for (const auto& slimePtr : input.slimeManager->GetSlimes())
+        {
+            const Slime* slime = slimePtr.get();
+            if (!slime || !slime->IsActive()) continue;
+            if (slime == leader) continue; // 代表はすぐ上で出しているので二重に出さない
+            if (slime->GetState() == SlimeState::Merging) continue;
+
+            PlaceHeadNumber(camera, slime->GetPosition(),
+                            slime->GetRadius() * headOffsetMinion_,
+                            slime->GetSize(), { 1.0f, 1.0f, 1.0f, 1.0f });
         }
     }
 
@@ -596,7 +598,7 @@ void GamePlaySceneHud::DrawImGui()
     ImGui::DragFloat2("Head Digit Size", &headDigitSize_.x, 0.5f);
     ImGui::DragFloat("Head Spacing", &headDigitSpacing_, 0.2f, -20.0f, 30.0f);
     ImGui::DragFloat("Offset Player", &headOffsetPlayer_, 0.02f, 0.0f, 8.0f);
-    ImGui::DragFloat("Offset Minion", &headOffsetMinion_, 0.02f, 0.0f, 8.0f);
+    ImGui::DragFloat("Offset Small Slime", &headOffsetMinion_, 0.02f, 0.0f, 8.0f);
     ImGui::DragFloat("Offset Enemy", &headOffsetEnemy_, 0.02f, 0.0f, 8.0f);
     ImGui::DragFloat("Head Alpha", &headAlpha_, 0.01f, 0.0f, 1.0f);
     ImGui::Text("Used this frame: %d / %d", headCursor_, static_cast<int>(headNumbers_.size()));

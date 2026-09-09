@@ -11,8 +11,8 @@
 
 class Object3dCom;
 class Camera;
-class PikminPlayer;
-class MinionManager;
+class Slime;
+class SlimeManager;
 
 /**
  * @brief モブ敵と敵弾をまとめて管理する
@@ -76,11 +76,13 @@ public:
      * @brief 更新
      * @param deltaTime デルタタイム
      * @param stageTilt ステージ傾斜
-     * @param player プレイヤー（衝突解決のため位置・速度が書き換わる）
-     * @param minionManager 小スライム群（省略可。渡すと小スライムも強さ判定で敵と戦う）
+     * @param slimeManager スライム群（衝突解決のため位置・速度が書き換わる）
+     * @note スライムが一本化されたので「プレイヤー」と「ミニオン」の区別は無い。
+     *       強さ比較は個体ごとの Slime::GetSize() で行い、
+     *       一番大きい個体（SlimeManager::GetLeader()）だけを
+     *       跳ね返り係数・演出フラグの上で「本体」として扱う
      */
-    void Update(float deltaTime, const Vector2& stageTilt, PikminPlayer* player,
-                MinionManager* minionManager = nullptr);
+    void Update(float deltaTime, const Vector2& stageTilt, SlimeManager* slimeManager);
 
     void Draw(const RenderContext& ctx);
 
@@ -135,17 +137,18 @@ private:
     /// @brief 弾モデルを読み込んでキャッシュする
     const Object3d::ModelData* GetOrLoadBulletModel(const MobEnemyConfig& config, std::string& outKey);
 
-    /// @brief プレイヤーの塊 vs 全敵
-    void ResolvePlayerCollisions(PikminPlayer* player, const Vector2& stageTilt, const Vector2& pivot);
+    /// @brief 全スライム vs 全敵
+    /// @note 旧 ResolvePlayerCollisions + ResolveMinionCollisions を統合したもの。
+    ///       判定ルールは元から両者同一で、違いは跳ね返り係数と
+    ///       「弾かれたときに Launch するか」だけだったので、
+    ///       代表個体かどうかで振り分けている
+    void ResolveSlimeCollisions(SlimeManager* slimeManager, const Vector2& stageTilt, const Vector2& pivot);
 
-    /// @brief 敵弾 vs プレイヤーの塊
-    void ResolveBulletCollisions(PikminPlayer* player);
+    /// @brief 敵弾 vs 代表スライム
+    void ResolveBulletCollisions(Slime* slime);
 
-    /// @brief 小スライム（ミニオン）vs 全敵。判定ルールはプレイヤー本体と同じ
-    void ResolveMinionCollisions(MinionManager* minionManager, const Vector2& stageTilt, const Vector2& pivot);
-
-    /// @brief プレイヤーの自爆で、爆風内の敵を強さ問わず倒す
-    void ResolveSelfDestruct(PikminPlayer* player);
+    /// @brief スライムの自爆（E キー全員分裂）で、爆風内の敵を強さ問わず倒す
+    void ResolveSelfDestruct(SlimeManager* slimeManager);
 
     /// @brief 現在のステージ傾斜での床面法線
     static Vector3 CalcStageNormal(const Vector2& stageTilt);

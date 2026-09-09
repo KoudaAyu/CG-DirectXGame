@@ -17,7 +17,8 @@ class EnemyManager;
 class CoinManager;
 class MobEnemy;
 class Coin;
-class PikminPlayer;
+class Slime;
+class SlimeManager;
 
 /**
  * @brief 敵・コイン・プレイヤー初期位置の配置エディタ
@@ -57,7 +58,10 @@ public:
         Camera* camera = nullptr;
         EnemyManager* enemyManager = nullptr;
         CoinManager* coinManager = nullptr;
-        PikminPlayer* player = nullptr;
+        // スライム群。プレイヤー開始位置の反映・読み取りは
+        // 「一番大きい個体（GetLeader）」を代表として行う。
+        // 合体でスライムの実体が破棄されるので、Slime* を持ち越さず毎回引き直すこと
+        SlimeManager* slimeManager = nullptr;
     };
 
     /// @brief 今おいているもの（ブラシ）
@@ -132,6 +136,9 @@ public:
     void SetGroundBaseColor(const Vector4& color) { groundBaseColor_ = color; }
 
 private:
+    /// @brief 配置エディタが「プレイヤー」として扱うスライム（＝群れの代表）
+    /// @note 合体でスライムの実体が破棄されるので、Slime* を保持せず必ずここから引き直す
+    Slime* PlayerSlime() const;
     // --- マウス / 座標 ---
     struct MouseState
     {

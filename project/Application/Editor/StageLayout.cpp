@@ -12,10 +12,13 @@ const char* StageLayout::kDefaultPath = "Resources/10days/stage_layout_10days.js
 
 namespace StagePlacement
 {
+    /// @brief 配置に必要な頭上クリアランス (m)。これより天井が低い場所は配置禁止
+    static constexpr float kRequiredHeadroom = 2.5f;
+
     Result Test(float x, float z, float* outY)
     {
-        SlimePhysics::GroundLayer layers[4];
-        int count = SlimePhysics::QueryGroundLayers(x, z, layers, 4);
+        SlimePhysics::GroundLayer layers[8];
+        int count = SlimePhysics::QueryGroundLayers(x, z, layers, 8);
 
         if (count <= 0)
         {
@@ -23,14 +26,27 @@ namespace StagePlacement
             return Result::NoGround;
         }
 
-        if (count >= 2)
+        // 一番上の床（QueryGroundLayers は Y 降順）＝プレイ面。
+        //
+        // 【変更の理由】以前は「2層あったら下段がプレイ area」という判定だった。
+        // これは旧地形（下段の広場＋その上に一本道が架かっている）に合わせたもの。
+        // いまの島（startLand / Land1）は**全域が上下2段**なので、その規則では
+        // 実際に遊ぶ上面が丸ごと BLOCKED になり、置ける場所が全体の 6% しか残らない。
+        // 上面を採り、代わりに「頭上が詰まっているか」で禁止を判断する
+        const float floorY = layers[0].y;
+        if (outY) *outY = floorY;
+
+        // 頭上クリアランス判定。オーバーハングや上下段の隙間へ潜り込ませないため。
+        // 探索距離を必要クリアランスの2倍で打ち切って、遠い地形を誤検出しないようにする
+        float ceilingY = 0.0f;
+        if (SlimePhysics::FindCeilingY(x, z, floorY, kRequiredHeadroom * 2.0f, ceilingY))
         {
-            // 上下段が重なっている。プレイ area は下段なので、返す Y は一番下の床
-            if (outY) *outY = layers[(std::min)(count, 4) - 1].y;
-            return Result::Obstructed;
+            if ((ceilingY - floorY) < kRequiredHeadroom)
+            {
+                return Result::Obstructed;
+            }
         }
 
-        if (outY) *outY = layers[0].y;
         return Result::Ok;
     }
 
@@ -41,7 +57,7 @@ namespace StagePlacement
         // ImGui のフォントに日本語グリフが無いので、表示文字列は全部 ASCII にすること
         case Result::Ok:         return "OK";
         case Result::NoGround:   return "NO GROUND (outside island)";
-        case Result::Obstructed: return "BLOCKED (under upper tier)";
+        case Result::Obstructed: return "BLOCKED (no headroom)";
         default:                 return "?";
         }
     }
@@ -221,6 +237,33 @@ bool StageLayout::SaveToFile(const std::string& path) const
 
     ofs << j.dump(2);
     return ofs.good();
+}
+
+bool StageLayout::IsCompatibleWithCurrentTerrain(float* outValidRatio) const
+{
+    const size_t total = enemies.size() + coins.size();
+    if (total == 0)
+    {
+        // 空のレイアウトは「壊れている」とは言えないので、そのまま通す
+        if (outValidRatio) *outValidRatio = 1.0f;
+        return true;
+    }
+
+    size_t onGround = 0;
+    for (const auto& e : enemies)
+    {
+        if (SlimePhysics::QueryGroundLayers(e.position.x, e.position.z, nullptr, 0) > 0) ++onGround;
+    }
+    for (const auto& c : coins)
+    {
+        if (SlimePhysics::QueryGroundLayers(c.position.x, c.position.z, nullptr, 0) > 0) ++onGround;
+    }
+
+    const float ratio = static_cast<float>(onGround) / static_cast<float>(total);
+    if (outValidRatio) *outValidRatio = ratio;
+
+    // 半分以上が島の外に出ていたら、別の地形で作ったデータとみなす
+    return ratio >= 0.5f;
 }
 
 StageLayout StageLayout::MakeFallback(int enemyCount, int coinCount)

@@ -12,8 +12,7 @@
 class KeyInput;
 class MouseInput;
 class Camera;
-class PikminPlayer;
-class MinionManager;
+class Slime;
 class SlimeFx;
 struct SceneRenderRequests;
 
@@ -38,7 +37,7 @@ public:
         Count, // 番兵（項目数）
     };
 
-    // PikminPlayer / MinionManager / SlimeFx を前方宣言のまま unique_ptr で持っているので、
+    // Slime / SlimeFx を前方宣言のまま unique_ptr で持っているので、
     // コンストラクタとデストラクタは両方 .cpp 側で定義する。
     //
     // デストラクタだけでは足りない: SceneRegistration.cpp の
@@ -171,7 +170,7 @@ private:
     // ===============================================================
     // タイトルスライム（3D）
     //
-    // ゲーム側の PikminPlayer をそのまま流用している。
+    // ゲーム側の Slime をそのまま流用している。
     // Update() の引数は全部ポインタなので、入力系を nullptr で渡すと
     // 「ステージの傾き（stageTilt）だけで動くスライム」になる。
     // タイトルではその傾きを「目標地点へ向ける P 制御」で自動生成していて、
@@ -190,8 +189,7 @@ private:
     Vector3 savedCameraTranslate_{}; // シーンを抜けるときに戻すための退避
     Vector3 savedCameraRotate_{};
 
-    std::unique_ptr<PikminPlayer> slime_;
-    std::unique_ptr<MinionManager> minions_;
+    std::unique_ptr<Slime> slime_;
     std::unique_ptr<SlimeFx> fx_;
 
     std::mt19937 randomEngine_;
@@ -209,7 +207,7 @@ private:
     float slimeTiltGain_ = 0.0f;   // 目標地点までの距離 → 傾きの変換係数
     float slimeMaxTilt_ = 0.0f;    // 傾きの上限（ラジアン）
     float slimeFollowRate_ = 0.0f; // マウス追従の強さ 0..1
-    bool slimeOverrideColor_ = false; // PikminPlayer が毎フレーム塗る色を上書きするか
+    bool slimeOverrideColor_ = false; // Slime が毎フレーム塗る色を上書きするか
     Vector4 slimeColor_{};
 
     // ===============================================================

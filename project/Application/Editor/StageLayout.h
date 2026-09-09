@@ -97,6 +97,15 @@ public:
      * @note SlimePhysics に地形メッシュが登録された後に呼ぶこと。
      *       地形が未登録なら原点だけを返す
      */
+    /**
+     * @brief いま登録されている地形に対して、この配置データが有効かを調べる
+     * @param[out] outValidRatio 敵・コインのうち「島の上に乗っている」割合 (0..1)
+     * @return 半分以上が島の上にあれば true。配置が空の場合も true
+     * @note 地形を差し替えると、前の地形で作った JSON の座標は島の外へ出てしまう。
+     *       そのまま適用すると敵とコインが全部奈落に落ちるので、読み込み側で弾くために使う
+     */
+    bool IsCompatibleWithCurrentTerrain(float* outValidRatio = nullptr) const;
+
     static StageLayout MakeFallback(int enemyCount = 6, int coinCount = 12);
 
     static const char* TypeToName(EnemyType type);

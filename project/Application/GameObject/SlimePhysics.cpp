@@ -6,6 +6,11 @@ namespace SlimePhysics
 {
     static float sFriction = 1.3f; // スライム共通の地面摩擦係数（通常・合体・ミニオン共通）
 
+    // 歩行可能床と壁の排他分離境界（傾斜角約56.6度: これ未満の急峻な面を壁として押し出し、
+    // これ以上の緩やかな面を歩行可能床として判定。床側と壁側で同じ定数を使うことで
+    // 「どちらでもない」「どちらでもある」隙間が生まれないようにしている）
+    static constexpr float kWalkableSlopeLimitNy = 0.55f;
+
     /// @brief 登録された地形メッシュ1枚分の情報
     /// @note 地形は複数メッシュに分割されることがあるので配列で保持する。
     ///       すべてのメッシュは GamePlayScene から同じピボット回転を掛けられている前提。
@@ -62,16 +67,21 @@ namespace SlimePhysics
 
     void SetGroundMesh(Object3d* groundObject, MeshCollider* groundCollider)
     {
-        ClearGroundMesh();
+        ClearGroundMeshes();
         AddGroundMesh(groundObject, groundCollider);
     }
 
-    void ClearGroundMesh()
+    void ClearGroundMeshes()
     {
         sGroundMeshes.clear();
         sLastFrameCount = 0xFFFFFFFF;
         sBoundsFrame = 0xFFFFFFFF;
         sBoundsValid = false;
+    }
+
+    void ClearGroundMesh()
+    {
+        ClearGroundMeshes();
     }
 
     int GetGroundMeshCount()
@@ -195,10 +205,13 @@ namespace SlimePhysics
         return true;
     }
 
+
     /// @brief (x, z) の真下にある「歩ける床」を全メッシュから集めて Y 降順で返す
     /// @note 旧実装は 250.0f * maxScale というマジックナンバーで最上空を決めていたが、
     ///       地形を差し替えて背が高くなるとレイの開始点が地形の中に入って床を取り逃がす。
-    ///       ここでは AABB ツリーの実測バウンズから開始高さを決めている
+    ///       ここでは AABB ツリーの実測バウンズから開始高さを決めている。
+    ///       1点だけのレイキャストだとポリゴンの継ぎ目（シーム）をすり抜けることがあるので、
+    ///       空振りしたときだけ十字に微小ジッターをかけて拾い直す
     static void CollectGroundCandidates(float x, float z, std::vector<GroundLayer>& out)
     {
         out.clear();
@@ -220,66 +233,83 @@ namespace SlimePhysics
         const int kMaxPenetrations = 32;
         const float kMaxRayDist = 100000.0f;
 
-        for (const auto& gm : sGroundMeshes)
+        auto PerformRaycastAt = [&](float rayX, float rayZ)
         {
-            if (!gm.object || !gm.collider) continue;
-
-            const Matrix4x4& worldMatrix = gm.currWorld;
-            Matrix4x4 invWorld = Inverse(worldMatrix);
-
-            Vector3 rayStartWorld = { x, topY, z };
-            const Vector3 rayDirWorld = { 0.0f, -1.0f, 0.0f };
-            float lastHitWorldY = 1e9f;
-
-            for (int iter = 0; iter < kMaxPenetrations; ++iter)
+            for (const auto& gm : sGroundMeshes)
             {
-                Vector3 localStart = TransformPointM(rayStartWorld, invWorld);
-                Vector3 localDir = TransformDirM(rayDirWorld, invWorld);
+                if (!gm.object || !gm.collider) continue;
 
-                float dirLen = std::sqrt(localDir.x * localDir.x + localDir.y * localDir.y + localDir.z * localDir.z);
-                if (dirLen < 1e-6f) break;
-                localDir = localDir * (1.0f / dirLen);
+                const Matrix4x4& worldMatrix = gm.currWorld;
+                Matrix4x4 invWorld = Inverse(worldMatrix);
 
-                float hitDist = 0.0f;
-                Vector3 hitNormal, v0, v1, v2;
+                Vector3 rayStartWorld = { rayX, topY, rayZ };
+                const Vector3 rayDirWorld = { 0.0f, -1.0f, 0.0f };
+                float lastHitWorldY = 1e9f;
 
-                if (!gm.collider->GetAABBTree().Raycast(localStart, localDir, kMaxRayDist, hitDist, hitNormal, v0, v1, v2))
+                for (int iter = 0; iter < kMaxPenetrations; ++iter)
                 {
-                    break; // これ以上下にメッシュが存在しない
-                }
+                    Vector3 localStart = TransformPointM(rayStartWorld, invWorld);
+                    Vector3 localDir = TransformDirM(rayDirWorld, invWorld);
 
-                // ヒットしたポリゴンの幾何法線を算出
-                Vector3 e1 = v1 - v0;
-                Vector3 e2 = v2 - v0;
-                Vector3 localTriNorm = NormalizeSafeV3({
-                    e1.y * e2.z - e1.z * e2.y,
-                    e1.z * e2.x - e1.x * e2.z,
-                    e1.x * e2.y - e1.y * e2.x
-                });
-                Vector3 worldTriNorm = NormalizeSafeV3(TransformDirM(localTriNorm, worldMatrix));
+                    float dirLen = std::sqrt(localDir.x * localDir.x + localDir.y * localDir.y + localDir.z * localDir.z);
+                    if (dirLen < 1e-6f) break;
+                    localDir = localDir * (1.0f / dirLen);
 
-                Vector3 localHit = {
-                    localStart.x + localDir.x * hitDist,
-                    localStart.y + localDir.y * hitDist,
-                    localStart.z + localDir.z * hitDist
-                };
-                float worldY = localHit.x * worldMatrix.m[0][1] + localHit.y * worldMatrix.m[1][1] + localHit.z * worldMatrix.m[2][1] + worldMatrix.m[3][1];
+                    float hitDist = 0.0f;
+                    Vector3 hitNormal, v0, v1, v2;
 
-                // 同一ポリゴンや極小オフセットによる重複ヒットを防止
-                if (worldY < lastHitWorldY - 0.005f)
-                {
-                    lastHitWorldY = worldY;
-
-                    // 歩行可能地面ポリゴンか判定:
-                    // モデル固有法線 localTriNorm.y >= 0.55f（傾斜約54.5度以下）で壁・垂直面を除外
-                    if (localTriNorm.y >= 0.55f && worldTriNorm.y > 0.15f)
+                    if (!gm.collider->GetAABBTree().Raycast(localStart, localDir, kMaxRayDist, hitDist, hitNormal, v0, v1, v2))
                     {
-                        out.push_back({ worldY, worldTriNorm });
+                        break; // これ以上下にメッシュが存在しない
                     }
-                }
 
-                rayStartWorld.y = worldY - 0.05f;
+                    // ヒットしたポリゴンの幾何法線を算出
+                    Vector3 e1 = v1 - v0;
+                    Vector3 e2 = v2 - v0;
+                    Vector3 localTriNorm = NormalizeSafeV3({
+                        e1.y * e2.z - e1.z * e2.y,
+                        e1.z * e2.x - e1.x * e2.z,
+                        e1.x * e2.y - e1.y * e2.x
+                    });
+                    Vector3 worldTriNorm = NormalizeSafeV3(TransformDirM(localTriNorm, worldMatrix));
+
+                    Vector3 localHit = {
+                        localStart.x + localDir.x * hitDist,
+                        localStart.y + localDir.y * hitDist,
+                        localStart.z + localDir.z * hitDist
+                    };
+                    float worldY = localHit.x * worldMatrix.m[0][1] + localHit.y * worldMatrix.m[1][1] + localHit.z * worldMatrix.m[2][1] + worldMatrix.m[3][1];
+
+                    // 同一ポリゴンや極小オフセットによる重複ヒットを防止
+                    if (worldY < lastHitWorldY - 0.005f)
+                    {
+                        lastHitWorldY = worldY;
+
+                        // 歩行可能地面ポリゴンか判定:
+                        // 最大登坂限界（kWalkableSlopeLimitNy）以上の緩やかな面のみを地面候補として収集。
+                        // 壁判定（localTriNorm.y < kWalkableSlopeLimitNy）と完全排他なので、
+                        // 同じ面が「床でも壁でもある」状態にならずジッターが出ない
+                        if (localTriNorm.y >= kWalkableSlopeLimitNy && worldTriNorm.y > 0.10f)
+                        {
+                            out.push_back({ worldY, worldTriNorm });
+                        }
+                    }
+
+                    rayStartWorld.y = worldY - 0.05f;
+                }
             }
+        };
+
+        PerformRaycastAt(x, z);
+
+        // ポリゴン同士の継ぎ目（シーム）でレイがすり抜けた場合のフォールバック（十字微小ジッター探索）
+        if (out.empty())
+        {
+            const float jitter = 0.035f;
+            PerformRaycastAt(x + jitter, z);
+            if (out.empty()) PerformRaycastAt(x - jitter, z);
+            if (out.empty()) PerformRaycastAt(x, z + jitter);
+            if (out.empty()) PerformRaycastAt(x, z - jitter);
         }
 
         if (out.size() > 1)
@@ -331,12 +361,12 @@ namespace SlimePhysics
 
             if (groundCandidates.empty())
             {
-                // 地面が見つからない（島の外、または完全な垂直壁のみ）
+                // 地面が見つからない（完全に島の外の奈落）
                 if (outHasGround) *outHasGround = false;
                 return (currentY != kIgnoreCurrentY) ? currentY : 0.0f;
             }
 
-            // --- 候補の中からプレイヤーの現在位置に最適な床を選択 ---
+            // CollectGroundCandidates() の時点で Y 降順に並んでいる
 
             // 1. currentY が未指定の場合（カメラや照準など最上面を取得したい場合）
             if (currentY == kIgnoreCurrentY)
@@ -347,7 +377,7 @@ namespace SlimePhysics
             }
 
             // 2. 接地中（isGrounded == true）の場合:
-            // ステージ傾斜の追従変位を反映し、自力登坂限界（kMaxStepUp = 0.35m）で上の階層へのテレポートを遮断
+            // ステージ傾斜・揺らしの追従変位を反映しつつ、段差・坂道を適切に追従
             if (isGrounded)
             {
                 float deltaYTilt = 0.0f;
@@ -362,45 +392,100 @@ namespace SlimePhysics
                     deltaYTilt = newWorldY - currentY;
                 }
 
-                // ステージ傾斜追従による今フレームの予想足元床高さ
                 float expectedFloorY = currentY + deltaYTilt;
+                // 自力登坂・段差許容マージン（頭上の天井を誤認しないよう最大0.40mまでに厳格制限）
+                float stepMargin = (std::min)(0.40f, (std::max)(0.15f, baseOffset * 0.40f));
+                float maxAllowedFloorY = expectedFloorY + stepMargin;
 
-                // kMaxStepUp: スライムがジャンプやスロープ無しに段差を自力で登れる最大高さ (35cm)
-                const float kMaxStepUp = 0.35f;
-                float maxAllowedFloorY = expectedFloorY + kMaxStepUp;
-
-                for (const auto& c : groundCandidates)
+                // 現在位置（足元）に最も近い床候補を探索（上空の天井はスキップ）
+                int bestIdx = -1;
+                float bestDist = 1e9f;
+                for (size_t i = 0; i < groundCandidates.size(); ++i)
                 {
-                    if (c.y <= maxAllowedFloorY)
+                    if (groundCandidates[i].y <= maxAllowedFloorY)
                     {
-                        if (outHasGround) *outHasGround = true;
-                        if (outNormal) *outNormal = c.normal;
-                        return c.y;
+                        float dist = std::abs(groundCandidates[i].y - expectedFloorY);
+                        if (dist < bestDist)
+                        {
+                            bestDist = dist;
+                            bestIdx = static_cast<int>(i);
+                        }
                     }
                 }
 
-                // 全候補が expectedFloorY + kMaxStepUp より上にある場合:
-                // 上の足場への瞬間移動を絶対に起こさせないため、hasGround = false とする
+                // めり込み復帰救済:
+                // 合体や激突で足元が一時的に床下にめり込んでいる場合（全床候補が expectedFloorY + stepMargin より上にある）
+                if (bestIdx == -1 && !groundCandidates.empty())
+                {
+                    float ceilingY = 0.0f;
+                    float maxRecoveryY = expectedFloorY + (std::max)(3.0f, baseOffset * 2.5f);
+                    if (FindCeilingY(x, z, expectedFloorY, baseOffset * 3.0f, ceilingY))
+                    {
+                        maxRecoveryY = (std::min)(maxRecoveryY, ceilingY - 0.10f);
+                    }
+
+                    for (int i = static_cast<int>(groundCandidates.size()) - 1; i >= 0; --i)
+                    {
+                        if (groundCandidates[i].y <= maxRecoveryY)
+                        {
+                            bestIdx = i;
+                            break;
+                        }
+                    }
+                }
+
+                if (bestIdx != -1)
+                {
+                    if (outHasGround) *outHasGround = true;
+                    if (outNormal) *outNormal = groundCandidates[bestIdx].normal;
+                    return groundCandidates[bestIdx].y;
+                }
+
                 if (outHasGround) *outHasGround = false;
                 return expectedFloorY;
             }
 
             // 3. 空中・落下中（isGrounded == false）の場合:
-            // 頭上（天井）以外の「足元・下にある最も高い床」を着地対象として検出する
-            float bodyHeight = (baseOffset > 0.0f) ? (baseOffset * 2.0f + 1.0f) : 2.5f;
-            float maxAllowedLandingFloorY = currentY + bodyHeight;
+            // スライムの足元以下にある床候補の中で最も高いもの（直下の床）を着地面として選定
+            // ※ 頭上の天井に着地するのを絶対に防ぐため、currentY + 0.15f 以下に厳格制限
+            float maxAllowedLandingFloorY = currentY + 0.15f;
 
-            for (const auto& c : groundCandidates)
+            int bestIdx = -1;
+            for (size_t i = 0; i < groundCandidates.size(); ++i)
             {
-                if (c.y <= maxAllowedLandingFloorY)
+                if (groundCandidates[i].y <= maxAllowedLandingFloorY)
                 {
-                    if (outHasGround) *outHasGround = true;
-                    if (outNormal) *outNormal = c.normal;
-                    return c.y;
+                    bestIdx = static_cast<int>(i); // 降順ソートなので最初に見つかったものが直下の最上床
+                    break;
                 }
             }
 
-            // 全候補が頭上より上にある場合（頭上にしか天井・足場がない場合）
+            // 落下中のめり込み着地救済（高速落下・合体直後のすり抜け完全防止）:
+            if (bestIdx == -1 && !groundCandidates.empty())
+            {
+                float ceilingY = 0.0f;
+                float maxRecoveryY = currentY + (std::max)(3.0f, baseOffset * 2.5f);
+                if (FindCeilingY(x, z, currentY, baseOffset * 3.0f, ceilingY))
+                {
+                    maxRecoveryY = (std::min)(maxRecoveryY, ceilingY - 0.10f);
+                }
+                for (int i = static_cast<int>(groundCandidates.size()) - 1; i >= 0; --i)
+                {
+                    if (groundCandidates[i].y <= maxRecoveryY)
+                    {
+                        bestIdx = i;
+                        break;
+                    }
+                }
+            }
+
+            if (bestIdx != -1)
+            {
+                if (outHasGround) *outHasGround = true;
+                if (outNormal) *outNormal = groundCandidates[bestIdx].normal;
+                return groundCandidates[bestIdx].y;
+            }
+
             if (outHasGround) *outHasGround = false;
             return currentY;
         }
@@ -467,7 +552,8 @@ namespace SlimePhysics
 
         float vc = d1 * d4 - d3 * d2;
         if (vc <= 0.0f && d1 >= 0.0f && d3 <= 0.0f) {
-            float v = d1 / (d1 - d3);
+            float denom = d1 - d3;
+            float v = (std::abs(denom) > 1e-7f) ? (d1 / denom) : 0.0f;
             return a + ab * v;
         }
 
@@ -478,23 +564,31 @@ namespace SlimePhysics
 
         float vb = d5 * d2 - d1 * d6;
         if (vb <= 0.0f && d2 >= 0.0f && d6 <= 0.0f) {
-            float w = d2 / (d2 - d6);
+            float denom = d2 - d6;
+            float w = (std::abs(denom) > 1e-7f) ? (d2 / denom) : 0.0f;
             return a + ac * w;
         }
 
         float va = d3 * d6 - d5 * d4;
         if (va <= 0.0f && (d4 - d3) >= 0.0f && (d5 - d6) >= 0.0f) {
-            float w = (d4 - d3) / ((d4 - d3) + (d5 - d6));
+            float denom = (d4 - d3) + (d5 - d6);
+            float w = (std::abs(denom) > 1e-7f) ? ((d4 - d3) / denom) : 0.0f;
             return b + (c - b) * w;
         }
 
-        float denom = 1.0f / (va + vb + vc);
+        float denomSum = va + vb + vc;
+        if (std::abs(denomSum) < 1e-7f) {
+            // 縮退三角形（面積0・同一直線上の頂点等）の場合は三角形の重心を安全に返す
+            return (a + b + c) * (1.0f / 3.0f);
+        }
+
+        float denom = 1.0f / denomSum;
         float v = vb * denom;
         float w = vc * denom;
         return a + ab * v + ac * w;
     }
 
-    bool ResolveWallCollision(Vector3& position, Vector3& velocity, float radius, float heightOffset)
+    bool ResolveWallCollision(Vector3& position, Vector3& velocity, float radius, float heightOffset, const Vector3* prevPos)
     {
         if (sGroundMeshes.empty()) return false;
 
@@ -510,7 +604,137 @@ namespace SlimePhysics
 
         bool anyCollided = false;
 
-        // 最大2回の反復解決（コーナーや直角壁での多重壁押し出しを過剰反発なしに滑らかに収束）
+        // =========================================================================
+        // Phase 1: 連続衝突判定（CCD: Continuous Collision Detection）
+        // 前フレーム位置（prevPos）から現在位置（position）への移動経路をスイープ探査し、
+        // 薄い壁や高速移動（吹き飛び・落下）による1フレームでの壁すり抜けを完全防止
+        // =========================================================================
+        if (prevPos)
+        {
+            Vector3 moveWorld = position - *prevPos;
+            float moveDistWorld = std::sqrt(moveWorld.x * moveWorld.x + moveWorld.y * moveWorld.y + moveWorld.z * moveWorld.z);
+
+            if (moveDistWorld > 1e-4f)
+            {
+                Vector3 dirWorld = moveWorld * (1.0f / moveDistWorld);
+
+                // 横幅（左右）および高さをカバーする4本の探査レイ（中心、左右、上方）
+                Vector3 perpHoriz = { -dirWorld.z, 0.0f, dirWorld.x };
+                float perpLen = std::sqrt(perpHoriz.x * perpHoriz.x + perpHoriz.z * perpHoriz.z);
+                if (perpLen > 1e-4f)
+                {
+                    perpHoriz = perpHoriz * ((radius * 0.55f) / perpLen);
+                }
+                else
+                {
+                    perpHoriz = { radius * 0.55f, 0.0f, 0.0f };
+                }
+
+                Vector3 sweepOrigins[4] = {
+                    { prevPos->x, prevPos->y + heightOffset, prevPos->z },
+                    { prevPos->x + perpHoriz.x, prevPos->y + heightOffset, prevPos->z + perpHoriz.z },
+                    { prevPos->x - perpHoriz.x, prevPos->y + heightOffset, prevPos->z - perpHoriz.z },
+                    { prevPos->x, prevPos->y + heightOffset + radius * 0.35f, prevPos->z }
+                };
+
+                float minEarliestHit = moveDistWorld + radius * 0.95f;
+                Vector3 bestHitWallNorm{ 0.0f, 0.0f, 0.0f };
+                bool hitSweepWall = false;
+
+                for (const auto& gm : sGroundMeshes)
+                {
+                    if (!gm.object || !gm.collider) continue;
+                    const Matrix4x4& worldMatrix = gm.currWorld;
+                    Matrix4x4 invWorld = Inverse(worldMatrix);
+
+                    for (const auto& rayStartWorld : sweepOrigins)
+                    {
+                        Vector3 localStart = TransformPt(rayStartWorld, invWorld);
+                        Vector3 localDir = {
+                            dirWorld.x * invWorld.m[0][0] + dirWorld.y * invWorld.m[1][0] + dirWorld.z * invWorld.m[2][0],
+                            dirWorld.x * invWorld.m[0][1] + dirWorld.y * invWorld.m[1][1] + dirWorld.z * invWorld.m[2][1],
+                            dirWorld.x * invWorld.m[0][2] + dirWorld.y * invWorld.m[1][2] + dirWorld.z * invWorld.m[2][2]
+                        };
+                        float localDirLen = std::sqrt(localDir.x * localDir.x + localDir.y * localDir.y + localDir.z * localDir.z);
+                        if (localDirLen < 1e-6f) continue;
+                        localDir = localDir * (1.0f / localDirLen);
+
+                        float sweepMaxDistWorld = moveDistWorld + radius * 0.95f;
+                        float maxLocalDist = sweepMaxDistWorld * localDirLen;
+                        float hitDist = 0.0f;
+                        Vector3 hitNormal, v0, v1, v2;
+
+                        if (gm.collider->GetAABBTree().Raycast(localStart, localDir, maxLocalDist, hitDist, hitNormal, v0, v1, v2))
+                        {
+                            Vector3 e1 = v1 - v0;
+                            Vector3 e2 = v2 - v0;
+                            Vector3 localTriNorm = {
+                                e1.y * e2.z - e1.z * e2.y,
+                                e1.z * e2.x - e1.x * e2.z,
+                                e1.x * e2.y - e1.y * e2.x
+                            };
+                            float triNormLen = std::sqrt(localTriNorm.x * localTriNorm.x + localTriNorm.y * localTriNorm.y + localTriNorm.z * localTriNorm.z);
+                            if (triNormLen > 1e-6f)
+                            {
+                                localTriNorm = localTriNorm * (1.0f / triNormLen);
+                            }
+
+                            // 壁ポリゴン（kWalkableSlopeLimitNy 未満の急斜面・垂直壁）のみを対象
+                            if (localTriNorm.y < kWalkableSlopeLimitNy)
+                            {
+                                float worldHitDist = hitDist / localDirLen;
+
+                                Vector3 worldTriNorm = {
+                                    localTriNorm.x * worldMatrix.m[0][0] + localTriNorm.y * worldMatrix.m[1][0] + localTriNorm.z * worldMatrix.m[2][0],
+                                    localTriNorm.x * worldMatrix.m[0][1] + localTriNorm.y * worldMatrix.m[1][1] + localTriNorm.z * worldMatrix.m[2][1],
+                                    localTriNorm.x * worldMatrix.m[0][2] + localTriNorm.y * worldMatrix.m[1][2] + localTriNorm.z * worldMatrix.m[2][2]
+                                };
+                                float wNormLen = std::sqrt(worldTriNorm.x * worldTriNorm.x + worldTriNorm.y * worldTriNorm.y + worldTriNorm.z * worldTriNorm.z);
+                                if (wNormLen > 1e-6f)
+                                {
+                                    worldTriNorm = worldTriNorm * (1.0f / wNormLen);
+                                }
+                                if (worldTriNorm.x * dirWorld.x + worldTriNorm.y * dirWorld.y + worldTriNorm.z * dirWorld.z > 0.0f)
+                                {
+                                    worldTriNorm = worldTriNorm * -1.0f;
+                                }
+
+                                if (worldHitDist < minEarliestHit)
+                                {
+                                    minEarliestHit = worldHitDist;
+                                    bestHitWallNorm = worldTriNorm;
+                                    hitSweepWall = true;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if (hitSweepWall)
+                {
+                    // 壁手前にクランプ（安全停止位置）
+                    float safeAdvance = (std::max)(0.0f, minEarliestHit - radius * 0.95f);
+                    position = *prevPos + dirWorld * safeAdvance;
+
+                    // 壁法線方向への微小オフセット
+                    position += bestHitWallNorm * 0.02f;
+
+                    // 壁に向かう速度成分を除去
+                    float vDotN = velocity.x * bestHitWallNorm.x + velocity.y * bestHitWallNorm.y + velocity.z * bestHitWallNorm.z;
+                    if (vDotN < 0.0f)
+                    {
+                        velocity.x -= bestHitWallNorm.x * vDotN;
+                        velocity.y -= bestHitWallNorm.y * vDotN;
+                        velocity.z -= bestHitWallNorm.z * vDotN;
+                    }
+                    anyCollided = true;
+                }
+            }
+        }
+
+        // =========================================================================
+        // Phase 2: 離散近接・めり込み押し出し（多方向探査と反復緩和）
+        // =========================================================================
         for (int iter = 0; iter < 2; ++iter)
         {
             Vector3 waistPos = { position.x, position.y + heightOffset, position.z };
@@ -535,21 +759,19 @@ namespace SlimePhysics
             testDirs[numDirs++] = {  0.7071f, 0.0f, -0.7071f };
             testDirs[numDirs++] = { -0.7071f, 0.0f, -0.7071f };
 
-            // 探索範囲: radius + マージン
-            const float checkDist = radius + 0.25f;
+            // 探索範囲: radius + マージン（深めり込み時でも確実に捕捉）
+            const float checkDist = radius + (std::max)(0.45f, radius * 0.6f);
 
             float maxPenetration = 0.0f;
             Vector2 bestPushDir = { 0.0f, 0.0f };
 
-            // スライムの体積（中心と足元寄り）を捉えるため2つの高さで探査
-            float yOffsets[] = { 0.0f, -radius * 0.30f };
+            // スライムの体積（中心とやや上方）を捉えるため2つの高さで探査
+            float yOffsets[] = { 0.0f, radius * 0.20f };
 
-            // 地形は複数メッシュに分割されている場合があるので全部を走査する
-            for (const auto& gmw : sGroundMeshes)
+            for (const auto& gm : sGroundMeshes)
             {
-                if (!gmw.object || !gmw.collider) continue;
-
-                const Matrix4x4& worldMatrix = gmw.currWorld;
+                if (!gm.object || !gm.collider) continue;
+                const Matrix4x4& worldMatrix = gm.currWorld;
                 Matrix4x4 invWorld = Inverse(worldMatrix);
 
                 for (float yOff : yOffsets)
@@ -575,7 +797,7 @@ namespace SlimePhysics
                         float hitDist = 0.0f;
                         Vector3 hitNormal, v0, v1, v2;
 
-                        if (gmw.collider->GetAABBTree().Raycast(localStart, localDir, maxLocalDist, hitDist, hitNormal, v0, v1, v2))
+                        if (gm.collider->GetAABBTree().Raycast(localStart, localDir, maxLocalDist, hitDist, hitNormal, v0, v1, v2))
                         {
                             // 三角形の幾何法線
                             Vector3 e1 = v1 - v0;
@@ -591,70 +813,76 @@ namespace SlimePhysics
                                 localTriNorm = localTriNorm * (1.0f / triNormLen);
                             }
 
-                            // 壁判定: 急峻な面のみ壁として押し出す（localTriNorm.y < 0.55f）
-                            if (localTriNorm.y < 0.55f)
+                            // 壁判定: 急峻な面のみ壁として押し出す（localTriNorm.y < kWalkableSlopeLimitNy）
+                            if (localTriNorm.y < kWalkableSlopeLimitNy)
                             {
                                 Vector3 wV0 = TransformPt(v0, worldMatrix);
                                 Vector3 wV1 = TransformPt(v1, worldMatrix);
                                 Vector3 wV2 = TransformPt(v2, worldMatrix);
 
-                                // スライム中心（探査点）から三角形への最近接点 Q を厳密に計算
+                                // スライム中心（探査点）から三角形への最近接点 Q を厳密に計算（面・エッジ・頂点すべて対応）
                                 Vector3 probePos = { waistPos.x, waistPos.y + yOff, waistPos.z };
                                 Vector3 closestQ = ClosestPointOnTriangle(probePos, wV0, wV1, wV2);
 
-                                // 最近接点とスライム中心の水平ベクトル
-                                Vector2 diffXZ = { probePos.x - closestQ.x, probePos.z - closestQ.z };
-                                float distXZ = std::sqrt(diffXZ.x * diffXZ.x + diffXZ.y * diffXZ.y);
+                                // 探査点と最近接点の3D差分ベクトル D = probePos - closestQ
+                                Vector3 diff3D = probePos - closestQ;
+                                float dist3DSq = diff3D.x * diff3D.x + diff3D.y * diff3D.y + diff3D.z * diff3D.z;
 
-                                // 壁のワールド法線
-                                Vector3 worldTriNorm = {
-                                    localTriNorm.x * worldMatrix.m[0][0] + localTriNorm.y * worldMatrix.m[1][0] + localTriNorm.z * worldMatrix.m[2][0],
-                                    localTriNorm.x * worldMatrix.m[0][1] + localTriNorm.y * worldMatrix.m[1][1] + localTriNorm.z * worldMatrix.m[2][1],
-                                    localTriNorm.x * worldMatrix.m[0][2] + localTriNorm.y * worldMatrix.m[1][2] + localTriNorm.z * worldMatrix.m[2][2]
-                                };
-                                float wNormLen = std::sqrt(worldTriNorm.x * worldTriNorm.x + worldTriNorm.y * worldTriNorm.y + worldTriNorm.z * worldTriNorm.z);
-                                if (wNormLen > 1e-6f)
+                                // スライム球体（半径 radius）との真の3D幾何学的交差判定（signedDist を完全廃止し最短距離で判定）
+                                if (dist3DSq < radius * radius)
                                 {
-                                    worldTriNorm = worldTriNorm * (1.0f / wNormLen);
-                                }
+                                    float dist3D = std::sqrt(dist3DSq);
+                                    float penetration = radius - dist3D; // 面・エッジ・頂点からの真のめり込み深さ
 
-                                Vector2 pushDir = { worldTriNorm.x, worldTriNorm.z };
-                                float pushLen = std::sqrt(pushDir.x * pushDir.x + pushDir.y * pushDir.y);
-                                if (pushLen > 1e-4f)
-                                {
-                                    pushDir = { pushDir.x / pushLen, pushDir.y / pushLen };
-                                }
-                                else
-                                {
-                                    continue;
-                                }
-
-                                // 壁平面からの符号付き垂直距離
-                                float signedDist = (probePos.x - wV0.x) * worldTriNorm.x +
-                                                  (probePos.y - wV0.y) * worldTriNorm.y +
-                                                  (probePos.z - wV0.z) * worldTriNorm.z;
-
-                                float penetration = 0.0f;
-                                // 幾何学的に正確なめり込み深さの算出:
-                                // 1. 壁の表面/裏側にめり込んでいる場合（符号付き距離）
-                                if (signedDist < radius && signedDist > -radius * 1.5f)
-                                {
-                                    penetration = radius - (std::max)(0.0f, signedDist);
-                                }
-                                // 2. 三角形のエッジ/頂点に接している場合
-                                else if (distXZ < radius)
-                                {
-                                    penetration = radius - distXZ;
-                                    if (distXZ > 1e-4f)
+                                    // 壁のワールド法線
+                                    Vector3 worldTriNorm = {
+                                        localTriNorm.x * worldMatrix.m[0][0] + localTriNorm.y * worldMatrix.m[1][0] + localTriNorm.z * worldMatrix.m[2][0],
+                                        localTriNorm.x * worldMatrix.m[0][1] + localTriNorm.y * worldMatrix.m[1][1] + localTriNorm.z * worldMatrix.m[2][1],
+                                        localTriNorm.x * worldMatrix.m[0][2] + localTriNorm.y * worldMatrix.m[1][2] + localTriNorm.z * worldMatrix.m[2][2]
+                                    };
+                                    float wNormLen = std::sqrt(worldTriNorm.x * worldTriNorm.x + worldTriNorm.y * worldTriNorm.y + worldTriNorm.z * worldTriNorm.z);
+                                    if (wNormLen > 1e-6f)
                                     {
-                                        pushDir = { diffXZ.x / distXZ, diffXZ.y / distXZ };
+                                        worldTriNorm = worldTriNorm * (1.0f / wNormLen);
                                     }
-                                }
 
-                                if (penetration > maxPenetration)
-                                {
-                                    maxPenetration = penetration;
-                                    bestPushDir = pushDir;
+                                    // 水平押し出し方向の算出（最近接点から離れる水平ベクトル）
+                                    Vector2 pushDir = { 0.0f, 0.0f };
+                                    Vector2 diffXZ = { diff3D.x, diff3D.z };
+                                    float lenXZ = std::sqrt(diffXZ.x * diffXZ.x + diffXZ.y * diffXZ.y);
+
+                                    if (lenXZ > 1e-4f)
+                                    {
+                                        pushDir = { diffXZ.x / lenXZ, diffXZ.y / lenXZ };
+                                    }
+                                    else
+                                    {
+                                        // 水平オフセットが極小の場合、壁ポリゴンの水平法線方向へ退避
+                                        float normXZLen = std::sqrt(worldTriNorm.x * worldTriNorm.x + worldTriNorm.z * worldTriNorm.z);
+                                        if (normXZLen > 1e-4f)
+                                        {
+                                            pushDir = { worldTriNorm.x / normXZLen, worldTriNorm.z / normXZLen };
+                                        }
+                                        else
+                                        {
+                                            continue;
+                                        }
+                                    }
+
+                                    // 三角形の裏面に入り込んでいる場合（法線と逆側にいる場合）のフェイルセーフ:
+                                    // 押し出し方向がポリゴン法線と逆を向いていたら、表面向きに補正
+                                    float dotWithNormal = pushDir.x * worldTriNorm.x + pushDir.y * worldTriNorm.z;
+                                    if (dotWithNormal < 0.0f)
+                                    {
+                                        pushDir.x = -pushDir.x;
+                                        pushDir.y = -pushDir.y;
+                                    }
+
+                                    if (penetration > maxPenetration)
+                                    {
+                                        maxPenetration = penetration;
+                                        bestPushDir = pushDir;
+                                    }
                                 }
                             }
                         }
@@ -686,6 +914,97 @@ namespace SlimePhysics
         }
 
         return anyCollided;
+    }
+
+    float GetVoidY(float margin)
+    {
+        Vector3 bmin, bmax;
+        if (GetGroundWorldBounds(bmin, bmax))
+        {
+            return bmin.y - margin;
+        }
+        // 地形が未登録のときだけ従来の決め打ちに落とす
+        return -12.0f;
+    }
+
+    bool FindCeilingY(float x, float z, float startY, float maxSearchDist, float& outCeilingY)
+    {
+        if (sGroundMeshes.empty()) return false;
+
+        UpdateGroundMatrices();
+
+        float nearestCeilingY = startY + maxSearchDist;
+        bool found = false;
+
+        for (const auto& gm : sGroundMeshes)
+        {
+            if (!gm.object || !gm.collider) continue;
+
+            const Matrix4x4& worldMatrix = gm.currWorld;
+            Matrix4x4 invWorld = Inverse(worldMatrix);
+
+            float currentRayY = startY + 0.05f;
+            float searchLimitY = startY + maxSearchDist;
+
+            for (int iter = 0; iter < 16; ++iter)
+            {
+                if (currentRayY >= searchLimitY) break;
+
+                Vector3 rayOriginWorld = { x, currentRayY, z };
+                Vector3 rayDirWorld = { 0.0f, 1.0f, 0.0f }; // 真上向き
+
+                Vector3 localStart = {
+                    rayOriginWorld.x * invWorld.m[0][0] + rayOriginWorld.y * invWorld.m[1][0] + rayOriginWorld.z * invWorld.m[2][0] + invWorld.m[3][0],
+                    rayOriginWorld.x * invWorld.m[0][1] + rayOriginWorld.y * invWorld.m[1][1] + rayOriginWorld.z * invWorld.m[2][1] + invWorld.m[3][1],
+                    rayOriginWorld.x * invWorld.m[0][2] + rayOriginWorld.y * invWorld.m[1][2] + rayOriginWorld.z * invWorld.m[2][2] + invWorld.m[3][2]
+                };
+
+                Vector3 localDir = {
+                    rayDirWorld.x * invWorld.m[0][0] + rayDirWorld.y * invWorld.m[1][0] + rayDirWorld.z * invWorld.m[2][0],
+                    rayDirWorld.x * invWorld.m[0][1] + rayDirWorld.y * invWorld.m[1][1] + rayDirWorld.z * invWorld.m[2][1],
+                    rayDirWorld.x * invWorld.m[0][2] + rayDirWorld.y * invWorld.m[1][2] + rayDirWorld.z * invWorld.m[2][2]
+                };
+                float dirLen = std::sqrt(localDir.x * localDir.x + localDir.y * localDir.y + localDir.z * localDir.z);
+                if (dirLen > 1e-6f)
+                {
+                    localDir.x /= dirLen;
+                    localDir.y /= dirLen;
+                    localDir.z /= dirLen;
+                }
+
+                float hitDist = 0.0f;
+                Vector3 hitNormal, v0, v1, v2;
+                float remDist = searchLimitY - currentRayY;
+                if (!gm.collider->GetAABBTree().Raycast(localStart, localDir, remDist * 2.5f, hitDist, hitNormal, v0, v1, v2))
+                {
+                    break; // これ以上上にメッシュが存在しない
+                }
+
+                Vector3 localHit = {
+                    localStart.x + localDir.x * hitDist,
+                    localStart.y + localDir.y * hitDist,
+                    localStart.z + localDir.z * hitDist
+                };
+                float worldY = localHit.x * worldMatrix.m[0][1] + localHit.y * worldMatrix.m[1][1] + localHit.z * worldMatrix.m[2][1] + worldMatrix.m[3][1];
+
+                // startY より少なくとも 0.10m 以上上にある遮蔽面を天井として検出
+                if (worldY > startY + 0.10f && worldY < nearestCeilingY)
+                {
+                    nearestCeilingY = worldY;
+                    found = true;
+                }
+
+                // 次の貫通探索のため、ヒット地点より上（0.04m）からレイを再開
+                currentRayY = worldY + 0.04f;
+            }
+        }
+
+        if (found)
+        {
+            outCeilingY = nearestCeilingY;
+            return true;
+        }
+        return false;
     }
 
     void UpdateDeformation(SlimeParamsCPU& params, const DeformInput& input)

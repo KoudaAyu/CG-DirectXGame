@@ -7,7 +7,8 @@
 
 class Object3dCom;
 class Camera;
-class PikminPlayer;
+class Slime;
+class SlimeManager;
 
 /// @brief コインの見た目・挙動の設定（ImGui から調整する用）
 struct CoinConfig
@@ -59,9 +60,12 @@ public:
      * @brief 更新
      * @param deltaTime デルタタイム
      * @param stageTilt ステージ傾斜
-     * @param player プレイヤー（nullptr なら取得判定をしない）
+     * @param slimeManager スライム群（nullptr なら取得判定をしない）
+     * @note ロコロコ準拠で「どのスライムでもコインを拾える」。
+     *       代表（一番大きい個体）だけに絞りたい場合は
+     *       CoinManager::Update() の取得ループを GetLeader() 1体に変えること
      */
-    void Update(float deltaTime, const Vector2& stageTilt, PikminPlayer* player);
+    void Update(float deltaTime, const Vector2& stageTilt, SlimeManager* slimeManager);
 
     void Draw(const RenderContext& ctx);
 

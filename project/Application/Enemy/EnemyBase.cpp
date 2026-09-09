@@ -33,7 +33,7 @@ namespace
 float EnemyBase::DefaultScaleFromStrength(int strength)
 {
     // strength 1 で 0.70。以降ゆるやかに大きくなる
-    // （PikminPlayer::CalculateScaleBySize と似た曲線にして、並んだときの見え方をそろえている）
+    // （Slime::CalculateScaleBySize と似た曲線にして、並んだときの見え方をそろえている）
     int s = (std::max)(1, strength);
     if (s == 1) return 0.70f;
     return 0.70f + 0.13f * static_cast<float>(s - 1)

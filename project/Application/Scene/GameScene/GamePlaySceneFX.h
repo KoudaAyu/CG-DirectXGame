@@ -10,8 +10,8 @@
 class DirectXCom;
 class Camera;
 class FireworkFx;
-class PikminPlayer;
-class MinionManager;
+class Slime;
+class SlimeManager;
 class CoinManager;
 class EnemyManager;
 
@@ -61,8 +61,11 @@ public:
 
     // --- 常時出ているもの（毎フレーム呼ぶ）---
     void UpdateAmbient(float deltaTime);
-    void UpdatePlayer(float deltaTime, PikminPlayer* player);
-    void UpdateMinions(float deltaTime, MinionManager* minionManager);
+    /// @brief 群れの代表（一番大きい個体）の光と軌跡
+    void UpdatePlayer(float deltaTime, Slime* player);
+
+    /// @brief 代表以外の小さいスライムの光。代表は UpdatePlayer() が担当するので除外する
+    void UpdateMinions(float deltaTime, SlimeManager* slimeManager);
     void UpdateCoins(float deltaTime, CoinManager* coinManager);
     void UpdateEnemies(float deltaTime, EnemyManager* enemyManager);
 
@@ -75,10 +78,11 @@ public:
      * BeginFrame() → 各 UpdateXxx() → Update() をこの順で呼ぶだけ。
      * シーン側はこれ1本を呼べばよく、演出の中身はこのクラスに閉じている
      *
-     * @param focusCenter カリングの中心（＝プレイヤー位置）
+     * @param focusCenter カリングの中心（＝群れの代表の位置）
+     * @param player 群れの代表（SlimeManager::GetLeader()。nullptr 可）
      */
-    void UpdateAll(float deltaTime, const Vector3& focusCenter, PikminPlayer* player,
-                   MinionManager* minionManager, CoinManager* coinManager,
+    void UpdateAll(float deltaTime, const Vector3& focusCenter, Slime* player,
+                   SlimeManager* slimeManager, CoinManager* coinManager,
                    EnemyManager* enemyManager);
 
     void Draw(ID3D12GraphicsCommandList* commandList);

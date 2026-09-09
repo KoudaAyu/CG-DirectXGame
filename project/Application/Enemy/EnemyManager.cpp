@@ -1,8 +1,7 @@
 #define NOMINMAX
 #include "EnemyManager.h"
 
-#include "Application/Player/PikminPlayer.h"
-#include "Application/Minion/MinionManager.h"
+#include "Application/GameObject/SlimeManager.h"
 #include "Baziru3_Engine/Framework/Collision/CollisionManager.h"
 #include "Baziru3_Engine/Graphics/3D/Object/Object3dCom.h"
 
@@ -258,8 +257,7 @@ Vector3 EnemyManager::CalcStageNormal(const Vector2& stageTilt)
     return (len > 1e-5f) ? n * (1.0f / len) : Vector3{ 0.0f, 1.0f, 0.0f };
 }
 
-void EnemyManager::Update(float deltaTime, const Vector2& stageTilt, PikminPlayer* player,
-                          MinionManager* minionManager)
+void EnemyManager::Update(float deltaTime, const Vector2& stageTilt, SlimeManager* slimeManager)
 {
     // 演出・SE 用のイベントは1フレームぶんだけ持つ
     defeatEvents_.clear();
@@ -267,24 +265,27 @@ void EnemyManager::Update(float deltaTime, const Vector2& stageTilt, PikminPlaye
 
     // 自爆イベントは必ず毎フレーム引き取る。
     // ここより下でリターンすると、古い座標のまま次フレームに爆発してしまう
-    // （エディタ中はプレイヤーの更新自体を止めているので発生しないが、
+    // （エディタ中はスライムの更新自体を止めているので発生しないが、
     //   イベントが溜まったまま Play に戻ると古い座標で爆発するので引き取りは続ける）
-    if (player)
+    if (slimeManager)
     {
-        PikminPlayer::SelfDestructEvent discarded;
+        SlimeManager::SelfDestructEvent discarded;
         if (editorMode_)
         {
-            player->TakeSelfDestructEvent(discarded);
+            slimeManager->TakeSelfDestructEvent(discarded);
         }
         else
         {
-            ResolveSelfDestruct(player);
+            ResolveSelfDestruct(slimeManager);
         }
     }
 
     if (!object3dCom_) return;
 
-    Vector3 playerPos = player ? player->GetPosition() : Vector3{ 0.0f, 0.0f, 0.0f };
+    // 敵が「どこを狙い、どのくらいの強さと比べるか」の基準は群れの代表（一番大きい個体）
+    Slime* leader = slimeManager ? slimeManager->GetLeader() : nullptr;
+
+    Vector3 playerPos = leader ? leader->GetPosition() : Vector3{ 0.0f, 0.0f, 0.0f };
     Vector2 pivot{ playerPos.x, playerPos.z };
 
     EnemyUpdateContext ctx;
@@ -292,7 +293,7 @@ void EnemyManager::Update(float deltaTime, const Vector2& stageTilt, PikminPlaye
     ctx.stageTilt = stageTilt;
     ctx.pivot = pivot;
     ctx.playerPos = playerPos;
-    ctx.playerStrength = player ? player->GetSize() : 1;
+    ctx.playerStrength = leader ? leader->GetSize() : 1;
 
     // 1. 敵の更新と発射要求の回収
     for (auto& e : enemies_)
@@ -315,11 +316,10 @@ void EnemyManager::Update(float deltaTime, const Vector2& stageTilt, PikminPlaye
     }
 
     // 3. 衝突解決（エディタ中は押し出しも撃破もしない）
-    if (enableCollision_ && player && !editorMode_)
+    if (enableCollision_ && slimeManager && !editorMode_)
     {
-        ResolvePlayerCollisions(player, stageTilt, pivot);
-        ResolveMinionCollisions(minionManager, stageTilt, pivot);
-        ResolveBulletCollisions(player);
+        ResolveSlimeCollisions(slimeManager, stageTilt, pivot);
+        ResolveBulletCollisions(leader);
     }
 
     // 4. 死体の掃除
@@ -329,103 +329,38 @@ void EnemyManager::Update(float deltaTime, const Vector2& stageTilt, PikminPlaye
         enemies_.end());
 }
 
-void EnemyManager::ResolvePlayerCollisions(PikminPlayer* player, const Vector2& stageTilt, const Vector2& pivot)
+void EnemyManager::ResolveSlimeCollisions(SlimeManager* slimeManager, const Vector2& stageTilt, const Vector2& pivot)
 {
-    EnemyCollision::SlimeBody slime;
-    slime.position = player->GetPosition();
-    slime.scale = player->GetScale();
-    slime.squashStretch = player->GetSlimeParams().squashStretch;
-    slime.baseRadius = 1.0f; // SlimeCollision と同じ規約（見た目半径 = scale * 0.78）
-    slime.strength = player->GetSize();
+    if (!slimeManager) return;
 
-    Vector3 velocity = player->GetVelocity();
-    bool changed = false;
-
-    // 押し出し・跳ね返りは床面内で解決する（斜面で上下にがたつかせない）
+    // 判定ルールは全個体で共通。強さは Slime::GetSize()（含まれる最小単位スライムの数）。
+    // 旧実装ではプレイヤー本体とミニオンで関数が分かれていたが、中身の違いは
+    //   (1) 跳ね返り係数（bounceSpeed_ / minionBounceSpeed_）
+    //   (2) 弾かれたときに Launch して放物線で飛ぶか、その場で押し戻すだけか
+    //   (3) 演出イベントの isPlayer フラグ
+    // の3点だけだったので、代表個体（一番大きいもの）かどうかで振り分けている。
+    // 大きい塊が敵に当たって空を飛ぶと画が破綻するので、代表は Launch しない
     const Vector3 planeNormal = CalcStageNormal(stageTilt);
+    const Slime* leader = slimeManager->GetLeader();
 
-    for (auto& e : enemies_)
+    for (const auto& slimePtr : slimeManager->GetSlimes())
     {
-        if (!e || e->IsDead()) continue;
+        Slime* target = slimePtr.get();
+        if (!target || !target->IsActive()) continue;
 
-        auto result = EnemyCollision::ResolvePlayerVsEnemy(slime, velocity, e->MakeHitBody(),
-                                                           bounceSpeed_, planeNormal);
-        if (!result.hit) continue;
+        // 吸い込まれている最中の個体は判定から外す（位置が補間で飛ぶため）
+        if (target->GetState() == SlimeState::Merging) continue;
 
-        auto& params = player->GetSlimeParams();
-        params.impulseStrength = (std::max)(params.impulseStrength, result.impulse);
-
-        // 演出用。衝突点はスライム中心と敵のヒットボックス中心の中点で近似する
-        const Vector3 enemyCenter = e->GetHitCenter();
-        const Vector3 contact = { (slime.position.x + enemyCenter.x) * 0.5f,
-                                  (slime.position.y + enemyCenter.y) * 0.5f,
-                                  (slime.position.z + enemyCenter.z) * 0.5f };
-
-        switch (result.outcome)
-        {
-        case EnemyCollision::HitOutcome::EnemyDefeated:
-            // プレイヤーのほうが強い。押し戻さずに突き抜けて倒す
-            defeatEvents_.push_back({ enemyCenter, e->GetStrength() });
-            e->Defeat();
-            params.squashStretch = { 0.18f, -0.14f, 0.18f };
-            break;
-
-        case EnemyCollision::HitOutcome::PlayerBounced:
-            // 敵のほうが強い。跳ね飛ばされる
-            hitEvents_.push_back({ contact, true });
-            params.squashStretch = { 0.32f, -0.26f, 0.32f };
-            changed = true;
-            break;
-
-        case EnemyCollision::HitOutcome::Standoff:
-            // 同じ強さ。押し合うだけ
-            hitEvents_.push_back({ contact, true });
-            changed = true;
-            break;
-
-        default:
-            break;
-        }
-
-        // 押される側の敵は、跳ね返し／押し合いどちらでも同じだけ動かす
-        if (result.outcome != EnemyCollision::HitOutcome::EnemyDefeated &&
-            (result.enemyPush.x != 0.0f || result.enemyPush.z != 0.0f))
-        {
-            e->ApplyPush(result.enemyPush, stageTilt, pivot);
-        }
-    }
-
-    if (changed)
-    {
-        player->SetPosition(slime.position);
-        player->SetVelocity(velocity);
-    }
-}
-
-void EnemyManager::ResolveMinionCollisions(MinionManager* minionManager, const Vector2& stageTilt, const Vector2& pivot)
-{
-    if (!minionManager) return;
-
-    // 判定ルールはプレイヤー本体とまったく同じ。
-    // 小スライムの「強さ」は Minion::GetSize()（含まれる最小単位スライムの数）
-    const Vector3 planeNormal = CalcStageNormal(stageTilt);
-
-    for (const auto& minionPtr : minionManager->GetMinions())
-    {
-        Minion* minion = minionPtr.get();
-        if (!minion || !minion->IsActive()) continue;
-
-        // 吸い込まれている最中の子は判定から外す（位置が補間で飛ぶため）
-        if (minion->GetState() == MinionState::Merging) continue;
+        const bool isLeader = (target == leader);
 
         EnemyCollision::SlimeBody slime;
-        slime.position = minion->GetPosition();
-        slime.scale = minion->GetScale();
-        slime.squashStretch = minion->GetSlimeParams().squashStretch;
-        slime.baseRadius = 1.0f;
-        slime.strength = minion->GetSize();
+        slime.position = target->GetPosition();
+        slime.scale = target->GetScale();
+        slime.squashStretch = target->GetSlimeParams().squashStretch;
+        slime.baseRadius = 1.0f; // SlimeCollision と同じ規約（見た目半径 = scale * 0.78）
+        slime.strength = target->GetSize();
 
-        Vector3 velocity = minion->GetVelocity();
+        Vector3 velocity = target->GetVelocity();
         bool changed = false;
         bool bounced = false;
 
@@ -434,12 +369,14 @@ void EnemyManager::ResolveMinionCollisions(MinionManager* minionManager, const V
             if (!e || e->IsDead()) continue;
 
             auto result = EnemyCollision::ResolvePlayerVsEnemy(slime, velocity, e->MakeHitBody(),
-                                                               minionBounceSpeed_, planeNormal);
+                                                               isLeader ? bounceSpeed_ : minionBounceSpeed_,
+                                                               planeNormal);
             if (!result.hit) continue;
 
-            auto& params = minion->GetSlimeParams();
+            auto& params = target->GetSlimeParams();
             params.impulseStrength = (std::max)(params.impulseStrength, result.impulse);
 
+            // 演出用。衝突点はスライム中心と敵のヒットボックス中心の中点で近似する
             const Vector3 enemyCenter = e->GetHitCenter();
             const Vector3 contact = { (slime.position.x + enemyCenter.x) * 0.5f,
                                       (slime.position.y + enemyCenter.y) * 0.5f,
@@ -448,19 +385,33 @@ void EnemyManager::ResolveMinionCollisions(MinionManager* minionManager, const V
             switch (result.outcome)
             {
             case EnemyCollision::HitOutcome::EnemyDefeated:
+                // スライムのほうが強い。押し戻さずに突き抜けて倒す
                 defeatEvents_.push_back({ enemyCenter, e->GetStrength() });
                 e->Defeat();
-                params.squashStretch = { 0.16f, -0.12f, 0.16f };
+                if (isLeader)
+                {
+                    params.squashStretch = { 0.18f, -0.14f, 0.18f };
+                }
+                else
+                {
+                    params.squashStretch = { 0.16f, -0.12f, 0.16f };
+                }
                 break;
 
             case EnemyCollision::HitOutcome::PlayerBounced:
-                hitEvents_.push_back({ contact, false });
+                // 敵のほうが強い。跳ね飛ばされる
+                hitEvents_.push_back({ contact, isLeader });
+                if (isLeader)
+                {
+                    params.squashStretch = { 0.32f, -0.26f, 0.32f };
+                }
                 changed = true;
                 bounced = true;
                 break;
 
             case EnemyCollision::HitOutcome::Standoff:
-                hitEvents_.push_back({ contact, false });
+                // 同じ強さ。押し合うだけ
+                hitEvents_.push_back({ contact, isLeader });
                 changed = true;
                 break;
 
@@ -468,6 +419,7 @@ void EnemyManager::ResolveMinionCollisions(MinionManager* minionManager, const V
                 break;
             }
 
+            // 押される側の敵は、跳ね返し／押し合いどちらでも同じだけ動かす
             if (result.outcome != EnemyCollision::HitOutcome::EnemyDefeated &&
                 (result.enemyPush.x != 0.0f || result.enemyPush.z != 0.0f))
             {
@@ -477,29 +429,32 @@ void EnemyManager::ResolveMinionCollisions(MinionManager* minionManager, const V
 
         if (changed)
         {
-            minion->SetPosition(slime.position);
+            target->SetPosition(slime.position);
 
-            // 接触が続いているあいだ毎フレーム Launch すると、いつまでも着地できない。
-            // まだ飛んでいない子だけ弾き飛ばす
-            if (bounced && minion->GetState() != MinionState::Thrown)
+            // 小さい個体は弾かれたときだけ放物線で飛ばす。
+            // 接触が続いているあいだ毎フレーム Launch すると、いつまでも着地できないので
+            // まだ飛んでいない個体だけにする
+            if (!isLeader && bounced && target->GetState() != SlimeState::Thrown)
             {
                 // Launch() は Thrown 状態にして放物線を描かせる。弾かれた感じが出る
-                minion->Launch(velocity);
+                target->Launch(velocity);
                 // Launch() が squashStretch を上書きするので、演出はこの後に掛ける
-                minion->GetSlimeParams().squashStretch = { 0.28f, -0.22f, 0.28f };
+                target->GetSlimeParams().squashStretch = { 0.28f, -0.22f, 0.28f };
             }
             else
             {
-                minion->SetVelocity(velocity);
+                target->SetVelocity(velocity);
             }
         }
     }
 }
 
-void EnemyManager::ResolveSelfDestruct(PikminPlayer* player)
+void EnemyManager::ResolveSelfDestruct(SlimeManager* slimeManager)
 {
-    PikminPlayer::SelfDestructEvent ev;
-    if (!player->TakeSelfDestructEvent(ev)) return;
+    if (!slimeManager) return;
+
+    SlimeManager::SelfDestructEvent ev;
+    if (!slimeManager->TakeSelfDestructEvent(ev)) return;
 
     // 分裂前の塊が大きいほど爆風も広い
     float radius = selfDestructBaseRadius_
@@ -530,14 +485,17 @@ void EnemyManager::ResolveSelfDestruct(PikminPlayer* player)
     lastSelfDestructKills_ = kills;
 }
 
-void EnemyManager::ResolveBulletCollisions(PikminPlayer* player)
+void EnemyManager::ResolveBulletCollisions(Slime* target)
 {
+    // 代表スライムが居ない（全員落下中など）ときは何もしない
+    if (!target) return;
+
     EnemyCollision::SlimeBody slime;
-    slime.position = player->GetPosition();
-    slime.scale = player->GetScale();
-    slime.squashStretch = player->GetSlimeParams().squashStretch;
+    slime.position = target->GetPosition();
+    slime.scale = target->GetScale();
+    slime.squashStretch = target->GetSlimeParams().squashStretch;
     slime.baseRadius = 1.0f;
-    slime.strength = player->GetSize();
+    slime.strength = target->GetSize();
 
     // 同じフレームに複数当たっても、ノックバックは合成して1回だけ適用する
     Vector3 pushSum{ 0.0f, 0.0f, 0.0f };
@@ -567,13 +525,13 @@ void EnemyManager::ResolveBulletCollisions(PikminPlayer* player)
                                     : Vector3{ 0.0f, 0.0f, 1.0f };
 
         // 暫定仕様: ノックバックのみ。塊のサイズは減らない
-        Vector3 velocity = player->GetVelocity();
+        Vector3 velocity = target->GetVelocity();
         velocity.x = dir.x * bulletKnockback_;
         velocity.z = dir.z * bulletKnockback_;
         velocity.y = (std::max)(velocity.y, bulletKnockback_ * 0.22f);
-        player->SetVelocity(velocity);
+        target->SetVelocity(velocity);
 
-        auto& params = player->GetSlimeParams();
+        auto& params = target->GetSlimeParams();
         params.impulseStrength = (std::max)(params.impulseStrength, 0.5f);
         params.squashStretch = { 0.28f, -0.22f, 0.28f };
     }
@@ -621,7 +579,7 @@ void EnemyManager::DrawImGui()
                 GetSkinnedObject3dPoolTotal());
     ImGui::Checkbox("Enable Collision", &enableCollision_);
     ImGui::DragFloat("Bounce Speed", &bounceSpeed_, 0.1f, 0.0f, 40.0f);
-    ImGui::DragFloat("Minion Bounce Speed", &minionBounceSpeed_, 0.1f, 0.0f, 40.0f);
+    ImGui::DragFloat("Small Slime Bounce Speed", &minionBounceSpeed_, 0.1f, 0.0f, 40.0f);
     ImGui::DragFloat("Bullet Knockback", &bulletKnockback_, 0.1f, 0.0f, 40.0f);
 
     ImGui::SeparatorText("Self Destruct (E key)");

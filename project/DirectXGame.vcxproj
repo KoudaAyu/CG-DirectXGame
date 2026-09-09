@@ -140,15 +140,16 @@
     <ClCompile Include="externals\imgui-node-editor\imgui_node_editor_api.cpp" />
     <ClCompile Include="externals\imgui-node-editor\imgui_canvas.cpp" />
     <ClCompile Include="externals\imgui-node-editor\crude_json.cpp" />
-    <ClCompile Include="Application\Minion\Minion.cpp" />
-    <ClCompile Include="Application\Minion\MinionManager.cpp" />
-    <ClCompile Include="Application\Player\PikminPlayer.cpp" />
     <ClCompile Include="Application\GameObject\SlimeMesh.cpp" />
     <ClCompile Include="Application\GameObject\SlimePhysics.cpp" />
     <ClCompile Include="Application\GameObject\AimGuide.cpp" />
     <ClCompile Include="Application\GameObject\SlimeCollision.cpp" />
     <ClCompile Include="Application\GameObject\FireworkFx.cpp" />
     <ClCompile Include="Application\GameObject\SlimeFx.cpp" />
+    <ClCompile Include="Application\GameObject\Slime.cpp" />
+    <ClCompile Include="Application\GameObject\SlimeManager.cpp" />
+    <ClCompile Include="Application\GameObject\IrisTransition.cpp" />
+    <ClCompile Include="Application\GameObject\GrowthCube.cpp" />
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="Resources\shaders\FireworkFx.VS.hlsl">
@@ -270,6 +271,9 @@
     </FxCompile>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Application\GameObject\IrisTransition.h" />
+    <ClInclude Include="Application\GameObject\Slime.h" />
+    <ClInclude Include="Application\GameObject\SlimeManager.h" />
     <ClInclude Include="Application\GameObject\SlimePhysics.h" />
     <ClInclude Include="Baziru3_Engine\Framework\Collision\SoftBodyDeformer.h" />
     <ClInclude Include="Baziru3_Engine\Framework\Collision\CollisionShapes.h" />
@@ -415,15 +419,13 @@
     <ClInclude Include="externals\imgui-node-editor\imgui_node_editor_internal.inl" />
     <ClInclude Include="externals\imgui-node-editor\imgui_canvas.h" />
     <ClInclude Include="externals\imgui-node-editor\crude_json.h" />
-    <ClInclude Include="Application\Minion\Minion.h" />
-    <ClInclude Include="Application\Minion\MinionManager.h" />
-    <ClInclude Include="Application\Player\PikminPlayer.h" />
     <ClInclude Include="Application\GameObject\SlimeMesh.h" />
     <ClInclude Include="Application\GameObject\AimGuide.h" />
     <ClInclude Include="Application\GameObject\SlimeCollision.h" />
     <ClInclude Include="Application\GameObject\PropellerObstacle.h" />
     <ClInclude Include="Application\GameObject\FireworkFx.h" />
     <ClInclude Include="Application\GameObject\SlimeFx.h" />
+    <ClInclude Include="Application\GameObject\GrowthCube.h" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="externals\DirectXTex\DirectXTex_Desktop_2022_Win10.vcxproj">

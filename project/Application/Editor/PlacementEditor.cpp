@@ -9,7 +9,7 @@
 #include "Application/Enemy/EnemyManager.h"
 #include "Application/GameObject/CoinManager.h"
 #include "Application/GameObject/SlimePhysics.h"
-#include "Application/Player/PikminPlayer.h"
+#include "Application/GameObject/SlimeManager.h"
 
 #include <algorithm>
 #include <cmath>
@@ -88,6 +88,11 @@ namespace
 PlacementEditor::~PlacementEditor()
 {
     Finalize();
+}
+
+Slime* PlacementEditor::PlayerSlime() const
+{
+    return refs_.slimeManager ? refs_.slimeManager->GetLeader() : nullptr;
 }
 
 void PlacementEditor::Initialize(const SceneRefs& refs)
@@ -198,10 +203,13 @@ void PlacementEditor::ApplyLayoutToScene()
         }
     }
 
-    if (refs_.player)
+    if (refs_.slimeManager)
     {
-        refs_.player->SetPosition(layout_.playerStart);
-        refs_.player->SetVelocity({ 0.0f, 0.0f, 0.0f });
+        if (Slime* leader = refs_.slimeManager->GetLeader())
+        {
+            leader->SetPosition(layout_.playerStart);
+            leader->SetVelocity({ 0.0f, 0.0f, 0.0f });
+        }
     }
 
     ClearSelection();
@@ -239,9 +247,12 @@ void PlacementEditor::SyncLayoutFromScene()
         }
     }
 
-    if (refs_.player)
+    if (refs_.slimeManager)
     {
-        layout_.playerStart = refs_.player->GetPosition();
+        if (const Slime* leader = refs_.slimeManager->GetLeader())
+        {
+            layout_.playerStart = leader->GetPosition();
+        }
     }
 }
 
@@ -606,14 +617,14 @@ Coin* PlacementEditor::PickCoin(const Vector3& world, float* outDistSq) const
 
 bool PlacementEditor::PickPlayer(const Vector3& world, float* outDistSq) const
 {
-    if (!refs_.player) return false;
+    if (!PlayerSlime()) return false;
 
-    const Vector3& p = refs_.player->GetPosition();
+    const Vector3& p = PlayerSlime()->GetPosition();
     float dx = p.x - world.x;
     float dz = p.z - world.z;
     float distSq = dx * dx + dz * dz;
 
-    float grab = refs_.player->GetCurrentScale() + 0.6f;
+    float grab = PlayerSlime()->GetCurrentScale() + 0.6f;
     if (distSq > grab * grab) return false;
 
     if (outDistSq) *outDistSq = distSq;
@@ -721,10 +732,10 @@ void PlacementEditor::PlaceAt(const Vector3& world)
         break;
 
     case Brush::PlayerStart:
-        if (refs_.player)
+        if (PlayerSlime())
         {
-            refs_.player->SetPosition(pos);
-            refs_.player->SetVelocity({ 0.0f, 0.0f, 0.0f });
+            PlayerSlime()->SetPosition(pos);
+            PlayerSlime()->SetVelocity({ 0.0f, 0.0f, 0.0f });
             selectionKind_ = SelectionKind::PlayerStart;
             selectedEnemy_ = nullptr;
             selectedCoin_ = nullptr;
@@ -811,10 +822,10 @@ void PlacementEditor::MoveSelectionTo(const Vector3& world)
         break;
 
     case SelectionKind::PlayerStart:
-        if (refs_.player)
+        if (PlayerSlime())
         {
-            refs_.player->SetPosition({ world.x, floorY, world.z });
-            refs_.player->SetVelocity({ 0.0f, 0.0f, 0.0f });
+            PlayerSlime()->SetPosition({ world.x, floorY, world.z });
+            PlayerSlime()->SetVelocity({ 0.0f, 0.0f, 0.0f });
             MarkDirty();
         }
         break;
@@ -1071,10 +1082,10 @@ void PlacementEditor::Draw(const RenderContext& ctx)
         break;
 
     case SelectionKind::PlayerStart:
-        if (refs_.player)
+        if (PlayerSlime())
         {
-            DrawMarker(ctx, refs_.player->GetPosition(),
-                       refs_.player->GetCurrentScale() + 0.7f, selectionColor_);
+            DrawMarker(ctx, PlayerSlime()->GetPosition(),
+                       PlayerSlime()->GetCurrentScale() + 0.7f, selectionColor_);
         }
         break;
 
@@ -1208,9 +1219,9 @@ void PlacementEditor::DrawImGui()
         break;
 
     case SelectionKind::PlayerStart:
-        if (refs_.player)
+        if (PlayerSlime())
         {
-            const Vector3& p = refs_.player->GetPosition();
+            const Vector3& p = PlayerSlime()->GetPosition();
             ImGui::Text("Player Start");
             ImGui::Text("Pos: (%.2f, %.2f, %.2f)", p.x, p.y, p.z);
         }
