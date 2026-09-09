@@ -841,6 +841,13 @@ void ClearScene::UpdateLogo(float deltaTime)
             {
                 letter.isLanded = true;
                 letter.landTimer = 0.0f;
+
+                // TODO(SE): 文字が基準位置に落下した瞬間の音をここで鳴らす。
+                //           こちらは1文字ずつ落ちてくるので、文字数ぶん（12回）鳴る。
+                //           軽い「ぽん」系を想定。連打になるのでピッチを少しずつ
+                //           上げると気持ちいい（letter.dropOrder が 0 起点の順番）。
+                //           ゲームオーバーシーン側は全文字同時着地なので1回だけ鳴る
+                //           （GameOverScene::UpdateLogo() の末尾にマークしてある）
             }
             else
             {
