@@ -94,6 +94,7 @@
     <ClCompile Include="Application\Scene\GameScene\GamePlaySceneHUD.cpp" />
     <ClCompile Include="Application\UI\NumberDisplay.cpp" />
     <ClCompile Include="Application\Scene\ClearScene\ClearScene.cpp" />
+    <ClCompile Include="Application\Scene\GameOverScene\GameOverScene.cpp" />
     <ClCompile Include="Baziru3_Engine\Graphics\Light\Light.cpp" />
     <ClCompile Include="Baziru3_Engine\Graphics\Light\CascadingShadowMap.cpp" />
 
@@ -365,6 +366,7 @@
     <ClInclude Include="Application\Scene\GameScene\CollisionSystem.h" />
     <ClInclude Include="Application\Scene\GameScene\CombatSystem.h" />
     <ClInclude Include="Application\Scene\ClearScene\ClearScene.h" />
+    <ClInclude Include="Application\Scene\GameOverScene\GameOverScene.h" />
     <ClInclude Include="Baziru3_Engine\Framework\Particle\ParticleEmitter.h" />
     <ClInclude Include="Baziru3_Engine\Framework\Particle\ParticleManager.h" />
     <ClInclude Include="Baziru3_Engine\Graphics\Light\Light.h" />
