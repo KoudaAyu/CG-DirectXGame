@@ -41,7 +41,7 @@ void WindowAPI::Initialize()
 	//ウィンドウの生成
 	hwnd_ = CreateWindow(
 		wc.lpszClassName, //ウィンドウクラス名
-		L"DirectX Window", //ウィンドウタイトル
+		L"3024_にゅるにゅる大冒険", //ウィンドウタイトル
 		WS_OVERLAPPEDWINDOW, //ウィンドウスタイル
 		CW_USEDEFAULT, CW_USEDEFAULT, //位置
 		wrc.right - wrc.left, wrc.bottom - wrc.top, //サイズ
