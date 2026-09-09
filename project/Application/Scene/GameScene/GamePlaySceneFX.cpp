@@ -775,6 +775,70 @@ void GamePlaySceneFx::EmitGrowthCubeAura(const Vector3& center, float radius, co
     fx_->Emit(desc);
 }
 
+void GamePlaySceneFx::UpdateBullets(float /*deltaTime*/, EnemyManager* enemyManager)
+{
+    if (!fx_ || !enemyManager || !enableBulletGlow_) return;
+
+    for (const auto& bulletPtr : enemyManager->GetBullets())
+    {
+        const EnemyBullet* bullet = bulletPtr.get();
+        if (!bullet || !bullet->IsAlive()) continue;
+
+        EmitBulletGlow(bullet->GetPosition(), bullet->GetVelocity(),
+                       bullet->GetHitRadius(), bullet->GetColor(), false);
+    }
+}
+
+void GamePlaySceneFx::EmitBulletGlow(const Vector3& position, const Vector3& velocity,
+                                     float radius, const Vector4& color, bool isBoss)
+{
+    if (!fx_ || !enableBulletGlow_) return;
+
+    // 弾は数が知れているが、遠くのものまで光らせても見えないので足切りはする
+    if (!IsInRange(position)) return;
+
+    const float boost = isBoss ? bossBulletGlowBoost_ : 1.0f;
+    const float scale = (std::max)(0.10f, radius) * bulletGlowScale_ * boost;
+
+    // 芯は「弾の色を白へ寄せたもの」。加算合成なので、白いほど明るく抜ける
+    const float w = std::clamp(bulletGlowWhiteness_, 0.0f, 1.0f);
+    const Vector4 core{ color.x + (1.0f - color.x) * w,
+                        color.y + (1.0f - color.y) * w,
+                        color.z + (1.0f - color.z) * w,
+                        bulletGlowAlpha_ };
+
+    // 1. 芯（正円）。速度に少しだけ引きずられて後ろへ残る
+    {
+        FireworkFxDesc desc{};
+        desc.position = position;
+        desc.velocity = velocity * -0.12f;
+        desc.drag = 4.0f;
+        desc.colorBegin = core;
+        desc.colorEnd = { color.x, color.y, color.z, 0.0f };
+        desc.scaleBegin = scale;
+        desc.scaleEnd = scale * 0.35f;
+        desc.lifeTime = bulletGlowLife_;
+        fx_->Emit(desc);
+    }
+
+    // 2. 進行方向へ伸ばしたキラッ（弾がどっちへ飛んでいるか分かるように）
+    {
+        FireworkFxDesc desc{};
+        desc.position = position;
+        desc.velocity = velocity * 0.35f;
+        desc.drag = 5.0f;
+        desc.colorBegin = { core.x, core.y, core.z, bulletGlowAlpha_ * 0.7f };
+        desc.colorEnd = { color.x, color.y, color.z, 0.0f };
+        desc.scaleBegin = scale * 1.25f;
+        desc.scaleEnd = scale * 0.5f;
+        desc.scaleAspect = 0.42f;
+        desc.alignToVelocity = true;
+        desc.useSparkTexture = true;
+        desc.lifeTime = bulletGlowLife_ * 0.8f;
+        fx_->Emit(desc);
+    }
+}
+
 void GamePlaySceneFx::UpdateGrowthCubes(float deltaTime, GrowthCubeManager* growthCubeManager)
 {
     if (!fx_ || !growthCubeManager || !enableGrowthCubeGlow_) return;
@@ -1148,6 +1212,7 @@ void GamePlaySceneFx::UpdateAll(float deltaTime, const Vector3& focusCenter, Sli
     UpdateMinions(deltaTime, slimeManager);
     UpdateCoins(deltaTime, coinManager);
     UpdateEnemies(deltaTime, enemyManager);
+    UpdateBullets(deltaTime, enemyManager);
     UpdateGrowthCubes(deltaTime, growthCubeManager);
     // ボスは BossFight が自分で UpdateBoss() を呼ぶ（居ないフレームのほうが多いため）
     Update(deltaTime);
@@ -1269,6 +1334,14 @@ void GamePlaySceneFx::DrawImGui()
     ImGui::DragFloat("Aura Rise", &enemyAuraRise_, 0.05f, 0.0f, 6.0f);
     ImGui::DragFloat("Enemy Range", &enemyRange_, 0.5f, 2.0f, 80.0f);
     ImGui::DragInt("Enemy Emitters", &enemyMaxEmitters_, 1.0f, 1, 64);
+
+    ImGui::SeparatorText("Bullet Glow (敵・ボスの弾の芯)");
+    ImGui::Checkbox("Enable Bullet Glow", &enableBulletGlow_);
+    ImGui::DragFloat("Bullet Glow Scale", &bulletGlowScale_, 0.02f, 0.1f, 10.0f);
+    ImGui::DragFloat("Bullet Glow Life", &bulletGlowLife_, 0.01f, 0.03f, 2.0f);
+    ImGui::DragFloat("Bullet Glow Alpha", &bulletGlowAlpha_, 0.01f, 0.0f, 1.0f);
+    ImGui::DragFloat("Bullet Glow Whiteness", &bulletGlowWhiteness_, 0.01f, 0.0f, 1.0f);
+    ImGui::DragFloat("Boss Bullet Boost", &bossBulletGlowBoost_, 0.01f, 0.5f, 4.0f);
 
     ImGui::SeparatorText("Growth Cube Glow (self halo)");
     ImGui::DragInt("Cube Count / cube", &growthCubeGlowCount_, 1.0f, 0, 128);

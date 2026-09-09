@@ -5,6 +5,9 @@
 #include "Baziru3_Engine/Framework/Collision/CollisionManager.h"
 #include "Baziru3_Engine/Graphics/3D/Object/Object3dCom.h"
 
+#include "SceneManager.h"
+#include "Audio/AudioManager.h"
+
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
@@ -16,6 +19,8 @@
 namespace
 {
     const char* kTypeNames[] = { "Slime", "FlowerClover", "FlowerLotus", "FlowerSunward" };
+
+    int32_t streamHandle_Shot;
 }
 
 EnemyManager::~EnemyManager()
@@ -42,6 +47,11 @@ void EnemyManager::Initialize(Object3dCom* object3dCom, Camera* camera)
         cm->SetCollisionFilter(CollisionAttribute::Minion, CollisionAttribute::Enemy, false);
         cm->SetCollisionFilter(CollisionAttribute::Bullet, CollisionAttribute::Enemy, false);
         cm->SetCollisionFilter(CollisionAttribute::Obstacle, CollisionAttribute::Enemy, false);
+    }
+
+    auto* audioMngr = SceneManager::GetInstance()->GetAudioManager();
+    if (audioMngr) {
+        streamHandle_Shot = audioMngr->Load("Resources/Audio/Shot.mp3");
     }
 }
 
@@ -216,8 +226,13 @@ const Object3d::ModelData* EnemyManager::GetOrLoadBulletModel(const MobEnemyConf
 
 void EnemyManager::FireBullet(const MobEnemyConfig& config, const MobEnemy::ShootRequest& request)
 {
-    // TODO(SE): 敵の弾の発射音をここで鳴らす
-    //           request.origin が発射位置、request.direction が向き
+    // 敵の弾の発射音
+    // TODO : request.origin が発射位置、request.direction が向き
+
+    auto* audioMngr = SceneManager::GetInstance()->GetAudioManager();
+    if (audioMngr) {
+        audioMngr->Play(streamHandle_Shot);
+    }
 
     std::string key;
     const Object3d::ModelData* model = GetOrLoadBulletModel(config, key);
@@ -319,7 +334,7 @@ void EnemyManager::Update(float deltaTime, const Vector2& stageTilt, SlimeManage
     if (enableCollision_ && slimeManager && !editorMode_)
     {
         ResolveSlimeCollisions(slimeManager, stageTilt, pivot);
-        ResolveBulletCollisions(leader);
+        ResolveBulletCollisions(slimeManager);
     }
 
     // 4. 死体の掃除
@@ -485,55 +500,72 @@ void EnemyManager::ResolveSelfDestruct(SlimeManager* slimeManager)
     lastSelfDestructKills_ = kills;
 }
 
-void EnemyManager::ResolveBulletCollisions(Slime* target)
+void EnemyManager::ResolveBulletCollisions(SlimeManager* slimeManager)
 {
-    // 代表スライムが居ない（全員落下中など）ときは何もしない
-    if (!target) return;
+    if (!slimeManager) return;
 
-    EnemyCollision::SlimeBody slime;
-    slime.position = target->GetPosition();
-    slime.scale = target->GetScale();
-    slime.squashStretch = target->GetSlimeParams().squashStretch;
-    slime.baseRadius = 1.0f;
-    slime.strength = target->GetSize();
-
-    // 同じフレームに複数当たっても、ノックバックは合成して1回だけ適用する
-    Vector3 pushSum{ 0.0f, 0.0f, 0.0f };
-    int hitCount = 0;
-
-    for (auto& b : bullets_)
+    // 被弾した個体とノックバック方向を「先に全部集めてから」処理する。
+    // SlimeManager::EjectOnBulletHit() は中で slimes_ に push_back するので、
+    // GetSlimes() を回している最中に呼ぶとイテレータが無効化される
+    // （Slime の実体は unique_ptr の先なので、集めた Slime* 自体は生き続ける）
+    struct BulletHit
     {
-        if (!b || !b->IsAlive()) continue;
+        Slime* slime = nullptr;
+        Vector3 dir{ 0.0f, 0.0f, 1.0f };
+    };
+    std::vector<BulletHit> hits;
 
-        Vector3 pushDir{ 0.0f, 0.0f, 0.0f };
-        if (!EnemyCollision::CheckBulletVsSlime(b->GetPosition(), b->GetHitRadius(), slime, pushDir))
+    for (const auto& slimePtr : slimeManager->GetSlimes())
+    {
+        Slime* target = slimePtr.get();
+        if (!target || !target->IsActive()) continue;
+
+        // 吸い込まれている最中の個体は座標が補間で飛ぶので判定から外す
+        if (target->GetState() == SlimeState::Merging) continue;
+
+        EnemyCollision::SlimeBody slime;
+        slime.position = target->GetPosition();
+        slime.scale = target->GetScale();
+        slime.squashStretch = target->GetSlimeParams().squashStretch;
+        slime.baseRadius = 1.0f;
+        slime.strength = target->GetSize();
+
+        // 同じフレームに複数当たっても、ノックバックは合成して1回だけ適用する
+        Vector3 pushSum{ 0.0f, 0.0f, 0.0f };
+        int hitCount = 0;
+
+        for (auto& b : bullets_)
         {
-            continue;
+            if (!b || !b->IsAlive()) continue;
+
+            Vector3 pushDir{ 0.0f, 0.0f, 0.0f };
+            if (!EnemyCollision::CheckBulletVsSlime(b->GetPosition(), b->GetHitRadius(), slime, pushDir))
+            {
+                continue;
+            }
+
+            pushSum.x += pushDir.x;
+            pushSum.z += pushDir.z;
+            ++hitCount;
+
+            b->Kill();
         }
 
-        pushSum.x += pushDir.x;
-        pushSum.z += pushDir.z;
-        ++hitCount;
+        if (hitCount == 0) continue;
 
-        b->Kill();
+        const float len = std::sqrt(pushSum.x * pushSum.x + pushSum.z * pushSum.z);
+        BulletHit hit;
+        hit.slime = target;
+        hit.dir = (len > 1e-4f) ? Vector3{ pushSum.x / len, 0.0f, pushSum.z / len }
+                                : Vector3{ 0.0f, 0.0f, 1.0f };
+        hits.push_back(hit);
     }
 
-    if (hitCount > 0)
+    // 被弾処理: サイズ N (>1) → N-1 ＋ 強さ1が遠くへ飛ぶ / サイズ1 → 消滅
+    for (const BulletHit& hit : hits)
     {
-        float len = std::sqrt(pushSum.x * pushSum.x + pushSum.z * pushSum.z);
-        Vector3 dir = (len > 1e-4f) ? Vector3{ pushSum.x / len, 0.0f, pushSum.z / len }
-                                    : Vector3{ 0.0f, 0.0f, 1.0f };
-
-        // 暫定仕様: ノックバックのみ。塊のサイズは減らない
-        Vector3 velocity = target->GetVelocity();
-        velocity.x = dir.x * bulletKnockback_;
-        velocity.z = dir.z * bulletKnockback_;
-        velocity.y = (std::max)(velocity.y, bulletKnockback_ * 0.22f);
-        target->SetVelocity(velocity);
-
-        auto& params = target->GetSlimeParams();
-        params.impulseStrength = (std::max)(params.impulseStrength, 0.5f);
-        params.squashStretch = { 0.28f, -0.22f, 0.28f };
+        // TODO(SE): 弾がスライムに当たったときの音（hit.slime->GetPosition() が着弾点）
+        slimeManager->EjectOnBulletHit(hit.slime, hit.dir, bulletKnockback_, bulletEjectSpeed_);
     }
 }
 
@@ -581,6 +613,7 @@ void EnemyManager::DrawImGui()
     ImGui::DragFloat("Bounce Speed", &bounceSpeed_, 0.1f, 0.0f, 40.0f);
     ImGui::DragFloat("Small Slime Bounce Speed", &minionBounceSpeed_, 0.1f, 0.0f, 40.0f);
     ImGui::DragFloat("Bullet Knockback", &bulletKnockback_, 0.1f, 0.0f, 40.0f);
+    ImGui::DragFloat("Bullet Eject Speed (被弾で飛ぶ子の初速)", &bulletEjectSpeed_, 0.1f, 0.0f, 40.0f);
 
     ImGui::SeparatorText("Self Destruct (E key)");
     ImGui::DragFloat("Blast Radius (size 1)", &selfDestructBaseRadius_, 0.05f, 0.0f, 40.0f);

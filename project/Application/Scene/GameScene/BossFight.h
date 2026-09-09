@@ -86,6 +86,13 @@ public:
         int scoreGain = 0;          //!< 加算するスコア（ボス撃破時のみ）
         float cameraShake = 0.0f;   //!< このフレームに足すカメラシェイクの trauma
         Vector3 scorePopupAt{ 0.0f, 0.0f, 0.0f }; //!< スコア加算を浮かせる位置
+
+        // --- BGM ---
+        // BossFight は音を鳴らさない。「切り替えて」と言うだけにして、
+        // 実際に Stop / Play するのは GamePlayScene の1箇所にまとめてある
+        // （BGM は同時に1本だけ、という決まりをそこで守れる）
+        bool requestBossBgm = false;   //!< ボス戦BGMへ切り替えてほしい（1回だけ立つ）
+        bool requestNormalBgm = false; //!< 通常BGMへ戻してほしい（1回だけ立つ）
     };
 
 public:
@@ -174,8 +181,9 @@ private:
     /// @brief ボスの弾を1発撃つ（プールから使い回す）
     void FireBullet(const Vector3& origin, const Vector3& direction);
 
-    /// @brief 弾 vs 代表スライム
-    void ResolveBulletCollisions(Slime* leader);
+    /// @brief ボスの弾 vs 全スライム
+    /// @note 当たり方は雑魚の弾と同じ（EnemyManager::ResolveBulletCollisions と対）
+    void ResolveBulletCollisions(SlimeManager* slimeManager);
 
     /// @brief 全スライム vs ボス。プレイヤーのほうが強ければボスが死ぬ
     /// @return このフレームにボスが倒されたら true
@@ -240,7 +248,8 @@ public:
     float explodeShake_ = 1.0f;        //!< 爆発の瞬間のカメラシェイク
 
     // --- 戦闘 ---
-    float bulletKnockback_ = 9.0f;     //!< 被弾時のノックバック初速
+    float bulletKnockback_ = 9.0f;     //!< 被弾時のノックバック初速（本体）
+    float bulletEjectSpeed_ = 16.0f;   //!< 被弾ではじけ飛ぶ強さ1のスライムの初速
     float bounceSpeed_ = 15.0f;        //!< ボスに弾かれるときの初速（代表）
     float minionBounceSpeed_ = 11.0f;  //!< 同（代表以外）
     bool enableCollision_ = true;

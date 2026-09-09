@@ -94,8 +94,8 @@ namespace
             c.shootRange = 11.0f;
             c.shootInterval = 2.2f;
             c.bulletSpeed = 9.0f;
-            c.bulletScale = 0.28f;
-            c.bulletHitRadius = 0.28f;
+            c.bulletScale = 0.62f;   // 俯瞰カメラ（約30m）でも粒として見えるサイズ
+            c.bulletHitRadius = 0.42f;
             c.muzzleHeightRatio = 1.10f;
             c.bulletDirectory = "Resources/Enemy/FlowerLotus";
             c.bulletFileName = "Lotus_Bullet.gltf";
@@ -128,8 +128,8 @@ namespace
             c.shootRange = 13.0f;
             c.shootInterval = 1.9f;
             c.bulletSpeed = 11.0f;
-            c.bulletScale = 0.30f;
-            c.bulletHitRadius = 0.30f;
+            c.bulletScale = 0.66f;   // 同上
+            c.bulletHitRadius = 0.45f;
             c.muzzleHeightRatio = 1.60f;
             c.bulletDirectory = "Resources/Enemy/FlowerSunward";
             c.bulletFileName = "Sunward_Bullet.gltf";

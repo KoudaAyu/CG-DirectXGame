@@ -7,6 +7,8 @@
 #include "Application/GameObject/Slime.h"
 #include "Application/GameObject/StageTerrain.h"
 #include "Application/Scene/GameScene/GamePlaySceneFX.h"
+#include "SceneManager.h"
+#include "Baziru3_Engine/Framework/Audio/AudioManager.h"
 
 #include <algorithm>
 #include <cmath>
@@ -25,6 +27,13 @@ namespace
         t = std::clamp(t, 0.0f, 1.0f);
         return t * t * (3.0f - 2.0f * t);
     }
+
+    int32_t streamHandle_Start;
+    int32_t streamHandle_Roar;
+    int32_t streamHandle_Damaged;
+    int32_t streamHandle_Explosion;
+    int32_t streamHandle_Shot;
+    int32_t streamHandle_HitByBoss;
 }
 
 BossFight::~BossFight()
@@ -47,6 +56,18 @@ void BossFight::Initialize(const SceneRefs& refs)
 
     bullets_.clear();
     bulletModelReady_ = false;
+
+
+    auto* audioMngr = SceneManager::GetInstance()->GetAudioManager();
+    if (audioMngr) {
+
+        streamHandle_Start = audioMngr->Load("Resources/Audio/BossStart.mp3");
+        streamHandle_Roar = audioMngr->Load("Resources/Audio/BossRoar.mp3");
+        streamHandle_Shot = audioMngr->Load("Resources/Audio/BossShoot.mp3");
+        streamHandle_Damaged = audioMngr->Load("Resources/Audio/BossDamaged.mp3");
+        streamHandle_Explosion = audioMngr->Load("Resources/Audio/BossExplosion.mp3");
+        streamHandle_HitByBoss = audioMngr->Load("Resources/Audio/Damaged.mp3");
+    }
 }
 
 void BossFight::Finalize()
@@ -276,7 +297,14 @@ BossFight::FrameResult BossFight::Update(const FrameInput& input)
             hpBar_.SetRatio(boss_->GetHpRatio());
             hpBar_.Show();
 
-            // TODO(SE): ボス戦の開始音（ジングル）をここで鳴らす
+            // ここでボス戦BGMへ。実際の Stop / Play は GamePlayScene がやる
+            result.requestBossBgm = true;
+
+            // ボス戦の開始音（ジングル）
+            auto* audioMngr = SceneManager::GetInstance()->GetAudioManager();
+            if (audioMngr) {
+                audioMngr->Play(streamHandle_Start);
+            }
         }
         break;
 
@@ -288,6 +316,7 @@ BossFight::FrameResult BossFight::Update(const FrameInput& input)
         {
             boss_->SetFrozen(true);
             boss_->SetShootEnabled(false);
+            boss_->SetMoveEnabled(false);
         }
 
         const float total = (std::max)(0.2f, focusInSeconds_);
@@ -318,6 +347,7 @@ BossFight::FrameResult BossFight::Update(const FrameInput& input)
             {
                 boss_->SetFrozen(false);
                 boss_->SetShootEnabled(true);
+                boss_->SetMoveEnabled(true); // ここから動き回る
             }
         }
         break;
@@ -329,6 +359,7 @@ BossFight::FrameResult BossFight::Update(const FrameInput& input)
         {
             boss_->SetFrozen(false);
             boss_->SetShootEnabled(true);
+            boss_->SetMoveEnabled(true);
 
             // --- 自爆でダメージ ---
             if (selfDestructs > 0)
@@ -336,14 +367,22 @@ BossFight::FrameResult BossFight::Update(const FrameInput& input)
                 const int damage = GetBossConfig().selfDestructDamage * selfDestructs;
                 if (boss_->ApplyDamage(damage))
                 {
-                    // TODO(SE): ボスの最後の一撃（HPが尽きた瞬間）の音をここで鳴らす
+                    // ボスの最後の一撃（HPが尽きた瞬間）の音
+                    auto* audioMngr = SceneManager::GetInstance()->GetAudioManager();
+                    if (audioMngr) {
+                        audioMngr->Play(streamHandle_Roar);
+                    }
                     result.scoreGain = input.playerLife * input.playerLife * input.playerLife;
                     result.scorePopupAt = boss_->GetHeadPosition();
                     BeginDeath();
                 }
                 else
                 {
-                    // TODO(SE): ボスの被弾音をここで鳴らす
+                    // ボスの被弾音
+                    auto* audioMngr = SceneManager::GetInstance()->GetAudioManager();
+                    if (audioMngr) {
+                        audioMngr->Play(streamHandle_Damaged);
+                    }
                     if (refs_.fx)
                     {
                         refs_.fx->EmitBossHit(boss_->GetHeadPosition(), boss_->GetVisualRadius());
@@ -356,6 +395,7 @@ BossFight::FrameResult BossFight::Update(const FrameInput& input)
     case Phase::Dying:
     {
         result.freezeSlimes = true;
+        if (boss_) boss_->SetMoveEnabled(false); // 死に際はその場で震えるだけ
 
         const float total = (std::max)(0.3f, deathSeconds_);
         const float t = std::clamp(phaseTimer_ / total, 0.0f, 1.0f);
@@ -382,7 +422,11 @@ BossFight::FrameResult BossFight::Update(const FrameInput& input)
             }
             result.cameraShake += explodeShake_;
 
-            // TODO(SE): ボスの爆散音をここで鳴らす
+            // ボスの爆散音
+            auto* audioMngr = SceneManager::GetInstance()->GetAudioManager();
+            if (audioMngr) {
+                audioMngr->Play(streamHandle_Explosion);
+            }
 
             DestroyBoss();
             hpBar_.SetRatio(0.0f);
@@ -437,8 +481,12 @@ BossFight::FrameResult BossFight::Update(const FrameInput& input)
         Boss::ShootBurst burst;
         if (boss_->TakeShootBurst(burst) && burst.fire)
         {
-            // TODO(SE): ボスの全方向弾の発射音をここで鳴らす
-            //           burst.origin が発射位置、burst.directions が向きの配列
+            // ボスの全方向弾の発射音
+            // burst.origin が発射位置、burst.directions が向きの配列
+            auto* audioMngr = SceneManager::GetInstance()->GetAudioManager();
+            if (audioMngr) {
+                audioMngr->Play(streamHandle_Shot);
+            }
             const float forward = GetBossConfig().muzzleForward;
             for (const Vector3& dir : burst.directions)
             {
@@ -458,9 +506,21 @@ BossFight::FrameResult BossFight::Update(const FrameInput& input)
         if (b) b->Update(input.deltaTime);
     }
 
+    // 弾の芯の光（弾が小さくて見えないので、FX 側で光らせている）
+    if (refs_.fx)
+    {
+        const Vector4 bulletColor = GetBossConfig().bulletColor;
+        for (auto& b : bullets_)
+        {
+            if (!b || !b->IsAlive()) continue;
+            refs_.fx->EmitBulletGlow(b->GetPosition(), b->GetVelocity(),
+                                     b->GetHitRadius(), bulletColor, true);
+        }
+    }
+
     if (enableCollision_ && refs_.slimeManager && phase_ == Phase::Battle)
     {
-        ResolveBulletCollisions(leader);
+        ResolveBulletCollisions(refs_.slimeManager);
 
         if (ResolveSlimeCollisions(refs_.slimeManager, input.stageTilt, input.pivot, result))
         {
@@ -580,54 +640,75 @@ void BossFight::FireBullet(const Vector3& origin, const Vector3& direction)
                  config.bulletScale, config.bulletHitRadius);
 }
 
-void BossFight::ResolveBulletCollisions(Slime* target)
+void BossFight::ResolveBulletCollisions(SlimeManager* slimeManager)
 {
-    if (!target) return;
+    if (!slimeManager) return;
 
-    EnemyCollision::SlimeBody slime;
-    slime.position = target->GetPosition();
-    slime.scale = target->GetScale();
-    slime.squashStretch = target->GetSlimeParams().squashStretch;
-    slime.baseRadius = 1.0f;
-    slime.strength = target->GetSize();
-
-    Vector3 pushSum{ 0.0f, 0.0f, 0.0f };
-    int hitCount = 0;
-
-    for (auto& b : bullets_)
+    // 被弾した個体を先に集めてから処理する。
+    // SlimeManager::EjectOnBulletHit() は中で slimes_ に push_back するので、
+    // GetSlimes() を回している最中に呼ぶとイテレータが無効化される
+    struct BulletHit
     {
-        if (!b || !b->IsAlive()) continue;
+        Slime* slime = nullptr;
+        Vector3 dir{ 0.0f, 0.0f, 1.0f };
+    };
+    std::vector<BulletHit> hits;
 
-        Vector3 pushDir{ 0.0f, 0.0f, 0.0f };
-        if (!EnemyCollision::CheckBulletVsSlime(b->GetPosition(), b->GetHitRadius(), slime, pushDir))
+    for (const auto& slimePtr : slimeManager->GetSlimes())
+    {
+        Slime* target = slimePtr.get();
+        if (!target || !target->IsActive()) continue;
+        if (target->GetState() == SlimeState::Merging) continue;
+
+        EnemyCollision::SlimeBody slime;
+        slime.position = target->GetPosition();
+        slime.scale = target->GetScale();
+        slime.squashStretch = target->GetSlimeParams().squashStretch;
+        slime.baseRadius = 1.0f;
+        slime.strength = target->GetSize();
+
+        Vector3 pushSum{ 0.0f, 0.0f, 0.0f };
+        int hitCount = 0;
+
+        for (auto& b : bullets_)
         {
-            continue;
+            if (!b || !b->IsAlive()) continue;
+
+            Vector3 pushDir{ 0.0f, 0.0f, 0.0f };
+            if (!EnemyCollision::CheckBulletVsSlime(b->GetPosition(), b->GetHitRadius(), slime, pushDir))
+            {
+                continue;
+            }
+
+            pushSum.x += pushDir.x;
+            pushSum.z += pushDir.z;
+            ++hitCount;
+            b->Kill();
         }
 
-        pushSum.x += pushDir.x;
-        pushSum.z += pushDir.z;
-        ++hitCount;
-        b->Kill();
+        if (hitCount <= 0) continue;
+
+        const float len = std::sqrt(pushSum.x * pushSum.x + pushSum.z * pushSum.z);
+        BulletHit hit;
+        hit.slime = target;
+        hit.dir = (len > 1e-4f) ? Vector3{ pushSum.x / len, 0.0f, pushSum.z / len }
+                                : Vector3{ 0.0f, 0.0f, 1.0f };
+        hits.push_back(hit);
     }
 
-    if (hitCount <= 0) return;
+    if (hits.empty()) return;
 
-    // TODO(SE): ボスの弾がプレイヤーに当たったときの音をここで鳴らす
+    // ボスの弾がプレイヤーに当たったときの音（同フレームに何体当たっても1回）
+    auto* audioMngr = SceneManager::GetInstance()->GetAudioManager();
+    if (audioMngr) {
+        audioMngr->Play(streamHandle_HitByBoss);
+    }
 
-    const float len = std::sqrt(pushSum.x * pushSum.x + pushSum.z * pushSum.z);
-    const Vector3 dir = (len > 1e-4f) ? Vector3{ pushSum.x / len, 0.0f, pushSum.z / len }
-                                      : Vector3{ 0.0f, 0.0f, 1.0f };
-
-    // 雑魚の弾と同じ暫定仕様: ノックバックのみ。塊のサイズは減らない
-    Vector3 velocity = target->GetVelocity();
-    velocity.x = dir.x * bulletKnockback_;
-    velocity.z = dir.z * bulletKnockback_;
-    velocity.y = (std::max)(velocity.y, bulletKnockback_ * 0.22f);
-    target->SetVelocity(velocity);
-
-    auto& params = target->GetSlimeParams();
-    params.impulseStrength = (std::max)(params.impulseStrength, 0.5f);
-    params.squashStretch = { 0.26f, -0.22f, 0.26f };
+    // 被弾処理: サイズ N (>1) → N-1 ＋ 強さ1が遠くへ飛ぶ / サイズ1 → 消滅
+    for (const BulletHit& hit : hits)
+    {
+        slimeManager->EjectOnBulletHit(hit.slime, hit.dir, bulletKnockback_, bulletEjectSpeed_);
+    }
 }
 
 // ===================================================================
@@ -703,7 +784,13 @@ bool BossFight::ResolveSlimeCollisions(SlimeManager* slimeManager, const Vector2
                 refs_.fx->EmitEnemyHitSplash(slime.position, params.baseColor);
             }
 
-            // TODO(SE): ボスに弾かれたときの衝突音をここで鳴らす
+            // ボスに弾かれたときの衝突音
+            {
+                auto* audioMngr = SceneManager::GetInstance()->GetAudioManager();
+                if (audioMngr) {
+                    audioMngr->Play(streamHandle_HitByBoss);
+                }
+            }
             break;
 
         default:
@@ -817,6 +904,7 @@ void BossFight::DrawImGui()
         ImGui::SeparatorText("Battle");
         ImGui::Checkbox("Enable collision", &enableCollision_);
         ImGui::DragFloat("Bullet Knockback", &bulletKnockback_, 0.1f, 0.0f, 40.0f);
+    ImGui::DragFloat("Bullet Eject Speed (被弾で飛ぶ子の初速)", &bulletEjectSpeed_, 0.1f, 0.0f, 40.0f);
         ImGui::DragFloat("Bounce (leader)", &bounceSpeed_, 0.1f, 0.0f, 40.0f);
         ImGui::DragFloat("Bounce (small)", &minionBounceSpeed_, 0.1f, 0.0f, 40.0f);
 
@@ -831,6 +919,24 @@ void BossFight::DrawImGui()
         ImGui::DragFloat("Shoot Interval", &c.shootInterval, 0.02f, 0.2f, 10.0f);
         ImGui::DragFloat("Bullet Speed", &c.bulletSpeed, 0.1f, 1.0f, 40.0f);
         ImGui::DragFloat("Volley Spin (rad)", &c.spinPerVolley, 0.01f, -1.0f, 1.0f);
+        ImGui::DragFloat("Bullet Scale", &c.bulletScale, 0.01f, 0.05f, 3.0f);
+        ImGui::DragFloat("Bullet Hit Radius", &c.bulletHitRadius, 0.01f, 0.05f, 3.0f);
+
+        ImGui::SeparatorText("Boss move (chase / keep distance)");
+        ImGui::Checkbox("Can Move", &c.canMove);
+        ImGui::DragFloat("Move Speed", &c.moveSpeed, 0.05f, 0.0f, 20.0f);
+        ImGui::DragFloat("Keep Distance", &c.keepDistance, 0.1f, 0.5f, 40.0f);
+        ImGui::DragFloat("Back Off Distance", &c.backOffDistance, 0.1f, 0.0f, 40.0f);
+        ImGui::DragFloat("Strafe Speed", &c.strafeSpeed, 0.05f, 0.0f, 20.0f);
+        ImGui::DragFloat("Strafe Switch Min", &c.strafeSwitchMin, 0.05f, 0.1f, 10.0f);
+        ImGui::DragFloat("Strafe Switch Max", &c.strafeSwitchMax, 0.05f, 0.1f, 20.0f);
+        ImGui::DragFloat("Roam Radius (0 = 無制限)", &c.roamRadius, 0.2f, 0.0f, 80.0f);
+        ImGui::DragFloat("Stop After Shoot (sec)", &c.shootStopSeconds, 0.02f, 0.0f, 3.0f);
+        if (boss_)
+        {
+            ImGui::Text("Move amount: %.2f   Move enabled: %d",
+                        boss_->GetMoveAmount(), boss_->IsMoveEnabled() ? 1 : 0);
+        }
         if (ImGui::Button("Apply model settings to boss") && boss_)
         {
             boss_->RefreshFromSpec();

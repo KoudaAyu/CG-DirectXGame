@@ -10,6 +10,7 @@ void EnemyBullet::Setup(Object3dCom* object3dCom, Camera* camera,
                         const Vector4& color)
 {
     modelKey_ = modelKey;
+    color_ = color;
 
     object3d_ = std::make_unique<Object3d>();
     object3d_->Initialize(object3dCom, modelData);

@@ -50,8 +50,23 @@ private:
     ///       汚すと次フレームの SmoothDamp の基準がぶれて揺れが残り続ける
     void UpdateCameraShake(float deltaTime);
 
+    /// @brief マウス右ドラッグでカメラの方位角（cameraYaw_）を回す
+    /// @note 俯瞰角（cameraPitch_）は動かさない。lookAt でいうと
+    ///       「eye が target を通る Y 軸のまわりを回る」だけ
+    void UpdateCameraOrbit();
+
     /// @brief 残機 ＝ スライムの数 ＝ プレイヤーの塊サイズ + フィールドのミニオンの強さの合計
     int CalculateLifeCount() const;
+
+    /**
+     * @brief リザルト（score / time / coin）を SceneContext へ書き出す
+     * @note ClearScene::LoadResultFromSceneContext() が同じキーを読む。
+     *       データの実体は SceneManager が持っているのでシーンをまたいで生き残る。
+     *       CLEAR へ抜ける直前と Finalize() の両方で呼んでいて、
+     *       どの経路で抜けても最新の値が入っている状態にしてある
+     *       （Finalize() は新しいシーンの Initialize() より先に走る）
+     */
+    void PublishResultToSceneContext();
 
     /// @brief 演出・HUD へイベントを流し込む（実装は GamePlaySceneFX / HUD 側）
     void UpdateFxAndHud(float deltaTime);
@@ -120,7 +135,12 @@ private:
     // --- カメラ制御パラメータ (プレイヤー相対座標一定モデル) ---
     float cameraDistance_ = 30.0f;        // プレイヤーからの基準カメラ距離（ステージ全体を見渡しやすいゆったりとした距離）
     float cameraPitch_ = 0.93f;           // 見下ろし角度 (rad, 0.93 rad ≈ 53.3度: 上空俯瞰視点)
-    float cameraYaw_ = 0.0f;             // 方位角 (rad)
+    float cameraYaw_ = 0.0f;             // 方位角 (rad)。右ドラッグで回る
+
+    // --- 右ドラッグによるカメラ旋回 ---
+    float cameraOrbitSensitivity_ = 0.006f; // マウス移動1ドットあたりの回転量 (rad)
+    bool cameraOrbitInvert_ = false;        // ドラッグの向きを反転させる
+    bool isCameraOrbiting_ = false;         // いま右ドラッグ中か
     float cameraFov_ = 0.85f;            // 垂直視野角 (rad, 0.85 rad ≈ 48.7度)
     float cameraTargetOffsetY_ = 0.8f;   // プレイヤー足元からの注視点高さ
     float cameraForwardOffset_ = 0.5f;   // 注視点Z前進オフセット（スライムを画面中央にしっかりと捉える）

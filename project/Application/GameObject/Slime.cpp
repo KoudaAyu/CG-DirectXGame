@@ -278,8 +278,10 @@ void Slime::UpdatePhysics(float deltaTime, const Vector2& stageTilt, const Vecto
     switch (state_) {
     case SlimeState::Rolling: {
         // ステージ傾斜による下り坂重力加速度
-        float accelX = std::sin(stageTilt.y) * tiltAccel_;
-        float accelZ = std::sin(stageTilt.x) * tiltAccel_;
+        // speedScale_ は SlimeManager が毎フレーム入れる（代表だけ 1.0、ミニオンは遅い）。
+        // 終端速度は「加速度 / 摩擦」なので、ここに掛けるだけで移動速度がそのまま倍率になる
+        float accelX = std::sin(stageTilt.y) * tiltAccel_ * speedScale_;
+        float accelZ = std::sin(stageTilt.x) * tiltAccel_ * speedScale_;
 
         velocity_.x += accelX * deltaTime;
         velocity_.z += accelZ * deltaTime;
@@ -318,7 +320,9 @@ void Slime::UpdatePhysics(float deltaTime, const Vector2& stageTilt, const Vecto
             float slopeHorizLen = std::sqrt(groundNormal.x * groundNormal.x + groundNormal.z * groundNormal.z);
             if (groundNormal.y < 0.82f && slopeHorizLen > 0.01f) {
                 Vector2 slopeDown = { groundNormal.x / slopeHorizLen, groundNormal.z / slopeHorizLen };
-                float slideStrength = (1.0f - groundNormal.y) * 22.0f;
+                // 斜面すべりにも同じ倍率を掛ける。こちらを素通しにすると、
+                // 坂の上ではミニオンだけ元の速さで滑り降りてしまう
+                float slideStrength = (1.0f - groundNormal.y) * 22.0f * speedScale_;
                 velocity_.x += slopeDown.x * slideStrength * deltaTime;
                 velocity_.z += slopeDown.y * slideStrength * deltaTime;
 

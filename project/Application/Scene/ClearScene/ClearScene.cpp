@@ -9,6 +9,7 @@
 #include "Application/GameObject/FireworkFx.h"
 #include "Baziru3_Engine/Graphics/3D/Object/Object3dCom.h"
 #include "Baziru3_Engine/Graphics/Graphics/SceneRenderRequests.h"
+#include "Baziru3_Engine/Framework/Audio/AudioManager.h"
 
 #include <algorithm>
 #include <cmath>
@@ -57,18 +58,18 @@ struct LogoChar
 };
 
 constexpr LogoChar kLogoChars[] = {
-    {"Resources/UI/Clear/logo_char_01.png", 54.0f, 0.0f },  // S
-    {"Resources/UI/Clear/logo_char_02.png", 54.0f, 0.0f },  // T
-    {"Resources/UI/Clear/logo_char_03.png", 54.0f, 0.0f },  // A
-    {"Resources/UI/Clear/logo_char_04.png", 54.0f, 0.0f },  // G
-    {"Resources/UI/Clear/logo_char_05.png", 54.0f, 34.0f},  // E （ここで単語が切れる）
-    {"Resources/UI/Clear/logo_char_06.png", 54.0f, 0.0f },  // C
-    {"Resources/UI/Clear/logo_char_07.png", 54.0f, 0.0f },  // L
-    {"Resources/UI/Clear/logo_char_08.png", 54.0f, 0.0f },  // E
-    {"Resources/UI/Clear/logo_char_09.png", 54.0f, 0.0f },  // A
-    {"Resources/UI/Clear/logo_char_10.png", 54.0f, 0.0f },  // R
-    {"Resources/UI/Clear/logo_char_11.png", 30.0f, 0.0f },  // !
-    {"Resources/UI/Clear/logo_char_12.png", 30.0f, 0.0f },  // !
+    {"Resources/UI/Clear/S.png", 54.0f, 0.0f },  // S
+    {"Resources/UI/Clear/T.png", 54.0f, 0.0f },  // T
+    {"Resources/UI/Clear/A.png", 54.0f, 0.0f },  // A
+    {"Resources/UI/Clear/G.png", 54.0f, 0.0f },  // G
+    {"Resources/UI/Clear/E.png", 54.0f, 34.0f},  // E （ここで単語が切れる）
+    {"Resources/UI/Clear/C.png", 54.0f, 0.0f },  // C
+    {"Resources/UI/Clear/L.png", 54.0f, 0.0f },  // L
+    {"Resources/UI/Clear/E.png", 54.0f, 0.0f },  // E
+    {"Resources/UI/Clear/A.png", 54.0f, 0.0f },  // A
+    {"Resources/UI/Clear/R.png", 54.0f, 0.0f },  // R
+    {"Resources/UI/Clear/Exquemation.png", 30.0f, 0.0f },  // !
+    {"Resources/UI/Clear/Exquemation.png", 30.0f, 0.0f },  // !
 };
 
 constexpr int kLogoCharCount = static_cast<int>(std::size(kLogoChars));
@@ -318,6 +319,12 @@ Vector2 CellLeftTop(int cell)
             static_cast<float>(row) * kDigitCellSize.y};
 }
 
+int32_t streamHandle_BGM;
+int32_t playHandle_BGM;
+
+int32_t streamHandle_FallDown;
+int32_t streamHandle_Counter;
+
 } // namespace
 
 // unique_ptr が持つ型（FireworkFx）の完全な定義が要るので、
@@ -354,6 +361,14 @@ void ClearScene::InitializeScene()
     isLogoBurstDone_ = false;
     launchTimer_ = 0.6f; // 最初の1発は少し待ってから
     ambientAccum_ = 0.0f;
+
+    auto* audioMngr = SceneManager::GetInstance()->GetAudioManager();
+    if (audioMngr) {
+        streamHandle_BGM = audioMngr->Load("Resources/Audio/PopStep.mp3");
+        streamHandle_FallDown = audioMngr->Load("Resources/Audio/FallDown.mp3");
+        streamHandle_Counter = audioMngr->Load("Resources/Audio/Counter.mp3");
+        playHandle_BGM = audioMngr->Play(streamHandle_BGM);
+    }
 }
 
 void ClearScene::Finalize()
@@ -414,6 +429,11 @@ void ClearScene::Finalize()
 
     delete input_;
     input_ = nullptr;
+
+    auto* audioMngr = SceneManager::GetInstance()->GetAudioManager();
+    if (audioMngr) {
+        audioMngr->Stop(playHandle_BGM);
+    }
 }
 
 void ClearScene::ResetTuningToDefault()
@@ -842,12 +862,17 @@ void ClearScene::UpdateLogo(float deltaTime)
                 letter.isLanded = true;
                 letter.landTimer = 0.0f;
 
-                // TODO(SE): 文字が基準位置に落下した瞬間の音をここで鳴らす。
-                //           こちらは1文字ずつ落ちてくるので、文字数ぶん（12回）鳴る。
-                //           軽い「ぽん」系を想定。連打になるのでピッチを少しずつ
-                //           上げると気持ちいい（letter.dropOrder が 0 起点の順番）。
-                //           ゲームオーバーシーン側は全文字同時着地なので1回だけ鳴る
-                //           （GameOverScene::UpdateLogo() の末尾にマークしてある）
+                // 文字が基準位置に落下した瞬間の音
+                // こちらは1文字ずつ落ちてくるので、文字数ぶん（12回）鳴る。
+                // 軽い「ぽん」系を想定。連打になるのでピッチを少しずつ
+                // 上げると気持ちいい（letter.dropOrder が 0 起点の順番）。
+                // ゲームオーバーシーン側は全文字同時着地なので1回だけ鳴る
+                // （GameOverScene::UpdateLogo() の末尾にマークしてある）
+
+                auto* audioMngr = SceneManager::GetInstance()->GetAudioManager();
+                if (audioMngr) {
+                    audioMngr->Play(streamHandle_FallDown);
+                }
             }
             else
             {
@@ -972,9 +997,12 @@ void ClearScene::UpdateNumbers(float deltaTime)
                 {
                     digit.punch = 1.0f;
 
-                    // TODO(SE): カウンターが増えていくときの音をここで鳴らす
-                    //           （ゲームプレイシーン側の同じ音は
-                    //             GamePlayScene::Update() にマークしてある）
+                    // カウンターが増えていくときの音
+
+                    auto* audioMngr = SceneManager::GetInstance()->GetAudioManager();
+                    if (audioMngr) {
+                        audioMngr->Play(streamHandle_Counter);
+                    }
                 }
                 digit.shownCell = digit.cell;
 

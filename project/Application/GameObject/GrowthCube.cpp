@@ -290,6 +290,10 @@ bool GrowthCube::CheckSlimeCollision(SlimeManager* slimeManager)
 {
     if (!slimeManager || state_ != State::Active) return false;
 
+    // 残機（＝全スライムのサイズ合計）が上限に達していたら食べられない。
+    // キューブはそのまま残るので、減ってから取りに戻れる
+    if (!slimeManager->CanGrow()) return false;
+
     const float cubeRadius = baseSize_ * 0.5f + sPickupRadius;
 
     for (const auto& slimePtr : slimeManager->GetSlimes())

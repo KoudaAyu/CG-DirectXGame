@@ -5,6 +5,7 @@
 
 #include "Sprite.h"
 #include "Baziru3_Engine/Core/Base/Vector.h"
+#include "Application/UI/UiTextShadow.h"
 
 /**
  * @brief 数字アトラスの切り出し設定と見た目
@@ -30,6 +31,10 @@ struct NumberDisplayStyle
     float spacing = 2.0f;              //!< 桁の間隔
     float punchAmount = 0.30f;         //!< 桁が変わった瞬間の弾み量
     float punchDamping = 11.0f;        //!< 弾みの減衰速度
+
+    /// @brief 白い数字が背景に溶けないよう、左上へずらした濃紺の同じ数字を重ねる
+    /// @note 桁ごとに色を少しランダムに振ってある（Initialize() で1回だけ決まる）
+    UiTextShadowStyle shadow{};
 };
 
 /**
@@ -125,6 +130,8 @@ private:
     struct CellSprite
     {
         std::unique_ptr<Sprite> sprite;
+        std::unique_ptr<Sprite> shadow;      //!< 重ねる濃紺の同じ数字
+        Vector4 shadowColor{ 0.0f, 0.0f, 0.0f, 1.0f }; //!< この桁ぶんの色（生成時に1回だけ決める）
         int cell = -1;       //!< 今フレーム出すセル番号
         int shownCell = -1;  //!< 前フレームのセル番号（変化を検出して弾ませる）
         float punch = 0.0f;  //!< 桁が変わった瞬間の弾み。1.0 から減衰する

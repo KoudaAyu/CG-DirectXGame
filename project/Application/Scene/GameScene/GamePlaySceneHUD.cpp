@@ -64,6 +64,24 @@ GamePlaySceneHud::~GamePlaySceneHud()
     Finalize();
 }
 
+GamePlaySceneHud::LabelSprite GamePlaySceneHud::MakeLabel(const char* texturePath, const Vector2& size,
+                                                          const UiTextShadowStyle& shadowStyle)
+{
+    LabelSprite label;
+    label.base = MakeSprite(texturePath, size);
+    label.shadow = UiShadow::Create(texturePath, size, { 0.5f, 0.5f });
+    // 色は**ここで1回だけ**決める。毎フレーム振り直すとチカチカする
+    label.shadowColor = UiShadow::MakeColor(shadowStyle);
+    return label;
+}
+
+void GamePlaySceneHud::ApplyLabel(LabelSprite& label, const Vector2& center, const Vector2& size,
+                                  float alpha)
+{
+    ApplySprite(label.base.get(), center, size, alpha);
+    UiShadow::Sync(label.shadow.get(), label.base.get(), labelShadow_, label.shadowColor);
+}
+
 std::unique_ptr<Sprite> GamePlaySceneHud::MakeSprite(const char* texturePath, const Vector2& size)
 {
     // 画像が無くても engine が 4x4 の白ダミーに差し替えるので落ちない
@@ -97,15 +115,16 @@ void GamePlaySceneHud::Initialize()
     Finalize();
 
     // --- ラベル ---
-    labelScore_ = MakeSprite(kLabelScoreTexture, labelSize_);
-    labelTime_ = MakeSprite(kLabelTimeTexture, labelSize_);
-    labelCoin_ = MakeSprite(kLabelCoinTexture, labelSize_);
-    labelLife_ = MakeSprite(kLabelLifeTexture, labelLifeSize_);
+    labelScore_ = MakeLabel(kLabelScoreTexture, labelSize_, labelShadow_);
+    labelTime_ = MakeLabel(kLabelTimeTexture, labelSize_, labelShadow_);
+    labelCoin_ = MakeLabel(kLabelCoinTexture, labelSize_, labelShadow_);
+    labelLife_ = MakeLabel(kLabelLifeTexture, labelLifeSize_, labelShadow_);
 
     // --- 数値 ---
     NumberDisplayStyle style;
     style.digitSize = digitSize_;
     style.spacing = digitSpacing_;
+    style.shadow = numberShadow_;
 
     scoreNumber_.Initialize(kScoreDigits, style);
     scoreNumber_.SetMode(NumberDisplay::Mode::Integer);
@@ -141,6 +160,9 @@ void GamePlaySceneHud::Initialize()
     headStyle.digitSize = headDigitSize_;
     headStyle.spacing = headDigitSpacing_;
     headStyle.punchAmount = 0.45f; // 強さが変わったときにしっかり弾ませる
+    headStyle.shadow = numberShadow_;
+    // 頭の数字は小さいので、ずらし量も控えめにする
+    headStyle.shadow.offset = { numberShadow_.offset.x * 0.6f, numberShadow_.offset.y * 0.6f };
 
     headNumbers_.clear();
     headNumbers_.resize(kHeadNumberPoolSize);
@@ -160,6 +182,8 @@ void GamePlaySceneHud::Initialize()
     NumberDisplayStyle popupStyle;
     popupStyle.digitSize = popupDigitSize_;
     popupStyle.spacing = 1.0f;
+    popupStyle.shadow = numberShadow_;
+    popupStyle.shadow.offset = { numberShadow_.offset.x * 0.7f, numberShadow_.offset.y * 0.7f };
 
     scorePopups_.clear();
     scorePopups_.resize(kScorePopupPoolSize);
@@ -188,10 +212,15 @@ void GamePlaySceneHud::Finalize()
         }
     };
 
-    finalizeSprite(labelScore_);
-    finalizeSprite(labelTime_);
-    finalizeSprite(labelCoin_);
-    finalizeSprite(labelLife_);
+    auto finalizeLabel = [&finalizeSprite](LabelSprite& label) {
+        finalizeSprite(label.base);
+        finalizeSprite(label.shadow);
+    };
+
+    finalizeLabel(labelScore_);
+    finalizeLabel(labelTime_);
+    finalizeLabel(labelCoin_);
+    finalizeLabel(labelLife_);
 
     scoreNumber_.Finalize();
     timeNumber_.Finalize();
@@ -254,10 +283,10 @@ void GamePlaySceneHud::Update(float deltaTime, const FrameInput& input)
     }
 
     // --- 1段目のラベル ---
-    ApplySprite(labelScore_.get(), labelScorePos_, labelSize_, 1.0f);
-    ApplySprite(labelTime_.get(), labelTimePos_, labelSize_, 1.0f);
-    ApplySprite(labelCoin_.get(), labelCoinPos_, labelSize_, 1.0f);
-    ApplySprite(labelLife_.get(), labelLifePos_, labelLifeSize_, 1.0f);
+    ApplyLabel(labelScore_, labelScorePos_, labelSize_, 1.0f);
+    ApplyLabel(labelTime_, labelTimePos_, labelSize_, 1.0f);
+    ApplyLabel(labelCoin_, labelCoinPos_, labelSize_, 1.0f);
+    ApplyLabel(labelLife_, labelLifePos_, labelLifeSize_, 1.0f);
 
     // --- 数値 ---
     scoreNumber_.SetTarget(input.score);
@@ -283,6 +312,12 @@ void GamePlaySceneHud::UpdateCounters(float deltaTime)
     timeNumber_.GetStyle().spacing = digitSpacing_;
     coinNumber_.GetStyle().digitSize = digitSize_;
     coinNumber_.GetStyle().spacing = digitSpacing_;
+
+    // 重ね文字の設定は毎フレーム流し込む（ImGui でその場で見比べられるように）。
+    // **桁ごとの色は cells_ 側に持っているので、ここを書き換えても色は振り直されない**
+    scoreNumber_.GetStyle().shadow = numberShadow_;
+    timeNumber_.GetStyle().shadow = numberShadow_;
+    coinNumber_.GetStyle().shadow = numberShadow_;
 
     scoreNumber_.SetRollSpeed(scoreRollCatchUp_, scoreRollMinStep_);
     coinNumber_.SetRollSpeed(coinRollCatchUp_, coinRollMinStep_);
@@ -365,6 +400,9 @@ void GamePlaySceneHud::PlaceHeadNumber(const Camera& camera, const Vector3& worl
     slot.used = true;
     slot.number->GetStyle().digitSize = headDigitSize_;
     slot.number->GetStyle().spacing = headDigitSpacing_;
+    slot.number->GetStyle().shadow = numberShadow_;
+    slot.number->GetStyle().shadow.offset = { numberShadow_.offset.x * 0.6f,
+                                              numberShadow_.offset.y * 0.6f };
     slot.number->SetTarget(value);
     slot.number->Update(1.0f / 60.0f, screen, headAlpha_ * tint.w);
 }
@@ -537,10 +575,17 @@ void GamePlaySceneHud::Draw(ID3D12GraphicsCommandList* commandList)
 {
     if (!showHud_ || !commandList) return;
 
-    if (labelScore_) labelScore_->Draw(commandList);
-    if (labelTime_) labelTime_->Draw(commandList);
-    if (labelCoin_) labelCoin_->Draw(commandList);
-    if (labelLife_) labelLife_->Draw(commandList);
+    // Sprite の PSO はデプス無効なので、後に描いたものが手前に来る
+    auto drawLabel = [&](const LabelSprite& label) {
+        if (labelShadow_.enabled && !labelShadow_.inFront && label.shadow) label.shadow->Draw(commandList);
+        if (label.base) label.base->Draw(commandList);
+        if (labelShadow_.enabled && labelShadow_.inFront && label.shadow) label.shadow->Draw(commandList);
+    };
+
+    drawLabel(labelScore_);
+    drawLabel(labelTime_);
+    drawLabel(labelCoin_);
+    drawLabel(labelLife_);
 
     scoreNumber_.Draw(commandList);
     timeNumber_.Draw(commandList);
@@ -570,6 +615,32 @@ void GamePlaySceneHud::DrawImGui()
     ImGui::Checkbox("Show HUD", &showHud_);
     ImGui::SameLine();
     ImGui::Checkbox("Head Numbers", &showHeadNumbers_);
+
+    ImGui::SeparatorText("Text Shadow (白文字が見づらい対策)");
+    ImGui::TextWrapped("同じ文字を少しずらして濃紺で重ねる。In Front を切ると普通の影になる");
+    ImGui::Checkbox("Label Shadow##on", &labelShadow_.enabled);
+    ImGui::SameLine();
+    ImGui::Checkbox("Label In Front", &labelShadow_.inFront);
+    ImGui::DragFloat2("Label Offset", &labelShadow_.offset.x, 0.2f, -30.0f, 30.0f);
+    ImGui::ColorEdit3("Label Color", &labelShadow_.color.x);
+    ImGui::DragFloat("Label Alpha Scale", &labelShadow_.alphaScale, 0.01f, 0.0f, 1.0f);
+
+    ImGui::Checkbox("Number Shadow##on", &numberShadow_.enabled);
+    ImGui::SameLine();
+    ImGui::Checkbox("Number In Front", &numberShadow_.inFront);
+    ImGui::DragFloat2("Number Offset", &numberShadow_.offset.x, 0.2f, -30.0f, 30.0f);
+    ImGui::ColorEdit3("Number Color", &numberShadow_.color.x);
+    ImGui::DragFloat("Number Alpha Scale", &numberShadow_.alphaScale, 0.01f, 0.0f, 1.0f);
+    ImGui::DragFloat("Color Jitter", &numberShadow_.colorJitter, 0.005f, 0.0f, 0.5f);
+    ImGui::DragFloat("Blue Jitter", &numberShadow_.blueJitter, 0.005f, 0.0f, 0.5f);
+    ImGui::TextDisabled("※ Jitter は Initialize() のときだけ効く（色の振り直しは Re-roll）");
+    if (ImGui::Button("Re-roll shadow colors"))
+    {
+        // 色は生成時に1回だけ決めているので、振り直すには作り直すのが一番早い
+        labelShadow_.colorJitter = numberShadow_.colorJitter;
+        labelShadow_.blueJitter = numberShadow_.blueJitter;
+        Initialize();
+    }
 
     ImGui::SeparatorText("Row 1 : SCORE / TIME / COIN");
     ImGui::DragFloat2("Label Score", &labelScorePos_.x, 1.0f);

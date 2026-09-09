@@ -372,6 +372,7 @@
     <ClInclude Include="Application\Scene\GameScene\GamePlaySceneFX.h" />
     <ClInclude Include="Application\Scene\GameScene\GamePlaySceneHUD.h" />
     <ClInclude Include="Application\UI\NumberDisplay.h" />
+    <ClInclude Include="Application\UI\UiTextShadow.h" />
     <ClInclude Include="Application\Scene\GameScene\CollisionSystem.h" />
     <ClInclude Include="Application\Scene\GameScene\CombatSystem.h" />
     <ClInclude Include="Application\Scene\ClearScene\ClearScene.h" />

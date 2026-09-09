@@ -9,6 +9,7 @@
 #include "Application/GameObject/FireworkFx.h"
 #include "Baziru3_Engine/Graphics/3D/Object/Object3dCom.h"
 #include "Baziru3_Engine/Graphics/Graphics/SceneRenderRequests.h"
+#include "Baziru3_Engine/Framework/Audio/AudioManager.h"
 
 #include <algorithm>
 #include <cmath>
@@ -40,15 +41,15 @@ struct LogoChar
 };
 
 constexpr LogoChar kLogoChars[] = {
-    {"Resources/UI/GameOver/logo_char_01.png", 54.0f, 0.0f },  // G
-    {"Resources/UI/GameOver/logo_char_02.png", 46.0f, 0.0f },  // a
-    {"Resources/UI/GameOver/logo_char_03.png", 66.0f, 0.0f },  // m
-    {"Resources/UI/GameOver/logo_char_04.png", 46.0f, 34.0f},  // e （ここで単語が切れる）
-    {"Resources/UI/GameOver/logo_char_05.png", 58.0f, 0.0f },  // O
-    {"Resources/UI/GameOver/logo_char_06.png", 48.0f, 0.0f },  // v
-    {"Resources/UI/GameOver/logo_char_07.png", 46.0f, 0.0f },  // e
-    {"Resources/UI/GameOver/logo_char_08.png", 40.0f, 0.0f },  // r
-    {"Resources/UI/GameOver/logo_char_09.png", 60.0f, 0.0f },  // …（三点リーダー1枚）
+    {"Resources/UI/GameOver/G.png", 54.0f, 0.0f },  // G
+    {"Resources/UI/GameOver/A.png", 46.0f, 0.0f },  // a
+    {"Resources/UI/GameOver/M.png", 66.0f, 0.0f },  // m
+    {"Resources/UI/GameOver/E.png", 46.0f, 34.0f},  // e （ここで単語が切れる）
+    {"Resources/UI/GameOver/O.png", 58.0f, 0.0f },  // O
+    {"Resources/UI/GameOver/V.png", 48.0f, 0.0f },  // v
+    {"Resources/UI/GameOver/E.png", 46.0f, 0.0f },  // e
+    {"Resources/UI/GameOver/R.png", 40.0f, 0.0f },  // r
+    {"Resources/UI/GameOver/tententen.png", 60.0f, 0.0f },  // …（三点リーダー1枚）
 };
 
 constexpr int kLogoCharCount = static_cast<int>(std::size(kLogoChars));
@@ -220,6 +221,11 @@ float Hash01(uint32_t value)
     return static_cast<float>(word) / static_cast<float>(0xFFFFFFFFu);
 }
 
+int32_t streamHandle_BGM;
+int32_t playHandle_BGM;
+
+int32_t streamHandle_FallDown;
+
 } // namespace
 
 // unique_ptr が持つ型（FireworkFx）の完全な定義が要るので、
@@ -263,6 +269,13 @@ void GameOverScene::InitializeScene()
         kind.isCling = true; // 初期配置は画面のどこにでも置きたいので張り付き扱いにする
         EmitDroplet(kind);
     }
+
+    auto* audioMngr = SceneManager::GetInstance()->GetAudioManager();
+    if (audioMngr) {
+        streamHandle_BGM = audioMngr->Load("Resources/Audio/Otoshimono.mp3");
+        streamHandle_FallDown = audioMngr->Load("Resources/Audio/FallDown2.mp3");
+        playHandle_BGM = audioMngr->Play(streamHandle_BGM);
+    }
 }
 
 void GameOverScene::Finalize()
@@ -305,6 +318,11 @@ void GameOverScene::Finalize()
 
     delete input_;
     input_ = nullptr;
+
+    auto* audioMngr = SceneManager::GetInstance()->GetAudioManager();
+    if (audioMngr) {
+        audioMngr->Stop(playHandle_BGM);
+    }
 }
 
 void GameOverScene::ResetTuningToDefault()
@@ -715,9 +733,14 @@ void GameOverScene::UpdateLogo(float deltaTime)
     {
         isLogoLandDone_ = true;
 
-        // TODO(SE): ロゴが基準位置に落下した瞬間の音をここで鳴らす。
-        //           全文字が同時に着地するので、鳴るのは1回だけ。
-        //           「ドスン」系の重い音を想定（クリアシーンは文字ごとに鳴る軽い音）
+        // ロゴが基準位置に落下した瞬間の音
+        // 全文字が同時に着地するので、鳴るのは1回だけ。
+        // 「ドスン」系の重い音を想定（クリアシーンは文字ごとに鳴る軽い音）
+
+        auto* audioMngr = SceneManager::GetInstance()->GetAudioManager();
+        if (audioMngr) {
+            audioMngr->Play(streamHandle_FallDown);
+        }
     }
 }
 

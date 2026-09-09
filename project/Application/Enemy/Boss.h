@@ -24,6 +24,17 @@ struct BossConfig
     int maxHp = 100;                 //!< 初期HP。HP がそのまま「強さ」になる
     int selfDestructDamage = 5;      //!< プレイヤーの自爆1回で減る量
 
+    // --- 移動（追跡＋間合い取り）---
+    bool canMove = true;             //!< false でその場固定（旧挙動）
+    float moveSpeed = 4.2f;          //!< 追いかける／下がる速さ (m/s)
+    float keepDistance = 8.5f;       //!< この距離まで近づいたら追うのをやめる (m)
+    float backOffDistance = 5.5f;    //!< これより近いと後ろへ下がる (m)
+    float strafeSpeed = 3.6f;        //!< 間合いを保っているときの横移動 (m/s)
+    float strafeSwitchMin = 1.4f;    //!< 横移動の向きを変えるまでの秒数（下限）
+    float strafeSwitchMax = 3.2f;    //!< 同（上限）
+    float roamRadius = 14.0f;        //!< 配置位置からこれ以上離れない (m)。0 で無制限
+    float shootStopSeconds = 0.45f;  //!< 撃った直後、この秒数だけ足を止める
+
     // --- 挙動 ---
     float turnSpeed = 1.6f;          //!< プレイヤーへ向き直る速さ
     float idleSpinSpeed = 0.0f;      //!< 常時回転させたいとき用（0 でプレイヤー追従のみ）
@@ -36,8 +47,8 @@ struct BossConfig
     float shootInterval = 2.4f;      //!< 発射間隔 (秒)
     float bulletSpeed = 8.0f;
     float bulletLifeTime = 4.0f;
-    float bulletScale = 0.40f;
-    float bulletHitRadius = 0.36f;
+    float bulletScale = 0.78f;       //!< 俯瞰カメラ（約30m）でも粒として見えるサイズ
+    float bulletHitRadius = 0.52f;
     float muzzleHeightRatio = 1.60f; //!< 発射口の高さ（モデルローカル単位）
     float muzzleForward = 0.60f;     //!< 中心からの発射半径 (ワールド m)
     float spinPerVolley = 0.26f;     //!< 1回撃つごとに方向をずらす角度 (rad)。渦になる
@@ -49,6 +60,7 @@ struct BossConfig
     // BOSS.gltf のクリップ: Jump_After / Jump_Wait / Walk / Walk_Wait
     bool useAnimation = true;
     const char* clipIdle = "Walk_Wait";
+    const char* clipWalk = "Walk";   //!< 移動中に再生する。空なら clipIdle のまま
     const char* clipAttack = "Jump_After";
     float animSpeed = 1.0f;
 };
@@ -115,6 +127,13 @@ public:
     void SetShootEnabled(bool enable) { shootEnabled_ = enable; }
     bool IsShootEnabled() const { return shootEnabled_; }
 
+    /// @brief 移動を止める／再開する（登場フォーカス・死亡演出の間は止める）
+    void SetMoveEnabled(bool enable) { moveEnabled_ = enable; }
+    bool IsMoveEnabled() const { return moveEnabled_; }
+
+    /// @brief いま歩いている量 (0..1)。ImGui 表示用
+    float GetMoveAmount() const { return moveAmount_; }
+
     // --- 演出 ---
     /// @brief オーラの激しさ (1.0 が通常。死亡演出でどんどん上がる)
     float GetAuraIntensity() const { return auraIntensity_; }
@@ -152,4 +171,12 @@ private:
     float auraIntensity_ = 1.0f;
     float deathShake_ = 0.0f;
     float shakePhase_ = 0.0f;
+
+    // --- 移動 ---
+    bool moveEnabled_ = true;
+    Vector3 homeLocal_{ 0.0f, 0.0f, 0.0f }; //!< 配置された場所（ステージローカル）。ここから roamRadius 以上離れない
+    float strafeDir_ = 1.0f;                //!< +1 / -1。プレイヤーのまわりを回り込む向き
+    float strafeTimer_ = 0.0f;              //!< 0 になったら向きを変える
+    float shootStopTimer_ = 0.0f;           //!< 撃った直後の足止め
+    float moveAmount_ = 0.0f;               //!< 0..1（アニメの切り替えに使う）
 };

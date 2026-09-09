@@ -17,6 +17,7 @@ class EnemyManager;
 class GrowthCube;
 class GrowthCubeManager;
 class Boss;
+class EnemyBullet;
 
 /**
  * @brief ゲームプレイシーンのパーティクル演出をまとめたもの
@@ -77,6 +78,17 @@ public:
 
     /// @brief ボスの禍々しいオーラ。Boss::GetAuraIntensity() で激しさが変わる
     void UpdateBoss(float deltaTime, Boss* boss);
+
+    /**
+     * @brief 敵の弾に「光る芯」をまとわせる（弾が小さくて見えない対策）
+     * @note 1発につき毎フレーム1粒。寿命が短いので、飛んだ跡が尾のように残る。
+     *       弾は同時にせいぜい数十発なので、レート制御は要らない
+     */
+    void UpdateBullets(float deltaTime, EnemyManager* enemyManager);
+
+    /// @brief 弾1発ぶんの芯の光。ボスの弾は BossFight がこれを直接呼ぶ
+    void EmitBulletGlow(const Vector3& position, const Vector3& velocity,
+                        float radius, const Vector4& color, bool isBoss);
 
     /// @brief FireworkFx 本体の更新。上の Update 群を全部呼んだあと、最後に1回
     void Update(float deltaTime);
@@ -273,6 +285,14 @@ public:
     float bossHitSpeed_ = 9.0f;
     int bossExplosionCount_ = 128;      //!< 最期の大爆発（分裂バーストの2倍相当）
     float bossExplosionSpeed_ = 15.0f;
+
+    // 敵・ボスの弾の芯の光
+    bool enableBulletGlow_ = true;
+    float bulletGlowScale_ = 2.6f;    //!< 弾の当たり判定半径の何倍の粒を出すか
+    float bulletGlowLife_ = 0.22f;    //!< 短いほどキュッと締まった芯になる
+    float bulletGlowAlpha_ = 0.85f;
+    float bulletGlowWhiteness_ = 0.45f; //!< 弾の色を白へ寄せる量（芯を明るく見せる）
+    float bossBulletGlowBoost_ = 1.35f; //!< ボスの弾は一回り大きく
 
     // 単発
     int hitSplashCount_ = 32;

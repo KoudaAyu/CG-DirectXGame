@@ -45,6 +45,15 @@ void NumberDisplay::Initialize(int cellCapacity, const NumberDisplayStyle& style
         // 左上座標だけを毎フレーム差し替えて数字を切り替える
         // （Sprite::Update() が textureLeftTop_ / textureSize_ から UV を計算し直す）
         cell.sprite->SetTextureSize(style_.cellSize);
+
+        // --- 重ねる濃紺の同じ数字 ---
+        // 色は桁ごとに**ここで1回だけ**決める。毎フレーム振り直すとチカチカする
+        cell.shadow = UiShadow::Create(style_.atlasTexture, style_.digitSize, { 0.5f, 0.5f });
+        cell.shadowColor = UiShadow::MakeColor(style_.shadow);
+        if (cell.shadow)
+        {
+            cell.shadow->SetTextureSize(style_.cellSize);
+        }
     }
 }
 
@@ -56,6 +65,11 @@ void NumberDisplay::Finalize()
         {
             cell.sprite->Finalize();
             cell.sprite.reset();
+        }
+        if (cell.shadow)
+        {
+            cell.shadow->Finalize();
+            cell.shadow.reset();
         }
     }
     cells_.clear();
@@ -202,9 +216,16 @@ bool NumberDisplay::Update(float deltaTime, const Vector2& anchor, float alpha,
             }
             cell.shownCell = cell.cell;
 
+            const Vector2 leftTop = CellLeftTop(cell.cell);
             if (cell.sprite)
             {
-                cell.sprite->SetTextureLeftTop(CellLeftTop(cell.cell));
+                cell.sprite->SetTextureLeftTop(leftTop);
+            }
+            // 重ねるほうも同じセルへ切り替える（切り出しはこちらからは読めないので手で合わせる）
+            if (cell.shadow)
+            {
+                cell.shadow->SetTextureLeftTop(leftTop);
+                cell.shadow->SetTextureSize(style_.cellSize);
             }
         }
         cell.punch = Approach(cell.punch, 0.0f, style_.punchDamping, deltaTime);
@@ -223,6 +244,10 @@ bool NumberDisplay::Update(float deltaTime, const Vector2& anchor, float alpha,
         color.w = std::clamp(alpha, 0.0f, 1.0f);
         cell.sprite->SetColor(color);
         cell.sprite->Update();
+
+        // 本体を置き終わってから写す。ずらし量は表示倍率に合わせて縮める
+        UiShadow::Sync(cell.shadow.get(), cell.sprite.get(), style_.shadow,
+                       cell.shadowColor, scale.x, scale.y);
     }
 
     // 使わなかったスプライトは透明にして畳んでおく
@@ -237,6 +262,8 @@ bool NumberDisplay::Update(float deltaTime, const Vector2& anchor, float alpha,
         color.w = 0.0f;
         cell.sprite->SetColor(color);
         cell.sprite->Update();
+
+        UiShadow::Hide(cell.shadow.get());
     }
 
     return cellChanged;
@@ -244,11 +271,29 @@ bool NumberDisplay::Update(float deltaTime, const Vector2& anchor, float alpha,
 
 void NumberDisplay::Draw(ID3D12GraphicsCommandList* commandList) const
 {
+    // Sprite の PSO はデプス無効なので、後に描いたものが手前に来る。
+    // inFront なら濃紺を後に描いて、元の白は右下のふちにだけ残す
+    if (style_.shadow.enabled && !style_.shadow.inFront)
+    {
+        for (const CellSprite& cell : cells_)
+        {
+            if (cell.visible && cell.shadow) cell.shadow->Draw(commandList);
+        }
+    }
+
     for (const CellSprite& cell : cells_)
     {
         if (cell.visible && cell.sprite)
         {
             cell.sprite->Draw(commandList);
+        }
+    }
+
+    if (style_.shadow.enabled && style_.shadow.inFront)
+    {
+        for (const CellSprite& cell : cells_)
+        {
+            if (cell.visible && cell.shadow) cell.shadow->Draw(commandList);
         }
     }
 }

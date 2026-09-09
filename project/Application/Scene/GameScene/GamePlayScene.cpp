@@ -9,6 +9,7 @@
 #include "Application/Editor/StageLayout.h"
 #include <cstdio>
 #include "Game.h"
+#include "Baziru3_Engine/Framework/Audio/AudioManager.h"
 
 #ifdef USE_IMGUI
 #include <imgui.h>
@@ -43,6 +44,41 @@ namespace
 
         return output;
     }
+}
+
+namespace {
+    int32_t streamHandle_BGM;
+    int32_t playHandle_BGM;
+
+    // --- ボス戦BGM ---
+    // 「BGM は同時に1本だけ」をここで一元管理する。
+    // BossFight は音を一切触らず、FrameResult のフラグで
+    // 「ボスBGMにして」「通常BGMに戻して」と言ってくるだけにしてある。
+    // 差し替えたいときは下のファイル名を変えるだけでいい
+    constexpr const char* kBgmNormalPath = "Resources/Audio/MysteriousForest.mp3";
+    constexpr const char* kBgmBossPath   = "Resources/Audio/TimeBend.mp3";
+
+    int32_t streamHandle_BossBGM = -1;
+    bool isBossBgmPlaying = false;
+
+    /// @brief いま鳴っている BGM を止めて、別の BGM に差し替える
+    void SwitchBgm(int32_t streamHandle)
+    {
+        auto* audioMngr = SceneManager::GetInstance()->GetAudioManager();
+        if (!audioMngr || streamHandle < 0) return;
+
+        audioMngr->Stop(playHandle_BGM);
+        playHandle_BGM = audioMngr->Play(streamHandle);
+    }
+
+    int32_t streamHandle_Jump;
+    int32_t streamHandle_Collision;
+    int32_t streamHandle_Explosion;
+    int32_t streamHandle_Killed;
+    int32_t streamHandle_Counter;
+    int32_t streamHandle_GotCoin;
+    int32_t streamHandle_Healed;
+    int32_t streamHandle_Damaged;
 }
 
 void GamePlayScene::InitializeScene()
@@ -286,6 +322,23 @@ void GamePlayScene::InitializeScene()
     // 成長キューブは配置データ（JSON の growthCubes）から
     // PlacementEditor::ApplyLayoutToScene() が置く。ここでのハードコードは廃止した
 
+    auto* audioMngr = SceneManager::GetInstance()->GetAudioManager();
+    if (audioMngr) {
+        streamHandle_BGM = audioMngr->Load(kBgmNormalPath);
+        streamHandle_BossBGM = audioMngr->Load(kBgmBossPath);
+        isBossBgmPlaying = false;
+        playHandle_BGM = audioMngr->Play(streamHandle_BGM);
+
+        streamHandle_Jump = audioMngr->Load("Resources/Audio/PlayerJump.mp3");
+        streamHandle_Collision = audioMngr->Load("Resources/Audio/Collision.mp3");
+        streamHandle_Explosion = audioMngr->Load("Resources/Audio/Explosion.mp3");
+        streamHandle_Killed = audioMngr->Load("Resources/Audio/Killed.mp3");
+        streamHandle_Counter = audioMngr->Load("Resources/Audio/Counter.mp3");
+        streamHandle_GotCoin = audioMngr->Load("Resources/Audio/GotCoin.mp3");
+        streamHandle_Healed = audioMngr->Load("Resources/Audio/Healed.mp3");
+        streamHandle_Damaged = audioMngr->Load("Resources/Audio/Damaged.mp3");
+    }
+
     isInitialized_ = true;
 }
 
@@ -340,11 +393,33 @@ void GamePlayScene::RestartGame()
         IrisTransition::GetInstance()->Initialize(dxCommon_);
     }
 
+    // ボス戦をやり直すので BGM も通常のものへ戻す
+    if (isBossBgmPlaying)
+    {
+        SwitchBgm(streamHandle_BGM);
+        isBossBgmPlaying = false;
+    }
+
     cameraInitialized_ = false;
+}
+
+void GamePlayScene::PublishResultToSceneContext()
+{
+    // 実体は SceneManager が持っている（BaseScene::SetSceneDataInt が横流ししている）ので、
+    // ここで書いた値はシーンを切り替えても残る。ClearScene が同じキーで読む
+    SetSceneDataInt("result.score", score_);
+    SetSceneDataFloat("result.time", elapsedSeconds_);
+    SetSceneDataInt("result.coin", coinManager_ ? coinManager_->GetCollectedCount() : 0);
 }
 
 void GamePlayScene::Finalize()
 {
+    // どの経路で抜けても最新のリザルトが入っている状態にしておく。
+    // SceneManager::CommitPendingSceneChange() は
+    //   旧シーンの Finalize() -> 新シーンの Initialize()
+    // の順なので、ここで書けば ClearScene::InitializeScene() が必ず読める
+    PublishResultToSceneContext();
+
     if (hud_)
     {
         hud_->Finalize();
@@ -444,6 +519,12 @@ void GamePlayScene::Finalize()
     previousSceneCamera_ = nullptr;
     cameraInitialized_ = false;
     isInitialized_ = false;
+
+    auto* audioMngr = SceneManager::GetInstance()->GetAudioManager();
+    if (audioMngr) {
+        audioMngr->Stop(playHandle_BGM);
+    }
+    isBossBgmPlaying = false;
 }
 
 void GamePlayScene::SetEditMode(bool edit)
@@ -477,29 +558,36 @@ void GamePlayScene::Update()
     {
         keyInput_->Update();
 
+#ifdef USE_IMGUI
         // F2キーでプレイ <-> 配置エディタ を切り替え
+        //
+        // 【Release では無効】USE_IMGUI は Debug と Development にしか定義されていない
+        //（DirectXGame.vcxproj の PreprocessorDefinitions を参照）。
+        // 製品ビルドで配置エディタに入られると詰むので、キーごと消してある
         if (keyInput_->TriggerKey(DIK_F2))
         {
             SetEditMode(!isEditMode_);
         }
+#endif
 
         // ENTERキーでクリアシーンへ遷移（SPACEキーはスライムのジャンプに割り当て）
         // 配置エディタ中は誤爆を避けるため無効
         if (!isEditMode_ && keyInput_->TriggerKey(DIK_RETURN))
         {
             // リザルトへ値を渡す。ClearScene が同じキーを読む
-            SetSceneDataInt("result.score", score_);
-            SetSceneDataFloat("result.time", elapsedSeconds_);
-            SetSceneDataInt("result.coin", coinManager_ ? coinManager_->GetCollectedCount() : 0);
+            PublishResultToSceneContext();
 
             SceneManager::GetInstance()->ChangeScene("CLEAR");
         }
 
+#ifdef USE_IMGUI
         // Rキーで再スタート（初期配置でスライムを再生成、ステージ傾斜・カメラを初期化）
+        // 【Release では無効】理由は上の F2 と同じ（デバッグ用のショートカット）
         if (keyInput_->TriggerKey(DIK_R))
         {
             RestartGame();
         }
+#endif
 
         // F1キーで当たり判定ワイヤーフレーム表示/非表示をトグル
         if (keyInput_->TriggerKey(DIK_F1))
@@ -514,16 +602,37 @@ void GamePlayScene::Update()
         mouseInput_->Update();
     }
 
+    // マウス右ドラッグでカメラを旋回（俯瞰角は固定）
+    UpdateCameraOrbit();
+
     // --- ステージ傾斜（ティルト）の入力とスムーズ補間 ---
+    //
+    // 【カメラ相対】WASD は「画面の上下左右」で効く。
+    // スライムの加速度は Slime::UpdatePhysics() で
+    //     accelX = sin(tilt.y) * k   /   accelZ = sin(tilt.x) * k
+    // と作られる（＝ワールド軸）ので、入力をカメラの yaw で回してから
+    // targetTilt_ に入れれば、カメラをどれだけ回しても
+    // 「W = 画面奥へ転がる」が保たれる
     targetTilt_ = { 0.0f, 0.0f };
     if (keyInput_ && !isEditMode_)
     {
-        // W: 奥へ傾ける (Pitch > 0) / S: 手前へ傾ける (Pitch < 0)
-        if (keyInput_->PushKey(DIK_W) || keyInput_->PushKey(DIK_UP))   targetTilt_.x += maxTiltAngle_;
-        if (keyInput_->PushKey(DIK_S) || keyInput_->PushKey(DIK_DOWN)) targetTilt_.x -= maxTiltAngle_;
-        // A: 左へ傾ける (Roll < 0) / D: 右へ傾ける (Roll > 0)
-        if (keyInput_->PushKey(DIK_A) || keyInput_->PushKey(DIK_LEFT))  targetTilt_.y -= maxTiltAngle_;
-        if (keyInput_->PushKey(DIK_D) || keyInput_->PushKey(DIK_RIGHT)) targetTilt_.y += maxTiltAngle_;
+        float inputForward = 0.0f; // W で +1（画面奥）
+        float inputRight = 0.0f;   // D で +1（画面右）
+
+        if (keyInput_->PushKey(DIK_W) || keyInput_->PushKey(DIK_UP))    inputForward += 1.0f;
+        if (keyInput_->PushKey(DIK_S) || keyInput_->PushKey(DIK_DOWN))  inputForward -= 1.0f;
+        if (keyInput_->PushKey(DIK_A) || keyInput_->PushKey(DIK_LEFT))  inputRight -= 1.0f;
+        if (keyInput_->PushKey(DIK_D) || keyInput_->PushKey(DIK_RIGHT)) inputRight += 1.0f;
+
+        // カメラの前方 = (sin(yaw), cos(yaw)) / 右方向 = (cos(yaw), -sin(yaw))
+        const float cosYawIn = std::cos(cameraYaw_);
+        const float sinYawIn = std::sin(cameraYaw_);
+
+        const float worldX = inputRight * cosYawIn + inputForward * sinYawIn;
+        const float worldZ = -inputRight * sinYawIn + inputForward * cosYawIn;
+
+        targetTilt_.y = worldX * maxTiltAngle_; // X 方向の加速度になる
+        targetTilt_.x = worldZ * maxTiltAngle_; // Z 方向の加速度になる
     }
 
     if (isEditMode_)
@@ -692,6 +801,19 @@ void GamePlayScene::Update()
             }
         }
 
+        // --- BGM の切り替え ---
+        // BossFight は「切り替えて」と言ってくるだけ。実際に鳴らすのはここ1箇所
+        if (bossResult.requestBossBgm && !isBossBgmPlaying)
+        {
+            SwitchBgm(streamHandle_BossBGM);
+            isBossBgmPlaying = true;
+        }
+        else if (bossResult.requestNormalBgm && isBossBgmPlaying)
+        {
+            SwitchBgm(streamHandle_BGM);
+            isBossBgmPlaying = false;
+        }
+
         if (bossResult.cameraShake > 0.0f)
         {
             AddCameraShake(bossResult.cameraShake);
@@ -710,9 +832,7 @@ void GamePlayScene::Update()
         if (bossResult.requestClear)
         {
             // リザルトへ値を渡す。ClearScene が同じキーを読む
-            SetSceneDataInt("result.score", score_);
-            SetSceneDataFloat("result.time", elapsedSeconds_);
-            SetSceneDataInt("result.coin", coinManager_ ? coinManager_->GetCollectedCount() : 0);
+            PublishResultToSceneContext();
 
             // フェード付きの予約遷移なので、この時点で this が消えることはない。
             // それでも「ボスを倒したあとの残りの処理」は意味が無いので抜ける
@@ -811,10 +931,11 @@ void GamePlayScene::Update()
 
             // 3. 注視点（LookAt Target）と目標カメラ位置の算出
             // 滑らかに補間された注視点を基準にし、視界を安定確保
+            // 「前方オフセット」はカメラの向いている方向へ出す（yaw を回しても破綻しないように）
             Vector3 lookAtTarget = {
-                currentFocusPos_.x,
+                currentFocusPos_.x + sinYaw * cameraForwardOffset_,
                 currentFocusPos_.y + cameraTargetOffsetY_,
-                currentFocusPos_.z + cameraForwardOffset_
+                currentFocusPos_.z + cosYaw * cameraForwardOffset_
             };
 
             Vector3 targetCamPos = {
@@ -873,10 +994,15 @@ void GamePlayScene::Update()
             if (totalWeight > 0) avgVelX /= static_cast<float>(totalWeight);
             float sideBank = -std::clamp(avgVelX * cameraDynamicBank_, -0.05f, 0.05f);
 
+            // ステージ傾斜への追従も、カメラの yaw に合わせて回してから足す。
+            // yaw = 0 のときは従来どおり（pitch += tilt.x / roll += -tilt.y）
+            const float tiltPitchAdd = currentTilt_.x * cosYaw + currentTilt_.y * sinYaw;
+            const float tiltRollAdd = -currentTilt_.y * cosYaw + currentTilt_.x * sinYaw;
+
             Vector3 targetCamRot = {
-                dynamicPitch + (followStageTilt_ ? currentTilt_.x : 0.0f),
+                dynamicPitch + (followStageTilt_ ? tiltPitchAdd : 0.0f),
                 dynamicYaw,
-                sideBank + (followStageTilt_ ? -currentTilt_.y : 0.0f)
+                sideBank + (followStageTilt_ ? tiltRollAdd : 0.0f)
             };
 
             if (!cameraInitialized_)
@@ -1038,6 +1164,53 @@ void GamePlayScene::AddCameraShake(float trauma)
     shakeTrauma_ = (std::min)(1.0f, shakeTrauma_ + trauma);
 }
 
+void GamePlayScene::UpdateCameraOrbit()
+{
+    if (!mouseInput_) return;
+
+    // 配置エディタ中はエディタがカメラを乗っ取っているので触らない
+    if (isEditMode_)
+    {
+        isCameraOrbiting_ = false;
+        return;
+    }
+
+#ifdef USE_IMGUI
+    // ImGui のウィンドウの上でドラッグしているときは奪わない
+    if (ImGui::GetCurrentContext() && ImGui::GetIO().WantCaptureMouse)
+    {
+        isCameraOrbiting_ = false;
+        return;
+    }
+#endif
+
+    // DirectInput のボタン番号: 0 = 左 / 1 = 右 / 2 = 中
+    const bool isRightDown = mouseInput_->PushButton(1);
+    if (!isRightDown)
+    {
+        isCameraOrbiting_ = false;
+        return;
+    }
+
+    // 押した瞬間は相対移動量に前フレームぶんのゴミが乗ることがあるので1フレーム捨てる
+    if (!isCameraOrbiting_)
+    {
+        isCameraOrbiting_ = true;
+        return;
+    }
+
+    const float moveX = static_cast<float>(mouseInput_->GetMoveX());
+    if (std::abs(moveX) < 0.5f) return;
+
+    const float sign = cameraOrbitInvert_ ? -1.0f : 1.0f;
+    cameraYaw_ += moveX * cameraOrbitSensitivity_ * sign;
+
+    // -pi..pi に畳む（補間が1周しないように）
+    constexpr float kPi2 = 6.28318530717958647692f;
+    while (cameraYaw_ > 3.14159265358979323846f)  cameraYaw_ -= kPi2;
+    while (cameraYaw_ < -3.14159265358979323846f) cameraYaw_ += kPi2;
+}
+
 void GamePlayScene::UpdateCameraShake(float deltaTime)
 {
     if (!playCamera_) return;
@@ -1139,8 +1312,12 @@ void GamePlayScene::UpdateFxAndHud(float deltaTime)
             // 軽くカメラを揺らす
             AddCameraShake(shakeOnEnemyHit_);
 
-            // TODO(SE): 敵とプレイヤー（ミニオン）の衝突音をここで鳴らす
-            //           ev.isPlayer で本体とミニオンを鳴らし分けられる
+            // 敵とプレイヤー（ミニオン）の衝突音
+            // TODO: ev.isPlayer で本体とミニオンを鳴らし分けられる
+            auto* audioMngr = SceneManager::GetInstance()->GetAudioManager();
+            if (audioMngr) {
+                audioMngr->Play(streamHandle_Collision);
+            }
         }
     }
 
@@ -1152,7 +1329,11 @@ void GamePlayScene::UpdateFxAndHud(float deltaTime)
         {
             if (ev.jumped)
             {
-                // TODO(SE): プレイヤーのジャンプ音をここで鳴らす
+                // プレイヤーのジャンプ音
+                auto* audioMngr = SceneManager::GetInstance()->GetAudioManager();
+                if (audioMngr) {
+                    audioMngr->Play(streamHandle_Jump);
+                }
             }
 
             if (ev.split)
@@ -1168,7 +1349,11 @@ void GamePlayScene::UpdateFxAndHud(float deltaTime)
                 // BossFight は次の Update() でまとめて HP を減らす
                 if (bossFight_) bossFight_->NotifySelfDestruct(ev.splitPosition);
 
-                // TODO(SE): プレイヤーの自爆（E キー分裂）音をここで鳴らす
+                // プレイヤーの自爆（E キー分裂）音
+                auto* audioMngr = SceneManager::GetInstance()->GetAudioManager();
+                if (audioMngr) {
+                    audioMngr->Play(streamHandle_Explosion);
+                }
             }
         }
     }
@@ -1182,7 +1367,11 @@ void GamePlayScene::UpdateFxAndHud(float deltaTime)
             // 光は CoinManager 側のコインが「消えきる」まで、
             // GamePlaySceneFx::UpdateCoins() が出し続ける
 
-            // TODO(SE): コイン取得音をここで鳴らす
+            // コイン取得音
+            auto* audioMngr = SceneManager::GetInstance()->GetAudioManager();
+            if (audioMngr) {
+                audioMngr->Play(streamHandle_GotCoin);
+            }
         }
     }
 
@@ -1195,7 +1384,11 @@ void GamePlayScene::UpdateFxAndHud(float deltaTime)
             // GrowthCube 側が持っていて、そのあいだ光は出続ける
             if (fx_) fx_->EmitGrowthCubeCollect(position, 0.6f);
 
-            // TODO(SE): 成長キューブを食べたときの音をここで鳴らす
+            // 成長キューブを食べたときの音
+            auto* audioMngr = SceneManager::GetInstance()->GetAudioManager();
+            if (audioMngr) {
+                audioMngr->Play(streamHandle_Healed);
+            }
         }
     }
 
@@ -1224,13 +1417,21 @@ void GamePlayScene::UpdateFxAndHud(float deltaTime)
 
         if (hud_->TakeLifeLostEvent())
         {
-            // TODO(SE): プレイヤーの残機（スライムの数）が減ったときの音をここで鳴らす
+            // プレイヤーの残機（スライムの数）が減ったときの音
+            auto* audioMngr = SceneManager::GetInstance()->GetAudioManager();
+            if (audioMngr) {
+                audioMngr->Play(streamHandle_Damaged);
+            }
         }
 
         if (hud_->TakeCounterTickEvent())
         {
-            // TODO(SE): カウンター（スコア・コイン）が増えていくときの音をここで鳴らす
-            //           クリアシーン側の同じ音は ClearScene::UpdateNumbers() にマークしてある
+            // カウンター（スコア・コイン）が増えていくときの音
+            // クリアシーン側の同じ音は ClearScene::UpdateNumbers() にマークしてある
+            auto* audioMngr = SceneManager::GetInstance()->GetAudioManager();
+            if (audioMngr) {
+                audioMngr->Play(streamHandle_Counter);
+            }
         }
     }
 }
@@ -1402,8 +1603,32 @@ void GamePlayScene::DrawDebugUI()
     {
         ImGui::Text("Score: %d", score_);
         ImGui::Text("Time : %.1f s", elapsedSeconds_);
+
+        // リザルトが CLEAR へちゃんと渡るかの確認用。
+        // "stored" は SceneManager 側に今入っている値（＝ ClearScene が読む値）
+        ImGui::SeparatorText("Result handoff (-> CLEAR)");
+        ImGui::Text("now    : score %d / time %.1f / coin %d",
+                    score_, elapsedSeconds_,
+                    coinManager_ ? coinManager_->GetCollectedCount() : 0);
+        ImGui::Text("stored : score %d / time %.1f / coin %d",
+                    GetSceneDataInt("result.score", -1),
+                    GetSceneDataFloat("result.time", -1.0f),
+                    GetSceneDataInt("result.coin", -1));
+        if (ImGui::Button("Publish result now"))
+        {
+            PublishResultToSceneContext();
+        }
         ImGui::Text("Coin : %d", coinManager_ ? coinManager_->GetCollectedCount() : 0);
-        ImGui::Text("Life : %d", CalculateLifeCount());
+        ImGui::Text("Life : %d / %d", CalculateLifeCount(),
+                    slimeManager_ ? slimeManager_->GetMaxTotalSize() : 0);
+        if (slimeManager_)
+        {
+            int lifeCap = slimeManager_->GetMaxTotalSize();
+            if (ImGui::DragInt("Life Cap (残機の上限)", &lifeCap, 1.0f, 1, 30))
+            {
+                slimeManager_->SetMaxTotalSize(lifeCap);
+            }
+        }
         ImGui::DragInt("Score (debug)", &score_, 10.0f, 0, 999999);
         if (ImGui::Button("Reset Score / Time"))
         {
@@ -1573,6 +1798,18 @@ void GamePlayScene::DrawDebugUI()
         if (ImGui::SliderFloat("Slime Friction (共通摩擦係数: 1.3)", &friction, 0.2f, 5.0f, "%.1f")) {
             SlimePhysics::SetFriction(friction);
         }
+
+        if (slimeManager_)
+        {
+            // 自爆で散らばったミニオンに追いつけるように、代表以外だけ遅くしている。
+            // 1.0 にすると全員同じ速さ（従来の挙動）に戻る
+            float minionSpeed = slimeManager_->GetMinionSpeedScale();
+            if (ImGui::SliderFloat("Minion Speed Scale (ミニオンの速さ倍率)", &minionSpeed, 0.2f, 1.5f, "%.2f"))
+            {
+                slimeManager_->SetMinionSpeedScale(minionSpeed);
+            }
+            ImGui::TextDisabled("プレイヤー本体（一番大きい個体）は常に 1.0");
+        }
     }
 
     ImGui::Separator();
@@ -1702,6 +1939,12 @@ void GamePlayScene::DrawDebugUI()
         {
             cameraYaw_ = yawDeg * 0.0174533f;
         }
+
+        ImGui::SeparatorText("Right Drag Orbit (右ドラッグ旋回)");
+        ImGui::DragFloat("Orbit Sensitivity (rad/dot)", &cameraOrbitSensitivity_, 0.0005f, 0.0005f, 0.05f, "%.4f");
+        ImGui::Checkbox("Invert Orbit Drag (向きを反転)", &cameraOrbitInvert_);
+        ImGui::SameLine();
+        if (ImGui::Button("Reset Yaw")) { cameraYaw_ = 0.0f; }
 
         ImGui::SliderFloat("Target Height Y (注視点の高さ)", &cameraTargetOffsetY_, 0.0f, 5.0f, "%.1f m");
         ImGui::SliderFloat("Forward Look Offset (前方視界オフセット)", &cameraForwardOffset_, -5.0f, 10.0f, "%.1f m");

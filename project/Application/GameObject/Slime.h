@@ -99,6 +99,20 @@ public:
     float GetCurrentScale() const { return scale_.x; }
     float GetTiltAccel() const { return tiltAccel_; }
     void SetTiltAccel(float a) { tiltAccel_ = a; }
+
+    /**
+     * @brief 転がりの速さに掛かる倍率（1.0 が既定）
+     * @note ステージ傾斜による加速度と、斜面すべりの両方に掛かる。
+     *       終端速度は「加速度 / 摩擦」で決まるので、
+     *       0.67 を入れるとそのまま **移動速度が 0.67 倍** になる。
+     *       空中の放物線（Launch / Thrown）には掛からないので、
+     *       分裂で弾け飛ぶ勢いは変わらない。
+     *
+     *       セットしているのは SlimeManager::Update()。
+     *       群れの代表（＝プレイヤー本体）だけ 1.0、それ以外を遅くしている
+     */
+    float GetSpeedScale() const { return speedScale_; }
+    void SetSpeedScale(float s) { speedScale_ = (s < 0.0f) ? 0.0f : s; }
     float GetFriction() const { return SlimePhysics::GetFriction(); }
     void SetFriction(float f) { SlimePhysics::SetFriction(f); }
 
@@ -132,6 +146,7 @@ private:
     float radius_ = 0.3f;
     float groundY_ = 0.30f;
     float tiltAccel_ = 35.0f;
+    float speedScale_ = 1.0f;   //!< 転がりの速さの倍率。SlimeManager が毎フレーム入れる
     float currentMergedScale_ = 0.4f;
 
     float mergeCooldown_ = 0.0f;

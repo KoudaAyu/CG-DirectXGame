@@ -130,6 +130,9 @@ public:
     int GetActiveBulletCount() const;
     const std::vector<std::unique_ptr<MobEnemy>>& GetEnemies() const { return enemies_; }
 
+    /// @brief 弾のプール（死んでいるものも含む）。演出側は IsAlive() を見ること
+    const std::vector<std::unique_ptr<EnemyBullet>>& GetBullets() const { return bullets_; }
+
 private:
     /// @brief 弾を1発撃つ（プールから使い回す）
     void FireBullet(const MobEnemyConfig& config, const MobEnemy::ShootRequest& request);
@@ -144,8 +147,13 @@ private:
     ///       代表個体かどうかで振り分けている
     void ResolveSlimeCollisions(SlimeManager* slimeManager, const Vector2& stageTilt, const Vector2& pivot);
 
-    /// @brief 敵弾 vs 代表スライム
-    void ResolveBulletCollisions(Slime* slime);
+    /**
+     * @brief 敵弾 vs 全スライム
+     * @note 当たった個体は SlimeManager::EjectOnBulletHit() に渡す。
+     *       サイズ N (>1) は N-1 になって強さ1が1体はじけ飛び（残機合計は不変）、
+     *       サイズ1の個体は消滅する（＝残機 -1）
+     */
+    void ResolveBulletCollisions(SlimeManager* slimeManager);
 
     /// @brief スライムの自爆（E キー全員分裂）で、爆風内の敵を強さ問わず倒す
     void ResolveSelfDestruct(SlimeManager* slimeManager);
@@ -171,7 +179,8 @@ private:
     std::mt19937 rng_{ std::random_device{}() };
 
     float bounceSpeed_ = 13.0f;        //!< 強い敵にぶつかったときの吹っ飛び初速
-    float bulletKnockback_ = 9.0f;     //!< 被弾時のノックバック初速
+    float bulletKnockback_ = 9.0f;     //!< 被弾時のノックバック初速（本体）
+    float bulletEjectSpeed_ = 15.0f;   //!< 被弾ではじけ飛ぶ強さ1のスライムの初速（"ちょっと遠め"）
     float minionBounceSpeed_ = 9.0f;   //!< 小スライムが強い敵に弾かれるときの初速
     float selfDestructBaseRadius_ = 4.0f; //!< 自爆の爆風半径（サイズ1のとき）
     float selfDestructPerSize_ = 0.8f;    //!< 分裂前サイズ1つあたりの爆風半径の伸び

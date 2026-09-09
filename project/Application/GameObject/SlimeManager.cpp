@@ -12,6 +12,9 @@
 
 namespace {
     constexpr float kPi = 3.14159265358979323846f;
+
+    // 被弾ではじけ飛んだ子が、飛び出した直後に本体へ吸い戻されないための待ち時間
+    constexpr float kBulletEjectMergeCooldown = 0.90f;
 }
 
 void SlimeManager::Initialize(Object3dCom* object3dCom, Camera* camera) {
@@ -258,6 +261,75 @@ void SlimeManager::TriggerSplit() {
     }
 }
 
+Slime* SlimeManager::EjectOnBulletHit(Slime* victim, const Vector3& knockDir,
+                                     float knockSpeed, float ejectSpeed) {
+    if (!victim || !victim->IsActive()) return nullptr;
+
+    // 水平成分だけ取り出して正規化
+    Vector3 dir{ knockDir.x, 0.0f, knockDir.z };
+    float len = std::sqrt(dir.x * dir.x + dir.z * dir.z);
+    if (len > 1e-4f) {
+        dir.x /= len;
+        dir.z /= len;
+    } else {
+        dir = { 0.0f, 0.0f, 1.0f };
+    }
+
+    const int size = victim->GetSize();
+
+    // --- 強さ1しか無い個体は、弾を食らったらその場で死ぬ ---
+    // 実体の破棄は Update() の末尾の erase に任せる（ここで消すと
+    // 呼び出し元が持っている Slime* がダングリングする）
+    if (size <= 1) {
+        victim->SetActive(false);
+        return nullptr;
+    }
+
+    // --- 塊から強さ1が1体はじけ出る（残機合計は変わらない）---
+    victim->SetSize(size - 1);
+    victim->SetMergeCooldown(kBulletEjectMergeCooldown);
+
+    Vector3 vel = victim->GetVelocity();
+    vel.x = dir.x * knockSpeed;
+    vel.z = dir.z * knockSpeed;
+    vel.y = (std::max)(vel.y, knockSpeed * 0.22f);
+    victim->SetVelocity(vel);
+
+    {
+        auto& params = victim->GetSlimeParams();
+        params.impulseStrength = (std::max)(params.impulseStrength, 0.7f);
+        params.squashStretch = { 0.30f, -0.26f, 0.30f };
+    }
+
+    // 上限に当たっているときは、本体が縮むだけ（残機合計は 1 減る）。
+    // ここで抗うと slimes_ が溢れて初期化に失敗した実体を抱えこむ
+    if (static_cast<int>(slimes_.size()) >= kMaxSlimes) return nullptr;
+
+    // 飛び出す子は本体から少しずらしてから放る。
+    // 同じ位置に出すと次のフレームの分離処理で押し合ってしまう
+    const Vector3 basePos = victim->GetPosition();
+    const float offset = victim->GetRadius() * 1.2f;
+    Vector3 spawnPos = { basePos.x + dir.x * offset,
+                         basePos.y + 0.25f,
+                         basePos.z + dir.z * offset };
+
+    auto ejected = std::make_unique<Slime>();
+    ejected->Initialize(object3dCom_, camera_, spawnPos, 1);
+    ejected->SetMergeCooldown(kBulletEjectMergeCooldown);
+
+    // 真っ直ぐだと本体の真上を通ることがあるので、左右へ少しばらす
+    const float spin = ((std::rand() % 100) / 100.0f - 0.5f) * 0.9f;
+    const float cs = std::cos(spin);
+    const float sn = std::sin(spin);
+    const Vector3 outDir{ dir.x * cs + dir.z * sn, 0.0f, -dir.x * sn + dir.z * cs };
+
+    ejected->Launch({ outDir.x * ejectSpeed, ejectSpeed * 0.55f, outDir.z * ejectSpeed });
+    ejected->GetSlimeParams().impulseStrength = 1.0f;
+
+    slimes_.push_back(std::move(ejected));
+    return slimes_.back().get();
+}
+
 void SlimeManager::CheckAndResolveMerge(const Vector2& stageTilt, const Vector2& pivot) {
     size_t count = slimes_.size();
     bool anyMerged = false;
@@ -430,6 +502,18 @@ void SlimeManager::Update(float deltaTime, KeyInput* keyInput, const Vector2& st
         mergeRequested_ = false;
         GetGroupCenterAndSpread(center, spread);
         pivot = { center.x, center.z };
+    }
+
+    // --- 移動速度の倍率を配る ---
+    // 自爆でミニオンが散らばったあと、全員が同じ速さで転がると
+    // いつまで経っても追いつけないので、**代表（＝プレイヤー本体）以外を遅くする**。
+    // 代表は毎フレーム引き直す（合体すると実体が erase されるため）
+    {
+        const Slime* leader = GetLeader();
+        for (auto& slime : slimes_) {
+            if (!slime) continue;
+            slime->SetSpeedScale((slime.get() == leader) ? 1.0f : minionSpeedScale_);
+        }
     }
 
     // 各スライムの物理更新

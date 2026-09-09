@@ -98,12 +98,48 @@ public:
     float GetMergeThreshold() const { return mergeThreshold_; }
     void SetMergeThreshold(float t) { mergeThreshold_ = t; }
 
+    /**
+     * @brief ミニオン（＝代表以外のスライム）の移動速度の倍率
+     * @note 自爆で散らばったミニオンに追いつけるようにするためのもの。
+     *       **代表（一番大きい個体＝プレイヤー本体）は常に 1.0 のまま。**
+     *       掛かるのはステージ傾斜による転がりと斜面すべりだけで、
+     *       分裂で弾け飛ぶ勢い（Launch）には影響しない
+     */
+    float GetMinionSpeedScale() const { return minionSpeedScale_; }
+    void SetMinionSpeedScale(float s) { minionSpeedScale_ = (s < 0.0f) ? 0.0f : s; }
+
     float GetSplitPopPower() const { return splitPopPower_; }
     void SetSplitPopPower(float p) { splitPopPower_ = p; }
     float GetSplitUpPower() const { return splitUpPower_; }
     void SetSplitUpPower(float p) { splitUpPower_ = p; }
 
     static constexpr int kMaxSlimes = 30;
+
+    /// @brief 残機（＝全スライムのサイズ合計）の既定上限
+    static constexpr int kDefaultMaxTotalSize = 20;
+
+    /// @brief 残機の上限。GrowthCube はこれを超える分を吐き出さない
+    int GetMaxTotalSize() const { return maxTotalSize_; }
+    void SetMaxTotalSize(int v) { maxTotalSize_ = (v < 1) ? 1 : v; }
+
+    /// @brief これ以上大きくなれるか（残機が上限未満か）
+    bool CanGrow() const { return GetTotalSize() < maxTotalSize_; }
+
+    /**
+     * @brief 弾に当たった1体を「分離」させる
+     * @param victim 被弾した個体
+     * @param knockDir 弾が飛んできた方向（水平成分だけ使う）
+     * @param knockSpeed 本体のノックバック初速
+     * @param ejectSpeed はじけ飛ぶサイズ1の初速（こちらのほうが速い）
+     * @return はじけ飛んだサイズ1のスライム。死んだ・発生しなかったときは nullptr
+     * @note サイズ N (>1) → N-1 になり、サイズ1が1体遠くへ飛ぶ。**残機合計は変わらない**。
+     *       サイズ1の個体が当たったときだけその場で消滅する（＝残機 -1）。
+     * @warning 中で slimes_ に push_back するので、**GetSlimes() を回しながら呼ばないこと**。
+     *          Slime の実体は unique_ptr の先なので Slime* 自体は生き続けるが、
+     *          vector のイテレータは無効化される。被弾した個体を先に集めてから呼ぶ
+     */
+    Slime* EjectOnBulletHit(Slime* victim, const Vector3& knockDir,
+                            float knockSpeed, float ejectSpeed);
 
 private:
     void ResolveSeparation(const Vector3& rotation, const Vector2& stageTilt, const Vector2& pivot);
@@ -126,6 +162,12 @@ private:
     float mergeThreshold_ = 2.5f;
     float splitPopPower_ = 8.0f;
     float splitUpPower_ = 7.0f;
+
+    // 残機（サイズ合計）の上限
+    int maxTotalSize_ = kDefaultMaxTotalSize;
+
+    // ミニオン（代表以外）の移動速度の倍率。プレイヤー本体は常に 1.0
+    float minionSpeedScale_ = 0.67f;
 
     // 全員落下時にカメラを初期位置に戻さないための直前有効位置キャッシュ
     Vector3 lastValidCenter_{ 0.0f, 0.5f, 0.0f };

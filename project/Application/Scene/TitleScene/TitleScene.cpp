@@ -81,6 +81,18 @@ constexpr float kLogoScaleDefault = 1.0f;
 constexpr float kCharHeightDefault = 135.0f; // 1文字の基準の高さ
 constexpr float kCharSpacingDefault = 6.0f;  // 文字間隔
 
+// --- マニュアル（MANUAL ボタンで出る1枚絵）---
+// 画像が無くても engine の LoadTexture が 4x4 の白ダミーを返すので、
+// 白い板として動作確認できる。あとから同じパスに置けばそのまま使われる
+constexpr const char* kManualTexture = "Resources/UI/Title/manual.png";
+constexpr const char* kManualDimTexture = "Resources/UI/Title/manual_dim.png";
+constexpr Vector2 kManualSize = {1120.0f, 630.0f}; // 画面より少し小さめ（背景が縁から覗く）
+constexpr Vector2 kManualCenter = {640.0f, 360.0f};
+constexpr float kManualOpenSeconds = 0.32f;  // にゅっと出るまで
+constexpr float kManualCloseSeconds = 0.18f; // すっと消えるまで
+constexpr float kManualRiseOffset = 60.0f;   // 出るときに下から持ち上げる量（ピクセル）
+constexpr float kManualDimAlpha = 0.55f;     // 背景を暗くする濃さ
+
 constexpr Vector2 kButtonSize = {320.0f, 90.0f};
 constexpr float kButtonCenterX = 950.0f; // ボタン列の中心X
 constexpr float kButtonFirstY = 420.0f;  // 一番上（START）の中心Y
@@ -262,6 +274,7 @@ void TitleScene::InitializeScene()
 
     CreateTitleLetters();
     CreateButtons();
+    CreateManual();
     CreateSlime();
 
     sceneTime_ = 0.0f;
@@ -580,13 +593,17 @@ void TitleScene::Update()
     UpdateTitleLetters(deltaTime);
     UpdateButtons(deltaTime);
 
+    // ボタンの入力可否を見てから開閉するので、UpdateButtons の後ろに置くこと
+    UpdateManual(deltaTime);
+
     // ボタンのホバー状態を見てから動かすので、UpdateButtons の後ろに置くこと
     UpdateDemo(deltaTime);
     UpdateSlime(deltaTime);
     UpdateFx(deltaTime);
 
     // Space キーでもゲーム開始（従来のショートカットを残しておく）
-    if (input_ && input_->TriggerKey(DIK_SPACE))
+    // マニュアルを開いている間は誤爆しないように止める
+    if (input_ && !IsManualVisible() && input_->TriggerKey(DIK_SPACE))
     {
         DecideMenu(MenuItem::Start);
     }
@@ -642,8 +659,9 @@ void TitleScene::UpdateButtons(float deltaTime)
 {
     const Vector2 mousePos = GetMousePositionOnUI();
 
-    // フェードイン中は誤爆防止で入力を受け付けない
-    const bool acceptInput = (fadeAlpha_ >= 1.0f);
+    // フェードイン中は誤爆防止で入力を受け付けない。
+    // マニュアルが出ている間も同じ扱いにして、ボタンを押せなくする
+    const bool acceptInput = (fadeAlpha_ >= 1.0f) && !IsManualVisible();
     const bool isClicked = acceptInput && mouse_ && mouse_->TriggerButton(0);
 
     for (int i = 0; i < static_cast<int>(MenuItem::Count); ++i)
@@ -703,6 +721,85 @@ void TitleScene::UpdateButtons(float deltaTime)
             DecideMenu(static_cast<MenuItem>(i));
         }
     }
+}
+
+// ===================================================================
+// マニュアル
+// ===================================================================
+
+void TitleScene::CreateManual()
+{
+    // 背景を暗くする板。画像が無ければ白ダミーになるので、色で黒く塗る
+    manualDim_ = MakeSprite(kManualDimTexture, {1280.0f, 720.0f}, {0.5f, 0.5f});
+    if (manualDim_)
+    {
+        manualDim_->SetColor({0.0f, 0.0f, 0.05f, 0.0f});
+        manualDim_->SetPosition({640.0f, 360.0f});
+    }
+
+    manualSheet_ = MakeSprite(kManualTexture, kManualSize, {0.5f, 0.5f});
+
+    isManualOpen_ = false;
+    manualRate_ = 0.0f;
+}
+
+void TitleScene::OpenManual()
+{
+    isManualOpen_ = true;
+}
+
+void TitleScene::CloseManual()
+{
+    isManualOpen_ = false;
+}
+
+void TitleScene::UpdateManual(float deltaTime)
+{
+    // ESC で閉じる
+    if (isManualOpen_ && input_ && input_->TriggerKey(DIK_ESCAPE))
+    {
+        CloseManual();
+    }
+
+    const float openSpeed = 1.0f / (std::max)(0.01f, kManualOpenSeconds);
+    const float closeSpeed = 1.0f / (std::max)(0.01f, kManualCloseSeconds);
+    manualRate_ = std::clamp(manualRate_ + (isManualOpen_ ? openSpeed : -closeSpeed) * deltaTime,
+                             0.0f, 1.0f);
+
+    if (manualRate_ <= 0.0f)
+    {
+        // 完全に閉じきったら透明にして終わり（Draw 側でも弾いている）
+        if (manualDim_)
+        {
+            Vector4 color = manualDim_->GetColor();
+            color.w = 0.0f;
+            manualDim_->SetColor(color);
+        }
+        return;
+    }
+
+    // 開くときだけ EaseOutBack で「にゅっ」と行き過ぎてから戻る。
+    // 閉じるときに EaseOutBack を通すと、消え際に一度膨らんで見えるので通さない
+    const float ease = isManualOpen_ ? EaseOutBack(manualRate_) : manualRate_;
+
+    if (manualDim_)
+    {
+        Vector4 color = manualDim_->GetColor();
+        color.w = kManualDimAlpha * manualRate_;
+        manualDim_->SetColor(color);
+        manualDim_->SetPosition({640.0f, 360.0f});
+        manualDim_->SetSize({1280.0f, 720.0f});
+        manualDim_->Update();
+    }
+
+    // 下から持ち上げつつ、横に伸びて縦に縮む「ぷにっ」を少しだけ足す
+    const float overshoot = ease - manualRate_;
+    const Vector2 center = {kManualCenter.x,
+                            kManualCenter.y + kManualRiseOffset * (1.0f - ease)};
+    const Vector2 size = {kManualSize.x * ease * (1.0f + overshoot * 0.12f),
+                          kManualSize.y * ease * (1.0f - overshoot * 0.12f)};
+
+    ApplySprite(manualSheet_.get(), center, size, manualRate_);
 }
 
 void TitleScene::UpdateSlime(float deltaTime)
@@ -995,7 +1092,9 @@ void TitleScene::DecideMenu(MenuItem item)
         break;
 
     case MenuItem::Manual:
-        // TODO: マニュアル画面ができたらここで遷移させる
+        // 画面遷移はせず、その場でマニュアルの1枚絵をにゅっと出す。
+        // 閉じるのは ESC キー（UpdateManual の中）
+        OpenManual();
         isManualRequested_ = true;
         break;
 
@@ -1072,6 +1171,20 @@ void TitleScene::Draw(SceneRenderRequests& renderRequests)
         if (button.light && button.lightRate > 0.0f)
         {
             button.light->Draw(commandList);
+        }
+    }
+
+    // マニュアルは全部の一番手前。Sprite の PSO はデプス無効なので、
+    // 最後に描いたものが必ず前に出る
+    if (manualRate_ > 0.0001f)
+    {
+        if (manualDim_)
+        {
+            manualDim_->Draw(commandList);
+        }
+        if (manualSheet_)
+        {
+            manualSheet_->Draw(commandList);
         }
     }
 }

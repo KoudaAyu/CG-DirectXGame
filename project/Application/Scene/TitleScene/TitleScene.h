@@ -100,6 +100,16 @@ private:
 
     void UpdateTitleLetters(float deltaTime);
     void UpdateButtons(float deltaTime);
+
+    // --- マニュアル（MANUAL ボタンで前に出てくる1枚絵）---
+    void CreateManual();
+    void UpdateManual(float deltaTime);
+    void OpenManual();
+    void CloseManual();
+
+    /// <summary>マニュアルが画面に出ているか（開閉アニメ中も含む）</summary>
+    /// <remarks>これが true の間はボタンのホバー・クリックを一切受け付けない</remarks>
+    bool IsManualVisible() const { return isManualOpen_ || manualRate_ > 0.0001f; }
     void UpdateFadeIn(float deltaTime);
     void DecideMenu(MenuItem item);
 
@@ -166,6 +176,12 @@ private:
 
     bool isManualRequested_ = false;
     bool isExitRequested_ = false;
+
+    // --- マニュアル ---
+    std::unique_ptr<Sprite> manualDim_;   // 背景を暗くする板（画像が無ければ engine の白ダミーが使われる）
+    std::unique_ptr<Sprite> manualSheet_; // マニュアル本体の1枚絵
+    bool isManualOpen_ = false;           // 開いている（＝開くほうへ動いている）か
+    float manualRate_ = 0.0f;             // 0 = 閉じきり / 1 = 開ききり
 
     // ===============================================================
     // タイトルスライム（3D）

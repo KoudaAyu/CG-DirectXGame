@@ -56,6 +56,9 @@ public:
     void Kill() { isAlive_ = false; }
 
     const Vector3& GetPosition() const { return position_; }
+    const Vector3& GetVelocity() const { return velocity_; }
+    /// @brief 弾の色。演出（芯の光）を弾と同じ色にするのに使う
+    const Vector4& GetColor() const { return color_; }
     float GetHitRadius() const { return hitRadius_; }
     const std::string& GetModelKey() const { return modelKey_; }
     bool IsReady() const { return object3d_ != nullptr; }
@@ -63,6 +66,7 @@ public:
 private:
     std::unique_ptr<Object3d> object3d_;
     std::string modelKey_;
+    Vector4 color_{ 1.0f, 1.0f, 1.0f, 1.0f };
 
     Vector3 position_{ 0.0f, 0.0f, 0.0f };
     Vector3 velocity_{ 0.0f, 0.0f, 0.0f };

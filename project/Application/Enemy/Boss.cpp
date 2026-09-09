@@ -1,8 +1,11 @@
 #define NOMINMAX
 #include "Application/Enemy/Boss.h"
 
+#include "Application/GameObject/SlimePhysics.h"
+
 #include <algorithm>
 #include <cmath>
+#include <cstdlib>
 
 namespace
 {
@@ -10,6 +13,13 @@ namespace
     constexpr float kTwoPi = kPi * 2.0f;
 
     BossConfig g_bossConfig{};
+
+    /// @brief min..max の一様乱数（演出のばらつき用。再現性は要らないので rand() で十分）
+    float RandomRange(float minValue, float maxValue)
+    {
+        const float t = static_cast<float>(std::rand() % 1001) / 1000.0f;
+        return minValue + (maxValue - minValue) * t;
+    }
 }
 
 BossConfig& GetBossConfig()
@@ -49,6 +59,14 @@ void Boss::OnInitialized()
     SetScaleFromStrength([](int) { return 1.0f; });
 
     ResetHp(c.maxHp);
+
+    // 「配置された場所」を覚えておく。ここから roamRadius 以上は離れない
+    homeLocal_ = anchorLocal_;
+    strafeDir_ = (std::rand() % 2 == 0) ? 1.0f : -1.0f;
+    strafeTimer_ = RandomRange(c.strafeSwitchMin, c.strafeSwitchMax);
+    shootStopTimer_ = 0.0f;
+    moveAmount_ = 0.0f;
+    moveEnabled_ = true;
 
     shootTimer_ = c.shootInterval * 0.6f;
     volleyPhase_ = 0.0f;
@@ -126,7 +144,6 @@ void Boss::UpdateBehavior(const EnemyUpdateContext& ctx)
     const float dt = ctx.deltaTime;
 
     // --- 向き ---
-    // その場固定なので、やることはプレイヤーの方を向くことだけ
     const float wdx = ctx.playerPos.x - position_.x;
     const float wdz = ctx.playerPos.z - position_.z;
     if (wdx * wdx + wdz * wdz > 1e-6f)
@@ -146,6 +163,116 @@ void Boss::UpdateBehavior(const EnemyUpdateContext& ctx)
     hopPhase_ += dt * c.hopSpeed;
     shakePhase_ += dt;
 
+    // ===================================================================
+    // 移動（追跡 ＋ 間合い取り ＋ 回り込み）
+    //
+    // 位置はステージローカル（anchorLocal_）で動かすのが EnemyBase の作法。
+    // ワールド座標（position_）は毎フレーム導出されるだけの結果でしかない。
+    // ここをワールドで動かすと、ステージを傾けた瞬間に地形だけ動いて取り残される
+    // ===================================================================
+    if (shootStopTimer_ > 0.0f) shootStopTimer_ -= dt;
+
+    moveAmount_ = 0.0f;
+    if (c.canMove && moveEnabled_ && shootStopTimer_ <= 0.0f && dt > 1e-5f)
+    {
+        // プレイヤーを同じ土俵（ステージローカル）へ持ってきて距離を測る
+        const Vector3 playerLocal = StageWorldToLocal(ctx.playerPos, ctx.stageTilt, ctx.pivot);
+        const float lx = playerLocal.x - anchorLocal_.x;
+        const float lz = playerLocal.z - anchorLocal_.z;
+        const float dist = std::sqrt(lx * lx + lz * lz);
+
+        float moveX = 0.0f;
+        float moveZ = 0.0f;
+
+        if (dist > 1e-4f)
+        {
+            const float nx = lx / dist;
+            const float nz = lz / dist;
+
+            if (dist > c.keepDistance)
+            {
+                // 遠い: 追いかける（間合いを通り越さない）
+                const float travel = (std::min)(c.moveSpeed * dt, dist - c.keepDistance);
+                moveX = nx * travel;
+                moveZ = nz * travel;
+            }
+            else if (dist < c.backOffDistance)
+            {
+                // 近すぎ: 後ろへ下がる
+                const float travel = (std::min)(c.moveSpeed * dt, c.backOffDistance - dist);
+                moveX = -nx * travel;
+                moveZ = -nz * travel;
+            }
+            else
+            {
+                // ちょうどいい間合い: プレイヤーのまわりを回り込む
+                strafeTimer_ -= dt;
+                if (strafeTimer_ <= 0.0f)
+                {
+                    strafeDir_ = -strafeDir_;
+                    strafeTimer_ = RandomRange(c.strafeSwitchMin, c.strafeSwitchMax);
+                }
+                // 接線方向（プレイヤーへの向きを90度回したもの）
+                moveX = -nz * strafeDir_ * c.strafeSpeed * dt;
+                moveZ = nx * strafeDir_ * c.strafeSpeed * dt;
+            }
+        }
+
+        // 【落下防止】動いた先に床があるか先に確かめる。
+        // 無ければその移動は無かったことにする（崖から落ちて y < -80 で
+        // 消えてしまうと、ボス戦がそのまま詰む）
+        if (moveX != 0.0f || moveZ != 0.0f)
+        {
+            const Vector3 nextLocal = { anchorLocal_.x + moveX, anchorLocal_.y, anchorLocal_.z + moveZ };
+            const Vector3 nextWorld = StageLocalToWorld(nextLocal, ctx.stageTilt, ctx.pivot);
+
+            bool hasGround = false;
+            SlimePhysics::CalculateGroundHeightEx(nextWorld.x, nextWorld.z, position_.y,
+                                                  ctx.stageTilt, &hasGround, nullptr,
+                                                  ctx.pivot, false, 0.0f);
+            if (!hasGround)
+            {
+                // 崖の縁。前進はやめて、次のフレームは逆向きに回り込む
+                moveX = 0.0f;
+                moveZ = 0.0f;
+                strafeDir_ = -strafeDir_;
+                strafeTimer_ = RandomRange(c.strafeSwitchMin, c.strafeSwitchMax);
+            }
+        }
+
+        anchorLocal_.x += moveX;
+        anchorLocal_.z += moveZ;
+
+        // 配置された場所から roamRadius 以上は離れない（ボス部屋から出ていかないように）
+        if (c.roamRadius > 0.1f)
+        {
+            const float hx = anchorLocal_.x - homeLocal_.x;
+            const float hz = anchorLocal_.z - homeLocal_.z;
+            const float homeDist = std::sqrt(hx * hx + hz * hz);
+            if (homeDist > c.roamRadius)
+            {
+                const float shrink = c.roamRadius / homeDist;
+                anchorLocal_.x = homeLocal_.x + hx * shrink;
+                anchorLocal_.z = homeLocal_.z + hz * shrink;
+            }
+        }
+
+        const float moved = std::sqrt(moveX * moveX + moveZ * moveZ);
+        const float maxStep = (std::max)(0.01f, c.moveSpeed) * dt;
+        moveAmount_ = std::clamp(moved / maxStep, 0.0f, 1.0f);
+    }
+
+    // --- 歩き／待機の切り替え（攻撃のワンショット中は触らない）---
+    if (IsAnimated() && !animator_.IsOneShotPlaying())
+    {
+        const bool walking = (moveAmount_ > 0.05f);
+        const char* clip = (walking && c.clipWalk && c.clipWalk[0] != 0) ? c.clipWalk : c.clipIdle;
+        if (clip && clip[0] != 0)
+        {
+            animator_.Play(clip);
+        }
+    }
+
     // --- 全方向弾 ---
     if (!shootEnabled_)
     {
@@ -158,6 +285,7 @@ void Boss::UpdateBehavior(const EnemyUpdateContext& ctx)
     if (shootTimer_ > 0.0f) return;
 
     shootTimer_ = (std::max)(0.2f, c.shootInterval);
+    shootStopTimer_ = (std::max)(0.0f, c.shootStopSeconds); // 撃つ瞬間は足を止める
 
     const int ways = (std::max)(3, c.bulletWays);
     const float muzzleY = position_.y + c.muzzleHeightRatio * modelScale_;

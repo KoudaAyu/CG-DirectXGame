@@ -120,16 +120,32 @@ private:
     static void ApplySprite(Sprite* sprite, const Vector2& center, const Vector2& size, float alpha);
 
 private:
+    /// @brief ラベル1枚（白い文字 ＋ 少しずらして重ねる濃紺の同じ文字）
+    struct LabelSprite
+    {
+        std::unique_ptr<Sprite> base;
+        std::unique_ptr<Sprite> shadow;
+        Vector4 shadowColor{ 0.0f, 0.0f, 0.0f, 1.0f }; //!< 生成時に1回だけ決める
+    };
+
+    /// @brief ラベルを1組作る
+    static LabelSprite MakeLabel(const char* texturePath, const Vector2& size,
+                                 const UiTextShadowStyle& shadowStyle);
+
+    /// @brief ラベルを配置して、重ねるほうも写す
+    void ApplyLabel(LabelSprite& label, const Vector2& center, const Vector2& size, float alpha);
+
+private:
     // --- 1段目: SCORE / TIME / COIN ---
-    std::unique_ptr<Sprite> labelScore_;
-    std::unique_ptr<Sprite> labelTime_;
-    std::unique_ptr<Sprite> labelCoin_;
+    LabelSprite labelScore_;
+    LabelSprite labelTime_;
+    LabelSprite labelCoin_;
     NumberDisplay scoreNumber_;
     NumberDisplay timeNumber_;
     NumberDisplay coinNumber_;
 
     // --- 2段目: LIFE ---
-    std::unique_ptr<Sprite> labelLife_;
+    LabelSprite labelLife_;
     std::vector<LifeIcon> lifeIcons_;
     int shownLifeCount_ = 0;
 
@@ -145,6 +161,11 @@ private:
     bool counterTickEvent_ = false;
 
 public:
+    /// @brief 白い文字が背景に溶けないように重ねる濃紺の設定（ImGui の "Game HUD" から触れる）
+    /// @note ラベルと数値で別々に持っている。数値のほうは各 NumberDisplay の style に入る
+    UiTextShadowStyle labelShadow_{};
+    UiTextShadowStyle numberShadow_{};
+
     // ===============================================================
     // レイアウト（1280x720 基準）。ImGui の "Game HUD" から調整できる
     // 添付のラフ（SCORE / TIME / COIN が上段、LIFE が2段目）に合わせた初期値
