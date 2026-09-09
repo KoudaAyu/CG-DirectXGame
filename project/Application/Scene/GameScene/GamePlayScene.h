@@ -10,13 +10,15 @@
 #include "Application/GameObject/PropellerObstacle.h"
 #include "Application/Enemy/EnemyManager.h"
 #include "Application/GameObject/CoinManager.h"
+#include "Application/GameObject/GrowthCubeManager.h"
+#include "Application/GameObject/StageTerrain.h"
 #include "Application/Editor/PlacementEditor.h"
+#include "Application/Scene/GameScene/BossFight.h"
 #include "Application/Scene/GameScene/GamePlaySceneFX.h"
 #include "Application/Scene/GameScene/GamePlaySceneHUD.h"
 #include "Baziru3_Engine/Graphics/3D/Object/Object3d.h"
 #include "Baziru3_Engine/Framework/Collision/MeshCollider.h"
 #include "Application/GameObject/IrisTransition.h"
-#include "Application/GameObject/GrowthCube.h"
 
 #include <memory>
 #include <vector>
@@ -39,7 +41,6 @@ public:
 
 private:
     void DrawDebugUI();
-    void ResetGrowthCubes();
 
     /// @brief カメラシェイクを足す（0..1。足しこまれて上限 1.0 でクランプ）
     void AddCameraShake(float trauma);
@@ -68,7 +69,15 @@ private:
     std::vector<std::unique_ptr<PropellerObstacle>> propellerObstacles_;
     std::unique_ptr<EnemyManager> enemyManager_;
     std::unique_ptr<CoinManager> coinManager_;
+    std::unique_ptr<GrowthCubeManager> growthCubeManager_;
     std::unique_ptr<PlacementEditor> placementEditor_;
+
+    // 地形メッシュ群。以前はここに stageParts_ をハードコードで持っていたが、
+    // 配置エディタから編集できるよう StageTerrain へ切り出して JSON 駆動にした
+    std::unique_ptr<StageTerrain> stageTerrain_;
+
+    // ボス戦フェーズ（ボス本体・弾・HPバー・カメラ演出）
+    std::unique_ptr<BossFight> bossFight_;
 
     // 演出と HUD。中身はそれぞれ GamePlaySceneFX.cpp / GamePlaySceneHUD.cpp にある
     std::unique_ptr<GamePlaySceneFx> fx_;
@@ -98,27 +107,15 @@ private:
     bool isEditMode_ = false;                          //!< 配置エディタ中か
     Vector4 groundBaseColor_{ 0.55f, 0.85f, 0.50f, 1.0f }; //!< 地面の草原カラー
 
-    // 触れると1段階大きくなるキューブ（TakanagaDev 由来）
-    std::vector<std::unique_ptr<GrowthCube>> growthCubes_;
+    /// @brief ボス戦の演出中で、プレイヤーを動かせない状態か
+    /// @note BossFight::Update() が返してくるので、次のフレームの入力抑制に使う
+    bool bossFreezeSlimes_ = false;
 
     // --- スライム初期スポーン位置 ---
     Vector3 spawnBasePos_{ 0.0f, 0.55f, 30.0f }; // 初期スポーン基準位置（島中央の平原: Z = 30.0f）
     float spawnGroupOffsetZ_ = 4.0f;            // 小スライム群の前方オフセット
     void RespawnSlimesAtBase();
     void RestartGame();
-    // --- ステージパーツ管理 ---
-    struct StagePart
-    {
-        std::string name;
-        std::unique_ptr<Object3d> object;
-        std::unique_ptr<MeshCollider> collider;
-        Object3d::ModelData modelData;
-        uint32_t textureIndex = 0;
-        Vector3 baseOffset{ 0.0f, 0.0f, 0.0f }; // 追加の平行移動オフセット（roadCellのステップ配置用）
-    };
-    std::vector<StagePart> stageParts_;
-    float groundScale_ = 0.25f; // 地面ステージの縮小スケール (適度な広さ: 幅約75m)
-    bool bridgeConnectMode_ = true; // startLandとLand1をroadCellで繋ぐモード
 
     // --- カメラ制御パラメータ (プレイヤー相対座標一定モデル) ---
     float cameraDistance_ = 30.0f;        // プレイヤーからの基準カメラ距離（ステージ全体を見渡しやすいゆったりとした距離）
@@ -153,6 +150,12 @@ private:
 
     Vector3 currentCameraPos_{ 0.0f, 18.0f, -12.0f }; // 現在の補間カメラ位置
     Vector3 currentCameraRot_{ 0.93f, 0.0f, 0.0f };   // 現在の補間カメラ回転
+
+    // 実際にカメラへ入れた最終値（ステージ揺らし＋ボスへのフォーカス補間まで込み）。
+    // カメラシェイクはこれを土台に足す。currentCameraPos_ を土台にすると
+    // ボス演出中のフォーカスがシェイクで打ち消されてしまう
+    Vector3 appliedCameraPos_{ 0.0f, 18.0f, -12.0f };
+    Vector3 appliedCameraRot_{ 0.93f, 0.0f, 0.0f };
     Vector3 cameraPosVelocity_{ 0.0f, 0.0f, 0.0f };   // カメラ位置の追従速度
     Vector3 cameraRotVelocity_{ 0.0f, 0.0f, 0.0f };   // カメラ角度の追従角速度
     Vector2 tiltVelocity_{ 0.0f, 0.0f };              // ステージ傾斜の角速度

@@ -4,7 +4,9 @@
 #include "Application/GameObject/FireworkFx.h"
 #include "Application/GameObject/CoinManager.h"
 #include "Application/GameObject/SlimeManager.h"
+#include "Application/GameObject/GrowthCubeManager.h"
 #include "Application/Enemy/EnemyManager.h"
+#include "Application/Enemy/Boss.h"
 
 #include <algorithm>
 #include <cmath>
@@ -60,6 +62,14 @@ namespace
         { 0.92f, 0.16f, 0.62f, 1.0f },
         { 1.00f, 0.22f, 0.22f, 1.0f },
     };
+
+    // ボス用。雑魚の紫赤よりさらに深く・毒々しく振ってある
+    constexpr Vector4 kBossStops[] = {
+        { 0.32f, 0.02f, 0.55f, 1.0f }, // 深い紫
+        { 0.78f, 0.05f, 0.85f, 1.0f }, // マゼンタ
+        { 1.00f, 0.10f, 0.24f, 1.0f }, // 血の赤
+        { 1.00f, 0.55f, 0.10f, 1.0f }, // 燃え差し
+    };
 }
 
 GamePlaySceneFx::GamePlaySceneFx() = default;
@@ -92,6 +102,9 @@ void GamePlaySceneFx::Initialize(DirectXCom* dxCommon, Camera* camera)
     minionGlowAccum_ = 0.0f;
     coinShineAccum_ = 0.0f;
     enemyAuraAccum_ = 0.0f;
+    growthCubeAccum_ = 0.0f;
+    bossAuraAccum_ = 0.0f;
+    bossEmberAccum_ = 0.0f;
     hasPrevPlayerPos_ = false;
 }
 
@@ -720,6 +733,403 @@ void GamePlaySceneFx::EmitPlayerSplit(const Vector3& position, int sizeBefore)
 }
 
 // ===================================================================
+// 成長キューブの「自分の七光り」
+//
+// 本体（GrowthCube）は Slime シェーダーでゲーミング色に光っているだけなので、
+// 「自分で発光している」ように見せるぶんはこちらで撒く。
+// ほかの演出より一段**でかい粒**にして、色は本体より少し金色へ寄せる
+// ===================================================================
+
+void GamePlaySceneFx::EmitGrowthCubeAura(const Vector3& center, float radius, const Vector4& bodyColor)
+{
+    if (!fx_) return;
+
+    // 球の内側から湧いて外へ抜ける。半径は cbrt 分布で体積一様に
+    const float theta = RandomRange(0.0f, kTwoPi);
+    const float cosPhi = RandomRange(-0.7f, 1.0f); // 少し上向きに寄せる
+    const float sinPhi = std::sqrt((std::max)(0.0f, 1.0f - cosPhi * cosPhi));
+    const float r = radius * std::cbrt(RandomRange(0.05f, 1.0f));
+
+    const Vector3 dir = { sinPhi * std::cos(theta), cosPhi, sinPhi * std::sin(theta) };
+
+    FireworkFxDesc desc{};
+    desc.position = { center.x + dir.x * r, center.y + dir.y * r, center.z + dir.z * r };
+
+    const float speed = growthCubeGlowSpeed_ * (0.35f + 0.65f * (r / (std::max)(0.01f, radius)));
+    desc.velocity = { dir.x * speed, dir.y * speed + 0.35f, dir.z * speed };
+    desc.gravity = -0.5f; // ゆるく持ち上がる
+    desc.drag = 1.6f;
+
+    // 本体の色を金色へ寄せる。「親の七光りならぬ自分の七光り」
+    Vector4 color = LerpColor(bodyColor, growthCubeGold_, growthCubeGoldMix_);
+    color.w = growthCubeGlowAlpha_;
+    desc.colorBegin = color;
+    desc.colorEnd = { color.x, color.y, color.z, 0.0f };
+
+    // ここが要点。ほかの演出（0.66〜1.0）よりはっきり大きい粒にする
+    desc.scaleBegin = growthCubeGlowScale_ * RandomRange(0.75f, 1.35f);
+    desc.scaleEnd = desc.scaleBegin * 0.35f;
+    desc.lifeTime = growthCubeGlowLife_ * RandomRange(0.75f, 1.25f);
+    desc.useSparkTexture = false;
+
+    fx_->Emit(desc);
+}
+
+void GamePlaySceneFx::UpdateGrowthCubes(float deltaTime, GrowthCubeManager* growthCubeManager)
+{
+    if (!fx_ || !growthCubeManager || !enableGrowthCubeGlow_) return;
+
+    struct Target { Vector3 position; float radius; Vector4 color; bool vanishing; };
+    std::vector<Target> targets;
+
+    const float rangeSq = growthCubeRange_ * growthCubeRange_;
+
+    for (const auto& cubePtr : growthCubeManager->GetCubes())
+    {
+        GrowthCube* cube = cubePtr.get();
+        if (!cube || !cube->IsVisible()) continue;
+
+        const bool vanishing = cube->IsVanishing();
+        const Vector3& position = cube->GetPosition();
+
+        const float dx = position.x - focusCenter_.x;
+        const float dz = position.z - focusCenter_.z;
+        if (!vanishing && (dx * dx + dz * dz) > rangeSq) continue;
+
+        targets.push_back({ position, (std::max)(0.1f, cube->GetVisualRadius()),
+                            cube->GetGamingColor(), vanishing });
+        if (static_cast<int>(targets.size()) >= growthCubeMaxEmitters_) break;
+    }
+
+    if (targets.empty())
+    {
+        growthCubeAccum_ = 0.0f;
+        return;
+    }
+
+    float rate = 0.0f;
+    for (const Target& target : targets)
+    {
+        rate += EmitRate(growthCubeGlowCount_, growthCubeGlowLife_)
+              * (target.vanishing ? growthCubeVanishBoost_ : 1.0f);
+    }
+    growthCubeAccum_ += rate * deltaTime;
+
+    std::uniform_int_distribution<size_t> pick(0, targets.size() - 1);
+    while (growthCubeAccum_ >= 1.0f)
+    {
+        growthCubeAccum_ -= 1.0f;
+        const Target& target = targets[pick(rng_)];
+        // 光は本体の半径より少し広い範囲から湧かせる。輪郭がぼやけて発光体に見える
+        EmitGrowthCubeAura(target.position, target.radius * 1.35f, target.color);
+    }
+}
+
+void GamePlaySceneFx::EmitGrowthCubeCollect(const Vector3& position, float radius)
+{
+    if (!fx_) return;
+
+    // コインの光芒と同じ「ゲーミングの細長い光」を一気に弾けさせる
+    const int count = (std::max)(1, growthCubeCollectCount_);
+    for (int i = 0; i < count; ++i)
+    {
+        const float angle = RandomRange(0.0f, kTwoPi);
+        const float cosPhi = RandomRange(-0.45f, 1.0f);
+        const float sinPhi = std::sqrt((std::max)(0.0f, 1.0f - cosPhi * cosPhi));
+        const Vector3 dir = { sinPhi * std::cos(angle), cosPhi, sinPhi * std::sin(angle) };
+        const float speed = growthCubeCollectSpeed_ * RandomRange(0.45f, 1.35f);
+
+        FireworkFxDesc desc{};
+        desc.position = { position.x + dir.x * radius * 0.4f,
+                          position.y + dir.y * radius * 0.4f,
+                          position.z + dir.z * radius * 0.4f };
+        desc.velocity = { dir.x * speed, dir.y * speed + 1.2f, dir.z * speed };
+        desc.gravity = 7.0f;
+        desc.drag = 1.2f;
+
+        // ゲーミング（虹色のベクター場）から毎フレーム引き直す
+        desc.useColorField = true;
+        desc.colorBegin = { 1.0f, 1.0f, 1.0f, 1.0f };
+        desc.colorEnd = { 1.0f, 1.0f, 1.0f, 0.0f };
+
+        desc.scaleBegin = coinShineScale_ * 1.4f * RandomRange(0.7f, 1.4f);
+        desc.scaleEnd = desc.scaleBegin * 0.25f;
+        desc.scaleAspect = coinShineAspect_;
+        desc.alignToVelocity = true;
+        desc.useSparkTexture = true;
+        desc.lifeTime = RandomRange(0.45f, 0.9f);
+        desc.trailInterval = 0.03f;
+        desc.trailLifeTime = 0.22f;
+        desc.trailScale = 0.28f;
+
+        fx_->Emit(desc);
+    }
+
+    // 中心に金色の閃光
+    for (int i = 0; i < 6; ++i)
+    {
+        FireworkFxDesc flash{};
+        flash.position = position;
+        flash.velocity = { RandomRange(-0.8f, 0.8f), RandomRange(-0.3f, 1.2f), RandomRange(-0.8f, 0.8f) };
+        flash.drag = 3.0f;
+        flash.colorBegin = { growthCubeGold_.x, growthCubeGold_.y, growthCubeGold_.z, 1.0f };
+        flash.colorEnd = { growthCubeGold_.x, growthCubeGold_.y, growthCubeGold_.z, 0.0f };
+        flash.scaleBegin = radius * 6.0f;
+        flash.scaleEnd = radius * 0.8f;
+        flash.lifeTime = 0.24f;
+        fx_->Emit(flash);
+    }
+}
+
+// ===================================================================
+// ボスの禍々しいオーラ
+//
+// 雑魚（EmitEnemyAura）が「ゆらゆら上る紫赤」なのに対して、
+// こちらは
+//   - 接線方向に流して**渦を巻かせる**
+//   - 速度方向へ引き伸ばした細い筋を混ぜる
+//   - 上る光だけでなく、**降ってくる火の粉**も足す
+// の3つで激しさを出している。intensity が上がるほど全部が増える
+// ===================================================================
+
+void GamePlaySceneFx::EmitBossAura(const Vector3& center, float radius, float intensity)
+{
+    if (!fx_) return;
+
+    const float scaled = (std::max)(0.1f, intensity);
+
+    const float angle = RandomRange(0.0f, kTwoPi);
+    const float r = radius * std::sqrt(RandomRange(0.15f, 1.0f));
+    const float cs = std::cos(angle);
+    const float sn = std::sin(angle);
+
+    FireworkFxDesc desc{};
+    desc.position = { center.x + cs * r,
+                      center.y + RandomRange(-radius * 0.9f, radius * 0.9f),
+                      center.z + sn * r };
+
+    // 接線方向（-sn, cs）へ流すと渦になる。半径が大きいほど速く回す
+    const float swirl = bossAuraSwirl_ * scaled * (0.4f + 0.6f * (r / (std::max)(0.01f, radius)));
+    desc.velocity = { -sn * swirl + RandomRange(-0.3f, 0.3f),
+                      bossAuraRise_ * scaled * RandomRange(0.6f, 1.5f),
+                      cs * swirl + RandomRange(-0.3f, 0.3f) };
+    desc.gravity = -0.4f * scaled;
+    desc.drag = 0.5f;
+
+    Vector4 color = SamplePalette(kBossStops, static_cast<int>(std::size(kBossStops)),
+                                  RandomRange(0.0f, 1.0f));
+    color.w = bossAuraAlpha_;
+    desc.colorBegin = color;
+    desc.colorEnd = { color.x * 0.6f, color.y * 0.3f, color.z * 0.3f, 0.0f };
+
+    desc.scaleBegin = bossAuraScale_ * RandomRange(0.7f, 1.4f) * (0.8f + 0.2f * scaled);
+    desc.scaleEnd = desc.scaleBegin * 1.6f; // 上るほどぼやけて広がる
+    desc.lifeTime = bossAuraLife_ * RandomRange(0.7f, 1.3f);
+
+    // 3粒に1粒は速度方向へ引き伸ばした筋にする。渦がはっきり見える
+    if (RandomRange(0.0f, 1.0f) < 0.34f)
+    {
+        desc.scaleAspect = 0.35f;
+        desc.alignToVelocity = true;
+        desc.useSparkTexture = true;
+        desc.scaleBegin *= 1.4f;
+    }
+
+    fx_->Emit(desc);
+}
+
+void GamePlaySceneFx::UpdateBoss(float deltaTime, Boss* boss)
+{
+    if (!fx_ || !boss || boss->IsDead() || !enableBossAura_) return;
+
+    const float intensity = (std::max)(0.1f, boss->GetAuraIntensity());
+    const float radius = (std::max)(0.5f, boss->GetVisualRadius());
+    const Vector3 center = boss->GetHeadPosition();
+
+    // --- 渦を巻くオーラ ---
+    bossAuraAccum_ += EmitRate(bossAuraCount_, bossAuraLife_) * intensity * deltaTime;
+    while (bossAuraAccum_ >= 1.0f)
+    {
+        bossAuraAccum_ -= 1.0f;
+        EmitBossAura(center, radius * 1.15f, intensity);
+    }
+
+    // --- 降ってくる火の粉 ---
+    bossEmberAccum_ += EmitRate(bossEmberCount_, bossEmberLife_) * intensity * deltaTime;
+    while (bossEmberAccum_ >= 1.0f)
+    {
+        bossEmberAccum_ -= 1.0f;
+
+        const float angle = RandomRange(0.0f, kTwoPi);
+        const float r = radius * RandomRange(0.4f, 1.8f);
+
+        FireworkFxDesc desc{};
+        desc.position = { center.x + std::cos(angle) * r,
+                          center.y + radius * RandomRange(1.0f, 2.2f),
+                          center.z + std::sin(angle) * r };
+        desc.velocity = { RandomRange(-0.6f, 0.6f), RandomRange(-1.8f, -0.4f), RandomRange(-0.6f, 0.6f) };
+        desc.gravity = 2.2f;
+        desc.drag = 0.2f;
+
+        Vector4 color = SamplePalette(kBossStops, static_cast<int>(std::size(kBossStops)),
+                                      RandomRange(0.55f, 1.0f)); // 赤〜燃え差し寄り
+        color.w = 0.9f;
+        desc.colorBegin = color;
+        desc.colorEnd = { color.x, color.y * 0.4f, color.z * 0.2f, 0.0f };
+
+        desc.scaleBegin = bossEmberScale_ * RandomRange(0.6f, 1.3f);
+        desc.scaleEnd = desc.scaleBegin * 0.2f;
+        desc.scaleAspect = 0.5f;
+        desc.alignToVelocity = true;
+        desc.useSparkTexture = true;
+        desc.lifeTime = bossEmberLife_ * RandomRange(0.7f, 1.3f);
+
+        fx_->Emit(desc);
+    }
+}
+
+void GamePlaySceneFx::EmitBossHit(const Vector3& position, float radius)
+{
+    if (!fx_) return;
+
+    for (int i = 0; i < bossHitCount_; ++i)
+    {
+        const float angle = RandomRange(0.0f, kTwoPi);
+        const float cosPhi = RandomRange(-0.3f, 1.0f);
+        const float sinPhi = std::sqrt((std::max)(0.0f, 1.0f - cosPhi * cosPhi));
+        const float speed = bossHitSpeed_ * RandomRange(0.4f, 1.3f);
+
+        Vector4 color = SamplePalette(kBossStops, static_cast<int>(std::size(kBossStops)),
+                                      RandomRange(0.0f, 1.0f));
+
+        FireworkFxDesc desc{};
+        desc.position = { position.x + RandomRange(-radius, radius) * 0.4f,
+                          position.y + RandomRange(-radius, radius) * 0.4f,
+                          position.z + RandomRange(-radius, radius) * 0.4f };
+        desc.velocity = { sinPhi * std::cos(angle) * speed,
+                          cosPhi * speed + 1.5f,
+                          sinPhi * std::sin(angle) * speed };
+        desc.gravity = 14.0f;
+        desc.drag = 0.6f;
+        desc.colorBegin = { color.x, color.y, color.z, 1.0f };
+        desc.colorEnd = { color.x, color.y, color.z, 0.0f };
+        desc.scaleBegin = 1.1f * RandomRange(0.6f, 1.4f);
+        desc.scaleEnd = 0.2f;
+        desc.scaleAspect = 0.55f;
+        desc.alignToVelocity = true;
+        desc.lifeTime = RandomRange(0.4f, 0.8f);
+        desc.trailInterval = 0.035f;
+        desc.trailLifeTime = 0.2f;
+        desc.trailScale = 0.3f;
+
+        fx_->Emit(desc);
+    }
+}
+
+void GamePlaySceneFx::EmitBossExplosion(const Vector3& position, float radius)
+{
+    if (!fx_) return;
+
+    // プレイヤーの自爆（EmitPlayerSplit）と同じ作りで、
+    //   - 粒数は約2倍
+    //   - 色はゲーミング（虹）と敵オーラ色を半々で混ぜる
+    // にしたもの
+    const int count = (std::max)(1, bossExplosionCount_);
+
+    for (int i = 0; i < count; ++i)
+    {
+        const float angle = RandomRange(0.0f, kTwoPi);
+        const float cosPhi = RandomRange(-0.8f, 1.0f);
+        const float sinPhi = std::sqrt((std::max)(0.0f, 1.0f - cosPhi * cosPhi));
+        const float speed = bossExplosionSpeed_ * RandomRange(0.4f, 1.4f);
+
+        FireworkFxDesc desc{};
+        desc.position = { position.x + RandomRange(-radius, radius) * 0.5f,
+                          position.y + RandomRange(-radius, radius) * 0.5f,
+                          position.z + RandomRange(-radius, radius) * 0.5f };
+        desc.velocity = { sinPhi * std::cos(angle) * speed,
+                          cosPhi * speed + 2.5f,
+                          sinPhi * std::sin(angle) * speed };
+        desc.gravity = 9.0f;
+        desc.drag = 0.4f;
+
+        // 半分はゲーミング、半分はボスのオーラ色。混ぜることで
+        // 「プレイヤーの自爆っぽいが、あきらかにボスのもの」に見える
+        if ((i & 1) == 0)
+        {
+            desc.useColorField = true;
+            desc.colorBegin = { 1.0f, 1.0f, 1.0f, 1.0f };
+            desc.colorEnd = { 1.0f, 1.0f, 1.0f, 0.0f };
+        }
+        else
+        {
+            Vector4 color = SamplePalette(kBossStops, static_cast<int>(std::size(kBossStops)),
+                                          RandomRange(0.0f, 1.0f));
+            desc.colorBegin = { color.x, color.y, color.z, 1.0f };
+            desc.colorEnd = { color.x, color.y, color.z, 0.0f };
+        }
+
+        desc.scaleBegin = 1.5f * RandomRange(0.7f, 1.5f);
+        desc.scaleEnd = 0.3f;
+        desc.scaleAspect = 0.38f;
+        desc.alignToVelocity = true;
+        desc.useSparkTexture = true;
+        desc.lifeTime = RandomRange(0.7f, 1.4f);
+        desc.trailInterval = 0.026f;
+        desc.trailLifeTime = 0.34f;
+        desc.trailScale = 0.45f;
+
+        fx_->Emit(desc);
+    }
+
+    // 中心の巨大な閃光。ゲーミングと血の赤を交互に
+    for (int i = 0; i < 14; ++i)
+    {
+        FireworkFxDesc flash{};
+        flash.position = position;
+        flash.velocity = { RandomRange(-1.5f, 1.5f), RandomRange(-0.8f, 2.0f), RandomRange(-1.5f, 1.5f) };
+        flash.drag = 2.6f;
+        if ((i & 1) == 0)
+        {
+            flash.useColorField = true;
+            flash.colorBegin = { 1.0f, 1.0f, 1.0f, 1.0f };
+            flash.colorEnd = { 1.0f, 1.0f, 1.0f, 0.0f };
+        }
+        else
+        {
+            flash.colorBegin = { 1.0f, 0.25f, 0.22f, 1.0f };
+            flash.colorEnd = { 1.0f, 0.25f, 0.22f, 0.0f };
+        }
+        flash.scaleBegin = radius * 6.0f * RandomRange(0.7f, 1.3f);
+        flash.scaleEnd = radius * 1.2f;
+        flash.lifeTime = RandomRange(0.25f, 0.45f);
+        fx_->Emit(flash);
+    }
+
+    // 地面に広がる衝撃波のリング
+    const int ringCount = 40;
+    for (int i = 0; i < ringCount; ++i)
+    {
+        const float angle = kTwoPi * static_cast<float>(i) / static_cast<float>(ringCount);
+        const float cs = std::cos(angle);
+        const float sn = std::sin(angle);
+
+        FireworkFxDesc desc{};
+        desc.position = { position.x + cs * radius, position.y - radius * 1.2f, position.z + sn * radius };
+        desc.velocity = { cs * bossExplosionSpeed_ * 1.2f, 0.0f, sn * bossExplosionSpeed_ * 1.2f };
+        desc.gravity = 0.0f;
+        desc.drag = 2.0f;
+        desc.shape = FireworkFxShape::Ground;
+        desc.colorBegin = { 1.0f, 0.55f, 0.15f, 0.9f };
+        desc.colorEnd = { 1.0f, 0.2f, 0.1f, 0.0f };
+        desc.scaleBegin = 2.2f;
+        desc.scaleEnd = 0.6f;
+        desc.lifeTime = 0.6f;
+        fx_->Emit(desc);
+    }
+}
+
+// ===================================================================
 // 更新 / 描画
 // ===================================================================
 
@@ -730,7 +1140,7 @@ void GamePlaySceneFx::Update(float deltaTime)
 
 void GamePlaySceneFx::UpdateAll(float deltaTime, const Vector3& focusCenter, Slime* player,
                                 SlimeManager* slimeManager, CoinManager* coinManager,
-                                EnemyManager* enemyManager)
+                                EnemyManager* enemyManager, GrowthCubeManager* growthCubeManager)
 {
     BeginFrame(focusCenter);
     UpdateAmbient(deltaTime);
@@ -738,6 +1148,8 @@ void GamePlaySceneFx::UpdateAll(float deltaTime, const Vector3& focusCenter, Sli
     UpdateMinions(deltaTime, slimeManager);
     UpdateCoins(deltaTime, coinManager);
     UpdateEnemies(deltaTime, enemyManager);
+    UpdateGrowthCubes(deltaTime, growthCubeManager);
+    // ボスは BossFight が自分で UpdateBoss() を呼ぶ（居ないフレームのほうが多いため）
     Update(deltaTime);
 }
 
@@ -758,6 +1170,9 @@ void GamePlaySceneFx::Clear()
     minionGlowAccum_ = 0.0f;
     coinShineAccum_ = 0.0f;
     enemyAuraAccum_ = 0.0f;
+    growthCubeAccum_ = 0.0f;
+    bossAuraAccum_ = 0.0f;
+    bossEmberAccum_ = 0.0f;
 }
 
 int GamePlaySceneFx::GetActiveParticleCount() const
@@ -801,6 +1216,9 @@ void GamePlaySceneFx::DrawImGui()
     ImGui::Checkbox("Coin Shine", &enableCoinShine_);
     ImGui::SameLine();
     ImGui::Checkbox("Enemy Aura", &enableEnemyAura_);
+    ImGui::Checkbox("Growth Cube Glow", &enableGrowthCubeGlow_);
+    ImGui::SameLine();
+    ImGui::Checkbox("Boss Aura", &enableBossAura_);
 
     ImGui::SeparatorText("Ambient (rising light)");
     ImGui::DragInt("Ambient Count", &ambientCount_, 1.0f, 0, 1024);
@@ -852,6 +1270,35 @@ void GamePlaySceneFx::DrawImGui()
     ImGui::DragFloat("Enemy Range", &enemyRange_, 0.5f, 2.0f, 80.0f);
     ImGui::DragInt("Enemy Emitters", &enemyMaxEmitters_, 1.0f, 1, 64);
 
+    ImGui::SeparatorText("Growth Cube Glow (self halo)");
+    ImGui::DragInt("Cube Count / cube", &growthCubeGlowCount_, 1.0f, 0, 128);
+    ImGui::DragFloat("Cube Life", &growthCubeGlowLife_, 0.01f, 0.05f, 5.0f);
+    ImGui::DragFloat("Cube Scale (big)", &growthCubeGlowScale_, 0.02f, 0.05f, 8.0f);
+    ImGui::DragFloat("Cube Speed", &growthCubeGlowSpeed_, 0.05f, 0.0f, 6.0f);
+    ImGui::DragFloat("Gold Mix", &growthCubeGoldMix_, 0.01f, 0.0f, 1.0f);
+    ImGui::ColorEdit4("Gold", &growthCubeGold_.x);
+    ImGui::DragFloat("Cube Alpha", &growthCubeGlowAlpha_, 0.01f, 0.0f, 1.0f);
+    ImGui::DragFloat("Cube Vanish Boost", &growthCubeVanishBoost_, 0.05f, 1.0f, 8.0f);
+    ImGui::DragFloat("Cube Range", &growthCubeRange_, 0.5f, 2.0f, 80.0f);
+    ImGui::DragInt("Cube Emitters", &growthCubeMaxEmitters_, 1.0f, 1, 64);
+    ImGui::DragInt("Cube Collect Burst", &growthCubeCollectCount_, 1.0f, 0, 256);
+    ImGui::DragFloat("Cube Collect Speed", &growthCubeCollectSpeed_, 0.1f, 0.0f, 30.0f);
+
+    ImGui::SeparatorText("Boss Aura (ominous)");
+    ImGui::DragInt("Boss Aura Count", &bossAuraCount_, 1.0f, 0, 512);
+    ImGui::DragFloat("Boss Aura Life", &bossAuraLife_, 0.01f, 0.05f, 6.0f);
+    ImGui::DragFloat("Boss Aura Scale", &bossAuraScale_, 0.02f, 0.05f, 8.0f);
+    ImGui::DragFloat("Boss Aura Rise", &bossAuraRise_, 0.05f, 0.0f, 8.0f);
+    ImGui::DragFloat("Boss Aura Swirl", &bossAuraSwirl_, 0.05f, 0.0f, 12.0f);
+    ImGui::DragFloat("Boss Aura Alpha", &bossAuraAlpha_, 0.01f, 0.0f, 1.0f);
+    ImGui::DragInt("Boss Ember Count", &bossEmberCount_, 1.0f, 0, 256);
+    ImGui::DragFloat("Boss Ember Life", &bossEmberLife_, 0.01f, 0.05f, 6.0f);
+    ImGui::DragFloat("Boss Ember Scale", &bossEmberScale_, 0.02f, 0.05f, 6.0f);
+    ImGui::DragInt("Boss Hit Burst", &bossHitCount_, 1.0f, 0, 256);
+    ImGui::DragFloat("Boss Hit Speed", &bossHitSpeed_, 0.1f, 0.0f, 40.0f);
+    ImGui::DragInt("Boss Explosion", &bossExplosionCount_, 1.0f, 0, 1024);
+    ImGui::DragFloat("Boss Explosion Speed", &bossExplosionSpeed_, 0.1f, 0.0f, 60.0f);
+
     ImGui::SeparatorText("Bursts");
     ImGui::DragInt("Hit Splash", &hitSplashCount_, 1.0f, 0, 256);
     ImGui::DragFloat("Hit Speed", &hitSplashSpeed_, 0.1f, 0.0f, 30.0f);
@@ -881,6 +1328,20 @@ void GamePlaySceneFx::DrawImGui()
     if (ImGui::Button("Split Burst"))
     {
         EmitPlayerSplit({ focusCenter_.x, focusCenter_.y + 0.5f, focusCenter_.z }, 5);
+    }
+    if (ImGui::Button("Cube Collect"))
+    {
+        EmitGrowthCubeCollect({ focusCenter_.x, focusCenter_.y + 0.8f, focusCenter_.z }, 0.5f);
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Boss Hit"))
+    {
+        EmitBossHit({ focusCenter_.x, focusCenter_.y + 1.5f, focusCenter_.z }, 2.0f);
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Boss Explosion"))
+    {
+        EmitBossExplosion({ focusCenter_.x, focusCenter_.y + 1.5f, focusCenter_.z }, 2.0f);
     }
 #endif
 }

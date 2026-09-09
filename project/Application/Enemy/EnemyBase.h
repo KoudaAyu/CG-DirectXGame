@@ -21,6 +21,7 @@ enum class EnemyType
     FlowerClover,   //!< 地面に固定。弾は撃たない
     FlowerLotus,    //!< 動きまわる。弾を撃つ
     FlowerSunward,  //!< 地面に固定。弾を撃つ
+    Boss,           //!< ボス。HP を持ち、その場で全方向弾を撃つ（Application/Enemy/Boss.h）
 
     Count
 };

@@ -150,6 +150,11 @@
     <ClCompile Include="Application\GameObject\SlimeManager.cpp" />
     <ClCompile Include="Application\GameObject\IrisTransition.cpp" />
     <ClCompile Include="Application\GameObject\GrowthCube.cpp" />
+    <ClCompile Include="Application\GameObject\StageTerrain.cpp" />
+    <ClCompile Include="Application\GameObject\GrowthCubeManager.cpp" />
+    <ClCompile Include="Application\Enemy\Boss.cpp" />
+    <ClCompile Include="Application\Scene\GameScene\BossFight.cpp" />
+    <ClCompile Include="Application\Scene\GameScene\BossHpBar.cpp" />
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="Resources\shaders\FireworkFx.VS.hlsl">
@@ -426,6 +431,11 @@
     <ClInclude Include="Application\GameObject\FireworkFx.h" />
     <ClInclude Include="Application\GameObject\SlimeFx.h" />
     <ClInclude Include="Application\GameObject\GrowthCube.h" />
+    <ClInclude Include="Application\GameObject\StageTerrain.h" />
+    <ClInclude Include="Application\GameObject\GrowthCubeManager.h" />
+    <ClInclude Include="Application\Enemy\Boss.h" />
+    <ClInclude Include="Application\Scene\GameScene\BossFight.h" />
+    <ClInclude Include="Application\Scene\GameScene\BossHpBar.h" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="externals\DirectXTex\DirectXTex_Desktop_2022_Win10.vcxproj">

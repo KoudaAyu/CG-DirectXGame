@@ -118,70 +118,15 @@ void GamePlayScene::InitializeScene()
         object3dCom->SetDefaultCamera(playCamera_.get());
     }
 
-    // 3. プロペラを除くステージOBJモデル群（startLand, Land1, toLandRoad, roadCell）の読み込みと配置
-    stageParts_.clear();
+    // 3. 地形メッシュ群のコンテナ。中身は配置データ（JSON）から流し込む。
+    //    以前はここに startLand / Land1 / toLandRoad / roadCell×6 が
+    //    ハードコードされていたが、配置エディタで編集できるよう JSON へ移した。
+    //    JSON に terrain が無い場合は StageLayout::MakeDefaultTerrain() が
+    //    その旧ハードコードと同じ配置を返す
     SlimePhysics::ClearGroundMeshes();
-
-    auto AddStagePart = [&](const std::string& name, const std::string& objFile, const Vector3& baseOffset, const std::string& defaultTex = "Resources/10days/land.png") {
-        StagePart part;
-        part.name = name;
-        part.baseOffset = baseOffset;
-        part.modelData = Object3d::LoadObjFile("Resources/10days", objFile);
-        part.modelData.boundingRadius = 10000.0f; // 視錐台誤カリングを完全に防止
-
-        std::string texPath = part.modelData.material.textureFilePath;
-        if (texPath.empty()) {
-            texPath = defaultTex;
-        }
-        part.textureIndex = TextureManager::GetInstance()->Load(texPath);
-        part.modelData.material.textureIndex = part.textureIndex;
-
-        part.object = std::make_unique<Object3d>();
-        if (part.object) {
-            part.object->Initialize(object3dCom, part.modelData);
-            part.object->SetCamera(playCamera_.get());
-            part.object->SetTranslate(baseOffset * groundScale_);
-            part.object->SetScale({ groundScale_, groundScale_, groundScale_ });
-            part.object->SetRotate({ 0.0f, 0.0f, 0.0f });
-            part.object->SetColor({ 0.55f, 0.85f, 0.50f, 1.0f });
-            part.object->SetEnableLighting(true);
-            part.object->Update();
-
-            part.collider = std::make_unique<MeshCollider>(part.object.get(), CollisionAttribute::Obstacle);
-            CollisionManager::GetInstance()->RegisterCollider(part.collider.get());
-            SlimePhysics::AddGroundMesh(part.object.get(), part.collider.get());
-        }
-        stageParts_.push_back(std::move(part));
-    };
-
-    // (1) 初期島: startLand.obj (マテリアル指定テクスチャ land.png)
-    AddStagePart("startLand", "startLand.obj", { 0.0f, 0.0f, 0.0f }, "Resources/10days/land.png");
-
-    // (2) 第1の島: Land1.obj (マテリアル指定テクスチャ land2.png)
-    AddStagePart("Land1", "Land1.obj", { 0.0f, 0.0f, 0.0f }, "Resources/10days/land2.png");
-
-    // (3) Land1接続路: toLandRoad.obj
-    AddStagePart("toLandRoad", "toLandRoad.obj", { 0.0f, 0.0f, 0.0f }, "Resources/10days/land.png");
-
-    // (4) 道ユニットセル: roadCell.obj (基本幅 45.563m)
-    // Blender元位置セル
-    AddStagePart("roadCell_0", "roadCell.obj", { 0.0f, 0.0f, 0.0f }, "Resources/10days/land.png");
-
-    // 橋連結モード: startLandの開口部（X ≈ -189m）まで roadCell を5ステップ連結配置し、島の間を渡れるようにする
-    if (bridgeConnectMode_)
-    {
-        const float stepWidth = 45.563018f;
-        for (int i = 1; i <= 5; ++i)
-        {
-            AddStagePart("roadCell_" + std::to_string(i), "roadCell.obj", { stepWidth * static_cast<float>(i), 0.0f, 0.0f }, "Resources/10days/land.png");
-        }
-    }
-
-    // 4. スライムマネージャーの初期化と初期スライム群の配置（前方に配置）
-    slimeManager_ = std::make_unique<SlimeManager>();
-    slimeManager_->Initialize(object3dCom, playCamera_.get());
-
-    RespawnSlimesAtBase();
+    stageTerrain_ = std::make_unique<StageTerrain>();
+    stageTerrain_->Initialize(object3dCom, playCamera_.get());
+    stageTerrain_->SetBaseColor(groundBaseColor_);
 
     // 6. マウス照準・放物線ガイドの初期化
     aimGuide_ = std::make_unique<AimGuide>();
@@ -215,9 +160,12 @@ void GamePlayScene::InitializeScene()
     enemyManager_ = std::make_unique<EnemyManager>();
     enemyManager_->Initialize(object3dCom, playCamera_.get());
 
-    // 10. コインマネージャーの初期化
+    // 10. コイン・成長キューブのマネージャー初期化
     coinManager_ = std::make_unique<CoinManager>();
     coinManager_->Initialize(object3dCom, playCamera_.get());
+
+    growthCubeManager_ = std::make_unique<GrowthCubeManager>();
+    growthCubeManager_->Initialize(object3dCom, playCamera_.get());
 
     // 11. 演出（パーティクル）と HUD の初期化
     //     中身は GamePlaySceneFX.cpp / GamePlaySceneHUD.cpp にある。
@@ -233,36 +181,43 @@ void GamePlayScene::InitializeScene()
     shakeTrauma_ = 0.0f;
     shakeTime_ = 0.0f;
 
+    // 11.5 ボス戦フェーズ。ボス本体・弾・HPバー・カメラ演出はここが持つ。
+    //      配置（座標・最大HP）は配置データから入る
+    //      Initialize() はスライム群を作ったあと（下の配置データのブロック）でまとめて呼ぶ
+    bossFight_ = std::make_unique<BossFight>();
+    bossFreezeSlimes_ = false;
+
     // 12. 配置エディタの初期化と、配置データ（JSON）の読み込み
     //     SpawnDebugSet() による仮スポーンは廃止。配置は全部 JSON から復元する
+    //     Initialize() はスライム群を作ったあと（すぐ下）でまとめて呼ぶ
     placementEditor_ = std::make_unique<PlacementEditor>();
-    {
-        PlacementEditor::SceneRefs refs;
-        refs.object3dCom = object3dCom;
-        refs.camera = playCamera_.get();
-        refs.enemyManager = enemyManager_.get();
-        refs.coinManager = coinManager_.get();
-        refs.slimeManager = slimeManager_.get();
-        placementEditor_->Initialize(refs);
-        placementEditor_->SetGroundBaseColor(groundBaseColor_);
-    }
 
     {
         StageLayout layout;
-        if (!layout.LoadFromFile(StageLayout::kDefaultPath))
+        const bool loaded = layout.LoadFromFile(StageLayout::kDefaultPath);
+        if (!loaded)
         {
-            // JSON が無い／壊れている。座標をハードコードすると地形差し替えで
-            // 全部おかしくなるので、地形を実際にレイキャストして置ける場所を探す
             OutputDebugStringA("[PlacementEditor] stage_layout not found. Using generated fallback layout.\n");
-            layout = StageLayout::MakeFallback();
         }
-        else
+
+        // 地形が空（＝旧フォーマットの JSON、またはファイルが無い）なら既定配置。
+        // 中身は以前 InitializeScene にハードコードされていたものと同じ
+        if (layout.terrain.empty())
         {
-            // 地形を差し替えたあとの JSON は座標がそのまま残っているので、
-            // 島の外を指していないか必ず検証する。ここを通さないと
-            // 敵とコインが全部宙に浮いて奈落へ落ちる（実際に startLand で起きた）
-            float validRatio = 0.0f;
-            if (!layout.IsCompatibleWithCurrentTerrain(&validRatio))
+            layout.terrain = StageLayout::MakeDefaultTerrain();
+        }
+
+        // 【順番が重要】敵・コイン・キューブの検証もフォールバック生成も
+        // 「地形へのレイキャスト」に依存しているので、地形を先に適用しておく
+        stageTerrain_->ApplyLayout(layout.terrain);
+
+        // 地形を差し替えたあとの JSON は座標がそのまま残っているので、
+        // 島の外を指していないか必ず検証する。ここを通さないと
+        // 敵とコインが全部宙に浮いて奈落へ落ちる（実際に startLand で起きた）
+        float validRatio = 0.0f;
+        if (!loaded || !layout.IsCompatibleWithCurrentTerrain(&validRatio))
+        {
+            if (loaded)
             {
                 char msg[192];
                 std::snprintf(msg, sizeof(msg),
@@ -270,9 +225,54 @@ void GamePlayScene::InitializeScene()
                               "(only %.0f%% on ground). Using generated fallback layout.\n",
                               validRatio * 100.0f);
                 OutputDebugStringA(msg);
-                layout = StageLayout::MakeFallback();
             }
+
+            // 地形とボスの設定だけは残す。フォールバックが作り直すのは
+            // 敵・コイン・キューブ・プレイヤー初期位置だけ
+            std::vector<StageTerrainEntry> keptTerrain = layout.terrain;
+            StageBossEntry keptBoss = layout.boss;
+
+            layout = StageLayout::MakeFallback();
+            layout.terrain = std::move(keptTerrain);
+            if (keptBoss.enabled) layout.boss = keptBoss;
         }
+
+        // 4. スライムマネージャーの初期化と初期スライム群の配置。
+        //    地形が登録されたあとでないと SpawnSlime() の地形スナップが効かない
+        slimeManager_ = std::make_unique<SlimeManager>();
+        slimeManager_->Initialize(object3dCom, playCamera_.get());
+
+        // プレイヤー初期位置は配置データが正。床がある場所なら採用する
+        if (SlimePhysics::QueryGroundLayers(layout.playerStart.x, layout.playerStart.z, nullptr, 0) > 0)
+        {
+            spawnBasePos_ = { layout.playerStart.x, layout.playerStart.y + 0.55f, layout.playerStart.z };
+        }
+        RespawnSlimesAtBase();
+
+        // エディタとボスの初期化。ここまで来て初めて全部の参照先が揃う
+        {
+            PlacementEditor::SceneRefs refs;
+            refs.object3dCom = object3dCom;
+            refs.camera = playCamera_.get();
+            refs.enemyManager = enemyManager_.get();
+            refs.coinManager = coinManager_.get();
+            refs.growthCubeManager = growthCubeManager_.get();
+            refs.slimeManager = slimeManager_.get();
+            refs.terrain = stageTerrain_.get();
+            refs.bossFight = bossFight_.get();
+            placementEditor_->Initialize(refs);
+            placementEditor_->SetGroundBaseColor(groundBaseColor_);
+        }
+        {
+            BossFight::SceneRefs refs;
+            refs.object3dCom = object3dCom;
+            refs.camera = playCamera_.get();
+            refs.slimeManager = slimeManager_.get();
+            refs.terrain = stageTerrain_.get();
+            refs.fx = fx_.get();
+            bossFight_->Initialize(refs);
+        }
+
         placementEditor_->SetLayout(layout);
     }
 
@@ -283,42 +283,10 @@ void GamePlayScene::InitializeScene()
     isGameOverTransition_ = false;
     gameOverDelayTimer_ = 0.0f;
 
-    // 9. プリミティブ生成による成長キューブアイテム (GrowthCube) の初期化・配置
-    growthCubes_.clear();
-    {
-        // キューブ1: 小スライム群の前方（まっすぐ進むとすぐ取れる位置）
-        auto cube1 = std::make_unique<GrowthCube>();
-        cube1->Initialize(object3dCom, playCamera_.get(), { spawnBasePos_.x, spawnBasePos_.y + 0.15f, spawnBasePos_.z + 8.0f }, 0.85f);
-        growthCubes_.push_back(std::move(cube1));
-
-        // キューブ2: スタート平原の左側
-        auto cube2 = std::make_unique<GrowthCube>();
-        cube2->Initialize(object3dCom, playCamera_.get(), { spawnBasePos_.x - 3.8f, spawnBasePos_.y + 0.15f, spawnBasePos_.z + 3.0f }, 0.80f);
-        growthCubes_.push_back(std::move(cube2));
-
-        // キューブ3: スタート平原の右側
-        auto cube3 = std::make_unique<GrowthCube>();
-        cube3->Initialize(object3dCom, playCamera_.get(), { spawnBasePos_.x + 3.8f, spawnBasePos_.y + 0.15f, spawnBasePos_.z + 3.0f }, 0.80f);
-        growthCubes_.push_back(std::move(cube3));
-
-        // キューブ4: 通路・橋の手前（Z=48m）
-        auto cube4 = std::make_unique<GrowthCube>();
-        cube4->Initialize(object3dCom, playCamera_.get(), { spawnBasePos_.x, spawnBasePos_.y + 0.15f, spawnBasePos_.z + 18.0f }, 0.90f);
-        growthCubes_.push_back(std::move(cube4));
-    }
+    // 成長キューブは配置データ（JSON の growthCubes）から
+    // PlacementEditor::ApplyLayoutToScene() が置く。ここでのハードコードは廃止した
 
     isInitialized_ = true;
-}
-
-void GamePlayScene::ResetGrowthCubes()
-{
-    for (auto& cube : growthCubes_)
-    {
-        if (cube)
-        {
-            cube->Respawn();
-        }
-    }
 }
 
 void GamePlayScene::RespawnSlimesAtBase()
@@ -340,7 +308,11 @@ void GamePlayScene::RestartGame()
     RespawnSlimesAtBase();
 
     // 成長キューブを再出現
-    ResetGrowthCubes();
+    if (growthCubeManager_) growthCubeManager_->RespawnAll();
+
+    // ボス戦を最初の状態（トリガー待ち）へ戻す
+    if (bossFight_) bossFight_->Restart();
+    bossFreezeSlimes_ = false;
 
     // ステージ傾斜を水平にリセット
     currentTilt_ = { 0.0f, 0.0f };
@@ -391,7 +363,15 @@ void GamePlayScene::Finalize()
     {
         if (isEditMode_)
         {
-            placementEditor_->SetActive(false); // 中で自動保存される
+            // 【注意】ここで SetActive(false) を呼んではいけない。
+            // あちらは ApplyLayoutToScene()（地形の再読み込みや Object3d の生成・破棄）と
+            // Camera::Update() まで走らせるが、終了時は DirectXCom / CB アロケータの
+            // 解放順が読めず、GPU を触った瞬間にアクセス違反になる
+            //（engine-notes.md の「Finalize() で GPU を触ると落ちる」パターン）。
+            // 保存に必要なのは placementEditor_ が持っている配置データだけなので、
+            // シーンから吸い出して書き出すところまでで止める
+            placementEditor_->SyncLayoutFromScene();
+            placementEditor_->Save();
             isEditMode_ = false;
         }
         else if (placementEditor_->IsDirty())
@@ -400,6 +380,18 @@ void GamePlayScene::Finalize()
         }
         placementEditor_->Finalize();
         placementEditor_.reset();
+    }
+
+    if (bossFight_)
+    {
+        bossFight_->Finalize();
+        bossFight_.reset();
+    }
+
+    if (growthCubeManager_)
+    {
+        growthCubeManager_->Finalize();
+        growthCubeManager_.reset();
     }
 
     if (coinManager_)
@@ -421,17 +413,14 @@ void GamePlayScene::Finalize()
     }
 
     aimGuide_.reset();
-    SlimePhysics::ClearGroundMeshes();
-    for (auto& part : stageParts_)
+
+    // 地形の解除（SlimePhysics と CollisionManager からの登録解除もここでやる）
+    if (stageTerrain_)
     {
-        if (part.collider)
-        {
-            CollisionManager::GetInstance()->UnregisterCollider(part.collider.get());
-            part.collider.reset();
-        }
-        part.object.reset();
+        stageTerrain_->Finalize();
+        stageTerrain_.reset();
     }
-    stageParts_.clear();
+    SlimePhysics::ClearGroundMeshes();
     slimeManager_.reset();
     playCamera_.reset();
     mouseInput_.reset();
@@ -596,63 +585,16 @@ void GamePlayScene::Update()
         shakeTilt.y = std::cos((stageShakeDuration_ - stageShakeTimer_) * 40.0f) * progress * stageShakeIntensity_ * 0.7f;
     }
 
-    // 全ステージパーツの回転を傾斜角＋揺動に合わせて更新
+    // 全ステージパーツの回転を傾斜角＋揺動に合わせて更新。
     // スライム群衆重心を回転中心（ピボット）にすることで、傾斜時にスライム直下の
-    // 地面高さが変動しなくなり、めり込み・追従ズレを根本から解消
-    if (!stageParts_.empty())
+    // 地面高さが変動しなくなり、めり込み・追従ズレを根本から解消する。
+    //
+    // 実際の行列計算（ピボット回転 + パーツごとの位置・Y回転・スケール）は
+    // StageTerrain::UpdateTransforms() の中。以前はここに直接書いてあった
+    if (stageTerrain_)
     {
-        Vector3 rot = { currentTilt_.x + shakeTilt.x, 0.0f, -currentTilt_.y + shakeTilt.y };
-
-        // ピボット = スライム重心の XZ 位置
-        float px = slimeCenter.x;
-        float pz = slimeCenter.z;
-
-        // rot = {pitch(α), 0, roll(β)} の回転行列 R = Rx(α) * Rz(β) を手計算し、
-        // ピボット点を R で変換した結果との差分を平行移動に設定
-        // → ピボットが回転前後で同じワールド座標に留まる
-        float cx = std::cos(rot.x), sx = std::sin(rot.x);
-        float cz = std::cos(rot.z), sz = std::sin(rot.z);
-
-        // R = Rx(α) * Rz(β) の行列（行ベクトル v * R）:
-        //   Row0 = ( cβ,      sβ,      0  )
-        //   Row1 = (-cα·sβ,   cα·cβ,   sα )  ← pivot.y = 0 なので寄与なし
-        //   Row2 = ( sα·sβ,  -sα·cβ,   cα )
-        // pivot_rotated = px * Row0 + pz * Row2
-        float prx = px * cz + pz * (sx * sz);
-        float pry = px * sz + pz * (-sx * cz);
-        float prz = pz * cx;
-
-        Vector3 groundTranslate = {
-            px - prx,
-            0.0f - pry + stageBounceOffset_,
-            pz - prz
-        };
-
-        for (auto& part : stageParts_)
-        {
-            if (!part.object) continue;
-
-            Vector3 offsetWorld = part.baseOffset * groundScale_;
-            float ox = offsetWorld.x * cz + offsetWorld.z * (sx * sz);
-            float oy = offsetWorld.x * sz + offsetWorld.z * (-sx * cz);
-            float oz = offsetWorld.z * cx;
-
-            Vector3 partTranslate = {
-                groundTranslate.x + ox,
-                groundTranslate.y + oy,
-                groundTranslate.z + oz
-            };
-
-            part.object->SetTranslate(partTranslate);
-            part.object->SetScale({ groundScale_, groundScale_, groundScale_ });
-            part.object->SetRotate(rot);
-            part.object->Update();
-
-            if (part.collider)
-            {
-                part.collider->Update();
-            }
-        }
+        stageTerrain_->UpdateTransforms(currentTilt_, { slimeCenter.x, slimeCenter.z },
+                                        stageBounceOffset_, shakeTilt);
     }
 
     // 照準ガイドはLocoRoco完全準拠のため無効化
@@ -661,7 +603,9 @@ void GamePlayScene::Update()
     // スライム群衆の更新（全スライムの入力、物理、合体、分裂、衝突分離）
     // 配置エディタ中は入力を一切渡さず、速度も毎フレーム殺してその場に留める。
     // Update 自体は呼ぶので、地面追従とスライムシェーダーの時間だけは進む
-    if (slimeManager_ && isEditMode_)
+    // ボスの登場フォーカス・死亡演出の間も同じ扱いで固める
+    //（bossFreezeSlimes_ は前フレームの BossFight::Update() が立てたもの）
+    if (slimeManager_ && (isEditMode_ || bossFreezeSlimes_))
     {
         for (const auto& slimePtr : slimeManager_->GetSlimes())
         {
@@ -706,13 +650,10 @@ void GamePlayScene::Update()
         }
     }
 
-    // 成長キューブアイテム (GrowthCube) の更新（浮遊、自転、ステージ傾斜追従、スライム当たり判定、巨大化）
-    for (auto& cube : growthCubes_)
+    // 成長キューブの更新（浮遊、自転、ステージ傾斜追従、スライム当たり判定、巨大化）
+    if (growthCubeManager_)
     {
-        if (cube)
-        {
-            cube->Update(deltaTime, currentTilt_, slimePivot, slimeManager_.get());
-        }
+        growthCubeManager_->Update(deltaTime, currentTilt_, slimePivot, slimeManager_.get());
     }
 
     // 敵の更新（各スライムとの強弱判定・被弾ノックバックもここで解決される）
@@ -726,6 +667,58 @@ void GamePlayScene::Update()
     if (coinManager_)
     {
         coinManager_->Update(deltaTime, currentTilt_, slimeManager_.get());
+    }
+
+    // ボス戦フェーズの更新。中身は BossFight.cpp
+    // （トリガー判定・カメラ演出・全方向弾・HPバー・死亡演出まで全部あちら）
+    if (bossFight_)
+    {
+        BossFight::FrameInput bossInput;
+        bossInput.deltaTime = deltaTime;
+        bossInput.stageTilt = currentTilt_;
+        bossInput.pivot = slimePivot;
+        bossInput.playerLife = CalculateLifeCount();
+        bossInput.editorMode = isEditMode_;
+
+        const BossFight::FrameResult bossResult = bossFight_->Update(bossInput);
+
+        bossFreezeSlimes_ = bossResult.freezeSlimes;
+        if (bossResult.freezeSlimes && slimeManager_)
+        {
+            // 立った瞬間から効かせたいので、その場で速度も殺しておく
+            for (const auto& slimePtr : slimeManager_->GetSlimes())
+            {
+                if (slimePtr) slimePtr->SetVelocity({ 0.0f, 0.0f, 0.0f });
+            }
+        }
+
+        if (bossResult.cameraShake > 0.0f)
+        {
+            AddCameraShake(bossResult.cameraShake);
+        }
+
+        if (bossResult.scoreGain > 0)
+        {
+            // スコアの増分は「残機の三乗」。計算は BossFight 側でやっている
+            score_ += bossResult.scoreGain;
+            if (hud_)
+            {
+                hud_->PushScorePopup(bossResult.scoreGain, bossResult.scorePopupAt);
+            }
+        }
+
+        if (bossResult.requestClear)
+        {
+            // リザルトへ値を渡す。ClearScene が同じキーを読む
+            SetSceneDataInt("result.score", score_);
+            SetSceneDataFloat("result.time", elapsedSeconds_);
+            SetSceneDataInt("result.coin", coinManager_ ? coinManager_->GetCollectedCount() : 0);
+
+            // フェード付きの予約遷移なので、この時点で this が消えることはない。
+            // それでも「ボスを倒したあとの残りの処理」は意味が無いので抜ける
+            SceneManager::GetInstance()->ChangeScene("CLEAR");
+            return;
+        }
     }
 
     // 衝突判定と押し出しの更新
@@ -915,8 +908,44 @@ void GamePlayScene::Update()
         }
 
         Vector3 finalCamPos = currentCameraPos_ + cameraShakeOffset_;
+        Vector3 finalCamRot = currentCameraRot_;
+
+        // --- ボス戦のカメラ演出 ---
+        // BossFight が「ボスの正面から見た位置・回転」と 0..1 の重みを返してくるので、
+        // 通常のカメラとの間を補間する。
+        // 【重要】currentCameraPos_ / currentCameraRot_ 自体は汚さない。
+        // 汚すと次フレームの SmoothDamp の基準がずれて、戻るときにカメラが跳ねる
+        if (bossFight_ && bossFight_->GetCameraBlend() > 0.0001f)
+        {
+            Vector3 focusPos, focusRot;
+            if (bossFight_->GetCameraTarget(focusPos, focusRot))
+            {
+                const float t = std::clamp(bossFight_->GetCameraBlend(), 0.0f, 1.0f);
+
+                finalCamPos.x += (focusPos.x - finalCamPos.x) * t;
+                finalCamPos.y += (focusPos.y - finalCamPos.y) * t;
+                finalCamPos.z += (focusPos.z - finalCamPos.z) * t;
+
+                // 角度は最短回り（-pi..pi）で補間しないと、境目で1周してしまう
+                auto LerpAngle = [](float from, float to, float rate) {
+                    constexpr float kPi = 3.14159265358979323846f;
+                    float diff = to - from;
+                    while (diff < -kPi) diff += kPi * 2.0f;
+                    while (diff > kPi)  diff -= kPi * 2.0f;
+                    return from + diff * rate;
+                };
+                finalCamRot.x = LerpAngle(finalCamRot.x, focusRot.x, t);
+                finalCamRot.y = LerpAngle(finalCamRot.y, focusRot.y, t);
+                finalCamRot.z = LerpAngle(finalCamRot.z, focusRot.z, t);
+            }
+        }
+
+        // カメラシェイクはこの値を土台に足す
+        appliedCameraPos_ = finalCamPos;
+        appliedCameraRot_ = finalCamRot;
+
         playCamera_->SetTranslate(finalCamPos);
-        playCamera_->SetRotate(currentCameraRot_);
+        playCamera_->SetRotate(finalCamRot);
         playCamera_->SetFovY(cameraFov_);
         playCamera_->Update();
     }
@@ -925,12 +954,9 @@ void GamePlayScene::Update()
     UpdateCameraShake(deltaTime);
 
     // カメラの最新ViewProjection行列に合わせて、各ステージパーツのWVP定数バッファを同期更新
-    for (auto& part : stageParts_)
+    if (stageTerrain_)
     {
-        if (part.object)
-        {
-            part.object->Update();
-        }
+        stageTerrain_->SyncConstantBuffers();
     }
 
     // 6. トランジション（IrisTransition）の更新と生存スライム死活監視
@@ -1030,17 +1056,18 @@ void GamePlayScene::UpdateCameraShake(float deltaTime)
     const float ny = std::sin(t * 1.31f + 2.4f) * 0.6f + std::sin(t * 2.71f + 0.3f) * 0.4f;
     const float nz = std::sin(t * 0.87f + 4.1f) * 0.6f + std::sin(t * 1.93f + 5.2f) * 0.4f;
 
-    // ステージ揺らし（SPACE のドン）による cameraShakeOffset_ を土台に足しこむ。
-    // ここで currentCameraPos_ だけを基準にすると、あちらの揺れを打ち消してしまう
+    // 土台は appliedCameraPos_ / appliedCameraRot_（ステージ揺らしの
+    // cameraShakeOffset_ と、ボス戦のフォーカス補間まで込みの最終値）。
+    // currentCameraPos_ を土台にすると、その2つを打ち消してしまう
     const Vector3 shakenPos = {
-        currentCameraPos_.x + cameraShakeOffset_.x + nx * shakeAmplitude_ * amount,
-        currentCameraPos_.y + cameraShakeOffset_.y + ny * shakeAmplitude_ * amount,
-        currentCameraPos_.z + cameraShakeOffset_.z + nz * shakeAmplitude_ * amount * 0.5f,
+        appliedCameraPos_.x + nx * shakeAmplitude_ * amount,
+        appliedCameraPos_.y + ny * shakeAmplitude_ * amount,
+        appliedCameraPos_.z + nz * shakeAmplitude_ * amount * 0.5f,
     };
     const Vector3 shakenRot = {
-        currentCameraRot_.x + ny * shakeRollAmount_ * amount * 0.4f,
-        currentCameraRot_.y + nx * shakeRollAmount_ * amount * 0.4f,
-        currentCameraRot_.z + nz * shakeRollAmount_ * amount,
+        appliedCameraRot_.x + ny * shakeRollAmount_ * amount * 0.4f,
+        appliedCameraRot_.y + nx * shakeRollAmount_ * amount * 0.4f,
+        appliedCameraRot_.z + nz * shakeRollAmount_ * amount,
     };
 
     playCamera_->SetTranslate(shakenPos);
@@ -1135,6 +1162,12 @@ void GamePlayScene::UpdateFxAndHud(float deltaTime)
                 // やや強めにカメラを揺らす
                 AddCameraShake(shakeOnSelfDestruct_);
 
+                // ボスへダメージ。
+                // SlimeManager::TakeSelfDestructEvent() は EnemyManager が
+                // 1箇所で拾ってしまうので、こちらで拾ったものを回してやる。
+                // BossFight は次の Update() でまとめて HP を減らす
+                if (bossFight_) bossFight_->NotifySelfDestruct(ev.splitPosition);
+
                 // TODO(SE): プレイヤーの自爆（E キー分裂）音をここで鳴らす
             }
         }
@@ -1153,11 +1186,24 @@ void GamePlayScene::UpdateFxAndHud(float deltaTime)
         }
     }
 
+    // --- 成長キューブ（食べると残機が増えるやつ）---
+    if (growthCubeManager_)
+    {
+        for (const Vector3& position : growthCubeManager_->GetCollectEvents())
+        {
+            // コインのような光芒が弾ける。縮小してスライムへ吸い込まれる動きは
+            // GrowthCube 側が持っていて、そのあいだ光は出続ける
+            if (fx_) fx_->EmitGrowthCubeCollect(position, 0.6f);
+
+            // TODO(SE): 成長キューブを食べたときの音をここで鳴らす
+        }
+    }
+
     // --- 常時出ている演出 ---
     if (fx_)
     {
         fx_->UpdateAll(deltaTime, playerPos, leader, slimeManager_.get(),
-                       coinManager_.get(), enemyManager_.get());
+                       coinManager_.get(), enemyManager_.get(), growthCubeManager_.get());
     }
 
     // --- HUD ---
@@ -1210,27 +1256,29 @@ void GamePlayScene::Draw(SceneRenderRequests& renderRequests)
     // 入れておかないと敵だけ陰影が変わる
     ctx.light = SceneManager::GetInstance()->GetLight();
 
-    // 1. 地面の描画（プロペラを除く全ステージOBJモデル群）
-    for (auto& part : stageParts_)
+    // 1. 地面の描画（配置データから作られた全ステージパーツ）
+    if (stageTerrain_)
     {
-        if (!part.object) continue;
-
-        RenderContext partCtx = ctx;
-        if (part.textureIndex != TextureManager::kInvalidTextureIndex) {
-            partCtx.textureHandle = TextureManager::GetInstance()->GetSrvHandleGPU(part.textureIndex);
-        }
-
-        // 配置エディタ中は、上段（一本道）越しに下段が見えるようパーツごとに半透明で描く。
-        // 地形が複数パーツに分かれたので、旧実装（単一メッシュ）と違い
-        // 「上段だけを透かす」ことも原理的には可能になっている
-        bool drawnTranslucent = false;
-        if (isEditMode_ && placementEditor_)
+        for (const auto& partPtr : stageTerrain_->GetParts())
         {
-            drawnTranslucent = placementEditor_->DrawGroundTranslucent(partCtx, part.object.get(), part.modelData);
-        }
-        if (!drawnTranslucent)
-        {
-            object3dCom->Draw(part.object.get(), partCtx, part.modelData, true);
+            if (!partPtr || !partPtr->object) continue;
+            StageTerrain::Part& part = *partPtr;
+
+            RenderContext partCtx = ctx;
+            if (part.textureIndex != TextureManager::kInvalidTextureIndex) {
+                partCtx.textureHandle = TextureManager::GetInstance()->GetSrvHandleGPU(part.textureIndex);
+            }
+
+            // 配置エディタ中は、オーバーハング越しに下が見えるようパーツごとに半透明で描く
+            bool drawnTranslucent = false;
+            if (isEditMode_ && placementEditor_)
+            {
+                drawnTranslucent = placementEditor_->DrawGroundTranslucent(partCtx, part.object.get(), part.modelData);
+            }
+            if (!drawnTranslucent)
+            {
+                object3dCom->Draw(part.object.get(), partCtx, part.modelData, true);
+            }
         }
     }
 
@@ -1258,13 +1306,16 @@ void GamePlayScene::Draw(SceneRenderRequests& renderRequests)
         coinManager_->Draw(ctx);
     }
 
-    // 5. プリミティブ成長キューブアイテムの描画
-    for (auto& cube : growthCubes_)
+    // 5. 成長キューブの描画（Slime シェーダーでゲーミング色に光る）
+    if (growthCubeManager_)
     {
-        if (cube)
-        {
-            cube->Draw(ctx);
-        }
+        growthCubeManager_->Draw(ctx);
+    }
+
+    // 5.5 ボスとボスの弾
+    if (bossFight_)
+    {
+        bossFight_->Draw(ctx);
     }
 
     // 6. 全スライムの描画
@@ -1299,6 +1350,12 @@ void GamePlayScene::Draw(SceneRenderRequests& renderRequests)
     {
         hud_->Draw(ctx.commandList);
     }
+
+    // 11. ボスのHPバー（画面下）。ほかの HUD より手前でよい
+    if (bossFight_)
+    {
+        bossFight_->DrawHud(ctx.commandList);
+    }
 }
 
 void GamePlayScene::DrawDebugUI()
@@ -1321,9 +1378,11 @@ void GamePlayScene::DrawDebugUI()
     ImGui::SetNextWindowSize(ImVec2(460, 480), ImGuiCond_FirstUseEver);
     ImGui::Begin("Pikmin x LocoRoco Debug Panel", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
 
-    // --- 演出 / HUD / カメラシェイク ---
+    // --- 演出 / HUD / カメラシェイク / ボス戦 ---
     if (fx_) fx_->DrawImGui();
     if (hud_) hud_->DrawImGui();
+    if (bossFight_) bossFight_->DrawImGui();
+    if (growthCubeManager_) growthCubeManager_->DrawImGui();
 
     if (ImGui::CollapsingHeader("Camera Shake"))
     {
@@ -1472,49 +1531,23 @@ void GamePlayScene::DrawDebugUI()
 
     ImGui::Separator();
 
-    // 3.5. 成長キューブアイテム (Growth Cubes)
-    if (ImGui::CollapsingHeader("Growth Cubes (成長キューブアイテム)", ImGuiTreeNodeFlags_DefaultOpen))
+    // 3.5. 成長キューブ（配置は JSON。細かい調整は Growth Cube / Game FX パネル側）
+    if (ImGui::CollapsingHeader("Growth Cubes", ImGuiTreeNodeFlags_DefaultOpen))
     {
-        ImGui::TextColored(ImVec4(1.0f, 0.85f, 0.2f, 1.0f), "Primitive-Generated Collectable Cubes:");
-        ImGui::Text("Active Cubes: %zu", growthCubes_.size());
-
-        if (ImGui::Button("Respawn All Cubes (全キューブ復活)", ImVec2(240, 28)))
+        if (growthCubeManager_)
         {
-            ResetGrowthCubes();
-        }
-
-        ImGui::SameLine();
-        if (ImGui::Button("Spawn Cube At Camera Target", ImVec2(220, 28)))
-        {
-            auto newCube = std::make_unique<GrowthCube>();
-            Vector3 pos = currentFocusPos_;
-            pos.y += 0.5f;
-            pos.z += 2.0f;
-            newCube->Initialize(GetObject3dCom(), playCamera_.get(), pos, 0.85f);
-            growthCubes_.push_back(std::move(newCube));
-        }
-
-        for (size_t i = 0; i < growthCubes_.size(); ++i)
-        {
-            if (!growthCubes_[i]) continue;
-            auto state = growthCubes_[i]->GetState();
-            const char* stateStr = "Active (出現中)";
-            ImVec4 stateColor = ImVec4(0.2f, 1.0f, 0.4f, 1.0f);
-            if (state == GrowthCube::State::Collecting) {
-                stateStr = "Collecting (取得演出中)";
-                stateColor = ImVec4(1.0f, 0.8f, 0.2f, 1.0f);
-            } else if (state == GrowthCube::State::Inactive) {
-                stateStr = "Inactive (取得済み)";
-                stateColor = ImVec4(0.7f, 0.7f, 0.7f, 1.0f);
-            }
-
-            ImGui::Text("Cube [%zu]: %s", i, stateStr);
-            ImGui::SameLine();
-            std::string respawnBtnId = "Respawn##" + std::to_string(i);
-            if (ImGui::SmallButton(respawnBtnId.c_str()))
+            ImGui::Text("Placed: %d / Eaten: %d",
+                        growthCubeManager_->GetTotalCount(), growthCubeManager_->GetCollectedCount());
+            if (ImGui::Button("Respawn All Cubes", ImVec2(240, 28)))
             {
-                growthCubes_[i]->Respawn();
+                growthCubeManager_->RespawnAll();
             }
+            ImGui::SameLine();
+            if (ImGui::Button("Spawn Cube At Focus", ImVec2(220, 28)))
+            {
+                growthCubeManager_->Spawn({ currentFocusPos_.x, 0.0f, currentFocusPos_.z + 2.0f }, 0.85f);
+            }
+            ImGui::TextDisabled("Placement is edited in the Placement Editor (F2).");
         }
     }
 
@@ -1533,7 +1566,8 @@ void GamePlayScene::DrawDebugUI()
         ImGui::SliderFloat("Tilt Smooth Time (傾斜スムーズ時間)", &tiltSmoothTime_, 0.05f, 1.00f, "%.2f s");
         ImGui::SliderFloat("Stage Shake Intensity (揺れ強度)", &stageShakeIntensity_, 0.005f, 0.10f, "%.3f rad");
         ImGui::SliderFloat("Stage Shake Duration (揺れ持続時間)", &stageShakeDuration_, 0.10f, 0.60f, "%.2f s");
-        ImGui::SliderFloat("Ground Scale (地面縮小スケール)", &groundScale_, 0.05f, 1.0f, "%.2f");
+        // 地面のスケールはパーツごとの設定になったので、配置エディタ（F2）の
+        // Terrain レイヤーで選択して変える
 
         float friction = SlimePhysics::GetFriction();
         if (ImGui::SliderFloat("Slime Friction (共通摩擦係数: 1.3)", &friction, 0.2f, 5.0f, "%.1f")) {
@@ -1591,15 +1625,22 @@ void GamePlayScene::DrawDebugUI()
     ImGui::Separator();
 
     // 6. ステージパーツ（地形モデル群）の状態表示
-    if (!stageParts_.empty() && ImGui::CollapsingHeader("Stage Parts (ステージ地形パーツ)", ImGuiTreeNodeFlags_DefaultOpen))
+    if (stageTerrain_ && stageTerrain_->GetPartCount() > 0 &&
+        ImGui::CollapsingHeader("Stage Parts", ImGuiTreeNodeFlags_DefaultOpen))
     {
-        ImGui::TextColored(ImVec4(0.4f, 0.9f, 0.4f, 1.0f), "Configured Stage Parts: %zu models", stageParts_.size());
-        for (size_t i = 0; i < stageParts_.size(); ++i)
+        ImGui::TextColored(ImVec4(0.4f, 0.9f, 0.4f, 1.0f), "Terrain parts: %d models",
+                           stageTerrain_->GetPartCount());
+        const auto& parts = stageTerrain_->GetParts();
+        for (size_t i = 0; i < parts.size(); ++i)
         {
-            const auto& part = stageParts_[i];
-            ImGui::BulletText("[%zu] %s (Offset: %.1f, %.1f, %.1f)",
-                i, part.name.c_str(), part.baseOffset.x, part.baseOffset.y, part.baseOffset.z);
+            const StageTerrain::Part* part = parts[i].get();
+            if (!part) continue;
+            ImGui::BulletText("[%zu] %s%s  pos(%.1f, %.1f) rotY %.0fdeg scale %.2f",
+                i, part->mesh.c_str(), part->bossTrigger ? " [BOSS TRIGGER]" : "",
+                part->position.x, part->position.z,
+                part->rotationY * 57.2958f, part->scale);
         }
+        ImGui::TextDisabled("Edit terrain in the Placement Editor (F2) > Terrain layer.");
     }
 
     // 7. プロペラ障害物のデバッグ調整

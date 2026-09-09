@@ -1,16 +1,58 @@
-#include "GrowthCube.h"
+#define NOMINMAX
+#include "Application/GameObject/GrowthCube.h"
+
+#include "Baziru3_Engine/Core/Base/Matrix4x4.h"
+#include "Baziru3_Engine/Core/Base/DirectXCom.h"
+#include "Baziru3_Engine/Core/Base/Allocator/ConstantBufferAllocator.h"
+#include "Baziru3_Engine/Core/Base/Pipeline/PipelineStateManager.h"
 #include "Baziru3_Engine/Graphics/3D/Object/Object3dCom.h"
 #include "Baziru3_Engine/Graphics/2D/Texture/TextureManager.h"
+#include "Application/GameObject/SlimeMesh.h"
 #include "Application/GameObject/SlimeManager.h"
 #include "Application/GameObject/Slime.h"
-#include <cmath>
+#include "SceneManager.h"
+#include "Light.h"
+
 #include <algorithm>
+#include <cmath>
+#include <cstring>
+
+// ===================================================================
+// 見た目の共有パラメータ
+// ===================================================================
+float GrowthCube::sHoverAmplitude = 0.16f;
+float GrowthCube::sHoverSpeed = 2.6f;
+float GrowthCube::sSpinSpeed = 1.4f;
+float GrowthCube::sHeightOffset = 0.55f;
+float GrowthCube::sCollectSeconds = 0.50f;
+float GrowthCube::sGamingTimeScale = 0.55f;
+float GrowthCube::sGamingSpaceScale = 0.035f;
+float GrowthCube::sGamingGain = 1.0f;
+float GrowthCube::sPickupRadius = 0.35f;
 
 namespace
 {
-    constexpr float kTwoPi = 6.283185307f;
+    constexpr float kPi = 3.14159265358979323846f;
+    constexpr float kTwoPi = kPi * 2.0f;
 
-    // 3x3 回転行列（行ベクトル形式）からエンジンのオイラー角 (rx, ry, rz) を逆算
+    /// @brief 行ベクトル規約（v * M）での回転適用
+    inline Vector3 ApplyRotation(const Vector3& v, const Matrix4x4& m)
+    {
+        return {
+            v.x * m.m[0][0] + v.y * m.m[1][0] + v.z * m.m[2][0],
+            v.x * m.m[0][1] + v.y * m.m[1][1] + v.z * m.m[2][1],
+            v.x * m.m[0][2] + v.y * m.m[1][2] + v.z * m.m[2][2]
+        };
+    }
+
+    /// @brief GamePlayScene が地面に掛けているのと同じ回転行列 R = Rx(pitch) * Rz(-roll)
+    inline Matrix4x4 BuildStageRotation(const Vector2& stageTilt)
+    {
+        return Multiply(MakeRotateXMatrix(stageTilt.x), MakeRotateZMatrix(-stageTilt.y));
+    }
+
+    /// @brief 3x3 回転行列から engine のオイラー角 (rx, ry, rz) を逆算
+    /// @note engine の MakeAffineMatrix は R = Rx(x) * Ry(y) * Rz(z)（行ベクトル規約）
     Vector3 MatrixToEulerXYZ(const Matrix4x4& R)
     {
         Vector3 euler;
@@ -33,119 +75,70 @@ namespace
     }
 }
 
-Object3d::ModelData GrowthCube::GeneratePrimitiveCube(float size)
+Vector4 GrowthCube::SampleGamingColor(float time, const Vector3& position)
 {
-    Object3d::ModelData modelData;
-    float h = size * 0.5f;
+    // GamePlaySceneFx::EvaluateGamingField と同じ Inigo Quilez のコサインパレット。
+    // 式をそろえてあるので、本体の色とまわりのパーティクルの色が連動して流れる
+    const float u = time * sGamingTimeScale
+                  + (position.x + position.y * 0.6f + position.z) * sGamingSpaceScale;
 
-    // 6面 × 4頂点 = 24頂点（各面独立法線によりエッジのシャープなキューブを形成）
-    modelData.vertices.reserve(24);
-    modelData.indices.reserve(36);
+    const float r = 0.5f + 0.5f * std::cos(kTwoPi * u);
+    const float g = 0.5f + 0.5f * std::cos(kTwoPi * (u + 1.0f / 3.0f));
+    const float b = 0.5f + 0.5f * std::cos(kTwoPi * (u + 2.0f / 3.0f));
 
-    // 面定義ヘルパーラムダ
-    auto AddFace = [&](const Vector3& normal,
-                       const Vector3& p0, const Vector3& p1,
-                       const Vector3& p2, const Vector3& p3)
-    {
-        uint32_t baseIdx = static_cast<uint32_t>(modelData.vertices.size());
-
-        Sprite::VertexData v0{ { p0.x, p0.y, p0.z, 1.0f }, { 0.0f, 0.0f }, normal };
-        Sprite::VertexData v1{ { p1.x, p1.y, p1.z, 1.0f }, { 1.0f, 0.0f }, normal };
-        Sprite::VertexData v2{ { p2.x, p2.y, p2.z, 1.0f }, { 1.0f, 1.0f }, normal };
-        Sprite::VertexData v3{ { p3.x, p3.y, p3.z, 1.0f }, { 0.0f, 1.0f }, normal };
-
-        modelData.vertices.push_back(v0);
-        modelData.vertices.push_back(v1);
-        modelData.vertices.push_back(v2);
-        modelData.vertices.push_back(v3);
-
-        // 時計回り三角形 (0, 1, 2) と (0, 2, 3)
-        modelData.indices.push_back(baseIdx + 0);
-        modelData.indices.push_back(baseIdx + 1);
-        modelData.indices.push_back(baseIdx + 2);
-
-        modelData.indices.push_back(baseIdx + 0);
-        modelData.indices.push_back(baseIdx + 2);
-        modelData.indices.push_back(baseIdx + 3);
-    };
-
-    // 1. 前面 (+Z)
-    AddFace({ 0.0f, 0.0f, 1.0f },
-            { -h,  h, h }, {  h,  h, h },
-            {  h, -h, h }, { -h, -h, h });
-
-    // 2. 背面 (-Z)
-    AddFace({ 0.0f, 0.0f, -1.0f },
-            {  h,  h, -h }, { -h,  h, -h },
-            { -h, -h, -h }, {  h, -h, -h });
-
-    // 3. 右面 (+X)
-    AddFace({ 1.0f, 0.0f, 0.0f },
-            { h,  h,  h }, { h,  h, -h },
-            { h, -h, -h }, { h, -h,  h });
-
-    // 4. 左面 (-X)
-    AddFace({ -1.0f, 0.0f, 0.0f },
-            { -h,  h, -h }, { -h,  h,  h },
-            { -h, -h,  h }, { -h, -h, -h });
-
-    // 5. 上面 (+Y)
-    AddFace({ 0.0f, 1.0f, 0.0f },
-            { -h, h, -h }, {  h, h, -h },
-            {  h, h,  h }, { -h, h,  h });
-
-    // 6. 下面 (-Y)
-    AddFace({ 0.0f, -1.0f, 0.0f },
-            { -h, -h,  h }, {  h, -h,  h },
-            {  h, -h, -h }, { -h, -h, -h });
-
-    modelData.boundingRadius = size * 0.866025f; // sqrt(3)/2 * size
-    return modelData;
+    return { std::clamp(r * sGamingGain, 0.0f, 1.0f),
+             std::clamp(g * sGamingGain, 0.0f, 1.0f),
+             std::clamp(b * sGamingGain, 0.0f, 1.0f),
+             1.0f };
 }
 
-void GrowthCube::Initialize(Object3dCom* object3dCom, Camera* camera, const Vector3& basePos, float size)
+void GrowthCube::Initialize(Object3dCom* object3dCom, Camera* camera, const Vector3& stageLocalPos, float size)
 {
     object3dCom_ = object3dCom;
     camera_ = camera;
-    basePosition_ = basePos;
-    baseSize_ = size;
-    currentWorldPos_ = basePos;
-    currentScale_ = { 1.0f, 1.0f, 1.0f };
-    currentRotation_ = { 0.0f, 0.0f, 0.0f };
+    anchorLocal_ = stageLocalPos;
+    position_ = stageLocalPos;
+    baseSize_ = (size > 0.01f) ? size : 0.85f;
+
+    currentScale_ = 1.0f;
+    rotation_ = { 0.0f, 0.0f, 0.0f };
     state_ = State::Active;
     collectTimer_ = 0.0f;
     respawnTimer_ = 0.0f;
-    hoverTimer_ = 0.0f;
-    currentAngle_ = 0.0f;
+    lifeTime_ = 0.0f;
+    spin_ = 0.0f;
+    needsGroundSnap_ = true;
     collectedBySlime_ = nullptr;
     autoRespawn_ = false;
 
-    // プリミティブキューブメッシュの生成
-    modelData_ = GeneratePrimitiveCube(baseSize_);
-
-    // テクスチャ設定
+    // プレイヤーと同じ球メッシュ。分割はプレイヤー（64x32）より控えめでよい
+    modelData_ = SlimeMesh::GenerateSphere(32, 16, 0.5f);
     textureIndex_ = TextureManager::GetInstance()->Load("Resources/uvChecker.png");
     modelData_.material.textureIndex = textureIndex_;
 
-    // Object3d の初期化
+    // Slime シェーダーのパラメータ。プレイヤーより少しだけよく揺れて、よく光る
+    slimeParams_ = SlimeParamsCPU{};
+    slimeParams_.wobbleStrength = 0.20f;
+    slimeParams_.wobbleFrequency = 5.0f;
+    slimeParams_.fresnelPower = 2.2f;
+    slimeParams_.envReflection = 0.55f;
+    slimeParams_.innerGlow = 0.85f;
+    slimeParams_.specularShininess = 72.0f;
+    slimeParams_.baseColor = SampleGamingColor(0.0f, position_);
+
     object3d_ = std::make_unique<Object3d>();
-    if (object3d_)
-    {
-        object3d_->Initialize(object3dCom_, modelData_);
-        object3d_->SetCamera(camera_);
-        object3d_->SetTranslate(currentWorldPos_);
-        object3d_->SetScale(currentScale_);
-        object3d_->SetRotate(currentRotation_);
-        // 輝くゴールド/アンバーカラー
-        object3d_->SetColor({ 1.0f, 0.82f, 0.15f, 1.0f });
-        object3d_->SetEnableLighting(true);
-        object3d_->Update();
-    }
+    object3d_->Initialize(object3dCom_, modelData_);
+    object3d_->SetCamera(camera_);
+    object3d_->SetTranslate(position_);
+    object3d_->SetScale({ baseSize_, baseSize_, baseSize_ });
+    object3d_->SetRotate(rotation_);
+    object3d_->SetEnableLighting(true);
+    object3d_->Update();
 }
 
-void GrowthCube::Update(float deltaTime, const Vector2& stageTilt, const Vector2& pivot, SlimeManager* slimeManager)
+bool GrowthCube::Update(float deltaTime, const Vector2& stageTilt, const Vector2& pivot, SlimeManager* slimeManager)
 {
-    if (!object3d_) return;
+    if (!object3d_) return false;
 
     if (state_ == State::Inactive)
     {
@@ -157,86 +150,125 @@ void GrowthCube::Update(float deltaTime, const Vector2& stageTilt, const Vector2
                 Respawn();
             }
         }
-        return;
+        return false;
     }
 
-    // 1. ステージ傾斜の合成回転行列
-    Matrix4x4 R_tilt = Multiply(MakeRotateXMatrix(stageTilt.x), MakeRotateZMatrix(-stageTilt.y));
+    lifeTime_ += deltaTime;
+    slimeParams_.time = lifeTime_;
+
+    bool collectedThisFrame = false;
+
+    const Matrix4x4 rTilt = BuildStageRotation(stageTilt);
+    const Vector3 pivot3 = { pivot.x, 0.0f, pivot.y };
 
     if (state_ == State::Active)
     {
-        // 上下ホバリング
-        hoverTimer_ += deltaTime;
-        float hoverOffsetY = std::sin(hoverTimer_ * 2.8f) * 0.15f;
+        // --- 自転（Y 軸まわり。少し傾けたほうが立体感が出る）---
+        spin_ += sSpinSpeed * deltaTime;
+        if (spin_ > kTwoPi) spin_ -= kTwoPi;
 
-        // 自転
-        currentAngle_ += 1.8f * deltaTime;
-        if (currentAngle_ > kTwoPi) currentAngle_ -= kTwoPi;
+        const Matrix4x4 rSpin = Multiply(MakeRotateXMatrix(0.18f), MakeRotateYMatrix(spin_));
+        rotation_ = MatrixToEulerXYZ(Multiply(rSpin, rTilt));
 
-        // 自転行列 (Y軸回転 + 少し斜めの傾きで魅力的な回転)
-        Matrix4x4 R_spin = Multiply(MakeRotateXMatrix(0.20f), MakeRotateYMatrix(currentAngle_));
-        Matrix4x4 R_combined = Multiply(R_spin, R_tilt);
+        // --- 1. ステージ傾斜に合わせて XZ のワールド座標を出す（Coin と同じ変換）---
+        const Vector3 world = ApplyRotation(anchorLocal_ - pivot3, rTilt) + pivot3;
+        position_.x = world.x;
+        position_.z = world.z;
 
-        // ステージ傾斜に伴う配置位置の回転
-        Vector3 P = { basePosition_.x, basePosition_.y + hoverOffsetY, basePosition_.z };
-        Vector3 P_rel = { P.x - pivot.x, P.y, P.z - pivot.y };
-        Vector3 RP_rel = {
-            P_rel.x * R_tilt.m[0][0] + P_rel.y * R_tilt.m[1][0] + P_rel.z * R_tilt.m[2][0],
-            P_rel.x * R_tilt.m[0][1] + P_rel.y * R_tilt.m[1][1] + P_rel.z * R_tilt.m[2][1],
-            P_rel.x * R_tilt.m[0][2] + P_rel.y * R_tilt.m[1][2] + P_rel.z * R_tilt.m[2][2]
+        // --- 2. 床の高さを毎フレーム取り直す ---
+        // 【重要】レイキャストは「いまの（傾いた）地形メッシュの行列」に対して行われるので、
+        // 必ずワールド XZ ＋ 実際の stageTilt / pivot で問い合わせること。
+        // ステージローカル座標のまま tilt=0 で聞くと、傾けた瞬間に床を見失う
+        //
+        // 初回（と、エディタで動かされた直後）だけ「最上面」を取る。
+        // 2回目以降は「頭より下で一番高い床」にして、上の段へ吸い上げられるのを防ぐ
+        bool hasGround = false;
+        Vector3 normal{ 0.0f, 1.0f, 0.0f };
+        const float currentYArg = needsGroundSnap_ ? SlimePhysics::kIgnoreCurrentY : position_.y;
+
+        const float floorY = SlimePhysics::CalculateGroundHeightEx(
+            position_.x, position_.z, currentYArg, stageTilt,
+            &hasGround, &normal, pivot, false, 0.0f);
+
+        // --- 3. 上下ホバリング ---
+        const float hoverY = std::sin(lifeTime_ * sHoverSpeed) * sHoverAmplitude;
+
+        if (hasGround)
+        {
+            position_.y = floorY + sHeightOffset + hoverY;
+            groundNormal_ = normal;
+            needsGroundSnap_ = false;
+        }
+        else
+        {
+            // 床が見つからない（島の外に置かれた）。落とさず、その場に浮かせたままにする。
+            // コインと同じ方針で、物理は一切やらない
+            position_.y = world.y + sHeightOffset + hoverY;
+        }
+
+        currentScale_ = 1.0f;
+
+        // --- ゲーミング色 ---
+        slimeParams_.baseColor = SampleGamingColor(lifeTime_, position_);
+        slimeParams_.baseColor.w = 0.95f;
+
+        // ぷるぷる。ゆっくり脈打たせて「生きている」感じを出す
+        slimeParams_.squashStretch = {
+            0.06f * std::sin(lifeTime_ * 3.1f),
+            -0.06f * std::sin(lifeTime_ * 3.1f),
+            0.06f * std::sin(lifeTime_ * 3.1f),
         };
-        currentWorldPos_ = { RP_rel.x + pivot.x, RP_rel.y, RP_rel.z + pivot.y };
 
-        currentRotation_ = MatrixToEulerXYZ(R_combined);
-        currentScale_ = { 1.0f, 1.0f, 1.0f };
-
-        // スライムとの接触判定
-        CheckSlimeCollision(slimeManager);
+        // --- スライムとの接触判定 ---
+        collectedThisFrame = CheckSlimeCollision(slimeManager);
     }
     else if (state_ == State::Collecting)
     {
         collectTimer_ += deltaTime;
-        float progress = std::clamp(collectTimer_ / collectDuration_, 0.0f, 1.0f);
+        const float duration = (std::max)(0.05f, sCollectSeconds);
+        const float progress = std::clamp(collectTimer_ / duration, 0.0f, 1.0f);
 
         // 高速回転
-        currentAngle_ += 8.0f * deltaTime;
-        Matrix4x4 R_spin = MakeRotateYMatrix(currentAngle_);
-        Matrix4x4 R_combined = Multiply(R_spin, R_tilt);
-        currentRotation_ = MatrixToEulerXYZ(R_combined);
+        spin_ += 9.0f * deltaTime;
+        rotation_ = MatrixToEulerXYZ(Multiply(MakeRotateYMatrix(spin_), rTilt));
 
-        // 拡大＆吸い込みアニメーション
-        // 前半 (0.0〜0.3): 一瞬ボヨン！と1.65倍に急拡大（Pop!）
-        // 後半 (0.3〜1.0): 対象スライムの中心へ引き寄せられながらゼロへ収縮
-        float s = 1.0f;
-        Vector3 targetPos = collectStartPos_;
-        if (collectedBySlime_ && collectedBySlime_->IsActive())
-        {
-            targetPos = collectedBySlime_->GetPosition();
-        }
+        // 吸い込まれる先。合体で実体が消えることがあるので毎回見に行かない
+        // （collectedBySlime_ は SlimeManager が erase するとダングリングするため、
+        //   位置は取得した瞬間に控えたものを使う）
+        const Vector3 target = collectTarget_;
 
         if (progress < 0.30f)
         {
-            float p = progress / 0.30f;
-            // 1.0 -> 1.65 へのイージングアウト拡大
-            s = 1.0f + 0.65f * std::sin(p * 1.5707963f);
-            currentWorldPos_ = collectStartPos_;
-            currentWorldPos_.y += 0.3f * std::sin(p * 3.14159f);
+            // 前半: ボヨン！と 1.55 倍まで膨らむ
+            const float p = progress / 0.30f;
+            currentScale_ = 1.0f + 0.55f * std::sin(p * (kPi * 0.5f));
+            position_ = collectStartPos_;
+            position_.y += 0.30f * std::sin(p * kPi);
         }
         else
         {
-            float p = (progress - 0.30f) / 0.70f;
-            // 1.65 -> 0.0 への収縮
-            s = 1.65f * (1.0f - p);
-            // スライムへの補間吸い込み
-            float t = p * p; // 加速吸い込み
-            currentWorldPos_ = {
-                collectStartPos_.x + (targetPos.x - collectStartPos_.x) * t,
-                collectStartPos_.y + (targetPos.y - collectStartPos_.y) * t,
-                collectStartPos_.z + (targetPos.z - collectStartPos_.z) * t
+            // 後半: 縮みながら加速してスライムへ吸い込まれる
+            const float p = (progress - 0.30f) / 0.70f;
+            currentScale_ = 1.55f * (1.0f - p);
+
+            const float t = p * p;
+            position_ = {
+                collectStartPos_.x + (target.x - collectStartPos_.x) * t,
+                collectStartPos_.y + (target.y - collectStartPos_.y) * t,
+                collectStartPos_.z + (target.z - collectStartPos_.z) * t,
             };
         }
 
-        currentScale_ = { s, s, s };
+        // 消えるまでゲーミングのまま。縮むほど白く飛ばす
+        Vector4 color = SampleGamingColor(lifeTime_, position_);
+        const float whiten = 1.0f - std::clamp(currentScale_ / 1.55f, 0.0f, 1.0f);
+        slimeParams_.baseColor = {
+            color.x + (1.0f - color.x) * whiten,
+            color.y + (1.0f - color.y) * whiten,
+            color.z + (1.0f - color.z) * whiten,
+            0.95f,
+        };
+        slimeParams_.impulseStrength = (std::max)(0.0f, 1.0f - progress);
 
         if (progress >= 1.0f)
         {
@@ -245,60 +277,157 @@ void GrowthCube::Update(float deltaTime, const Vector2& stageTilt, const Vector2
         }
     }
 
-    object3d_->SetTranslate(currentWorldPos_);
-    object3d_->SetRotate(currentRotation_);
-    object3d_->SetScale(currentScale_);
+    const float s = baseSize_ * currentScale_;
+    object3d_->SetTranslate(position_);
+    object3d_->SetRotate(rotation_);
+    object3d_->SetScale({ s, s, s });
     object3d_->Update();
+
+    return collectedThisFrame;
 }
 
-void GrowthCube::CheckSlimeCollision(SlimeManager* slimeManager)
+bool GrowthCube::CheckSlimeCollision(SlimeManager* slimeManager)
 {
-    if (!slimeManager || state_ != State::Active) return;
+    if (!slimeManager || state_ != State::Active) return false;
 
-    const auto& slimes = slimeManager->GetSlimes();
-    float cubeRadius = baseSize_ * 0.65f;
+    const float cubeRadius = baseSize_ * 0.5f + sPickupRadius;
 
-    for (const auto& slime : slimes)
+    for (const auto& slimePtr : slimeManager->GetSlimes())
     {
+        Slime* slime = slimePtr.get();
         if (!slime || !slime->IsActive()) continue;
 
-        Vector3 sPos = slime->GetPosition();
-        float distSq = (sPos.x - currentWorldPos_.x) * (sPos.x - currentWorldPos_.x)
-                     + (sPos.y - currentWorldPos_.y) * (sPos.y - currentWorldPos_.y)
-                     + (sPos.z - currentWorldPos_.z) * (sPos.z - currentWorldPos_.z);
+        // 吸い込まれている最中の個体は判定から外す（位置が補間で飛ぶため）
+        if (slime->GetState() == SlimeState::Merging) continue;
 
-        float hitRadius = cubeRadius + slime->GetRadius();
-        if (distSq <= hitRadius * hitRadius)
-        {
-            // 取得成功！
-            collectedBySlime_ = slime.get();
-            state_ = State::Collecting;
-            collectTimer_ = 0.0f;
-            collectStartPos_ = currentWorldPos_;
+        const Vector3 sPos = slime->GetPosition();
+        const float dx = sPos.x - position_.x;
+        const float dy = sPos.y - position_.y;
+        const float dz = sPos.z - position_.z;
+        const float distSq = dx * dx + dy * dy + dz * dz;
 
-            // スライムを1サイズ巨大化！
-            int currentSize = slime->GetSize();
-            slime->SetSize(currentSize + 1);
+        const float hitRadius = cubeRadius + slime->GetRadius();
+        if (distSq > hitRadius * hitRadius) continue;
 
-            // 弾性変形エフェクト（大喜びのポヨン！弾み）
-            slime->GetSlimeParams().squashStretch = { 0.35f, -0.38f, 0.35f };
-            slime->GetSlimeParams().impulseStrength = 1.0f;
-            break;
-        }
+        // --- 食べられた ---
+        collectedBySlime_ = slime;
+        collectTarget_ = sPos;
+        state_ = State::Collecting;
+        collectTimer_ = 0.0f;
+        collectStartPos_ = position_;
+
+        // 残機（＝スライムのサイズ）を1つ増やす
+        slime->SetSize(slime->GetSize() + 1);
+
+        // 大喜びのポヨン！
+        slime->GetSlimeParams().squashStretch = { 0.35f, -0.38f, 0.35f };
+        slime->GetSlimeParams().impulseStrength = 1.0f;
+        return true;
     }
+
+    return false;
 }
 
 void GrowthCube::Draw(const RenderContext& ctx)
 {
-    if (state_ == State::Inactive || !object3d_ || !object3dCom_) return;
+    if (state_ == State::Inactive || !object3d_ || !object3dCom_ || !ctx.commandList) return;
 
-    RenderContext cubeCtx = ctx;
-    if (textureIndex_ != TextureManager::kInvalidTextureIndex)
+    DirectXCom* dx = object3dCom_->GetDirectXCom();
+    if (!dx) return;
+
+    auto* cbAllocator = dx->GetCBAllocator();
+    if (!cbAllocator) return;
+
+    // Slime シェーダー。engine の初期化時に用意されているので、どのシーンからでも使える
+    auto rootSig = PipelineStateManager::GetInstance()->GetRootSignature("Slime");
+    auto slimePSO = PipelineStateManager::GetInstance()->GetPipelineState("Slime_Normal");
+    if (!rootSig || !slimePSO)
     {
-        cubeCtx.textureHandle = TextureManager::GetInstance()->GetSrvHandleGPU(textureIndex_);
+        // フォールバック描画（通常の Object3D PSO）。色だけは合わせておく
+        object3d_->SetColor(slimeParams_.baseColor);
+        RenderContext localCtx = ctx;
+        if (textureIndex_ != TextureManager::kInvalidTextureIndex)
+        {
+            localCtx.textureHandle = TextureManager::GetInstance()->GetSrvHandleGPU(textureIndex_);
+        }
+        object3dCom_->Draw(object3d_.get(), localCtx, modelData_, true);
+        return;
     }
 
-    object3dCom_->Draw(object3d_.get(), cubeCtx, modelData_, true);
+    object3d_->PrepareConstantBuffers(dx);
+
+    auto slimeAlloc = cbAllocator->Allocate(sizeof(SlimeParamsCPU));
+    if (!slimeAlloc.cpuAddress)
+    {
+        return; // 定数バッファ枯渇時のクラッシュ防止
+    }
+    std::memcpy(slimeAlloc.cpuAddress, &slimeParams_, sizeof(SlimeParamsCPU));
+
+    ctx.commandList->SetGraphicsRootSignature(rootSig.Get());
+    ctx.commandList->SetPipelineState(slimePSO.Get());
+
+    // 0: Material / 1: TransformationMatrix
+    ctx.commandList->SetGraphicsRootConstantBufferView(0, object3d_->GetMaterialGPUAddress());
+    ctx.commandList->SetGraphicsRootConstantBufferView(1, object3d_->GetTransformationMatrixGPUAddress());
+
+    // 2: Main Texture
+    D3D12_GPU_DESCRIPTOR_HANDLE texHandle{};
+    if (textureIndex_ != TextureManager::kInvalidTextureIndex)
+    {
+        texHandle = TextureManager::GetInstance()->GetSrvHandleGPU(textureIndex_);
+    }
+    if (texHandle.ptr == 0)
+    {
+        return; // 未バインド描画による GPU クラッシュを防ぐ
+    }
+    ctx.commandList->SetGraphicsRootDescriptorTable(2, texHandle);
+
+    // 3: SlimeParams
+    ctx.commandList->SetGraphicsRootConstantBufferView(3, slimeAlloc.gpuAddress);
+
+    // 4: DirectionalLight
+    if (ctx.light && ctx.light->GetDirectionalLightResource())
+    {
+        ctx.commandList->SetGraphicsRootConstantBufferView(4, ctx.light->GetDirectionalLightResource()->GetGPUVirtualAddress());
+    }
+    else
+    {
+        ctx.commandList->SetGraphicsRootConstantBufferView(4, object3d_->GetDirectionalLightGPUAddress());
+    }
+
+    // 5: Camera
+    if (ctx.camera && ctx.camera->GetCameraGpuAddress() != 0)
+    {
+        ctx.commandList->SetGraphicsRootConstantBufferView(5, ctx.camera->GetCameraGpuAddress());
+    }
+
+    // 6: Cube Environment Map（スカイボックスの映り込み）
+    uint32_t skyboxIndex = SceneManager::GetInstance()->GetSkyboxTextureIndex();
+    D3D12_GPU_DESCRIPTOR_HANDLE skyboxHandle{};
+    if (skyboxIndex != TextureManager::kInvalidTextureIndex)
+    {
+        skyboxHandle = TextureManager::GetInstance()->GetSrvHandleGPU(skyboxIndex);
+    }
+    if (skyboxHandle.ptr == 0)
+    {
+        skyboxHandle = texHandle;
+    }
+    ctx.commandList->SetGraphicsRootDescriptorTable(6, skyboxHandle);
+
+    auto vbv = object3d_->GetVertexBufferView();
+    ctx.commandList->IASetVertexBuffers(0, 1, &vbv);
+    ctx.commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+    if (object3d_->HasIndexBuffer())
+    {
+        auto ibv = object3d_->GetIndexBufferView();
+        ctx.commandList->IASetIndexBuffer(&ibv);
+        ctx.commandList->DrawIndexedInstanced(static_cast<UINT>(modelData_.indices.size()), 1, 0, 0, 0);
+    }
+    else
+    {
+        ctx.commandList->DrawInstanced(static_cast<UINT>(modelData_.vertices.size()), 1, 0, 0);
+    }
 }
 
 void GrowthCube::Respawn()
@@ -306,21 +435,21 @@ void GrowthCube::Respawn()
     state_ = State::Active;
     collectTimer_ = 0.0f;
     respawnTimer_ = 0.0f;
-    currentScale_ = { 1.0f, 1.0f, 1.0f };
+    currentScale_ = 1.0f;
     collectedBySlime_ = nullptr;
+    needsGroundSnap_ = true;
+    slimeParams_.impulseStrength = 0.0f;
 }
 
 void GrowthCube::SetBaseSize(float size)
 {
-    if (std::abs(baseSize_ - size) > 0.01f && object3d_)
+    baseSize_ = (size > 0.01f) ? size : 0.85f;
+    // メッシュは半径 0.5 の単位球なので、スケールを変えるだけでよい
+    // （旧実装はメッシュを作り直していたが、Object3d::Initialize を呼び直すと
+    //   頂点バッファを毎回確保し直すことになるので避けた）
+    if (object3d_)
     {
-        baseSize_ = size;
-        modelData_ = GeneratePrimitiveCube(baseSize_);
-        modelData_.material.textureIndex = textureIndex_;
-        object3d_->Initialize(object3dCom_, modelData_);
-        object3d_->SetCamera(camera_);
-        object3d_->SetColor({ 1.0f, 0.82f, 0.15f, 1.0f });
-        object3d_->SetEnableLighting(true);
-        object3d_->Update();
+        const float s = baseSize_ * currentScale_;
+        object3d_->SetScale({ s, s, s });
     }
 }

@@ -14,6 +14,9 @@ class Slime;
 class SlimeManager;
 class CoinManager;
 class EnemyManager;
+class GrowthCube;
+class GrowthCubeManager;
+class Boss;
 
 /**
  * @brief ゲームプレイシーンのパーティクル演出をまとめたもの
@@ -69,6 +72,12 @@ public:
     void UpdateCoins(float deltaTime, CoinManager* coinManager);
     void UpdateEnemies(float deltaTime, EnemyManager* enemyManager);
 
+    /// @brief 成長キューブの「自分の七光り」。本体より金色に寄せた大きい粒
+    void UpdateGrowthCubes(float deltaTime, GrowthCubeManager* growthCubeManager);
+
+    /// @brief ボスの禍々しいオーラ。Boss::GetAuraIntensity() で激しさが変わる
+    void UpdateBoss(float deltaTime, Boss* boss);
+
     /// @brief FireworkFx 本体の更新。上の Update 群を全部呼んだあと、最後に1回
     void Update(float deltaTime);
 
@@ -83,7 +92,7 @@ public:
      */
     void UpdateAll(float deltaTime, const Vector3& focusCenter, Slime* player,
                    SlimeManager* slimeManager, CoinManager* coinManager,
-                   EnemyManager* enemyManager);
+                   EnemyManager* enemyManager, GrowthCubeManager* growthCubeManager = nullptr);
 
     void Draw(ID3D12GraphicsCommandList* commandList);
     void DrawImGui();
@@ -101,6 +110,15 @@ public:
     /// @brief プレイヤーが分裂したときのゲーミング光芒
     void EmitPlayerSplit(const Vector3& position, int sizeBefore);
 
+    /// @brief 成長キューブが食べられたときの、コインのような光芒が弾ける演出
+    void EmitGrowthCubeCollect(const Vector3& position, float radius);
+
+    /// @brief ボスが自爆でダメージを受けたときの一撃
+    void EmitBossHit(const Vector3& position, float radius);
+
+    /// @brief ボスの最期の大爆発（ゲーミング色＋敵オーラ色。プレイヤー分裂の2倍くらい）
+    void EmitBossExplosion(const Vector3& position, float radius);
+
     int GetActiveParticleCount() const;
 
 private:
@@ -115,6 +133,12 @@ private:
 
     /// @brief 敵1体ぶんの不気味な光を出す
     void EmitEnemyAura(const Vector3& center, float radius);
+
+    /// @brief 成長キューブ1個ぶんの「自分の七光り」を出す
+    void EmitGrowthCubeAura(const Vector3& center, float radius, const Vector4& bodyColor);
+
+    /// @brief ボス1体ぶんの禍々しいオーラを出す
+    void EmitBossAura(const Vector3& center, float radius, float intensity);
 
     /// @brief 淡い黄 → 緑 → 水色 のパレットから1色引く
     Vector4 SampleAmbientColor(float t) const;
@@ -145,6 +169,9 @@ private:
     float minionGlowAccum_ = 0.0f;
     float coinShineAccum_ = 0.0f;
     float enemyAuraAccum_ = 0.0f;
+    float growthCubeAccum_ = 0.0f;
+    float bossAuraAccum_ = 0.0f;
+    float bossEmberAccum_ = 0.0f;
 
     Vector3 prevPlayerPos_{ 0.0f, 0.0f, 0.0f };
     bool hasPrevPlayerPos_ = false;
@@ -215,6 +242,37 @@ public:
     float enemyAuraRise_ = 0.75f;
     float enemyRange_ = 26.0f;
     int enemyMaxEmitters_ = 16;
+
+    // 成長キューブの「自分の七光り」
+    bool enableGrowthCubeGlow_ = true;
+    int growthCubeGlowCount_ = 28;      //!< キューブ1個あたりの同時数
+    float growthCubeGlowLife_ = 1.05f;
+    float growthCubeGlowScale_ = 1.55f; //!< **でかい粒**。ほかの演出の倍くらい
+    float growthCubeGlowSpeed_ = 1.1f;
+    float growthCubeGoldMix_ = 0.45f;   //!< 本体の色を金色へ寄せる量 (0..1)
+    Vector4 growthCubeGold_{ 1.0f, 0.82f, 0.25f, 1.0f };
+    float growthCubeGlowAlpha_ = 0.70f;
+    float growthCubeVanishBoost_ = 2.4f; //!< 食べられている最中の発生倍率
+    float growthCubeRange_ = 28.0f;
+    int growthCubeMaxEmitters_ = 8;
+    int growthCubeCollectCount_ = 56;   //!< 食べられた瞬間に弾けるコイン光芒の数
+    float growthCubeCollectSpeed_ = 9.0f;
+
+    // ボスの禍々しいオーラ
+    bool enableBossAura_ = true;
+    int bossAuraCount_ = 96;            //!< 同時数（intensity 1.0 のとき）
+    float bossAuraLife_ = 1.5f;
+    float bossAuraScale_ = 1.30f;
+    float bossAuraRise_ = 1.6f;
+    float bossAuraSwirl_ = 2.2f;        //!< 接線方向の流れ（渦を巻く）
+    float bossAuraAlpha_ = 0.80f;
+    int bossEmberCount_ = 32;           //!< 落ちてくる火の粉の同時数
+    float bossEmberLife_ = 1.2f;
+    float bossEmberScale_ = 0.85f;
+    int bossHitCount_ = 40;             //!< 被弾1回ぶんの粒
+    float bossHitSpeed_ = 9.0f;
+    int bossExplosionCount_ = 128;      //!< 最期の大爆発（分裂バーストの2倍相当）
+    float bossExplosionSpeed_ = 15.0f;
 
     // 単発
     int hitSplashCount_ = 32;

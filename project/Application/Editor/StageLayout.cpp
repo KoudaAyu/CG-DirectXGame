@@ -9,6 +9,7 @@
 #include <fstream>
 
 const char* StageLayout::kDefaultPath = "Resources/10days/stage_layout_10days.json";
+const char* StageLayout::kTerrainDirectory = "Resources/10days";
 
 namespace StagePlacement
 {
@@ -65,9 +66,12 @@ namespace StagePlacement
 
 void StageLayout::Clear()
 {
+    terrain.clear();
     playerStart = { 0.0f, 0.0f, 0.0f };
     enemies.clear();
     coins.clear();
+    growthCubes.clear();
+    boss = StageBossEntry{};
 }
 
 const char* StageLayout::TypeToName(EnemyType type)
@@ -113,6 +117,83 @@ namespace
         }
         return v;
     }
+
+    /// @brief {"position": {...}} でも {"x":..,"y":..,"z":..} でも読めるようにする（手書き用の保険）
+    Vector3 ReadPosition(const nlohmann::json& j)
+    {
+        if (j.is_object() && j.contains("position"))
+        {
+            return FromJson(j["position"], { 0.0f, 0.0f, 0.0f });
+        }
+        return FromJson(j, { 0.0f, 0.0f, 0.0f });
+    }
+
+    float ReadFloat(const nlohmann::json& j, const char* key, float fallback)
+    {
+        if (j.is_object() && j.contains(key) && j[key].is_number()) return j[key].get<float>();
+        return fallback;
+    }
+
+    int ReadInt(const nlohmann::json& j, const char* key, int fallback)
+    {
+        if (j.is_object() && j.contains(key) && j[key].is_number_integer()) return j[key].get<int>();
+        return fallback;
+    }
+
+    bool ReadBool(const nlohmann::json& j, const char* key, bool fallback)
+    {
+        if (j.is_object() && j.contains(key) && j[key].is_boolean()) return j[key].get<bool>();
+        return fallback;
+    }
+
+    std::string ReadString(const nlohmann::json& j, const char* key, const char* fallback)
+    {
+        if (j.is_object() && j.contains(key) && j[key].is_string()) return j[key].get<std::string>();
+        return fallback;
+    }
+}
+
+std::vector<StageTerrainEntry> StageLayout::MakeDefaultTerrain()
+{
+    // 以前 GamePlayScene::InitializeScene() にハードコードされていた配置。
+    // groundScale_ = 0.25 / bridgeConnectMode_ = true 相当。
+    //
+    // 旧コードは baseOffset を「モデルローカル単位」で持ち、
+    //   SetTranslate(baseOffset * groundScale_)
+    // していたので、ここではワールド座標に直した値を入れてある
+    //   45.563018 * 0.25 = 11.3907545
+    const float kScale = 0.25f;
+    const float kStepWorld = 45.563018f * kScale;
+
+    std::vector<StageTerrainEntry> list;
+
+    auto Add = [&](const char* mesh, const char* tex, float x, bool bossTrigger = false)
+    {
+        StageTerrainEntry e;
+        e.mesh = mesh;
+        e.texture = tex;
+        e.position = { x, 0.0f, 0.0f };
+        e.rotationY = 0.0f;
+        e.scale = kScale;
+        e.bossTrigger = bossTrigger;
+        list.push_back(e);
+    };
+
+    Add("startLand.obj",  "Resources/10days/land.png",  0.0f);
+
+    // 【既定のボス戦トリガー】橋を渡った先の島（Land1）に踏み入れるとボス戦が始まる。
+    // 配置エディタ（F2）の Terrain レイヤーで、別のメッシュに付け替えられる
+    Add("Land1.obj",      "Resources/10days/land2.png", 0.0f, true);
+
+    Add("toLandRoad.obj", "Resources/10days/land.png",  0.0f);
+
+    // 道ユニットセル: 基本幅 45.563m を6枚つないで島の間を渡れるようにする
+    for (int i = 0; i <= 5; ++i)
+    {
+        Add("roadCell.obj", "Resources/10days/land.png", kStepWorld * static_cast<float>(i));
+    }
+
+    return list;
 }
 
 bool StageLayout::LoadFromFile(const std::string& path)
@@ -135,6 +216,28 @@ bool StageLayout::LoadFromFile(const std::string& path)
 
     StageLayout loaded;
 
+    // --- 地形 ---
+    if (j.contains("terrain") && j["terrain"].is_array())
+    {
+        for (const auto& t : j["terrain"])
+        {
+            if (!t.is_object()) continue;
+
+            StageTerrainEntry entry;
+            entry.mesh = ReadString(t, "mesh", "");
+            if (entry.mesh.empty()) continue; // メッシュ名が無いエントリは捨てる
+
+            entry.texture = ReadString(t, "texture", "");
+            entry.position = ReadPosition(t);
+            entry.rotationY = ReadFloat(t, "rotationY", 0.0f);
+            entry.scale = ReadFloat(t, "scale", 0.25f);
+            if (entry.scale <= 0.0001f) entry.scale = 0.25f;
+            entry.bossTrigger = ReadBool(t, "bossTrigger", false);
+
+            loaded.terrain.push_back(entry);
+        }
+    }
+
     if (j.contains("player"))
     {
         loaded.playerStart = FromJson(j["player"], { 0.0f, 0.0f, 0.0f });
@@ -148,24 +251,11 @@ bool StageLayout::LoadFromFile(const std::string& path)
 
             StageEnemyEntry entry;
 
-            std::string typeName = "Slime";
-            if (e.contains("type") && e["type"].is_string()) typeName = e["type"].get<std::string>();
+            std::string typeName = ReadString(e, "type", "Slime");
             if (!NameToType(typeName, entry.type)) continue; // 知らない種類は捨てる
 
-            if (e.contains("position"))
-            {
-                entry.position = FromJson(e["position"], { 0.0f, 0.0f, 0.0f });
-            }
-            else
-            {
-                // 平たい形（{"x":..,"y":..,"z":..}）も許容しておく
-                entry.position = FromJson(e, { 0.0f, 0.0f, 0.0f });
-            }
-
-            if (e.contains("strength") && e["strength"].is_number_integer())
-            {
-                entry.strength = e["strength"].get<int>();
-            }
+            entry.position = ReadPosition(e);
+            entry.strength = ReadInt(e, "strength", -1);
 
             loaded.enemies.push_back(entry);
         }
@@ -176,16 +266,29 @@ bool StageLayout::LoadFromFile(const std::string& path)
         for (const auto& c : j["coins"])
         {
             StageCoinEntry entry;
-            if (c.is_object() && c.contains("position"))
-            {
-                entry.position = FromJson(c["position"], { 0.0f, 0.0f, 0.0f });
-            }
-            else
-            {
-                entry.position = FromJson(c, { 0.0f, 0.0f, 0.0f });
-            }
+            entry.position = ReadPosition(c);
             loaded.coins.push_back(entry);
         }
+    }
+
+    if (j.contains("growthCubes") && j["growthCubes"].is_array())
+    {
+        for (const auto& g : j["growthCubes"])
+        {
+            StageGrowthCubeEntry entry;
+            entry.position = ReadPosition(g);
+            entry.size = ReadFloat(g, "size", 0.85f);
+            if (entry.size <= 0.01f) entry.size = 0.85f;
+            loaded.growthCubes.push_back(entry);
+        }
+    }
+
+    if (j.contains("boss") && j["boss"].is_object())
+    {
+        loaded.boss.enabled = ReadBool(j["boss"], "enabled", true);
+        loaded.boss.position = ReadPosition(j["boss"]);
+        loaded.boss.hp = ReadInt(j["boss"], "hp", 100);
+        if (loaded.boss.hp <= 0) loaded.boss.hp = 100;
     }
 
     *this = loaded;
@@ -209,7 +312,22 @@ bool StageLayout::SaveToFile(const std::string& path) const
     }
 
     nlohmann::json j;
-    j["version"] = 1;
+    j["version"] = 2; // 2 で terrain / growthCubes / boss が入った
+
+    nlohmann::json terrainArray = nlohmann::json::array();
+    for (const auto& t : terrain)
+    {
+        nlohmann::json item;
+        item["mesh"] = t.mesh;
+        item["texture"] = t.texture;
+        item["position"] = ToJson(t.position);
+        item["rotationY"] = t.rotationY;
+        item["scale"] = t.scale;
+        item["bossTrigger"] = t.bossTrigger;
+        terrainArray.push_back(item);
+    }
+    j["terrain"] = terrainArray;
+
     j["player"] = ToJson(playerStart);
 
     nlohmann::json enemyArray = nlohmann::json::array();
@@ -232,6 +350,22 @@ bool StageLayout::SaveToFile(const std::string& path) const
     }
     j["coins"] = coinArray;
 
+    nlohmann::json cubeArray = nlohmann::json::array();
+    for (const auto& g : growthCubes)
+    {
+        nlohmann::json item;
+        item["position"] = ToJson(g.position);
+        item["size"] = g.size;
+        cubeArray.push_back(item);
+    }
+    j["growthCubes"] = cubeArray;
+
+    nlohmann::json bossObject;
+    bossObject["enabled"] = boss.enabled;
+    bossObject["position"] = ToJson(boss.position);
+    bossObject["hp"] = boss.hp;
+    j["boss"] = bossObject;
+
     std::ofstream ofs(path);
     if (!ofs.is_open()) return false;
 
@@ -241,7 +375,7 @@ bool StageLayout::SaveToFile(const std::string& path) const
 
 bool StageLayout::IsCompatibleWithCurrentTerrain(float* outValidRatio) const
 {
-    const size_t total = enemies.size() + coins.size();
+    const size_t total = enemies.size() + coins.size() + growthCubes.size();
     if (total == 0)
     {
         // 空のレイアウトは「壊れている」とは言えないので、そのまま通す
@@ -258,6 +392,10 @@ bool StageLayout::IsCompatibleWithCurrentTerrain(float* outValidRatio) const
     {
         if (SlimePhysics::QueryGroundLayers(c.position.x, c.position.z, nullptr, 0) > 0) ++onGround;
     }
+    for (const auto& g : growthCubes)
+    {
+        if (SlimePhysics::QueryGroundLayers(g.position.x, g.position.z, nullptr, 0) > 0) ++onGround;
+    }
 
     const float ratio = static_cast<float>(onGround) / static_cast<float>(total);
     if (outValidRatio) *outValidRatio = ratio;
@@ -266,7 +404,7 @@ bool StageLayout::IsCompatibleWithCurrentTerrain(float* outValidRatio) const
     return ratio >= 0.5f;
 }
 
-StageLayout StageLayout::MakeFallback(int enemyCount, int coinCount)
+StageLayout StageLayout::MakeFallback(int enemyCount, int coinCount, int growthCubeCount)
 {
     StageLayout layout;
 
@@ -344,6 +482,21 @@ StageLayout StageLayout::MakeFallback(int enemyCount, int coinCount)
         ++placedCoins;
     }
 
+    // 成長キューブ: プレイヤーから 6m〜24m。コインと同じセルを踏まないよう位相をずらす
+    int placedCubes = 0;
+    for (size_t i = 0; i < sorted.size() && placedCubes < growthCubeCount; ++i)
+    {
+        float d = Distance(sorted[i]);
+        if (d < 6.0f || d > 24.0f) continue;
+        if ((i % 7) != 1) continue;
+
+        StageGrowthCubeEntry entry;
+        entry.position = { sorted[i]->x, sorted[i]->y, sorted[i]->z };
+        entry.size = 0.85f;
+        layout.growthCubes.push_back(entry);
+        ++placedCubes;
+    }
+
     // 敵: プレイヤーから 10m 以上離す。種類は順番に回す
     const EnemyType kTypes[] = { EnemyType::Slime, EnemyType::FlowerClover,
                                  EnemyType::FlowerLotus, EnemyType::FlowerSunward };
@@ -361,6 +514,15 @@ StageLayout StageLayout::MakeFallback(int enemyCount, int coinCount)
         layout.enemies.push_back(entry);
         ++placedEnemies;
     }
+
+    // ボス: プレイヤーから一番遠い置けるセル（＝ステージの果て。既定地形なら
+    // 橋の向こうの Land1 側になる）に置く。
+    // MakeDefaultTerrain() が Land1 にボス戦トリガーを立てているので、
+    // 何もしなくても「橋を渡るとボス戦」が成立する状態になる。
+    // 位置も HP も配置エディタ（F2）から変えられる
+    layout.boss.enabled = true;
+    layout.boss.hp = 100;
+    layout.boss.position = { sorted.back()->x, sorted.back()->y, sorted.back()->z };
 
     return layout;
 }

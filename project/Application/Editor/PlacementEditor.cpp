@@ -8,8 +8,11 @@
 #include "Baziru3_Engine/Framework/Scene/Manager/SceneManager.h"
 #include "Application/Enemy/EnemyManager.h"
 #include "Application/GameObject/CoinManager.h"
+#include "Application/GameObject/GrowthCubeManager.h"
 #include "Application/GameObject/SlimePhysics.h"
 #include "Application/GameObject/SlimeManager.h"
+#include "Application/GameObject/StageTerrain.h"
+#include "Application/Scene/GameScene/BossFight.h"
 
 #include <algorithm>
 #include <cmath>
@@ -95,6 +98,32 @@ Slime* PlacementEditor::PlayerSlime() const
     return refs_.slimeManager ? refs_.slimeManager->GetLeader() : nullptr;
 }
 
+namespace
+{
+    /**
+     * @brief スライムを「その XZ の床にちゃんと乗る中心 Y」で置き直す
+     *
+     * 【重要】床の Y をそのまま SetPosition() に渡してはいけない。
+     * スライムの原点は**中心**なので、床の高さを中心に入れると足元が床より下に潜り、
+     * 次のフレームの空中判定（着地上限 = 足元 + 0.15m）で上面が弾かれて
+     * 下の段まで落ちる。実際に起動直後クラッシュの原因になった挙動そのもの
+     * （claude/stage-terrain-and-crash-fixes.md 参照）。
+     * 床の高さ + 接地オフセット（GetGroundY）で中心を出すこと
+     */
+    void PlaceSlimeOnGround(Slime* slime, float x, float z, float fallbackFloorY)
+    {
+        if (!slime) return;
+
+        bool hasGround = false;
+        const float centerY = SlimePhysics::CalculateGroundedCenterYEx(
+            x, z, SlimePhysics::kIgnoreCurrentY, { 0.0f, 0.0f },
+            slime->GetGroundY(), &hasGround, nullptr, { 0.0f, 0.0f }, false);
+
+        slime->SetPosition({ x, hasGround ? centerY : (fallbackFloorY + slime->GetGroundY()), z });
+        slime->SetVelocity({ 0.0f, 0.0f, 0.0f });
+    }
+}
+
 void PlacementEditor::Initialize(const SceneRefs& refs)
 {
     refs_ = refs;
@@ -127,8 +156,9 @@ void PlacementEditor::SetActive(bool active)
         // こうしないと「プレイ中に倒された敵」がそのまま消えた状態で編集されてしまう
         ApplyLayoutToScene();
 
-        if (refs_.enemyManager) refs_.enemyManager->SetEditorMode(true);
-        if (refs_.coinManager)  refs_.coinManager->SetEditorMode(true);
+        if (refs_.enemyManager)      refs_.enemyManager->SetEditorMode(true);
+        if (refs_.coinManager)       refs_.coinManager->SetEditorMode(true);
+        if (refs_.growthCubeManager) refs_.growthCubeManager->SetEditorMode(true);
 
         if (refs_.camera)
         {
@@ -156,8 +186,9 @@ void PlacementEditor::SetActive(bool active)
         isActive_ = false;
         ClearSelection();
 
-        if (refs_.enemyManager) refs_.enemyManager->SetEditorMode(false);
-        if (refs_.coinManager)  refs_.coinManager->SetEditorMode(false);
+        if (refs_.enemyManager)      refs_.enemyManager->SetEditorMode(false);
+        if (refs_.coinManager)       refs_.coinManager->SetEditorMode(false);
+        if (refs_.growthCubeManager) refs_.growthCubeManager->SetEditorMode(false);
 
         ApplyLayoutToScene();
 
@@ -184,6 +215,19 @@ void PlacementEditor::SetLayout(const StageLayout& layout)
 
 void PlacementEditor::ApplyLayoutToScene()
 {
+    // --- 地形が先。敵・コイン・キューブは地形へのレイキャストで高さが決まるので、
+    //     地形を差し替えたあとでないと足元が無い場所に置かれてしまう ---
+    if (refs_.terrain)
+    {
+        // JSON に terrain が無い（旧フォーマット）なら、
+        // 以前 GamePlayScene にハードコードされていた既定配置を使う
+        if (layout_.terrain.empty())
+        {
+            layout_.terrain = StageLayout::MakeDefaultTerrain();
+        }
+        refs_.terrain->ApplyLayout(layout_.terrain);
+    }
+
     if (refs_.enemyManager)
     {
         refs_.enemyManager->ClearAll();
@@ -203,12 +247,29 @@ void PlacementEditor::ApplyLayoutToScene()
         }
     }
 
+    if (refs_.growthCubeManager)
+    {
+        refs_.growthCubeManager->ClearAll();
+        for (const auto& g : layout_.growthCubes)
+        {
+            refs_.growthCubeManager->Spawn({ g.position.x, 0.0f, g.position.z }, g.size);
+        }
+    }
+
+    if (refs_.bossFight)
+    {
+        refs_.bossFight->SetLayout(layout_.boss);
+    }
+
     if (refs_.slimeManager)
     {
         if (Slime* leader = refs_.slimeManager->GetLeader())
         {
-            leader->SetPosition(layout_.playerStart);
-            leader->SetVelocity({ 0.0f, 0.0f, 0.0f });
+            // JSON の Y は参考値なので、床から中心 Y を取り直す。
+            // MakeFallback() が書く playerStart.y は「床の高さ」なので、
+            // そのまま入れると足元が床の下に潜って下の段へ落ちる
+            PlaceSlimeOnGround(leader, layout_.playerStart.x, layout_.playerStart.z,
+                               layout_.playerStart.y);
         }
     }
 
@@ -247,6 +308,31 @@ void PlacementEditor::SyncLayoutFromScene()
         }
     }
 
+    if (refs_.growthCubeManager)
+    {
+        layout_.growthCubes.clear();
+        for (const auto& g : refs_.growthCubeManager->GetCubes())
+        {
+            if (!g) continue;
+
+            StageGrowthCubeEntry entry;
+            entry.position = g->GetStageLocalPosition();
+            entry.position.y = g->GetPosition().y;
+            entry.size = g->GetBaseSize();
+            layout_.growthCubes.push_back(entry);
+        }
+    }
+
+    if (refs_.terrain)
+    {
+        refs_.terrain->WriteLayout(layout_.terrain);
+    }
+
+    if (refs_.bossFight)
+    {
+        refs_.bossFight->WriteLayout(layout_.boss);
+    }
+
     if (refs_.slimeManager)
     {
         if (const Slime* leader = refs_.slimeManager->GetLeader())
@@ -254,6 +340,15 @@ void PlacementEditor::SyncLayoutFromScene()
             layout_.playerStart = leader->GetPosition();
         }
     }
+}
+
+void PlacementEditor::OnTerrainChanged()
+{
+    // 地形が変わると「置ける場所」も基準平面も全部変わるので作り直す。
+    // 実際の配置判定は毎回レイキャストしているので、オーバーレイは見た目だけの問題
+    RebuildOverlay();
+    MarkDirty();
+    SyncLayoutFromScene();
 }
 
 bool PlacementEditor::Save()
@@ -356,8 +451,10 @@ Vector3 PlacementEditor::ScreenToWorldAt(const Vector2& screen, float camX, floa
         int count = SlimePhysics::QueryGroundLayers(p.x, p.z, layers, 4);
         if (count <= 0) break;
 
-        // プレイ area は下段なので、一番下の床に合わせる
-        float floorY = layers[(std::min)(count, 4) - 1].y;
+        // 【変更】以前は「プレイ area は下段」として一番下の床に合わせていたが、
+        // いまの島は全域が上下2段で、遊ぶのは**上面**。StagePlacement::Test() も
+        // 最上面を採るようになったので、そちらに合わせる
+        float floorY = layers[0].y;
         if (std::abs(floorY - p.y) < 0.01f) break;
 
         p = IntersectAtHeight(floorY);
@@ -465,18 +562,27 @@ void PlacementEditor::HandleMouse(const MouseState& mouse)
         else
         {
             pressBlocked_ = false;
-            SelectionKind kind = SelectionKind::None;
-            MobEnemy* enemy = nullptr;
-            Coin* coin = nullptr;
-            PickAny(mouse.world, kind, enemy, coin);
+            const PickResult picked = PickAny(mouse.world);
 
-            if (kind != SelectionKind::None)
+            if (picked.kind != SelectionKind::None)
             {
                 // 置いてあるものを掴んだ -> 選択してドラッグ移動の候補にする
-                selectionKind_ = kind;
-                selectedEnemy_ = enemy;
-                selectedCoin_ = coin;
+                selectionKind_ = picked.kind;
+                selectedEnemy_ = picked.enemy;
+                selectedCoin_ = picked.coin;
+                selectedCube_ = picked.cube;
+                selectedTerrain_ = picked.terrain;
                 dragStartedOnObject_ = true;
+
+                // 地形はハンドルとカーソルのずれを覚えておく。
+                // 覚えないと掴んだ瞬間にパーツがカーソルの下へ飛ぶ
+                if (picked.kind == SelectionKind::Terrain && picked.terrain)
+                {
+                    const Vector3 handle = picked.terrain->HandlePosition();
+                    terrainDragOffset_ = { picked.terrain->position.x - handle.x,
+                                           0.0f,
+                                           picked.terrain->position.z - handle.z };
+                }
             }
             else
             {
@@ -531,12 +637,18 @@ void PlacementEditor::HandleMouse(const MouseState& mouse)
             // ドラッグしていない = クリック
             if (dragStartedOnObject_)
             {
-                // 選択済み（PickAny の時点で選択している）。敵ならポップアップが出る
+                // 選択済み（PickAny の時点で選択している）。パラメータのパネルが出る
             }
             else
             {
                 PlaceAt(mouse.world);
             }
+        }
+        else if (isDraggingObject_ && selectionKind_ == SelectionKind::Terrain)
+        {
+            // 地形を動かし終わった。ここで初めて配置禁止オーバーレイを作り直す
+            // （ドラッグ中に毎フレームやると数千セルのレイキャストで固まる）
+            OnTerrainChanged();
         }
 
         movedWhileDown_ = false;
@@ -631,22 +743,122 @@ bool PlacementEditor::PickPlayer(const Vector3& world, float* outDistSq) const
     return true;
 }
 
-void PlacementEditor::PickAny(const Vector3& world, SelectionKind& outKind,
-                              MobEnemy*& outEnemy, Coin*& outCoin) const
+GrowthCube* PlacementEditor::PickGrowthCube(const Vector3& world, float* outDistSq) const
 {
-    outKind = SelectionKind::None;
-    outEnemy = nullptr;
-    outCoin = nullptr;
+    if (!refs_.growthCubeManager) return nullptr;
 
+    GrowthCube* best = nullptr;
     float bestDistSq = 1e18f;
 
+    for (const auto& g : refs_.growthCubeManager->GetCubes())
+    {
+        if (!g) continue;
+
+        const Vector3& p = g->GetPosition();
+        float dx = p.x - world.x;
+        float dz = p.z - world.z;
+        float distSq = dx * dx + dz * dz;
+
+        float grab = g->GetBaseSize() * 0.5f + 0.6f;
+        if (distSq > grab * grab) continue;
+
+        if (distSq < bestDistSq)
+        {
+            bestDistSq = distSq;
+            best = g.get();
+        }
+    }
+
+    if (best && outDistSq) *outDistSq = bestDistSq;
+    return best;
+}
+
+bool PlacementEditor::PickBoss(const Vector3& world, float* outDistSq) const
+{
+    if (!refs_.bossFight || !refs_.bossFight->IsEnabled()) return false;
+
+    const Vector3 p = refs_.bossFight->GetWorldPosition();
+    float dx = p.x - world.x;
+    float dz = p.z - world.z;
+    float distSq = dx * dx + dz * dz;
+
+    float grab = refs_.bossFight->GetPickRadius() + 0.5f;
+    if (distSq > grab * grab) return false;
+
+    if (outDistSq) *outDistSq = distSq;
+    return true;
+}
+
+StageTerrain::Part* PlacementEditor::PickTerrain(const Vector3& world, float* outDistSq) const
+{
+    if (!refs_.terrain) return nullptr;
+
+    StageTerrain::Part* best = nullptr;
+    float bestDistSq = 1e18f;
+
+    // 地形パーツは島まるごとの大きさがあるので、AABB で掴むと何を触っているか
+    // 分からなくなる。ワールド AABB の XZ 中心に置いた「ハンドル」だけを掴ませる
+    for (const auto& partPtr : refs_.terrain->GetParts())
+    {
+        if (!partPtr) continue;
+
+        const Vector3 handle = partPtr->HandlePosition();
+        float dx = handle.x - world.x;
+        float dz = handle.z - world.z;
+        float distSq = dx * dx + dz * dz;
+
+        float grab = partPtr->HandleRadius();
+        if (distSq > grab * grab) continue;
+
+        if (distSq < bestDistSq)
+        {
+            bestDistSq = distSq;
+            best = partPtr.get();
+        }
+    }
+
+    if (best && outDistSq) *outDistSq = bestDistSq;
+    return best;
+}
+
+PlacementEditor::PickResult PlacementEditor::PickAny(const Vector3& world) const
+{
+    PickResult result;
+    float bestDistSq = 1e18f;
     float d = 0.0f;
+
+    if (layer_ == EditLayer::Terrain)
+    {
+        // 地形レイヤーでは地形パーツしか掴めない。
+        // こうしないと敵とハンドルが混ざって、どちらを動かしているのか分からなくなる
+        d = 0.0f;
+        if (StageTerrain::Part* part = PickTerrain(world, &d))
+        {
+            result.kind = SelectionKind::Terrain;
+            result.terrain = part;
+        }
+        return result;
+    }
+
+    // --- Objects レイヤー。小さいものほど優先的に拾えるよう、距離が近い順に決める ---
+    d = 0.0f;
     if (Coin* coin = PickCoin(world, &d))
     {
-        // コインは小さいので優先的に拾えるようにする
         bestDistSq = d;
-        outKind = SelectionKind::Coin;
-        outCoin = coin;
+        result.kind = SelectionKind::Coin;
+        result.coin = coin;
+    }
+
+    d = 0.0f;
+    if (GrowthCube* cube = PickGrowthCube(world, &d))
+    {
+        if (d < bestDistSq)
+        {
+            bestDistSq = d;
+            result = PickResult{};
+            result.kind = SelectionKind::GrowthCube;
+            result.cube = cube;
+        }
     }
 
     d = 0.0f;
@@ -655,9 +867,9 @@ void PlacementEditor::PickAny(const Vector3& world, SelectionKind& outKind,
         if (d < bestDistSq)
         {
             bestDistSq = d;
-            outKind = SelectionKind::Enemy;
-            outEnemy = enemy;
-            outCoin = nullptr;
+            result = PickResult{};
+            result.kind = SelectionKind::Enemy;
+            result.enemy = enemy;
         }
     }
 
@@ -666,11 +878,24 @@ void PlacementEditor::PickAny(const Vector3& world, SelectionKind& outKind,
     {
         if (d < bestDistSq)
         {
-            outKind = SelectionKind::PlayerStart;
-            outEnemy = nullptr;
-            outCoin = nullptr;
+            bestDistSq = d;
+            result = PickResult{};
+            result.kind = SelectionKind::PlayerStart;
         }
     }
+
+    d = 0.0f;
+    if (PickBoss(world, &d))
+    {
+        // ボスは図体が大きいので一番あとに見る（ほかを掴めなかったときだけ）
+        if (d < bestDistSq)
+        {
+            result = PickResult{};
+            result.kind = SelectionKind::Boss;
+        }
+    }
+
+    return result;
 }
 
 // ------------------------------------------------------------------
@@ -682,10 +907,54 @@ void PlacementEditor::ClearSelection()
     selectionKind_ = SelectionKind::None;
     selectedEnemy_ = nullptr;
     selectedCoin_ = nullptr;
+    selectedCube_ = nullptr;
+    selectedTerrain_ = nullptr;
 }
 
 void PlacementEditor::PlaceAt(const Vector3& world)
 {
+    // --- 地形レイヤー: 置ける場所かどうかは見ない（地形そのものを置くので当然）---
+    if (layer_ == EditLayer::Terrain)
+    {
+        if (!refs_.terrain)
+        {
+            std::snprintf(statusText_, sizeof(statusText_), "No terrain container");
+            return;
+        }
+
+        const auto& catalog = StageTerrain::GetMeshCatalog();
+        if (catalog.empty())
+        {
+            std::snprintf(statusText_, sizeof(statusText_), "No .obj found in %s",
+                          StageLayout::kTerrainDirectory);
+            return;
+        }
+
+        const int index = std::clamp(terrainMeshIndex_, 0, static_cast<int>(catalog.size()) - 1);
+
+        // 位置は XZ だけ。Y は 0 に置く（JSON を手で書けば効く）
+        StageTerrain::Part* added = refs_.terrain->AddPart(catalog[static_cast<size_t>(index)],
+                                                           { world.x, 0.0f, world.z },
+                                                           terrainNewRotationY_, terrainNewScale_,
+                                                           terrainNewBossTrigger_);
+        if (!added)
+        {
+            std::snprintf(statusText_, sizeof(statusText_), "Failed to load mesh: %s",
+                          catalog[static_cast<size_t>(index)].c_str());
+            return;
+        }
+
+        selectionKind_ = SelectionKind::Terrain;
+        selectedEnemy_ = nullptr;
+        selectedCoin_ = nullptr;
+        selectedCube_ = nullptr;
+        selectedTerrain_ = added;
+
+        std::snprintf(statusText_, sizeof(statusText_), "Placed terrain: %s", added->mesh.c_str());
+        OnTerrainChanged();
+        return;
+    }
+
     float floorY = 0.0f;
     StagePlacement::Result result = StagePlacement::Test(world.x, world.z, &floorY);
     if (result != StagePlacement::Result::Ok)
@@ -731,14 +1000,41 @@ void PlacementEditor::PlaceAt(const Vector3& world)
         }
         break;
 
+    case Brush::GrowthCube:
+        if (refs_.growthCubeManager)
+        {
+            GrowthCube* spawned = refs_.growthCubeManager->Spawn({ pos.x, 0.0f, pos.z }, brushCubeSize_);
+            if (spawned)
+            {
+                ClearSelection();
+                selectionKind_ = SelectionKind::GrowthCube;
+                selectedCube_ = spawned;
+                MarkDirty();
+                std::snprintf(statusText_, sizeof(statusText_), "Placed growth cube");
+            }
+        }
+        break;
+
+    case Brush::Boss:
+        if (refs_.bossFight)
+        {
+            // ボスは1体だけ。置き直すと前のボスは消える
+            refs_.bossFight->SetStageLocalPosition({ pos.x, 0.0f, pos.z });
+            refs_.bossFight->SetEnabled(true);
+            ClearSelection();
+            selectionKind_ = SelectionKind::Boss;
+            MarkDirty();
+            std::snprintf(statusText_, sizeof(statusText_), "Placed boss (HP %d)",
+                          refs_.bossFight->GetMaxHp());
+        }
+        break;
+
     case Brush::PlayerStart:
         if (PlayerSlime())
         {
-            PlayerSlime()->SetPosition(pos);
-            PlayerSlime()->SetVelocity({ 0.0f, 0.0f, 0.0f });
+            PlaceSlimeOnGround(PlayerSlime(), pos.x, pos.z, floorY);
+            ClearSelection();
             selectionKind_ = SelectionKind::PlayerStart;
-            selectedEnemy_ = nullptr;
-            selectedCoin_ = nullptr;
             MarkDirty();
             std::snprintf(statusText_, sizeof(statusText_), "Moved player start");
         }
@@ -750,18 +1046,15 @@ void PlacementEditor::PlaceAt(const Vector3& world)
 
 void PlacementEditor::DeleteAt(const Vector3& world)
 {
-    SelectionKind kind = SelectionKind::None;
-    MobEnemy* enemy = nullptr;
-    Coin* coin = nullptr;
-    PickAny(world, kind, enemy, coin);
+    const PickResult picked = PickAny(world);
 
-    switch (kind)
+    switch (picked.kind)
     {
     case SelectionKind::Enemy:
-        if (refs_.enemyManager && enemy)
+        if (refs_.enemyManager && picked.enemy)
         {
-            if (selectedEnemy_ == enemy) ClearSelection();
-            refs_.enemyManager->Remove(enemy);
+            if (selectedEnemy_ == picked.enemy) ClearSelection();
+            refs_.enemyManager->Remove(picked.enemy);
             MarkDirty();
             SyncLayoutFromScene();
             std::snprintf(statusText_, sizeof(statusText_), "Deleted enemy");
@@ -769,13 +1062,46 @@ void PlacementEditor::DeleteAt(const Vector3& world)
         break;
 
     case SelectionKind::Coin:
-        if (refs_.coinManager && coin)
+        if (refs_.coinManager && picked.coin)
         {
-            if (selectedCoin_ == coin) ClearSelection();
-            refs_.coinManager->Remove(coin);
+            if (selectedCoin_ == picked.coin) ClearSelection();
+            refs_.coinManager->Remove(picked.coin);
             MarkDirty();
             SyncLayoutFromScene();
             std::snprintf(statusText_, sizeof(statusText_), "Deleted coin");
+        }
+        break;
+
+    case SelectionKind::GrowthCube:
+        if (refs_.growthCubeManager && picked.cube)
+        {
+            if (selectedCube_ == picked.cube) ClearSelection();
+            refs_.growthCubeManager->Remove(picked.cube);
+            MarkDirty();
+            SyncLayoutFromScene();
+            std::snprintf(statusText_, sizeof(statusText_), "Deleted growth cube");
+        }
+        break;
+
+    case SelectionKind::Boss:
+        if (refs_.bossFight)
+        {
+            ClearSelection();
+            refs_.bossFight->SetEnabled(false);
+            MarkDirty();
+            SyncLayoutFromScene();
+            std::snprintf(statusText_, sizeof(statusText_), "Removed boss");
+        }
+        break;
+
+    case SelectionKind::Terrain:
+        if (refs_.terrain && picked.terrain)
+        {
+            if (selectedTerrain_ == picked.terrain) ClearSelection();
+            std::snprintf(statusText_, sizeof(statusText_), "Deleted terrain: %s",
+                          picked.terrain->mesh.c_str());
+            refs_.terrain->RemovePart(picked.terrain);
+            OnTerrainChanged();
         }
         break;
 
@@ -792,6 +1118,21 @@ void PlacementEditor::DeleteAt(const Vector3& world)
 
 void PlacementEditor::MoveSelectionTo(const Vector3& world)
 {
+    // --- 地形は「置ける場所」の制限を受けない。XZ だけ動かす ---
+    if (selectionKind_ == SelectionKind::Terrain)
+    {
+        if (refs_.terrain && selectedTerrain_)
+        {
+            refs_.terrain->SetPartPositionXZ(selectedTerrain_,
+                                             world.x + terrainDragOffset_.x,
+                                             world.z + terrainDragOffset_.z);
+            // ドラッグ中はオーバーレイを作り直さない（毎フレームやると重い）。
+            // 離したときに OnTerrainChanged() が走る
+            MarkDirty();
+        }
+        return;
+    }
+
     float floorY = 0.0f;
     StagePlacement::Result result = StagePlacement::Test(world.x, world.z, &floorY);
     if (result != StagePlacement::Result::Ok)
@@ -821,11 +1162,26 @@ void PlacementEditor::MoveSelectionTo(const Vector3& world)
         }
         break;
 
+    case SelectionKind::GrowthCube:
+        if (selectedCube_)
+        {
+            selectedCube_->SetStageLocalPosition({ world.x, 0.0f, world.z });
+            MarkDirty();
+        }
+        break;
+
+    case SelectionKind::Boss:
+        if (refs_.bossFight)
+        {
+            refs_.bossFight->SetStageLocalPosition({ world.x, 0.0f, world.z });
+            MarkDirty();
+        }
+        break;
+
     case SelectionKind::PlayerStart:
         if (PlayerSlime())
         {
-            PlayerSlime()->SetPosition({ world.x, floorY, world.z });
-            PlayerSlime()->SetVelocity({ 0.0f, 0.0f, 0.0f });
+            PlaceSlimeOnGround(PlayerSlime(), world.x, world.z, floorY);
             MarkDirty();
         }
         break;
@@ -870,25 +1226,28 @@ void PlacementEditor::RebuildOverlay()
     double sumOkY = 0.0;
     int okCount = 0;
 
+    // 【重要】判定は必ず StagePlacement::Test() と同じものを使うこと。
+    // 以前は「床が2層あったら禁止」で塗っていたが、Test() 側が
+    // 「最上面を採る + 頭上クリアランス」に変わったので、オーバーレイだけ
+    // 古い規則のままだと赤い場所に普通に置けてしまい、見た目が嘘になる
     for (float z = bmin.z; z <= bmax.z; z += cell)
     {
         for (float x = bmin.x; x <= bmax.x; x += cell)
         {
-            SlimePhysics::GroundLayer layers[4];
-            int count = SlimePhysics::QueryGroundLayers(x, z, layers, 4);
+            float floorY = 0.0f;
+            StagePlacement::Result result = StagePlacement::Test(x, z, &floorY);
 
-            if (count == 1)
+            if (result == StagePlacement::Result::Ok)
             {
-                // プレイ area。カメラの基準平面を決めるために高さを平均しておく
-                sumOkY += layers[0].y;
+                // プレイ面。カメラの基準平面を決めるために高さを平均しておく
+                sumOkY += floorY;
                 ++okCount;
                 continue;
             }
-            if (count <= 0) continue; // 島の外。描くものが無い
+            if (result == StagePlacement::Result::NoGround) continue; // 島の外。描くものが無い
 
-            // 上下段が重なっている = 遮蔽物の下。ここを赤く塗る。
-            // 一番下の床（＝プレイ area 側）の高さに敷く
-            float y = layers[(std::min)(count, 4) - 1].y + lift;
+            // 頭上が詰まっている = オーバーハングの下。ここを赤く塗る
+            float y = floorY + lift;
 
             uint32_t base = static_cast<uint32_t>(overlayModel_.vertices.size());
 
@@ -1081,6 +1440,30 @@ void PlacementEditor::Draw(const RenderContext& ctx)
         }
         break;
 
+    case SelectionKind::GrowthCube:
+        if (selectedCube_)
+        {
+            DrawMarker(ctx, selectedCube_->GetPosition(),
+                       selectedCube_->GetBaseSize() * 0.5f + 0.6f, selectionColor_);
+        }
+        break;
+
+    case SelectionKind::Boss:
+        if (refs_.bossFight && refs_.bossFight->IsEnabled())
+        {
+            DrawMarker(ctx, refs_.bossFight->GetWorldPosition(),
+                       refs_.bossFight->GetPickRadius() + 0.6f, selectionColor_);
+        }
+        break;
+
+    case SelectionKind::Terrain:
+        if (selectedTerrain_)
+        {
+            DrawMarker(ctx, selectedTerrain_->HandlePosition(),
+                       selectedTerrain_->HandleRadius() * 1.15f, selectionColor_);
+        }
+        break;
+
     case SelectionKind::PlayerStart:
         if (PlayerSlime())
         {
@@ -1093,10 +1476,41 @@ void PlacementEditor::Draw(const RenderContext& ctx)
         break;
     }
 
-    // 3. カーソル（置けるかどうかを色で出す）
+    // 3. 地形パーツのハンドル。Terrain レイヤーのときだけ全部出す。
+    //    ボス戦トリガー付きのパーツは別の色にして、どれが引き金か一目で分かるようにする
+    if (showTerrainHandles_ && layer_ == EditLayer::Terrain && refs_.terrain)
+    {
+        for (const auto& partPtr : refs_.terrain->GetParts())
+        {
+            if (!partPtr || partPtr.get() == selectedTerrain_) continue;
+            DrawMarker(ctx, partPtr->HandlePosition(), partPtr->HandleRadius(),
+                       partPtr->bossTrigger ? terrainTriggerColor_ : terrainHandleColor_);
+        }
+    }
+    else if (showTerrainHandles_ && refs_.terrain)
+    {
+        // Objects レイヤーでも、トリガー付きのパーツだけは出しておく。
+        // 「どこに踏み入れるとボス戦が始まるか」を確認したいことのほうが多い
+        for (const auto& partPtr : refs_.terrain->GetParts())
+        {
+            if (!partPtr || !partPtr->bossTrigger) continue;
+            DrawMarker(ctx, partPtr->HandlePosition(), partPtr->HandleRadius(), terrainTriggerColor_);
+        }
+    }
+
+    // 4. ボスの位置（選択していなくても常に出す。図体が大きいので目印が要る）
+    if (refs_.bossFight && refs_.bossFight->IsEnabled() && selectionKind_ != SelectionKind::Boss)
+    {
+        DrawMarker(ctx, refs_.bossFight->GetWorldPosition(),
+                   refs_.bossFight->GetPickRadius(), { 1.0f, 0.35f, 0.25f, 0.5f });
+    }
+
+    // 5. カーソル（置けるかどうかを色で出す）
     if (hasCursor_)
     {
-        bool ok = (lastCursorResult_ == StagePlacement::Result::Ok);
+        // 地形レイヤーではどこにでも置けるので、常に「置ける」色にする
+        const bool ok = (layer_ == EditLayer::Terrain) ||
+                        (lastCursorResult_ == StagePlacement::Result::Ok);
         DrawMarker(ctx, lastCursorWorld_, 0.8f, ok ? cursorOkColor_ : cursorNgColor_);
     }
 }
@@ -1120,31 +1534,111 @@ void PlacementEditor::DrawImGui()
     ImGui::TextWrapped("R-Click: delete            Wheel: zoom at cursor");
     ImGui::Separator();
 
-    // --- ブラシ ---
-    ImGui::SeparatorText("Brush");
-    int brushIndex = static_cast<int>(brush_);
-    if (ImGui::RadioButton("Enemy", brushIndex == 0)) brush_ = Brush::Enemy;
-    ImGui::SameLine();
-    if (ImGui::RadioButton("Coin", brushIndex == 1)) brush_ = Brush::Coin;
-    ImGui::SameLine();
-    if (ImGui::RadioButton("Player Start", brushIndex == 2)) brush_ = Brush::PlayerStart;
-
-    if (brush_ == Brush::Enemy)
+    // --- 編集レイヤー ---
+    // 地形は島まるごとの大きさがあるので、敵やコインと同じ土俵で掴ませない
+    ImGui::SeparatorText("Layer");
+    if (ImGui::RadioButton("Objects", layer_ == EditLayer::Objects))
     {
-        int typeIndex = static_cast<int>(brushEnemyType_);
-        if (ImGui::Combo("Type", &typeIndex, kEnemyTypeNames, IM_ARRAYSIZE(kEnemyTypeNames)))
+        layer_ = EditLayer::Objects;
+        ClearSelection();
+    }
+    ImGui::SameLine();
+    if (ImGui::RadioButton("Terrain", layer_ == EditLayer::Terrain))
+    {
+        layer_ = EditLayer::Terrain;
+        ClearSelection();
+    }
+
+    if (layer_ == EditLayer::Terrain)
+    {
+        // --- 地形ブラシ ---
+        ImGui::SeparatorText("Terrain brush");
+
+        const auto& catalog = StageTerrain::GetMeshCatalog();
+        if (catalog.empty())
         {
-            brushEnemyType_ = static_cast<EnemyType>(typeIndex);
+            ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "No .obj found in %s",
+                               StageLayout::kTerrainDirectory);
+        }
+        else
+        {
+            terrainMeshIndex_ = std::clamp(terrainMeshIndex_, 0, static_cast<int>(catalog.size()) - 1);
+            if (ImGui::BeginCombo("Mesh", catalog[static_cast<size_t>(terrainMeshIndex_)].c_str()))
+            {
+                for (int i = 0; i < static_cast<int>(catalog.size()); ++i)
+                {
+                    const bool selected = (i == terrainMeshIndex_);
+                    if (ImGui::Selectable(catalog[static_cast<size_t>(i)].c_str(), selected))
+                    {
+                        terrainMeshIndex_ = i;
+                    }
+                    if (selected) ImGui::SetItemDefaultFocus();
+                }
+                ImGui::EndCombo();
+            }
         }
 
-        bool randomStrength = (brushStrength_ < 1);
-        if (ImGui::Checkbox("Random strength", &randomStrength))
+        ImGui::SliderAngle("Rotation Y", &terrainNewRotationY_, -180.0f, 180.0f);
+        ImGui::DragFloat("Scale", &terrainNewScale_, 0.005f, 0.01f, 4.0f);
+        ImGui::Checkbox("Boss trigger", &terrainNewBossTrigger_);
+
+        if (ImGui::Button("Refresh mesh list"))
         {
-            brushStrength_ = randomStrength ? -1 : 3;
+            StageTerrain::RefreshMeshCatalog();
         }
-        if (!randomStrength)
+        ImGui::SameLine();
+        ImGui::Checkbox("Show handles", &showTerrainHandles_);
+
+        ImGui::TextDisabled("Click empty space to place. Drag a handle to move (XZ only).");
+    }
+    else
+    {
+        // --- オブジェクトのブラシ ---
+        ImGui::SeparatorText("Brush");
+        if (ImGui::RadioButton("Enemy", brush_ == Brush::Enemy)) brush_ = Brush::Enemy;
+        ImGui::SameLine();
+        if (ImGui::RadioButton("Coin", brush_ == Brush::Coin)) brush_ = Brush::Coin;
+        ImGui::SameLine();
+        if (ImGui::RadioButton("Growth Cube", brush_ == Brush::GrowthCube)) brush_ = Brush::GrowthCube;
+        if (ImGui::RadioButton("Boss", brush_ == Brush::Boss)) brush_ = Brush::Boss;
+        ImGui::SameLine();
+        if (ImGui::RadioButton("Player Start", brush_ == Brush::PlayerStart)) brush_ = Brush::PlayerStart;
+
+        if (brush_ == Brush::Enemy)
         {
-            ImGui::SliderInt("Strength", &brushStrength_, 1, 10);
+            int typeIndex = static_cast<int>(brushEnemyType_);
+            if (ImGui::Combo("Type", &typeIndex, kEnemyTypeNames, IM_ARRAYSIZE(kEnemyTypeNames)))
+            {
+                brushEnemyType_ = static_cast<EnemyType>(typeIndex);
+            }
+
+            bool randomStrength = (brushStrength_ < 1);
+            if (ImGui::Checkbox("Random strength", &randomStrength))
+            {
+                brushStrength_ = randomStrength ? -1 : 3;
+            }
+            if (!randomStrength)
+            {
+                ImGui::SliderInt("Strength", &brushStrength_, 1, 10);
+            }
+        }
+        else if (brush_ == Brush::GrowthCube)
+        {
+            ImGui::DragFloat("Cube size", &brushCubeSize_, 0.01f, 0.2f, 4.0f);
+        }
+        else if (brush_ == Brush::Boss)
+        {
+            if (refs_.bossFight)
+            {
+                int hp = refs_.bossFight->GetMaxHp();
+                if (ImGui::DragInt("Boss max HP", &hp, 1.0f, 1, 9999))
+                {
+                    refs_.bossFight->SetMaxHp(hp);
+                    MarkDirty();
+                    SyncLayoutFromScene();
+                }
+                ImGui::TextDisabled("Only one boss can be placed.");
+            }
         }
     }
 
@@ -1218,6 +1712,122 @@ void PlacementEditor::DrawImGui()
         }
         break;
 
+    case SelectionKind::GrowthCube:
+        if (selectedCube_)
+        {
+            const Vector3& p = selectedCube_->GetPosition();
+            ImGui::Text("Growth Cube");
+            ImGui::Text("Pos: (%.2f, %.2f, %.2f)", p.x, p.y, p.z);
+
+            float size = selectedCube_->GetBaseSize();
+            if (ImGui::DragFloat("Size", &size, 0.01f, 0.2f, 4.0f))
+            {
+                selectedCube_->SetBaseSize(size);
+                MarkDirty();
+                SyncLayoutFromScene();
+            }
+
+            if (ImGui::Button("Delete this cube"))
+            {
+                if (refs_.growthCubeManager)
+                {
+                    refs_.growthCubeManager->Remove(selectedCube_);
+                    ClearSelection();
+                    MarkDirty();
+                    SyncLayoutFromScene();
+                }
+            }
+        }
+        break;
+
+    case SelectionKind::Boss:
+        if (refs_.bossFight)
+        {
+            const Vector3 p = refs_.bossFight->GetWorldPosition();
+            ImGui::Text("Boss");
+            ImGui::Text("Pos: (%.2f, %.2f, %.2f)", p.x, p.y, p.z);
+
+            int hp = refs_.bossFight->GetMaxHp();
+            if (ImGui::DragInt("Max HP##sel", &hp, 1.0f, 1, 9999))
+            {
+                refs_.bossFight->SetMaxHp(hp);
+                MarkDirty();
+                SyncLayoutFromScene();
+            }
+
+            if (!refs_.terrain || !refs_.terrain->HasBossTrigger())
+            {
+                ImGui::TextColored(ImVec4(1.0f, 0.75f, 0.2f, 1.0f),
+                                   "No terrain has a boss trigger.\n"
+                                   "Switch to the Terrain layer and check\n"
+                                   "'Boss trigger' on one of the meshes.");
+            }
+
+            if (ImGui::Button("Remove boss"))
+            {
+                refs_.bossFight->SetEnabled(false);
+                ClearSelection();
+                MarkDirty();
+                SyncLayoutFromScene();
+            }
+        }
+        break;
+
+    case SelectionKind::Terrain:
+        if (selectedTerrain_ && refs_.terrain)
+        {
+            ImGui::Text("Terrain: %s", selectedTerrain_->mesh.c_str());
+            ImGui::Text("Pos: (%.2f, %.2f, %.2f)",
+                        selectedTerrain_->position.x, selectedTerrain_->position.y,
+                        selectedTerrain_->position.z);
+            ImGui::Text("Bounds XZ: %.1f x %.1f",
+                        selectedTerrain_->worldMax.x - selectedTerrain_->worldMin.x,
+                        selectedTerrain_->worldMax.z - selectedTerrain_->worldMin.z);
+
+            // XZ は数値でも動かせるようにしておく（微調整用）
+            float px = selectedTerrain_->position.x;
+            float pz = selectedTerrain_->position.z;
+            bool moved = false;
+            moved |= ImGui::DragFloat("Pos X", &px, 0.1f, -2000.0f, 2000.0f);
+            moved |= ImGui::DragFloat("Pos Z", &pz, 0.1f, -2000.0f, 2000.0f);
+            if (moved)
+            {
+                refs_.terrain->SetPartPositionXZ(selectedTerrain_, px, pz);
+                OnTerrainChanged();
+            }
+
+            float rot = selectedTerrain_->rotationY;
+            if (ImGui::SliderAngle("Rotation Y##sel", &rot, -180.0f, 180.0f))
+            {
+                refs_.terrain->SetPartRotationY(selectedTerrain_, rot);
+                OnTerrainChanged();
+            }
+
+            float scale = selectedTerrain_->scale;
+            if (ImGui::DragFloat("Scale##sel", &scale, 0.005f, 0.01f, 4.0f))
+            {
+                refs_.terrain->SetPartScale(selectedTerrain_, scale);
+                OnTerrainChanged();
+            }
+
+            bool trigger = selectedTerrain_->bossTrigger;
+            if (ImGui::Checkbox("Boss trigger (start boss fight here)", &trigger))
+            {
+                refs_.terrain->SetPartBossTrigger(selectedTerrain_, trigger);
+                MarkDirty();
+                SyncLayoutFromScene();
+            }
+
+            if (ImGui::Button("Delete this terrain"))
+            {
+                StageTerrain::Part* victim = selectedTerrain_;
+                ClearSelection();
+                refs_.terrain->RemovePart(victim);
+                OnTerrainChanged();
+            }
+        }
+        break;
+
     case SelectionKind::PlayerStart:
         if (PlayerSlime())
         {
@@ -1230,6 +1840,57 @@ void PlacementEditor::DrawImGui()
     default:
         ImGui::TextDisabled("Nothing selected");
         break;
+    }
+
+    // --- 地形の一覧（Terrain レイヤーのときだけ）---
+    if (layer_ == EditLayer::Terrain && refs_.terrain)
+    {
+        ImGui::SeparatorText("Terrain list");
+        ImGui::Text("Parts: %d", refs_.terrain->GetPartCount());
+
+        if (ImGui::BeginChild("terrain_list", ImVec2(0.0f, 130.0f), true))
+        {
+            const auto& parts = refs_.terrain->GetParts();
+            for (int i = 0; i < static_cast<int>(parts.size()); ++i)
+            {
+                StageTerrain::Part* part = parts[static_cast<size_t>(i)].get();
+                if (!part) continue;
+
+                char label[160];
+                std::snprintf(label, sizeof(label), "%d: %s%s##terrain%d",
+                              i, part->mesh.c_str(), part->bossTrigger ? "  [BOSS]" : "", i);
+
+                if (ImGui::Selectable(label, part == selectedTerrain_))
+                {
+                    ClearSelection();
+                    selectionKind_ = SelectionKind::Terrain;
+                    selectedTerrain_ = part;
+
+                    // 選んだパーツを画面の真ん中へ持ってくる
+                    const Vector3 handle = part->HandlePosition();
+                    camX_ = handle.x;
+                    camZ_ = handle.z;
+                }
+            }
+        }
+        ImGui::EndChild();
+
+        if (ImGui::Button("Reset terrain to default"))
+        {
+            layout_.terrain = StageLayout::MakeDefaultTerrain();
+            refs_.terrain->ApplyLayout(layout_.terrain);
+            ClearSelection();
+            OnTerrainChanged();
+            std::snprintf(statusText_, sizeof(statusText_), "Terrain reset to default layout");
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Clear terrain"))
+        {
+            refs_.terrain->ClearParts();
+            ClearSelection();
+            OnTerrainChanged();
+            std::snprintf(statusText_, sizeof(statusText_), "All terrain removed");
+        }
     }
 
     // --- カーソル情報 ---
@@ -1269,9 +1930,13 @@ void PlacementEditor::DrawImGui()
     // --- ファイル ---
     ImGui::SeparatorText("File");
     ImGui::Text("File: %s", layoutPath_.c_str());
-    ImGui::Text("Enemies: %d / Coins: %d%s",
+    ImGui::Text("Terrain: %d / Enemies: %d / Coins: %d",
+                static_cast<int>(layout_.terrain.size()),
                 static_cast<int>(layout_.enemies.size()),
-                static_cast<int>(layout_.coins.size()),
+                static_cast<int>(layout_.coins.size()));
+    ImGui::Text("Cubes: %d / Boss: %s%s",
+                static_cast<int>(layout_.growthCubes.size()),
+                layout_.boss.enabled ? "yes" : "no",
                 isDirty_ ? "   * unsaved changes" : "");
 
     if (ImGui::Button("Save"))
@@ -1287,8 +1952,12 @@ void PlacementEditor::DrawImGui()
     ImGui::SameLine();
     if (ImGui::Button("Clear All"))
     {
-        if (refs_.enemyManager) refs_.enemyManager->ClearAll();
-        if (refs_.coinManager)  refs_.coinManager->ClearAll();
+        // 地形は消さない（Terrain レイヤーの "Clear terrain" で消す）。
+        // 地形まで消えると置ける場所が無くなって復帰しづらい
+        if (refs_.enemyManager)      refs_.enemyManager->ClearAll();
+        if (refs_.coinManager)       refs_.coinManager->ClearAll();
+        if (refs_.growthCubeManager) refs_.growthCubeManager->ClearAll();
+        if (refs_.bossFight)         refs_.bossFight->SetEnabled(false);
         ClearSelection();
         MarkDirty();
         SyncLayoutFromScene();
@@ -1298,6 +1967,11 @@ void PlacementEditor::DrawImGui()
     {
         StageLayout generated = StageLayout::MakeFallback();
         generated.playerStart = layout_.playerStart;
+        // 地形は「いま置いてあるもの」を正とする。
+        // MakeFallback() は地形をレイキャストして敵とコインの位置を決めるだけで、
+        // 地形自体は作らない（作ってしまうと足元が消える）
+        generated.terrain = layout_.terrain;
+        generated.boss = layout_.boss;
         layout_ = generated;
         ApplyLayoutToScene();
         if (refs_.enemyManager)

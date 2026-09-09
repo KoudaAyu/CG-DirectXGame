@@ -89,6 +89,16 @@ namespace SlimePhysics
         return static_cast<int>(sGroundMeshes.size());
     }
 
+    int FindGroundMeshIndex(const Object3d* groundObject)
+    {
+        if (!groundObject) return -1;
+        for (size_t i = 0; i < sGroundMeshes.size(); ++i)
+        {
+            if (sGroundMeshes[i].object == groundObject) return static_cast<int>(i);
+        }
+        return -1;
+    }
+
     // ------------------------------------------------------------------
     // 内部ヘルパー
     // ------------------------------------------------------------------
@@ -235,8 +245,9 @@ namespace SlimePhysics
 
         auto PerformRaycastAt = [&](float rayX, float rayZ)
         {
-            for (const auto& gm : sGroundMeshes)
+            for (size_t meshIdx = 0; meshIdx < sGroundMeshes.size(); ++meshIdx)
             {
+                const GroundMeshEntry& gm = sGroundMeshes[meshIdx];
                 if (!gm.object || !gm.collider) continue;
 
                 const Matrix4x4& worldMatrix = gm.currWorld;
@@ -291,7 +302,7 @@ namespace SlimePhysics
                         // 同じ面が「床でも壁でもある」状態にならずジッターが出ない
                         if (localTriNorm.y >= kWalkableSlopeLimitNy && worldTriNorm.y > 0.10f)
                         {
-                            out.push_back({ worldY, worldTriNorm });
+                            out.push_back({ worldY, worldTriNorm, static_cast<int>(meshIdx) });
                         }
                     }
 

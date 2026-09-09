@@ -29,6 +29,7 @@ namespace SlimePhysics
     {
         float y = 0.0f;                        //!< 床のワールドY座標
         Vector3 normal{ 0.0f, 1.0f, 0.0f };    //!< 床のワールド法線
+        int meshIndex = -1;                    //!< どの地形メッシュの床か（AddGroundMesh の登録順。-1 は不明）
     };
 
     /**
@@ -55,6 +56,14 @@ namespace SlimePhysics
 
     /// @brief 現在登録されている地面メッシュの枚数
     int GetGroundMeshCount();
+
+    /**
+     * @brief 登録済みの地面メッシュのうち、指定の Object3d が何番目かを返す
+     * @return 登録されていなければ -1
+     * @note GroundLayer::meshIndex と突き合わせて「いまどの地形パーツの上に居るか」を
+     *       判定するために使う（ボス戦トリガー）。登録順は AddGroundMesh を呼んだ順
+     */
+    int FindGroundMeshIndex(const Object3d* groundObject);
 
     /**
      * @brief (x, z) の真下にある「歩ける床」を全部取得する（Y 降順）
