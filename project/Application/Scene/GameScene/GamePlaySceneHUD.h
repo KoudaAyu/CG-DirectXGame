@@ -151,21 +151,21 @@ public:
     // ===============================================================
     bool showHud_ = true;
 
-    Vector2 labelScorePos_{ 78.0f, 80.0f };
-    Vector2 labelTimePos_{ 464.0f, 80.0f };
-    Vector2 labelCoinPos_{ 759.0f, 80.0f };
+    Vector2 labelScorePos_{ 88.0f, 40.0f };
+    Vector2 labelTimePos_{ 474.0f, 40.0f };
+    Vector2 labelCoinPos_{ 769.0f, 40.0f };
     Vector2 labelSize_{ 150.0f, 44.0f };
 
     /// 数値は「右端の桁の中心」で置く
-    Vector2 scoreValuePos_{ 372.0f, 80.0f };
-    Vector2 timeValuePos_{ 668.0f, 80.0f };
-    Vector2 coinValuePos_{ 962.0f, 80.0f };
+    Vector2 scoreValuePos_{ 382.0f, 40.0f };
+    Vector2 timeValuePos_{ 678.0f, 40.0f };
+    Vector2 coinValuePos_{ 972.0f, 40.0f };
     Vector2 digitSize_{ 40.0f, 52.0f };
     float digitSpacing_ = 3.0f;
 
-    Vector2 labelLifePos_{ 83.0f, 168.0f };
+    Vector2 labelLifePos_{ 88.0f, 88.0f };
     Vector2 labelLifeSize_{ 130.0f, 44.0f };
-    Vector2 lifeOrigin_{ 182.0f, 168.0f }; //!< 1個目のスライムの中心
+    Vector2 lifeOrigin_{ 182.0f, 88.0f }; //!< 1個目のスライムの中心
     float lifeSpacing_ = 40.0f;
     Vector2 lifeIconSize_{ 40.0f, 32.0f };
     float lifePopSeconds_ = 0.22f;   //!< にゅっと出るまでの時間
