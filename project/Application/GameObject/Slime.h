@@ -6,6 +6,7 @@
 #include "Baziru3_Engine/Graphics/3D/Object/Object3d.h"
 #include "Baziru3_Engine/Framework/Collision/MeshCollider.h"
 #include "Application/GameObject/SlimePhysics.h"
+#include "Application/GameObject/SlimeMesh.h"
 #include <vector>
 #include <memory>
 
@@ -30,6 +31,7 @@ public:
     void Initialize(Object3dCom* object3dCom, Camera* camera, const Vector3& startPos, int initialSize = 1);
     void Update(float deltaTime, const Vector2& stageTilt = { 0.0f, 0.0f }, const Vector2& pivot = { 0.0f, 0.0f });
     void Draw(const RenderContext& ctx);
+    void DrawShadow(const RenderContext& ctx);
     void DrawXRay(const RenderContext& ctx, ID3D12PipelineState* xRayPSO);
     void DrawDebug(Camera* camera);
 
@@ -146,4 +148,7 @@ private:
     Vector3 prevVelocity_{ 0.0f, 0.0f, 0.0f }; // スクワッシュ変形用の前フレーム速度
     bool isTitleException_ = false;
     float ceilingSquash_ = 0.0f; // 狭い隙間・天井による平べった変形率
+
+    std::unique_ptr<CharacterShadow> shadow_;
+    bool shadowDrawnThisFrame_ = false;
 };

@@ -539,10 +539,17 @@ void EnemyManager::ResolveBulletCollisions(Slime* target)
 
 void EnemyManager::Draw(const RenderContext& ctx)
 {
+    // 0. 全敵の足元丸影を描画（地面に半透明ブレンド）
     for (auto& e : enemies_)
     {
-        if (e) e->Draw(ctx);
+        if (e && !e->IsDead()) e->DrawShadow(ctx);
     }
+    // 1. 敵本体の描画
+    for (auto& e : enemies_)
+    {
+        if (e && !e->IsDead()) e->Draw(ctx);
+    }
+    // 2. 弾の描画
     for (auto& b : bullets_)
     {
         if (b) b->Draw(ctx);

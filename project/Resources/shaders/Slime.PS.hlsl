@@ -62,8 +62,11 @@ PixelShaderOutput main(VertexShaderOutput input)
     float deformTint = 1.0f + input.deformAmount * 0.5f;
     slimeColor.rgb *= deformTint;
 
-    // --- ディフューズ（Half-Lambert）---
+    // --- ディフューズ（Half-Lambert + 環境光軽減）---
     float diffuseFactor = pow(NdotL * 0.5f + 0.5f, 2.0f);
+    // 環境光寄与を軽減（暗い面をより暗くする）
+    float ambientReduction = 0.60f;
+    diffuseFactor = lerp(diffuseFactor * ambientReduction, diffuseFactor, NdotL);
     float3 diffuse = slimeColor.rgb * gDirectionalLight.color.rgb * diffuseFactor * gDirectionalLight.intensity;
 
     // --- スペキュラ（Blinn-Phong）---
@@ -87,8 +90,13 @@ PixelShaderOutput main(VertexShaderOutput input)
     float innerGlow = gSlimeParams.innerGlow * (1.0f - NdotV) * 0.5f;
     float3 sssColor = slimeColor.rgb * innerGlow;
 
+    // --- セルフシャドウ（下面の陰影強調）---
+    float worldNormalY = N.y;
+    float selfShadow = saturate(worldNormalY * 0.5f + 0.5f); // 0(真下) ~ 1(真上)
+    selfShadow = lerp(0.30f, 1.0f, selfShadow); // 下面は最大70%暗くなる（スライムは丸いので強めに）
+
     // --- 合成 ---
-    float3 finalColor = diffuse + specular + edgeGlow + envReflection + sssColor;
+    float3 finalColor = (diffuse + specular + edgeGlow + envReflection + sssColor) * selfShadow;
 
     // --- 半透明度 ---
     // 中心ほど不透明、端ほど透明（ゼリー感）

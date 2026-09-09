@@ -132,6 +132,11 @@ namespace SlimePhysics
     Vector3 GetGroundNormal(float x, float z, const Vector2& stageTilt, const Vector2& pivot = { 0.0f, 0.0f });
 
     /**
+     * @brief 地面メッシュまたは傾斜平面から、指定 (x, z) における地面表面のY座標と法線を取得
+     */
+    float CalculateGroundHeight(float x, float z, float currentY, const Vector2& stageTilt, bool* outHasGround = nullptr, Vector3* outNormal = nullptr, const Vector2& pivot = { 0.0f, 0.0f });
+
+    /**
      * @brief 地形メッシュの壁・垂直面との水平押し出し衝突判定
      * @param[in,out] position オブジェクトのワールド座標（めり込み分が押し出される）
      * @param[in,out] velocity オブジェクトの移動速度（壁向き成分が相殺される）

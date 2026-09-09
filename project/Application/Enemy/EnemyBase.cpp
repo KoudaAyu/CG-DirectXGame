@@ -5,6 +5,7 @@
 #include "Baziru3_Engine/Graphics/3D/Object/Object3dCom.h"
 #include "Baziru3_Engine/Framework/Collision/CollisionManager.h"
 #include "Application/GameObject/SlimePhysics.h"
+#include "Application/GameObject/SlimeMesh.h"
 
 #include <algorithm>
 #include <cmath>
@@ -178,6 +179,10 @@ void EnemyBase::Initialize(Object3dCom* object3dCom, Camera* camera, const Vecto
     // 「Sphere コライダーを近くの Object3d のスケールへ自動同期する」処理に
     // 半径とオフセットを毎フレーム上書きされてしまうため。
     collider_ = std::make_unique<BoxCollider>(GetHitBoxFullSize(), &position_, &rotation_, CollisionAttribute::Enemy);
+
+    // 足元の丸影（ドロップシャドウ）
+    shadow_ = std::make_unique<CharacterShadow>();
+    shadow_->Initialize(object3dCom_, camera_);
     collider_->SetPositionOffset({ 0.0f, scale_.y * hitOffsetRatio_, 0.0f });
     collider_->SetIsTrigger(true);
     if (CollisionManager::GetInstance())
@@ -409,11 +414,32 @@ void EnemyBase::Update(const EnemyUpdateContext& ctx)
     object3d_->Update();
 
     RefreshCollider();
+
+    // 足元の丸影更新
+    if (shadow_)
+    {
+        Vector3 renderScale = GetRenderScale();
+        float shadowRadius = (std::max)(renderScale.x, renderScale.z) * 0.90f;
+        shadow_->Update(position_, shadowRadius, groundOffset_, ctx.stageTilt, ctx.pivot);
+    }
+}
+
+void EnemyBase::DrawShadow(const RenderContext& ctx)
+{
+    if (isDead_ || !shadow_) return;
+    shadow_->Draw(ctx);
+    shadowDrawnThisFrame_ = true;
 }
 
 void EnemyBase::Draw(const RenderContext& ctx)
 {
-    if (isDead_ || !object3d_) return;
+    if (isDead_) return;
+    if (!shadowDrawnThisFrame_ && shadow_)
+    {
+        shadow_->Draw(ctx);
+    }
+    shadowDrawnThisFrame_ = false;
+    if (!object3d_) return;
 
     if (isAnimated_)
     {
@@ -441,6 +467,7 @@ void EnemyBase::Finalize()
     }
     object3d_ = nullptr;
     ownedObject_.reset();
+    shadow_.reset();
     animAsset_ = nullptr;
     isAnimated_ = false;
     isDead_ = true;

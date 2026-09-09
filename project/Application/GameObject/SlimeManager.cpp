@@ -583,6 +583,13 @@ bool SlimeManager::TakeFxEvents(FxEvents& out) {
 }
 
 void SlimeManager::Draw(const RenderContext& ctx) {
+    // 0. 全スライムの足元丸影を描画（地面に半透明ブレンド）
+    for (auto& slime : slimes_) {
+        if (slime && slime->IsActive()) {
+            slime->DrawShadow(ctx);
+        }
+    }
+
     // 1. 遮蔽時 X-Ray 描画（障害物の裏に隠れたスライムを描画）
     // ※ 通常描画の前に実行することで、スライム自身のポリゴン深度との自己干渉を完全防止！
     //    デプスバッファにはステージや障害物の深度しか入っていないため、

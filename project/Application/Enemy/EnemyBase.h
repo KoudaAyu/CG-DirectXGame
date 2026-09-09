@@ -10,6 +10,7 @@
 #include "Baziru3_Engine/Framework/Collision/BoxCollider.h"
 #include "Application/Enemy/EnemyCollision.h"
 #include "Application/Enemy/EnemyAnimation.h"
+#include "Application/GameObject/SlimeMesh.h"
 
 class Object3dCom;
 class Camera;
@@ -98,6 +99,7 @@ public:
 
     void Update(const EnemyUpdateContext& ctx);
     void Draw(const RenderContext& ctx);
+    void DrawShadow(const RenderContext& ctx);
     void Finalize();
 
     // --- 強さ ---
@@ -240,4 +242,7 @@ protected:
     ScaleFromStrengthFunc scaleFunc_; //!< 空なら既定関数が使われる
     EnemyAnimator animator_;
     std::unique_ptr<BoxCollider> collider_;
+
+    std::unique_ptr<CharacterShadow> shadow_;
+    bool shadowDrawnThisFrame_ = false;
 };
