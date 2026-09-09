@@ -109,6 +109,8 @@ public:
 
     // --- 状態 ---
     bool IsDead() const { return isDead_; }
+    bool HasGround() const { return hasGroundLastFrame_; }
+    float GetLifeTime() const { return lifeTime_; }
 
     /**
      * @brief 挙動を凍結する（配置エディタ用）
@@ -228,6 +230,7 @@ protected:
 
     int strength_ = 1;
     bool isDead_ = false;
+    bool hasGroundLastFrame_ = false;
     bool isPushable_ = false;
     bool needsGroundSnap_ = true;  //!< 初回だけ最上段の床へ即吸着する
     bool isFrozen_ = false;        //!< true の間は挙動を止める（配置エディタ用）

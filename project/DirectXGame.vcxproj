@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|x64">
@@ -472,7 +472,7 @@
     <UseDebugLibraries>false</UseDebugLibraries>
     <PlatformToolset Condition="'$(DefaultPlatformToolset)' != ''">$(DefaultPlatformToolset)</PlatformToolset>
     <PlatformToolset Condition="'$(DefaultPlatformToolset)' == ''">v143</PlatformToolset>
-    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <WholeProgramOptimization>false</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Development|x64'" Label="Configuration">
@@ -480,7 +480,7 @@
     <UseDebugLibraries>false</UseDebugLibraries>
     <PlatformToolset Condition="'$(DefaultPlatformToolset)' != ''">$(DefaultPlatformToolset)</PlatformToolset>
     <PlatformToolset Condition="'$(DefaultPlatformToolset)' == ''">v143</PlatformToolset>
-    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <WholeProgramOptimization>false</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
@@ -562,7 +562,7 @@ xcopy /y /d "$(ProjectDir)externals\dxc\*.dll" "$(OutDir)"</Command>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>imgui.lib;assimp-vc143-mt.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>assimp-vc143-mt.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(ProjectDir)..\generated\output\$(Configuration);$(ProjectDir)..\generated\output\Release;$(ProjectDir)externals\assimp\lib\$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <PostBuildEvent>

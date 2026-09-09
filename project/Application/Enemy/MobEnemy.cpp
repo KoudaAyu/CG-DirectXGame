@@ -1,5 +1,6 @@
 #define NOMINMAX
 #include "MobEnemy.h"
+#include "Application/GameObject/SlimePhysics.h"
 
 #include <algorithm>
 #include <cmath>
@@ -30,6 +31,7 @@ namespace
             c.canMove = true;
             c.canShoot = false;
             c.isPushable = true;
+            c.preventFall = true;
             c.moveSpeed = 2.6f;
             c.chaseRange = 9.0f;
             c.loseRange = 14.0f;
@@ -84,6 +86,7 @@ namespace
             c.canMove = true;
             c.canShoot = true;
             c.isPushable = true;
+            c.preventFall = true;
             c.moveSpeed = 1.5f;
             c.chaseRange = 10.0f;
             c.loseRange = 15.0f;
@@ -235,6 +238,53 @@ bool MobEnemy::TakeShootRequest(ShootRequest& out)
     return true;
 }
 
+bool MobEnemy::IsStepSafe(const Vector3& stepLocal, const EnemyUpdateContext& ctx) const
+{
+    float lenSq = stepLocal.x * stepLocal.x + stepLocal.z * stepLocal.z;
+    if (lenSq < 1e-8f) return true;
+
+    float len = std::sqrt(lenSq);
+    Vector3 dir{ stepLocal.x / len, 0.0f, stepLocal.z / len };
+
+    // 敵の体の半径を考慮した前方のチェック距離
+    // 足元の半径: scale_.x * hitRadiusRatio_ (スライムで約0.5m〜1.2m)
+    // 敵が崖に近づいた時、体の中心が崖のフチより手前であっても足がはみ出て落ちないよう、
+    // 移動先 (anchorLocal_ + stepLocal) よりさらに前方へプローブを伸ばす
+    float footRadius = scale_.x * hitRadiusRatio_;
+    float probeDistance = len + (std::max)(0.30f, footRadius * 0.6f);
+
+    Vector3 probeLocal = anchorLocal_ + dir * probeDistance;
+    Vector3 probeWorld = StageLocalToWorld(probeLocal, ctx.stageTilt, ctx.pivot);
+
+    bool hasGround = false;
+    Vector3 normal{ 0.0f, 1.0f, 0.0f };
+    float groundY = SlimePhysics::CalculateGroundedCenterYEx(
+        probeWorld.x, probeWorld.z, position_.y, ctx.stageTilt, groundOffset_,
+        &hasGround, &normal, ctx.pivot, true);
+
+    if (!hasGround)
+    {
+        return false; // 床が存在しない（奈落）
+    }
+
+    // 落差（現在の中心Y座標との差）
+    float diffY = groundY - position_.y;
+
+    // 登り段差: 0.40m 以上は登れない（壁・高段差）
+    if (diffY > 0.40f)
+    {
+        return false;
+    }
+
+    // 降り段差（落差）: 0.50m 以上は崖と判定して歩行停止
+    if (diffY < -0.50f)
+    {
+        return false;
+    }
+
+    return true;
+}
+
 void MobEnemy::UpdateBehavior(const EnemyUpdateContext& ctx)
 {
     const MobEnemyConfig& c = GetConfig();
@@ -287,9 +337,50 @@ void MobEnemy::UpdateBehavior(const EnemyUpdateContext& ctx)
         float travel = (std::min)(step, dist - c.keepDistance);
         if (travel > 0.0f)
         {
-            anchorLocal_.x += (dx / dist) * travel;
-            anchorLocal_.z += (dz / dist) * travel;
-            moveAmount_ = travel / (std::max)(1e-4f, step); // 0〜1
+            Vector3 desiredStep{ (dx / dist) * travel, 0.0f, (dz / dist) * travel };
+
+            if (!c.preventFall || IsStepSafe(desiredStep, ctx))
+            {
+                anchorLocal_.x += desiredStep.x;
+                anchorLocal_.z += desiredStep.z;
+                moveAmount_ = travel / (std::max)(1e-4f, step); // 0〜1
+            }
+            else if (c.preventFall)
+            {
+                // 軸分離（壁ずり・崖沿い移動）:
+                // 斜めに崖へ突っ込んだ際、崖に沿う方向へ滑るように進む
+                Vector3 stepX{ desiredStep.x, 0.0f, 0.0f };
+                Vector3 stepZ{ 0.0f, 0.0f, desiredStep.z };
+
+                bool safeX = (std::abs(desiredStep.x) > 1e-5f) && IsStepSafe(stepX, ctx);
+                bool safeZ = (std::abs(desiredStep.z) > 1e-5f) && IsStepSafe(stepZ, ctx);
+
+                if (safeX && safeZ)
+                {
+                    // 移動量が大きい軸を優先
+                    if (std::abs(desiredStep.x) >= std::abs(desiredStep.z))
+                    {
+                        anchorLocal_.x += stepX.x;
+                        moveAmount_ = std::abs(stepX.x) / (std::max)(1e-4f, step);
+                    }
+                    else
+                    {
+                        anchorLocal_.z += stepZ.z;
+                        moveAmount_ = std::abs(stepZ.z) / (std::max)(1e-4f, step);
+                    }
+                }
+                else if (safeX)
+                {
+                    anchorLocal_.x += stepX.x;
+                    moveAmount_ = std::abs(stepX.x) / (std::max)(1e-4f, step);
+                }
+                else if (safeZ)
+                {
+                    anchorLocal_.z += stepZ.z;
+                    moveAmount_ = std::abs(stepZ.z) / (std::max)(1e-4f, step);
+                }
+                // 両方の軸とも崖ならその場で停止（moveAmount_ は 0.0f のまま）
+            }
         }
     }
 

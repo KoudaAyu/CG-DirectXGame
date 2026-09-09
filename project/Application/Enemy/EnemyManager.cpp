@@ -664,6 +664,10 @@ void EnemyManager::DrawImGui()
             c.hitShape = (shape == 1) ? EnemyCollision::HitShape::AABB : EnemyCollision::HitShape::Sphere;
         }
 
+        if (c.canMove)
+        {
+            ImGui::Checkbox("Prevent Fall (Cliff Safe)", &c.preventFall);
+        }
         ImGui::DragFloat("Move Speed", &c.moveSpeed, 0.05f, 0.0f, 20.0f);
         ImGui::DragFloat("Chase Range", &c.chaseRange, 0.1f, 0.0f, 60.0f);
         ImGui::DragFloat("Lose Range", &c.loseRange, 0.1f, 0.0f, 80.0f);
@@ -710,11 +714,13 @@ void EnemyManager::DrawImGui()
             MobEnemy* e = enemies_[i].get();
             if (!e) continue;
             const Vector3& p = e->GetPosition();
-            ImGui::Text("[%2zu] %-14s STR %2d  scale %.2f  pos(%.1f, %.1f, %.1f) %s %s",
-                        i, e->GetTypeName(), e->GetStrength(), e->GetScale().x,
+            ImGui::Text("[%2zu] %-12s S:%2d p(%.1f, %.1f, %.1f) %s %s [%s] t=%.1fs",
+                        i, e->GetTypeName(), e->GetStrength(),
                         p.x, p.y, p.z,
-                        e->IsChasing() ? "<chase>" : "",
-                        e->IsAnimated() ? e->GetAnimator().GetCurrentClipName() : "[static]");
+                        e->IsChasing() ? "<chase>" : "       ",
+                        e->HasGround() ? "GND:OK" : "NO-GND!",
+                        e->IsAnimated() ? e->GetAnimator().GetCurrentClipName() : "static",
+                        e->GetLifeTime());
         }
     }
     ImGui::EndChild();
