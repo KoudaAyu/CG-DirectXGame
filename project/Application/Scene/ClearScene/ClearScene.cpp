@@ -12,11 +12,17 @@
 
 void ClearScene::InitializeScene()
 {
-	if (dxCommon_)
+	// 基底クラスの安全なアクセサーを経由し入力を初期化する
+	DirectXCom* dx = GetDirectXCom();
+	if (dx)
 	{
 		input_ = new KeyInput();
-		input_->Initialize(dxCommon_->GetWindowAPI());
+		input_->Initialize(dx->GetWindowAPI());
 	}
+
+	// Scene Context から型安全に戦績を受取る（GamePlaySceneが ChangeScene 前に SetSceneData したもの）
+	// データがない場合はシングルトンへのフォールバックで演出が欠けることなく継続
+	raidStats_ = GetSceneData<RaidStats>("RaidStats", RaidStats::GetInstance());
 }
 
 void ClearScene::Finalize()
@@ -84,8 +90,8 @@ void ClearScene::Update()
 	// 区切り線
 	dl->AddLine(ImVec2(winPos.x + 40.0f, winPos.y + 92.0f), ImVec2(winMax.x - 40.0f, winPos.y + 92.0f), IM_COL32(0, 255, 140, 180), 1.5f);
 
-	// レイド戦績の取得
-	auto& stats = RaidStats::GetInstance();
+	// レイド戦績の取得（Scene Context から取得した raidStats_ を使用）
+	auto& stats = raidStats_;
 	int rMin = static_cast<int>(stats.raidTime) / 60;
 	int rSec = static_cast<int>(stats.raidTime) % 60;
 

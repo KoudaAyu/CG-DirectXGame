@@ -1,10 +1,9 @@
 #pragma once
 
 #include "BaseScene.h"
+#include "../GameScene/RaidStats.h"
 
-class DirectXCom;
 class KeyInput;
-class Camera;
 struct SceneRenderRequests;
 
 class ClearScene : public BaseScene
@@ -18,6 +17,8 @@ public:
 	const char* GetSceneType() const { return "CLEAR"; }
 
 private:
-	DirectXCom* dxCommon_ = nullptr;
 	KeyInput* input_ = nullptr;
+
+	// クリア画面表示用戦績（Scene Context 経由で受け取った RaidStats）
+	RaidStats raidStats_{};
 };

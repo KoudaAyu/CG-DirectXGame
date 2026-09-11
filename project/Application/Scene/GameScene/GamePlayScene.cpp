@@ -17,6 +17,7 @@
 #include <Windows.h>
 #include <fstream>
 #include <nlohmann/json.hpp>
+#include "Baziru3_Engine/Framework/IO/JsonSafeLoader.h"
 #include "Baziru3_Engine/Framework/AI/NavMesh.h"
 
 #include "GamePlayScene.h"
@@ -1170,6 +1171,8 @@ void GamePlayScene::Update()
 #endif
 		if (proceedPressed)
 		{
+			// 型安全 Scene Context でゲームオーバー画面へ戦績を転送
+			SetSceneData<RaidStats>("RaidStats", RaidStats::GetInstance());
 			SceneManager::GetInstance()->ChangeScene("GAMEOVER");
 			return;
 		}
@@ -1196,6 +1199,8 @@ void GamePlayScene::Update()
 		{
 			RaidStats::GetInstance().isSurvived = true;
 			RaidStats::GetInstance().totalLootValue = player_ ? player_->GetLootValue() : 0;
+			// 型安全 Scene Context でクリア画面へ戦績を転送
+			SetSceneData<RaidStats>("RaidStats", RaidStats::GetInstance());
 			SceneManager::GetInstance()->ChangeScene("CLEAR");
 			return;
 		}
@@ -1416,108 +1421,104 @@ void GamePlayScene::InitializeObstacles()
 		"../project/Resources/stage_layout.json"
 	};
 
+	nlohmann::json j;
 	for (const auto& filepath : pathCandidates)
 	{
-		std::ifstream file(filepath);
-		if (file.is_open())
+		if (!std::filesystem::exists(filepath)) continue;
+		if (!BaziruEngine::IO::JsonSafeLoader::LoadSafe(filepath, j))
 		{
-			try
+			OutputDebugStringA(("GamePlayScene: Failed to load stage_layout.json (corrupted or missing): " + filepath + "\n").c_str());
+			continue;
+		}
+		try
+		{
+			for (const auto& obj : j)
 			{
-				nlohmann::json j;
-				file >> j;
-				file.close();
-
-				for (const auto& obj : j)
+				std::string name = obj.value("name", "");
+				std::string type = obj.value("type", "");
+				if (!name.empty() && name != "GroundPlane" && type != "SpawnPoint" && type != "GoalRing" && name != "Player_Spawn_Point" && name != "Enemy_Spawn_Point" && name != "Goal_Extraction_Ring")
 				{
-					std::string name = obj.value("name", "");
-					std::string type = obj.value("type", "");
-					if (!name.empty() && name != "GroundPlane" && type != "SpawnPoint" && type != "GoalRing" && name != "Player_Spawn_Point" && name != "Enemy_Spawn_Point" && name != "Goal_Extraction_Ring")
+					Vector3 pos = {
+						obj["position"]["x"].get<float>(),
+						obj["position"]["y"].get<float>(),
+						obj["position"]["z"].get<float>()
+					};
+					Vector3 scl = { 1.0f, 1.0f, 1.0f };
+					if (obj.contains("scale"))
 					{
-						Vector3 pos = {
-							obj["position"]["x"].get<float>(),
-							obj["position"]["y"].get<float>(),
-							obj["position"]["z"].get<float>()
+						scl = {
+							obj["scale"]["x"].get<float>(),
+							obj["scale"]["y"].get<float>(),
+							obj["scale"]["z"].get<float>()
 						};
-						Vector3 scl = { 1.0f, 1.0f, 1.0f };
-						if (obj.contains("scale"))
-						{
-							scl = {
-								obj["scale"]["x"].get<float>(),
-								obj["scale"]["y"].get<float>(),
-								obj["scale"]["z"].get<float>()
-							};
-						}
-						Vector3 rot = { 0.0f, 0.0f, 0.0f };
-						if (obj.contains("rotation"))
-						{
-							rot = {
-								obj["rotation"]["x"].get<float>(),
-								obj["rotation"]["y"].get<float>(),
-								obj["rotation"]["z"].get<float>()
-							};
-						}
-						std::string modelFile = obj.value("modelFilename", "fence.obj");
-						if (type == "Target" || name.find("Target") != std::string::npos || name.find("target") != std::string::npos)
-						{
-							auto target = std::make_unique<Target>();
-							float rad = obj.value("radius", 0.8f);
-							target->Initialize(object3dCom, camera_, pos, rad);
-							targets_.push_back(std::move(target));
-							continue;
-						}
-						else if (type == "River" || name.find("River") != std::string::npos || name.find("river") != std::string::npos || name.find("Water") != std::string::npos || name.find("water") != std::string::npos)
-						{
-							modelFile = "river.obj";
-						}
-						else if (modelFile == "plane.obj" || name.find("Ground") != std::string::npos || name.find("Plane") != std::string::npos)
-						{
-							continue; // 不要な中央巨大板 plane.obj の生成をスキップ
-						}
-						
-						auto obs = std::make_unique<Obstacle>();
-						obs->Initialize(object3dCom, camera_, pos, 1.0f, modelFile, scl, rot);
-						obstacles_.push_back(std::move(obs));
 					}
-				}
-				// ステージ最下層に25x25mタイル16枚（4x4グリッド）で地面を敷く
-				// ground.obj単体(100x100m)だとフラスタムカリングで端が消えるため分割する
-				{
-					const float tileSize = 25.0f; // タイル1枚のサイズ
-					const int gridW = 4;
-					const int gridH = 4;
-					// グリッドの中心を (0, -0.01, 15) に合わせる
-					const float startX = 0.0f - tileSize * gridW * 0.5f + tileSize * 0.5f;
-					const float startZ = 15.0f - tileSize * gridH * 0.5f + tileSize * 0.5f;
-					for (int gz = 0; gz < gridH; ++gz)
+					Vector3 rot = { 0.0f, 0.0f, 0.0f };
+					if (obj.contains("rotation"))
 					{
-						for (int gx = 0; gx < gridW; ++gx)
-						{
-							Vector3 tilePos = { startX + gx * tileSize, -0.01f, startZ + gz * tileSize };
-							auto tile = std::make_unique<Obstacle>();
-							tile->Initialize(object3dCom, camera_, tilePos, 1.0f, "ground_tile.obj", { 1.0f, 1.0f, 1.0f }, { 0.0f, 0.0f, 0.0f });
-							obstacles_.insert(obstacles_.begin(), std::move(tile));
-						}
+						rot = {
+							obj["rotation"]["x"].get<float>(),
+							obj["rotation"]["y"].get<float>(),
+							obj["rotation"]["z"].get<float>()
+						};
+					}
+					std::string modelFile = obj.value("modelFilename", "fence.obj");
+					if (type == "Target" || name.find("Target") != std::string::npos || name.find("target") != std::string::npos)
+					{
+						auto target = std::make_unique<Target>();
+						float rad = obj.value("radius", 0.8f);
+						target->Initialize(object3dCom, camera_, pos, rad);
+						targets_.push_back(std::move(target));
+						continue;
+					}
+					else if (type == "River" || name.find("River") != std::string::npos || name.find("river") != std::string::npos || name.find("Water") != std::string::npos || name.find("water") != std::string::npos)
+					{
+						modelFile = "river.obj";
+					}
+					else if (modelFile == "plane.obj" || name.find("Ground") != std::string::npos || name.find("Plane") != std::string::npos)
+					{
+						continue; // 不要な中央巨大板 plane.obj の生成をスキップ
+					}
+
+					auto obs = std::make_unique<Obstacle>();
+					obs->Initialize(object3dCom, camera_, pos, 1.0f, modelFile, scl, rot);
+					obstacles_.push_back(std::move(obs));
+				}
+			}
+			// ステージ最下層に25x25mタイル16枚（4x4グリッド）で地面を敷く
+			// ground.obj単体(100x100m)だとフラスタムカリングで端が消えるため分割する
+			{
+				const float tileSize = 25.0f; // タイル1枚のサイズ
+				const int gridW = 4;
+				const int gridH = 4;
+				// グリッドの中心を (0, -0.01, 15) に合わせる
+				const float startX = 0.0f - tileSize * gridW * 0.5f + tileSize * 0.5f;
+				const float startZ = 15.0f - tileSize * gridH * 0.5f + tileSize * 0.5f;
+				for (int gz = 0; gz < gridH; ++gz)
+				{
+					for (int gx = 0; gx < gridW; ++gx)
+					{
+						Vector3 tilePos = { startX + gx * tileSize, -0.01f, startZ + gz * tileSize };
+						auto tile = std::make_unique<Obstacle>();
+						tile->Initialize(object3dCom, camera_, tilePos, 1.0f, "ground_tile.obj", { 1.0f, 1.0f, 1.0f }, { 0.0f, 0.0f, 0.0f });
+						obstacles_.insert(obstacles_.begin(), std::move(tile));
 					}
 				}
-
-				// 橋の下を東西に横断する美しいクリアブルーの川水面を配置（幅60m x 奥行き5m）
-				// ※ 地面とのZファイト防止のため Y=kRiverSurfaceY に配置
-				auto river = std::make_unique<Obstacle>();
-				river->Initialize(object3dCom, camera_, GameConfig::Environment::kRiverPosition, 1.0f, "river.obj", GameConfig::Environment::kRiverScale, GameConfig::Environment::kRiverRotation);
-				obstacles_.insert(obstacles_.begin() + 1, std::move(river));
-
-
-				success = true;
-				OutputDebugStringA("GamePlayScene: Successfully loaded obstacles from JSON.\n");
-				break;
-
 			}
-			catch (const std::exception& e)
-			{
-				char errorMsg[256];
-				sprintf_s(errorMsg, "GamePlayScene: Failed to parse stage_layout.json: %s\n", e.what());
-				OutputDebugStringA(errorMsg);
-			}
+
+			// 橋の下を東西に横断する川水面を配置
+			auto river = std::make_unique<Obstacle>();
+			river->Initialize(object3dCom, camera_, GameConfig::Environment::kRiverPosition, 1.0f, "river.obj", GameConfig::Environment::kRiverScale, GameConfig::Environment::kRiverRotation);
+			obstacles_.insert(obstacles_.begin() + 1, std::move(river));
+
+			success = true;
+			OutputDebugStringA("GamePlayScene: Successfully loaded obstacles from JSON.\n");
+			break;
+		}
+		catch (const std::exception& e)
+		{
+			char errorMsg[256];
+			sprintf_s(errorMsg, "GamePlayScene: Failed to parse stage_layout.json: %s\n", e.what());
+			OutputDebugStringA(errorMsg);
 		}
 	}
 

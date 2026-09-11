@@ -11,11 +11,16 @@
 
 void GameOverScene::InitializeScene()
 {
-	if (dxCommon_)
+	// 基底クラスの安全なアクセサーを経由し入力を初期化する
+	DirectXCom* dx = GetDirectXCom();
+	if (dx)
 	{
 		input_ = new KeyInput();
-		input_->Initialize(dxCommon_->GetWindowAPI());
+		input_->Initialize(dx->GetWindowAPI());
 	}
+
+	// Scene Context から型安全に戦績を受取る（GamePlaySceneが ChangeScene 前に SetSceneData したもの）
+	raidStats_ = GetSceneData<RaidStats>("RaidStats", RaidStats::GetInstance());
 }
 
 void GameOverScene::Finalize()
@@ -62,7 +67,7 @@ void GameOverScene::Update()
 	ImVec2 winPos = ImGui::GetWindowPos();
 	ImVec2 winMax = ImVec2(winPos.x + panelW, winPos.y + panelH);
 
-	auto& stats = RaidStats::GetInstance();
+	auto& stats = raidStats_;
 	bool isMIA = stats.isMIA;
 
 	// 背景パネル (ダーククリムゾン / MIA時はダークアンバー)

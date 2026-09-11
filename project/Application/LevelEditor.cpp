@@ -10,6 +10,7 @@
 #include "Light.h"
 #include <Windows.h>
 #include "externals/nlohmann/json.hpp"
+#include "Baziru3_Engine/Framework/IO/JsonSafeLoader.h"
 #include "Baziru3_Engine/3D/Procedural/BioProceduralGenerator.h"
 #include "Baziru3_Engine/Framework/Collision/CollisionManager.h"
 #include "Baziru3_Engine/Framework/Collision/BoxCollider.h"
@@ -489,10 +490,11 @@ bool LevelEditor::SaveToJson(const std::string& filepath)
         j.push_back(item);
     }
 
-    std::ofstream file(filepath);
-    if (!file.is_open()) return false;
-
-    file << j.dump(4);
+    // 安全なアトミック書き込み（中断・クラッシュによる0バイト破損を防止）
+    if (!BaziruEngine::IO::JsonSafeLoader::SaveSafe(filepath, j, 4)) {
+        OutputDebugStringA(("[LevelEditor] Failed to save JSON: " + filepath + "\n").c_str());
+        return false;
+    }
     return true;
 }
 
@@ -548,16 +550,9 @@ bool LevelEditor::LoadFromFile(const std::string& filepath)
 
 bool LevelEditor::LoadFromJson(const std::string& filepath)
 {
-    std::ifstream file(filepath);
-    if (!file.is_open()) return false;
-
     nlohmann::json j;
-    try
-    {
-        file >> j;
-    }
-    catch (...)
-    {
+    if (!BaziruEngine::IO::JsonSafeLoader::LoadSafe(filepath, j)) {
+        OutputDebugStringA(("[LevelEditor] Failed to load JSON (corrupted or missing): " + filepath + "\n").c_str());
         return false;
     }
 

@@ -1,8 +1,8 @@
 #pragma once
 
 #include "BaseScene.h"
+#include "../GameScene/RaidStats.h"
 
-class DirectXCom;
 class KeyInput;
 struct SceneRenderRequests;
 
@@ -18,4 +18,7 @@ public:
 
 private:
 	KeyInput* input_ = nullptr;
+
+	// ゲームオーバー画面表示用戦績（Scene Context 経由で受け取った RaidStats）
+	RaidStats raidStats_{};
 };
