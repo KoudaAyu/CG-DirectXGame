@@ -1,6 +1,7 @@
 #include "BehaviorTree.h"
 #include "CompositeNodes.h"
 #include "BehaviorNodeFactory.h" // ノード生成用ファクトリーのインクルード
+#include "../IO/JsonSafeLoader.h"
 #include "../Base/Vector.h"
 #include <fstream>
 #include <Windows.h>
@@ -66,36 +67,56 @@ private:
 // BehaviorTree 実装
 // ==========================================
 
-// JSONファイルからツリーの動的読み込みと再構築
-bool BehaviorTree::LoadFromJSON(const std::string& filePath) {
-    std::ifstream file(filePath);
-    if (!file.is_open()) {
-        std::string err = "[BT Error] Failed to open JSON file: " + filePath + "\n";
-        OutputDebugStringA(err.c_str());
-        return false;
+void BehaviorTree::CreateDefaultFallbackTree() {
+    auto fallbackRoot = BehaviorNodeFactory::GetInstance().Create("SequenceNode", nlohmann::json::object());
+    if (fallbackRoot) {
+        SetRoot(fallbackRoot);
     }
+}
+
+// JSONファイルからツリーの安全な読み込みとフォールスルー再構築
+bool BehaviorTree::LoadFromJSON(const std::string& filePath, bool enableFallthrough) {
+    nlohmann::json fallbackData = {
+        {"Type", "SequenceNode"},
+        {"Children", nlohmann::json::array()}
+    };
 
     nlohmann::json rootJson;
+    bool loadOk = BaziruEngine::IO::JsonSafeLoader::LoadSafe(filePath, rootJson, fallbackData);
+
+    if (!loadOk && !enableFallthrough) {
+        return false;
+    }
+
     try {
-        file >> rootJson;
-    } catch (const nlohmann::json::parse_error& e) {
-        std::string err = "[BT Error] JSON parse error: " + std::string(e.what()) + "\n";
+        // 最上位ノードのType文字列の存在チェック
+        if (!rootJson.contains("Type") || !rootJson["Type"].is_string()) {
+            OutputDebugStringA("[BT Error] Root node must have a valid \"Type\" string. Falling through.\n");
+            if (enableFallthrough) {
+                CreateDefaultFallbackTree();
+                return true;
+            }
+            return false;
+        }
+
+        std::string typeName = rootJson["Type"];
+        
+        // ファクトリーを使用してルートノードおよび配下の子ノードを再帰生成
+        auto rootNode = BehaviorNodeFactory::GetInstance().Create(typeName, rootJson);
+        if (rootNode) {
+            SetRoot(rootNode);
+            return true;
+        }
+    } catch (const std::exception& e) {
+        std::string err = "[BT Error] Exception creating root node: " + std::string(e.what()) + "\n";
         OutputDebugStringA(err.c_str());
-        return false;
+    } catch (...) {
+        OutputDebugStringA("[BT Error] Unknown exception creating root node.\n");
     }
 
-    // 最上位ノードのType文字列の存在チェック
-    if (!rootJson.contains("Type") || !rootJson["Type"].is_string()) {
-        OutputDebugStringA("[BT Error] Root node must have a valid \"Type\" string.\n");
-        return false;
-    }
-
-    std::string typeName = rootJson["Type"];
-    
-    // ファクトリーを使用してルートノードおよび配下の子ノードを再帰生成
-    auto rootNode = BehaviorNodeFactory::GetInstance().Create(typeName, rootJson);
-    if (rootNode) {
-        SetRoot(rootNode);
+    if (enableFallthrough) {
+        OutputDebugStringA("[BT Warning] Creating default fallback tree to prevent crash.\n");
+        CreateDefaultFallbackTree();
         return true;
     }
 
@@ -207,6 +228,28 @@ void BehaviorTree::ExecuteTests() {
                 }
             }
         }
+    }
+
+    // 5. JSONフォールスルー耐性テスト（破損JSON・構文エラー時の安全動作検証）
+    OutputDebugStringA("[BT Test] Starting JSON Fall-Through Resilience Test...\n");
+    {
+        std::string brokenJsonPath = "test_corrupted_tree.json";
+        std::ofstream brokenFile(brokenJsonPath);
+        if (brokenFile.is_open()) {
+            brokenFile << "{ this is completely invalid JSON syntax! : [ ] }";
+            brokenFile.close();
+        }
+
+        auto testFallthroughTree = std::make_unique<BehaviorTree>();
+        bool loaded = testFallthroughTree->LoadFromJSON(brokenJsonPath);
+        if (loaded && testFallthroughTree->GetRoot() != nullptr) {
+            OutputDebugStringA("[BT Test] Fall-through test PASSED: Successfully fell back without crash!\n");
+            testFallthroughTree->Update();
+        } else {
+            OutputDebugStringA("[BT Test] Fall-through test: Tree handled gracefully without crash.\n");
+        }
+        std::error_code ec;
+        std::filesystem::remove(brokenJsonPath, ec);
     }
 
     OutputDebugStringA("[BT Test] BehaviorTree JSON Loader Test Finished.\n");

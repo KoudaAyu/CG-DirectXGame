@@ -745,6 +745,13 @@ Microsoft::WRL::ComPtr<IDxcBlob> DirectXCom::CompileShader(const std::wstring& f
 	Microsoft::WRL::ComPtr<IDxcBlobEncoding> shaderScore = nullptr;
 	HRESULT hr = dxcUtils->LoadFile(filePath.c_str(), nullptr, &shaderScore);
 	//ファイルの読み込みに失敗した場合はエラー
+	if (FAILED(hr))
+	{
+		std::string errMsg = std::format("[DirectXCom::CompileShader] Failed to load shader file: {} (hr=0x{:08X})\n",
+			StringUtil::ConvertString(filePath), static_cast<uint32_t>(hr));
+		OutputDebugStringA(errMsg.c_str());
+		Logger::Log(logStream, errMsg);
+	}
 	assert(SUCCEEDED(hr));
 	//読み込んだファイルの内容を設定する
 	DxcBuffer shaderSourceBuffer;

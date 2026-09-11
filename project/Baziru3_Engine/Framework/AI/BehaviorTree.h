@@ -33,8 +33,12 @@ public:
         return BehaviorStatus::Invalid;
     }
 
-    // JSONアセットファイルからツリーの構造をロードし、再構成します
-    bool LoadFromJSON(const std::string& filePath);
+    // 最小動作が保証された安全なフォールバックツリー（空のSequenceNode）を構築
+    void CreateDefaultFallbackTree();
+
+    // JSONアセットファイルからツリーの構造を安全にロードし、再構成します
+    // ロード失敗やJSON破損時はフォールスルー機能によりフォールバックツリーを自動生成してクラッシュ（即死）を防ぎます
+    bool LoadFromJSON(const std::string& filePath, bool enableFallthrough = true);
 
     // エンジン初期化時に自動でBTの動作をテストするための静的関数
     static void ExecuteTests();

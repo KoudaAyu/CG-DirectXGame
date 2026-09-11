@@ -57,6 +57,13 @@ void BaseScene::SetSceneData(const std::string &key, const std::string &value)
 	}
 }
 
+void BaseScene::SetSceneData(const std::string &key, const char* value)
+{
+	if (sceneManager_) {
+		sceneManager_->SetSceneData(key, value);
+	}
+}
+
 void BaseScene::SetSceneDataInt(const std::string &key, int value)
 {
 	if (sceneManager_) {
@@ -68,6 +75,27 @@ void BaseScene::SetSceneDataFloat(const std::string &key, float value)
 {
 	if (sceneManager_) {
 		sceneManager_->SetSceneDataFloat(key, value);
+	}
+}
+
+void BaseScene::SetSceneDataDouble(const std::string &key, double value)
+{
+	if (sceneManager_) {
+		sceneManager_->SetSceneDataDouble(key, value);
+	}
+}
+
+void BaseScene::SetSceneDataBool(const std::string &key, bool value)
+{
+	if (sceneManager_) {
+		sceneManager_->SetSceneDataBool(key, value);
+	}
+}
+
+void BaseScene::SetSceneDataString(const std::string &key, const std::string &value)
+{
+	if (sceneManager_) {
+		sceneManager_->SetSceneDataString(key, value);
 	}
 }
 
@@ -84,4 +112,38 @@ int BaseScene::GetSceneDataInt(const std::string &key, int defaultVal) const
 float BaseScene::GetSceneDataFloat(const std::string &key, float defaultVal) const
 {
 	return sceneManager_ ? sceneManager_->GetSceneDataFloat(key, defaultVal) : defaultVal;
+}
+
+double BaseScene::GetSceneDataDouble(const std::string &key, double defaultVal) const
+{
+	return sceneManager_ ? sceneManager_->GetSceneDataDouble(key, defaultVal) : defaultVal;
+}
+
+bool BaseScene::GetSceneDataBool(const std::string &key, bool defaultVal) const
+{
+	return sceneManager_ ? sceneManager_->GetSceneDataBool(key, defaultVal) : defaultVal;
+}
+
+std::string BaseScene::GetSceneDataString(const std::string &key, const std::string &defaultVal) const
+{
+	return sceneManager_ ? sceneManager_->GetSceneDataString(key, defaultVal) : defaultVal;
+}
+
+bool BaseScene::HasSceneData(const std::string &key) const
+{
+	return sceneManager_ ? sceneManager_->HasSceneData(key) : false;
+}
+
+void BaseScene::RemoveSceneData(const std::string &key)
+{
+	if (sceneManager_) {
+		sceneManager_->RemoveSceneData(key);
+	}
+}
+
+void BaseScene::ClearAllSceneData()
+{
+	if (sceneManager_) {
+		sceneManager_->ClearAllSceneData();
+	}
 }

@@ -10,6 +10,9 @@
 #include <unordered_map>
 #include <vector>
 
+#include <any>
+#include <type_traits>
+
 class DirectXCom;
 class Camera;
 class Object3dCom;
@@ -134,31 +137,102 @@ public:
     // 現在のシーンを即座に再起動（F5リロード等）
     void RestartCurrentScene() { ChangeScene(currentSceneName_); }
 
+    // =========================================================================
     // シーン間データ共有（Scene Context）
-    void SetSceneData(const std::string& key, const std::string& value) { sceneContextData_[key] = value; }
-    void SetSceneDataInt(const std::string& key, int value) { sceneContextData_[key] = std::to_string(value); }
-    void SetSceneDataFloat(const std::string& key, float value) { sceneContextData_[key] = std::to_string(value); }
+    // 基本型（int, float, bool等）はもちろん、任意の構造体やクラスも受け渡し可能
+    // =========================================================================
 
+    /// @brief 任意の型 T のデータを保存します（スコア構造体など）
+    template <typename T>
+    void SetSceneData(const std::string& key, const T& value)
+    {
+        sceneAnyData_[key] = value;
+        if constexpr (std::is_same_v<T, std::string>) {
+            sceneContextData_[key] = value;
+        } else if constexpr (std::is_same_v<T, const char*>) {
+            sceneContextData_[key] = std::string(value);
+        } else if constexpr (std::is_same_v<T, bool>) {
+            sceneContextData_[key] = value ? "true" : "false";
+        } else if constexpr (std::is_arithmetic_v<T>) {
+            sceneContextData_[key] = std::to_string(value);
+        }
+    }
+
+    /// @brief 文字列リテラル専用オーバーロード
+    void SetSceneData(const std::string& key, const char* value)
+    {
+        SetSceneData<std::string>(key, std::string(value));
+    }
+
+    /// @brief 直感的な基本型オーバーロード
+    void SetSceneDataInt(const std::string& key, int value) { SetSceneData<int>(key, value); }
+    void SetSceneDataFloat(const std::string& key, float value) { SetSceneData<float>(key, value); }
+    void SetSceneDataDouble(const std::string& key, double value) { SetSceneData<double>(key, value); }
+    void SetSceneDataBool(const std::string& key, bool value) { SetSceneData<bool>(key, value); }
+    void SetSceneDataString(const std::string& key, const std::string& value) { SetSceneData<std::string>(key, value); }
+
+    /// @brief 任意の型 T のデータを取得します（型不一致時は文字列辞書からのフォールバックも実行）
+    template <typename T>
+    [[nodiscard]] T GetSceneData(const std::string& key, const T& defaultVal = T{}) const
+    {
+        // 1. any データから検索
+        auto itAny = sceneAnyData_.find(key);
+        if (itAny != sceneAnyData_.end()) {
+            try {
+                return std::any_cast<T>(itAny->second);
+            } catch (const std::bad_any_cast&) {
+                // 型不一致時は文字列辞書側を探索
+            }
+        }
+        // 2. 文字列データからの変換フォールバック
+        auto itStr = sceneContextData_.find(key);
+        if (itStr != sceneContextData_.end()) {
+            if constexpr (std::is_same_v<T, std::string>) {
+                return itStr->second;
+            } else if constexpr (std::is_same_v<T, int>) {
+                try { return std::stoi(itStr->second); } catch (...) {}
+            } else if constexpr (std::is_same_v<T, float>) {
+                try { return std::stof(itStr->second); } catch (...) {}
+            } else if constexpr (std::is_same_v<T, double>) {
+                try { return std::stod(itStr->second); } catch (...) {}
+            } else if constexpr (std::is_same_v<T, bool>) {
+                return (itStr->second == "1" || itStr->second == "true" || itStr->second == "TRUE");
+            }
+        }
+        return defaultVal;
+    }
+
+    /// @brief 文字列型取得（後方互換性用）
     [[nodiscard]] std::string GetSceneData(const std::string& key, const std::string& defaultVal = "") const
     {
-        auto it = sceneContextData_.find(key);
-        return it != sceneContextData_.end() ? it->second : defaultVal;
+        return GetSceneData<std::string>(key, defaultVal);
     }
-    [[nodiscard]] int GetSceneDataInt(const std::string& key, int defaultVal = 0) const
+
+    /// @brief 直感的な基本型ゲッター
+    [[nodiscard]] int         GetSceneDataInt(const std::string& key, int defaultVal = 0) const { return GetSceneData<int>(key, defaultVal); }
+    [[nodiscard]] float       GetSceneDataFloat(const std::string& key, float defaultVal = 0.0f) const { return GetSceneData<float>(key, defaultVal); }
+    [[nodiscard]] double      GetSceneDataDouble(const std::string& key, double defaultVal = 0.0) const { return GetSceneData<double>(key, defaultVal); }
+    [[nodiscard]] bool        GetSceneDataBool(const std::string& key, bool defaultVal = false) const { return GetSceneData<bool>(key, defaultVal); }
+    [[nodiscard]] std::string GetSceneDataString(const std::string& key, const std::string& defaultVal = "") const { return GetSceneData<std::string>(key, defaultVal); }
+
+    /// @brief データが存在するか確認
+    [[nodiscard]] bool HasSceneData(const std::string& key) const
     {
-        auto it = sceneContextData_.find(key);
-        if (it != sceneContextData_.end()) {
-            try { return std::stoi(it->second); } catch (...) {}
-        }
-        return defaultVal;
+        return (sceneAnyData_.find(key) != sceneAnyData_.end() || sceneContextData_.find(key) != sceneContextData_.end());
     }
-    [[nodiscard]] float GetSceneDataFloat(const std::string& key, float defaultVal = 0.0f) const
+
+    /// @brief 特定のキーのデータを削除
+    void RemoveSceneData(const std::string& key)
     {
-        auto it = sceneContextData_.find(key);
-        if (it != sceneContextData_.end()) {
-            try { return std::stof(it->second); } catch (...) {}
-        }
-        return defaultVal;
+        sceneAnyData_.erase(key);
+        sceneContextData_.erase(key);
+    }
+
+    /// @brief 全てのシーン共有データをクリア
+    void ClearAllSceneData()
+    {
+        sceneAnyData_.clear();
+        sceneContextData_.clear();
     }
 
     // ImGui によるシーン切り替えデバッグUI
@@ -197,6 +271,7 @@ private:
     Fade*                fadeApplication_     = nullptr;
 
     std::unordered_map<std::string, std::string> sceneContextData_;
+    std::unordered_map<std::string, std::any>    sceneAnyData_;
 
     bool isSceneTransitioning_       = false;
     bool hasSwitchedSceneDuringFade_ = false;
@@ -207,3 +282,18 @@ private:
 /// @brief アプリケーション側で簡単にシーンを登録できるマクロ
 #define REGISTER_SCENE(SceneClass, SceneName) \
     SceneManager::GetInstance()->RegisterScene<SceneClass>(SceneName)
+
+// BaseScene テンプレートメソッドのインライン実装
+template <typename T>
+inline void BaseScene::SetSceneData(const std::string &key, const T &value)
+{
+    if (sceneManager_) {
+        sceneManager_->SetSceneData<T>(key, value);
+    }
+}
+
+template <typename T>
+inline T BaseScene::GetSceneData(const std::string &key, const T &defaultVal) const
+{
+    return sceneManager_ ? sceneManager_->GetSceneData<T>(key, defaultVal) : defaultVal;
+}
