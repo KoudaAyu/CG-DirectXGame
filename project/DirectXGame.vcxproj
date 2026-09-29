@@ -473,7 +473,6 @@
     </Link>
     <PostBuildEvent>
       <Command>if not exist "$(TargetDir)" mkdir "$(TargetDir)"
->>>>>>> GE3_Game
 xcopy /y /d "$(ProjectDir)externals\dxc\*.dll" "$(OutDir)"</Command>
     </PostBuildEvent>
     <Manifest>
