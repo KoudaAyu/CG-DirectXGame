@@ -107,7 +107,7 @@ void GameOverScene::Update()
 	int rMin = static_cast<int>(stats.raidTime) / 60;
 	int rSec = static_cast<int>(stats.raidTime) % 60;
 
-	// --- 📊 損害レポートグリッド (幅 640px / 高さ 250px) ---
+	// 損害レポートグリッド
 	float gridX = winPos.x + 40.0f;
 	float gridY = winPos.y + 110.0f;
 	float gridW = panelW - 80.0f;

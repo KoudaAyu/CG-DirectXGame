@@ -55,11 +55,11 @@ public:
 	void EmitMuzzleFlare(std::mt19937& randomEngine, const Vector3& position, float scale, const Vector4& color, float lifeTime, uint32_t textureIndex);
 	void EmitDeathFlash(std::mt19937& randomEngine, const Vector3& position, float scale, const Vector4& color, float lifeTime, uint32_t textureIndex);
 
-	// --- 💥 大迫力GPUインスタンシング撃破爆散パーティクル ---
+	// 撃破時の爆散パーティクル（GPUインスタンシング）
 	void EmitEnemyDestroyGPUBurst(std::mt19937& randomEngine, const Vector3& position, const Vector3& hitDirection, uint32_t particleTexIndex, uint32_t flashTexIndex, uint32_t smokeTexIndex);
 	void EmitTargetDestroyGPUBurst(std::mt19937& randomEngine, const Vector3& position, uint32_t particleTexIndex, uint32_t flashTexIndex, uint32_t smokeTexIndex);
 
-	// --- 🏃 プレイヤーアクション＆環境GPUパーティクル ---
+	// プレイヤーアクション & 環境GPUパーティクル
 	void EmitDodgeRollDust(std::mt19937& randomEngine, const Vector3& position, const Vector3& moveDirection, uint32_t smokeTexIndex);
 	void EmitFootstepDust(std::mt19937& randomEngine, const Vector3& position, uint32_t smokeTexIndex);
 	void EmitRicochetSparks(std::mt19937& randomEngine, const Vector3& hitPoint, const Vector3& hitNormal, uint32_t sparkTexIndex, uint32_t smokeTexIndex);

@@ -1,6 +1,6 @@
 #pragma once
 
-#include"AbstractSceneFactory.h"
+#include "AbstractSceneFactory.h"
 #include <memory>
 
 class Game;
@@ -8,20 +8,14 @@ class Game;
 class Framework
 {
 public:
-
 	virtual ~Framework();
 
 	virtual void Initialize();
-
 	virtual void Finalize();
-
 	virtual void Update();
-
 	virtual void Draw() = 0;
 
 	virtual bool IsEndRequest() { return endRequest; }
-
-	
 	virtual bool IsQuitRequested() { return false; }
 
 	void Run();
@@ -37,4 +31,3 @@ private:
 	// シーンファクトリー
 	std::unique_ptr<AbstractSceneFactory> sceneFactory_;
 };
-

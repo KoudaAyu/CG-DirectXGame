@@ -95,7 +95,7 @@ void ClearScene::Update()
 	int rMin = static_cast<int>(stats.raidTime) / 60;
 	int rSec = static_cast<int>(stats.raidTime) % 60;
 
-	// --- 📊 戦績グリッドパネル (幅 640px / 高さ 230px) ---
+	// 戦績グリッドパネル
 	float gridX = winPos.x + 40.0f;
 	float gridY = winPos.y + 110.0f;
 	float gridW = panelW - 80.0f;
@@ -136,7 +136,7 @@ void ClearScene::Update()
 	sprintf_s(buf, "💰  EXTRACTED LOOT VALUE:  +$%d ROUBLES (SECURED IN STASH)", stats.totalLootValue);
 	dl->AddText(ImVec2(gridX + 24.0f, rowY), IM_COL32(255, 220, 40, 255), buf);
 
-	// --- 🖼️ 回収物資イラストギャラリー (4つのアイテムアイコンを並べて表示) ---
+	// 回収物資アイコンギャラリー
 	uint32_t iconDuck = TextureManager::GetInstance()->Load("Resources/item_gold_duck.jpg");
 	uint32_t iconMed = TextureManager::GetInstance()->Load("Resources/item_medkit.jpg");
 	uint32_t iconAmmo = TextureManager::GetInstance()->Load("Resources/item_ammo.jpg");

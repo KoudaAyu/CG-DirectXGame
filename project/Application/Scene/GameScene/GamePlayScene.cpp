@@ -62,7 +62,7 @@ void GamePlayScene::InitializeScene()
 	particleManager = GetParticleManager();
 	appParticleManager_ = std::make_unique<AppParticleManager>();
 	appParticleManager_->Initialize(particleManager);
-	// 📷 カメラの初期化（Escape from Duckov 斜め45度トップダウン見下ろし視点）
+	// カメラの初期化（斜め45度トップダウン見下ろし視点）
 	if (camera_)
 	{
 		camera_->SetTranslate(Vector3{ 0.0f, 20.0f, -20.0f });
@@ -142,10 +142,10 @@ void GamePlayScene::InitializeEnvironment()
 	isGameCleared_ = false;
 	extractionTimer_ = kExtractionMaxTime;
 
-	// --- ✨ LevelEditorはImGui編集UI用に初期化のみ（DrawはInitializeObstacles側で一括処理するため二重ロード不要）---
+	// LevelEditorはImGui編集UI用に初期化のみ（描画はInitializeObstaclesで一括処理）
 	levelEditor_ = std::make_unique<LevelEditor>();
 	levelEditor_->Initialize(directXCom, object3dCom);
-	// levelEditor_->LoadFromFile("Resources/stage_layout.json"); // InitializeObstaclesと二重GPUバッファ作成になるため無効化
+	// InitializeObstaclesでステージレイアウトを読み込むため、ここではロード不要
 }
 
 void GamePlayScene::InitializeCharacters()
@@ -1626,7 +1626,7 @@ void GamePlayScene::InitializeObstacles()
 		targets_.push_back(std::move(t3));
 	}
 
-	// --- 📜 8/31 チュートリアル用看板 (TutorialSign) の完全配置 ---
+	// チュートリアル用看板の配置
 	tutorialSigns_.clear();
 	{
 		// 看板1: 初期位置（基本移動＆回避ローリング）
@@ -1713,7 +1713,7 @@ void GamePlayScene::Draw(SceneRenderRequests& renderRequests)
 	// Draw Skybox
 	SceneManager::GetInstance()->DrawSkybox(ctx.commandList);
 
-	// --- ✨ レベルエディタの重複描画を防止し、obstacles_側の本物モデル(コンテナ・フェンス)のみを描画 ---
+	// レベルエディタの重複描画を防止（obstacles_側のモデルのみ描画）
 	// if (levelEditor_)
 	// {
 	// 	levelEditor_->Draw(renderRequests);
