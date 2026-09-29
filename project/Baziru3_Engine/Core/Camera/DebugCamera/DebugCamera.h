@@ -1,39 +1,53 @@
 #pragma once
-#include"KeyInput.h"
-#include"Matrix4x4.h"
+#include "Camera.h"
+#include "KeyInput.h"
+#include "Matrix4x4.h"
 #include "Vector.h"
 
-class DebugCamera
+class WindowAPI;
+class DirectXCom;
+
+/// <summary>
+/// デバッグ用自由移動カメラ。
+/// 
+/// 【オブジェクト指向：ポリモーフィズム（派生クラス）】
+/// ・基底クラス Camera を継承し、Update() メソッドをオーバーライド。
+/// ・キーボード操作（WASD、矢印キー）による自由な視点移動・回転制御を実装。
+/// ・Camera* 型のポインタとして扱えるため、通常カメラとデバッグカメラを
+///   呼び出し側のコードを変更することなくポリモーフィックに切り替え可能。
+/// </summary>
+class DebugCamera : public Camera
 {
 public: 
-	void Initialize(WindowAPI* windowAPI);
+	DebugCamera() = default;
+	~DebugCamera() override = default;
 
-	void Update();
+	/// <summary>
+	/// デバッグカメラの初期化
+	/// </summary>
+	/// <param name="windowAPI">ウィンドウ管理ポインタ</param>
+	/// <param name="dxCommon">DirectX管理ポインタ（GPU定数バッファ割り当て用、省略可）</param>
+	void Initialize(WindowAPI* windowAPI, DirectXCom* dxCommon = nullptr);
 
-	const Matrix4x4& GetViewMatrix() const { return view_matrix_; }
-	const Matrix4x4& GetProjectionMatrix() const { return projection_matrix_; }
+	/// <summary>
+	/// カメラ状態の更新（キー入力による移動・回転の反映）
+	/// 【ポリモーフィズム】基底クラス Camera::Update() をオーバーライド
+	/// </summary>
+	void Update() override;
+
+	// --- 既存コードとの互換性のためのエイリアス ---
+	const Matrix4x4& GetViewMatrix() const { return viewMatrix_; }
+	const Matrix4x4& GetProjectionMatrix() const { return projectionMatrix_; }
 
 private:
+	WindowAPI* windowAPI_ = nullptr;
 
-	WindowAPI* windowAPI = nullptr;
+	// デバッグ用累積回転行列
+	Matrix4x4 matRot_ = {};
 
-	Vector3 rotation_ = { 0.0f,0.0f,0.0f };
-	Vector3 translation_ = { 0.0f,0.0f,-50.0f };
-
-	//ビュー行列
-	Matrix4x4 view_matrix_ = {};
-	//射影行列
-	Matrix4x4 projection_matrix_ = {};
-
-	//累積回転行列
-	Matrix4x4 matRot_;
-
+	// デバッグ専用キー入力
 	KeyInput keyInput_;
 
-	const float speed = 0.1f;
-
-	float fovY = 0.45f;  // 資料通り
-	float aspectRatio = static_cast<float>(1280) / static_cast<float>(720);
-	float nearZ = 0.1f;
-	float farZ = 100.0f;
+	// カメラ移動速度
+	const float speed_ = 0.1f;
 };
