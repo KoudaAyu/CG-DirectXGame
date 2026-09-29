@@ -126,7 +126,7 @@
     <ClCompile Include="externals\imgui-node-editor\imgui_node_editor_api.cpp" />
     <ClCompile Include="externals\imgui-node-editor\imgui_canvas.cpp" />
     <ClCompile Include="externals\imgui-node-editor\crude_json.cpp" />
-
+    <ClCompile Include="Baziru3_Engine\Framework\Command\CommandManager.cpp" />
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="Resources\shaders\InitializeParticle.CS.hlsl">
@@ -304,6 +304,7 @@
     <ClInclude Include="Application\GameObject\Bullet.h" />
     <ClInclude Include="Baziru3_Engine\Framework\Framework.h" />
     <ClInclude Include="Baziru3_Engine\Core\Base\EngineAssert.h" />
+    <ClInclude Include="Baziru3_Engine\Core\Base\ObjectPool.h" />
     <ClInclude Include="Baziru3_Engine\Core\Base\EngineContext.h" />
     <ClInclude Include="Game.h" />
     <ClInclude Include="Application\Scene\GameScene\GamePlayScene.h" />
@@ -318,6 +319,8 @@
     <ClInclude Include="Baziru3_Engine\Graphics\3D\Model\Model.h" />
     <ClInclude Include="Baziru3_Engine\Graphics\3D\Model\ModelCom.h" />
     <ClInclude Include="Baziru3_Engine\Graphics\3D\Model\ModelManager.h" />
+    <ClInclude Include="Baziru3_Engine\Framework\Command\ICommand.h" />
+    <ClInclude Include="Baziru3_Engine\Framework\Command\CommandManager.h" />
     <ClInclude Include="Baziru3_Engine\Framework\Scene\Factory\SceneFactory.h" />
     <ClInclude Include="Baziru3_Engine\Framework\Scene\Manager\SceneManager.h" />
     <ClInclude Include="Baziru3_Engine\Framework\Scene\Factory\SceneRegistration.h" />
