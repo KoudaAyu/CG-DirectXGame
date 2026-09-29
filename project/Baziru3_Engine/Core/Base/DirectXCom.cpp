@@ -18,7 +18,7 @@
 #include"ImGuiManager.h"
 #include "Baziru3_Engine/Core/Base/Allocator/ConstantBufferAllocator.h"
 #include "Baziru3_Engine/Core/Base/Allocator/StackAllocator.h"
-#include "Baziru3_Engine/Graphics/Graphics/GpuProfiler.h"
+#include "GpuProfiler.h"
 
 using namespace Microsoft::WRL;
 

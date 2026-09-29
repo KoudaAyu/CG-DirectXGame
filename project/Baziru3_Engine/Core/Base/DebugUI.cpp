@@ -9,7 +9,7 @@
 #include "ParticleManager.h"
 #include "Application/Scene/GameScene/GamePlayScene.h"
 #include "BehaviorTreeEditor.h"
-#include "Baziru3_Engine/Graphics/Graphics/GpuProfiler.h"
+#include "GpuProfiler.h"
 #include "Baziru3_Engine/Framework/Collision/CollisionManager.h"
 #include "Baziru3_Engine/Core/Base/Allocator/ConstantBufferAllocator.h"
 #include "Baziru3_Engine/Core/Base/Allocator/StackAllocator.h"
