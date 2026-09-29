@@ -51,6 +51,11 @@ public:
 
   bool IsQuitRequested() override;
 
+  /// <summary>
+  /// ウィンドウメッセージ処理（EngineContext経由でカプセル化）
+  /// </summary>
+  bool ProcessMessage() override;
+
   // 初期化関係
   bool InitializeEngine();
 
@@ -60,24 +65,20 @@ public:
   void LogEngineDiagnostics();
 
   /// <summary>
-  /// SceneManagerに渡す基盤オブジェクトを用意する部分
-  /// </summary>
-  void InitializeSceneCore();
-
-  /// <summary>
-  /// 描画に必要な共通リソースを作る
+  /// 描画に必要な共通リソース（サンプルのPlane等）を作る
   /// </summary>
   void InitializeModelResources();
 
-  void InitializeSceneResources();
-
-  /// <summary>
-  /// 音声、入力系の初期化
-  /// </summary>
-  void InitializeAudioAndInput();
-
 public:
   std::ostream &logStream = log.GetLogStream();
+
+  /// <summary>
+  /// 【カプセル化】EngineContextへのアクセサ
+  /// </summary>
+  EngineContext *GetEngineContext() { return engine_.get(); }
+  const EngineContext *GetEngineContext() const { return engine_.get(); }
+
+  // --- 後方互換アクセサ（EngineContextに委譲） ---
   DirectXCom *GetDirectXCom() {
     return engine_ ? engine_->GetDirectXCom() : nullptr;
   }
@@ -87,11 +88,17 @@ public:
 
   Object3d *GetObject3d() { return object3d_.get(); }
   const Object3d *GetObject3d() const { return object3d_.get(); }
-  Object3dCom *GetObject3dCom() { return object3dCom.get(); }
-  const Object3dCom *GetObject3dCom() const { return object3dCom.get(); }
-  ParticleManager *GetParticleManager() { return particleManager.get(); }
+  Object3dCom *GetObject3dCom() {
+    return engine_ ? engine_->GetObject3dCom() : nullptr;
+  }
+  const Object3dCom *GetObject3dCom() const {
+    return engine_ ? engine_->GetObject3dCom() : nullptr;
+  }
+  ParticleManager *GetParticleManager() {
+    return engine_ ? engine_->GetParticleManager() : nullptr;
+  }
   const ParticleManager *GetParticleManager() const {
-    return particleManager.get();
+    return engine_ ? engine_->GetParticleManager() : nullptr;
   }
 
 private:
@@ -101,38 +108,24 @@ private:
 
 private:
   ResourceLeakCheck leakChecker; // リソースリークチェック用のオブジェクト
-  CrashDump crashDump; // クラッシュダンプ生成用のオブジェクト
+  CrashDump crashDump;           // クラッシュダンプ生成用のオブジェクト
   Log log;
 
-  std::unique_ptr<Camera> camera_;
+  // 【カプセル化】エンジン全サブシステム（DirectX12, 入力, 音声, カメラ, 描画基盤）を保持する司令塔
   std::unique_ptr<EngineContext> engine_;
-  std::unique_ptr<ImGuiManager> imguiManager;
-  std::unique_ptr<Light> light;
+
+  // ゲーム固有・デバッグ固有オブジェクト
+  DebugCamera debugCamera_;
+  std::unique_ptr<DebugUI> debugUI;
   std::unique_ptr<Model> model_;
   std::unique_ptr<ModelCom> modelCom_;
   std::unique_ptr<Object3d> object3d_;
-  std::unique_ptr<Object3dCom> object3dCom;
-  std::unique_ptr<SkinningObject3dCom> skinningObject3dCom;
-  std::unique_ptr<OffScreenRendering> offScreenRendering_;
-  std::unique_ptr<ParticleManager> particleManager;
+
   ParticleRenderer particleRenderer_;
   SphereRenderer sphereRenderer_;
-  std::unique_ptr<SkyBox> skybox_;
-  std::unique_ptr<SkyboxCom> skyboxCom_;
-
-  DebugCamera debugCamera_;
-
-  KeyInput inputManager;
-  // Mouse input for cursor sprite
-  MouseInput mouseInput;
-  std::unique_ptr<AudioManager> audioManager_;
-  std::unique_ptr<MaterialManager> materialManager_;
-  std::unique_ptr<DebugUI> debugUI; // debug UI
-  std::unique_ptr<Fade> fadeApplication_;
 
 private:
   std::vector<std::unique_ptr<Sprite>> sprites;
-  // index of cursor sprite in sprites vector, -1 if none
   int cursorSpriteIndex = -1;
   Sprite::Transform transformObject;
 

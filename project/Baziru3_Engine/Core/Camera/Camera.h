@@ -38,14 +38,15 @@ struct Frustum {
 
 class DirectXCom;
 
+// カメラの基底クラス（DebugCameraなどの親クラス）
 class Camera {
 public:
   Camera();
-  void Update();
+  virtual ~Camera() = default;
 
-  void Initialize(DirectXCom *directXCom);
-
-  void Finalize();
+  virtual void Initialize(DirectXCom *directXCom);
+  virtual void Update();
+  virtual void Finalize();
 
 public:
   const Matrix4x4 &GetWorldMatrix() const { return worldMatrix_; }
@@ -83,13 +84,16 @@ public:
   }
   bool IsShaking() const { return shakeTimer_ > 0.0f; }
 
-  // Access to GPU-side camera virtual address
+  // GPU側カメラ定数バッファのアドレス取得
   D3D12_GPU_VIRTUAL_ADDRESS GetCameraGpuAddress() const {
     return cameraGpuAddress_;
   }
 
-private:
+protected:
+  // 視錐台の更新
   void UpdateFrustum();
+  // GPU定数バッファの更新
+  void UpdateGPUBuffer(const Vector3& worldPos);
 
   Frustum frustum_;
   Transform transform_;
@@ -99,9 +103,7 @@ private:
   Vector3 translation_ = {0.0f, 0.0f, 0.0f};
   Matrix4x4 worldMatrix_{};
   Matrix4x4 viewMatrix_{};
-
   Matrix4x4 projectionMatrix_{};
-
   Matrix4x4 viewProjectionMatrix_{};
 
   // 水平方向視野角

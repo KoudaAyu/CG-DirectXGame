@@ -54,8 +54,7 @@ void Camera::Update() {
 
   viewProjectionMatrix_ = Multiply(viewMatrix_, projectionMatrix_);
   UpdateFrustum();
-
-  cameraData_.worldPosition = finalTranslate;
+  UpdateGPUBuffer(finalTranslate);
 
   DirectXCom* dx = directXCom_;
   if (!dx) {

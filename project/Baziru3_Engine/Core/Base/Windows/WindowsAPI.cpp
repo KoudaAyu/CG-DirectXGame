@@ -93,5 +93,21 @@ void WindowAPI::Finalize()
 
 bool WindowAPI::ProcessMessage()
 {
-	return false;
+	// Windowsのメッセージキューからメッセージを取得・処理する
+	// 【カプセル化の目的】
+	// Win32 API固有の PeekMessage / MSG 構造体をエンジン内部に隠蔽し、
+	// アプリケーション側（Framework/Game）が「終了要求があるかどうか」だけを bool で安全に受け取れるようにする。
+	MSG msg{};
+	while (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
+	{
+		TranslateMessage(&msg);
+		DispatchMessage(&msg);
+
+		if (msg.message == WM_QUIT)
+		{
+			return true; // アプリケーション終了要求を受信
+		}
+	}
+	return false; // ゲームループ継続
 }
+

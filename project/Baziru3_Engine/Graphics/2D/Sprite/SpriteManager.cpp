@@ -1,6 +1,6 @@
 #include "SpriteManager.h"
 #include "Log.h"
-#include "DebugCamera.h"
+#include "Camera.h"
 #include "SpriteCom.h"
 #include "WindowsAPI.h"
 #include "Light.h"
@@ -56,7 +56,7 @@ void SpriteManager::Draw()
     DrawAll(buildCtx, nullptr, nullptr);
 }
 
-void SpriteManager::DrawAll(const RenderContext& ctx, DebugCamera* debugCamera, const std::vector<std::unique_ptr<Sprite>>* externalSprites)
+void SpriteManager::DrawAll(const RenderContext& ctx, Camera* camera, const std::vector<std::unique_ptr<Sprite>>* externalSprites)
 {
     if (!ctx.GetRawCommandList())
     {
@@ -84,7 +84,7 @@ void SpriteManager::DrawAll(const RenderContext& ctx, DebugCamera* debugCamera, 
     }
 }
 
-void SpriteManager::DrawAll(DebugCamera* debugCamera, const std::vector<std::unique_ptr<Sprite>>* externalSprites)
+void SpriteManager::DrawAll(Camera* camera, const std::vector<std::unique_ptr<Sprite>>* externalSprites)
 {
     if (!spriteCom_) return;
     DirectXCom* dx = spriteCom_->GetDxCommon();
@@ -97,7 +97,7 @@ void SpriteManager::DrawAll(DebugCamera* debugCamera, const std::vector<std::uni
     ctx.light = SceneManager::GetInstance()->GetLight();
     ctx.materialGPUAddress = 0;
 
-    DrawAll(ctx, debugCamera, externalSprites);
+    DrawAll(ctx, camera, externalSprites);
 }
 
 std::vector<std::unique_ptr<Sprite>>& SpriteManager::GetSprites()
