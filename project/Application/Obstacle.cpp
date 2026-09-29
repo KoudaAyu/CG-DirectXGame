@@ -168,12 +168,12 @@ void Obstacle::Initialize(Object3dCom* object3dCom, Camera* camera, const Vector
     }
     else if (filename.find("bridge") != std::string::npos || filename.find("Bridge") != std::string::npos)
     {
-        // 橋：中央の通路（幅2.4m）はプレイヤーが自由に渡れるよう開放し、左右の欄干（X = -1.35 と +1.35）のみに薄いコライダーを配置
+        // 橋：中央の通路（幅2.6m）はプレイヤーが自由に渡れるよう開放し、左右の欄干（X = -1.40 と +1.40）のみに薄いコライダーを配置
         rot1_ = rotation_;
 
-        Vector3 railingSize = { 0.35f * scale.x * radius_, 1.0f * scale.y * radius_, 8.0f * scale.z * radius_ };
-        Vector3 leftRailingOffset = { -1.35f * scale.x * radius_, 0.5f * scale.y * radius_, 0.0f };
-        Vector3 rightRailingOffset = { 1.35f * scale.x * radius_, 0.5f * scale.y * radius_, 0.0f };
+        Vector3 railingSize = { 0.20f * scale.x * radius_, 1.0f * scale.y * radius_, 8.0f * scale.z * radius_ };
+        Vector3 leftRailingOffset = { -1.40f * scale.x * radius_, 0.5f * scale.y * radius_, 0.0f };
+        Vector3 rightRailingOffset = { 1.40f * scale.x * radius_, 0.5f * scale.y * radius_, 0.0f };
 
         collider_ = std::make_unique<BoxCollider>(railingSize, &position_, &rot1_, CollisionAttribute::Obstacle);
         collider_->SetPositionOffset(leftRailingOffset);
@@ -187,13 +187,13 @@ void Obstacle::Initialize(Object3dCom* object3dCom, Camera* camera, const Vector
     else if (filename.find("river") != std::string::npos || filename.find("River") != std::string::npos ||
              filename.find("water") != std::string::npos)
     {
-        // 川：プレイヤーおよび敵が川へ直接侵入できないよう、橋の通路部分（X: -1.2m 〜 +1.2m）を除いた東西の水面全域に侵入不可コライダーを配置
+        // 川：プレイヤーおよび敵が川へ直接侵入できないよう、橋の通路部分（X: -1.35m 〜 +1.35m）を除いた東西の水面全域に侵入不可コライダーを配置
         rot1_ = rotation_;
 
         float riverHalfWidth = scale.x * 0.5f; // 例: 30.0m
-        float bridgeWalkwayHalfWidth = 1.2f;    // 橋の開放通路幅
-        float barrierWidth = (std::max)(1.0f, riverHalfWidth - bridgeWalkwayHalfWidth); // 28.8m
-        float barrierOffset = bridgeWalkwayHalfWidth + barrierWidth * 0.5f;             // 15.6m
+        float bridgeWalkwayHalfWidth = 1.35f;    // 橋の開放通路幅 (2.7m幅で余裕を持たせる)
+        float barrierWidth = (std::max)(1.0f, riverHalfWidth - bridgeWalkwayHalfWidth); // 28.65m
+        float barrierOffset = bridgeWalkwayHalfWidth + barrierWidth * 0.5f;
 
         Vector3 barrierSize = { barrierWidth, 2.0f, scale.z };
         Vector3 leftBarrierOffset = { -barrierOffset, 1.0f, 0.0f };
@@ -216,9 +216,10 @@ void Obstacle::Initialize(Object3dCom* object3dCom, Camera* camera, const Vector
     }
     else
     {
-        // 全モデル共通: 自動算出された精密なAABBサイズとオフセットでBoxColliderを生成
+        // 全モデル共通: 通路での引っ掛かりを防止するため実寸よりわずかにスリム(0.90倍)なBoxColliderを生成
         rot1_ = rotation_;
-        collider_ = std::make_unique<BoxCollider>(boxSize, &position_, &rotation_, CollisionAttribute::Obstacle);
+        Vector3 snugBoxSize = { boxSize.x * 0.90f, boxSize.y, boxSize.z * 0.90f };
+        collider_ = std::make_unique<BoxCollider>(snugBoxSize, &position_, &rotation_, CollisionAttribute::Obstacle);
         collider_->SetPositionOffset(centerOffset);
         CollisionManager::GetInstance()->RegisterCollider(collider_.get());
     }

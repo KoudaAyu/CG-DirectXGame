@@ -226,26 +226,24 @@ void CollisionManager::Update()
                     volumeCompXZ = 1.0f / std::sqrt(std::abs(normY));
                 }
 
-                // 軟体・液体（Player/Minion）メッシュ特有のSag・接地偏平係数を自動適用
-                bool isSoftBody = (sphere->GetAttribute() == CollisionAttribute::Player || sphere->GetAttribute() == CollisionAttribute::Minion);
+                // 軟体・液体（Minion/SoftBody）メッシュ特有のSag・接地偏平係数
+                bool isSoftBody = (sphere->GetAttribute() == CollisionAttribute::Minion);
                 if (isSoftBody)
                 {
                     // シェーダー(Slime.VS.hlsl)のSagFactor + 接地偏平 + 黒いアウトライン外周に100%一致する包絡楕円体
                     Vector3 slimeScale = { 1.56f, 0.88f, 1.56f };
                     sphere->SetRadius(maxS);
                     sphere->SetScale(slimeScale);
-                    sphere->SetPositionOffset({ 0.0f, 0.02f * maxS, 0.0f });
                 }
                 else
                 {
                     Vector3 deformedRatio = {
-                        (s.x / maxS) * volumeCompXZ,
+                        (volumeCompXZ > 0.0f) ? std::abs(s.x) * volumeCompXZ : std::abs(s.x),
                         normY,
-                        (s.z / maxS) * volumeCompXZ
+                        (volumeCompXZ > 0.0f) ? std::abs(s.z) * volumeCompXZ : std::abs(s.z)
                     };
                     sphere->SetRadius(maxS);
                     sphere->SetScale(deformedRatio);
-                    sphere->SetPositionOffset({ 0.0f, 0.0f, 0.0f });
                 }
             }
             sphere->SetRotation(bestObj->GetRotate());
@@ -272,16 +270,6 @@ void CollisionManager::Update()
         data.attribute = col->GetAttribute();
         data.worldPosition = col->GetWorldPosition(); // 仮想関数とポインタ逆参照をここで一度だけ評価してフラット化
         data.isTrigger = col->IsTrigger();
-
-        // アプリ側で Player 属性として登録されている半径小のコライダーを Minion として自動分類
-        if (data.attribute == CollisionAttribute::Player && data.type == ColliderType::Sphere)
-        {
-            SphereCollider* sphere = static_cast<SphereCollider*>(col);
-            if (sphere->GetRadius() <= 0.45f)
-            {
-                data.attribute = CollisionAttribute::Minion;
-            }
-        }
 
         // 形状ごとの固有データを事前に取得して詰め込む
         if (data.type == ColliderType::Sphere)

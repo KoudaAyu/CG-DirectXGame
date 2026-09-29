@@ -47,7 +47,7 @@ namespace GameConfig
         constexpr float kDefaultMaxHp                  = 100.0f;
         constexpr float kDefaultMaxStamina             = 100.0f;
         constexpr float kMoveSpeed                     = 0.05f;  // 通常移動速度
-        constexpr float kColliderRadius                = 0.55f;  // 衝突判定球半径
+        constexpr float kColliderRadius                = 0.38f;  // 衝突判定球半径 (通路通行をスムーズ化)
         constexpr float kStaminaRegenRate              = 15.0f;  // 毎秒スタミナ回復量
 
         // 回避ローリング (Dodge Roll)
@@ -98,7 +98,7 @@ namespace GameConfig
         // ダメージ & ヒット判定
         constexpr float kEnemyBulletDamage             = 10.0f;  // 敵の射撃ダメージ
         constexpr float kContactDamage                 = 20.0f;  // 敵接触ダメージ
-        constexpr float kPlayerHitRadius               = 0.6f;   // プレイヤー当たり判定半径
-        constexpr float kEnemyHitRadius                = 0.6f;   // 敵当たり判定半径
+        constexpr float kPlayerHitRadius               = 0.40f;  // プレイヤー当たり判定半径
+        constexpr float kEnemyHitRadius                = 0.45f;  // 敵当たり判定半径
     }
 }
