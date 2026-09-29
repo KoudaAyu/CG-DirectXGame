@@ -155,26 +155,99 @@ void GamePlayScene::InitializeCharacters()
 		player_ = std::make_unique<Player>();
 		player_->Initialize(object3dCom, camera_);
 	}
+}
 
-	if (!enemy_)
+Enemy* GamePlayScene::SpawnEnemy(const Vector3& position, bool isPatrol)
+{
+	if (!object3dCom || !camera_) return nullptr;
+
+	std::unique_ptr<Enemy> newEnemy;
+	SpriteCom* sc = spriteCom ? spriteCom : (SceneManager::GetInstance() ? SceneManager::GetInstance()->GetSpriteCom() : nullptr);
+
+	if (isPatrol)
 	{
-		enemy_ = std::make_unique<Enemy>();
-		enemy_->Initialize(object3dCom, camera_);
+		auto moving = std::make_unique<MovingEnemy>();
+		moving->Initialize(object3dCom, camera_);
+		moving->SetPosition(position);
+
+		// スプライン巡回ルート（敵のスポーン位置を基準に左右へCatmull-Rom）
+		std::vector<Vector3> patrolSpline = {
+			{ position.x - 7.0f, position.y, position.z - 1.0f },
+			{ position.x - 2.0f, position.y, position.z + 1.5f },
+			{ position.x + 2.0f, position.y, position.z - 0.5f },
+			{ position.x + 7.0f, position.y, position.z + 1.0f }
+		};
+		moving->SetPatrolPath(patrolSpline, false, 2.0f);
+
+		// アラート（！マーク）スプライト
+		if (sc)
+		{
+			Sprite::Transform defaultTransform = { {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f} };
+			auto alertBar = Sprite::Create(sc, defaultTransform, "Resources/CG4/human/white.png");
+			auto alertDot = Sprite::Create(sc, defaultTransform, "Resources/CG4/human/white.png");
+			if (alertBar && alertDot)
+			{
+				alertBar->SetAnchorPoint({ 0.5f, 1.0f });
+				alertDot->SetAnchorPoint({ 0.5f, 0.0f });
+				sprites.emplace_back(std::move(alertBar));
+				sprites.emplace_back(std::move(alertDot));
+				moving->SetAlertSprites(sprites[sprites.size() - 2].get(), sprites[sprites.size() - 1].get());
+			}
+		}
+
+		newEnemy = std::move(moving);
+	}
+	else
+	{
+		auto sentry = std::make_unique<Enemy>();
+		sentry->Initialize(object3dCom, camera_);
+		sentry->SetPosition(position);
+		newEnemy = std::move(sentry);
 	}
 
-	if (!movingEnemy_)
+	// HPバースプライトの付与
+	if (sc)
 	{
-		movingEnemy_ = std::make_unique<MovingEnemy>();
-		movingEnemy_->Initialize(object3dCom, camera_);
+		Sprite::Transform defaultTransform = { {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f} };
+		auto hpBg = Sprite::Create(sc, defaultTransform, "Resources/CG4/human/white.png");
+		auto hpFg = Sprite::Create(sc, defaultTransform, "Resources/CG4/human/white.png");
+		if (hpBg && hpFg)
+		{
+			hpBg->SetAnchorPoint({ 0.0f, 0.0f });
+			hpFg->SetAnchorPoint({ 0.0f, 0.0f });
+			sprites.emplace_back(std::move(hpBg));
+			sprites.emplace_back(std::move(hpFg));
+			newEnemy->SetHPBarSprites(sprites[sprites.size() - 2].get(), sprites[sprites.size() - 1].get());
+		}
+	}
 
-		// エンジン層のスプライン曲線等速移動システムを活用した戦術巡回ルート（敵陣地エリアを巡るCatmull-Rom曲線）
-		std::vector<Vector3> patrolSpline = {
-			{ -10.0f, 0.0f, 25.0f },
-			{  -3.0f, 0.0f, 27.5f },
-			{   3.0f, 0.0f, 25.5f },
-			{  10.0f, 0.0f, 27.0f }
-		};
-		movingEnemy_->SetPatrolPath(patrolSpline, false, 2.0f); // 往復PingPong巡回
+	Enemy* ret = newEnemy.get();
+	enemies_.push_back(std::move(newEnemy));
+	return ret;
+}
+
+void GamePlayScene::TriggerReinforcements()
+{
+	if (reinforcementTriggered_) return;
+	reinforcementTriggered_ = true;
+
+	// アラート演出
+	TriggerCameraShake(0.5f, 1.0f);
+	AddFloatingText(Vector3{ 0.0f, 3.0f, 20.0f }, "WARNING: HOSTILE REINFORCEMENTS INBOUND!", { 1.0f, 0.15f, 0.15f, 1.0f }, true);
+
+	// キャッシュされた増援スポーン位置、または脱出地点周辺からスポーン
+	if (!reinforceSpawnPoints_.empty())
+	{
+		for (const auto& sp : reinforceSpawnPoints_)
+		{
+			SpawnEnemy(sp, true);
+		}
+	}
+	else
+	{
+		// デフォルト増援（脱出地点の東西から挟撃）
+		SpawnEnemy({ -8.0f, 0.0f, 30.0f }, true);
+		SpawnEnemy({  8.0f, 0.0f, 32.0f }, false);
 	}
 }
 
@@ -214,48 +287,6 @@ void GamePlayScene::InitializeSprites()
 		cursor->SetAnchorPoint({ 0.5f, 0.5f });
 		sprites.emplace_back(std::move(cursor));
 		cursorSpriteIndex = static_cast<int>(sprites.size()) - 1;
-	}
-
-	auto hpBg = Sprite::Create(sc, defaultTransform, "Resources/CG4/human/white.png");
-	auto hpFg = Sprite::Create(sc, defaultTransform, "Resources/CG4/human/white.png");
-	if (hpBg && hpFg)
-	{
-		hpBg->SetAnchorPoint({ 0.0f, 0.0f });
-		hpFg->SetAnchorPoint({ 0.0f, 0.0f });
-		sprites.emplace_back(std::move(hpBg));
-		sprites.emplace_back(std::move(hpFg));
-		if (enemy_)
-		{
-			enemy_->SetHPBarSprites(sprites[sprites.size() - 2].get(), sprites[sprites.size() - 1].get());
-		}
-	}
-
-	auto mobBg = Sprite::Create(sc, defaultTransform, "Resources/CG4/human/white.png");
-	auto mobFg = Sprite::Create(sc, defaultTransform, "Resources/CG4/human/white.png");
-	if (mobBg && mobFg)
-	{
-		mobBg->SetAnchorPoint({ 0.0f, 0.0f });
-		mobFg->SetAnchorPoint({ 0.0f, 0.0f });
-		sprites.emplace_back(std::move(mobBg));
-		sprites.emplace_back(std::move(mobFg));
-		if (movingEnemy_)
-		{
-			movingEnemy_->SetHPBarSprites(sprites[sprites.size() - 2].get(), sprites[sprites.size() - 1].get());
-		}
-	}
-
-	auto alertBar = Sprite::Create(sc, defaultTransform, "Resources/CG4/human/white.png");
-	auto alertDot = Sprite::Create(sc, defaultTransform, "Resources/CG4/human/white.png");
-	if (alertBar && alertDot)
-	{
-		alertBar->SetAnchorPoint({ 0.5f, 1.0f }); // 下端中央
-		alertDot->SetAnchorPoint({ 0.5f, 0.0f }); // 上端中央
-		sprites.emplace_back(std::move(alertBar));
-		sprites.emplace_back(std::move(alertDot));
-		if (movingEnemy_)
-		{
-			movingEnemy_->SetAlertSprites(sprites[sprites.size() - 2].get(), sprites[sprites.size() - 1].get());
-		}
 	}
 
 	auto pBg = Sprite::Create(sc, defaultTransform, "Resources/CG4/human/white.png");
@@ -394,17 +425,14 @@ void GamePlayScene::Finalize()
 		player_.reset();
 	}
 
-	if (enemy_)
+	for (auto& enemy : enemies_)
 	{
-		enemy_->Finalize();
-		enemy_.reset();
+		if (enemy)
+		{
+			enemy->Finalize();
+		}
 	}
-
-	if (movingEnemy_)
-	{
-		movingEnemy_->Finalize();
-		movingEnemy_.reset();
-	}
+	enemies_.clear();
 
 	for (auto& obs : obstacles_)
 	{
@@ -770,24 +798,17 @@ void GamePlayScene::UpdateCharacters(float deltaTime)
 					playerSoundTimer_ = 0.4f; // Ring lasts for 0.4s
 					
 					Vector3 playerPos = player_->GetPosition();
-					if (enemy_ && !enemy_->IsDead())
+					for (auto& enemy : enemies_)
 					{
-						float dx = enemy_->GetPosition().x - playerPos.x;
-						float dz = enemy_->GetPosition().z - playerPos.z;
-						float dist = std::sqrt(dx * dx + dz * dz);
-						if (dist <= maxRad)
+						if (enemy && !enemy->IsDead())
 						{
-							enemy_->HearNoise(playerPos);
-						}
-					}
-					if (movingEnemy_ && !movingEnemy_->IsDead())
-					{
-						float dx = movingEnemy_->GetPosition().x - playerPos.x;
-						float dz = movingEnemy_->GetPosition().z - playerPos.z;
-						float dist = std::sqrt(dx * dx + dz * dz);
-						if (dist <= maxRad)
-						{
-							movingEnemy_->HearNoise(playerPos);
+							float dx = enemy->GetPosition().x - playerPos.x;
+							float dz = enemy->GetPosition().z - playerPos.z;
+							float dist = std::sqrt(dx * dx + dz * dz);
+							if (dist <= maxRad)
+							{
+								enemy->HearNoise(playerPos);
+							}
 						}
 					}
 					
@@ -859,24 +880,17 @@ void GamePlayScene::UpdateCharacters(float deltaTime)
 						playerSoundTimer_ = 0.25f; // Ring lasts for 0.25s
 						
 						Vector3 playerPos = player_->GetPosition();
-						if (enemy_ && !enemy_->IsDead())
+						for (auto& enemy : enemies_)
 						{
-							float dx = enemy_->GetPosition().x - playerPos.x;
-							float dz = enemy_->GetPosition().z - playerPos.z;
-							float dist = std::sqrt(dx * dx + dz * dz);
-							if (dist <= maxRad)
+							if (enemy && !enemy->IsDead())
 							{
-								enemy_->HearNoise(playerPos);
-							}
-						}
-						if (movingEnemy_ && !movingEnemy_->IsDead())
-						{
-							float dx = movingEnemy_->GetPosition().x - playerPos.x;
-							float dz = movingEnemy_->GetPosition().z - playerPos.z;
-							float dist = std::sqrt(dx * dx + dz * dz);
-							if (dist <= maxRad)
-							{
-								movingEnemy_->HearNoise(playerPos);
+								float dx = enemy->GetPosition().x - playerPos.x;
+								float dz = enemy->GetPosition().z - playerPos.z;
+								float dist = std::sqrt(dx * dx + dz * dz);
+								if (dist <= maxRad)
+								{
+									enemy->HearNoise(playerPos);
+								}
 							}
 						}
 					}
@@ -890,10 +904,6 @@ void GamePlayScene::UpdateCharacters(float deltaTime)
 	}
 
 	WindowAPI* windowAPI = directXCom ? directXCom->GetWindowAPI() : nullptr;
-	if (!enemy_)
-	{
-		return;
-	}
 
 	const Vector3* target = nullptr;
 	Vector3 playerPosTarget{};
@@ -920,23 +930,27 @@ void GamePlayScene::UpdateCharacters(float deltaTime)
 		player_->SetInCover(isPlayerInCover);
 	}
 
-	enemy_->Update(windowAPI, target, obstacles_, deltaTime, isPlayerInCover);
-
-	if (movingEnemy_)
+	// 全敵AIの更新
+	bool anyEnemyChasing = false;
+	for (auto& enemy : enemies_)
 	{
-		movingEnemy_->Update(windowAPI, target, obstacles_, deltaTime, isPlayerInCover);
+		if (!enemy) continue;
+		enemy->Update(windowAPI, target, obstacles_, deltaTime, isPlayerInCover);
+		if (enemy->GetAIState() == Enemy::AIState::Chase && !enemy->IsDead())
+		{
+			anyEnemyChasing = true;
+		}
 	}
 
 	// 1体が発見したら周囲の仲間に無線で位置を伝達（グループ連携無線）
-	if (enemy_ && movingEnemy_ && player_ && !player_->IsDead())
+	if (anyEnemyChasing && player_ && !player_->IsDead())
 	{
-		if (enemy_->GetAIState() == Enemy::AIState::Chase && !enemy_->IsDead())
+		for (auto& enemy : enemies_)
 		{
-			movingEnemy_->AlertEnemy(player_->GetPosition());
-		}
-		if (movingEnemy_->GetAIState() == MovingEnemy::AIState::Chase && !movingEnemy_->IsDead())
-		{
-			enemy_->AlertEnemy(player_->GetPosition());
+			if (enemy && !enemy->IsDead() && enemy->GetAIState() != Enemy::AIState::Chase)
+			{
+				enemy->AlertEnemy(player_->GetPosition());
+			}
 		}
 	}
 
@@ -997,18 +1011,13 @@ void GamePlayScene::UpdateCharacters(float deltaTime)
 			}
 		};
 
-		if (enemy_ && enemy_->GetJustRespawned())
+		for (auto& enemy : enemies_)
 		{
-			// 通常の敵：視認性の高い「鮮やかなネオンゴールド（オレンジ黄）」のフューチャーゲートでサイズを1.35倍に拡大
-			emitRespawnPortal(enemy_->GetPosition(), { 1.0f, 0.7f, 0.0f, 0.95f }, 1.35f);
-			enemy_->ClearJustRespawned();
-		}
-
-		if (movingEnemy_ && movingEnemy_->GetJustRespawned())
-		{
-			// 動く敵：ホットマゼンタ（ピンク）のマジックポータル
-			emitRespawnPortal(movingEnemy_->GetPosition(), { 1.0f, 0.1f, 0.75f, 0.85f }, 1.0f);
-			movingEnemy_->ClearJustRespawned();
+			if (enemy && enemy->GetJustRespawned())
+			{
+				emitRespawnPortal(enemy->GetPosition(), { 1.0f, 0.7f, 0.0f, 0.95f }, 1.25f);
+				enemy->ClearJustRespawned();
+			}
 		}
 	}
 
@@ -1304,6 +1313,10 @@ void GamePlayScene::Update()
 		}
 	}
 	allTargetsDestroyed_ = (totalTargets > 0 && !anyTargetAlive && destroyedCount >= totalTargets);
+	if (allTargetsDestroyed_ && !reinforcementTriggered_)
+	{
+		TriggerReinforcements();
+	}
 
 	UpdatePlayerHpBar();
 	CheckGameOver();
@@ -1436,13 +1449,32 @@ void GamePlayScene::InitializeObstacles()
 			{
 				std::string name = obj.value("name", "");
 				std::string type = obj.value("type", "");
-				if (!name.empty() && name != "GroundPlane" && type != "SpawnPoint" && type != "GoalRing" && name != "Player_Spawn_Point" && name != "Enemy_Spawn_Point" && name != "Goal_Extraction_Ring")
+
+				Vector3 pos = {
+					obj["position"]["x"].get<float>(),
+					obj["position"]["y"].get<float>(),
+					obj["position"]["z"].get<float>()
+				};
+
+				// 敵スポーンポイントの判定 (LevelEditorからの配置データ駆動)
+				if (type == "EnemySpawn_Reinforce" || name.find("Enemy_Reinforce") != std::string::npos)
 				{
-					Vector3 pos = {
-						obj["position"]["x"].get<float>(),
-						obj["position"]["y"].get<float>(),
-						obj["position"]["z"].get<float>()
-					};
+					reinforceSpawnPoints_.push_back(pos);
+					continue;
+				}
+				else if (type == "EnemySpawn_Patrol" || name.find("Enemy_Patrol") != std::string::npos)
+				{
+					SpawnEnemy(pos, true);
+					continue;
+				}
+				else if (type == "EnemySpawn" || name == "Enemy_Spawn_Point" || name.find("Enemy_Sentry") != std::string::npos || name.find("Enemy_Spawn") != std::string::npos)
+				{
+					SpawnEnemy(pos, false);
+					continue;
+				}
+
+				if (!name.empty() && name != "GroundPlane" && type != "SpawnPoint" && type != "GoalRing" && name != "Player_Spawn_Point" && name != "Goal_Extraction_Ring")
+				{
 					Vector3 scl = { 1.0f, 1.0f, 1.0f };
 					if (obj.contains("scale"))
 					{
@@ -1483,6 +1515,13 @@ void GamePlayScene::InitializeObstacles()
 					obs->Initialize(object3dCom, camera_, pos, 1.0f, modelFile, scl, rot);
 					obstacles_.push_back(std::move(obs));
 				}
+			}
+
+			// 後方互換性フォールバック: もしJSONに敵スポーンが定義されていなければ、デフォルトの敵を配置
+			if (enemies_.empty())
+			{
+				SpawnEnemy({ 0.0f, 0.0f, 26.0f }, false); // 定点敵
+				SpawnEnemy({ -5.0f, 0.0f, 26.0f }, true); // 巡回敵
 			}
 			// ステージ最下層に25x25mタイル16枚（4x4グリッド）で地面を敷く
 			// ground.obj単体(100x100m)だとフラスタムカリングで端が消えるため分割する
@@ -1696,14 +1735,12 @@ void GamePlayScene::Draw(SceneRenderRequests& renderRequests)
 		}
 	}
 
-	if (enemy_)
+	for (auto& enemy : enemies_)
 	{
-		enemy_->Draw(ctx);
-	}
-
-	if (movingEnemy_)
-	{
-		movingEnemy_->Draw(ctx);
+		if (enemy)
+		{
+			enemy->Draw(ctx);
+		}
 	}
 
 	for (auto& obs : obstacles_)
@@ -1788,8 +1825,7 @@ void GamePlayScene::Draw(SceneRenderRequests& renderRequests)
 		GamePlayHUDContext hudCtx;
 		hudCtx.camera = camera_;
 		hudCtx.player = player_.get();
-		hudCtx.enemy = enemy_.get();
-		hudCtx.movingEnemy = movingEnemy_.get();
+		hudCtx.enemies = &enemies_;
 		hudCtx.obstacles = &obstacles_;
 		hudCtx.targets = &targets_;
 		hudCtx.tutorialSigns = &tutorialSigns_;

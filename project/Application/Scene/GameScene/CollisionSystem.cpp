@@ -318,10 +318,13 @@ void CollisionSystem::ResolveBulletCollisions()
 
 		if (bullet->GetOwner() == BulletOwner::Player)
 		{
-			// --- プレイヤーの弾丸と固定敵の精密衝突判定 ---
-			if (scene_->enemy_ && !scene_->enemy_->IsDead())
+			// --- プレイヤーの弾丸と全敵キャラクター（Enemy）の精密衝突判定 ---
+			bool hitAnyEnemy = false;
+			for (auto& enemy : scene_->GetEnemies())
 			{
-				const Vector3 enemyPos = scene_->enemy_->GetPosition();
+				if (!enemy || enemy->IsDead()) continue;
+
+				const Vector3 enemyPos = enemy->GetPosition();
 				Vector3 hitPoint;
 				if (CheckBulletCapsuleHit(bPosPrev, bPosCurrent, kBulletRadius, enemyPos, kDuckHeight, kDuckRadius, hitPoint))
 				{
@@ -337,13 +340,14 @@ void CollisionSystem::ResolveBulletCollisions()
 						{
 							TriggerObstacleHitEffect(obsHitPos, bullet->GetDirection());
 							bullet->Finalize();
-							continue;
+							hitAnyEnemy = true;
+							break;
 						}
 					}
 
-					int prevHp = scene_->enemy_->GetHP();
-					scene_->enemy_->OnHit(scene_->player_ ? scene_->player_->GetPosition() : Vector3{0.0f,0.0f,0.0f});
-					int dmg = prevHp - scene_->enemy_->GetHP();
+					int prevHp = enemy->GetHP();
+					enemy->OnHit(scene_->player_ ? scene_->player_->GetPosition() : Vector3{0.0f,0.0f,0.0f});
+					int dmg = prevHp - enemy->GetHP();
 					RaidStats::GetInstance().shotsHit++;
 					if (dmg > 0)
 					{
@@ -370,7 +374,7 @@ void CollisionSystem::ResolveBulletCollisions()
 							);
 						}
 
-						if (scene_->enemy_->IsDead())
+						if (enemy->IsDead())
 						{
 							RaidStats::GetInstance().enemiesKilled++;
 							scene_->TriggerHitStop(0.14f);
@@ -381,7 +385,7 @@ void CollisionSystem::ResolveBulletCollisions()
 						}
 					}
 
-					if (scene_->enemy_->IsDead())
+					if (enemy->IsDead())
 					{
 						scene_->TriggerCameraShake(0.65f, 1.6f);
 						// 💥 敵撃破時の大迫力GPUインスタンシング爆散＆スパークスプラッター
@@ -402,97 +406,11 @@ void CollisionSystem::ResolveBulletCollisions()
 						}
 					}
 					bullet->Finalize();
-					continue;
+					hitAnyEnemy = true;
+					break;
 				}
 			}
-
-			// --- プレイヤーの弾丸と移動敵の精密衝突判定 ---
-			if (scene_->movingEnemy_ && !scene_->movingEnemy_->IsDead())
-			{
-				const Vector3 enemyPos = scene_->movingEnemy_->GetPosition();
-				Vector3 hitPoint;
-				if (CheckBulletCapsuleHit(bPosPrev, bPosCurrent, kBulletRadius, enemyPos, kDuckHeight, kDuckRadius, hitPoint))
-				{
-					// ★ 障害物遮蔽チェック (Line-of-Sight): 弾丸の移動軌跡上に障害物がないか検証
-					Vector3 toHit = { hitPoint.x - bPosPrev.x, hitPoint.y - bPosPrev.y, hitPoint.z - bPosPrev.z };
-					float hitDist = std::sqrt(toHit.x * toHit.x + toHit.y * toHit.y + toHit.z * toHit.z);
-					if (hitDist > 1e-4f)
-					{
-						Vector3 hitDir = { toHit.x / hitDist, toHit.y / hitDist, toHit.z / hitDist };
-						float obsDist = hitDist;
-						Vector3 obsHitPos{};
-						if (RaycastObstacles(bPosPrev, hitDir, hitDist, obsDist, obsHitPos))
-						{
-							TriggerObstacleHitEffect(obsHitPos, bullet->GetDirection());
-							bullet->Finalize();
-							continue;
-						}
-					}
-
-					int prevHp = scene_->movingEnemy_->GetHP();
-					scene_->movingEnemy_->OnHit(scene_->player_ ? scene_->player_->GetPosition() : Vector3{0.0f,0.0f,0.0f});
-					int dmg = prevHp - scene_->movingEnemy_->GetHP();
-					RaidStats::GetInstance().shotsHit++;
-					if (dmg > 0)
-					{
-						bool isCritical = (rand() % 100 < 30);
-						std::string text = std::to_string(dmg);
-						Vector4 color = isCritical ? Vector4{ 1.0f, 0.9f, 0.0f, 1.0f } : Vector4{ 1.0f, 1.0f, 1.0f, 1.0f };
-						if (isCritical) text += "!";
-						scene_->AddFloatingText(hitPoint + Vector3{ 0.0f, 0.8f, 0.0f }, text, color, isCritical);
-
-						// 🩸 リアル＆バイオレントな被弾指向性血しぶきスプラッター
-						if (scene_->particleManager && scene_->appParticleManager_)
-						{
-							Vector3 bulletDir = bPosCurrent - bPosPrev;
-							float blen = std::sqrt(bulletDir.x * bulletDir.x + bulletDir.y * bulletDir.y + bulletDir.z * bulletDir.z);
-							if (blen > 1e-4f) bulletDir = { bulletDir.x / blen, bulletDir.y / blen, bulletDir.z / blen };
-
-							scene_->appParticleManager_->EmitViolentBloodSpray(
-								scene_->particleManager->GetRandomEngine(),
-								hitPoint,
-								bulletDir,
-								isCritical,
-								scene_->bloodTextureIndex_,
-								scene_->smokeTextureIndex_
-							);
-						}
-
-						if (scene_->movingEnemy_->IsDead())
-						{
-							RaidStats::GetInstance().enemiesKilled++;
-							scene_->TriggerHitStop(0.14f);
-						}
-						else if (isCritical)
-						{
-							scene_->TriggerHitStop(0.06f);
-						}
-					}
-
-					if (scene_->movingEnemy_->IsDead())
-					{
-						scene_->TriggerCameraShake(0.65f, 1.6f);
-						// 💥 移動敵撃破時の大迫力GPUインスタンシング爆散＆スパークスプラッター
-						if (scene_->particleManager && scene_->appParticleManager_)
-						{
-							Vector3 hitDir = bPosCurrent - bPosPrev;
-							float hlen = std::sqrt(hitDir.x * hitDir.x + hitDir.y * hitDir.y + hitDir.z * hitDir.z);
-							if (hlen > 1e-4f) hitDir = { hitDir.x / hlen, hitDir.y / hlen, hitDir.z / hlen };
-
-							scene_->appParticleManager_->EmitEnemyDestroyGPUBurst(
-								scene_->particleManager->GetRandomEngine(),
-								enemyPos,
-								hitDir,
-								scene_->particleTextureB,
-								scene_->starburstTextureIndex_,
-								scene_->smokeTextureIndex_
-							);
-						}
-					}
-					bullet->Finalize();
-					continue;
-				}
-			}
+			if (hitAnyEnemy || bullet->IsDead()) continue;
 
 			// --- プレイヤーの弾丸と的（Target）の精密衝突判定 ---
 			for (auto& target : scene_->GetTargets())
@@ -691,32 +609,19 @@ void CollisionSystem::ResolveObstacleCollisions()
 // プレイヤーと敵の直接接触時の接触ダメージ判定と適用
 void CollisionSystem::ResolveContactDamage()
 {
-	if (!scene_->player_ || !scene_->enemy_ || scene_->enemy_->IsDead() || scene_->player_->IsDead())
+	if (!scene_->player_ || scene_->player_->IsDead())
 	{
 		return;
 	}
 
-	// 固定敵との接触ダメージ
-	if (scene_->IsWithinRadius(scene_->player_->GetPosition(), scene_->enemy_->GetPosition(), GamePlayScene::kPlayerHitRadius + GamePlayScene::kEnemyHitRadius))
+	for (auto& enemy : scene_->GetEnemies())
 	{
-		float prevHp = scene_->player_->GetHP();
-		scene_->player_->TakeDamage(GamePlayScene::kContactDamage, "SENTRY GUARD", "BLUNT FORCE TRAUMA (CLOSE COMBAT)");
-		if (scene_->player_->GetHP() < prevHp)
-		{
-			scene_->vignetteAlpha_ = 0.6f;
-			scene_->TriggerCameraShake(0.25f, 0.5f);
-			scene_->TriggerHitStop(0.06f); // 接触被弾時のスローモーション
-			scene_->AddFloatingText(scene_->player_->GetPosition() + Vector3{0.0f, 1.0f, 0.0f}, "WARNING -20", {1.0f, 0.1f, 0.1f, 1.0f}, true);
-		}
-	}
+		if (!enemy || enemy->IsDead()) continue;
 
-	// 移動敵との接触ダメージ
-	if (scene_->movingEnemy_ && !scene_->movingEnemy_->IsDead())
-	{
-		if (scene_->IsWithinRadius(scene_->player_->GetPosition(), scene_->movingEnemy_->GetPosition(), GamePlayScene::kPlayerHitRadius + GamePlayScene::kEnemyHitRadius))
+		if (scene_->IsWithinRadius(scene_->player_->GetPosition(), enemy->GetPosition(), GamePlayScene::kPlayerHitRadius + GamePlayScene::kEnemyHitRadius))
 		{
 			float prevHp = scene_->player_->GetHP();
-			scene_->player_->TakeDamage(GamePlayScene::kContactDamage, "PATROL ENFORCER", "CQC MELEE ENGAGEMENT (FATAL IMPACT)");
+			scene_->player_->TakeDamage(GamePlayScene::kContactDamage, "HOSTILE GUARD", "CQC CLOSE COMBAT (BLUNT TRAUMA)");
 			if (scene_->player_->GetHP() < prevHp)
 			{
 				scene_->vignetteAlpha_ = 0.6f;

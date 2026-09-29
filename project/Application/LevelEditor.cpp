@@ -325,6 +325,42 @@ void LevelEditor::DrawImGui()
         {
             AddObject(addName_, addDir_, addFile_, addIsStatic_);
         }
+
+        ImGui::Spacing();
+        // 敵スポーン用クイックプリセット
+        ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "[ Enemy Spawner Presets ]");
+        if (ImGui::Button("+ Sentry Enemy"))
+        {
+            static int sentryCount = 1;
+            char sName[64];
+            sprintf_s(sName, "Enemy_Sentry_%d", sentryCount++);
+            AddObject(sName, "Resources", "Enemy_Spawn_Point.obj", false);
+            if (!objectDatas_.empty()) {
+                objectDatas_.back().type = "EnemySpawn";
+            }
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("+ Patrol Enemy"))
+        {
+            static int patrolCount = 1;
+            char pName[64];
+            sprintf_s(pName, "Enemy_Patrol_%d", patrolCount++);
+            AddObject(pName, "Resources", "Enemy_Spawn_Point.obj", false);
+            if (!objectDatas_.empty()) {
+                objectDatas_.back().type = "EnemySpawn_Patrol";
+            }
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("+ Reinforce Spawn"))
+        {
+            static int reinCount = 1;
+            char rName[64];
+            sprintf_s(rName, "Enemy_Reinforce_%d", reinCount++);
+            AddObject(rName, "Resources", "Enemy_Spawn_Point.obj", false);
+            if (!objectDatas_.empty()) {
+                objectDatas_.back().type = "EnemySpawn_Reinforce";
+            }
+        }
     }
     ImGui::End();
 
@@ -343,6 +379,13 @@ void LevelEditor::DrawImGui()
             if (ImGui::InputText("Name", nameBuf, sizeof(nameBuf)))
             {
                 obj.name = nameBuf;
+            }
+
+            char typeBuf[128];
+            strcpy_s(typeBuf, obj.type.c_str());
+            if (ImGui::InputText("Type", typeBuf, sizeof(typeBuf)))
+            {
+                obj.type = typeBuf;
             }
 
             // 既存オブジェクトのモデル情報編集

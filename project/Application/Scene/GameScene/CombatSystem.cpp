@@ -55,24 +55,17 @@ void CombatSystem::UpdateCombat(float deltaTime)
 			
 			// 周囲の敵への銃声通知シミュレーション
 			Vector3 playerPos = scene_->player_->GetPosition();
-			if (scene_->enemy_ && !scene_->enemy_->IsDead())
+			for (auto& enemy : scene_->GetEnemies())
 			{
-				float dx = scene_->enemy_->GetPosition().x - playerPos.x;
-				float dz = scene_->enemy_->GetPosition().z - playerPos.z;
-				float dist = std::sqrt(dx * dx + dz * dz);
-				if (dist <= maxRad)
+				if (enemy && !enemy->IsDead())
 				{
-					scene_->enemy_->HearNoise(playerPos);
-				}
-			}
-			if (scene_->movingEnemy_ && !scene_->movingEnemy_->IsDead())
-			{
-				float dx = scene_->movingEnemy_->GetPosition().x - playerPos.x;
-				float dz = scene_->movingEnemy_->GetPosition().z - playerPos.z;
-				float dist = std::sqrt(dx * dx + dz * dz);
-				if (dist <= maxRad)
-				{
-					scene_->movingEnemy_->HearNoise(playerPos);
+					float dx = enemy->GetPosition().x - playerPos.x;
+					float dz = enemy->GetPosition().z - playerPos.z;
+					float dist = std::sqrt(dx * dx + dz * dz);
+					if (dist <= maxRad)
+					{
+						enemy->HearNoise(playerPos);
+					}
 				}
 			}
 
@@ -150,121 +143,67 @@ void CombatSystem::UpdateCombat(float deltaTime)
 		}
 	}
 
-	// --- 固定敵の射撃判定 ---
-	if (scene_->enemy_ && scene_->player_ && !scene_->enemy_->IsDead() && !scene_->player_->IsDead())
+	// --- 全敵キャラクターの射撃判定 ---
+	if (scene_->player_ && !scene_->player_->IsDead())
 	{
-		std::unique_ptr<Bullet> bullet = scene_->enemy_->TryShoot(scene_->player_->GetPosition());
-		if (bullet)
+		for (auto& enemy : scene_->GetEnemies())
 		{
-			scene_->TriggerCameraShake(0.06f, 0.08f);
-			if (scene_->particleManager && scene_->appParticleManager_)
+			if (!enemy || enemy->IsDead()) continue;
+
+			std::unique_ptr<Bullet> bullet = enemy->TryShoot(scene_->player_->GetPosition());
+			if (bullet)
 			{
-				Vector3 bulletPos = bullet->GetPosition();
-				Vector3 dir = bullet->GetDirection();
-				Vector3 right = { dir.z, 0.0f, -dir.x };
-				Vector3 up = { 0.0f, 1.0f, 0.0f };
-
-				for (int i = 0; i < 6; ++i)
+				scene_->TriggerCameraShake(0.06f, 0.08f);
+				if (scene_->particleManager && scene_->appParticleManager_)
 				{
-					scene_->appParticleManager_->EmitMuzzleFlash(
+					Vector3 bulletPos = bullet->GetPosition();
+					Vector3 dir = bullet->GetDirection();
+					Vector3 right = { dir.z, 0.0f, -dir.x };
+					Vector3 up = { 0.0f, 1.0f, 0.0f };
+
+					for (int i = 0; i < 6; ++i)
+					{
+						scene_->appParticleManager_->EmitMuzzleFlash(
+							scene_->particleManager->GetRandomEngine(),
+							bulletPos,
+							dir,
+							right,
+							up,
+							{ 1.0f, 0.3f, 0.3f, 1.0f },
+							1.0f,
+							scene_->particleTextureB
+						);
+					}
+
+					scene_->appParticleManager_->EmitMuzzleFlare(
 						scene_->particleManager->GetRandomEngine(),
 						bulletPos,
-						dir,
-						right,
-						up,
-						{ 1.0f, 0.2f, 0.2f, 1.0f },
-						1.0f,
-						scene_->particleTextureB
-					);
-				}
-
-				scene_->appParticleManager_->EmitMuzzleFlare(
-					scene_->particleManager->GetRandomEngine(),
-					bulletPos,
-					0.4f,
-					{ 1.0f, 0.3f, 0.3f, 1.0f },
-					0.08f,
-					scene_->particleTextureB
-				);
-
-				for (int i = 0; i < 3; ++i)
-				{
-					std::uniform_real_distribution<float> velXZ(-0.4f, 0.4f);
-					std::uniform_real_distribution<float> velY(0.1f, 0.3f);
-					std::uniform_real_distribution<float> forwardMult(0.8f, 2.0f);
-					Vector3 smokeVel = dir * forwardMult(scene_->particleManager->GetRandomEngine()) + right * velXZ(scene_->particleManager->GetRandomEngine()) + up * velY(scene_->particleManager->GetRandomEngine());
-					
-					scene_->appParticleManager_->EmitDustWithVelocity(
-						scene_->particleManager->GetRandomEngine(),
-						bulletPos,
-						0.45f,
-						{ 0.85f, 0.75f, 0.75f, 0.3f },
-						smokeVel,
 						0.4f,
+						{ 1.0f, 0.35f, 0.35f, 1.0f },
+						0.08f,
 						scene_->particleTextureB
 					);
+
+					for (int i = 0; i < 3; ++i)
+					{
+						std::uniform_real_distribution<float> velXZ(-0.4f, 0.4f);
+						std::uniform_real_distribution<float> velY(0.1f, 0.3f);
+						std::uniform_real_distribution<float> forwardMult(0.8f, 2.0f);
+						Vector3 smokeVel = dir * forwardMult(scene_->particleManager->GetRandomEngine()) + right * velXZ(scene_->particleManager->GetRandomEngine()) + up * velY(scene_->particleManager->GetRandomEngine());
+						
+						scene_->appParticleManager_->EmitDustWithVelocity(
+							scene_->particleManager->GetRandomEngine(),
+							bulletPos,
+							0.45f,
+							{ 0.85f, 0.75f, 0.75f, 0.3f },
+							smokeVel,
+							0.4f,
+							scene_->particleTextureB
+						);
+					}
 				}
+				AddBullet(std::move(bullet));
 			}
-			AddBullet(std::move(bullet));
-		}
-	}
-
-	// --- 巡回敵の射撃判定 ---
-	if (scene_->movingEnemy_ && scene_->player_ && !scene_->movingEnemy_->IsDead() && !scene_->player_->IsDead())
-	{
-		std::unique_ptr<Bullet> bullet = scene_->movingEnemy_->TryShoot(scene_->player_->GetPosition());
-		if (bullet)
-		{
-			scene_->TriggerCameraShake(0.06f, 0.08f);
-			if (scene_->particleManager && scene_->appParticleManager_)
-			{
-				Vector3 bulletPos = bullet->GetPosition();
-				Vector3 dir = bullet->GetDirection();
-				Vector3 right = { dir.z, 0.0f, -dir.x };
-				Vector3 up = { 0.0f, 1.0f, 0.0f };
-
-				for (int i = 0; i < 6; ++i)
-				{
-					scene_->appParticleManager_->EmitMuzzleFlash(
-						scene_->particleManager->GetRandomEngine(),
-						bulletPos,
-						dir,
-						right,
-						up,
-						{ 0.8f, 0.4f, 1.0f, 1.0f },
-						1.0f,
-						scene_->particleTextureB
-					);
-				}
-
-				scene_->appParticleManager_->EmitMuzzleFlare(
-					scene_->particleManager->GetRandomEngine(),
-					bulletPos,
-					0.4f,
-					{ 0.9f, 0.4f, 1.0f, 1.0f },
-					0.08f,
-					scene_->particleTextureB
-				);
-
-				for (int i = 0; i < 3; ++i)
-				{
-					std::uniform_real_distribution<float> velXZ(-0.4f, 0.4f);
-					std::uniform_real_distribution<float> velY(0.1f, 0.3f);
-					std::uniform_real_distribution<float> forwardMult(0.8f, 2.0f);
-					Vector3 smokeVel = dir * forwardMult(scene_->particleManager->GetRandomEngine()) + right * velXZ(scene_->particleManager->GetRandomEngine()) + up * velY(scene_->particleManager->GetRandomEngine());
-					
-					scene_->appParticleManager_->EmitDustWithVelocity(
-						scene_->particleManager->GetRandomEngine(),
-						bulletPos,
-						0.45f,
-						{ 0.8f, 0.75f, 0.85f, 0.3f },
-						smokeVel,
-						0.4f,
-						scene_->particleTextureB
-					);
-				}
-			}
-			AddBullet(std::move(bullet));
 		}
 	}
 }

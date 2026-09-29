@@ -1,0 +1,1156 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ダッシューティングダック — プレゼンテーション資料</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700;900&family=Oswald:wght@500;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<style>
+  :root {
+    /* ─── GDC / PROFESSIONAL GAME DEV DARK PALETTE ─── */
+    --bg-dark:      #080b11; /* 最深部背景（プレゼン外枠） */
+    --slide-bg:     #0f141f; /* スライド本体：上質なディープスレートチャコール */
+    --card-bg:      #171e2e; /* 補助パネル・カード：落ち着いたダークネイビーグレー */
+    --card-border:  #253046; /* 控えめで上質な極薄境界線 */
+    --border:       #1e293b;
+    --border-light: #334155;
+    
+    /* ─── TECHNICAL ACCENT PALETTE (GDC / UE5 / NVIDIA 標準) ─── */
+    --primary:      #f8fafc;
+    --accent:       #38bdf8; /* エレクトリック・スカイブルー（視認性最高） */
+    --accent-dark:  #0284c7;
+    --accent-amber: #fbbf24; /* 知的で温かみのあるテックゴールド */
+    --accent-red:   #f43f5e; /* 被弾・警告のクリムゾンローズ */
+    --accent-green: #34d399; /* 成功・安全のエメラルドミント */
+    
+    /* ─── TYPOGRAPHY ─── */
+    --text-head:    #f8fafc; /* 鮮烈で読みやすい純白 */
+    --text-body:    #cbd5e1; /* 目に優しくコントラスト十分なライトシルバー */
+    --text-muted:   #94a3b8; /* 落ち着いた補足スレート */
+    --text-white:   #ffffff;
+    
+    --font-jp:      'Zen Kaku Gothic New', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --font-num:     'Oswald', sans-serif;
+    --font-mono:    'JetBrains Mono', Consolas, monospace;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg-dark);
+    color: var(--text-body);
+    font-family: var(--font-jp);
+    height: 100vh;
+    overflow: hidden;
+    user-select: none;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* ─── SLIDE FRAME (16:9 Aspect Ratio) ─── */
+  #presentation {
+    position: relative;
+    width: 92vw;
+    max-width: 1200px;
+    aspect-ratio: 16 / 9;
+    max-height: 85vh;
+  }
+
+  .slide {
+    position: absolute;
+    inset: 0;
+    display: none;
+    flex-direction: column;
+    background: var(--slide-bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 24px 36px 18px;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.7);
+  }
+  .slide.active { display: flex; }
+
+  /* ─── SLIDE HEADER ─── */
+  .header-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 4px;
+  }
+  .slide-meta {
+    font-size: 11px;
+    font-weight: 800;
+    color: var(--accent);
+    letter-spacing: 1.5px;
+    font-family: var(--font-mono);
+  }
+  .slide-category-tag {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-muted);
+  }
+  
+  .slide-headline {
+    font-size: 21px;
+    font-weight: 900;
+    color: var(--text-head);
+    line-height: 1.25;
+    margin-bottom: 4px;
+    letter-spacing: -0.2px;
+  }
+  .slide-message {
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--accent);
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  /* ─── OVERVIEW GRID (SLIDE 2) ─── */
+  .overview-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+  .overview-cell {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 6px;
+    padding: 8px 12px;
+  }
+  .overview-k {
+    font-size: 10px;
+    color: var(--text-muted);
+    font-weight: 700;
+    margin-bottom: 2px;
+  }
+  .overview-v {
+    font-size: 12.5px;
+    font-weight: 800;
+    color: var(--text-head);
+  }
+
+  /* ─── SLIDE BODY (2 COLUMN) ─── */
+  .slide-body {
+    display: grid;
+    grid-template-columns: 1.1fr 1fr;
+    gap: 20px;
+    flex: 1;
+    min-height: 0;
+  }
+
+  /* ─── LEFT TEXT COLUMN (GDC エグゼクティブ組版：カード枠廃止・余白設計) ─── */
+  .text-column {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 10px;
+    min-height: 0;
+  }
+
+  .point-item {
+    background: transparent;
+    border: none;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+  .point-title {
+    font-size: 13px;
+    font-weight: 800;
+    color: var(--text-head);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    line-height: 1.35;
+  }
+  .point-title .marker {
+    width: 6px;
+    height: 6px;
+    background: var(--accent);
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .point-desc {
+    font-size: 11px;
+    line-height: 1.55;
+    color: var(--text-body);
+    padding-left: 12px;
+  }
+
+  /* ─── HIGHLIGHT CALLOUT (ディープスレート ＋ エメラルド帯) ─── */
+  .callout-box {
+    background: rgba(6, 78, 59, 0.25);
+    border-left: 4px solid var(--accent-green);
+    border-radius: 4px;
+    padding: 8px 12px;
+    font-size: 11px;
+    line-height: 1.5;
+    color: #a7f3d0;
+    margin-top: auto;
+  }
+  .callout-box strong {
+    color: #ffffff;
+    font-weight: 800;
+  }
+
+  /* ─── RIGHT IMAGE/DIAGRAM COLUMN (DirectX 12 / UE5 ビューポート仕様) ─── */
+  .image-column {
+    background: #090d16;
+    border: 1px solid var(--border-light);
+    border-radius: 6px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,0.03);
+  }
+  .image-column img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    background: #090d16;
+    display: block;
+  }
+  .image-column.has-img .placeholder-ui {
+    display: none;
+  }
+
+  .placeholder-ui {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    text-align: center;
+    gap: 8px;
+  }
+  .placeholder-badge {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--accent);
+    background: rgba(56, 189, 248, 0.15);
+    padding: 3px 10px;
+    border-radius: 4px;
+  }
+  .placeholder-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text-white);
+  }
+  .placeholder-text {
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+  .placeholder-btn {
+    font-size: 11px;
+    color: var(--accent-blue);
+    margin-top: 4px;
+    text-decoration: underline;
+  }
+
+  .image-footer-caption {
+    background: #111726;
+    border-top: 1px solid var(--border);
+    padding: 6px 14px;
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--text-muted);
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-family: var(--font-mono);
+  }
+
+  /* ─── SLIDE 1: COVER ─── */
+  .cover-container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 0 30px;
+  }
+  .cover-pre {
+    font-size: 13px;
+    font-weight: 800;
+    color: var(--accent);
+    letter-spacing: 2.5px;
+    margin-bottom: 14px;
+    font-family: var(--font-mono);
+  }
+  .cover-main-title {
+    font-size: 42px;
+    font-weight: 900;
+    color: var(--text-head);
+    line-height: 1.15;
+    margin-bottom: 10px;
+    letter-spacing: -0.5px;
+  }
+  .cover-main-title span {
+    display: block;
+    font-family: var(--font-num);
+    font-size: 28px;
+    color: var(--accent-amber);
+    letter-spacing: 1px;
+    margin-top: 4px;
+  }
+  .cover-sub {
+    font-size: 16px;
+    color: var(--text-body);
+    font-weight: 600;
+    margin-bottom: 24px;
+    line-height: 1.4;
+  }
+  .cover-tags {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .cover-tag {
+    background: #171e2e;
+    border: 1px solid var(--card-border);
+    border-radius: 4px;
+    padding: 5px 12px;
+    font-size: 11.5px;
+    font-weight: 700;
+    color: #e2e8f0;
+  }
+  .cover-footer {
+    border-top: 1px solid var(--border);
+    padding-top: 12px;
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    color: var(--text-muted);
+    font-weight: 500;
+  }
+  .cover-footer strong {
+    color: var(--text-head);
+  }
+
+  /* ─── SLIDE 6: CONSULTATION ─── */
+  .consult-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    flex: 1;
+    min-height: 0;
+  }
+  .consult-box {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 6px;
+    padding: 18px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .consult-num {
+    font-family: var(--font-num);
+    font-size: 24px;
+    color: var(--accent);
+    line-height: 1;
+  }
+  .consult-heading {
+    font-size: 15px;
+    font-weight: 800;
+    color: var(--text-head);
+    line-height: 1.4;
+  }
+  .consult-text {
+    font-size: 11.5px;
+    line-height: 1.65;
+    color: var(--text-body);
+  }
+  .consult-text strong {
+    color: var(--text-head);
+    font-weight: 800;
+  }
+
+  /* ─── NAVIGATION BAR ─── */
+  .nav-bar {
+    position: fixed;
+    bottom: 12px;
+    display: flex;
+    justify-content: space-between;
+    width: 92vw;
+    max-width: 1200px;
+    font-size: 12px;
+    color: #94a3b8;
+    font-family: var(--font-mono);
+  }
+  .progress-track {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    height: 3px;
+    background: var(--border);
+  }
+  .progress-fill {
+    height: 100%;
+    background: var(--accent);
+    transition: width 0.25s ease;
+  }
+</style>
+</head>
+<body>
+
+<input type="file" id="file-uploader" accept="image/*" style="display:none;">
+
+<div id="presentation">
+
+  <!-- ══════════════════════════════════════
+       SLIDE 1 — 表紙
+  ══════════════════════════════════════ -->
+  <div class="slide active" id="slide-1">
+    <div class="cover-container">
+      <div class="cover-pre">作品プレゼンテーション（5分）</div>
+      <div class="cover-main-title">
+        ダッシューティングダック<br>
+        <span>DASH SHOOTING DUCK</span>
+      </div>
+      <div class="cover-sub">
+        足音や銃声で敵と駆け引きする、3Dシューティングアクション
+      </div>
+      <div class="cover-tags">
+        <span class="cover-tag">個人制作</span>
+        <span class="cover-tag">C++ / DirectX 12</span>
+        <span class="cover-tag">敵AI知覚システム</span>
+        <span class="cover-tag">自作エディタ・ツール</span>
+        <span class="cover-tag">シューティング手触り設計</span>
+      </div>
+    </div>
+    <div class="cover-footer">
+      制作・発表：<strong>コウダ アユ</strong><br>
+      制作期間：約6ヶ月（エンジン＋ゲーム＋ツール）
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════
+       SLIDE 2 — ゲーム概要
+  ══════════════════════════════════════ -->
+  <div class="slide" id="slide-2">
+    <div class="header-top">
+      <div class="slide-meta">02 ｜ GAME OVERVIEW</div>
+      <div class="slide-category-tag">作品概要 ＆ ゲームルール</div>
+    </div>
+    <div class="slide-headline">ゲーム概要：廃工場を制圧し、物資を持ち帰って生還せよ</div>
+    <div class="slide-message">「撃ちまくる爽快感」だけでなく、「逃げるか・挑むか」の判断を作るゲームデザイン</div>
+
+    <div class="overview-grid">
+      <div class="overview-cell">
+        <div class="overview-k">ジャンル</div>
+        <div class="overview-v">3Dシューティングアクション</div>
+      </div>
+      <div class="overview-cell">
+        <div class="overview-k">クリア目標</div>
+        <div class="overview-v">3箇所の拠点破壊 ➔ 脱出</div>
+      </div>
+      <div class="overview-cell">
+        <div class="overview-k">制限時間</div>
+        <div class="overview-v">5分（超過でMIA失敗）</div>
+      </div>
+      <div class="overview-cell">
+        <div class="overview-k">開発スタイル</div>
+        <div class="overview-v">個人制作（プログラム全般）</div>
+      </div>
+    </div>
+
+    <div class="slide-body">
+      <div class="text-column">
+        <div class="point-item">
+          <div class="point-title"><span class="marker"></span>走る足音や銃声が命取りになるステルス要素</div>
+          <div class="point-desc">
+            敵は視界だけでなく「音」でもプレイヤーを探知します。不用意に走ったり発砲すると周囲の敵を引き寄せるため、隠れてやり過ごすか、先手を打って仕掛けるかの判断が生まれます。
+          </div>
+        </div>
+
+        <div class="point-item">
+          <div class="point-title"><span class="marker"></span>脱出直前に訪れる「増援クライマックス」</div>
+          <div class="point-desc">
+            3つの拠点を破壊すると脱出ゲートが開きますが、同時にサイレン警報が鳴り敵の増援が急襲。「最後の最後が一番危ない」という起承転結をコードで演出しました。
+          </div>
+        </div>
+
+        <div class="callout-box">
+          <strong>目指したゲーム性：</strong>コミカルなアヒルの見た目とは裏腹に、リソース（弾薬・回復）と位置取りをシビアに管理する本格的なシューター体験を目指しました。
+        </div>
+      </div>
+
+      <div class="image-column" id="img-slot-1">
+        <!-- Slide 1: ミッション・タクティカル俯瞰マップ (GDC Dark Viewport) -->
+        <svg viewBox="0 0 440 320" style="width:100%; height:100%; background:#090d16;">
+          <defs>
+            <pattern id="grid1" width="20" height="20" patternUnits="userSpaceOnUse">
+              <path d="M 20 0 L 0 0 0 20" fill="none" stroke="#1e293b" stroke-width="1"/>
+            </pattern>
+            <radialGradient id="player-glow" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stop-color="#38bdf8" stop-opacity="0.3"/>
+              <stop offset="100%" stop-color="#38bdf8" stop-opacity="0"/>
+            </radialGradient>
+          </defs>
+          <rect width="440" height="320" fill="url(#grid1)" />
+          
+          <!-- HUD 情報オーバーレイ（左上：スレートカード仕様） -->
+          <rect x="14" y="12" width="130" height="22" fill="#131b2c" stroke="#253046" stroke-width="1.2" rx="3"/>
+          <text x="22" y="27" fill="#fbbf24" font-size="9.5" font-weight="bold" font-family="Consolas, monospace">TIME: 04:32 / 05:00</text>
+
+          <!-- 壁・遮蔽物（建築図面調スレートグレー） -->
+          <rect x="70" y="85" width="120" height="18" fill="#1e293b" stroke="#334155" stroke-width="1.2" rx="3"/>
+          <rect x="250" y="140" width="18" height="110" fill="#1e293b" stroke="#334155" stroke-width="1.2" rx="3"/>
+          <rect x="120" y="210" width="80" height="18" fill="#1e293b" stroke="#334155" stroke-width="1.2" rx="3"/>
+
+          <!-- 拠点 A, B, C（ダークピルバッジ ＋ クリムゾンレッド枠線・白文字） -->
+          <!-- BASE A -->
+          <g transform="translate(65, 48)">
+            <rect x="0" y="0" width="56" height="20" fill="#181318" stroke="#f43f5e" stroke-width="1.5" rx="3"/>
+            <text x="28" y="14" fill="#f43f5e" font-size="9" font-weight="bold" text-anchor="middle" font-family="Consolas, monospace">BASE A</text>
+          </g>
+          
+          <!-- BASE B -->
+          <g transform="translate(340, 78)">
+            <rect x="0" y="0" width="56" height="20" fill="#181318" stroke="#f43f5e" stroke-width="1.5" rx="3"/>
+            <text x="28" y="14" fill="#f43f5e" font-size="9" font-weight="bold" text-anchor="middle" font-family="Consolas, monospace">BASE B</text>
+          </g>
+
+          <!-- BASE C -->
+          <g transform="translate(136, 248)">
+            <rect x="0" y="0" width="56" height="20" fill="#181318" stroke="#f43f5e" stroke-width="1.5" rx="3"/>
+            <text x="28" y="14" fill="#f43f5e" font-size="9" font-weight="bold" text-anchor="middle" font-family="Consolas, monospace">BASE C</text>
+          </g>
+
+          <!-- 脱出ポイント（エメラルドグリーン破線） -->
+          <rect x="340" y="232" width="78" height="38" fill="#064e3b33" stroke="#34d399" stroke-width="1.5" stroke-dasharray="4,3" rx="4"/>
+          <text x="379" y="255" fill="#34d399" font-size="9.5" font-weight="bold" text-anchor="middle">脱出ゾーン</text>
+
+          <!-- プレイヤー（中央：スカイブルーサークル ＋ 白地バッジ） -->
+          <circle cx="200" cy="145" r="28" fill="url(#player-glow)"/>
+          <circle cx="200" cy="145" r="7.5" fill="#38bdf8" stroke="#ffffff" stroke-width="2"/>
+          <g transform="translate(155, 168)">
+            <rect x="0" y="0" width="90" height="18" fill="#0f172a" stroke="#38bdf8" stroke-width="1.2" rx="2"/>
+            <text x="45" y="13" fill="#38bdf8" font-size="9" font-weight="bold" text-anchor="middle">主人公 (Duck)</text>
+          </g>
+          
+          <!-- 索敵ルート線（スカイブルー破線） -->
+          <path d="M 200 137 Q 235 98 275 88" fill="none" stroke="#38bdf8" stroke-dasharray="3,3" stroke-width="1.5"/>
+
+          <!-- 敵シンボル（三角マーク：ウォームゴールド） -->
+          <polygon points="298,78 310,96 286,96" fill="#fbbf24"/>
+          <polygon points="96,242 108,260 84,260" fill="#fbbf24"/>
+          <polygon points="282,185 294,203 270,203" fill="#fbbf24"/>
+        </svg>
+        <div class="image-footer-caption">
+          <span>タクティカル見下ろしマップ構造</span>
+          <span>拠点破壊 ➔ 敵増援 ➔ 脱出シークエンス</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════
+       SLIDE 3 — 敵AIと戦闘手触り
+  ══════════════════════════════════════ -->
+  <div class="slide" id="slide-3">
+    <div class="header-top">
+      <div class="slide-meta">03 ｜ GAMEPLAY & AI</div>
+      <div class="slide-category-tag">ゲームプレイ実装</div>
+    </div>
+    <div class="slide-headline">技術のこだわり ①：敵AIの知覚連携と、撃ち合いの手触り</div>
+    <div class="slide-message">ただ突っ込んでくるだけの敵をなくし、音と仲間連携でプレイヤーを追い詰める</div>
+
+    <div class="slide-body">
+      <div class="text-column">
+        <div class="point-item">
+          <div class="point-title"><span class="marker"></span>視覚だけでなく「音」でプレイヤーを探す敵AI</div>
+          <div class="point-desc">
+            銃声やダッシュした足音を聞きつけて、その発生場所に警戒しながら集まります。視界（65度）に入っても、物陰に隠れれば見失うため、ステルスでやり過ごす緊張感を作りました。
+          </div>
+        </div>
+
+        <div class="point-item">
+          <div class="point-title"><span class="marker"></span>仲間を呼んで包囲してくる連携ロジック</div>
+          <div class="point-desc">
+            プレイヤーを見つけた敵は周囲の仲間に警戒を伝達し、一斉に集結して挟み撃ちにしてきます。単体で突撃してくるだけの単調さをなくし、常に退路を考えさせます。
+          </div>
+        </div>
+
+        <div class="point-item">
+          <div class="point-title"><span class="marker"></span>立ち止まって狙うか、逃げながら撃つかのメリハリ</div>
+          <div class="point-desc">
+            移動しながら撃つと弾が大きくブレる「移動ペナルティ」を実装。足を止めて正確に当てるメリットを強調しました。緊急回避（ローリング）は無敵があるもののスタミナを消費し、連発できない設計にしています。
+          </div>
+        </div>
+
+        <div class="callout-box">
+          <strong>実装の工夫：</strong>敵の数値をただ強くするのではなく、「音を立てずに進む」「見つかったら囲まれる前に引く」といった<strong>プレイヤーの駆け引きが生まれるルール</strong>をコードで作りました。
+        </div>
+      </div>
+
+      <div class="image-column" id="img-slot-2">
+        <!-- Slide 2: 敵AIの視界コーンと足音知覚シミュレーション (GDC Dark Viewport) -->
+        <svg viewBox="0 0 440 320" style="width:100%; height:100%; background:#090d16;">
+          <defs>
+            <radialGradient id="sound-wave" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stop-color="#fbbf24" stop-opacity="0.25"/>
+              <stop offset="70%" stop-color="#fbbf24" stop-opacity="0.08"/>
+              <stop offset="100%" stop-color="#fbbf24" stop-opacity="0"/>
+            </radialGradient>
+            <linearGradient id="cone-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#f43f5e" stop-opacity="0.28"/>
+              <stop offset="100%" stop-color="#f43f5e" stop-opacity="0.04"/>
+            </linearGradient>
+          </defs>
+
+          <!-- 背景グリッド（ダークスレート線） -->
+          <line x1="0" y1="80" x2="440" y2="80" stroke="#1e293b" stroke-width="1"/>
+          <line x1="0" y1="160" x2="440" y2="160" stroke="#1e293b" stroke-width="1"/>
+          <line x1="0" y1="240" x2="440" y2="240" stroke="#1e293b" stroke-width="1"/>
+          <line x1="110" y1="0" x2="110" y2="320" stroke="#1e293b" stroke-width="1"/>
+          <line x1="220" y1="0" x2="220" y2="320" stroke="#1e293b" stroke-width="1"/>
+          <line x1="330" y1="0" x2="330" y2="320" stroke="#1e293b" stroke-width="1"/>
+
+          <!-- 遮蔽物の壁（スレートグレー） -->
+          <rect x="175" y="85" width="22" height="126" fill="#1e293b" stroke="#334155" stroke-width="1.2" rx="3"/>
+          <text x="186" y="148" fill="#64748b" font-size="9" font-weight="bold" text-anchor="middle" transform="rotate(-90 186 148)">OBSTACLE WALL</text>
+
+          <!-- プレイヤー（スカイブルーサークル ＋ ゴールド音紋） -->
+          <circle cx="105" cy="140" r="54" fill="url(#sound-wave)"/>
+          <circle cx="105" cy="140" r="54" fill="none" stroke="#fbbf24" stroke-dasharray="4,4" stroke-width="1.5"/>
+          <circle cx="105" cy="140" r="8" fill="#38bdf8" stroke="#ffffff" stroke-width="2"/>
+          <g transform="translate(35, 208)">
+            <rect x="0" y="0" width="140" height="28" fill="#0f172a" stroke="#38bdf8" stroke-width="1.2" rx="3"/>
+            <text x="70" y="12" fill="#38bdf8" font-size="9" font-weight="bold" text-anchor="middle">走るプレイヤー</text>
+            <text x="70" y="23" fill="#fbbf24" font-size="7.5" font-weight="bold" text-anchor="middle">足音音紋（半径15m）</text>
+          </g>
+
+          <!-- 音波の伝播線（壁の下側を通り敵Aへ届く） -->
+          <path d="M 159 145 Q 185 224 240 220 T 285 210" fill="none" stroke="#fbbf24" stroke-width="1.8" stroke-dasharray="3,3"/>
+
+          <!-- 敵A（ゴールドサークル ＋ ダークバッジ） -->
+          <circle cx="295" cy="210" r="9.5" fill="#fbbf24" stroke="#ffffff" stroke-width="1.5"/>
+          <rect x="310" y="186" width="22" height="15" fill="#fbbf24" rx="2"/>
+          <text x="321" y="197" fill="#0f172a" font-size="10" font-weight="900" text-anchor="middle">?!</text>
+          <g transform="translate(220, 234)">
+            <rect x="0" y="0" width="150" height="18" fill="#0f172a" stroke="#fbbf24" stroke-width="1.2" rx="2"/>
+            <text x="75" y="13" fill="#fbbf24" font-size="8.5" font-weight="bold" text-anchor="middle">敵A：音を聴知して索敵急行</text>
+          </g>
+
+          <!-- 敵B（ローズサークル ＋ 視界コーン） -->
+          <path d="M 295 80 L 405 32 A 120 120 0 0 1 405 128 Z" fill="url(#cone-grad)" stroke="#f43f5e" stroke-width="1" stroke-dasharray="3,2"/>
+          <circle cx="295" cy="80" r="9.5" fill="#f43f5e" stroke="#ffffff" stroke-width="1.5"/>
+          <line x1="295" y1="80" x2="375" y2="80" stroke="#f43f5e" stroke-width="2"/>
+          <g transform="translate(192, 34)">
+            <rect x="0" y="0" width="132" height="18" fill="#0f172a" stroke="#f43f5e" stroke-width="1.2" rx="2"/>
+            <text x="66" y="13" fill="#f43f5e" font-size="8.5" font-weight="bold" text-anchor="middle">敵B (視角65度コーン)</text>
+          </g>
+
+          <!-- 仲間連携通信線（インディゴ枠） -->
+          <line x1="295" y1="92" x2="295" y2="130" stroke="#f43f5e" stroke-width="1.5" stroke-dasharray="3,2"/>
+          <line x1="295" y1="154" x2="295" y2="198" stroke="#f43f5e" stroke-width="1.5" stroke-dasharray="3,2"/>
+          <g transform="translate(248, 134)">
+            <rect x="0" y="0" width="94" height="18" fill="#0f172a" stroke="#818cf8" stroke-width="1.2" rx="2"/>
+            <text x="47" y="13" fill="#a5b4fc" font-size="8.5" font-weight="bold" text-anchor="middle">仲間へ位置共有</text>
+          </g>
+        </svg>
+        <div class="image-footer-caption">
+          <span>知覚システム：視界コーン ＆ 足音音紋</span>
+          <span>遮蔽物Raycast判定 ＋ 仲間連携AI</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════
+       SLIDE 4 — UI演出とゲームループ
+  ══════════════════════════════════════ -->
+  <div class="slide" id="slide-4">
+    <div class="header-top">
+      <div class="slide-meta">04 ｜ UI & GAME LOOP</div>
+      <div class="slide-category-tag">UI演出・演出連携</div>
+    </div>
+    <div class="slide-headline">技術のこだわり ②：状況が直感的に伝わる情報提示UI</div>
+    <div class="slide-message">文字を読まなくても、視覚エフェクトで「危険度」と「被弾方向」がわかる工夫</div>
+
+    <div class="slide-body">
+      <div class="text-column">
+        <div class="point-item">
+          <div class="point-title"><span class="marker"></span>どこまで音が届いたかがわかる「音紋リング」</div>
+          <div class="point-desc">
+            走ったり発砲した瞬間、「敵にどこまで音が届いているか」を地面に広がる円形エフェクトで可視化。「今のはマズい、走って逃げよう」とプレイヤー自身が直感的に気づけるようにしました。
+          </div>
+        </div>
+
+        <div class="point-item">
+          <div class="point-title"><span class="marker"></span>死角から撃たれても即座にわかる「360度被弾アロー」</div>
+          <div class="point-desc">
+            トップダウン視点でもどこから撃たれたか迷わないよう、プレイヤー中心の円環矢印で弾の飛来方向を明示。体力が減ると画面縁が暗赤色に拍動し、ピンチを体感させます。
+          </div>
+        </div>
+
+        <div class="point-item">
+          <div class="point-title"><span class="marker"></span>物資探索（死体漁り）の無防備タイマーとリザルト精算</div>
+          <div class="point-desc">
+            敵の死体を漁るには長押しが必要（0.8秒）。途中で動くとキャンセルされるため、周囲を警戒しながら欲張る駆け引きを表現。クリア時には換金総額や命中率を集計します。
+          </div>
+        </div>
+
+        <div class="callout-box">
+          <strong>設計の工夫：</strong>UI描画クラスがゲームロジックを直接触らないよう、読み取り専用のコンテキスト構造体を受け取る疎結合設計にし、演出の追加や変更を容易にしました。
+        </div>
+      </div>
+
+      <div class="image-column" id="img-slot-3">
+        <!-- Slide 3: 直感的なHUDと視覚フィードバックUI (GDC Dark Viewport) -->
+        <svg viewBox="0 0 440 320" style="width:100%; height:100%; background:#090d16; font-family:'Zen Kaku Gothic New', sans-serif;">
+          <defs>
+            <radialGradient id="sound-ring-grad" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stop-color="#fbbf24" stop-opacity="0.25"/>
+              <stop offset="70%" stop-color="#fbbf24" stop-opacity="0.08"/>
+              <stop offset="100%" stop-color="#fbbf24" stop-opacity="0"/>
+            </radialGradient>
+            <radialGradient id="vignette-grad" cx="50%" cy="50%" r="50%">
+              <stop offset="65%" stop-color="#000000" stop-opacity="0"/>
+              <stop offset="100%" stop-color="#f43f5e" stop-opacity="0.25"/>
+            </radialGradient>
+            <pattern id="s3-grid" width="24" height="24" patternUnits="userSpaceOnUse">
+              <path d="M 24 0 L 0 0 0 24" fill="none" stroke="#1e293b" stroke-width="1"/>
+            </pattern>
+          </defs>
+
+          <!-- 背景グリッド（ダークスレート線） -->
+          <rect width="440" height="320" fill="url(#s3-grid)"/>
+
+          <!-- 瀕死ビネット演出（クリムゾン縁取り） -->
+          <rect width="440" height="320" fill="url(#vignette-grad)"/>
+
+          <!-- 地面の音紋リング（足音・銃声到達範囲） -->
+          <circle cx="190" cy="125" r="62" fill="url(#sound-ring-grad)"/>
+          <circle cx="190" cy="125" r="62" fill="none" stroke="#fbbf24" stroke-width="2" stroke-dasharray="5,4"/>
+          
+          <!-- 音紋ラベル（ダークバッジ ＋ ゴールド枠線） -->
+          <rect x="95" y="16" width="190" height="22" fill="#0f172a" stroke="#fbbf24" stroke-width="1.2" rx="3"/>
+          <text x="190" y="31" fill="#fbbf24" font-family="Consolas, 'JetBrains Mono', monospace" font-size="9.5" font-weight="bold" text-anchor="middle">SOUND RING (Radius: 15.0m)</text>
+
+          <!-- プレイヤー Duck（中央：スカイブルーサークル ＋ 白地バッジ） -->
+          <circle cx="190" cy="125" r="14" fill="#38bdf8" stroke="#ffffff" stroke-width="2"/>
+          <polygon points="190,115 204,125 190,135" fill="#0284c7"/>
+          <circle cx="190" cy="125" r="5" fill="#ffffff"/>
+          <g transform="translate(145, 146)">
+            <rect x="0" y="0" width="90" height="17" fill="#0f172a" stroke="#38bdf8" stroke-width="1.2" rx="2"/>
+            <text x="45" y="12" fill="#38bdf8" font-size="9" font-weight="bold" text-anchor="middle">Duck (Player)</text>
+          </g>
+
+          <!-- 360度 被弾インジケータ（右上からの銃撃） -->
+          <g transform="translate(190, 125)">
+            <path d="M 20 -20 L 44 -44" stroke="#f43f5e" stroke-width="3.5" stroke-linecap="round"/>
+            <polygon points="16,-16 22,-28 28,-22" fill="#f43f5e"/>
+          </g>
+          <!-- 弾道軌跡線 -->
+          <line x1="380" y1="36" x2="226" y2="92" stroke="#f43f5e" stroke-width="1.8" stroke-dasharray="4,2"/>
+          
+          <!-- 被弾アロー解説バナー（ダークスレート ＋ クリムゾン枠線） -->
+          <rect x="270" y="96" width="160" height="40" fill="#0f172a" stroke="#f43f5e" stroke-width="1.2" rx="3"/>
+          <text x="350" y="112" fill="#fda4af" font-size="9.5" font-weight="bold" text-anchor="middle">死角からの被弾を即知覚</text>
+          <text x="350" y="128" fill="#f43f5e" font-family="Consolas, 'JetBrains Mono', monospace" font-size="9.5" font-weight="bold" text-anchor="middle">DAMAGE ARROW (360°)</text>
+
+          <!-- レティクル拡散比較（左下：ダークカード仕様） -->
+          <rect x="14" y="210" width="180" height="96" fill="#111726" stroke="#253046" stroke-width="1.2" rx="4"/>
+          <text x="24" y="228" fill="#f8fafc" font-size="10.5" font-weight="bold">照準集弾率（移動ペナルティ）</text>
+          
+          <!-- 静止時（高精度） -->
+          <circle cx="48" cy="260" r="11" fill="none" stroke="#38bdf8" stroke-width="2"/>
+          <line x1="48" y1="245" x2="48" y2="275" stroke="#38bdf8" stroke-width="1.5"/>
+          <line x1="33" y1="260" x2="63" y2="260" stroke="#38bdf8" stroke-width="1.5"/>
+          <text x="48" y="294" fill="#38bdf8" font-size="10" font-weight="bold" text-anchor="middle">静止（高精度）</text>
+
+          <!-- 移動時（拡散） -->
+          <circle cx="138" cy="260" r="22" fill="none" stroke="#f43f5e" stroke-width="2" stroke-dasharray="4,2"/>
+          <line x1="138" y1="234" x2="138" y2="286" stroke="#f43f5e" stroke-width="1.5"/>
+          <line x1="112" y1="260" x2="164" y2="260" stroke="#f43f5e" stroke-width="1.5"/>
+          <text x="138" y="294" fill="#f43f5e" font-size="10" font-weight="bold" text-anchor="middle">ダッシュ（拡散大）</text>
+
+          <!-- 物資探索ゲージ（右下：ダークカード仕様） -->
+          <rect x="230" y="226" width="196" height="80" fill="#111726" stroke="#253046" stroke-width="1.2" rx="4"/>
+          <text x="242" y="247" fill="#34d399" font-family="'JetBrains Mono', monospace" font-size="11" font-weight="700">LOOT INTERACTION GAUGE</text>
+          <rect x="242" y="258" width="172" height="14" fill="#1e293b" stroke="#334155" stroke-width="1" rx="2"/>
+          <rect x="242" y="258" width="130" height="14" fill="#059669" rx="2"/>
+          <text x="328" y="269" fill="#ffffff" font-family="'JetBrains Mono', monospace" font-size="9.5" font-weight="bold" text-anchor="middle">0.6s / 0.8s [HOLD E]</text>
+          <text x="242" y="292" fill="#94a3b8" font-size="9.5">動くと即キャンセルされるリスク設計</text>
+        </svg>
+        <div class="image-footer-caption">
+          <span>直感的な情報提示HUD（音紋・被弾アロー・探索ゲージ）</span>
+          <span>GamePlayHUDContext によるゲームロジック疎結合設計</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════
+       SLIDE 5 — 自作精密衝突判定基盤
+  ══════════════════════════════════════ -->
+  <div class="slide" id="slide-5">
+    <div class="header-top">
+      <div class="slide-meta">05 ｜ COLLISION & PHYSICS</div>
+      <div class="slide-category-tag">自作DirectX 12エンジン ＆ 物理基盤</div>
+    </div>
+    <div class="slide-headline">技術のこだわり ③：高速戦闘を支える、自作の精密衝突判定基盤</div>
+    <div class="slide-message">「弾がすり抜ける」「斜め壁に引っかかる」などの手触りストレスを数学的に徹底排除</div>
+
+    <div class="slide-body">
+      <div class="text-column">
+        <div class="point-item">
+          <div class="point-title"><span class="marker"></span>高速弾のすり抜けを完全阻止する「Swept-Capsule CCD」</div>
+          <div class="point-desc">
+            前後フレームの弾丸移動を連続した線分とし、障害物との交差パラメータ t（0.0〜1.0）を解く連続衝突判定（CCD）を自作。どんなに高速な弾丸でも薄い壁をすり抜けない強固な着弾保証を実現しました。
+          </div>
+        </div>
+
+        <div class="point-item">
+          <div class="point-title"><span class="marker"></span>自由な角度の壁に密着できる「Slab法 任意回転OBB」</div>
+          <div class="point-desc">
+            AABB（軸平行）では不可能な斜めの遮蔽物・障害物に対し、3x3ローカル回転基底へ射影するSlab法を採用。傾いたオブジェクトに対しても隙間や引っかかりのない精密な当たり判定を構築しました。
+          </div>
+        </div>
+
+        <div class="point-item">
+          <div class="point-title"><span class="marker"></span>オブジェクト増加でも破綻しない「空間分割ハッシュ O(1)」</div>
+          <div class="point-desc">
+            総当たり判定 O(N²) を廃止し、2048エントリの空間ハッシュグリッド（セル幅10m）を実装。弾丸近傍のオブジェクトのみを定数時間 O(1) で高速探索し、60fps固定を堅持します。
+          </div>
+        </div>
+
+        <div class="callout-box">
+          <strong>エンジンの真価：</strong>市販エンジンに頼らず、交差数式や空間ハッシュを自らC++でコーディングすることで、ゲームに求められる「当たり判定の心地よさ」と「60fps固定の軽さ」を両立させました。
+        </div>
+      </div>
+
+      <div class="image-column" id="img-slot-4">
+        <!-- Slide 4: 本格エンジニアリング仕様 DirectX 12 衝突デバッグビューポート (GDC Dark Viewport) -->
+        <svg viewBox="0 0 440 320" style="width:100%; height:100%; background:#090d16; font-family:'Zen Kaku Gothic New', sans-serif;">
+          <defs>
+            <linearGradient id="ray-grad" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stop-color="#38bdf8" stop-opacity="0.4"/>
+              <stop offset="100%" stop-color="#38bdf8" stop-opacity="1"/>
+            </linearGradient>
+          </defs>
+
+          <!-- ─── 上部：DirectX 12 デバッグタイトルバー（スレートブラック） ─── -->
+          <rect x="0" y="0" width="440" height="24" fill="#0b0f19" stroke="#1e293b" stroke-width="1"/>
+          <text x="12" y="16" fill="#f8fafc" font-family="Consolas, 'JetBrains Mono', monospace" font-size="9.5" font-weight="700" letter-spacing="0.3px">DIRECTX 12 COLLISION BENCHMARK &amp; DEBUG VIEW</text>
+          <circle cx="318" cy="12" r="3.5" fill="#22c55e"/>
+          <text x="430" y="16" fill="#4ade80" font-family="Consolas, 'JetBrains Mono', monospace" font-size="9.5" font-weight="700" letter-spacing="0.5px" text-anchor="end">60.0 FPS [0.38ms]</text>
+
+          <!-- ─── 3Dパースペクティブ風デバッグ床グリッド（ダークスレート線） ─── -->
+          <g stroke="#1e293b" stroke-width="1">
+            <!-- 奥行き放射線 -->
+            <line x1="220" y1="90" x2="-40" y2="280"/>
+            <line x1="220" y1="90" x2="40"  y2="280"/>
+            <line x1="220" y1="90" x2="120" y2="280"/>
+            <line x1="220" y1="90" x2="200" y2="280"/>
+            <line x1="220" y1="90" x2="280" y2="280"/>
+            <line x1="220" y1="90" x2="360" y2="280"/>
+            <line x1="220" y1="90" x2="440" y2="280"/>
+            <line x1="220" y1="90" x2="520" y2="280"/>
+            <!-- 水平グリッド線 -->
+            <line x1="140" y1="130" x2="300" y2="130"/>
+            <line x1="100" y1="165" x2="340" y2="165"/>
+            <line x1="60"  y1="205" x2="380" y2="205"/>
+            <line x1="20"  y1="245" x2="420" y2="245"/>
+          </g>
+
+          <!-- ─── 左上：技術比較注記（ダークカード仕様） ─── -->
+          <rect x="12" y="28" width="225" height="38" fill="#111726" stroke="#253046" stroke-width="1.2" rx="3"/>
+          <text x="18" y="42" fill="#f43f5e" font-size="8.5" font-weight="bold">● 離散点判定 : 弾速＞壁厚で貫通（トンネリング）</text>
+          <text x="18" y="56" fill="#34d399" font-size="8.5" font-weight="bold">● 自作CCD    : 前後線分とOBBのSlab交差で表面停止</text>
+
+          <!-- ─── 右上：リアルタイム ImGui デバッグログHUD（ダークカード仕様） ─── -->
+          <rect x="270" y="28" width="158" height="78" fill="#111726" stroke="#253046" stroke-width="1.2" rx="3"/>
+          <rect x="270" y="28" width="158" height="16" fill="#182236" rx="3 3 0 0"/>
+          <text x="278" y="40" fill="#94a3b8" font-family="Consolas, 'JetBrains Mono', monospace" font-size="8" font-weight="bold">[RAYCAST_OBB_RESULT]</text>
+          
+          <g font-family="Consolas, 'JetBrains Mono', monospace" font-size="7.5" fill="#e2e8f0" letter-spacing="0.2px">
+            <text x="278" y="55">Status   : <tspan fill="#34d399" font-weight="bold">HIT (CCD Intersect)</tspan></text>
+            <text x="278" y="66">Param t  : <tspan fill="#38bdf8" font-weight="bold">0.624</tspan> / 1.000</text>
+            <text x="278" y="77">Hit Pos  : [14.2, 1.5, -3.8]</text>
+            <text x="278" y="88">Normal N : [<tspan fill="#fbbf24" font-weight="bold">-0.71, 0.00, 0.71</tspan>]</text>
+            <text x="278" y="99">Tunneling: <tspan fill="#34d399" font-weight="bold">PREVENTED (100%)</tspan></text>
+          </g>
+
+          <!-- ─── メイン：3D回転OBBワイヤーフレーム ─── -->
+          <!-- OBB 背面面 -->
+          <polygon points="245,142 315,122 335,202 265,222" fill="#34d399" fill-opacity="0.08"/>
+          
+          <!-- OBB 背面ワイヤーフレーム（破線） -->
+          <g stroke="#34d399" stroke-width="1.2" stroke-dasharray="3,2" stroke-opacity="0.7">
+            <line x1="245" y1="142" x2="315" y2="122"/>
+            <line x1="315" y1="122" x2="335" y2="202"/>
+            <line x1="335" y1="202" x2="265" y2="222"/>
+            <line x1="265" y1="222" x2="245" y2="142"/>
+          </g>
+
+          <!-- OBB 前面面 -->
+          <polygon points="215,160 285,140 305,220 235,240" fill="#34d399" fill-opacity="0.14"/>
+
+          <!-- OBB 接続線（奥行きエッジ 4本） -->
+          <g stroke="#34d399" stroke-width="1.5">
+            <line x1="215" y1="160" x2="245" y2="142"/>
+            <line x1="285" y1="140" x2="315" y2="122"/>
+            <line x1="305" y1="220" x2="335" y2="202"/>
+            <line x1="235" y1="240" x2="265" y2="222"/>
+          </g>
+
+          <!-- OBB 前面ワイヤーフレーム（実線） -->
+          <polygon points="215,160 285,140 305,220 235,240" fill="none" stroke="#34d399" stroke-width="2"/>
+
+          <!-- OBB 頂点マーカー（Vertex） -->
+          <circle cx="215" cy="160" r="2.5" fill="#ffffff" stroke="#34d399" stroke-width="1.5"/>
+          <circle cx="285" cy="140" r="2.5" fill="#ffffff" stroke="#34d399" stroke-width="1.5"/>
+          <circle cx="305" cy="220" r="2.5" fill="#ffffff" stroke="#34d399" stroke-width="1.5"/>
+          <circle cx="235" cy="240" r="2.5" fill="#ffffff" stroke="#34d399" stroke-width="1.5"/>
+
+          <!-- OBB 内部：ローカル軸（X:赤, Y:緑, Z:青） -->
+          <g transform="translate(270, 162)">
+            <!-- X軸（赤） -->
+            <line x1="0" y1="0" x2="24" y2="-7" stroke="#f43f5e" stroke-width="2"/>
+            <polygon points="24,-7 17,-10 19,-4" fill="#f43f5e"/>
+            <text x="28" y="-5" fill="#f43f5e" font-family="Consolas, 'JetBrains Mono', monospace" font-size="8" font-weight="bold">X'</text>
+            <!-- Y軸（緑） -->
+            <line x1="0" y1="0" x2="0" y2="-22" stroke="#34d399" stroke-width="2"/>
+            <polygon points="0,-22 -3,-15 3,-15" fill="#34d399"/>
+            <text x="4" y="-20" fill="#34d399" font-family="Consolas, 'JetBrains Mono', monospace" font-size="8" font-weight="bold">Y'</text>
+            <!-- Z軸（青） -->
+            <line x1="0" y1="0" x2="-16" y2="11" stroke="#38bdf8" stroke-width="2"/>
+            <polygon points="-16,11 -10,7 -13,4" fill="#38bdf8"/>
+            <text x="-24" y="17" fill="#38bdf8" font-family="Consolas, 'JetBrains Mono', monospace" font-size="8" font-weight="bold">Z'</text>
+            <circle cx="0" cy="0" r="2" fill="#ffffff"/>
+          </g>
+
+          <!-- OBB 名称ラベル（ダークバッジ ＋ グリーン枠線） -->
+          <g transform="translate(185, 252)">
+            <rect x="0" y="0" width="160" height="17" fill="#0f172a" stroke="#34d399" stroke-width="1.2" rx="3"/>
+            <text x="80" y="12" fill="#34d399" font-family="Consolas, 'JetBrains Mono', monospace" font-size="8.5" font-weight="bold" text-anchor="middle">OBB BoxCollider (Local 3x3)</text>
+          </g>
+
+          <!-- ─── 弾丸の連続レイキャスト軌道（Swept Line） ─── -->
+          <!-- 始点 P0 (Frame t) -->
+          <g transform="translate(14, 168)">
+            <rect x="0" y="0" width="84" height="16" fill="#0f172a" stroke="#38bdf8" stroke-width="1.2" rx="2"/>
+            <text x="42" y="11.5" fill="#38bdf8" font-family="Consolas, 'JetBrains Mono', monospace" font-size="8" font-weight="bold" text-anchor="middle">P0 (Frame t)</text>
+          </g>
+          <circle cx="25" cy="194" r="4.5" fill="#38bdf8" stroke="#ffffff" stroke-width="1.5"/>
+          
+          <!-- 連続交差レイ（P0 -> Hit Point） -->
+          <line x1="25" y1="194" x2="222" y2="188" stroke="url(#ray-grad)" stroke-width="2.5"/>
+
+          <!-- 仮想貫通レイ（Hit Point -> P1: 赤破線） -->
+          <line x1="222" y1="188" x2="380" y2="182" stroke="#f43f5e" stroke-width="1.5" stroke-dasharray="4,3"/>
+
+          <!-- 仮想貫通点 P1（ダーク ＋ クリムゾン枠線） -->
+          <circle cx="380" cy="182" r="4.5" fill="#f43f5e" stroke="#ffffff" stroke-width="1.5"/>
+          <g transform="translate(325, 134)">
+            <rect x="0" y="0" width="110" height="28" fill="#0f172a" stroke="#f43f5e" stroke-width="1.2" rx="3"/>
+            <text x="55" y="12" fill="#fda4af" font-family="Consolas, 'JetBrains Mono', monospace" font-size="8" font-weight="bold" text-anchor="middle">P1 (Frame t+1: 貫通点)</text>
+            <text x="55" y="23" fill="#f43f5e" font-size="7.5" font-weight="bold" text-anchor="middle">※点判定だとすり抜ける</text>
+            <!-- 引き出し線 -->
+            <line x1="55" y1="28" x2="55" y2="44" stroke="#f43f5e" stroke-width="1"/>
+          </g>
+
+          <!-- ─── デバッグ法線ベクトル N（アンバー実線） ─── -->
+          <line x1="222" y1="188" x2="162" y2="138" stroke="#fbbf24" stroke-width="2.2"/>
+          <polygon points="159,135 170,139 165,146" fill="#fbbf24"/>
+          <!-- 法線バッジ（ダーク ＋ ゴールド枠線） -->
+          <g transform="translate(75, 122)">
+            <rect x="0" y="0" width="66" height="18" fill="#0f172a" stroke="#fbbf24" stroke-width="1.2" rx="2"/>
+            <text x="33" y="12.5" fill="#fbbf24" font-family="Consolas, 'JetBrains Mono', monospace" font-size="8" font-weight="bold" text-anchor="middle">Normal N</text>
+          </g>
+
+          <!-- ─── 跳弾ベクトル（Reflected Ray） ─── -->
+          <line x1="222" y1="188" x2="155" y2="234" stroke="#fbbf24" stroke-width="1.5" stroke-dasharray="3,2"/>
+          <!-- 跳弾バッジ（ダーク ＋ ゴールド枠線） -->
+          <g transform="translate(62, 236)">
+            <rect x="0" y="0" width="78" height="16" fill="#0f172a" stroke="#fbbf24" stroke-width="1" rx="2"/>
+            <text x="39" y="11.5" fill="#fbbf24" font-family="Consolas, 'JetBrains Mono', monospace" font-size="7.5" font-weight="bold" text-anchor="middle">Reflected Ray</text>
+          </g>
+
+          <!-- ─── 着弾点（Hit Point: t = 0.624） ─── -->
+          <circle cx="222" cy="188" r="5.5" fill="#fbbf24" stroke="#ffffff" stroke-width="2"/>
+          <!-- 十字クロスヘア -->
+          <line x1="215" y1="188" x2="229" y2="188" stroke="#ffffff" stroke-width="1.5"/>
+          <line x1="222" y1="181" x2="222" y2="195" stroke="#ffffff" stroke-width="1.5"/>
+          
+          <!-- 着弾バッジ（ダーク ＋ ゴールド枠線 ＋ クリア空間配置） -->
+          <g transform="translate(130, 156)">
+            <rect x="0" y="0" width="82" height="17" fill="#0f172a" stroke="#fbbf24" stroke-width="1.5" rx="2"/>
+            <text x="41" y="12" fill="#fbbf24" font-family="Consolas, 'JetBrains Mono', monospace" font-size="8" font-weight="bold" text-anchor="middle">HIT (t=0.624)</text>
+            <!-- 引き出し線 -->
+            <line x1="82" y1="17" x2="90" y2="30" stroke="#fbbf24" stroke-width="1"/>
+          </g>
+
+          <!-- ─── 下部ステータスバー：エンジニアリング仕様（スレートブラック） ─── -->
+          <rect x="0" y="278" width="440" height="42" fill="#0b0f19" stroke="#1e293b" stroke-width="1"/>
+          <g font-family="Consolas, 'JetBrains Mono', monospace" font-size="8.5" fill="#cbd5e1">
+            <text x="12" y="294"><tspan fill="#38bdf8" font-weight="bold">[1] SPATIAL HASH</tspan> : 2048 cells / 10m grid (近傍探索 O(1) アルゴリズム)</text>
+            <text x="12" y="309"><tspan fill="#4ade80" font-weight="bold">[2] SLAB METHOD</tspan>  : 任意回転OBB (3x3 基底射影)  ｜  <tspan fill="#facc15" font-weight="bold">[3] SWEPT CCD</tspan> : 連続交差パラメータ t 解法</text>
+          </g>
+        </svg>
+        <div class="image-footer-caption">
+          <span>自作精密衝突判定基盤（Slab法 OBB ＆ Swept CCD）</span>
+          <span>空間ハッシュ O(1) 探索 ｜ すり抜けゼロ保証</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════
+       SLIDE 6 — 相談事項
+  ══════════════════════════════════════ -->
+  <div class="slide" id="slide-6">
+    <div class="header-top">
+      <div class="slide-meta">06 ｜ CONSULTATION</div>
+      <div class="slide-category-tag">作品相談 ＆ 就職活動</div>
+    </div>
+    <div class="slide-headline">現場のプログラマ社員の方に相談したいこと</div>
+    <div class="slide-message">作品のこれからの拡張と、就職活動での技術アピールについてアドバイスをいただきたいです</div>
+
+    <div class="consult-grid">
+      <div class="consult-box">
+        <div class="consult-num">01</div>
+        <div class="consult-heading">敵AIやゲーム規模が大きくなったときの現場のコード設計について</div>
+        <div class="consult-text">
+          本作ではFSMに加え、ImGuiでノードを繋ぐ「自作ビヘイビアツリーエディタ」を構築しました。<br><br>
+          今後、敵の種類（近接兵・スナイパー等）や複雑な包囲行動を追加していくにあたり、<br><br>
+          商業開発の現場では、<strong>「AIの肥大化を防ぎ、プランナーとも協調しながら破綻せずに拡張していくために、どのようなBehavior Treeやタスクシステムの設計・運用をしているか」</strong>を伺いたいです。
+        </div>
+      </div>
+
+      <div class="consult-box">
+        <div class="consult-num">02</div>
+        <div class="consult-heading">自作ツール・エンジン経験とゲームプレイ実装のアピールバランス</div>
+        <div class="consult-text">
+          自作DirectX 12エンジンや開発用エディタを作ることで制作環境を整えつつ、本作では「遊んで気持ちいいゲームプレイ」を最優先に作り込みました。<br><br>
+          商用エンジン（Unreal/Unity）での開発が主流の今、新卒採用の現場において、<br><br>
+          <strong>「ツールやエンジンを自作できる技術力」と「ゲームの手触りや面白さを作る力」をどのような切り口や比率で伝えると、ゲームプログラマとして最も評価されるか</strong>を教えていただきたいです。
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- #presentation -->
+
+<div class="progress-track">
+  <div class="progress-fill" id="prog-bar"></div>
+</div>
+
+<div class="nav-bar">
+  <div id="slide-num-label">SLIDE 1 / 6</div>
+  <div>← → ARROW KEYS / CLICK TO ADVANCE （画像クリックで任意画像に差し替え可能）</div>
+</div>
+
+<script>
+  const slides   = document.querySelectorAll('.slide');
+  const progBar  = document.getElementById('prog-bar');
+  const numLabel = document.getElementById('slide-num-label');
+  let current    = 0;
+
+  function showSlide(idx) {
+    slides[current].classList.remove('active');
+    current = Math.max(0, Math.min(idx, slides.length - 1));
+    slides[current].classList.add('active');
+    
+    const pct = (current / (slides.length - 1)) * 100;
+    progBar.style.width = pct + '%';
+    numLabel.textContent = `SLIDE ${current + 1} / ${slides.length}`;
+    history.replaceState(null, '', '#slide-' + (current + 1));
+  }
+
+  function getInitialSlide() {
+    const hash = window.location.hash;
+    if (hash && hash.startsWith('#slide-')) {
+      const num = parseInt(hash.replace('#slide-', ''), 10);
+      if (!isNaN(num)) {
+        // 1-indexed (1〜6)
+        if (num >= 1 && num <= slides.length) return num - 1;
+        // 互換: 0なら0番目
+        if (num === 0) return 0;
+      }
+    }
+    const params = new URLSearchParams(window.location.search);
+    if (params.has('slide')) {
+      const s = parseInt(params.get('slide'), 10);
+      if (!isNaN(s)) {
+        if (s >= 1 && s <= slides.length) return s - 1;
+        if (s === 0) return 0;
+      }
+    }
+    return 0;
+  }
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown'  || e.key === ' ') showSlide(current + 1);
+    if (e.key === 'ArrowLeft'  || e.key === 'ArrowUp')                      showSlide(current - 1);
+  });
+
+  document.getElementById('presentation').addEventListener('click', (e) => {
+    if (e.target.closest('.image-column')) return;
+    showSlide(current + 1);
+  });
+
+  // 画像アップローダー（クリックで自由に画像差し替え可能）
+  const fileUploader = document.getElementById('file-uploader');
+  let activeCol = null;
+
+  document.querySelectorAll('.image-column').forEach(col => {
+    col.addEventListener('click', (e) => {
+      e.stopPropagation();
+      activeCol = col;
+      fileUploader.click();
+    });
+
+    col.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      col.style.borderColor = 'var(--accent)';
+    });
+
+    col.addEventListener('dragleave', () => {
+      col.style.borderColor = '';
+    });
+
+    col.addEventListener('drop', (e) => {
+      e.preventDefault();
+      col.style.borderColor = '';
+      if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+        attachImage(col, e.dataTransfer.files[0]);
+      }
+    });
+  });
+
+  fileUploader.addEventListener('change', (e) => {
+    if (activeCol && e.target.files && e.target.files[0]) {
+      attachImage(activeCol, e.target.files[0]);
+    }
+  });
+
+  function attachImage(col, file) {
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const img = col.querySelector('img');
+      img.src = ev.target.result;
+      col.classList.add('has-img');
+    };
+    reader.readAsDataURL(file);
+  }
+
+  showSlide(getInitialSlide());
+</script>
+
+</body>
+</html>

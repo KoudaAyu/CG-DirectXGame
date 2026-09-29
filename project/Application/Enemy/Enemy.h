@@ -23,23 +23,25 @@ public:
     };
 
 public:
-    void Initialize(Object3dCom* object3dCom, Camera* camera);
-    void Update(WindowAPI* windowAPI, const Vector3* targetPosition, const std::vector<std::unique_ptr<Obstacle>>& obstacles, float deltaTime, bool isPlayerInCover = false);
-    void Draw(const RenderContext& ctx);
-    void Finalize();
-    void OnHit(const Vector3& attackerPos);
+    virtual ~Enemy() = default;
 
-    std::unique_ptr<Bullet> TryShoot(const Vector3& targetPosition);
+    virtual void Initialize(Object3dCom* object3dCom, Camera* camera);
+    virtual void Update(WindowAPI* windowAPI, const Vector3* targetPosition, const std::vector<std::unique_ptr<Obstacle>>& obstacles, float deltaTime, bool isPlayerInCover = false);
+    virtual void Draw(const RenderContext& ctx);
+    virtual void Finalize();
+    virtual void OnHit(const Vector3& attackerPos);
 
-    Vector3 GetPosition() const { return object3d_ ? object3d_->GetTranslate() : Vector3{ 0.0f, 0.0f, 0.0f }; }
-    void SetPosition(const Vector3& pos) { if (object3d_) object3d_->SetTranslate(pos); }
+    virtual std::unique_ptr<Bullet> TryShoot(const Vector3& targetPosition);
+
+    virtual Vector3 GetPosition() const { return object3d_ ? object3d_->GetTranslate() : Vector3{ 0.0f, 0.0f, 0.0f }; }
+    virtual void SetPosition(const Vector3& pos) { if (object3d_) object3d_->SetTranslate(pos); }
 
     int GetHP() const { return hp_; }
     int GetMaxHP() const { return maxHp_; }
     bool IsDead() const { return isDead_; }
     bool GetJustRespawned() const { return justRespawned_; }
     void ClearJustRespawned() { justRespawned_ = false; }
-    void SetHPBarSprites(Sprite* bg, Sprite* fg) { hpBarBg_ = bg; hpBarFg_ = fg; }
+    virtual void SetHPBarSprites(Sprite* bg, Sprite* fg) { hpBarBg_ = bg; hpBarFg_ = fg; }
 
     // AI索敵ゲッター
     AIState GetAIState() const { return state_; }
@@ -52,10 +54,10 @@ public:
     float GetYaw() const { return object3d_ ? object3d_->GetRotate().y : 0.0f; }
 
     // 音源検知のトリガー
-    void HearNoise(const Vector3& noisePosition);
-    void AlertEnemy(const Vector3& targetPos);
+    virtual void HearNoise(const Vector3& noisePosition);
+    virtual void AlertEnemy(const Vector3& targetPos);
 
-private:
+protected:
     bool FaceTarget(const Vector3& targetPosition, float deltaTime = 0.016f);
     bool HasLineOfSight(const Vector3& playerPos, const std::vector<std::unique_ptr<Obstacle>>& obstacles);
 

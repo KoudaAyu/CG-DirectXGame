@@ -119,17 +119,13 @@ void CharacterEffectController::UpdateEnemyEffects(float /*deltaTime*/)
 		}
 	};
 
-	if (scene_->enemy_ && !scene_->enemy_->IsDead() &&
-		scene_->enemy_->GetDetectionMeter() > 0.0f &&
-		scene_->enemy_->GetAIState() != Enemy::AIState::Chase)
+	for (auto& enemy : scene_->GetEnemies())
 	{
-		emitSuspicionAura(scene_->enemy_->GetPosition(), scene_->enemy_->GetDetectionMeter());
-	}
-
-	if (scene_->movingEnemy_ && !scene_->movingEnemy_->IsDead() &&
-		scene_->movingEnemy_->GetDetectionMeter() > 0.0f &&
-		scene_->movingEnemy_->GetAIState() != MovingEnemy::AIState::Chase)
-	{
-		emitSuspicionAura(scene_->movingEnemy_->GetPosition(), scene_->movingEnemy_->GetDetectionMeter());
+		if (enemy && !enemy->IsDead() &&
+			enemy->GetDetectionMeter() > 0.0f &&
+			enemy->GetAIState() != Enemy::AIState::Chase)
+		{
+			emitSuspicionAura(enemy->GetPosition(), enemy->GetDetectionMeter());
+		}
 	}
 }

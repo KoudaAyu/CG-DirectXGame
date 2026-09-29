@@ -21,8 +21,7 @@ struct GamePlayHUDContext
 {
     Camera* camera                           = nullptr;
     Player* player                           = nullptr;
-    Enemy* enemy                             = nullptr;
-    MovingEnemy* movingEnemy                 = nullptr;
+    const std::vector<std::unique_ptr<Enemy>>* enemies = nullptr;
     const std::vector<std::unique_ptr<Obstacle>>* obstacles = nullptr;
     const std::vector<std::unique_ptr<Target>>* targets     = nullptr;
     const std::vector<std::unique_ptr<TutorialSign>>* tutorialSigns = nullptr;

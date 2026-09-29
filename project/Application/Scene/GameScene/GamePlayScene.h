@@ -146,6 +146,22 @@ public:
     /// </summary>
     const std::vector<std::unique_ptr<Obstacle>>& GetObstacles() const { return obstacles_; }
 
+    /// <summary>
+    /// 全敵キャラクターリストの取得
+    /// </summary>
+    const std::vector<std::unique_ptr<Enemy>>& GetEnemies() const { return enemies_; }
+    std::vector<std::unique_ptr<Enemy>>& GetEnemies() { return enemies_; }
+
+    /// <summary>
+    /// 敵キャラクターの動的スポーン生成
+    /// </summary>
+    Enemy* SpawnEnemy(const Vector3& position, bool isPatrol = false);
+
+    /// <summary>
+    /// 脱出阻止・増援フェーズの発動
+    /// </summary>
+    void TriggerReinforcements();
+
 private:
     // --- 内部初期化 & 更新メソッド ---
     float AdvanceDeltaTime();
@@ -192,8 +208,9 @@ private:
 
     // --- ゲームエンティティ ---
     std::unique_ptr<Player> player_;
-    std::unique_ptr<Enemy> enemy_;
-    std::unique_ptr<MovingEnemy> movingEnemy_;
+    std::vector<std::unique_ptr<Enemy>> enemies_;
+    std::vector<Vector3> reinforceSpawnPoints_;
+    bool reinforcementTriggered_ = false;
     std::vector<std::unique_ptr<Obstacle>> obstacles_;
     std::vector<std::unique_ptr<Target>> targets_;
     std::vector<std::unique_ptr<TutorialSign>> tutorialSigns_;
