@@ -250,6 +250,7 @@ private:
     uint32_t smokeTextureIndex_     = TextureManager::kInvalidTextureIndex;
     uint32_t fenceTextureIndex_     = TextureManager::kInvalidTextureIndex;
     uint32_t starburstTextureIndex_ = TextureManager::kInvalidTextureIndex;
+    uint32_t minovskyCircleTextureIndex_ = TextureManager::kInvalidTextureIndex;
 
     // --- ゲームステート & タイマー ---
     bool allTargetsDestroyed_ = false;

@@ -390,6 +390,7 @@ void GamePlayScene::InitializeAudioAndParticles()
 	smokeTextureIndex_ = TextureManager::GetInstance()->Load("Resources/smoke_dark.png");
 	fenceTextureIndex_ = TextureManager::GetInstance()->Load("Resources/fence.png");
 	starburstTextureIndex_ = TextureManager::GetInstance()->Load("Resources/starburst.png");
+	minovskyCircleTextureIndex_ = particleTextureB;
 	if (hitEffect_)
 	{
 		hitEffect_->SetPlaneParticleTextureIndex(particleTextureB);

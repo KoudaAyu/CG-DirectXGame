@@ -26,6 +26,22 @@ struct AppParticle
 	// Relative movement
 	bool followPlayer = false;
 	Vector3 offsetFromPlayer;
+
+	// Advanced dynamics (for Minovsky & aerodynamic flight effects)
+	float drag = 0.0f;
+	float initialScale = 0.0f;
+	float targetScale = 0.0f;
+	float wobbleFreq = 0.0f;
+	float wobbleAmp = 0.0f;
+	Vector3 wobbleAxis = { 0.0f, 1.0f, 0.0f };
+
+	// Advanced optical & GPU dynamics
+	float twinklePhase = 0.0f;
+	float twinkleSpeed = 0.0f;
+	Vector4 endColor = { 0.0f, 0.0f, 0.0f, 0.0f };
+	bool hasColorShift = false;
+	float curlFreq = 0.0f;
+	float curlAmp = 0.0f;
 };
 
 class AppParticleManager
@@ -68,7 +84,19 @@ public:
 	void EmitRiverWaveRipples(std::mt19937& randomEngine, uint32_t waterTexIndex);
 	void EmitRiverSplashDroplet(std::mt19937& randomEngine, const Vector3& position, uint32_t waterTexIndex);
 
+	// ミノフスキー粒子エフェクト（閃光のハサウェイ・キルケーの魔女風 / 3D空間加算合成）
+	void EmitMinovskySwirl(std::mt19937& randomEngine, const Vector3& center, float radius, float height, float angle, bool isMagenta, uint32_t textureIndex, float scale = 0.22f);
+	void EmitMinovskyStream(std::mt19937& randomEngine, const Vector3& origin, const Vector3& velocity, bool isMagenta, uint32_t textureIndex, float scale = 0.16f);
+	void EmitMinovskyBurst(std::mt19937& randomEngine, const Vector3& center, int count, uint32_t circleTexIndex, uint32_t starTexIndex, float power = 4.0f);
+	void EmitMinovskyBokeh(std::mt19937& randomEngine, const Vector3& position, float scale, bool isMagenta, uint32_t textureIndex);
+	void EmitMinovskyDashTrail(std::mt19937& randomEngine, const Vector3& position, const Vector3& moveDirection, uint32_t circleTexIndex, uint32_t starTexIndex);
+	void EmitMinovskyFlightAura(std::mt19937& randomEngine, const Vector3& center, int count, uint32_t circleTexIndex, uint32_t starTexIndex);
+	void EmitMinovskyGlitter(std::mt19937& randomEngine, const Vector3& position, float scale, uint32_t starTexIndex);
 
+	// マウス水面波紋インタラクション（川の波・引き波・波紋）
+	void EmitMouseWaveWake(std::mt19937& randomEngine, const Vector3& pos, const Vector3& moveDir, float speed, uint32_t circleTex, uint32_t starTex);
+	void EmitMouseRippleRing(std::mt19937& randomEngine, const Vector3& center, float power, uint32_t circleTex, uint32_t starTex);
+	void ApplyMouseWaveDisturbance(const Vector3& mouseWorldPos, const Vector3& mouseWorldVel, float radius, float force);
 
 private:
 	struct Vertex
@@ -81,7 +109,7 @@ private:
 	ParticleManager* enginePM_ = nullptr;
 	std::list<AppParticle> particles_;
 
-	static const uint32_t kNumMaxInstances = 1024;
+	static const uint32_t kNumMaxInstances = 8192;
 	Microsoft::WRL::ComPtr<ID3D12Resource> instancingResource_ = nullptr;
 	ParticleManager::ParticleCS* instanceData_ = nullptr;
 	uint32_t instancingSrvIndex_ = 0;
@@ -92,6 +120,8 @@ private:
 
 	Microsoft::WRL::ComPtr<ID3D12Resource> perViewResource_ = nullptr;
 	ParticleManager::PerView* perViewData_ = nullptr;
+
+	Microsoft::WRL::ComPtr<ID3D12Resource> defaultMaterialResource_ = nullptr;
 
 public:
 	void Draw();

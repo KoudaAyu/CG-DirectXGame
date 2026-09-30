@@ -58,6 +58,14 @@ void CharacterEffectController::UpdatePlayerEffects(float deltaTime)
 				dodgeDir,
 				scene_->smokeTextureIndex_
 			);
+			// ミノフスキー高速散布トレイル（ダッシュ・回避時の閃光光流）
+			scene_->appParticleManager_->EmitMinovskyDashTrail(
+				scene_->particleManager->GetRandomEngine(),
+				pPos,
+				dodgeDir,
+				scene_->minovskyCircleTextureIndex_,
+				scene_->starburstTextureIndex_
+			);
 			dodgeDustTimer_ = 0.0f;
 		}
 	}

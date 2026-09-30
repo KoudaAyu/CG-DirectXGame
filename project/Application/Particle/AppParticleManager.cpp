@@ -60,6 +60,20 @@ void AppParticleManager::Initialize(ParticleManager* enginePM)
 		perViewResource_ = dxCommon->CreateBufferResource(dxCommon->GetDevice().Get(), sizeof(ParticleManager::PerView));
 		perViewResource_->Map(0, nullptr, reinterpret_cast<void**>(&perViewData_));
 		std::memset(perViewData_, 0, sizeof(ParticleManager::PerView));
+
+		struct DefaultMatCB
+		{
+			Vector4 color{ 1.0f, 1.0f, 1.0f, 1.0f };
+			int32_t enableLighting = 0;
+			float padding[3]{};
+			Matrix4x4 uvTransform = MakeIdentity4x4();
+		};
+		defaultMaterialResource_ = dxCommon->CreateBufferResource(dxCommon->GetDevice().Get(), sizeof(DefaultMatCB));
+		void* matPtr = nullptr;
+		defaultMaterialResource_->Map(0, nullptr, &matPtr);
+		DefaultMatCB dMat{};
+		std::memcpy(matPtr, &dMat, sizeof(DefaultMatCB));
+		defaultMaterialResource_->Unmap(0, nullptr);
 	}
 }
 
@@ -95,7 +109,7 @@ void AppParticleManager::Update(float deltaTime, const Vector3& playerPos)
 	if (!enginePM_) return;
 
 	// パーティクル数が上限を超えた場合、古い順に即時回収して処理落ちを完全防止
-	while (particles_.size() > 512)
+	while (particles_.size() > 7600)
 	{
 		particles_.pop_front();
 	}
@@ -108,6 +122,13 @@ void AppParticleManager::Update(float deltaTime, const Vector3& playerPos)
 		{
 			it = particles_.erase(it);
 			continue;
+		}
+
+		// 空気抵抗（Drag）減速
+		if (it->drag > 0.0f)
+		{
+			float decay = (std::max)(0.0f, 1.0f - it->drag * deltaTime);
+			it->velocity = it->velocity * decay;
 		}
 
 		Vector3 pos;
@@ -123,7 +144,7 @@ void AppParticleManager::Update(float deltaTime, const Vector3& playerPos)
 			pos = it->transform.GetTranslate() + it->velocity * deltaTime;
 
 			float groundY = 0.0f;
-			if (pos.y < groundY && it->velocity.y < 0.0f)
+			if (pos.y < groundY && it->velocity.y < 0.0f && it->bounceElasticity > 0.0f)
 			{
 				pos.y = groundY;
 				it->velocity.y = -it->velocity.y * it->bounceElasticity;
@@ -131,7 +152,31 @@ void AppParticleManager::Update(float deltaTime, const Vector3& playerPos)
 				it->velocity.z *= 0.7f;
 			}
 		}
+
+		// カール乱流（Fluid Curl Turbulence）
+		if (it->curlAmp > 0.0f && it->curlFreq > 0.0f)
+		{
+			float waveY = std::sin(pos.y * it->curlFreq + it->currentTime * 4.2f);
+			float waveX = std::cos(pos.x * it->curlFreq + it->currentTime * 3.8f);
+			pos.x += waveY * it->curlAmp * deltaTime;
+			pos.z += waveX * it->curlAmp * deltaTime;
+		}
+
+		// 有機的ゆらぎ（Sinusoidal Flutter / Wobble）
+		if (it->wobbleFreq > 0.0f && it->wobbleAmp > 0.0f)
+		{
+			float sine = std::sin(it->currentTime * it->wobbleFreq);
+			pos += it->wobbleAxis * (sine * it->wobbleAmp * deltaTime);
+		}
 		it->transform.SetTranslate(pos);
+
+		// スケール補間（発生時ふわりと膨らみ、消滅時小さく輝く）
+		if (it->initialScale > 0.0f && it->targetScale > 0.0f && it->lifeTime > 0.0f)
+		{
+			float t = std::clamp(it->currentTime / it->lifeTime, 0.0f, 1.0f);
+			float s = it->initialScale + (it->targetScale - it->initialScale) * t;
+			it->transform.SetScale({ s, s, 1.0f });
+		}
 
 		Vector3 rot = it->transform.GetRotate();
 		rot.z += it->angularVelocity * deltaTime;
@@ -1077,6 +1122,500 @@ void AppParticleManager::EmitRiverSplashDroplet(std::mt19937& randomEngine, cons
 	}
 }
 
+void AppParticleManager::EmitMinovskySwirl(std::mt19937& randomEngine, const Vector3& center, float radius, float height, float angle, bool isMagenta, uint32_t textureIndex, float scale)
+{
+	std::uniform_real_distribution<float> jitterDist(-0.04f, 0.04f);
+	std::uniform_real_distribution<float> scaleJitter(0.8f, 1.25f);
+	std::uniform_real_distribution<float> lifeDist(1.2f, 2.2f);
+	std::uniform_real_distribution<float> spinDist(-6.0f, 6.0f);
+	std::uniform_real_distribution<float> twinklePhaseDist(0.0f, 6.2831853f);
+	std::uniform_real_distribution<float> twinkleSpeedDist(8.0f, 18.0f);
+
+	float r = radius + jitterDist(randomEngine);
+	Vector3 pos = {
+		center.x + std::cos(angle) * r,
+		center.y + height + jitterDist(randomEngine),
+		center.z + std::sin(angle) * r
+	};
+
+	// 軌道の接線速度 + 上昇気流（キルケーの魔女の有機的上昇）
+	Vector3 tangent = { -std::sin(angle), 0.38f, std::cos(angle) };
+	Vector3 vel = tangent * (0.85f + jitterDist(randomEngine) * 2.0f) + Vector3{ 0.0f, 0.55f, 0.0f };
+
+	AppParticle p{};
+	p.transform.Initialize();
+	p.transform.SetTranslate(pos);
+
+	float actualScale = scale * scaleJitter(randomEngine);
+	p.transform.SetScale({ actualScale, actualScale, 1.0f });
+
+	std::uniform_real_distribution<float> rotDist(0.0f, 6.2831853f);
+	p.transform.SetRotate({ 0.0f, 0.0f, rotDist(randomEngine) });
+
+	// 色設定: 発光シアン ⇔ ネオンマゼンタ（波長シフト）
+	if (isMagenta)
+	{
+		p.color = { 1.0f, 0.22f, 0.90f, 0.95f };
+		p.endColor = { 0.25f, 0.85f, 1.0f, 0.95f };
+	}
+	else
+	{
+		p.color = { 0.12f, 0.98f, 1.0f, 0.95f };
+		p.endColor = { 0.95f, 0.20f, 0.85f, 0.95f };
+	}
+	p.hasColorShift = true;
+
+	p.velocity = vel;
+	p.lifeTime = lifeDist(randomEngine);
+	p.currentTime = 0.0f;
+	p.textureIndex = textureIndex;
+
+	p.gravity = -0.18f; // 反重力浮遊
+	p.drag = 0.75f;
+	p.angularVelocity = spinDist(randomEngine);
+
+	// スケール補間（発生時ふわりと膨らみ、消滅時小さく輝く）
+	p.initialScale = actualScale * 0.4f;
+	p.targetScale = actualScale * 1.15f;
+
+	// 有機的ゆらぎ（Wobble）
+	p.wobbleFreq = 4.0f + jitterDist(randomEngine) * 10.0f;
+	p.wobbleAmp = 0.22f;
+	p.wobbleAxis = { std::sin(angle * 1.5f), 0.2f, std::cos(angle * 1.5f) };
+
+	p.twinklePhase = twinklePhaseDist(randomEngine);
+	p.twinkleSpeed = twinkleSpeedDist(randomEngine);
+	p.curlFreq = 3.2f;
+	p.curlAmp = 0.18f;
+
+	particles_.push_back(p);
+}
+
+void AppParticleManager::EmitMinovskyStream(std::mt19937& randomEngine, const Vector3& origin, const Vector3& velocity, bool isMagenta, uint32_t textureIndex, float scale)
+{
+	std::uniform_real_distribution<float> jitterDist(-0.08f, 0.08f);
+	std::uniform_real_distribution<float> lifeDist(0.6f, 1.2f);
+	std::uniform_real_distribution<float> spinDist(-5.0f, 5.0f);
+
+	AppParticle p{};
+	p.transform.Initialize();
+	Vector3 pos = origin + Vector3{ jitterDist(randomEngine), jitterDist(randomEngine), jitterDist(randomEngine) };
+	p.transform.SetTranslate(pos);
+
+	p.transform.SetScale({ scale, scale, 1.0f });
+
+	std::uniform_real_distribution<float> rotDist(0.0f, 6.2831853f);
+	p.transform.SetRotate({ 0.0f, 0.0f, rotDist(randomEngine) });
+
+	if (isMagenta)
+	{
+		p.color = { 1.0f, 0.25f, 0.90f, 0.95f };
+	}
+	else
+	{
+		p.color = { 0.15f, 0.95f, 1.0f, 0.95f };
+	}
+
+	p.velocity = velocity + Vector3{ jitterDist(randomEngine) * 2.0f, jitterDist(randomEngine) * 2.0f, jitterDist(randomEngine) * 2.0f };
+	p.lifeTime = lifeDist(randomEngine);
+	p.currentTime = 0.0f;
+	p.textureIndex = textureIndex;
+
+	p.gravity = -0.2f;
+	p.drag = 1.8f;
+	p.angularVelocity = spinDist(randomEngine);
+
+	p.initialScale = scale;
+	p.targetScale = scale * 0.2f;
+
+	particles_.push_back(p);
+}
+
+void AppParticleManager::EmitMinovskyBurst(std::mt19937& randomEngine, const Vector3& center, int count, uint32_t circleTexIndex, uint32_t starTexIndex, float power)
+{
+	std::uniform_real_distribution<float> distDir(-1.0f, 1.0f);
+	std::uniform_real_distribution<float> distSpeed(power * 0.4f, power * 1.2f);
+	std::uniform_real_distribution<float> distScale(0.15f, 0.35f);
+	std::uniform_real_distribution<float> distLife(0.8f, 1.6f);
+	std::uniform_real_distribution<float> spinDist(-8.0f, 8.0f);
+	std::uniform_int_distribution<int> colorDist(0, 10);
+
+	for (int i = 0; i < count; ++i)
+	{
+		Vector3 dir = { distDir(randomEngine), distDir(randomEngine), distDir(randomEngine) };
+		float len = std::sqrt(dir.x * dir.x + dir.y * dir.y + dir.z * dir.z);
+		if (len > 0.0001f)
+		{
+			dir = dir * (1.0f / len);
+		}
+		else
+		{
+			dir = { 0.0f, 1.0f, 0.0f };
+		}
+
+		float speed = distSpeed(randomEngine);
+		Vector3 vel = dir * speed;
+
+		AppParticle p{};
+		p.transform.Initialize();
+		p.transform.SetTranslate(center);
+
+		float scale = distScale(randomEngine);
+		p.transform.SetScale({ scale, scale, 1.0f });
+
+		std::uniform_real_distribution<float> rotDist(0.0f, 6.2831853f);
+		p.transform.SetRotate({ 0.0f, 0.0f, rotDist(randomEngine) });
+
+		int colType = colorDist(randomEngine);
+		if (colType <= 1 && starTexIndex != UINT32_MAX)
+		{
+			p.color = { 1.0f, 1.0f, 1.0f, 1.0f };
+			p.textureIndex = starTexIndex;
+			scale *= 1.3f;
+		}
+		else if (colType <= 5)
+		{
+			p.color = { 0.15f, 0.95f, 1.0f, 0.95f };
+			p.textureIndex = (starTexIndex != UINT32_MAX && colType == 2) ? starTexIndex : circleTexIndex;
+		}
+		else
+		{
+			p.color = { 1.0f, 0.18f, 0.88f, 0.95f };
+			p.textureIndex = (starTexIndex != UINT32_MAX && colType == 6) ? starTexIndex : circleTexIndex;
+		}
+
+		p.velocity = vel;
+		p.lifeTime = distLife(randomEngine);
+		p.currentTime = 0.0f;
+
+		p.gravity = -0.1f;
+		p.drag = 2.5f;
+		p.angularVelocity = spinDist(randomEngine);
+
+		p.initialScale = scale * 0.5f;
+		p.targetScale = scale * 1.4f;
+
+		particles_.push_back(p);
+	}
+}
+
+void AppParticleManager::EmitMinovskyBokeh(std::mt19937& randomEngine, const Vector3& position, float scale, bool isMagenta, uint32_t textureIndex)
+{
+	std::uniform_real_distribution<float> driftVel(-0.15f, 0.15f);
+	std::uniform_real_distribution<float> upVel(0.1f, 0.35f);
+	std::uniform_real_distribution<float> distLife(3.0f, 6.0f);
+	std::uniform_real_distribution<float> spinDist(-1.5f, 1.5f);
+
+	AppParticle p{};
+	p.transform.Initialize();
+	p.transform.SetTranslate(position);
+	p.transform.SetScale({ scale, scale, 1.0f });
+
+	std::uniform_real_distribution<float> rotDist(0.0f, 6.2831853f);
+	p.transform.SetRotate({ 0.0f, 0.0f, rotDist(randomEngine) });
+
+	if (isMagenta)
+	{
+		p.color = { 0.95f, 0.22f, 0.80f, 0.65f };
+	}
+	else
+	{
+		p.color = { 0.15f, 0.88f, 1.0f, 0.65f };
+	}
+
+	p.velocity = { driftVel(randomEngine), upVel(randomEngine), driftVel(randomEngine) };
+	p.lifeTime = distLife(randomEngine);
+	p.currentTime = 0.0f;
+	p.textureIndex = textureIndex;
+
+	p.gravity = -0.05f;
+	p.drag = 0.2f;
+	p.angularVelocity = spinDist(randomEngine);
+
+	p.initialScale = scale * 0.7f;
+	p.targetScale = scale * 1.25f;
+
+	p.wobbleFreq = 1.8f;
+	p.wobbleAmp = 0.2f;
+	p.wobbleAxis = { 1.0f, 0.0f, 0.5f };
+
+	particles_.push_back(p);
+}
+
+void AppParticleManager::EmitMinovskyDashTrail(std::mt19937& randomEngine, const Vector3& position, const Vector3& moveDirection, uint32_t circleTexIndex, uint32_t starTexIndex)
+{
+	std::uniform_real_distribution<float> jitterDist(-0.25f, 0.25f);
+	std::uniform_real_distribution<float> distScale(0.18f, 0.32f);
+	std::uniform_int_distribution<int> colorDist(0, 1);
+
+	Vector3 backDir = moveDirection * -1.0f;
+	for (int i = 0; i < 4; ++i)
+	{
+		Vector3 emitPos = position + Vector3{ jitterDist(randomEngine), 0.2f + jitterDist(randomEngine) * 0.5f, jitterDist(randomEngine) };
+		Vector3 vel = backDir * (3.0f + jitterDist(randomEngine) * 2.0f) + Vector3{ 0.0f, 0.8f, 0.0f };
+
+		bool isMagenta = (colorDist(randomEngine) == 1);
+		uint32_t tex = (i == 0 && starTexIndex != UINT32_MAX) ? starTexIndex : circleTexIndex;
+		float sc = distScale(randomEngine);
+
+		EmitMinovskyStream(randomEngine, emitPos, vel, isMagenta, tex, sc);
+	}
+}
+
+void AppParticleManager::EmitMinovskyFlightAura(std::mt19937& randomEngine, const Vector3& center, int count, uint32_t circleTexIndex, uint32_t starTexIndex)
+{
+	std::uniform_real_distribution<float> angleDist(0.0f, 6.2831853f);
+	std::uniform_real_distribution<float> radDist(0.25f, 0.95f);
+	std::uniform_real_distribution<float> hDist(-0.45f, 0.65f);
+	std::uniform_real_distribution<float> scaleDist(0.022f, 0.045f);
+	std::uniform_real_distribution<float> lifeDist(1.4f, 2.6f);
+	std::uniform_real_distribution<float> spinDist(-7.0f, 7.0f);
+	std::uniform_real_distribution<float> twinklePhaseDist(0.0f, 6.2831853f);
+	std::uniform_real_distribution<float> twinkleSpeedDist(12.0f, 22.0f);
+	std::uniform_int_distribution<int> colorDist(0, 9);
+
+	for (int i = 0; i < count; ++i)
+	{
+		float angle = angleDist(randomEngine);
+		float r = radDist(randomEngine);
+		float h = hDist(randomEngine);
+
+		Vector3 pos = {
+			center.x + std::cos(angle) * r,
+			center.y + h,
+			center.z + std::sin(angle) * r
+		};
+
+		Vector3 tangent = { -std::sin(angle), 0.5f, std::cos(angle) };
+		Vector3 vel = tangent * 0.45f + Vector3{ 0.0f, 0.38f, 0.0f };
+
+		AppParticle p{};
+		p.transform.Initialize();
+		p.transform.SetTranslate(pos);
+
+		float sc = scaleDist(randomEngine);
+		p.transform.SetScale({ sc, sc, 1.0f });
+
+		p.transform.SetRotate({ 0.0f, 0.0f, angleDist(randomEngine) });
+
+		int c = colorDist(randomEngine);
+		if (c <= 1 && starTexIndex != UINT32_MAX)
+		{
+			p.color = { 1.0f, 1.0f, 1.0f, 1.0f };
+			p.endColor = { 0.3f, 0.95f, 1.0f, 0.8f };
+			p.textureIndex = starTexIndex;
+			sc *= 1.25f;
+		}
+		else if (c <= 5)
+		{
+			p.color = { 0.18f, 0.96f, 1.0f, 0.95f };
+			p.endColor = { 0.95f, 0.22f, 0.88f, 0.95f };
+			p.textureIndex = circleTexIndex;
+		}
+		else
+		{
+			p.color = { 1.0f, 0.25f, 0.90f, 0.95f };
+			p.endColor = { 0.15f, 0.92f, 1.0f, 0.95f };
+			p.textureIndex = circleTexIndex;
+		}
+		p.hasColorShift = true;
+
+		p.velocity = vel;
+		p.lifeTime = lifeDist(randomEngine);
+		p.currentTime = 0.0f;
+
+		p.gravity = -0.15f;
+		p.drag = 0.5f;
+		p.angularVelocity = spinDist(randomEngine);
+
+		p.initialScale = sc * 0.35f;
+		p.targetScale = sc * 1.2f;
+
+		p.twinklePhase = twinklePhaseDist(randomEngine);
+		p.twinkleSpeed = twinkleSpeedDist(randomEngine);
+		p.curlFreq = 3.5f;
+		p.curlAmp = 0.2f;
+
+		particles_.push_back(p);
+	}
+}
+
+void AppParticleManager::EmitMinovskyGlitter(std::mt19937& randomEngine, const Vector3& position, float scale, uint32_t starTexIndex)
+{
+	std::uniform_real_distribution<float> jitterDist(-0.06f, 0.06f);
+	std::uniform_real_distribution<float> lifeDist(0.5f, 1.1f);
+	std::uniform_real_distribution<float> spinDist(-12.0f, 12.0f);
+	std::uniform_real_distribution<float> twinklePhaseDist(0.0f, 6.2831853f);
+
+	AppParticle p{};
+	p.transform.Initialize();
+	p.transform.SetTranslate(position + Vector3{ jitterDist(randomEngine), jitterDist(randomEngine), jitterDist(randomEngine) });
+	p.transform.SetScale({ scale, scale, 1.0f });
+
+	std::uniform_real_distribution<float> rotDist(0.0f, 6.2831853f);
+	p.transform.SetRotate({ 0.0f, 0.0f, rotDist(randomEngine) });
+
+	p.color = { 1.0f, 1.0f, 1.0f, 1.0f };
+	p.endColor = { 0.4f, 1.0f, 1.0f, 0.85f };
+	p.hasColorShift = true;
+
+	p.velocity = { jitterDist(randomEngine) * 0.8f, 0.35f + jitterDist(randomEngine) * 0.5f, jitterDist(randomEngine) * 0.8f };
+	p.lifeTime = lifeDist(randomEngine);
+	p.currentTime = 0.0f;
+	p.textureIndex = starTexIndex;
+
+	p.gravity = -0.1f;
+	p.drag = 0.3f;
+	p.angularVelocity = spinDist(randomEngine);
+
+	p.initialScale = scale * 0.2f;
+	p.targetScale = scale * 1.5f;
+
+	p.twinklePhase = twinklePhaseDist(randomEngine);
+	p.twinkleSpeed = 24.0f;
+
+	particles_.push_back(p);
+}
+
+void AppParticleManager::EmitMouseWaveWake(std::mt19937& randomEngine, const Vector3& pos, const Vector3& moveDir, float speed, uint32_t circleTex, uint32_t /*starTex*/)
+{
+	float dirLen = std::sqrt(moveDir.x * moveDir.x + moveDir.y * moveDir.y);
+	Vector3 perp = (dirLen > 0.001f)
+		? Vector3{ -moveDir.y / dirLen, moveDir.x / dirLen, 0.0f }
+		: Vector3{ 1.0f, 0.0f, 0.0f };
+
+	std::uniform_real_distribution<float> jitterDist(-0.025f, 0.025f);
+	std::uniform_real_distribution<float> spreadDist(0.35f, 0.85f);
+	std::uniform_real_distribution<float> lifeDist(0.7f, 1.3f);
+	std::uniform_real_distribution<float> scaleDist(0.032f, 0.058f);
+	std::uniform_real_distribution<float> spinDist(-1.2f, 1.2f);
+
+	float wavePower = std::clamp(speed * 0.22f, 0.4f, 2.5f);
+
+	// 左右の波条（ケルビン航跡波：進行方向の斜め後方に広がるV字波面）
+	for (float side : { -1.0f, 1.0f })
+	{
+		for (int i = 0; i < 2; ++i)
+		{
+			float spread = spreadDist(randomEngine);
+			// 進行方向の後方かつ左右に広がる波面位置
+			Vector3 spawnPos = pos + perp * (side * (0.05f + 0.07f * i)) - moveDir * (0.035f * i)
+				+ Vector3{ jitterDist(randomEngine), jitterDist(randomEngine), 0.0f };
+			Vector3 waveVel = (perp * (side * spread) - moveDir * 0.20f) * wavePower + Vector3{ 0.0f, 0.08f, 0.0f };
+
+			AppParticle p{};
+			p.transform.Initialize();
+			p.transform.SetTranslate(spawnPos);
+
+			float sc = scaleDist(randomEngine) * (1.0f + wavePower * 0.15f);
+			p.transform.SetScale({ sc, sc, 1.0f });
+
+			std::uniform_real_distribution<float> rotDist(0.0f, 6.2831853f);
+			p.transform.SetRotate({ 0.0f, 0.0f, rotDist(randomEngine) });
+
+			// チカチカ・点滅を完全に排除し、透明感のある柔らかな川の白波・水流カラー
+			if (i == 0)
+			{
+				p.color = { 0.55f, 0.90f, 1.0f, 0.45f };    // 澄んだ淡いアクアブルー
+				p.endColor = { 0.18f, 0.65f, 0.92f, 0.12f }; // 水面に馴染む深いリバーブルー
+			}
+			else
+			{
+				p.color = { 0.25f, 0.80f, 0.98f, 0.35f };
+				p.endColor = { 0.12f, 0.48f, 0.88f, 0.06f };
+			}
+			p.textureIndex = circleTex; // 棘のある星テクスチャではなく滑らかな丸粒子
+			p.hasColorShift = true;
+
+			p.velocity = waveVel;
+			p.lifeTime = lifeDist(randomEngine);
+			p.currentTime = 0.0f;
+
+			p.gravity = -0.03f;
+			p.drag = 2.2f; // 水面の粘性抵抗で滑らかに減速
+			p.angularVelocity = spinDist(randomEngine);
+
+			p.initialScale = sc * 0.7f;
+			p.targetScale = sc * 1.6f; // 波紋が自然に広がりながら消滅
+
+			p.twinklePhase = 0.0f;
+			p.twinkleSpeed = 0.0f; // ★チカチカ点滅完全停止（滑らかなフェードアウト）
+			p.curlFreq = 2.0f;
+			p.curlAmp = 0.04f; // 穏やかな水流の揺らぎ
+
+			particles_.push_back(p);
+		}
+	}
+}
+
+void AppParticleManager::EmitMouseRippleRing(std::mt19937& randomEngine, const Vector3& center, float power, uint32_t circleTex, uint32_t /*starTex*/)
+{
+	const int kRingCount = 20;
+	std::uniform_real_distribution<float> jitterDist(-0.02f, 0.02f);
+	std::uniform_real_distribution<float> lifeDist(0.7f, 1.2f);
+	std::uniform_real_distribution<float> scaleDist(0.032f, 0.055f);
+
+	float expSpeed = 1.1f * power;
+
+	for (int i = 0; i < kRingCount; ++i)
+	{
+		float angle = (static_cast<float>(i) / static_cast<float>(kRingCount)) * 6.2831853f;
+		Vector3 dir = { std::cos(angle), std::sin(angle), 0.0f };
+		Vector3 spawnPos = center + dir * 0.05f + Vector3{ jitterDist(randomEngine), jitterDist(randomEngine), 0.0f };
+		Vector3 vel = dir * expSpeed;
+
+		AppParticle p{};
+		p.transform.Initialize();
+		p.transform.SetTranslate(spawnPos);
+
+		float sc = scaleDist(randomEngine);
+		p.transform.SetScale({ sc, sc, 1.0f });
+		p.transform.SetRotate({ 0.0f, 0.0f, angle });
+
+		// 点滅のない、透き通った穏やかな波紋
+		p.color = { 0.50f, 0.88f, 1.0f, 0.40f };
+		p.endColor = { 0.15f, 0.58f, 0.90f, 0.08f };
+		p.textureIndex = circleTex;
+		p.hasColorShift = true;
+
+		p.velocity = vel;
+		p.lifeTime = lifeDist(randomEngine);
+		p.currentTime = 0.0f;
+
+		p.gravity = 0.0f;
+		p.drag = 2.4f;
+		p.angularVelocity = 0.0f;
+
+		p.initialScale = sc * 0.6f;
+		p.targetScale = sc * 1.7f;
+
+		p.twinklePhase = 0.0f;
+		p.twinkleSpeed = 0.0f; // ★チカチカ点滅完全停止
+
+		particles_.push_back(p);
+	}
+}
+
+void AppParticleManager::ApplyMouseWaveDisturbance(const Vector3& mouseWorldPos, const Vector3& mouseWorldVel, float radius, float force)
+{
+	float radSq = radius * radius;
+	for (auto& p : particles_)
+	{
+		Vector3 curPos = p.transform.GetTranslate();
+		Vector3 diff = curPos - mouseWorldPos;
+		diff.z *= 0.5f;
+		float distSq = diff.x * diff.x + diff.y * diff.y + diff.z * diff.z;
+		if (distSq < radSq && distSq > 0.0001f)
+		{
+			float dist = std::sqrt(distSq);
+			float factor = (1.0f - dist / radius);
+			Vector3 pushDir = diff * (1.0f / dist);
+			p.velocity += pushDir * (force * factor * 1.8f) + mouseWorldVel * (0.35f * factor);
+			p.wobbleAmp = (std::max)(p.wobbleAmp, 0.35f * factor);
+		}
+	}
+}
+
 void AppParticleManager::Draw()
 {
 	if (!enginePM_) return;
@@ -1144,9 +1683,29 @@ void AppParticleManager::Draw(const RenderContext& ctx)
 			p.currentTime = ap->currentTime;
 			p.velocity = ap->velocity;
 
-			float alpha = 1.0f - (ap->currentTime / ap->lifeTime);
-			p.color = ap->color;
-			p.color.w = (std::clamp)(alpha * ap->color.w, 0.0f, 1.0f);
+			float t = std::clamp(ap->currentTime / ap->lifeTime, 0.0f, 1.0f);
+			if (ap->hasColorShift)
+			{
+				p.color.x = ap->color.x + (ap->endColor.x - ap->color.x) * t;
+				p.color.y = ap->color.y + (ap->endColor.y - ap->color.y) * t;
+				p.color.z = ap->color.z + (ap->endColor.z - ap->color.z) * t;
+			}
+			else
+			{
+				p.color.x = ap->color.x;
+				p.color.y = ap->color.y;
+				p.color.z = ap->color.z;
+			}
+
+			// きらめきシンチレーション（Twinkle）
+			float twinkle = 1.0f;
+			if (ap->twinkleSpeed > 0.0f)
+			{
+				twinkle = 0.70f + 0.30f * std::sin(ap->twinklePhase + ap->currentTime * ap->twinkleSpeed);
+			}
+
+			float alpha = 1.0f - t;
+			p.color.w = (std::clamp)(alpha * ap->color.w * twinkle, 0.0f, 1.0f);
 
 			instanceData_[currentWriteIndex++] = p;
 		}
@@ -1178,7 +1737,15 @@ void AppParticleManager::Draw(const RenderContext& ctx)
 	// 2. エンジン側の Particle 描画パイプラインをセットアップ
 	enginePM_->SetupDraw(ctx.commandList);
 
-	ctx.commandList->SetGraphicsRootConstantBufferView(RootParam::Particle::kMaterial, ctx.materialGPUAddress);
+	D3D12_GPU_VIRTUAL_ADDRESS matGpuAddress = ctx.materialGPUAddress;
+	if (matGpuAddress == 0 && defaultMaterialResource_)
+	{
+		matGpuAddress = defaultMaterialResource_->GetGPUVirtualAddress();
+	}
+	if (matGpuAddress != 0)
+	{
+		ctx.commandList->SetGraphicsRootConstantBufferView(RootParam::Particle::kMaterial, matGpuAddress);
+	}
 	ctx.commandList->SetGraphicsRootDescriptorTable(RootParam::Particle::kInstancing, instancingSrvHandleGPU_);
 
 	if (ctx.light)
