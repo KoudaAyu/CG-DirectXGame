@@ -143,7 +143,7 @@ void AppParticleManager::Update(float deltaTime, const Vector3& playerPos)
 			it->velocity.y -= it->gravity * deltaTime;
 			pos = it->transform.GetTranslate() + it->velocity * deltaTime;
 
-			float groundY = 0.0f;
+			float groundY = groundY_;
 			if (pos.y < groundY && it->velocity.y < 0.0f && it->bounceElasticity > 0.0f)
 			{
 				pos.y = groundY;
@@ -1104,23 +1104,312 @@ void AppParticleManager::EmitRiverWaveRipples(std::mt19937& randomEngine, uint32
 
 void AppParticleManager::EmitRiverSplashDroplet(std::mt19937& randomEngine, const Vector3& position, uint32_t waterTexIndex)
 {
-	// 川面でパシャッと跳ねる水しぶき・水滴 (10個)
+	// 川面でパシャッと跳ねるリアルな水しぶき・水滴 (6〜8個)
 	std::uniform_real_distribution<float> angleDist(0.0f, 6.2831853f);
-	std::uniform_real_distribution<float> speedDist(1.5f, 3.5f);
+	std::uniform_real_distribution<float> speedDist(0.8f, 2.2f);
+	std::uniform_real_distribution<float> scaleDist(0.025f, 0.055f);
 
-	for (int i = 0; i < 10; ++i)
+	for (int i = 0; i < 8; ++i)
 	{
 		float a = angleDist(randomEngine);
 		float spd = speedDist(randomEngine);
-		Vector3 vel = { std::cos(a) * spd, 1.8f + (static_cast<float>(rand()) / RAND_MAX) * 2.2f, std::sin(a) * spd };
-		Vector4 col = { 0.85f, 0.95f, 1.0f, 0.85f };
+		Vector3 vel = { std::cos(a) * spd, 1.2f + (static_cast<float>(rand()) / RAND_MAX) * 1.6f, std::sin(a) * spd };
+		Vector4 col = { 0.92f, 0.97f, 1.0f, 0.90f };
 
-		// 水面高さに自動連動したY座標
-		Vector3 sPos = position;
-		sPos.y = GameConfig::Environment::kRiverSplashY;
-		EmitDustWithVelocity(randomEngine, sPos, 1.2f, col, vel, 0.55f, waterTexIndex);
+		AppParticle p{};
+		p.transform.Initialize();
+		p.transform.SetTranslate(position + Vector3{ (static_cast<float>(rand()) / RAND_MAX - 0.5f) * 0.1f, 0.01f, (static_cast<float>(rand()) / RAND_MAX - 0.5f) * 0.1f });
+
+		float s = scaleDist(randomEngine);
+		p.transform.SetScale({ s, s, 1.0f });
+		p.velocity = vel;
+		p.color = col;
+		p.endColor = { 0.65f, 0.88f, 1.0f, 0.15f };
+		p.hasColorShift = true;
+		p.lifeTime = 0.38f + (static_cast<float>(rand()) / RAND_MAX) * 0.22f;
+		p.currentTime = 0.0f;
+		p.textureIndex = waterTexIndex;
+
+		p.gravity = 13.5f; // 重力で弧を描いて川面に戻る
+		p.drag = 0.5f;
+		p.initialScale = s * 0.8f;
+		p.targetScale = s * 0.4f;
+
+		particles_.push_back(p);
 	}
 }
+
+void AppParticleManager::EmitRealisticRiverSpray(std::mt19937& randomEngine, const Vector3& crestPos, const Vector3& currentDir, float currentSpeed, uint32_t dropletTex, uint32_t mistTex)
+{
+	// 1. 微細水滴の放物線スプレー（重力落下するきらめく水滴アーチ：8個）
+	std::uniform_real_distribution<float> lateralJitter(-0.35f, 0.35f);
+	std::uniform_real_distribution<float> speedJitter(0.7f, 1.4f);
+	std::uniform_real_distribution<float> upSpeedDist(0.75f, 1.9f);
+	std::uniform_real_distribution<float> scaleDist(0.022f, 0.048f);
+	std::uniform_real_distribution<float> lifeDist(0.30f, 0.50f);
+
+	Vector3 perp = { -currentDir.z, 0.0f, currentDir.x };
+
+	for (int i = 0; i < 8; ++i)
+	{
+		AppParticle p{};
+		p.transform.Initialize();
+
+		Vector3 spawn = crestPos + perp * lateralJitter(randomEngine) + Vector3{ 0.0f, 0.015f, 0.0f };
+		p.transform.SetTranslate(spawn);
+
+		float sc = scaleDist(randomEngine);
+		p.transform.SetScale({ sc, sc, 1.0f });
+
+		// 川の流速ベクトル + 前方・上空への放物線射出
+		float forwardSpd = currentSpeed * speedJitter(randomEngine);
+		Vector3 vel = currentDir * forwardSpd + perp * (lateralJitter(randomEngine) * 0.8f) + Vector3{ 0.0f, upSpeedDist(randomEngine), 0.0f };
+		p.velocity = vel;
+
+		p.color = { 0.92f, 0.97f, 1.0f, 0.95f }; // 透き通る清流の水滴
+		p.endColor = { 0.65f, 0.88f, 1.0f, 0.15f };
+		p.hasColorShift = true;
+		p.lifeTime = lifeDist(randomEngine);
+		p.currentTime = 0.0f;
+		p.textureIndex = dropletTex;
+
+		p.gravity = 14.0f; // 重力で弧を描いて川面へ戻る
+		p.drag = 0.6f;
+
+		p.initialScale = sc * 0.8f;
+		p.targetScale = sc * 0.35f;
+
+		particles_.push_back(p);
+	}
+
+	// 2. エアロゾル水煙霧（波頭が砕けた瞬間にふわりと漂う極微細な霧：3個）
+	for (int i = 0; i < 3; ++i)
+	{
+		AppParticle p{};
+		p.transform.Initialize();
+
+		Vector3 spawn = crestPos + perp * (lateralJitter(randomEngine) * 0.8f) + Vector3{ 0.0f, 0.03f, 0.0f };
+		p.transform.SetTranslate(spawn);
+
+		float sc = 0.055f + (static_cast<float>(rand()) / RAND_MAX) * 0.045f;
+		p.transform.SetScale({ sc, sc, 1.0f });
+
+		Vector3 vel = currentDir * (currentSpeed * 0.65f) + Vector3{ 0.0f, 0.20f, 0.0f };
+		p.velocity = vel;
+
+		p.color = { 0.96f, 0.98f, 1.0f, 0.28f }; // ふわりと霞む白波ミスト
+		p.endColor = { 0.82f, 0.92f, 1.0f, 0.0f };
+		p.hasColorShift = true;
+		p.lifeTime = 0.60f + (static_cast<float>(rand()) / RAND_MAX) * 0.35f;
+		p.currentTime = 0.0f;
+		p.textureIndex = (mistTex != UINT32_MAX ? mistTex : dropletTex);
+
+		p.gravity = 0.05f;
+		p.drag = 3.2f; // 空気抵抗でふわりと滞留
+
+		p.initialScale = sc;
+		p.targetScale = sc * 2.8f; // 空気中で自然に拡散
+
+		particles_.push_back(p);
+	}
+
+	// 3. 水面に残る純白の泡パッチ（Crest Spume：2個）
+	for (int i = 0; i < 2; ++i)
+	{
+		AppParticle p{};
+		p.transform.Initialize();
+
+		Vector3 spawn = crestPos + perp * (lateralJitter(randomEngine) * 0.6f);
+		p.transform.SetTranslate(spawn);
+
+		float sc = 0.040f + (static_cast<float>(rand()) / RAND_MAX) * 0.035f;
+		p.transform.SetScale({ sc, sc, 1.0f });
+
+		// 水面と一体となって下流へ流れる
+		p.velocity = currentDir * (currentSpeed * 0.72f);
+		p.color = { 1.0f, 1.0f, 1.0f, 0.60f };
+		p.endColor = { 0.75f, 0.92f, 1.0f, 0.0f };
+		p.hasColorShift = true;
+		p.lifeTime = 1.0f + (static_cast<float>(rand()) / RAND_MAX) * 0.5f;
+		p.currentTime = 0.0f;
+		p.textureIndex = dropletTex;
+
+		p.gravity = 0.0f; // 水面に密着
+		p.drag = 0.4f;
+
+		p.initialScale = sc * 0.9f;
+		p.targetScale = sc * 1.5f;
+
+		particles_.push_back(p);
+	}
+}
+
+void AppParticleManager::EmitDuckHullSplash(std::mt19937& randomEngine, const Vector3& duckPos, const Vector3& currentDir, uint32_t dropletTex, uint32_t mistTex)
+{
+	// アヒルちゃんの胸元（上流側）と両側面から跳ねる水滴と航跡白泡
+	Vector3 perp = { -currentDir.z, 0.0f, currentDir.x };
+
+	// 胸元の水跳ね (水流がアヒルの胸に当たって跳ね上がる：3個)
+	for (int i = 0; i < 3; ++i)
+	{
+		AppParticle p{};
+		p.transform.Initialize();
+
+		float flank = (static_cast<float>(rand()) / RAND_MAX - 0.5f) * 0.28f;
+		// アヒルちゃんの胸（上流側 -X 方向）
+		Vector3 spawn = duckPos - currentDir * 0.16f + perp * flank + Vector3{ 0.0f, 0.015f, 0.0f };
+		p.transform.SetTranslate(spawn);
+
+		float sc = 0.016f + (static_cast<float>(rand()) / RAND_MAX) * 0.022f;
+		p.transform.SetScale({ sc, sc, 1.0f });
+
+		Vector3 vel = perp * (flank * 3.0f) + currentDir * 0.20f + Vector3{ 0.0f, 0.75f + (static_cast<float>(rand()) / RAND_MAX) * 0.75f, 0.0f };
+		p.velocity = vel;
+
+		p.color = { 0.94f, 0.98f, 1.0f, 0.92f };
+		p.endColor = { 0.70f, 0.90f, 1.0f, 0.15f };
+		p.hasColorShift = true;
+		p.lifeTime = 0.25f + (static_cast<float>(rand()) / RAND_MAX) * 0.15f;
+		p.currentTime = 0.0f;
+		p.textureIndex = dropletTex;
+
+		p.gravity = 14.0f;
+		p.drag = 0.5f;
+
+		particles_.push_back(p);
+	}
+
+	// 側面の航跡白泡 (両脇を流れる微細な泡：2個)
+	for (float side : { -1.0f, 1.0f })
+	{
+		AppParticle p{};
+		p.transform.Initialize();
+
+		float flankBack = (static_cast<float>(rand()) / RAND_MAX) * 0.22f;
+		Vector3 spawn = duckPos + perp * (side * 0.20f) + currentDir * flankBack;
+		p.transform.SetTranslate(spawn);
+
+		float sc = 0.030f + (static_cast<float>(rand()) / RAND_MAX) * 0.025f;
+		p.transform.SetScale({ sc, sc, 1.0f });
+
+		p.velocity = currentDir * 0.70f + perp * (side * 0.12f);
+		p.color = { 0.96f, 0.99f, 1.0f, 0.55f };
+		p.endColor = { 0.65f, 0.88f, 1.0f, 0.0f };
+		p.hasColorShift = true;
+		p.lifeTime = 0.80f + (static_cast<float>(rand()) / RAND_MAX) * 0.40f;
+		p.currentTime = 0.0f;
+		p.textureIndex = dropletTex;
+
+		p.gravity = 0.0f;
+		p.drag = 0.8f;
+		p.initialScale = sc;
+		p.targetScale = sc * 1.5f;
+
+		particles_.push_back(p);
+	}
+}
+
+void AppParticleManager::EmitMouseWaterSplashFling(std::mt19937& randomEngine, const Vector3& waterPos, const Vector3& flingDir, float flingSpeed, uint32_t dropletTex, uint32_t mistTex)
+{
+	// マウス操作によって水面から飛び散る指向性水しぶき
+	Vector3 perp = { -flingDir.z, 0.0f, flingDir.x };
+	float spdClamped = std::clamp(flingSpeed * 0.25f, 1.2f, 4.5f);
+
+	// 水滴粒 (10個)
+	for (int i = 0; i < 10; ++i)
+	{
+		AppParticle p{};
+		p.transform.Initialize();
+
+		float jitter = (static_cast<float>(rand()) / RAND_MAX - 0.5f) * 0.10f;
+		p.transform.SetTranslate(waterPos + perp * jitter + Vector3{ 0.0f, 0.015f, 0.0f });
+
+		float sc = 0.022f + (static_cast<float>(rand()) / RAND_MAX) * 0.030f;
+		p.transform.SetScale({ sc, sc, 1.0f });
+
+		float spread = (static_cast<float>(rand()) / RAND_MAX - 0.5f) * 1.6f;
+		float up = 1.2f + (static_cast<float>(rand()) / RAND_MAX) * 2.0f;
+		p.velocity = flingDir * spdClamped + perp * spread + Vector3{ 0.0f, up, 0.0f };
+
+		p.color = { 0.94f, 0.98f, 1.0f, 0.95f };
+		p.endColor = { 0.55f, 0.85f, 1.0f, 0.15f };
+		p.hasColorShift = true;
+		p.lifeTime = 0.32f + (static_cast<float>(rand()) / RAND_MAX) * 0.22f;
+		p.currentTime = 0.0f;
+		p.textureIndex = dropletTex;
+
+		p.gravity = 14.5f; // 重力落下
+		p.drag = 0.4f;
+
+		particles_.push_back(p);
+	}
+
+	// 霧煙 (2個)
+	for (int i = 0; i < 2; ++i)
+	{
+		AppParticle p{};
+		p.transform.Initialize();
+		p.transform.SetTranslate(waterPos + Vector3{ 0.0f, 0.025f, 0.0f });
+
+		float sc = 0.06f + (static_cast<float>(rand()) / RAND_MAX) * 0.05f;
+		p.transform.SetScale({ sc, sc, 1.0f });
+
+		p.velocity = flingDir * (spdClamped * 0.35f) + Vector3{ 0.0f, 0.40f, 0.0f };
+		p.color = { 0.95f, 0.98f, 1.0f, 0.30f };
+		p.endColor = { 0.80f, 0.92f, 1.0f, 0.0f };
+		p.hasColorShift = true;
+		p.lifeTime = 0.55f + (static_cast<float>(rand()) / RAND_MAX) * 0.25f;
+		p.currentTime = 0.0f;
+		p.textureIndex = (mistTex != UINT32_MAX ? mistTex : dropletTex);
+
+		p.gravity = 0.1f;
+		p.drag = 3.0f;
+		p.initialScale = sc;
+		p.targetScale = sc * 2.4f;
+
+		particles_.push_back(p);
+	}
+}
+
+void AppParticleManager::EmitShorelineWave(std::mt19937& randomEngine, const Vector3& shorePos, const Vector3& shoreNormal, float waveEnergy, uint32_t dropletTex, uint32_t /*mistTex*/)
+{
+	// 岸辺に沿った接線ベクトル（下流方向 -Z）
+	Vector3 shoreTangent = { -shoreNormal.z, 0.0f, shoreNormal.x };
+	if (shoreTangent.z > 0.0f) { shoreTangent = shoreTangent * -1.0f; }
+
+	std::uniform_real_distribution<float> speedJitter(0.35f, 0.75f);
+	std::uniform_real_distribution<float> lateralJitter(-0.04f, 0.04f);
+
+	// 汀線に沿って流れる極めて淡い半透明のフィラメント状水面シマー（丸粒子ではなく、水流方向に細長く馴染む筋）
+	AppParticle p{};
+	p.transform.Initialize();
+	Vector3 spawn = shorePos + shoreTangent * lateralJitter(randomEngine) + Vector3{ 0.0f, 0.003f, 0.0f };
+	p.transform.SetTranslate(spawn);
+
+	// 水流に沿った細長いアスペクト比（幅約6mm、長さ約3.5cm）で自然な水面の泡筋を形成
+	p.transform.SetScale({ 0.007f, 0.035f, 1.0f });
+	float angle = std::atan2(shoreTangent.x, -shoreTangent.z);
+	p.transform.SetRotate({ 0.0f, 0.0f, angle });
+
+	// 川の流れ（-Z方向）に沿って下流へ滑らかに漂う
+	p.velocity = shoreTangent * (0.42f * speedJitter(randomEngine));
+
+	// 不透明な白丸を完全排除し、極めて淡い半透明の清流水色（アルファ0.10f）
+	p.color = { 0.75f, 0.95f, 1.0f, 0.10f };
+	p.endColor = { 0.50f, 0.85f, 1.0f, 0.0f };
+	p.hasColorShift = true;
+	p.lifeTime = 0.60f + (static_cast<float>(rand()) / RAND_MAX) * 0.25f;
+	p.currentTime = 0.0f;
+	p.textureIndex = dropletTex;
+
+	p.gravity = 0.0f;
+	p.drag = 0.4f;
+	p.initialScale = 0.025f;
+	p.targetScale = 0.035f;
+
+	particles_.push_back(p);
+}
+
 
 void AppParticleManager::EmitMinovskySwirl(std::mt19937& randomEngine, const Vector3& center, float radius, float height, float angle, bool isMagenta, uint32_t textureIndex, float scale)
 {
@@ -1706,6 +1995,12 @@ void AppParticleManager::Draw(const RenderContext& ctx)
 
 			float alpha = 1.0f - t;
 			p.color.w = (std::clamp)(alpha * ap->color.w * twinkle, 0.0f, 1.0f);
+			if (premultiplyAlpha_)
+			{
+				p.color.x *= p.color.w;
+				p.color.y *= p.color.w;
+				p.color.z *= p.color.w;
+			}
 
 			instanceData_[currentWriteIndex++] = p;
 		}

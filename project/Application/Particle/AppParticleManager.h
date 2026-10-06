@@ -84,6 +84,12 @@ public:
 	void EmitRiverWaveRipples(std::mt19937& randomEngine, uint32_t waterTexIndex);
 	void EmitRiverSplashDroplet(std::mt19937& randomEngine, const Vector3& position, uint32_t waterTexIndex);
 
+	// リアルな水面波飛沫・水滴アーチ・ミストスプレー（重力落下・エアロゾル霧・水面白泡）
+	void EmitRealisticRiverSpray(std::mt19937& randomEngine, const Vector3& crestPos, const Vector3& currentDir, float currentSpeed, uint32_t dropletTex, uint32_t mistTex);
+	void EmitDuckHullSplash(std::mt19937& randomEngine, const Vector3& duckPos, const Vector3& currentDir, uint32_t dropletTex, uint32_t mistTex);
+	void EmitMouseWaterSplashFling(std::mt19937& randomEngine, const Vector3& waterPos, const Vector3& flingDir, float flingSpeed, uint32_t dropletTex, uint32_t mistTex);
+	void EmitShorelineWave(std::mt19937& randomEngine, const Vector3& shorePos, const Vector3& shoreNormal, float waveEnergy, uint32_t dropletTex, uint32_t mistTex);
+
 	// ミノフスキー粒子エフェクト（閃光のハサウェイ・キルケーの魔女風 / 3D空間加算合成）
 	void EmitMinovskySwirl(std::mt19937& randomEngine, const Vector3& center, float radius, float height, float angle, bool isMagenta, uint32_t textureIndex, float scale = 0.22f);
 	void EmitMinovskyStream(std::mt19937& randomEngine, const Vector3& origin, const Vector3& velocity, bool isMagenta, uint32_t textureIndex, float scale = 0.16f);
@@ -98,7 +104,18 @@ public:
 	void EmitMouseRippleRing(std::mt19937& randomEngine, const Vector3& center, float power, uint32_t circleTex, uint32_t starTex);
 	void ApplyMouseWaveDisturbance(const Vector3& mouseWorldPos, const Vector3& mouseWorldVel, float radius, float force);
 
+	// 汎用：完全に設定済みのパーティクルを直接投入（シーン側で自由に演出を組むため）
+	void AddParticle(const AppParticle& particle) { particles_.push_back(particle); }
+	// バウンド判定に使う地面の高さ（既定 0.0f）
+	void SetGroundY(float groundY) { groundY_ = groundY; }
+	// 加算合成時に RGB へ α を乗算し、寿命に合わせて自然にフェードさせる（既定 false）
+	void SetPremultiplyAlpha(bool enable) { premultiplyAlpha_ = enable; }
+	size_t GetParticleCount() const { return particles_.size(); }
+
 private:
+	float groundY_ = 0.0f;
+	bool premultiplyAlpha_ = false;
+
 	struct Vertex
 	{
 		Vector4 pos;
