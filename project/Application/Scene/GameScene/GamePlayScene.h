@@ -113,13 +113,9 @@ public:
     LootSystem* GetLootSystem() const { return lootSystem_.get(); }
 
     /// <summary>
-    /// カメラシェイク（揺れ）エフェクトの誘発
+    /// カメラシェイク（揺れ）エフェクトの誘発（エンジン層 Camera::Shake に委譲）
     /// </summary>
-    void TriggerCameraShake(float duration, float intensity) {
-        cameraShakeTime_ = duration;
-        cameraShakeDurationMax_ = duration > 0.0f ? duration : 1.0f;
-        cameraShakeIntensity_ = intensity;
-    }
+    void TriggerCameraShake(float duration, float intensity);
 
     /// <summary>
     /// ヒットストップ（時間一時停止）の誘発

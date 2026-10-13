@@ -454,15 +454,13 @@ void StingerTransition::Update(float deltaTime) {
 
         if (bgAlpha > 0.001f) {
             Vector4 col = (stripes_.size() >= 7) ? stripes_[6].color : Vector4{ 0.08f, 0.09f, 0.12f, 1.0f };
-            col.w = bgAlpha;
             safetyBackdrop_->SetPosition({ -20.0f, -20.0f });
             safetyBackdrop_->SetSize({ screenWidth_ + 40.0f, screenHeight_ + 40.0f });
             safetyBackdrop_->SetColor(col);
-            safetyBackdrop_->Update();
+            safetyBackdrop_->SetAlpha(bgAlpha);
         } else {
             safetyBackdrop_->SetPosition({ -9999.0f, -9999.0f });
-            safetyBackdrop_->SetColor({ 0.0f, 0.0f, 0.0f, 0.0f });
-            safetyBackdrop_->Update();
+            safetyBackdrop_->SetAlpha(0.0f);
         }
     }
 
@@ -479,11 +477,9 @@ void StingerTransition::Update(float deltaTime) {
     }
     if (topLetterbox_) {
         topLetterbox_->SetPosition({ 0.0f, letterboxOffset });
-        topLetterbox_->Update();
     }
     if (bottomLetterbox_) {
         bottomLetterbox_->SetPosition({ 0.0f, screenHeight_ - letterboxOffset });
-        bottomLetterbox_->Update();
     }
 
     // -------------------------------------------------------------------------
@@ -503,9 +499,8 @@ void StingerTransition::Update(float deltaTime) {
             centerFrameSprite_->SetSize({ size, size });
             centerFrameSprite_->SetRotation(rot);
             Vector4 col = (stripes_.size() >= 5) ? stripes_[4].color : Vector4{ 1.0f, 0.8f, 0.2f, 1.0f };
-            col.w = pulse * 0.95f;
             centerFrameSprite_->SetColor(col);
-            centerFrameSprite_->Update();
+            centerFrameSprite_->SetAlpha(pulse * 0.95f);
         }
 
         // 内側コアダイヤモンド: 時計回りに優雅に高速回転
@@ -515,9 +510,8 @@ void StingerTransition::Update(float deltaTime) {
             centerCoreSprite_->SetPosition({ cx, cy });
             centerCoreSprite_->SetSize({ size, size });
             centerCoreSprite_->SetRotation(rot);
-            Vector4 col = { 1.0f, 1.0f, 1.0f, pulse };
-            centerCoreSprite_->SetColor(col);
-            centerCoreSprite_->Update();
+            centerCoreSprite_->SetColor({ 1.0f, 1.0f, 1.0f, 1.0f });
+            centerCoreSprite_->SetAlpha(pulse);
         }
 
         // 水平閃光スリットバー: 中央を左右に貫く発光バーが滑らかに展開
@@ -527,25 +521,21 @@ void StingerTransition::Update(float deltaTime) {
             centerGlintBar_->SetPosition({ cx, cy });
             centerGlintBar_->SetSize({ barW, barH });
             Vector4 col = (stripes_.size() >= 2) ? stripes_[1].color : Vector4{ 1.0f, 0.5f, 0.15f, 1.0f };
-            col.w = pulse * 0.90f;
             centerGlintBar_->SetColor(col);
-            centerGlintBar_->Update();
+            centerGlintBar_->SetAlpha(pulse * 0.90f);
         }
     } else {
         if (centerFrameSprite_) {
-            centerFrameSprite_->SetColor({ 0.0f, 0.0f, 0.0f, 0.0f });
+            centerFrameSprite_->SetAlpha(0.0f);
             centerFrameSprite_->SetPosition({ -9999.0f, -9999.0f });
-            centerFrameSprite_->Update();
         }
         if (centerCoreSprite_) {
-            centerCoreSprite_->SetColor({ 0.0f, 0.0f, 0.0f, 0.0f });
+            centerCoreSprite_->SetAlpha(0.0f);
             centerCoreSprite_->SetPosition({ -9999.0f, -9999.0f });
-            centerCoreSprite_->Update();
         }
         if (centerGlintBar_) {
-            centerGlintBar_->SetColor({ 0.0f, 0.0f, 0.0f, 0.0f });
+            centerGlintBar_->SetAlpha(0.0f);
             centerGlintBar_->SetPosition({ -9999.0f, -9999.0f });
-            centerGlintBar_->Update();
         }
     }
 
@@ -554,12 +544,11 @@ void StingerTransition::Update(float deltaTime) {
         if (t >= 0.48f && t <= 0.60f) {
             float flashU = (t - 0.48f) / 0.12f;
             float flashA = 0.35f * (1.0f - flashU * flashU);
-            centerFlashSprite_->SetColor({ 1.0f, 1.0f, 1.0f, flashA });
+            centerFlashSprite_->SetColor({ 1.0f, 1.0f, 1.0f, 1.0f });
+            centerFlashSprite_->SetAlpha(flashA);
             centerFlashSprite_->SetPosition({ 0.0f, 0.0f });
-            centerFlashSprite_->Update();
         } else {
-            centerFlashSprite_->SetColor({ 0.0f, 0.0f, 0.0f, 0.0f });
-            centerFlashSprite_->Update();
+            centerFlashSprite_->SetAlpha(0.0f);
         }
     }
 

@@ -1629,14 +1629,15 @@ void TitleScene::Update()
 		{
 			isStarting_ = true;
 			startTransitionTimer_ = 0.0f;
-			sShakeTimer = 0.30f;
-			sShakePower = 0.035f;
+			if (camera_) {
+				camera_->Shake(0.30f, 0.035f);
+			}
 			sDuckRecoilTimer = 0.25f;
 
-			// アヒルSEを再生
+			// アヒルSEをワンショット再生
 			if (sDuckSeSoundId >= 0 && SceneManager::GetInstance() && SceneManager::GetInstance()->GetAudioManager())
 			{
-				sDuckSePlayId = SceneManager::GetInstance()->GetAudioManager()->Play(sDuckSeSoundId);
+				SceneManager::GetInstance()->GetAudioManager()->PlayOneShot(sDuckSeSoundId, 1.0f);
 			}
 
 			if (appParticleManager_ && GetParticleManager())
@@ -1673,8 +1674,9 @@ void TitleScene::Update()
 	if (!sLogoLanded && sIntroTimer >= kLogoSlamTime + kLogoSlideTime)
 	{
 		sLogoLanded = true;
-		sShakeTimer = 0.20f;
-		sShakePower = 0.035f;
+		if (camera_) {
+			camera_->Shake(0.20f, 0.035f);
+		}
 	}
 
 	// ---------------------------------------------------------------
@@ -1712,13 +1714,6 @@ void TitleScene::Update()
 			camPos.y -= normY * 0.06f * idleBlend;
 			camRot.y += normX * 0.015f * idleBlend;
 			camRot.x += normY * 0.008f * idleBlend;
-
-			if (sShakeTimer > 0.0f)
-			{
-				float k = sShakePower * (sShakeTimer / 0.20f);
-				camPos.x += (Rand01() - 0.5f) * k;
-				camPos.y += (Rand01() - 0.5f) * k;
-			}
 
 			camera_->SetTranslate(camPos);
 			camera_->SetRotate(camRot);
@@ -1760,8 +1755,6 @@ void TitleScene::Update()
 			}
 		}
 	}
-
-	if (sShakeTimer > 0.0f) sShakeTimer -= deltaTime;
 
 	for (auto& s : mouseWaveSources_) s.age += deltaTime;
 	mouseWaveSources_.erase(

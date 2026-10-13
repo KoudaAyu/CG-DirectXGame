@@ -270,11 +270,9 @@ void Game::Draw() {
   engine_->BeginFrame();
 
   // 2. 3Dシーンおよび2Dスプライト描画の実行
-  // 【データ競合・チラ見えの完全撲滅】スレッドセーフでない定数バッファアロケータ（CBAllocator）への同時アクセスをMutexで排他制御
-  static std::mutex s_renderMutex;
+  // エンジン層の ConstantBufferAllocator がスレッドセーフ化されたため、3Dと2Dの安全な並列描画が可能
   engine_->RenderFrame(
       [this](const RenderContext &ctx) {
-        std::lock_guard<std::mutex> lock(s_renderMutex);
         // --- 3D描画パス ---
         if (SceneManager::GetInstance()) {
           SceneManager::GetInstance()->DrawSkybox(ctx.commandList);
@@ -293,7 +291,6 @@ void Game::Draw() {
         DrawParticles(ctx);
       },
       [this](const RenderContext &workerCtx) {
-        std::lock_guard<std::mutex> lock(s_renderMutex);
         // --- 2Dスプライト並列描画パス ---
         DrawSprites(workerCtx);
       });

@@ -1272,18 +1272,6 @@ void GamePlayScene::Update()
 			camera_->SetRotate({ 0.785f, 0.0f, 0.0f });
 		}
 
-		// カメラシェイク（被弾・爆発時の画面揺れ）
-		if (cameraShakeTime_ > 0.0f)
-		{
-			cameraShakeTime_ -= realDeltaTime;
-			float progress = cameraShakeTime_ / cameraShakeDurationMax_;
-			float currentIntensity = cameraShakeIntensity_ * progress * progress;
-			float rx = ((float)rand() / RAND_MAX * 2.0f - 1.0f) * currentIntensity;
-			float ry = ((float)rand() / RAND_MAX * 2.0f - 1.0f) * currentIntensity;
-			float rz = ((float)rand() / RAND_MAX * 2.0f - 1.0f) * currentIntensity;
-			camera_->SetTranslate(camera_->GetTranslate() + Vector3{ rx, ry, rz });
-		}
-
 		camera_->Update();
 	}
 
@@ -1901,6 +1889,14 @@ void GamePlayScene::UpdateStressTestMode()
 	else if (!isStressTestActive_ && !stressTestObstacles_.empty())
 	{
 		stressTestObstacles_.clear();
+	}
+}
+
+void GamePlayScene::TriggerCameraShake(float duration, float intensity)
+{
+	if (camera_)
+	{
+		camera_->Shake(duration, intensity);
 	}
 }
 
