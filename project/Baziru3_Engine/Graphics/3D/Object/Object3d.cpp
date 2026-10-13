@@ -583,10 +583,18 @@ Object3d::ModelData Object3d::LoadObjFile(const std::string &directoryPath,
 
 Object3d::ModelData Object3d::LoadModelFile(const std::string &directoryPath,
                                             const std::string &filename) {
+  const std::string fullPath = directoryPath + "/" + filename;
+
+  // モデルファイルのキャッシュ確認
+  static std::unordered_map<std::string, Object3d::ModelData> sModelFileCache;
+  auto it = sModelFileCache.find(fullPath);
+  if (it != sModelFileCache.end()) {
+    return it->second;
+  }
+
   Object3d::ModelData modelData;
   Assimp::Importer importer;
 
-  const std::string fullPath = directoryPath + "/" + filename;
   const aiScene *scene =
       importer.ReadFile(fullPath, aiProcess_Triangulate | aiProcess_FlipUVs |
                                       aiProcess_GenNormals);
@@ -596,6 +604,7 @@ Object3d::ModelData Object3d::LoadModelFile(const std::string &directoryPath,
   AppendAssimpNodeMeshes(scene->mRootNode, scene, modelData);
   LoadAssimpMaterial(scene, directoryPath, modelData);
 
+  sModelFileCache[fullPath] = modelData;
   return modelData;
 }
 

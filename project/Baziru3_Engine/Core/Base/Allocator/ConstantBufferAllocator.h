@@ -3,6 +3,7 @@
 #include <wrl.h>
 #include <cstdint>
 #include <vector>
+#include <mutex>
 
 class DirectXCom;
 
@@ -51,4 +52,7 @@ private:
     static constexpr size_t kNumFrames = 3;
     size_t frameSize_ = 0;
     uint32_t currentFrameIndex_ = 0;
+
+    // マルチスレッド描画時の排他制御
+    mutable std::mutex mutex_;
 };

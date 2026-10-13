@@ -71,6 +71,7 @@ void ConstantBufferAllocator::Finalize()
 
 void ConstantBufferAllocator::BeginFrame()
 {
+    std::lock_guard<std::mutex> lock(mutex_);
     // フレームインデックスを進めて、そのフレーム用の領域の先頭オフセットを設定
     currentFrameIndex_ = (currentFrameIndex_ + 1) % kNumFrames;
     currentOffset_ = currentFrameIndex_ * frameSize_;
@@ -78,6 +79,7 @@ void ConstantBufferAllocator::BeginFrame()
 
 ConstantBufferAllocator::Allocation ConstantBufferAllocator::Allocate(size_t size)
 {
+    std::lock_guard<std::mutex> lock(mutex_);
     size_t alignedSize = AlignUp(size, 256);
     
     // 今フレームの割り当て領域上限
