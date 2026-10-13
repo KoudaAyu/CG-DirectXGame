@@ -90,6 +90,15 @@ int32_t AudioManager::Load(const std::string& filename)
         return -1;
     }
 
+    {
+        std::lock_guard<std::mutex> lk(mutex_);
+        auto it = soundPathCache_.find(filename);
+        if (it != soundPathCache_.end())
+        {
+            return it->second;
+        }
+    }
+
     if (!xAudio2_)
     {
         logStream_ << "AudioManager::Load - XAudio2 not initialized\n";
@@ -113,6 +122,7 @@ int32_t AudioManager::Load(const std::string& filename)
     {
         std::lock_guard<std::mutex> lk(mutex_);
         loadedSounds_[id] = std::move(data);
+        soundPathCache_[filename] = id;
     }
 
     logStream_ << "AudioManager::Load - loaded id=" << id << " file=" << filename << "\n";
@@ -239,6 +249,14 @@ void AudioManager::Unload(int32_t soundId)
     auto lit = loadedSounds_.find(soundId);
     if (lit != loadedSounds_.end())
     {
+        for (auto it = soundPathCache_.begin(); it != soundPathCache_.end(); ++it)
+        {
+            if (it->second == soundId)
+            {
+                soundPathCache_.erase(it);
+                break;
+            }
+        }
         loadedSounds_.erase(lit);
         logStream_ << "AudioManager::Unload - unloaded soundId=" << soundId << "\n";
     }
@@ -249,6 +267,26 @@ void AudioManager::SetMasterVolume(float volume)
 {
     masterVolume_ = volume;
     if (masterVoice_) masterVoice_->SetVolume(volume, XAUDIO2_COMMIT_NOW);
+}
+
+void AudioManager::SetVolume(int32_t playId, float volume)
+{
+    std::lock_guard<std::mutex> lk(mutex_);
+    auto it = playingVoices_.find(playId);
+    if (it != playingVoices_.end() && it->second.voice)
+    {
+        it->second.voice->SetVolume(std::clamp(volume, 0.0f, 1.0f), XAUDIO2_COMMIT_NOW);
+    }
+}
+
+int32_t AudioManager::PlayOneShot(int32_t soundId, float volume)
+{
+    int32_t playId = Play(soundId);
+    if (playId != -1 && volume != 1.0f)
+    {
+        SetVolume(playId, volume);
+    }
+    return playId;
 }
 
 void AudioManager::Update()

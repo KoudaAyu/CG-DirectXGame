@@ -3,6 +3,7 @@
 #include "DirectXCom.h"
 #include "WindowsAPI.h"
 #include "SceneManager.h"
+#include <algorithm>
 
 
 Camera::Camera()
@@ -28,6 +29,20 @@ void Camera::Initialize(DirectXCom *directXCom) {
 void Camera::Finalize() { directXCom_ = nullptr; }
 
 void Camera::Update() {
+  // スムーズ移動の補間
+  if (moveTimer_ < moveDuration_) {
+    moveTimer_ += 1.0f / 60.0f;
+    float t = (moveDuration_ > 0.0f) ? std::clamp(moveTimer_ / moveDuration_, 0.0f, 1.0f) : 1.0f;
+    // イーズアウト補間
+    float easedT = 1.0f - (1.0f - t) * (1.0f - t);
+    Vector3 newTranslate = {
+      moveStartTranslate_.x + (moveTargetTranslate_.x - moveStartTranslate_.x) * easedT,
+      moveStartTranslate_.y + (moveTargetTranslate_.y - moveStartTranslate_.y) * easedT,
+      moveStartTranslate_.z + (moveTargetTranslate_.z - moveStartTranslate_.z) * easedT
+    };
+    transform_.SetTranslate(newTranslate);
+  }
+
   Vector3 finalTranslate = transform_.GetTranslate();
 
   if (shakeTimer_ > 0.0f) {
@@ -55,6 +70,13 @@ void Camera::Update() {
   viewProjectionMatrix_ = Multiply(viewMatrix_, projectionMatrix_);
   UpdateFrustum();
   UpdateGPUBuffer(finalTranslate);
+}
+
+void Camera::MoveTo(const Vector3& targetTranslate, float duration) {
+  moveStartTranslate_ = transform_.GetTranslate();
+  moveTargetTranslate_ = targetTranslate;
+  moveDuration_ = duration;
+  moveTimer_ = 0.0f;
 }
 
 void Camera::UpdateGPUBuffer(const Vector3& worldPos) {

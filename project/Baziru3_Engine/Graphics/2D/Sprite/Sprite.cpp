@@ -196,9 +196,14 @@ void Sprite::Update() {
     RecalculateUVMatrix();
     uvDirty_ = false;
   }
+  isDirty_ = false;
 }
 
 void Sprite::Draw(ID3D12GraphicsCommandList *commandList) {
+  if (isDirty_) {
+    Update();
+  }
+
   ID3D12GraphicsCommandList *cmdList =
       commandList ? commandList : (dxCommon_ ? dxCommon_->GetCommandList().Get() : nullptr);
   if (!cmdList) return;

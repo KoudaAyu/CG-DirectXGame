@@ -232,6 +232,7 @@ void SceneManager::CommitPendingSceneChange() {
 
   // 次シーンの初期化
   scene_->Initialize(dxCommon_, camera_);
+  scene_->Update();
 }
 
 void SceneManager::Draw(SceneRenderRequests &renderRequests) {

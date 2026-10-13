@@ -7,6 +7,7 @@
 #include "Matrix4x4.h"
 #include "Vector.h"
 #include <memory>
+#include <algorithm>
 
 
 class SpriteCom;
@@ -114,30 +115,39 @@ public:
 
   // Spriteの座標関係
   const Vector2 &GetPosition() const { return position_; }
-  void SetPosition(const Vector2 &position) { this->position_ = position; }
+  void SetPosition(const Vector2 &position) { this->position_ = position; isDirty_ = true; }
 
   // Spriteの回転関係
   const float GetRotation() const { return rotation_; }
-  void SetRotation(const float rotation) { this->rotation_ = rotation; }
+  void SetRotation(const float rotation) { this->rotation_ = rotation; isDirty_ = true; }
 
   // Spriteの色
   const Vector4 &GetColor() const { return materialData_.color; }
   void SetColor(const Vector4 &color) {
     const_cast<Sprite *>(this)->materialData_.color = color;
+    isDirty_ = true;
+  }
+
+  // Spriteの透明度関係
+  float GetAlpha() const { return materialData_.color.w; }
+  void SetAlpha(float alpha) {
+    const_cast<Sprite *>(this)->materialData_.color.w = std::clamp(alpha, 0.0f, 1.0f);
+    isDirty_ = true;
   }
 
   // Spriteの大きさ関係
   const Vector2 &GetSize() const { return size_; }
-  void SetSize(const Vector2 &size) { this->size_ = size; }
+  void SetSize(const Vector2 &size) { this->size_ = size; isDirty_ = true; }
 
   const Vector2 &GetAnchorPoint() const { return anchorPoint_; }
   void SetAnchorPoint(const Vector2 &anchorPoint) {
     this->anchorPoint_ = anchorPoint;
+    isDirty_ = true;
   }
 
-  void SetTextureLeftTop(const Vector2 &leftTop) { textureLeftTop_ = leftTop; }
+  void SetTextureLeftTop(const Vector2 &leftTop) { textureLeftTop_ = leftTop; isDirty_ = true; }
 
-  void SetTextureSize(const Vector2 &size) { textureSize_ = size; }
+  void SetTextureSize(const Vector2 &size) { textureSize_ = size; isDirty_ = true; }
 
   void SetTextureHandle(D3D12_GPU_DESCRIPTOR_HANDLE handle) {
     textureHandleGPU_ = handle;
@@ -170,6 +180,7 @@ private:
   Transform uvParams_{
       {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f}};
   bool uvDirty_ = true;
+  bool isDirty_ = true;
 
 private:
   DirectXCom *dxCommon_ = nullptr;

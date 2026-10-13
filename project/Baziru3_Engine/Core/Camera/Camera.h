@@ -82,7 +82,17 @@ public:
     shakeDuration_ = duration;
     shakeTimer_ = duration;
   }
+  void Shake(float duration, float power) {
+    AddShake(power, duration);
+  }
+  void StopShake() {
+    shakeTimer_ = 0.0f;
+  }
   bool IsShaking() const { return shakeTimer_ > 0.0f; }
+
+  // 目標点へのスムーズ移動
+  void MoveTo(const Vector3& targetTranslate, float duration);
+  bool IsMoving() const { return moveTimer_ < moveDuration_; }
 
   // GPU側カメラ定数バッファのアドレス取得
   D3D12_GPU_VIRTUAL_ADDRESS GetCameraGpuAddress() const {
@@ -124,4 +134,10 @@ protected:
   float shakeIntensity_ = 0.0f;
   float shakeDuration_ = 0.0f;
   float shakeTimer_ = 0.0f;
+
+  // スムーズ移動
+  Vector3 moveStartTranslate_ = { 0.0f, 0.0f, 0.0f };
+  Vector3 moveTargetTranslate_ = { 0.0f, 0.0f, 0.0f };
+  float moveDuration_ = 0.0f;
+  float moveTimer_ = 0.0f;
 };
