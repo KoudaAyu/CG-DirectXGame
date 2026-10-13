@@ -3,6 +3,7 @@
 #include "DirectXCom.h"
 #include "SceneManager.h"
 #include "../GameScene/RaidStats.h"
+#include "Application/Transition/StingerTransition.h"
 #include <cmath>
 
 #ifdef USE_IMGUI
@@ -182,11 +183,11 @@ void GameOverScene::Update()
 
 	if (retryTriggered)
 	{
-		SceneManager::GetInstance()->ChangeScene("GAMEPLAY");
+		SceneTransition::Change("GAMEPLAY", 0.5f);
 	}
 	else if (titleTriggered)
 	{
-		SceneManager::GetInstance()->ChangeScene("TITLE");
+		SceneTransition::Change("TITLE", 0.5f);
 	}
 }
 

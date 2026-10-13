@@ -1,4 +1,4 @@
-﻿#include "GamePlayHUD.h"
+#include "GamePlayHUD.h"
 #include "TextureManager.h"
 #include "Camera.h"
 #include "../../Player/Player.h"
@@ -10,6 +10,8 @@
 #include "TutorialSign.h"
 #include <cmath>
 #include <algorithm>
+
+#include "Application/Config/AppDebugConfig.h"
 
 #ifdef USE_IMGUI
 #include "imgui.h"
@@ -585,7 +587,7 @@ void GamePlayHUD::DrawFloatingTexts(const GamePlayHUDContext& ctx)
 
 void GamePlayHUD::DrawVisionConesAndGizmos(const GamePlayHUDContext& ctx)
 {
-#ifdef USE_IMGUI
+#if APP_DEBUG_UI // 開発用ギズモ（Release では描画しない）
     if (!ctx.showDebugGizmos || !ctx.camera) return;
 
     ImDrawList* drawList = ImGui::GetForegroundDrawList();
@@ -620,7 +622,7 @@ void GamePlayHUD::DrawVisionConesAndGizmos(const GamePlayHUDContext& ctx)
 
 void GamePlayHUD::DrawPerformanceTrackerUI(const GamePlayHUDContext& ctx, float deltaTime)
 {
-#ifdef USE_IMGUI
+#if APP_DEBUG_UI // 開発用プロファイラ（Release では表示しない）
     if (!ctx.showPerformanceTracker) return;
 
     ImGui::SetNextWindowPos(ImVec2(16.0f, 60.0f), ImGuiCond_FirstUseEver);

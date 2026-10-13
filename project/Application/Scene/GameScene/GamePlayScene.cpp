@@ -22,6 +22,8 @@
 
 #include "GamePlayScene.h"
 #include "Application/Config/GameConfig.h"
+#include "Application/Config/AppDebugConfig.h"
+#include "Application/Transition/StingerTransition.h"
 #include "RaidStats.h"
 #include "Baziru3_Engine/Core/Base/Allocator/ConstantBufferAllocator.h"
 #include "imgui.h"
@@ -679,6 +681,7 @@ void GamePlayScene::UpdateDebugInput()
 		prevKey8 = curKey8;
 	}
 
+#if APP_DEBUG_UI // F1: デバッグギズモ切替（Release では無効）
 	{
 		static bool prevF1 = false;
 		const bool curF1 = (GetAsyncKeyState(VK_F1) & 0x8000) != 0;
@@ -688,6 +691,7 @@ void GamePlayScene::UpdateDebugInput()
 		}
 		prevF1 = curF1;
 	}
+#endif
 }
 
 void GamePlayScene::UpdateCharacters(float deltaTime)
@@ -1183,7 +1187,7 @@ void GamePlayScene::Update()
 		{
 			// 型安全 Scene Context でゲームオーバー画面へ戦績を転送
 			SetSceneData<RaidStats>("RaidStats", RaidStats::GetInstance());
-			SceneManager::GetInstance()->ChangeScene("GAMEOVER");
+			SceneTransition::Change("GAMEOVER", 0.5f);
 			return;
 		}
 	}
@@ -1211,7 +1215,7 @@ void GamePlayScene::Update()
 			RaidStats::GetInstance().totalLootValue = player_ ? player_->GetLootValue() : 0;
 			// 型安全 Scene Context でクリア画面へ戦績を転送
 			SetSceneData<RaidStats>("RaidStats", RaidStats::GetInstance());
-			SceneManager::GetInstance()->ChangeScene("CLEAR");
+			SceneTransition::Change("CLEAR", 0.5f);
 			return;
 		}
 	}

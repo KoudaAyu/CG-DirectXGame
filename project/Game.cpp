@@ -3,6 +3,7 @@
 #include "Baziru3_Engine/Core/Base/Pipeline/PipelineStateManager.h"
 #include "DebugUI.h"
 #include <future>
+#include <mutex>
 
 #include <combaseapi.h>
 
@@ -14,10 +15,37 @@
 #include "RenderContext.h"
 #include "RootParam.h"
 
+#include "Application/Config/AppDebugConfig.h"
+#include "Application/Transition/StingerTransition.h"
+
 #ifdef USE_IMGUI
 #include <imgui.h>
 #include <imgui_impl_dx12.h>
 #include <imgui_impl_win32.h>
+#include <imgui_internal.h>
+#endif
+
+#if defined(USE_IMGUI) && !APP_DEBUG_UI
+namespace {
+// エンジン側が無条件で出す開発用ウィンドウ。
+// Release では描画直前に非表示にして、画面にも入力にも関わらないようにする。
+constexpr const char *kEngineDebugWindows[] = {
+    "Engine Scene Manager",
+    "Collision Debug Overlay Settings",
+    "Engine Fallback Scene",
+};
+
+void HideEngineDebugWindows() {
+  if (!ImGui::GetCurrentContext()) {
+    return;
+  }
+  for (const char *name : kEngineDebugWindows) {
+    if (ImGuiWindow *window = ImGui::FindWindowByName(name)) {
+      window->Hidden = true;
+    }
+  }
+}
+} // namespace
 #endif
 
 void Game::Initialize() {
@@ -34,6 +62,13 @@ void Game::Initialize() {
   }
 
   LogEngineDiagnostics();
+
+#if defined(USE_IMGUI) && !APP_DEBUG_UI
+  // Release ではウィンドウ配置の imgui.ini を書き出さない
+  if (ImGui::GetCurrentContext()) {
+    ImGui::GetIO().IniFilename = nullptr;
+  }
+#endif
 
   auto *spriteCom = engine_->GetSpriteCom();
   auto *window = engine_->GetWindowAPI();
@@ -80,6 +115,17 @@ void Game::Initialize() {
 
   // シーン登録と初期シーン設定
   SceneRegistration::RegisterScenes();
+
+  // アプリケーション層トランジション初期化（猫麦とろろ風スティンガー演出）
+  if (engine_) {
+    StingerTransition::GetInstance()->Initialize(engine_->GetSpriteCom(),
+                                                 engine_->GetWindowAPI());
+    StingerTransition::GetInstance()->SetOffScreenRendering(
+        engine_->GetOffScreenRendering());
+    // エンジンのデフォルト黒フェードを無効化（即時切り替えにして、演出はアプリケーション層Stingerで完全制御）
+    SceneManager::GetInstance()->SetFadeApplication(nullptr);
+  }
+
   SceneManager::GetInstance()->ChangeScene("TITLE");
 
   // テクスチャ読み込み
@@ -124,6 +170,9 @@ void Game::Finalize() {
     object3d_.reset();
   }
 
+  // 3.5. トランジション破棄
+  StingerTransition::GetInstance()->Finalize();
+
   // 4. エンジンの一括破棄（SceneManager、サブシステム、DirectX12の逆順安全解放）
   // 【カプセル化】エンジン内部で依存関係を解決して安全にシャットダウン
   if (engine_) {
@@ -150,6 +199,9 @@ void Game::Update() {
   // 2. シーンマネージャの更新（固定タイムステップ 1/60s）
   SceneManager::GetInstance()->Update(kDeltaTime);
 
+  // 2.5. アプリケーション層トランジション更新
+  StingerTransition::GetInstance()->Update(kDeltaTime);
+
   // 3. デバッグカメラ・サンプルオブジェクトの更新
   debugCamera_.Update();
 
@@ -158,7 +210,7 @@ void Game::Update() {
     object3d_->Update();
   }
 
-#ifdef USE_IMGUI
+#if APP_DEBUG_UI
   if (debugUI) {
     debugUI->Update();
   }
@@ -205,20 +257,24 @@ void Game::Draw() {
   if (!engine_)
     return;
 
-  // 【カプセル化の真価】
-  // DirectX 12 の低レベルAPI（コマンドアロケータ、記述子ヒープ、OMSetRenderTargets、
-  // マルチスレッド描画コマンドの同期・提出、ポストプロセス、フェード、Present等）は
-  // すべて EngineContext 内部に完全に隠蔽（カプセル化）されています。
-  //
-  // ゲーム開発者（チームメンバー）は、DirectX12の知識を必要とせず、
-  // 「3Dシーンで何を描画するか」「2Dスプライトで何を描画するか」の意図だけを伝えます。
+  // トランジション中は深度アウトラインポストプロセスを確実に抑制（ストライプの上の輪郭線浮きを完全防止）
+  if (engine_->GetOffScreenRendering()) {
+    if (StingerTransition::GetInstance()->IsTransitioning()) {
+      if (engine_->GetOffScreenRendering()->GetPostEffect() != OffScreenRendering::PostEffect::Normal) {
+        engine_->GetOffScreenRendering()->SetPostEffect(OffScreenRendering::PostEffect::Normal);
+      }
+    }
+  }
 
   // 1. フレーム描画の開始（バックバッファクリア、オフスクリーンレンダリング開始等）
   engine_->BeginFrame();
 
-  // 2. 3Dシーンおよび2Dスプライト描画の実行（並列スレッドコマンド記録・GPU提出をエンジンが自動制御）
+  // 2. 3Dシーンおよび2Dスプライト描画の実行
+  // 【データ競合・チラ見えの完全撲滅】スレッドセーフでない定数バッファアロケータ（CBAllocator）への同時アクセスをMutexで排他制御
+  static std::mutex s_renderMutex;
   engine_->RenderFrame(
       [this](const RenderContext &ctx) {
+        std::lock_guard<std::mutex> lock(s_renderMutex);
         // --- 3D描画パス ---
         if (SceneManager::GetInstance()) {
           SceneManager::GetInstance()->DrawSkybox(ctx.commandList);
@@ -237,11 +293,15 @@ void Game::Draw() {
         DrawParticles(ctx);
       },
       [this](const RenderContext &workerCtx) {
+        std::lock_guard<std::mutex> lock(s_renderMutex);
         // --- 2Dスプライト並列描画パス ---
         DrawSprites(workerCtx);
       });
 
   // 3. フレーム描画の終了（ポストプロセスバッファ描画、フェード、ImGui、画面フリップ）
+#if defined(USE_IMGUI) && !APP_DEBUG_UI
+  HideEngineDebugWindows();
+#endif
   engine_->EndFrame();
 }
 
@@ -336,13 +396,15 @@ void Game::DrawObjects(const RenderContext &ctx) {
 }
 
 void Game::DrawSprites(const RenderContext &ctx) {
-  if (!drawSprite)
-    return;
-
-  SpriteManager *sm = engine_ ? engine_->GetSpriteManager() : nullptr;
-  if (sm) {
-    sm->DrawAll(ctx, &debugCamera_, &sprites);
+  if (drawSprite) {
+    SpriteManager *sm = engine_ ? engine_->GetSpriteManager() : nullptr;
+    if (sm) {
+      sm->DrawAll(ctx, &debugCamera_, &sprites);
+    }
   }
+
+  // アプリケーション層トランジション描画（最前面に猫麦とろろ風スティンガーを重ねる）
+  StingerTransition::GetInstance()->Draw(ctx);
 }
 
 void Game::DrawParticles(const RenderContext &ctx) {

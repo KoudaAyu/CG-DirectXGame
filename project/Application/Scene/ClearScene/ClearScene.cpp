@@ -4,6 +4,7 @@
 #include "SceneManager.h"
 #include "TextureManager.h"
 #include "../GameScene/RaidStats.h"
+#include "Application/Transition/StingerTransition.h"
 #include <cmath>
 
 #ifdef USE_IMGUI
@@ -197,11 +198,11 @@ void ClearScene::Update()
 
 	if (redeployTriggered)
 	{
-		SceneManager::GetInstance()->ChangeScene("GAMEPLAY");
+		SceneTransition::Change("GAMEPLAY", 0.5f);
 	}
 	else if (returnTitle)
 	{
-		SceneManager::GetInstance()->ChangeScene("TITLE");
+		SceneTransition::Change("TITLE", 0.5f);
 	}
 }
 

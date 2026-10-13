@@ -89,6 +89,7 @@
     <ClCompile Include="Application\Scene\ClearScene\ClearScene.cpp" />
     <ClCompile Include="Application\Scene\GameOverScene\GameOverScene.cpp" />
     <ClCompile Include="Application\Obstacle.cpp" />
+    <ClCompile Include="Application\Transition\StingerTransition.cpp" />
     <ClCompile Include="Baziru3_Engine\Graphics\Light\Light.cpp" />
     <ClCompile Include="Baziru3_Engine\Graphics\Light\CascadingShadowMap.cpp" />
 
@@ -322,6 +323,7 @@
     <ClInclude Include="Application\Scene\GameScene\EnvironmentSystem.h" />
     <ClInclude Include="Application\Scene\GameScene\CharacterEffectController.h" />
     <ClInclude Include="Application\Config\GameConfig.h" />
+    <ClInclude Include="Application\Config\AppDebugConfig.h" />
     <ClInclude Include="Application\Scene\ClearScene\ClearScene.h" />
     <ClInclude Include="Baziru3_Engine\Framework\Particle\ParticleEmitter.h" />
     <ClInclude Include="Baziru3_Engine\Framework\Particle\ParticleManager.h" />
@@ -347,6 +349,7 @@
     <ClInclude Include="Application\Scene\GameScene\Target.h" />
     <ClInclude Include="Application\Scene\GameScene\TutorialSign.h" />
     <ClInclude Include="Application\LevelEditor.h" />
+    <ClInclude Include="Application\Transition\StingerTransition.h" />
     <ClInclude Include="Baziru3_Engine\3D\Water\River.h" />
     <ClInclude Include="Baziru3_Engine\3D\Procedural\BioProceduralGenerator.h" />
     <ClInclude Include="Baziru3_Engine\Graphics\3D\Object\SkinningObject3dCom.h" />
@@ -463,6 +466,7 @@
       <TreatWarningAsError>false</TreatWarningAsError>
       <AdditionalIncludeDirectories>$(ProjectDir)Baziru3_Engine\Core;$(ProjectDir)Baziru3_Engine\Graphics;$(ProjectDir)Baziru3_Engine\Framework;$(ProjectDir)Baziru3_Engine\Framework\Spline;$(ProjectDir);$(ProjectDir)\externals\DirectXTex;$(ProjectDir)\externals\imgui;$(ProjectDir)\externals\assimp\include;$(ProjectDir)Application;$(ProjectDir)Application\Fade;$(ProjectDir)Application\Player;$(ProjectDir)Application\Scene;$(ProjectDir)Application\Scene\GameScene;$(ProjectDir)Application\Scene\TitleScene;$(ProjectDir)Application\GameObject;$(ProjectDir)Application\Subsystem;$(ProjectDir)Baziru3_Engine\Graphics\2D;$(ProjectDir)Baziru3_Engine\Graphics\2D\Sprite;$(ProjectDir)Baziru3_Engine\Graphics\2D\Texture;$(ProjectDir)Baziru3_Engine\Graphics\3D\Model;$(ProjectDir)Baziru3_Engine\Graphics\3D\Model\SkinCluster;$(ProjectDir)Baziru3_Engine\Graphics\3D\Object;$(ProjectDir)Baziru3_Engine\Framework\Audio;$(ProjectDir)Baziru3_Engine\Framework\Animation;$(ProjectDir)Baziru3_Engine\Framework\Animation\Joint;$(ProjectDir)Baziru3_Engine\Framework\Animation\Keyframe;$(ProjectDir)Baziru3_Engine\Framework\Animation\NodeAnimation;$(ProjectDir)Baziru3_Engine\Framework\Animation\Skeleton;$(ProjectDir)Baziru3_Engine\Core\Base;$(ProjectDir)Baziru3_Engine\Core\Base\ImGui;$(ProjectDir)Baziru3_Engine\Core\Base\Log;$(ProjectDir)Baziru3_Engine\Core\Base\OffScreenRendering;$(ProjectDir)Baziru3_Engine\Core\Base\Scene;$(ProjectDir)Baziru3_Engine\Core\Base\Srv;$(ProjectDir)Baziru3_Engine\Core\Base\Windows;$(ProjectDir)Baziru3_Engine\Core\Camera;$(ProjectDir)Baziru3_Engine\Core\Camera\DebugCamera;$(ProjectDir)Baziru3_Engine\Graphics\Graphics;$(ProjectDir)Baziru3_Engine\Graphics\Graphics\Material;$(ProjectDir)Baziru3_Engine\Core\IO;$(ProjectDir)Baziru3_Engine\Core\IO\Key;$(ProjectDir)Baziru3_Engine\Core\IO\Mouse;$(ProjectDir)Baziru3_Engine\Graphics\Light;$(ProjectDir)Baziru3_Engine\Core\Math;$(ProjectDir)Baziru3_Engine\Framework\Particle;$(ProjectDir)Baziru3_Engine\Core\Platform\Windows;$(ProjectDir)Baziru3_Engine\Graphics\Primitive\Cylinder;$(ProjectDir)Baziru3_Engine\Framework\Scene;$(ProjectDir)Baziru3_Engine\Framework\Scene\Factory;$(ProjectDir)Baziru3_Engine\Framework\Scene\Manager;$(ProjectDir)Baziru3_Engine\Graphics\Shapes\Sphere;$(ProjectDir)Baziru3_Engine\Graphics\SkyBox;$(ProjectDir)Baziru3_Engine\Framework\AI;$(ProjectDir)externals;$(ProjectDir)externals\imgui-node-editor</AdditionalIncludeDirectories>
       <BasicRuntimeChecks>Default</BasicRuntimeChecks>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -485,13 +489,14 @@ xcopy /y /d "$(ProjectDir)externals\dxc\*.dll" "$(OutDir)"</Command>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>NDEBUG;_CONSOLE;USE_IMGUI;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;_CONSOLE;USE_IMGUI;SHIPPING_BUILD;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <AdditionalOptions>/utf-8 /FS %(AdditionalOptions)</AdditionalOptions>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <Optimization>MinSpace</Optimization>
+      <DebugInformationFormat>None</DebugInformationFormat>
       <AdditionalIncludeDirectories>$(ProjectDir)Baziru3_Engine\Core;$(ProjectDir)Baziru3_Engine\Graphics;$(ProjectDir)Baziru3_Engine\Framework;$(ProjectDir)Baziru3_Engine\Framework\Spline;$(ProjectDir);$(ProjectDir)\externals\DirectXTex;$(ProjectDir)\externals\imgui;$(ProjectDir)\externals\assimp\include;$(ProjectDir)Application;$(ProjectDir)Application\Fade;$(ProjectDir)Application\Player;$(ProjectDir)Application\Scene;$(ProjectDir)Application\Scene\GameScene;$(ProjectDir)Application\Scene\TitleScene;$(ProjectDir)Application\GameObject;$(ProjectDir)Application\Subsystem;$(ProjectDir)Baziru3_Engine\Graphics\2D;$(ProjectDir)Baziru3_Engine\Graphics\2D\Sprite;$(ProjectDir)Baziru3_Engine\Graphics\2D\Texture;$(ProjectDir)Baziru3_Engine\Graphics\3D\Model;$(ProjectDir)Baziru3_Engine\Graphics\3D\Model\SkinCluster;$(ProjectDir)Baziru3_Engine\Graphics\3D\Object;$(ProjectDir)Baziru3_Engine\Framework\Audio;$(ProjectDir)Baziru3_Engine\Framework\Animation;$(ProjectDir)Baziru3_Engine\Framework\Animation\Joint;$(ProjectDir)Baziru3_Engine\Framework\Animation\Keyframe;$(ProjectDir)Baziru3_Engine\Framework\Animation\NodeAnimation;$(ProjectDir)Baziru3_Engine\Framework\Animation\Skeleton;$(ProjectDir)Baziru3_Engine\Core\Base;$(ProjectDir)Baziru3_Engine\Core\Base\ImGui;$(ProjectDir)Baziru3_Engine\Core\Base\Log;$(ProjectDir)Baziru3_Engine\Core\Base\OffScreenRendering;$(ProjectDir)Baziru3_Engine\Core\Base\Scene;$(ProjectDir)Baziru3_Engine\Core\Base\Srv;$(ProjectDir)Baziru3_Engine\Core\Base\Windows;$(ProjectDir)Baziru3_Engine\Core\Camera;$(ProjectDir)Baziru3_Engine\Core\Camera\DebugCamera;$(ProjectDir)Baziru3_Engine\Graphics\Graphics;$(ProjectDir)Baziru3_Engine\Graphics\Graphics\Material;$(ProjectDir)Baziru3_Engine\Graphics\Light;$(ProjectDir)Baziru3_Engine\Core\Math;$(ProjectDir)Baziru3_Engine\Framework\Particle;$(ProjectDir)Baziru3_Engine\Core\Platform\Windows;$(ProjectDir)Baziru3_Engine\Graphics\Primitive\Cylinder;$(ProjectDir)Baziru3_Engine\Framework\Scene;$(ProjectDir)Baziru3_Engine\Framework\Scene\Factory;$(ProjectDir)Baziru3_Engine\Framework\Scene\Manager;$(ProjectDir)Baziru3_Engine\Graphics\Shapes\Sphere;$(ProjectDir)Baziru3_Engine\Graphics\SkyBox;$(ProjectDir)Baziru3_Engine\Framework\AI;$(ProjectDir)externals;$(ProjectDir)externals\imgui-node-editor</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
@@ -504,6 +509,7 @@ xcopy /y /d "$(ProjectDir)externals\dxc\*.dll" "$(OutDir)"</Command>
     </Link>
     <PostBuildEvent>
       <Command>if not exist "$(TargetDir)" mkdir "$(TargetDir)"
+xcopy /E /Y /I /D "$(ProjectDir)Resources" "$(TargetDir)Resources"
 xcopy /y /d "$(ProjectDir)externals\dxc\*.dll" "$(OutDir)"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
@@ -520,6 +526,7 @@ xcopy /y /d "$(ProjectDir)externals\dxc\*.dll" "$(OutDir)"</Command>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <Optimization>Disabled</Optimization>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <AdditionalIncludeDirectories>$(ProjectDir)Baziru3_Engine\Core;$(ProjectDir)Baziru3_Engine\Graphics;$(ProjectDir)Baziru3_Engine\Framework;$(ProjectDir)Baziru3_Engine\Framework\Spline;$(ProjectDir);$(ProjectDir)\externals\DirectXTex;$(ProjectDir)\externals\imgui;$(ProjectDir)\externals\assimp\include;$(ProjectDir)Application;$(ProjectDir)Application\Fade;$(ProjectDir)Application\Player;$(ProjectDir)Application\Scene;$(ProjectDir)Application\Scene\GameScene;$(ProjectDir)Application\Scene\TitleScene;$(ProjectDir)Application\GameObject;$(ProjectDir)Application\Subsystem;$(ProjectDir)Baziru3_Engine\Graphics\2D;$(ProjectDir)Baziru3_Engine\Graphics\2D\Sprite;$(ProjectDir)Baziru3_Engine\Graphics\2D\Texture;$(ProjectDir)Baziru3_Engine\Graphics\3D\Model;$(ProjectDir)Baziru3_Engine\Graphics\3D\Model\SkinCluster;$(ProjectDir)Baziru3_Engine\Graphics\3D\Object;$(ProjectDir)Baziru3_Engine\Framework\Audio;$(ProjectDir)Baziru3_Engine\Framework\Animation;$(ProjectDir)Baziru3_Engine\Framework\Animation\Joint;$(ProjectDir)Baziru3_Engine\Framework\Animation\Keyframe;$(ProjectDir)Baziru3_Engine\Framework\Animation\NodeAnimation;$(ProjectDir)Baziru3_Engine\Framework\Animation\Skeleton;$(ProjectDir)Baziru3_Engine\Core\Base;$(ProjectDir)Baziru3_Engine\Core\Base\ImGui;$(ProjectDir)Baziru3_Engine\Core\Base\Log;$(ProjectDir)Baziru3_Engine\Core\Base\OffScreenRendering;$(ProjectDir)Baziru3_Engine\Core\Base\Scene;$(ProjectDir)Baziru3_Engine\Core\Base\Srv;$(ProjectDir)Baziru3_Engine\Core\Base\Windows;$(ProjectDir)Baziru3_Engine\Core\Camera;$(ProjectDir)Baziru3_Engine\Core\Camera\DebugCamera;$(ProjectDir)Baziru3_Engine\Graphics\Graphics;$(ProjectDir)Baziru3_Engine\Graphics\Graphics\Material;$(ProjectDir)Baziru3_Engine\Core\IO;$(ProjectDir)Baziru3_Engine\Core\IO\Key;$(ProjectDir)Baziru3_Engine\Core\IO\Mouse;$(ProjectDir)Baziru3_Engine\Graphics\Light;$(ProjectDir)Baziru3_Engine\Core\Math;$(ProjectDir)Baziru3_Engine\Framework\Particle;$(ProjectDir)Baziru3_Engine\Core\Platform\Windows;$(ProjectDir)Baziru3_Engine\Graphics\Primitive\Cylinder;$(ProjectDir)Baziru3_Engine\Framework\Scene;$(ProjectDir)Baziru3_Engine\Framework\Scene\Factory;$(ProjectDir)Baziru3_Engine\Framework\Scene\Manager;$(ProjectDir)Baziru3_Engine\Graphics\Shapes\Sphere;$(ProjectDir)Baziru3_Engine\Graphics\SkyBox;$(ProjectDir)Baziru3_Engine\Framework\AI;$(ProjectDir)externals;$(ProjectDir)externals\imgui-node-editor</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
