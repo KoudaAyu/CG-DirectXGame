@@ -819,6 +819,9 @@ void MovingEnemy::Update(WindowAPI* windowAPI, const Vector3* targetPosition, co
         }
     }
 
+    // 地面接地保証
+    position_.y = 0.0f;
+
     object3d_->SetTranslate(position_);
     object3d_->Update();
 

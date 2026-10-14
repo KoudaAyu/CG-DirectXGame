@@ -64,11 +64,24 @@ void GamePlayScene::InitializeScene()
 	particleManager = GetParticleManager();
 	appParticleManager_ = std::make_unique<AppParticleManager>();
 	appParticleManager_->Initialize(particleManager);
-	// カメラの初期化（斜め45度トップダウン見下ろし視点）
+	// ☀️ シネマティックライティング設定（タイトル画面と同等の温かい午後の陽光と陰影）
+	if (light)
+	{
+		Vector3 sunDir = { -0.42f, -0.78f, 0.46f };
+		float len = std::sqrt(sunDir.x * sunDir.x + sunDir.y * sunDir.y + sunDir.z * sunDir.z);
+		sunDir = { sunDir.x / len, sunDir.y / len, sunDir.z / len };
+		light->SetDirectionalLight({ 1.0f, 0.94f, 0.82f, 1.0f }, sunDir, 1.35f);
+	}
+	if (SceneManager::GetInstance())
+	{
+		SceneManager::GetInstance()->SetShowSkybox(true);
+	}
+
+	// カメラの初期化（トップダウン見下ろし近接視点）
 	if (camera_)
 	{
-		camera_->SetTranslate(Vector3{ 0.0f, 20.0f, -20.0f });
-		camera_->SetRotate({ 0.785f, 0.0f, 0.0f });
+		camera_->SetTranslate(GameConfig::Camera::kDefaultFollowOffset * cameraZoom_);
+		camera_->SetRotate(GameConfig::Camera::kFollowRotation);
 		camera_->Update();
 	}
 
@@ -692,6 +705,18 @@ void GamePlayScene::UpdateDebugInput()
 		prevF1 = curF1;
 	}
 #endif
+
+	// カメラズーム微調整 ([ ズームイン / ] ズームアウト)
+	{
+		if ((GetAsyncKeyState(VK_OEM_4) & 0x8000) != 0 || (GetAsyncKeyState(VK_SUBTRACT) & 0x8000) != 0)
+		{
+			cameraZoom_ = (std::min)(cameraZoom_ + 0.015f, GameConfig::Camera::kMaxZoomScale);
+		}
+		if ((GetAsyncKeyState(VK_OEM_6) & 0x8000) != 0 || (GetAsyncKeyState(VK_ADD) & 0x8000) != 0)
+		{
+			cameraZoom_ = (std::max)(cameraZoom_ - 0.015f, GameConfig::Camera::kMinZoomScale);
+		}
+	}
 }
 
 void GamePlayScene::UpdateCharacters(float deltaTime)
@@ -1255,7 +1280,7 @@ void GamePlayScene::Update()
 		if (isGameCleared_)
 		{
 			// クリア時のシネマティックズームイン (プレイヤーアヒルに徐々に寄る)
-			Vector3 targetOffset = { 0.0f, 6.0f, -7.0f };
+			Vector3 targetOffset = GameConfig::Camera::kClearOffset;
 			Vector3 currentTranslate = camera_->GetTranslate();
 			Vector3 targetTranslate = playerPos + targetOffset;
 			
@@ -1266,10 +1291,10 @@ void GamePlayScene::Update()
 		}
 		else
 		{
-			// 通常プレイ時の斜め見下ろしプレイヤー追従
-			Vector3 targetCamPos = playerPos + Vector3{ 0.0f, 20.0f, -20.0f };
+			// 通常プレイ時の斜め見下ろしプレイヤー追従（近接視点＋ズーム対応）
+			Vector3 targetCamPos = playerPos + (GameConfig::Camera::kDefaultFollowOffset * cameraZoom_);
 			camera_->SetTranslate(targetCamPos);
-			camera_->SetRotate({ 0.785f, 0.0f, 0.0f });
+			camera_->SetRotate(GameConfig::Camera::kFollowRotation);
 		}
 
 		camera_->Update();
@@ -1324,15 +1349,15 @@ void GamePlayScene::Update()
 	// ライト点滅（マズルフラッシュ効果）の更新
 	if (light)
 	{
-		float intensity = 1.0f;
+		float intensity = 1.35f;
 		if (lightFlashTimer_ > 0.0f)
 		{
 			lightFlashTimer_ -= deltaTime;
-			intensity = 5.5f; // 眩しく発光
+			intensity = 4.5f; // 眩しく発光
 		}
 		else
 		{
-			intensity = 1.0f; // 通常の明るさ
+			intensity = 1.35f; // 通常のシネマティック明るさ
 		}
 
 		light->SetDirectionalLightIntensity(intensity);
@@ -1497,7 +1522,7 @@ void GamePlayScene::InitializeObstacles()
 					}
 					else if (type == "River" || name.find("River") != std::string::npos || name.find("river") != std::string::npos || name.find("Water") != std::string::npos || name.find("water") != std::string::npos)
 					{
-						modelFile = "river.obj";
+						continue; // 川水面は最下層でGameConfig座標に基づき1つだけ正確に生成する
 					}
 					else if (modelFile == "plane.obj" || name.find("Ground") != std::string::npos || name.find("Plane") != std::string::npos)
 					{
@@ -1518,13 +1543,14 @@ void GamePlayScene::InitializeObstacles()
 			}
 			// ステージ最下層に25x25mタイル16枚（4x4グリッド）で地面を敷く
 			// ground.obj単体(100x100m)だとフラスタムカリングで端が消えるため分割する
+			const int gridW = 4;
+			const int gridH = 4;
 			{
 				const float tileSize = 25.0f; // タイル1枚のサイズ
-				const int gridW = 4;
-				const int gridH = 4;
-				// グリッドの中心を (0, -0.01, 15) に合わせる
+				// グリッドの中心を (0, -0.01, 32.5) に合わせる（Z: -17.5m 〜 +82.5m をカバー）
 				const float startX = 0.0f - tileSize * gridW * 0.5f + tileSize * 0.5f;
-				const float startZ = 15.0f - tileSize * gridH * 0.5f + tileSize * 0.5f;
+				const float startZ = 32.5f - tileSize * gridH * 0.5f + tileSize * 0.5f;
+				std::vector<std::unique_ptr<Obstacle>> groundTiles;
 				for (int gz = 0; gz < gridH; ++gz)
 				{
 					for (int gx = 0; gx < gridW; ++gx)
@@ -1532,15 +1558,17 @@ void GamePlayScene::InitializeObstacles()
 						Vector3 tilePos = { startX + gx * tileSize, -0.01f, startZ + gz * tileSize };
 						auto tile = std::make_unique<Obstacle>();
 						tile->Initialize(object3dCom, camera_, tilePos, 1.0f, "ground_tile.obj", { 1.0f, 1.0f, 1.0f }, { 0.0f, 0.0f, 0.0f });
-						obstacles_.insert(obstacles_.begin(), std::move(tile));
+						groundTiles.push_back(std::move(tile));
 					}
 				}
+				// 16枚の地面タイルを obstacles_ の最先頭に一括挿入
+				obstacles_.insert(obstacles_.begin(), std::make_move_iterator(groundTiles.begin()), std::make_move_iterator(groundTiles.end()));
 			}
 
-			// 橋の下を東西に横断する川水面を配置
+			// 地面タイルの上・橋の下を東西に横断する川水面を配置（地面タイルの直後）
 			auto river = std::make_unique<Obstacle>();
 			river->Initialize(object3dCom, camera_, GameConfig::Environment::kRiverPosition, 1.0f, "river.obj", GameConfig::Environment::kRiverScale, GameConfig::Environment::kRiverRotation);
-			obstacles_.insert(obstacles_.begin() + 1, std::move(river));
+			obstacles_.insert(obstacles_.begin() + (gridW * gridH), std::move(river));
 
 			success = true;
 			OutputDebugStringA("GamePlayScene: Successfully loaded obstacles from JSON.\n");
@@ -1565,7 +1593,7 @@ void GamePlayScene::InitializeObstacles()
 			const int gridW = 4;
 			const int gridH = 4;
 			const float startX = 0.0f - tileSize * gridW * 0.5f + tileSize * 0.5f;
-			const float startZ = 15.0f - tileSize * gridH * 0.5f + tileSize * 0.5f;
+			const float startZ = 32.5f - tileSize * gridH * 0.5f + tileSize * 0.5f;
 			for (int gz = 0; gz < gridH; ++gz)
 			{
 				for (int gx = 0; gx < gridW; ++gx)
@@ -1578,45 +1606,100 @@ void GamePlayScene::InitializeObstacles()
 			}
 		}
 
-		// コンテナ2個
+		// 前哨検問所の斜め配置大型コンテナ
 		auto c1 = std::make_unique<Obstacle>();
-		c1->Initialize(object3dCom, camera_, { -2.5f, 0.0f, 12.0f }, 1.0f, "container.obj", { 1.0f, 1.0f, 1.0f }, { 0.0f, 0.0f, 0.0f });
+		c1->Initialize(object3dCom, camera_, { -3.5f, 0.0f, 14.5f }, 1.0f, "container.obj", { 1.0f, 1.0f, 1.0f }, { 0.0f, 0.22f, 0.0f });
 		obstacles_.push_back(std::move(c1));
 
 		auto c2 = std::make_unique<Obstacle>();
-		c2->Initialize(object3dCom, camera_, { 2.5f, 0.0f, 12.0f }, 1.0f, "container.obj", { 1.0f, 1.0f, 1.0f }, { 0.0f, 0.0f, 0.0f });
+		c2->Initialize(object3dCom, camera_, { 3.6f, 0.0f, 18.5f }, 1.0f, "container.obj", { 1.0f, 1.0f, 1.0f }, { 0.0f, -0.25f, 0.0f });
 		obstacles_.push_back(std::move(c2));
 
-		// 直立フェンス（川 Z=18.75m の手前と奥に配置）
-		std::vector<Vector3> fencePositions = {
-			{ -5.0f, 0.0f, 8.0f },
-			{ 5.0f, 0.0f, 8.0f },
-			{ -5.0f, 0.0f, 15.5f },
-			{ 5.0f, 0.0f, 15.5f },
-			{ -2.0f, 0.0f, 29.0f },
-			{ 2.0f, 0.0f, 29.0f }
+		// 土嚢バリケード（検問所・川前哨・要塞・脱出ゾーン）
+		std::vector<std::pair<Vector3, Vector3>> sandbags = {
+			{ { -3.5f, 0.0f, 8.0f },  { 0.0f, 0.35f, 0.0f } },
+			{ { -6.0f, 0.0f, 15.0f }, { 0.0f, 1.57f, 0.0f } },
+			{ { -2.0f, 0.0f, 22.0f }, { 0.0f, -0.2f, 0.0f } },
+			{ { -3.5f, 0.0f, 27.0f }, { 0.0f, 0.0f, 0.0f } },
+			{ {  3.5f, 0.0f, 27.0f }, { 0.0f, 0.0f, 0.0f } },
+			{ { -3.5f, 0.0f, 33.5f }, { 0.0f, 3.14f, 0.0f } },
+			{ {  3.5f, 0.0f, 33.5f }, { 0.0f, 3.14f, 0.0f } },
+			{ { -3.8f, 0.0f, 45.0f }, { 0.0f, 0.0f, 0.0f } },
+			{ {  3.8f, 0.0f, 45.0f }, { 0.0f, 0.0f, 0.0f } },
+			{ { -3.2f, 0.0f, 56.5f }, { 0.0f, 0.3f, 0.0f } },
+			{ {  3.2f, 0.0f, 56.5f }, { 0.0f, -0.3f, 0.0f } },
+			{ { -3.8f, 0.0f, 62.0f }, { 0.0f, 1.57f, 0.0f } },
+			{ {  3.8f, 0.0f, 62.0f }, { 0.0f, 1.57f, 0.0f } }
 		};
-		for (const auto& fpos : fencePositions)
+		for (const auto& sb : sandbags)
 		{
-			auto fobs = std::make_unique<Obstacle>();
-			fobs->Initialize(object3dCom, camera_, fpos, 1.0f, "fence.obj", { 1.0f, 1.0f, 1.0f }, { 0.0f, 0.0f, 0.0f });
-			obstacles_.push_back(std::move(fobs));
+			auto obs = std::make_unique<Obstacle>();
+			obs->Initialize(object3dCom, camera_, sb.first, 1.0f, "duckov_sandbag_wall.obj", { 1.0f, 1.0f, 1.0f }, sb.second);
+			obstacles_.push_back(std::move(obs));
 		}
+
+		// ドラム缶スタック
+		std::vector<Vector3> barrels = {
+			{  4.5f, 0.0f, 2.8f },
+			{  3.8f, 0.0f, 9.2f },
+			{  5.2f, 0.0f, 20.0f },
+			{ -5.5f, 0.0f, 26.5f },
+			{  5.8f, 0.0f, 34.0f },
+			{ -4.5f, 0.0f, 40.5f },
+			{  0.0f, 0.0f, 58.0f },
+			{ -3.0f, 0.0f, 64.0f },
+			{  3.0f, 0.0f, 64.0f }
+		};
+		for (const auto& bpos : barrels)
+		{
+			auto bobs = std::make_unique<Obstacle>();
+			bobs->Initialize(object3dCom, camera_, bpos, 1.0f, "duckov_barrel_stack.obj", { 1.0f, 1.0f, 1.0f }, { 0.0f, 0.0f, 0.0f });
+			obstacles_.push_back(std::move(bobs));
+		}
+
+		// 木箱
+		std::vector<std::pair<Vector3, float>> crates = {
+			{ { -3.6f, 0.0f, 3.2f }, 0.25f },
+			{ {  5.5f, 0.0f, 4.2f }, 0.15f },
+			{ {  6.0f, 0.0f, 18.0f }, 0.50f },
+			{ { -4.5f, 0.0f, 21.5f }, 0.30f },
+			{ {  5.5f, 0.0f, 26.5f }, -0.15f },
+			{ { -5.8f, 0.0f, 34.0f }, 0.40f },
+			{ {  4.5f, 0.0f, 40.5f }, 0.20f },
+			{ {  0.0f, 0.0f, 48.0f }, 0.25f },
+			{ { -5.5f, 0.0f, 57.5f }, 0.15f },
+			{ {  0.0f, 0.0f, 66.0f }, 0.0f }
+		};
+		for (const auto& cr : crates)
+		{
+			auto crobs = std::make_unique<Obstacle>();
+			crobs->Initialize(object3dCom, camera_, cr.first, 1.0f, "duckov_crate.obj", { 1.0f, 1.0f, 1.0f }, { 0.0f, cr.second, 0.0f });
+			obstacles_.push_back(std::move(crobs));
+		}
+
+		// 木造橋
+		auto bridge = std::make_unique<Obstacle>();
+		bridge->Initialize(object3dCom, camera_, { 0.0f, 0.0f, 30.0f }, 1.0f, "bridge.obj", { 1.0f, 1.0f, 1.0f }, { 0.0f, 0.0f, 0.0f });
+		obstacles_.push_back(std::move(bridge));
 	}
 
 	if (targets_.empty())
 	{
 		auto t1 = std::make_unique<Target>();
-		t1->Initialize(object3dCom, camera_, { -4.5f, 0.0f, 9.0f }, 0.8f);
+		t1->Initialize(object3dCom, camera_, { -5.0f, 0.0f, 8.5f }, 0.8f);
 		targets_.push_back(std::move(t1));
 
 		auto t2 = std::make_unique<Target>();
-		t2->Initialize(object3dCom, camera_, { 4.5f, 0.0f, 13.0f }, 0.8f);
+		t2->Initialize(object3dCom, camera_, { 5.2f, 0.0f, 19.5f }, 0.8f);
 		targets_.push_back(std::move(t2));
 
 		auto t3 = std::make_unique<Target>();
-		t3->Initialize(object3dCom, camera_, { -2.5f, 0.0f, 25.5f }, 0.8f);
+		t3->Initialize(object3dCom, camera_, { -4.2f, 0.0f, 43.5f }, 0.8f);
 		targets_.push_back(std::move(t3));
+
+		auto t4 = std::make_unique<Target>();
+		t4->Initialize(object3dCom, camera_, { 4.2f, 0.0f, 47.5f }, 0.8f);
+		targets_.push_back(std::move(t4));
 	}
 
 	// チュートリアル用看板の配置
@@ -1636,13 +1719,13 @@ void GamePlayScene::InitializeObstacles()
 
 		// 看板3: 遮蔽・戦術エリア（COVER＆ステルス）
 		auto sign3 = std::make_unique<TutorialSign>();
-		sign3->Initialize(object3dCom, camera_, { -3.0f, 0.0f, 15.0f },
+		sign3->Initialize(object3dCom, camera_, { -3.0f, 0.0f, 14.0f },
 			(const char*)u8"【 戦術遮蔽（COVER）訓練 】\nコンテナや土嚢のそばに行くと 自動的に ◆ COVER 状態！\n敵の視界が大幅に遮られ、見つかりにくくなるぞ！", 3.2f);
 		tutorialSigns_.push_back(std::move(sign3));
 
 		// 看板4: 脱出エリア（ヘリパッド脱出目標）
 		auto sign4 = std::make_unique<TutorialSign>();
-		sign4->Initialize(object3dCom, camera_, { 2.5f, 0.0f, 26.5f },
+		sign4->Initialize(object3dCom, camera_, { 2.5f, 0.0f, 54.0f },
 			(const char*)u8"【 レイド脱出訓練 】\nすべての標的を破壊後、最奥の ◆ 脱出パッド へ向かえ！\nパッド内でカウントダウン完了で生還（CLEAR）だ！", 3.2f);
 		tutorialSigns_.push_back(std::move(sign4));
 	}
@@ -1813,7 +1896,8 @@ void GamePlayScene::Draw(SceneRenderRequests& renderRequests)
 
 #ifdef USE_IMGUI
 	// --- タクティカルHUD統合描画 ---
-	if (hud_)
+	// トランジション（画面切り替え演出）実行中はHUDを一切描画しない（レーザーサイト等の先行表示を防止）
+	if (hud_ && (!StingerTransition::GetInstance() || !StingerTransition::GetInstance()->IsTransitioning()))
 	{
 		GamePlayHUDContext hudCtx;
 		hudCtx.camera = camera_;

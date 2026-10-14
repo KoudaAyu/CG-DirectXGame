@@ -185,6 +185,7 @@ private:
     // --- コアシステム & エンジンコンテキスト ---
     DirectXCom* directXCom = nullptr;
     Camera* camera_ = nullptr;
+    float cameraZoom_ = 1.0f;
     Light* light = nullptr;
     MaterialManager* materialManager = nullptr;
     Object3dCom* object3dCom = nullptr;

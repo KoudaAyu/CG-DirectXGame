@@ -18,6 +18,8 @@
 #include "imgui_internal.h"
 #endif
 
+#include "Application/Transition/StingerTransition.h"
+
 void GamePlayHUD::Initialize()
 {
     medkitTextureIndex_   = TextureManager::GetInstance()->Load("Resources/item_medkit.jpg");
@@ -40,6 +42,9 @@ bool GamePlayHUD::Project3DTo2D(const Vector3& pos3D, const Matrix4x4& vp, float
 void GamePlayHUD::Draw(const GamePlayHUDContext& ctx, float deltaTime)
 {
 #ifdef USE_IMGUI
+    // トランジション（画面切り替え演出）実行中は全HUD（レーザーサイト含む）を完全に非表示
+    if (StingerTransition::GetInstance() && StingerTransition::GetInstance()->IsTransitioning()) return;
+
     ImGuiIO& io = ImGui::GetIO();
     float screenW = io.DisplaySize.x;
     float screenH = io.DisplaySize.y;
@@ -496,6 +501,10 @@ void GamePlayHUD::DrawLaserSight(const GamePlayHUDContext& ctx)
 {
 #ifdef USE_IMGUI
     if (!ctx.player || ctx.player->IsDead() || !ctx.camera || ctx.isDeathSequenceActive) return;
+
+    // トランジション実行中、およびシーン入場フェード中はレーザーサイトを絶対に描画しない
+    if (StingerTransition::GetInstance() && StingerTransition::GetInstance()->IsTransitioning()) return;
+    if (ctx.sceneEntranceFadeTimer > 0.05f) return;
 
     ImGuiIO& io = ImGui::GetIO();
     ImDrawList* drawList = ImGui::GetForegroundDrawList();

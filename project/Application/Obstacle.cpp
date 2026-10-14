@@ -28,8 +28,10 @@ void Obstacle::Initialize(Object3dCom* object3dCom, Camera* camera, const Vector
             else if (filename.find("barrel") != std::string::npos) loaded.material.textureFilePath = "Resources/duckov_barrel.png";
             else if (filename.find("bridge") != std::string::npos) loaded.material.textureFilePath = "Resources/duckov_bridge.png";
             else if (filename.find("ground") != std::string::npos || filename.find("plane") != std::string::npos) loaded.material.textureFilePath = "Resources/grass.png";
-            else if (filename.find("river") != std::string::npos || filename.find("water") != std::string::npos) loaded.material.textureFilePath = "Resources/water.png";
+            else if (filename.find("river") != std::string::npos || filename.find("water") != std::string::npos) loaded.material.textureFilePath = "Resources/water_river.jpg";
             else if (filename.find("container") != std::string::npos) loaded.material.textureFilePath = "Resources/container_military.png";
+            else if (filename.find("fence") != std::string::npos) loaded.material.textureFilePath = "Resources/fence.png";
+            else if (filename.find("watchtower") != std::string::npos) loaded.material.textureFilePath = "Resources/duckov_crate.png";
             else loaded.material.textureFilePath = "Resources/CG4/human/white.png";
         }
         uint32_t texIdx = TextureManager::GetInstance()->Load(loaded.material.textureFilePath);
@@ -64,6 +66,15 @@ void Obstacle::Initialize(Object3dCom* object3dCom, Camera* camera, const Vector
     object3d_->SetTranslate(position_);
     object3d_->SetRotate(rotation_);
     object3d_->SetScale({ scale.x * radius_, scale.y * radius_, scale.z * radius_ });
+
+    // 川水面の場合は水面反射・環境マッピングを有効化
+    if (filename.find("river") != std::string::npos || filename.find("water") != std::string::npos)
+    {
+        object3d_->SetColor({ 0.42f, 0.82f, 0.94f, 0.90f });
+        object3d_->SetReflectionFactor(0.82f);
+        object3d_->SetFresnelF0(0.04f);
+        object3d_->SetEnableLighting(true);
+    }
 
     // 頂点配列からモデル本来の正確な最小・最大座標 (AABB) を自動計算
     Vector3 minPos = {  1e9f,  1e9f,  1e9f };

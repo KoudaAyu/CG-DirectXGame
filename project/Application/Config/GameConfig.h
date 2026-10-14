@@ -10,7 +10,7 @@ namespace GameConfig
     namespace Environment
     {
         // 川 (River) 水面モデル配置設定
-        constexpr Vector3 kRiverPosition          = { 0.0f, 0.04f, 18.75f };
+        constexpr Vector3 kRiverPosition          = { 0.0f, 0.04f, 30.0f };
         constexpr Vector3 kRiverScale             = { 60.0f, 1.0f, 5.0f };
         constexpr Vector3 kRiverRotation          = { 0.0f, 0.0f, 0.0f };
         constexpr float   kRiverSurfaceY          = 0.04f;
@@ -19,8 +19,8 @@ namespace GameConfig
         constexpr float   kRiverWaveParticleY     = kRiverSurfaceY + 0.03f; // 0.07f (水面の3cm上)
         constexpr float   kRiverSplashY           = kRiverSurfaceY + 0.03f; // 0.07f
         constexpr float   kRiverFoamPillarY       = kRiverSurfaceY + 0.035f; // 0.075f
-        constexpr float   kRiverZMin              = 16.5f;
-        constexpr float   kRiverZMax              = 21.0f;
+        constexpr float   kRiverZMin              = 27.5f;
+        constexpr float   kRiverZMax              = 32.5f;
         constexpr float   kRiverWaveInterval      = 0.15f;  // 波紋放出インターバル (秒)
         constexpr float   kRiverSplashInterval    = 0.25f;  // 水滴放出インターバル (秒)
         constexpr float   kRiverWaveSpeedMin      = 4.5f;   // 流速 (m/s)
@@ -29,7 +29,7 @@ namespace GameConfig
         constexpr float   kRiverWaveScaleMax      = 5.5f;
 
         // 脱出ヘリパッド設定
-        constexpr Vector3 kExtractionPadPosition  = { 0.0f, 0.01f, 32.0f };
+        constexpr Vector3 kExtractionPadPosition  = { 0.0f, 0.01f, 62.0f };
         constexpr float   kExtractionRadius       = 2.2f;   // 脱出ゾーン判定半径 (m)
         constexpr float   kExtractionMaxTime      = 3.0f;   // 脱出カウントダウン時間 (秒)
 
@@ -101,4 +101,23 @@ namespace GameConfig
         constexpr float kPlayerHitRadius               = 0.40f;  // プレイヤー当たり判定半径
         constexpr float kEnemyHitRadius                = 0.45f;  // 敵当たり判定半径
     }
+
+    // =========================================================================
+    // カメラパラメータ設定 (Camera)
+    // =========================================================================
+    namespace Camera
+    {
+        // プレイヤー追従オフセット（トップダウン見下ろし）
+        // 近すぎず遠すぎない索敵と臨場感を両立した距離（約18.0m）に調整
+        constexpr Vector3 kDefaultFollowOffset         = { 0.0f, 13.0f, -12.5f };
+        constexpr Vector3 kFollowRotation              = { 0.805f, 0.0f, 0.0f }; // 約46度斜め見下ろし
+        
+        // ズームスケール制限 (0.5倍〜2.0倍)
+        constexpr float   kMinZoomScale                = 0.5f;   // 最接近 (約9.0m)
+        constexpr float   kMaxZoomScale                = 2.0f;   // 最大引き (約36.0m)
+
+        // クリア時のズームイン
+        constexpr Vector3 kClearOffset                 = { 0.0f, 6.0f, -6.5f };
+    }
 }
+

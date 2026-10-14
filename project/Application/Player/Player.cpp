@@ -434,6 +434,9 @@ void Player::Update(float deltaTime, MouseInput* mouseInput)
     UpdateSpread(deltaTime, isMoving);
     isMoving_ = isMoving;
 
+    // 地面接地保証: 障害物との3D衝突押し出しによってY座標が上下に狂ったり地面下に沈むのを原理的に防止
+    position_.y = 0.0f;
+
     if (isDodging_)
     {
         object3d_->SetTranslate(drawPos_);
@@ -447,6 +450,9 @@ void Player::Update(float deltaTime, MouseInput* mouseInput)
 
 void Player::PostCollisionUpdate()
 {
+    // 物理エンジン（CollisionManager）の押し出し解決後にも、Y座標を確実に地面レベル(0.0f)に固定
+    position_.y = 0.0f;
+
     if (object3d_)
     {
         if (isDodging_)

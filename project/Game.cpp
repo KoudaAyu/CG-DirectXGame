@@ -257,11 +257,17 @@ void Game::Draw() {
   if (!engine_)
     return;
 
-  // トランジション中は深度アウトラインポストプロセスを確実に抑制（ストライプの上の輪郭線浮きを完全防止）
+  // トランジション中およびタイトルシーン中は深度アウトラインポストプロセスを確実に抑制
+  // （タイトルロゴ文字への輪郭線浸食やトランジション帯の輪郭線浮きを完全防止）
   if (engine_->GetOffScreenRendering()) {
-    if (StingerTransition::GetInstance()->IsTransitioning()) {
+    bool isTitle = (SceneManager::GetInstance() && SceneManager::GetInstance()->GetCurrentSceneName() == "TITLE");
+    if (StingerTransition::GetInstance()->IsTransitioning() || isTitle) {
       if (engine_->GetOffScreenRendering()->GetPostEffect() != OffScreenRendering::PostEffect::Normal) {
         engine_->GetOffScreenRendering()->SetPostEffect(OffScreenRendering::PostEffect::Normal);
+      }
+    } else {
+      if (engine_->GetOffScreenRendering()->GetPostEffect() != OffScreenRendering::PostEffect::DepthBasedOutline) {
+        engine_->GetOffScreenRendering()->SetPostEffect(OffScreenRendering::PostEffect::DepthBasedOutline);
       }
     }
   }

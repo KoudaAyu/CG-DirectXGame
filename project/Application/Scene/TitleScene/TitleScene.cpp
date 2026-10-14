@@ -105,6 +105,7 @@ namespace {
 		OvalPatrol,    // 滑らかな楕円パトロール（進行方向を常に滑らかに向く）
 		StandGuard,    // 監視塔・ドラム缶脇の警戒姿勢
 		ScoutScan,     // 小道沿いでの周囲索敵・安全確認
+		PatrolAcross,  // 対岸防衛ラインを横断行軍する巡回兵
 	};
 
 	struct EnemyDuckInstance
@@ -173,14 +174,21 @@ namespace {
 	float sRiverWakeTimer = 0.0f;   // 岩や橋脚の激突白波・引き波ウェイク
 	float sRiverGlintTimer = 0.0f;  // 水面のきらめき・跳ね水滴
 	float sLeafTimer = 0.0f;        // 風に舞う木の葉エフェクトタイマー
+	float sGroundDustTimer = 0.0f;  // 地面の微小土煙・砂埃パーティクルタイマー
 
 	float sDuckRecoilTimer = 0.0f;
+	float sDuckClickHopTimer = 0.0f; // アヒルをクリックしたときのホップ演出タイマー
 	int32_t sAlarmSoundId = -1;
 	int32_t sBgmSoundId = -1;
 	int32_t sBgmPlayId = -1;
 	float sBgmTimer = 0.0f;
 	int32_t sDuckSeSoundId = -1;
 	int32_t sDuckSePlayId = -1;
+
+	// 出撃時カメラ完全ロック制御（トランジション開始前・実行中にカメラが動くのを完全に防止）
+	bool sCameraLocked = false;
+	Vector3 sCameraLockedPos = { 0.0f, 0.0f, 0.0f };
+	Vector3 sCameraLockedRot = { 0.0f, 0.0f, 0.0f };
 
 	float EaseInOutCubic(float t)
 	{
@@ -567,6 +575,7 @@ void TitleScene::InitializeScene()
 	bgTimer_ = 0.0f;
 	startTransitionTimer_ = 0.0f;
 	isStarting_ = false;
+	sCameraLocked = false;
 	sDuckSePlayId = -1;
 
 	sIntroTimer = 0.0f;
@@ -740,7 +749,7 @@ void TitleScene::InitializeScene()
 			sNearGroundModel = std::make_unique<Object3d>();
 			sNearGroundModel->Initialize(GetObject3dCom(), data);
 			sNearGroundModel->SetCamera(camera_);
-			sNearGroundModel->SetColor({ 1.0f, 1.0f, 1.0f, 1.0f });
+			sNearGroundModel->SetColor({ 0.88f, 0.90f, 0.88f, 1.0f });
 			sNearGroundModel->SetEnableLighting(true);
 			sNearGroundModel->SetAllowWireframeOverlay(false);
 		}
@@ -786,7 +795,7 @@ void TitleScene::InitializeScene()
 			sFarGroundModel = std::make_unique<Object3d>();
 			sFarGroundModel->Initialize(GetObject3dCom(), data);
 			sFarGroundModel->SetCamera(camera_);
-			sFarGroundModel->SetColor({ 0.95f, 0.97f, 0.95f, 1.0f });
+			sFarGroundModel->SetColor({ 0.86f, 0.88f, 0.86f, 1.0f });
 			sFarGroundModel->SetEnableLighting(true);
 			sFarGroundModel->SetAllowWireframeOverlay(false);
 		}
@@ -942,6 +951,8 @@ void TitleScene::InitializeScene()
 		addEnemyDuck({ 2.40f, kFarLandY, 9.90f }, kPi - 0.35f, EnemyBehaviorType::StandGuard, 0.0f, 0.0f, 0.70f, 2.4f);
 		// 4. 最奥脱出地点手前の斥候兵（小道沿いで手前と奥を交互に索敵）
 		addEnemyDuck({ 0.60f, kFarLandY, 13.20f }, kPi * 0.90f, EnemyBehaviorType::ScoutScan, 0.0f, 0.0f, 0.45f, 3.6f);
+		// 5. 対岸の警戒ラインを左右に堂々と横断行軍するパトロール兵（近く・視界内を通り過ぎる敵の演出）
+		addEnemyDuck({ 0.0f, kFarLandY, 11.20f }, kPi * 0.5f, EnemyBehaviorType::PatrolAcross, 4.2f, 0.0f, 0.32f, 0.0f);
 
 		// =========================================================
 		// 6. 接地影デカール（静的オブジェクト＆主役アヒルの影を一括バッチ生成）
@@ -953,38 +964,38 @@ void TitleScene::InitializeScene()
 			shadowData.boundingRadius = 60.0f;
 
 			// 主役アヒル（手前岸）
-			AddShadowDisc(shadowData, 3.30f, kLandY + 0.003f, 0.90f, 0.48f, 0.48f);
+			AddShadowDisc(shadowData, 3.30f, kLandY + 0.012f, 0.90f, 0.48f, 0.48f);
 
 			// 手前岸の物資
-			AddShadowDisc(shadowData, 4.40f, kLandY + 0.003f, 1.60f, 0.45f, 0.45f);
-			AddShadowDisc(shadowData, 2.95f, kLandY + 0.003f, 1.85f, 0.55f, 0.35f);
+			AddShadowDisc(shadowData, 4.40f, kLandY + 0.012f, 1.60f, 0.45f, 0.45f);
+			AddShadowDisc(shadowData, 2.95f, kLandY + 0.012f, 1.85f, 0.55f, 0.35f);
 
 			// 渡河木造橋の両端（岸に掛かる部分）
-			AddShadowDisc(shadowData, 0.60f, kLandY + 0.003f, 2.30f, 1.05f, 0.30f);
-			AddShadowDisc(shadowData, 0.60f, kFarLandY + 0.003f, 7.75f, 1.05f, 0.30f);
+			AddShadowDisc(shadowData, 0.60f, kLandY + 0.012f, 2.30f, 1.05f, 0.30f);
+			AddShadowDisc(shadowData, 0.60f, kFarLandY + 0.012f, 7.75f, 1.05f, 0.30f);
 
 			// 対岸検問所（Zone 1）
-			AddShadowDisc(shadowData, -0.50f, kFarLandY + 0.003f, 8.70f, 0.60f, 0.30f);
-			AddShadowDisc(shadowData, -0.75f, kFarLandY + 0.003f, 8.10f, 0.28f, 0.28f);
-			AddShadowDisc(shadowData, 2.30f, kFarLandY + 0.003f, 8.50f, 0.48f, 0.40f);
+			AddShadowDisc(shadowData, -0.50f, kFarLandY + 0.012f, 8.70f, 0.60f, 0.30f);
+			AddShadowDisc(shadowData, -0.75f, kFarLandY + 0.012f, 8.10f, 0.28f, 0.28f);
+			AddShadowDisc(shadowData, 2.30f, kFarLandY + 0.012f, 8.50f, 0.48f, 0.40f);
 
 			// 左翼コンテナヤード（Zone 2）
-			AddShadowDisc(shadowData, -4.80f, kFarLandY + 0.003f, 12.40f, 1.10f, 1.40f);
-			AddShadowDisc(shadowData, -2.00f, kFarLandY + 0.003f, 13.20f, 1.10f, 1.30f);
-			AddShadowDisc(shadowData, -1.60f, kFarLandY + 0.003f, 10.40f, 0.55f, 0.55f);
+			AddShadowDisc(shadowData, -4.80f, kFarLandY + 0.012f, 12.40f, 1.10f, 1.40f);
+			AddShadowDisc(shadowData, -2.00f, kFarLandY + 0.012f, 13.20f, 1.10f, 1.30f);
+			AddShadowDisc(shadowData, -1.60f, kFarLandY + 0.012f, 10.40f, 0.55f, 0.55f);
 
 			// 右翼監視塔（Zone 3）
-			AddShadowDisc(shadowData, 3.6f, kFarLandY + 0.003f, 11.4f, 0.30f, 0.30f);
-			AddShadowDisc(shadowData, 4.8f, kFarLandY + 0.003f, 11.4f, 0.30f, 0.30f);
-			AddShadowDisc(shadowData, 3.6f, kFarLandY + 0.003f, 12.6f, 0.30f, 0.30f);
-			AddShadowDisc(shadowData, 4.8f, kFarLandY + 0.003f, 12.6f, 0.30f, 0.30f);
-			AddShadowDisc(shadowData, 6.30f, kFarLandY + 0.003f, 11.20f, 0.48f, 0.48f);
-			AddShadowDisc(shadowData, 6.20f, kFarLandY + 0.003f, 12.70f, 0.48f, 0.40f);
+			AddShadowDisc(shadowData, 3.6f, kFarLandY + 0.012f, 11.4f, 0.30f, 0.30f);
+			AddShadowDisc(shadowData, 4.8f, kFarLandY + 0.012f, 11.4f, 0.30f, 0.30f);
+			AddShadowDisc(shadowData, 3.6f, kFarLandY + 0.012f, 12.6f, 0.30f, 0.30f);
+			AddShadowDisc(shadowData, 4.8f, kFarLandY + 0.012f, 12.6f, 0.30f, 0.30f);
+			AddShadowDisc(shadowData, 6.30f, kFarLandY + 0.012f, 11.20f, 0.48f, 0.48f);
+			AddShadowDisc(shadowData, 6.20f, kFarLandY + 0.012f, 12.70f, 0.48f, 0.40f);
 
 			// 最奥脱出地点・射撃標的（Zone 4）
-			AddShadowDisc(shadowData, 2.70f, kFarLandY + 0.003f, 15.70f, 1.35f, 1.35f);
-			AddShadowDisc(shadowData, -1.60f, kFarLandY + 0.003f, 16.10f, 0.35f, 0.35f);
-			AddShadowDisc(shadowData, -0.10f, kFarLandY + 0.003f, 16.30f, 0.35f, 0.35f);
+			AddShadowDisc(shadowData, 2.70f, kFarLandY + 0.012f, 15.70f, 1.35f, 1.35f);
+			AddShadowDisc(shadowData, -1.60f, kFarLandY + 0.012f, 16.10f, 0.35f, 0.35f);
+			AddShadowDisc(shadowData, -0.10f, kFarLandY + 0.012f, 16.30f, 0.35f, 0.35f);
 
 			sShadowDecalsModel = std::make_unique<Object3d>();
 			sShadowDecalsModel->Initialize(GetObject3dCom(), shadowData);
@@ -1373,7 +1384,7 @@ void TitleScene::InitializeScene()
 					{
 						float t = static_cast<float>(k) / n;
 						float r = HashRange(seed, 0.40f, 0.52f);
-						AddShadowDisc(pathData, path[i].x + dx * t + HashRange(seed, -0.05f, 0.05f), g + 0.002f,
+						AddShadowDisc(pathData, path[i].x + dx * t + HashRange(seed, -0.05f, 0.05f), g + 0.015f,
 							path[i].y + dz * t + HashRange(seed, -0.05f, 0.05f), r, r);
 					}
 				}
@@ -1456,13 +1467,13 @@ void TitleScene::InitializeSprites()
 
 	Sprite::Transform defaultTransform = { {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f} };
 
-	// 1. 周辺減光ビネット
+	// 1. 周辺減光ビネット（シックで淡い落ち着いた周辺減光。中央楕円の白浮きを解消）
 	if (auto vig = Sprite::Create(sc, defaultTransform, "Resources/title_vignette.png"))
 	{
 		vig->SetAnchorPoint({ 0.0f, 0.0f });
 		vig->SetPosition({ 0.0f, 0.0f });
 		vig->SetSize({ sScreenW, sScreenH });
-		vig->SetColor({ 1.0f, 1.0f, 1.0f, 0.75f });
+		vig->SetColor({ 0.10f, 0.12f, 0.15f, 0.20f });
 		sprites_.emplace_back(std::move(vig));
 		vignetteSprite_ = sprites_.back().get();
 	}
@@ -1600,7 +1611,13 @@ void TitleScene::Update()
 	lastTime_ = now;
 	deltaTime = std::clamp(deltaTime, 0.0001f, 1.0f / 30.0f);
 	bgTimer_ += deltaTime;
-	sIntroTimer += deltaTime;
+
+	// トランジション中または出撃ロック中はカメラタイマーを進めず、トランジション前の予期せぬカメラ移動を完全に防止
+	const bool isTransitioningNow = (StingerTransition::GetInstance() && StingerTransition::GetInstance()->IsTransitioning());
+	if (!isTransitioningNow && !sCameraLocked)
+	{
+		sIntroTimer += deltaTime;
+	}
 
 	const bool introPlaying = sIntroTimer < kIntroDuration;
 
@@ -1629,9 +1646,6 @@ void TitleScene::Update()
 		{
 			isStarting_ = true;
 			startTransitionTimer_ = 0.0f;
-			if (camera_) {
-				camera_->Shake(0.30f, 0.035f);
-			}
 			sDuckRecoilTimer = 0.25f;
 
 			// アヒルSEをワンショット再生
@@ -1647,6 +1661,14 @@ void TitleScene::Update()
 				appParticleManager_->EmitMuzzleFlash(rng, muzzle, { 0.0f, 0.0f, 1.0f }, { 1.0f, 0.0f, 0.0f }, { 0.0f, 1.0f, 0.0f }, { 1.0f, 0.85f, 0.35f, 1.0f }, 2.0f, circleTexIndex_);
 				appParticleManager_->EmitMuzzleFlare(rng, muzzle, 0.70f, { 1.0f, 0.95f, 0.80f, 1.0f }, 0.12f, starTexIndex_ != UINT32_MAX ? starTexIndex_ : circleTexIndex_);
 			}
+
+			// 出撃時のカメラ位置・姿勢を完全にロック（トランジション開始前にカメラが動いたり揺れたりするのを完全防止）
+			sCameraLocked = true;
+			if (camera_)
+			{
+				sCameraLockedPos = camera_->GetTranslate();
+				sCameraLockedRot = camera_->GetRotate();
+			}
 		}
 		else if (input_->TriggerKey(DIK_ESCAPE))
 		{
@@ -1658,11 +1680,17 @@ void TitleScene::Update()
 	{
 		startTransitionTimer_ += deltaTime;
 
-		// アヒルの発砲＆リアクション後、タイトル調和タクティカルスティンガートランジションでタイトルへループ
-		const float kFadeStartTime = 0.35f;
-		if (startTransitionTimer_ >= kFadeStartTime && !StingerTransition::GetInstance()->IsTransitioning())
+		// アヒルが完全に鳴き終わった後（約3.15秒）にトランジションを開始
+		const float kDuckCryDuration = 3.15f;
+		if (startTransitionTimer_ >= kDuckCryDuration && (!StingerTransition::GetInstance() || !StingerTransition::GetInstance()->IsTransitioning()))
 		{
+#if !APP_DEBUG_UI || defined(NDEBUG)
+			// リリースモード：タイトルをループ再生（タイトル → トランジション → タイトル）
 			SceneTransition::Change("TITLE", 1.80f, TransitionTheme::TitleTactical);
+#else
+			// デバッグモード：ゲーム本編へ出撃
+			SceneTransition::Change("GAMEPLAY", 1.80f, TransitionTheme::TitleTactical);
+#endif
 		}
 	}
 
@@ -1683,10 +1711,6 @@ void TitleScene::Update()
 	// カメラ：シネマティッククレーンダウン → 鳥瞰ジオラマ構図
 	// ---------------------------------------------------------------
 	float introT = EaseInOutCubic(sIntroTimer / kIntroDuration);
-	if (isStarting_)
-	{
-		introT = 1.0f; // 出撃およびトランジション前後はカメラを定位置（kCamFinalPos）に完全固定し、引きジャンプを根絶
-	}
 	Vector3 camPos = Lerp3(kCamStartPos, kCamFinalPos, introT);
 	Vector3 camRot = Lerp3(kCamStartRot, kCamFinalRot, introT);
 
@@ -1710,13 +1734,21 @@ void TitleScene::Update()
 			normX = std::clamp((mp.x / cw) * 2.0f - 1.0f, -1.0f, 1.0f);
 			normY = std::clamp((mp.y / ch) * 2.0f - 1.0f, -1.0f, 1.0f);
 
-			camPos.x += normX * 0.12f * idleBlend;
-			camPos.y -= normY * 0.06f * idleBlend;
-			camRot.y += normX * 0.015f * idleBlend;
-			camRot.x += normY * 0.008f * idleBlend;
+			if (!sCameraLocked)
+			{
+				camPos.x += normX * 0.12f * idleBlend;
+				camPos.y -= normY * 0.06f * idleBlend;
+				camRot.y += normX * 0.015f * idleBlend;
+				camRot.x += normY * 0.008f * idleBlend;
 
-			camera_->SetTranslate(camPos);
-			camera_->SetRotate(camRot);
+				camera_->SetTranslate(camPos);
+				camera_->SetRotate(camRot);
+			}
+			else
+			{
+				camera_->SetTranslate(sCameraLockedPos);
+				camera_->SetRotate(sCameraLockedRot);
+			}
 			camera_->Update();
 
 			// マウス光線と水面 (y = kWaterY) の交差判定
@@ -1982,6 +2014,7 @@ void TitleScene::Update()
 
 	// ---------------------------------------------------------------
 	// ライティング：C案の澄んだ午後の陽光（黄金色のキーライト + 柔らかな水面反射）
+	// 白飛び・ちらつきを抑制した落ち着いたトーン
 	// ---------------------------------------------------------------
 	if (SceneManager::GetInstance() && SceneManager::GetInstance()->GetLight())
 	{
@@ -1989,16 +2022,78 @@ void TitleScene::Update()
 		Vector3 sunDir = { -0.42f, -0.78f, 0.46f };
 		float len = std::sqrt(sunDir.x * sunDir.x + sunDir.y * sunDir.y + sunDir.z * sunDir.z);
 		sunDir = { sunDir.x / len, sunDir.y / len, sunDir.z / len };
-		light->SetDirectionalLight({ 1.0f, 0.94f, 0.82f, 1.0f }, sunDir, 1.35f);
+		light->SetDirectionalLight({ 0.98f, 0.94f, 0.86f, 1.0f }, sunDir, 1.10f);
 
 		float flash = (sDuckRecoilTimer > 0.0f) ? (sDuckRecoilTimer / 0.14f) * 1.8f : 0.0f;
 		light->SetPointLight(
 			{ 1.0f, 0.95f, 0.82f, 1.0f },
 			{ duckBasePos_.x + 0.2f, duckBasePos_.y + 0.8f, duckBasePos_.z - 0.5f },
-			1.0f + flash, 5.5f, 1.6f);
+			0.75f + flash, 5.5f, 1.6f);
 	}
 
 	if (sDuckRecoilTimer > 0.0f) sDuckRecoilTimer -= deltaTime;
+
+	// ---------------------------------------------------------------
+	// 主役アヒル：マウスクリック時の鳴き声SE＆ピョン！と跳ねるインタラクション
+	// ---------------------------------------------------------------
+	if (!isStarting_ && camera_)
+	{
+		Matrix4x4 vp = Multiply(camera_->GetViewMatrix(), camera_->GetProjectionMatrix());
+		Vector4 clip = { duckBasePos_.x, duckBasePos_.y + 0.3f, duckBasePos_.z, 1.0f };
+		Vector4 proj = {
+			clip.x * vp.m[0][0] + clip.y * vp.m[1][0] + clip.z * vp.m[2][0] + clip.w * vp.m[3][0],
+			clip.x * vp.m[0][1] + clip.y * vp.m[1][1] + clip.z * vp.m[2][1] + clip.w * vp.m[3][1],
+			clip.x * vp.m[0][2] + clip.y * vp.m[1][2] + clip.z * vp.m[2][2] + clip.w * vp.m[3][2],
+			clip.x * vp.m[0][3] + clip.y * vp.m[1][3] + clip.z * vp.m[2][3] + clip.w * vp.m[3][3],
+		};
+		if (proj.w > 0.01f)
+		{
+			float ndcX = proj.x / proj.w;
+			float ndcY = proj.y / proj.w;
+			float screenX = (ndcX * 0.5f + 0.5f) * sScreenW;
+			float screenY = (1.0f - (ndcY * 0.5f + 0.5f)) * sScreenH;
+			Vector2 mp = mouseInput_.GetScaledPosition();
+			float d2 = (mp.x - screenX) * (mp.x - screenX) + (mp.y - screenY) * (mp.y - screenY);
+			if (d2 <= 95.0f * 95.0f && mouseInput_.TriggerButton(0) && !isHoveringRiver)
+			{
+				sDuckClickHopTimer = 0.35f;
+				if (sDuckSeSoundId >= 0 && SceneManager::GetInstance() && SceneManager::GetInstance()->GetAudioManager())
+				{
+					SceneManager::GetInstance()->GetAudioManager()->PlayOneShot(sDuckSeSoundId, 1.0f);
+				}
+				if (appParticleManager_)
+				{
+					for (int d = 0; d < 6; ++d)
+					{
+						float a = Rand01() * 2.0f * kPi;
+						Vector3 p = { duckBasePos_.x + std::cos(a) * 0.15f, kLandY + 0.02f, duckBasePos_.z + std::sin(a) * 0.15f };
+						Vector3 v = { std::cos(a) * RandRange(0.4f, 0.8f), RandRange(0.2f, 0.5f), std::sin(a) * RandRange(0.4f, 0.8f) };
+						Vector4 endC = { 0.76f, 0.70f, 0.58f, 0.0f };
+						Spawn(appParticleManager_.get(), p, v, { 0.82f, 0.76f, 0.65f, 0.45f }, 0.035f, 0.10f, 0.40f, sFx.circle, 0.0f, 0.0f, 0.04f, &endC);
+					}
+				}
+			}
+		}
+	}
+
+	float hopY = 0.0f;
+	float hopPitch = 0.0f;
+	if (sDuckClickHopTimer > 0.0f)
+	{
+		sDuckClickHopTimer -= deltaTime;
+		float hopNorm = std::clamp(1.0f - sDuckClickHopTimer / 0.35f, 0.0f, 1.0f);
+		hopY = std::sin(hopNorm * kPi) * 0.18f;
+		hopPitch = std::sin(hopNorm * kPi * 2.0f) * 0.08f;
+	}
+
+	// 出撃時（SPACE押下後）：アヒルが完全に鳴き終わるまでの雄叫び・気合入れアクション
+	if (isStarting_ && startTransitionTimer_ < 3.12f)
+	{
+		float cryPhase = startTransitionTimer_ * 14.0f;
+		float cryAmp = std::clamp(1.0f - startTransitionTimer_ / 3.12f, 0.0f, 1.0f);
+		hopPitch += std::sin(cryPhase) * 0.08f * cryAmp;
+		hopY += std::abs(std::sin(cryPhase * 0.5f)) * 0.04f * cryAmp;
+	}
 
 	// ---------------------------------------------------------------
 	// 主役アヒル（分隊長）：渡河橋を見据え、マウスXにわずかにエイム追従
@@ -2008,8 +2103,8 @@ void TitleScene::Update()
 		float breathe = std::sin(bgTimer_ * 2.0f) * 0.008f;
 		float recoil = (sDuckRecoilTimer > 0.0f) ? (sDuckRecoilTimer / 0.14f) : 0.0f;
 		float yaw = kDuckFacingYaw + std::sin(bgTimer_ * 0.8f) * 0.04f + normX * 0.15f * idleBlend;
-		duckModel_->SetTranslate({ duckBasePos_.x, duckBasePos_.y + breathe, duckBasePos_.z - recoil * 0.04f });
-		duckModel_->SetRotate({ 0.06f * recoil, yaw, 0.0f });
+		duckModel_->SetTranslate({ duckBasePos_.x, duckBasePos_.y + breathe + hopY, duckBasePos_.z - recoil * 0.04f });
+		duckModel_->SetRotate({ 0.06f * recoil + hopPitch, yaw, 0.0f });
 		duckModel_->Update();
 	}
 
@@ -2079,6 +2174,24 @@ void TitleScene::Update()
 			curFacing = ed.baseFacing + smoothTurn * 0.70f;
 			break;
 		}
+		case EnemyBehaviorType::PatrolAcross:
+		{
+			// 5. 対岸の警戒ラインを左右に堂々と横断行軍するパトロール兵（視界内を通り過ぎる演出）
+			float phase = bgTimer_ * ed.speed + ed.phaseOffset;
+			float sinVal = std::sin(phase);
+			curPos.x = ed.basePos.x + sinVal * ed.radiusX;
+
+			// 移動方向に応じた向き（+Xなら右向き、-Xなら左向き、端で滑らかに旋回）
+			float cosVal = std::cos(phase);
+			float turnRate = std::clamp(cosVal * 3.5f, -1.0f, 1.0f);
+			curFacing = (turnRate >= 0.0f) ? (kPi * 0.5f - (1.0f - turnRate) * 0.5f * kPi) : (-kPi * 0.5f + (1.0f + turnRate) * 0.5f * kPi);
+
+			// よちよち歩きのアニメーション（Y微上下＆Roll揺れ）
+			float walkCycle = phase * 6.0f;
+			curPos.y += std::abs(std::sin(walkCycle)) * 0.0035f;
+			curRoll = std::sin(walkCycle) * 0.015f;
+			break;
+		}
 		}
 
 		ed.model->SetTranslate(curPos);
@@ -2087,7 +2200,7 @@ void TitleScene::Update()
 
 		if (i < sEnemyDuckShadows.size() && sEnemyDuckShadows[i])
 		{
-			sEnemyDuckShadows[i]->SetTranslate({ curPos.x, kFarLandY + 0.003f, curPos.z });
+			sEnemyDuckShadows[i]->SetTranslate({ curPos.x, kFarLandY + 0.012f, curPos.z });
 			sEnemyDuckShadows[i]->Update();
 		}
 	}
@@ -2331,7 +2444,28 @@ void TitleScene::Update()
 				RandRange(0.020f, 0.045f), 0.015f, RandRange(3.0f, 5.0f), sFx.circle, 0.0f, 0.0f, 0.20f);
 		}
 
-		// (E) 風に舞い散るリアルな紅葉（物理3Dオブジェクト：非発光・太陽光受光・3Dタンブリング）
+		// (E) 地面から風に乗ってふわりと漂う微小な土煙・砂埃パーティクル（手前岸・対岸）
+		sGroundDustTimer += deltaTime;
+		while (sGroundDustTimer >= 0.14f)
+		{
+			sGroundDustTimer -= 0.14f;
+			bool nearSide = (Rand01() < 0.5f);
+			Vector3 dustPos;
+			if (nearSide)
+			{
+				dustPos = { RandRange(0.8f, 5.2f), kLandY + 0.02f, RandRange(-1.6f, 2.2f) };
+			}
+			else
+			{
+				dustPos = { RandRange(-3.5f, 4.5f), kFarLandY + 0.02f, RandRange(8.5f, 15.0f) };
+			}
+			Vector3 dustVel = { RandRange(0.18f, 0.42f), RandRange(0.06f, 0.16f), RandRange(-0.06f, 0.06f) };
+			Vector4 dustCol = { 0.76f, 0.70f, 0.58f, RandRange(0.16f, 0.30f) };
+			Vector4 dustEndCol = { 0.72f, 0.66f, 0.54f, 0.0f };
+			Spawn(pm, dustPos, dustVel, dustCol, RandRange(0.04f, 0.08f), RandRange(0.14f, 0.26f), RandRange(0.9f, 1.7f), sFx.circle, 0.0f, 0.0f, 0.05f, &dustEndCol);
+		}
+
+		// (F) 風に舞い散るリアルな紅葉（物理3Dオブジェクト：非発光・太陽光受光・3Dタンブリング）
 		//     加算パーティクル（火花・光粒・花粉）を完全排除し、実体モデルとして美しく舞わせる
 		float windGust = 0.60f + 0.40f * std::sin(bgTimer_ * 0.55f);
 		bool isWindGusting = (windGust > 0.68f);
@@ -2589,13 +2723,14 @@ void TitleScene::Update()
 		}
 		else
 		{
-			// 決定：ポンと膨らんで白く弾ける
+			// 決定：ポンと膨らんで白く弾けてフェードアウト
 			const float t = startTransitionTimer_;
-			const float pop = 1.0f + 0.16f * EaseOutCubic(t / 0.18f);
+			const float pop = 1.0f + 0.16f * EaseOutCubic((std::clamp)(t / 0.18f, 0.0f, 1.0f));
+			const float alpha = (std::clamp)(1.0f - (t - 0.15f) / 0.35f, 0.0f, 1.0f);
 			const Vector2 size = { kPromptSize.x * pop, kPromptSize.y * pop };
 			pressSpaceSprite_->SetPosition(sPromptBasePos);
 			pressSpaceSprite_->SetSize(size);
-			pressSpaceSprite_->SetColor({ 1.0f, 1.0f, 1.0f, 1.0f });
+			pressSpaceSprite_->SetColor({ 1.0f, 1.0f, 1.0f, alpha });
 			if (sPromptShine)
 			{
 				const float f = 1.0f - std::clamp(t / 0.30f, 0.0f, 1.0f);
