@@ -968,6 +968,55 @@ void AppParticleManager::EmitTargetDestroyGPUBurst(std::mt19937& randomEngine, c
 	}
 }
 
+void AppParticleManager::EmitLandingGPUBurst(std::mt19937& randomEngine, const Vector3& position, uint32_t sparkTexIndex, uint32_t smokeTexIndex, uint32_t flashTexIndex)
+{
+	// 1. GPU Compute Shader パーティクルエミッター（大容量10240バッファ）の発動
+	if (enginePM_ && enginePM_->GetGPUEmitter() && enginePM_->GetGPUEmitter()->GetEmitterData())
+	{
+		auto* emitter = enginePM_->GetGPUEmitter()->GetEmitterData();
+		emitter->translate = position;
+		emitter->radius = 2.4f;
+		emitter->count = 64; // GPU側で超大量の粒子を一斉生成
+		emitter->emit = 1;
+	}
+
+	// 2. 着地激突の瞬間衝撃フラッシュ（プリミティブではなくテクスチャによるフラッシュ）
+	EmitDeathFlash(randomEngine, position + Vector3{ 0.0f, 0.12f, 0.0f }, 2.8f, { 1.0f, 0.95f, 0.7f, 0.9f }, 0.10f, flashTexIndex);
+
+	// 3. 超高速放射状スパーク（GPUインスタンシング火花・小石破片 48個）
+	std::uniform_real_distribution<float> angleDist(0.0f, 6.2831853f);
+	std::uniform_real_distribution<float> spdDist(3.5f, 8.5f);
+	std::uniform_real_distribution<float> scaleDist(0.12f, 0.28f);
+	std::uniform_real_distribution<float> lifeDist(0.35f, 0.70f);
+
+	for (int i = 0; i < 48; ++i)
+	{
+		float a = angleDist(randomEngine);
+		float spd = spdDist(randomEngine);
+		Vector3 vel = { std::cos(a) * spd, 1.8f + ((float)rand() / RAND_MAX) * 3.5f, std::sin(a) * spd };
+		Vector4 col = (i % 2 == 0) ? Vector4{ 1.0f, 0.88f, 0.35f, 1.0f } : Vector4{ 1.0f, 0.55f, 0.18f, 1.0f };
+		EmitSparkWithVelocity(randomEngine, position + Vector3{ 0.0f, 0.08f, 0.0f }, vel, col, scaleDist(randomEngine), lifeDist(randomEngine), sparkTexIndex);
+	}
+
+	// 4. 地面を這う高速な爆風土煙リング（24方向放射状）
+	for (int i = 0; i < 24; ++i)
+	{
+		float a = (static_cast<float>(i) / 24.0f) * 6.2831853f;
+		Vector3 vel = { std::cos(a) * 5.5f, 0.20f, std::sin(a) * 5.5f };
+		Vector4 sCol = { 0.85f, 0.80f, 0.72f, 0.75f };
+		EmitDustWithVelocity(randomEngine, position + Vector3{ 0.0f, 0.05f, 0.0f }, 1.15f, sCol, vel, 0.50f, smokeTexIndex);
+	}
+
+	// 5. ふんわりと立ち上るヘビーな煙雲（12方向）
+	for (int i = 0; i < 12; ++i)
+	{
+		float a = (static_cast<float>(i) / 12.0f) * 6.2831853f + 0.26f;
+		Vector3 vel = { std::cos(a) * 2.2f, 1.8f + ((float)rand() / RAND_MAX) * 1.4f, std::sin(a) * 2.2f };
+		Vector4 sCol = { 0.75f, 0.70f, 0.65f, 0.65f };
+		EmitDustWithVelocity(randomEngine, position + Vector3{ 0.0f, 0.10f, 0.0f }, 0.90f, sCol, vel, 0.75f, smokeTexIndex);
+	}
+}
+
 void AppParticleManager::EmitDodgeRollDust(std::mt19937& randomEngine, const Vector3& position, const Vector3& moveDirection, uint32_t smokeTexIndex)
 {
 	// 回避時にプレイヤー足元後方から進行方向逆向きに吹き出す軽快な土煙（5個）

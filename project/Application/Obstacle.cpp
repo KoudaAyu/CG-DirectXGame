@@ -32,6 +32,7 @@ void Obstacle::Initialize(Object3dCom* object3dCom, Camera* camera, const Vector
             else if (filename.find("container") != std::string::npos) loaded.material.textureFilePath = "Resources/container_military.png";
             else if (filename.find("fence") != std::string::npos) loaded.material.textureFilePath = "Resources/fence.png";
             else if (filename.find("watchtower") != std::string::npos) loaded.material.textureFilePath = "Resources/duckov_crate.png";
+            else if (filename.find("tree") != std::string::npos || filename.find("Tree") != std::string::npos) loaded.material.textureFilePath = "Resources/duckov_pine_tree.png";
             else loaded.material.textureFilePath = "Resources/CG4/human/white.png";
         }
         uint32_t texIdx = TextureManager::GetInstance()->Load(loaded.material.textureFilePath);
@@ -225,6 +226,17 @@ void Obstacle::Initialize(Object3dCom* object3dCom, Camera* camera, const Vector
         // 地面・床面：通行可能エリアのため、障害物コライダーは登録しない
         rot1_ = rotation_;
     }
+    else if (filename.find("tree") != std::string::npos || filename.find("Tree") != std::string::npos)
+    {
+        // 樹木（マツ・針葉樹）：巨大な枝葉の広がりではなく、中央の幹（幹幅0.65m）にのみ強固なコライダーを配置
+        // これによりプレイヤーや敵は木の枝葉の下をくぐり抜けつつ、幹でリアルに遮蔽・接触できる
+        rot1_ = rotation_;
+        Vector3 trunkSize = { 0.65f * scale.x * radius_, 4.2f * scale.y * radius_, 0.65f * scale.z * radius_ };
+        Vector3 trunkOffset = { 0.0f, 2.1f * scale.y * radius_, 0.0f };
+        collider_ = std::make_unique<BoxCollider>(trunkSize, &position_, &rotation_, CollisionAttribute::Obstacle);
+        collider_->SetPositionOffset(trunkOffset);
+        CollisionManager::GetInstance()->RegisterCollider(collider_.get());
+    }
     else
     {
         // 全モデル共通: 通路での引っ掛かりを防止するため実寸よりわずかにスリム(0.90倍)なBoxColliderを生成
@@ -236,7 +248,12 @@ void Obstacle::Initialize(Object3dCom* object3dCom, Camera* camera, const Vector
     }
 
     // --- オブジェクトタイプ別の識別色（ぱっと見で区別できるよう色分け）---
-    if (filename.find("crate") != std::string::npos)
+    if (filename.find("tree") != std::string::npos || filename.find("Tree") != std::string::npos)
+    {
+        // 針葉樹：テクスチャ本来の自然な濃緑と樹皮色
+        object3d_->SetColor({ 1.0f, 1.0f, 1.0f, 1.0f });
+    }
+    else if (filename.find("crate") != std::string::npos)
     {
         // 物資箱：軍用ブラウン
         object3d_->SetColor({ 0.55f, 0.38f, 0.18f, 1.0f });

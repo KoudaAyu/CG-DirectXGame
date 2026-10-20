@@ -35,6 +35,7 @@ public:
 
     virtual Vector3 GetPosition() const { return object3d_ ? object3d_->GetTranslate() : Vector3{ 0.0f, 0.0f, 0.0f }; }
     virtual void SetPosition(const Vector3& pos) { if (object3d_) object3d_->SetTranslate(pos); }
+    Object3d* GetObject3d() const { return object3d_.get(); }
 
     int GetHP() const { return hp_; }
     int GetMaxHP() const { return maxHp_; }

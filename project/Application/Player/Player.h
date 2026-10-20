@@ -86,6 +86,11 @@ public:
     Vector3 GetRotation() const { return object3d_ ? object3d_->GetRotate() : Vector3{ 0.0f, 0.0f, 0.0f }; }
     void SetPosition(const Vector3& pos) { position_ = pos; if (object3d_) object3d_->SetTranslate(pos); }
     SphereCollider* GetCollider() const { return collider_.get(); }
+    Object3d* GetObject3d() const { return object3d_.get(); }
+
+    // --- ゲーム開始演出制御 ---
+    void SetIntroTransform(const Vector3& offset, const Vector3& scale, const Vector3& rotate);
+    void RestoreIntroPose();
 
     // --- 体力 & ダメージ関連 ---
     void TakeDamage(float damage, const std::string& attackerName = "HOSTILE PATROL", const std::string& cause = "7.62x39mm PS CARTRIDGE (CHEST PENETRATION)");
@@ -189,6 +194,7 @@ private:
     float maxStamina_ = kDefaultMaxStamina;
     const float dodgeStaminaCost_ = kDodgeStaminaCost;
     const float staminaRegenRate_ = kStaminaRegenRate;
+    bool prevSpacePressed_ = false;
 
     // --- 照準拡散 & 遮蔽 ---
     float currentSpread_ = 0.0f;

@@ -98,6 +98,7 @@ void Player::Reset()
     dodgeTimer_ = 0.0f;
     dodgeDirection_ = { 0.0f, 0.0f, 1.0f };
     stamina_ = maxStamina_ = kDefaultMaxStamina;
+    prevSpacePressed_ = false;
 
     // 照準拡散とトランスフォームの初期化
     currentSpread_ = 0.0f;
@@ -313,8 +314,12 @@ void Player::Update(float deltaTime, MouseInput* mouseInput)
             moveDir.z /= len;
         }
 
-        // [SPACE] キーで回避ローリング開始
-        if ((GetAsyncKeyState(VK_SPACE) & 0x8000) != 0 && stamina_ >= kDodgeStaminaCost)
+        bool isSpaceDown = (GetAsyncKeyState(VK_SPACE) & 0x8000) != 0;
+        bool isSpaceTriggered = isSpaceDown && !prevSpacePressed_;
+        prevSpacePressed_ = isSpaceDown;
+
+        // [SPACE] キーで回避ローリング開始 (トリガー判定でスキップ直後の暴発を防止)
+        if (isSpaceTriggered && stamina_ >= kDodgeStaminaCost)
         {
             isDodging_ = true;
             isMoving = true;
@@ -418,10 +423,18 @@ void Player::Update(float deltaTime, MouseInput* mouseInput)
                         Vector3 hit = { worldNear.x + dir.x * t, 0.0f, worldNear.z + dir.z * t };
                         Vector3 ppos = position_;
                         Vector3 to = { hit.x - ppos.x, 0.0f, hit.z - ppos.z };
-                        float yaw = std::atan2(to.x, to.z);
+                        float targetYaw = std::atan2(to.x, to.z);
                         Vector3 r = object3d_->GetRotate();
+
+                        // 最短回転角 (-PI ~ +PI)
+                        float diff = targetYaw - r.y;
+                        while (diff > 3.14159265f) diff -= 6.2831853f;
+                        while (diff < -3.14159265f) diff += 6.2831853f;
+
+                        // 高いレスポンス性を維持しつつ急激な瞬間移動（カクつき）を完全に防ぐスムーズ旋回
+                        float rotFactor = (std::min)(1.0f - std::exp(-16.0f * deltaTime), 0.30f);
                         r.x = 0.0f;
-                        r.y = yaw;
+                        r.y += diff * rotFactor;
                         r.z = 0.0f;
                         object3d_->SetRotate(r);
                     }
@@ -466,6 +479,30 @@ void Player::PostCollisionUpdate()
             object3d_->SetTranslate(position_);
         }
         object3d_->Update();
+    }
+}
+
+void Player::SetIntroTransform(const Vector3& offset, const Vector3& scale, const Vector3& rotate)
+{
+    if (object3d_)
+    {
+        Vector3 p = { position_.x + offset.x, position_.y + offset.y, position_.z + offset.z };
+        object3d_->SetTranslate(p);
+        object3d_->SetScale(scale);
+        object3d_->SetRotate(rotate);
+        object3d_->Update();
+    }
+}
+
+void Player::RestoreIntroPose()
+{
+    if (object3d_)
+    {
+        object3d_->SetTranslate(position_);
+        object3d_->SetScale({ 1.0f, 1.0f, 1.0f });
+        object3d_->SetRotate({ 0.0f, 0.0f, 0.0f });
+        object3d_->Update();
+        prevSpacePressed_ = true; // イントロ終了・スキップ直後のSPACEキー暴発を確実に抑止
     }
 }
 

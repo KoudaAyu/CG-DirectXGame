@@ -36,6 +36,7 @@
 #include "GamePlayHUD.h"
 
 #include "Application/Config/GameConfig.h"
+#include "HelicopterInsertionController.h"
 
 class Camera;
 class SpriteCom;
@@ -44,6 +45,7 @@ class CombatSystem;
 class CollisionSystem;
 class EnvironmentSystem;
 class CharacterEffectController;
+class HelicopterInsertionController;
 struct SceneRenderRequests;
 
 /// <summary>
@@ -57,6 +59,7 @@ class GamePlayScene : public BaseScene
     friend class CollisionSystem;
     friend class EnvironmentSystem;
     friend class CharacterEffectController;
+    friend class HelicopterInsertionController;
 
 public:
     // =========================================================================
@@ -177,6 +180,7 @@ private:
     void CheckGameOver();
     void UpdateObstacles();
     void UpdateStressTestMode();
+    void UpdateGameIntro(float realDeltaTime);
 
     RenderContext BuildRenderContext() const;
     static bool IsWithinRadius(const Vector3& a, const Vector3& b, float radius);
@@ -200,6 +204,7 @@ private:
     std::unique_ptr<LootSystem> lootSystem_;
     std::unique_ptr<EnvironmentSystem> environmentSystem_;
     std::unique_ptr<CharacterEffectController> characterEffectController_;
+    std::unique_ptr<HelicopterInsertionController> helicopterIntro_;
     std::unique_ptr<GamePlayHUD> hud_;
     std::unique_ptr<LevelEditor> levelEditor_;
 
@@ -250,6 +255,14 @@ private:
     uint32_t minovskyCircleTextureIndex_ = TextureManager::kInvalidTextureIndex;
 
     // --- ゲームステート & タイマー ---
+    static constexpr float kGameIntroDuration = 5.00f; // 開始ドロップ＆カメラ回り込み演出時間 (秒)
+    bool isGameIntroActive_ = true;                   // ゲーム開始演出中フラグ
+    float gameIntroTimer_ = 0.0f;                     // 演出タイマー
+    bool introLanded_ = false;                        // 着地インパクト発生済みフラグ
+    float introFeatherTimer_ = 0.0f;                  // プルプル身震い羽毛パーティクルタイマー
+    bool introCockSparkEmitted_ = false;              // 武器コッキング閃光発生済みフラグ
+    float introTrailTimer_ = 0.0f;                    // ダイブ中の風切り気流トレイルタイマー
+
     bool allTargetsDestroyed_ = false;
     bool isGameCleared_ = false;
     float clearSlowMoTimer_ = kClearSlowMoDuration;

@@ -415,6 +415,7 @@
     <ClInclude Include="Game.h" />
     <ClInclude Include="Application\Scene\GameScene\GamePlayScene.h" />
     <ClInclude Include="Application\Scene\GameScene\CollisionSystem.h" />
+    <ClInclude Include="Application\Scene\GameScene\HelicopterInsertionController.h" />
     <ClInclude Include="Application\Scene\GameScene\CombatSystem.h" />
     <ClInclude Include="Application\Scene\GameScene\EnvironmentSystem.h" />
     <ClInclude Include="Application\Scene\GameScene\CharacterEffectController.h" />

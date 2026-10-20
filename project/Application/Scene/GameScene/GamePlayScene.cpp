@@ -1,5 +1,6 @@
 
 #include "SceneManager.h"
+#include "SkyBox.h"
 #include "MaterialManager.h"
 #include "Light.h"
 #include "ParticleManager.h"
@@ -117,6 +118,36 @@ void GamePlayScene::InitializeScene()
 	showPerformanceTracker_ = false;
 	CollisionManager::GetInstance()->SetShowDebugColliders(false);
 	CollisionManager::GetInstance()->SetShowMeshWireframe(false);
+
+	// 軍用ヘリ低空急襲・ファストロープ降下シネマティック演出の初期化
+	helicopterIntro_ = std::make_unique<HelicopterInsertionController>(this);
+	helicopterIntro_->Initialize();
+	isGameIntroActive_ = true;
+
+	// 初回フレーム描画用のWVP行列をイントロカメラ（Act 1アングル）で全3Dオブジェクト同期
+	UpdateObstacles();
+	if (extractionPadObject_)
+	{
+		extractionPadObject_->Update();
+	}
+	for (auto& enemy : enemies_)
+	{
+		if (enemy && enemy->GetObject3d())
+		{
+			enemy->GetObject3d()->Update();
+		}
+	}
+	for (auto& t : targets_)
+	{
+		if (t)
+		{
+			t->Update(0.0f);
+		}
+	}
+	if (SceneManager::GetInstance() && SceneManager::GetInstance()->GetSkyBox())
+	{
+		SceneManager::GetInstance()->GetSkyBox()->Update();
+	}
 }
 
 void GamePlayScene::InitializeEnvironment()
@@ -417,6 +448,11 @@ void GamePlayScene::InitializeAudioAndParticles()
 
 void GamePlayScene::Finalize()
 {
+	if (helicopterIntro_)
+	{
+		helicopterIntro_->Finalize();
+		helicopterIntro_.reset();
+	}
 
 	if (hitEffect_)
 	{
@@ -1186,11 +1222,64 @@ void GamePlayScene::CheckGameOver()
 	}
 }
 
+void GamePlayScene::UpdateGameIntro(float realDeltaTime)
+{
+	if (helicopterIntro_ && helicopterIntro_->IsActive())
+	{
+		helicopterIntro_->Update(realDeltaTime);
+		isGameIntroActive_ = helicopterIntro_->IsActive();
+
+		// イントロ中も全3Dオブジェクト（障害物・敵・環境・標的・スカイボックス）のWVP行列を最新カメラと完全同期
+		UpdateObstacles();
+		if (extractionPadObject_)
+		{
+			extractionPadObject_->Update();
+		}
+		for (auto& enemy : enemies_)
+		{
+			if (enemy && enemy->GetObject3d())
+			{
+				enemy->GetObject3d()->Update();
+			}
+		}
+		for (auto& t : targets_)
+		{
+			if (t)
+			{
+				t->Update(realDeltaTime);
+			}
+		}
+		if (player_ && player_->GetObject3d())
+		{
+			player_->GetObject3d()->Update();
+		}
+		if (SceneManager::GetInstance() && SceneManager::GetInstance()->GetSkyBox())
+		{
+			SceneManager::GetInstance()->GetSkyBox()->Update();
+		}
+
+		UpdateEnvironment();
+		UpdateParticles(realDeltaTime);
+		UpdateSprites(realDeltaTime);
+	}
+	else
+	{
+		isGameIntroActive_ = false;
+	}
+}
+
 void GamePlayScene::Update()
 {
 	float realDeltaTime = AdvanceDeltaTime();
 	float deltaTime = realDeltaTime;
 
+	// 軍用ヘリ急襲・ファストロープ降下演出中
+	if (helicopterIntro_ && helicopterIntro_->IsActive())
+	{
+		UpdateGameIntro(realDeltaTime);
+		return;
+	}
+	isGameIntroActive_ = false;
 	// 死亡シーケンス中: SPACEキーまたはENTERキーが押されるまで待機
 	if (isDeathSequenceActive_)
 	{
@@ -1308,6 +1397,17 @@ void GamePlayScene::Update()
 
 	UpdateEnvironment();
 	UpdateObstacles();
+	if (extractionPadObject_)
+	{
+		extractionPadObject_->Update();
+	}
+	for (auto& enemy : enemies_)
+	{
+		if (enemy && enemy->GetObject3d())
+		{
+			enemy->GetObject3d()->Update();
+		}
+	}
 
 	// 標的の更新
 	for (auto& t : targets_)
@@ -1681,6 +1781,27 @@ void GamePlayScene::InitializeObstacles()
 		auto bridge = std::make_unique<Obstacle>();
 		bridge->Initialize(object3dCom, camera_, { 0.0f, 0.0f, 30.0f }, 1.0f, "bridge.obj", { 1.0f, 1.0f, 1.0f }, { 0.0f, 0.0f, 0.0f });
 		obstacles_.push_back(std::move(bridge));
+
+		// 外周の軍用針葉樹（マツ林）
+		std::vector<std::pair<Vector3, float>> fallbackTrees = {
+			{ { -10.5f, 0.0f, -11.5f }, 0.45f },
+			{ {  -3.8f, 0.0f, -11.2f }, 0.90f },
+			{ {   0.0f, 0.0f, -13.0f }, 2.30f },
+			{ {   3.5f, 0.0f, -11.4f }, 1.20f },
+			{ {  10.8f, 0.0f, -11.6f }, 0.60f },
+			{ { -14.5f, 0.0f,  -8.0f }, 0.85f },
+			{ { -15.2f, 0.0f,  -3.5f }, 2.10f },
+			{ {  14.5f, 0.0f,  -8.0f }, 1.50f },
+			{ {  15.5f, 0.0f,  -3.0f }, 0.70f },
+			{ { -10.2f, 0.0f,  -6.5f }, 1.30f },
+			{ {  10.2f, 0.0f,  -6.5f }, 2.00f },
+		};
+		for (const auto& tr : fallbackTrees)
+		{
+			auto trobs = std::make_unique<Obstacle>();
+			trobs->Initialize(object3dCom, camera_, tr.first, 1.0f, "duckov_pine_tree.obj", { 1.2f, 1.35f, 1.2f }, { 0.0f, tr.second, 0.0f });
+			obstacles_.push_back(std::move(trobs));
+		}
 	}
 
 	if (targets_.empty())
@@ -1707,7 +1828,7 @@ void GamePlayScene::InitializeObstacles()
 	{
 		// 看板1: 初期位置（基本移動＆回避ローリング）
 		auto sign1 = std::make_unique<TutorialSign>();
-		sign1->Initialize(object3dCom, camera_, { -2.5f, 0.0f, 2.0f },
+		sign1->Initialize(object3dCom, camera_, { -3.6f, 0.0f, 1.8f },
 			(const char*)u8"【 基本操作訓練 】\n[ W ][ A ][ S ][ D ] : 移動\n[ SPACE ] : 回避ローリング（素早く前転・無敵時間あり！）", 3.2f);
 		tutorialSigns_.push_back(std::move(sign1));
 
@@ -1773,11 +1894,8 @@ RenderContext GamePlayScene::BuildRenderContext() const
 
 void GamePlayScene::Draw(SceneRenderRequests& renderRequests)
 {
-	// 描画直前にカメラを更新して最新フレームのGPU仮想アドレスを確定
-	if (camera_)
-	{
-		camera_->Update();
-	}
+	// ※カメラの更新は Update() / UpdateGameIntro() 内で全3DオブジェクトのWVP計算前に確実に1回だけ実行済み。
+	// ここでの二重更新はカメラシェイク時の乱数ズレやWVP不整合を引き起こすため行わない。
 
 	renderRequests.sceneDrawn = true;
 	const RenderContext ctx = BuildRenderContext();
@@ -1870,6 +1988,12 @@ void GamePlayScene::Draw(SceneRenderRequests& renderRequests)
 		extractionPadObject_->Draw(ctx);
 	}
 
+	// 軍用強襲ヘリ・ファストロープ・機体影の3D描画
+	if (helicopterIntro_ && helicopterIntro_->IsActive())
+	{
+		helicopterIntro_->Draw3D(ctx);
+	}
+
 	if (hitEffect_)
 	{
 		hitEffect_->Draw();
@@ -1896,8 +2020,8 @@ void GamePlayScene::Draw(SceneRenderRequests& renderRequests)
 
 #ifdef USE_IMGUI
 	// --- タクティカルHUD統合描画 ---
-	// トランジション（画面切り替え演出）実行中はHUDを一切描画しない（レーザーサイト等の先行表示を防止）
-	if (hud_ && (!StingerTransition::GetInstance() || !StingerTransition::GetInstance()->IsTransitioning()))
+	// トランジション実行中および開始演出中はHUDを描画しない
+	if (hud_ && !isGameIntroActive_ && (!StingerTransition::GetInstance() || !StingerTransition::GetInstance()->IsTransitioning()))
 	{
 		GamePlayHUDContext hudCtx;
 		hudCtx.camera = camera_;
@@ -1925,6 +2049,12 @@ void GamePlayScene::Draw(SceneRenderRequests& renderRequests)
 		hudCtx.sceneEntranceFadeTimer = sceneEntranceFadeTimer_;
 
 		hud_->Draw(hudCtx, AdvanceDeltaTime());
+	}
+
+	// 軍用ヘリ演出UI（映画風シネマスコープ・RED/GREEN LIGHT合図・スキップHUD）の描画
+	if (helicopterIntro_ && helicopterIntro_->IsActive())
+	{
+		helicopterIntro_->DrawUI();
 	}
 #endif
 

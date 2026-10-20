@@ -1,17 +1,17 @@
 [
     {
-        "name": "BaseCamp_Supply_Container",
-        "type": "Container",
+        "name": "Perimeter_Fence_South_0",
+        "type": "Obstacle",
         "modelDirectory": "Resources",
-        "modelFilename": "container.obj",
+        "modelFilename": "fence.obj",
         "position": {
-            "x": -5.8,
+            "x": -8.72,
             "y": 0.0,
-            "z": 4.5
+            "z": -9.0
         },
         "rotation": {
             "x": 0.0,
-            "y": 0.1,
+            "y": 0.0,
             "z": 0.0
         },
         "scale": {
@@ -22,18 +22,18 @@
         "isStatic": true
     },
     {
-        "name": "BaseCamp_Crate_1",
+        "name": "Perimeter_Fence_South_1",
         "type": "Obstacle",
         "modelDirectory": "Resources",
-        "modelFilename": "duckov_crate.obj",
+        "modelFilename": "fence.obj",
         "position": {
-            "x": -3.6,
+            "x": -4.36,
             "y": 0.0,
-            "z": 3.2
+            "z": -9.0
         },
         "rotation": {
             "x": 0.0,
-            "y": 0.25,
+            "y": 0.0,
             "z": 0.0
         },
         "scale": {
@@ -44,40 +44,18 @@
         "isStatic": true
     },
     {
-        "name": "BaseCamp_Crate_2",
+        "name": "Perimeter_Fence_South_2",
         "type": "Obstacle",
         "modelDirectory": "Resources",
-        "modelFilename": "duckov_crate.obj",
+        "modelFilename": "fence.obj",
         "position": {
-            "x": -4.5,
+            "x": 0.0,
             "y": 0.0,
-            "z": 2.5
+            "z": -9.0
         },
         "rotation": {
             "x": 0.0,
-            "y": -0.15,
-            "z": 0.0
-        },
-        "scale": {
-            "x": 0.9,
-            "y": 0.9,
-            "z": 0.9
-        },
-        "isStatic": true
-    },
-    {
-        "name": "BaseCamp_Barrels_Right",
-        "type": "Obstacle",
-        "modelDirectory": "Resources",
-        "modelFilename": "duckov_barrel_stack.obj",
-        "position": {
-            "x": 4.5,
             "y": 0.0,
-            "z": 2.8
-        },
-        "rotation": {
-            "x": 0.0,
-            "y": -0.3,
             "z": 0.0
         },
         "scale": {
@@ -88,18 +66,18 @@
         "isStatic": true
     },
     {
-        "name": "BaseCamp_Crate_Right",
+        "name": "Perimeter_Fence_South_3",
         "type": "Obstacle",
         "modelDirectory": "Resources",
-        "modelFilename": "duckov_crate.obj",
+        "modelFilename": "fence.obj",
         "position": {
-            "x": 5.5,
+            "x": 4.36,
             "y": 0.0,
-            "z": 4.2
+            "z": -9.0
         },
         "rotation": {
             "x": 0.0,
-            "y": 0.15,
+            "y": 0.0,
             "z": 0.0
         },
         "scale": {
@@ -110,18 +88,1096 @@
         "isStatic": true
     },
     {
-        "name": "FiringRange_Sandbag_Left",
+        "name": "Perimeter_Fence_South_4",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "fence.obj",
+        "position": {
+            "x": 8.72,
+            "y": 0.0,
+            "z": -9.0
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "Perimeter_Fence_West_00",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "fence.obj",
+        "position": {
+            "x": -12.5,
+            "y": 0.0,
+            "z": -8.5
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 1.571,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "Perimeter_Fence_East_00",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "fence.obj",
+        "position": {
+            "x": 12.5,
+            "y": 0.0,
+            "z": -8.5
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 1.571,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "Perimeter_Fence_West_01",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "fence.obj",
+        "position": {
+            "x": -12.5,
+            "y": 0.0,
+            "z": -4.14
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 1.571,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "Perimeter_Fence_East_01",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "fence.obj",
+        "position": {
+            "x": 12.5,
+            "y": 0.0,
+            "z": -4.14
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 1.571,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "Perimeter_Fence_West_02",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "fence.obj",
+        "position": {
+            "x": -12.5,
+            "y": 0.0,
+            "z": 0.22
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 1.571,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "Perimeter_Fence_East_02",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "fence.obj",
+        "position": {
+            "x": 12.5,
+            "y": 0.0,
+            "z": 0.22
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 1.571,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "Perimeter_Fence_West_03",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "fence.obj",
+        "position": {
+            "x": -12.5,
+            "y": 0.0,
+            "z": 4.58
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 1.571,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "Perimeter_Fence_East_03",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "fence.obj",
+        "position": {
+            "x": 12.5,
+            "y": 0.0,
+            "z": 4.58
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 1.571,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "Perimeter_Fence_West_04",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "fence.obj",
+        "position": {
+            "x": -12.5,
+            "y": 0.0,
+            "z": 8.94
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 1.571,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "Perimeter_Fence_East_04",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "fence.obj",
+        "position": {
+            "x": 12.5,
+            "y": 0.0,
+            "z": 8.94
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 1.571,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "Perimeter_Fence_West_05",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "fence.obj",
+        "position": {
+            "x": -12.5,
+            "y": 0.0,
+            "z": 13.3
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 1.571,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "Perimeter_Fence_East_05",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "fence.obj",
+        "position": {
+            "x": 12.5,
+            "y": 0.0,
+            "z": 13.3
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 1.571,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "Perimeter_Fence_West_06",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "fence.obj",
+        "position": {
+            "x": -12.5,
+            "y": 0.0,
+            "z": 17.66
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 1.571,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "Perimeter_Fence_East_06",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "fence.obj",
+        "position": {
+            "x": 12.5,
+            "y": 0.0,
+            "z": 17.66
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 1.571,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "Perimeter_Fence_West_07",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "fence.obj",
+        "position": {
+            "x": -12.5,
+            "y": 0.0,
+            "z": 22.02
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 1.571,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "Perimeter_Fence_East_07",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "fence.obj",
+        "position": {
+            "x": 12.5,
+            "y": 0.0,
+            "z": 22.02
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 1.571,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "Perimeter_Fence_West_08",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "fence.obj",
+        "position": {
+            "x": -12.5,
+            "y": 0.0,
+            "z": 26.38
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 1.571,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "Perimeter_Fence_East_08",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "fence.obj",
+        "position": {
+            "x": 12.5,
+            "y": 0.0,
+            "z": 26.38
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 1.571,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "Perimeter_Fence_West_09",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "fence.obj",
+        "position": {
+            "x": -12.5,
+            "y": 0.0,
+            "z": 30.74
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 1.571,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "Perimeter_Fence_East_09",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "fence.obj",
+        "position": {
+            "x": 12.5,
+            "y": 0.0,
+            "z": 30.74
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 1.571,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "Perimeter_Fence_West_10",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "fence.obj",
+        "position": {
+            "x": -12.5,
+            "y": 0.0,
+            "z": 35.1
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 1.571,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "Perimeter_Fence_East_10",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "fence.obj",
+        "position": {
+            "x": 12.5,
+            "y": 0.0,
+            "z": 35.1
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 1.571,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "Perimeter_Fence_West_11",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "fence.obj",
+        "position": {
+            "x": -12.5,
+            "y": 0.0,
+            "z": 39.46
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 1.571,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "Perimeter_Fence_East_11",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "fence.obj",
+        "position": {
+            "x": 12.5,
+            "y": 0.0,
+            "z": 39.46
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 1.571,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "Perimeter_Fence_West_12",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "fence.obj",
+        "position": {
+            "x": -12.5,
+            "y": 0.0,
+            "z": 43.82
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 1.571,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "Perimeter_Fence_East_12",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "fence.obj",
+        "position": {
+            "x": 12.5,
+            "y": 0.0,
+            "z": 43.82
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 1.571,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "Perimeter_Fence_West_13",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "fence.obj",
+        "position": {
+            "x": -12.5,
+            "y": 0.0,
+            "z": 48.18
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 1.571,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "Perimeter_Fence_East_13",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "fence.obj",
+        "position": {
+            "x": 12.5,
+            "y": 0.0,
+            "z": 48.18
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 1.571,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "Perimeter_Fence_West_14",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "fence.obj",
+        "position": {
+            "x": -12.5,
+            "y": 0.0,
+            "z": 52.54
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 1.571,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "Perimeter_Fence_East_14",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "fence.obj",
+        "position": {
+            "x": 12.5,
+            "y": 0.0,
+            "z": 52.54
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 1.571,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "Perimeter_Fence_West_15",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "fence.obj",
+        "position": {
+            "x": -12.5,
+            "y": 0.0,
+            "z": 56.9
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 1.571,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "Perimeter_Fence_East_15",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "fence.obj",
+        "position": {
+            "x": 12.5,
+            "y": 0.0,
+            "z": 56.9
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 1.571,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "Perimeter_Fence_West_16",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "fence.obj",
+        "position": {
+            "x": -12.5,
+            "y": 0.0,
+            "z": 61.26
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 1.571,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "Perimeter_Fence_East_16",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "fence.obj",
+        "position": {
+            "x": 12.5,
+            "y": 0.0,
+            "z": 61.26
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 1.571,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "Perimeter_Fence_West_17",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "fence.obj",
+        "position": {
+            "x": -12.5,
+            "y": 0.0,
+            "z": 65.62
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 1.571,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "Perimeter_Fence_East_17",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "fence.obj",
+        "position": {
+            "x": 12.5,
+            "y": 0.0,
+            "z": 65.62
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 1.571,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "Perimeter_Fence_North_0",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "fence.obj",
+        "position": {
+            "x": -8.72,
+            "y": 0.0,
+            "z": 68.0
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 3.142,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "Perimeter_Fence_North_1",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "fence.obj",
+        "position": {
+            "x": -4.36,
+            "y": 0.0,
+            "z": 68.0
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 3.142,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "Perimeter_Fence_North_2",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "fence.obj",
+        "position": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 68.0
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 3.142,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "Perimeter_Fence_North_3",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "fence.obj",
+        "position": {
+            "x": 4.36,
+            "y": 0.0,
+            "z": 68.0
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 3.142,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "Perimeter_Fence_North_4",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "fence.obj",
+        "position": {
+            "x": 8.72,
+            "y": 0.0,
+            "z": 68.0
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 3.142,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "Player_Spawn_Point",
+        "type": "SpawnPoint",
+        "modelDirectory": "Resources",
+        "modelFilename": "Player_Spawn_Point.obj",
+        "position": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "Insertion_Sandbag_RearLeft",
         "type": "Obstacle",
         "modelDirectory": "Resources",
         "modelFilename": "duckov_sandbag_wall.obj",
         "position": {
-            "x": -3.5,
+            "x": -2.8,
+            "y": 0.0,
+            "z": -3.5
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "Insertion_Sandbag_RearRight",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "duckov_sandbag_wall.obj",
+        "position": {
+            "x": 2.8,
+            "y": 0.0,
+            "z": -3.5
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "Insertion_Crate_RearWest",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "duckov_crate.obj",
+        "position": {
+            "x": -6.0,
+            "y": 0.0,
+            "z": -3.5
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "Insertion_Barrels_RearEast",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "duckov_barrel_stack.obj",
+        "position": {
+            "x": 6.0,
+            "y": 0.0,
+            "z": -3.5
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "Insertion_Cover_Sandbag_Left",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "duckov_sandbag_wall.obj",
+        "position": {
+            "x": -3.2,
+            "y": 0.0,
+            "z": 3.5
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "Insertion_Cover_Sandbag_Right",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "duckov_sandbag_wall.obj",
+        "position": {
+            "x": 3.2,
+            "y": 0.0,
+            "z": 3.5
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "Sector1_Container_WestFlank",
+        "type": "Container",
+        "modelDirectory": "Resources",
+        "modelFilename": "container.obj",
+        "position": {
+            "x": -7.5,
             "y": 0.0,
             "z": 8.0
         },
         "rotation": {
             "x": 0.0,
-            "y": 0.35,
+            "y": 0.0,
             "z": 0.0
         },
         "scale": {
@@ -132,36 +1188,58 @@
         "isStatic": true
     },
     {
-        "name": "FiringRange_Barrels_Right",
+        "name": "Sector1_Container_EastFlank",
+        "type": "Container",
+        "modelDirectory": "Resources",
+        "modelFilename": "container.obj",
+        "position": {
+            "x": 7.5,
+            "y": 0.0,
+            "z": 8.0
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "Sector1_Crate_W_Ambush",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "duckov_crate.obj",
+        "position": {
+            "x": -4.8,
+            "y": 0.0,
+            "z": 7.5
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "Sector1_Barrels_E_Ambush",
         "type": "Obstacle",
         "modelDirectory": "Resources",
         "modelFilename": "duckov_barrel_stack.obj",
         "position": {
-            "x": 3.8,
+            "x": 4.8,
             "y": 0.0,
-            "z": 9.2
-        },
-        "rotation": {
-            "x": 0.0,
-            "y": -0.1,
-            "z": 0.0
-        },
-        "scale": {
-            "x": 1.0,
-            "y": 1.0,
-            "z": 1.0
-        },
-        "isStatic": true
-    },
-    {
-        "name": "ShootingTarget_1",
-        "type": "Target",
-        "modelDirectory": "Resources",
-        "modelFilename": "shooting_target.obj",
-        "position": {
-            "x": -5.0,
-            "y": 0.0,
-            "z": 8.5
+            "z": 7.5
         },
         "rotation": {
             "x": 0.0,
@@ -173,22 +1251,21 @@
             "y": 1.0,
             "z": 1.0
         },
-        "radius": 0.8,
         "isStatic": true
     },
     {
-        "name": "Checkpoint_Container_A",
+        "name": "Sector1_Container_CenterCover",
         "type": "Container",
         "modelDirectory": "Resources",
         "modelFilename": "container.obj",
         "position": {
-            "x": -3.5,
+            "x": -3.0,
             "y": 0.0,
-            "z": 14.5
+            "z": 13.5
         },
         "rotation": {
             "x": 0.0,
-            "y": 0.22,
+            "y": 0.0,
             "z": 0.0
         },
         "scale": {
@@ -199,80 +1276,14 @@
         "isStatic": true
     },
     {
-        "name": "Checkpoint_Sandbag_SideLeft",
-        "type": "Obstacle",
-        "modelDirectory": "Resources",
-        "modelFilename": "duckov_sandbag_wall.obj",
-        "position": {
-            "x": -6.0,
-            "y": 0.0,
-            "z": 15.0
-        },
-        "rotation": {
-            "x": 0.0,
-            "y": 1.57,
-            "z": 0.0
-        },
-        "scale": {
-            "x": 1.0,
-            "y": 1.0,
-            "z": 1.0
-        },
-        "isStatic": true
-    },
-    {
-        "name": "Checkpoint_Container_B",
+        "name": "Sector1_Container_EastForward",
         "type": "Container",
         "modelDirectory": "Resources",
         "modelFilename": "container.obj",
-        "position": {
-            "x": 3.6,
-            "y": 0.0,
-            "z": 18.5
-        },
-        "rotation": {
-            "x": 0.0,
-            "y": -0.25,
-            "z": 0.0
-        },
-        "scale": {
-            "x": 1.0,
-            "y": 1.0,
-            "z": 1.0
-        },
-        "isStatic": true
-    },
-    {
-        "name": "Checkpoint_Crates_B_Stack",
-        "type": "Obstacle",
-        "modelDirectory": "Resources",
-        "modelFilename": "duckov_crate.obj",
         "position": {
             "x": 6.0,
             "y": 0.0,
-            "z": 18.0
-        },
-        "rotation": {
-            "x": 0.0,
-            "y": 0.5,
-            "z": 0.0
-        },
-        "scale": {
-            "x": 1.0,
-            "y": 1.0,
-            "z": 1.0
-        },
-        "isStatic": true
-    },
-    {
-        "name": "Checkpoint_Barrels_B_Side",
-        "type": "Obstacle",
-        "modelDirectory": "Resources",
-        "modelFilename": "duckov_barrel_stack.obj",
-        "position": {
-            "x": 5.2,
-            "y": 0.0,
-            "z": 20.0
+            "z": 14.0
         },
         "rotation": {
             "x": 0.0,
@@ -287,85 +1298,40 @@
         "isStatic": true
     },
     {
-        "name": "ShootingTarget_2",
-        "type": "Target",
-        "modelDirectory": "Resources",
-        "modelFilename": "shooting_target.obj",
-        "position": {
-            "x": 5.2,
-            "y": 0.0,
-            "z": 19.5
-        },
-        "rotation": {
-            "x": 0.0,
-            "y": 0.0,
-            "z": 0.0
-        },
-        "scale": {
-            "x": 1.0,
-            "y": 1.0,
-            "z": 1.0
-        },
-        "radius": 0.8,
-        "isStatic": true
-    },
-    {
-        "name": "Checkpoint_Sandbag_Center",
-        "type": "Obstacle",
-        "modelDirectory": "Resources",
-        "modelFilename": "duckov_sandbag_wall.obj",
-        "position": {
-            "x": -2.0,
-            "y": 0.0,
-            "z": 22.0
-        },
-        "rotation": {
-            "x": 0.0,
-            "y": -0.2,
-            "z": 0.0
-        },
-        "scale": {
-            "x": 1.0,
-            "y": 1.0,
-            "z": 1.0
-        },
-        "isStatic": true
-    },
-    {
-        "name": "Checkpoint_Crate_West",
-        "type": "Obstacle",
-        "modelDirectory": "Resources",
-        "modelFilename": "duckov_crate.obj",
-        "position": {
-            "x": -4.5,
-            "y": 0.0,
-            "z": 21.5
-        },
-        "rotation": {
-            "x": 0.0,
-            "y": 0.3,
-            "z": 0.0
-        },
-        "scale": {
-            "x": 1.0,
-            "y": 1.0,
-            "z": 1.0
-        },
-        "isStatic": true
-    },
-    {
-        "name": "Enemy_Patrol_Checkpoint",
+        "name": "Enemy_Patrol_Sector1",
         "type": "EnemySpawn_Patrol",
         "modelDirectory": "Resources",
         "modelFilename": "Enemy_Spawn_Point.obj",
         "position": {
-            "x": 0.5,
+            "x": 2.5,
+            "y": 0.0,
+            "z": 10.5
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "OutpostAlpha_Bunker_Sandbag",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "duckov_sandbag_wall.obj",
+        "position": {
+            "x": -4.2,
             "y": 0.0,
             "z": 16.5
         },
         "rotation": {
             "x": 0.0,
-            "y": 3.14,
+            "y": 0.0,
             "z": 0.0
         },
         "scale": {
@@ -376,36 +1342,14 @@
         "isStatic": true
     },
     {
-        "name": "Enemy_Sentry_Checkpoint",
-        "type": "EnemySpawn",
+        "name": "OutpostAlpha_Objective_Target1",
+        "type": "Target",
         "modelDirectory": "Resources",
-        "modelFilename": "Enemy_Spawn_Point.obj",
+        "modelFilename": "shooting_target.obj",
         "position": {
-            "x": -3.0,
+            "x": -4.2,
             "y": 0.0,
-            "z": 22.5
-        },
-        "rotation": {
-            "x": 0.0,
-            "y": 3.14,
-            "z": 0.0
-        },
-        "scale": {
-            "x": 1.0,
-            "y": 1.0,
-            "z": 1.0
-        },
-        "isStatic": true
-    },
-    {
-        "name": "River_Defense_Sandbag_NearLeft",
-        "type": "Obstacle",
-        "modelDirectory": "Resources",
-        "modelFilename": "duckov_sandbag_wall.obj",
-        "position": {
-            "x": -3.5,
-            "y": 0.0,
-            "z": 27.0
+            "z": 18.0
         },
         "rotation": {
             "x": 0.0,
@@ -420,62 +1364,18 @@
         "isStatic": true
     },
     {
-        "name": "River_Defense_Barrels_NearLeft",
-        "type": "Obstacle",
-        "modelDirectory": "Resources",
-        "modelFilename": "duckov_barrel_stack.obj",
-        "position": {
-            "x": -5.5,
-            "y": 0.0,
-            "z": 26.5
-        },
-        "rotation": {
-            "x": 0.0,
-            "y": 0.2,
-            "z": 0.0
-        },
-        "scale": {
-            "x": 1.0,
-            "y": 1.0,
-            "z": 1.0
-        },
-        "isStatic": true
-    },
-    {
-        "name": "River_Defense_Sandbag_NearRight",
-        "type": "Obstacle",
-        "modelDirectory": "Resources",
-        "modelFilename": "duckov_sandbag_wall.obj",
-        "position": {
-            "x": 3.5,
-            "y": 0.0,
-            "z": 27.0
-        },
-        "rotation": {
-            "x": 0.0,
-            "y": 0.0,
-            "z": 0.0
-        },
-        "scale": {
-            "x": 1.0,
-            "y": 1.0,
-            "z": 1.0
-        },
-        "isStatic": true
-    },
-    {
-        "name": "River_Defense_Crate_NearRight",
+        "name": "OutpostAlpha_Ammo_Crate",
         "type": "Obstacle",
         "modelDirectory": "Resources",
         "modelFilename": "duckov_crate.obj",
         "position": {
-            "x": 5.5,
+            "x": -7.0,
             "y": 0.0,
-            "z": 26.5
+            "z": 17.0
         },
         "rotation": {
             "x": 0.0,
-            "y": -0.15,
+            "y": 0.0,
             "z": 0.0
         },
         "scale": {
@@ -486,14 +1386,300 @@
         "isStatic": true
     },
     {
-        "name": "Wooden_Bridge_Center",
+        "name": "Enemy_Sentry_OutpostAlpha_Bunker",
+        "type": "EnemySpawn",
+        "modelDirectory": "Resources",
+        "modelFilename": "Enemy_Spawn_Point.obj",
+        "position": {
+            "x": -1.5,
+            "y": 0.0,
+            "z": 17.5
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 3.142,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "OutpostAlpha_Right_Sandbag",
         "type": "Obstacle",
         "modelDirectory": "Resources",
-        "modelFilename": "bridge.obj",
+        "modelFilename": "duckov_sandbag_wall.obj",
         "position": {
+            "x": 3.2,
+            "y": 0.0,
+            "z": 17.5
+        },
+        "rotation": {
             "x": 0.0,
             "y": 0.0,
-            "z": 30.0
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "OutpostAlpha_Right_Barrels",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "duckov_barrel_stack.obj",
+        "position": {
+            "x": 6.2,
+            "y": 0.0,
+            "z": 17.5
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "Enemy_Sentry_OutpostAlpha_Right",
+        "type": "EnemySpawn",
+        "modelDirectory": "Resources",
+        "modelFilename": "Enemy_Spawn_Point.obj",
+        "position": {
+            "x": 3.2,
+            "y": 0.0,
+            "z": 19.2
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 3.142,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "Sector2_Sandbag_CenterBunker",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "duckov_sandbag_wall.obj",
+        "position": {
+            "x": -1.5,
+            "y": 0.0,
+            "z": 21.5
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "Sector2_Crate_West",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "duckov_crate.obj",
+        "position": {
+            "x": -5.5,
+            "y": 0.0,
+            "z": 21.5
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "Sector2_Container_WestWall",
+        "type": "Container",
+        "modelDirectory": "Resources",
+        "modelFilename": "container.obj",
+        "position": {
+            "x": -8.2,
+            "y": 0.0,
+            "z": 22.0
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "Enemy_Sentry_Riverbank_West",
+        "type": "EnemySpawn",
+        "modelDirectory": "Resources",
+        "modelFilename": "Enemy_Spawn_Point.obj",
+        "position": {
+            "x": -5.5,
+            "y": 0.0,
+            "z": 23.5
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 2.8,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "Riverbank_Fuel_Barrels",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "duckov_barrel_stack.obj",
+        "position": {
+            "x": 4.8,
+            "y": 0.0,
+            "z": 23.5
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "Riverbank_Sandbag_Defense",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "duckov_sandbag_wall.obj",
+        "position": {
+            "x": 6.2,
+            "y": 0.0,
+            "z": 24.5
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "Riverbank_Objective_Target2",
+        "type": "Target",
+        "modelDirectory": "Resources",
+        "modelFilename": "shooting_target.obj",
+        "position": {
+            "x": 6.2,
+            "y": 0.0,
+            "z": 25.8
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "Enemy_Sentry_Riverbank_AA",
+        "type": "EnemySpawn",
+        "modelDirectory": "Resources",
+        "modelFilename": "Enemy_Spawn_Point.obj",
+        "position": {
+            "x": 4.5,
+            "y": 0.0,
+            "z": 25.8
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 3.142,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "Sector2_Container_EastBuffer",
+        "type": "Container",
+        "modelDirectory": "Resources",
+        "modelFilename": "container.obj",
+        "position": {
+            "x": 8.5,
+            "y": 0.0,
+            "z": 21.0
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "Enemy_Patrol_Sector2",
+        "type": "EnemySpawn_Patrol",
+        "modelDirectory": "Resources",
+        "modelFilename": "Enemy_Spawn_Point.obj",
+        "position": {
+            "x": -1.5,
+            "y": 0.0,
+            "z": 23.5
         },
         "rotation": {
             "x": 0.0,
@@ -530,18 +1716,150 @@
         "isStatic": true
     },
     {
-        "name": "River_Defense_Sandbag_FarLeft",
+        "name": "Wooden_Bridge_Center",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "bridge.obj",
+        "position": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 30.0
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "River_Watchtower_West",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "watchtower.obj",
+        "position": {
+            "x": -8.2,
+            "y": 0.0,
+            "z": 26.5
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "River_Defense_Sandbag_SouthLeft",
         "type": "Obstacle",
         "modelDirectory": "Resources",
         "modelFilename": "duckov_sandbag_wall.obj",
         "position": {
-            "x": -3.5,
+            "x": -4.0,
+            "y": 0.0,
+            "z": 26.5
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "River_Defense_Sandbag_SouthRight",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "duckov_sandbag_wall.obj",
+        "position": {
+            "x": 4.0,
+            "y": 0.0,
+            "z": 27.5
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "River_Watchtower_East",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "watchtower.obj",
+        "position": {
+            "x": 8.2,
             "y": 0.0,
             "z": 33.5
         },
         "rotation": {
             "x": 0.0,
-            "y": 3.14,
+            "y": 3.142,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "River_Defense_Sandbag_NorthLeft",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "duckov_sandbag_wall.obj",
+        "position": {
+            "x": -4.0,
+            "y": 0.0,
+            "z": 33.5
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 3.142,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "River_Defense_Sandbag_NorthRight",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "duckov_sandbag_wall.obj",
+        "position": {
+            "x": 4.0,
+            "y": 0.0,
+            "z": 33.5
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 3.142,
             "z": 0.0
         },
         "scale": {
@@ -557,57 +1875,13 @@
         "modelDirectory": "Resources",
         "modelFilename": "duckov_crate.obj",
         "position": {
-            "x": -5.8,
-            "y": 0.0,
-            "z": 34.0
-        },
-        "rotation": {
-            "x": 0.0,
-            "y": 0.4,
-            "z": 0.0
-        },
-        "scale": {
-            "x": 1.0,
-            "y": 1.0,
-            "z": 1.0
-        },
-        "isStatic": true
-    },
-    {
-        "name": "River_Defense_Sandbag_FarRight",
-        "type": "Obstacle",
-        "modelDirectory": "Resources",
-        "modelFilename": "duckov_sandbag_wall.obj",
-        "position": {
-            "x": 3.5,
+            "x": -7.2,
             "y": 0.0,
             "z": 33.5
         },
         "rotation": {
             "x": 0.0,
-            "y": 3.14,
-            "z": 0.0
-        },
-        "scale": {
-            "x": 1.0,
-            "y": 1.0,
-            "z": 1.0
-        },
-        "isStatic": true
-    },
-    {
-        "name": "River_Defense_Barrels_FarRight",
-        "type": "Obstacle",
-        "modelDirectory": "Resources",
-        "modelFilename": "duckov_barrel_stack.obj",
-        "position": {
-            "x": 5.8,
             "y": 0.0,
-            "z": 34.0
-        },
-        "rotation": {
-            "x": 0.0,
-            "y": -0.3,
             "z": 0.0
         },
         "scale": {
@@ -618,18 +1892,18 @@
         "isStatic": true
     },
     {
-        "name": "Enemy_Sentry_Bridge",
+        "name": "Enemy_Sentry_Bridge_Chokepoint",
         "type": "EnemySpawn",
         "modelDirectory": "Resources",
         "modelFilename": "Enemy_Spawn_Point.obj",
         "position": {
             "x": 0.0,
             "y": 0.0,
-            "z": 34.5
+            "z": 35.5
         },
         "rotation": {
             "x": 0.0,
-            "y": 3.14,
+            "y": 3.142,
             "z": 0.0
         },
         "scale": {
@@ -640,18 +1914,150 @@
         "isStatic": true
     },
     {
-        "name": "Enemy_Patrol_RiverBank",
+        "name": "Enemy_Patrol_NorthBank",
         "type": "EnemySpawn_Patrol",
         "modelDirectory": "Resources",
         "modelFilename": "Enemy_Spawn_Point.obj",
         "position": {
-            "x": -3.8,
+            "x": -3.5,
+            "y": 0.0,
+            "z": 35.5
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "Enemy_Sentry_Watchtower_Lookout",
+        "type": "EnemySpawn",
+        "modelDirectory": "Resources",
+        "modelFilename": "Enemy_Spawn_Point.obj",
+        "position": {
+            "x": 3.8,
             "y": 0.0,
             "z": 35.0
         },
         "rotation": {
             "x": 0.0,
-            "y": 3.14,
+            "y": 3.142,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "Fortress_Container_WestGate",
+        "type": "Container",
+        "modelDirectory": "Resources",
+        "modelFilename": "container.obj",
+        "position": {
+            "x": -6.0,
+            "y": 0.0,
+            "z": 39.5
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "Fortress_Container_EastGate",
+        "type": "Container",
+        "modelDirectory": "Resources",
+        "modelFilename": "container.obj",
+        "position": {
+            "x": 6.0,
+            "y": 0.0,
+            "z": 39.5
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "Fortress_Sandbag_GateLeft",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "duckov_sandbag_wall.obj",
+        "position": {
+            "x": -2.8,
+            "y": 0.0,
+            "z": 39.5
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "Fortress_Sandbag_GateRight",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "duckov_sandbag_wall.obj",
+        "position": {
+            "x": 2.8,
+            "y": 0.0,
+            "z": 39.5
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "Enemy_Sentry_FortressGate",
+        "type": "EnemySpawn",
+        "modelDirectory": "Resources",
+        "modelFilename": "Enemy_Spawn_Point.obj",
+        "position": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 40.5
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 3.142,
             "z": 0.0
         },
         "scale": {
@@ -667,31 +2073,9 @@
         "modelDirectory": "Resources",
         "modelFilename": "watchtower.obj",
         "position": {
-            "x": -6.5,
+            "x": -8.2,
             "y": 0.0,
-            "z": 42.0
-        },
-        "rotation": {
-            "x": 0.0,
-            "y": 0.35,
-            "z": 0.0
-        },
-        "scale": {
-            "x": 1.0,
-            "y": 1.0,
-            "z": 1.0
-        },
-        "isStatic": true
-    },
-    {
-        "name": "Fortress_Barrels_West",
-        "type": "Obstacle",
-        "modelDirectory": "Resources",
-        "modelFilename": "duckov_barrel_stack.obj",
-        "position": {
-            "x": -4.5,
-            "y": 0.0,
-            "z": 40.5
+            "z": 44.5
         },
         "rotation": {
             "x": 0.0,
@@ -711,13 +2095,13 @@
         "modelDirectory": "Resources",
         "modelFilename": "watchtower.obj",
         "position": {
-            "x": 6.5,
+            "x": 8.2,
             "y": 0.0,
-            "z": 42.0
+            "z": 44.5
         },
         "rotation": {
             "x": 0.0,
-            "y": -0.35,
+            "y": 0.0,
             "z": 0.0
         },
         "scale": {
@@ -728,18 +2112,40 @@
         "isStatic": true
     },
     {
-        "name": "Fortress_Crates_East",
-        "type": "Obstacle",
+        "name": "Fortress_Container_Left",
+        "type": "Container",
         "modelDirectory": "Resources",
-        "modelFilename": "duckov_crate.obj",
+        "modelFilename": "container.obj",
+        "position": {
+            "x": -4.5,
+            "y": 0.0,
+            "z": 45.0
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "Fortress_Container_Right",
+        "type": "Container",
+        "modelDirectory": "Resources",
+        "modelFilename": "container.obj",
         "position": {
             "x": 4.5,
             "y": 0.0,
-            "z": 40.5
+            "z": 45.0
         },
         "rotation": {
             "x": 0.0,
-            "y": 0.2,
+            "y": 0.0,
             "z": 0.0
         },
         "scale": {
@@ -750,41 +2156,62 @@
         "isStatic": true
     },
     {
-        "name": "ShootingTarget_3",
+        "name": "Fortress_Sandbag_CenterBunker",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "duckov_sandbag_wall.obj",
+        "position": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 45.0
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "Fortress_Objective_Target3",
         "type": "Target",
         "modelDirectory": "Resources",
         "modelFilename": "shooting_target.obj",
         "position": {
-            "x": -4.2,
+            "x": -8.2,
+            "y": 0.0,
+            "z": 41.5
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "Enemy_Sentry_Fortress_WestCorridor",
+        "type": "EnemySpawn",
+        "modelDirectory": "Resources",
+        "modelFilename": "Enemy_Spawn_Point.obj",
+        "position": {
+            "x": -2.2,
             "y": 0.0,
             "z": 43.5
         },
         "rotation": {
             "x": 0.0,
-            "y": 0.0,
-            "z": 0.0
-        },
-        "scale": {
-            "x": 1.0,
-            "y": 1.0,
-            "z": 1.0
-        },
-        "radius": 0.8,
-        "isStatic": true
-    },
-    {
-        "name": "Fortress_Container_Center",
-        "type": "Container",
-        "modelDirectory": "Resources",
-        "modelFilename": "container.obj",
-        "position": {
-            "x": 0.0,
-            "y": 0.0,
-            "z": 45.0
-        },
-        "rotation": {
-            "x": 0.0,
-            "y": 1.57,
+            "y": 3.142,
             "z": 0.0
         },
         "scale": {
@@ -795,56 +2222,12 @@
         "isStatic": true
     },
     {
-        "name": "Fortress_Sandbag_West",
-        "type": "Obstacle",
-        "modelDirectory": "Resources",
-        "modelFilename": "duckov_sandbag_wall.obj",
-        "position": {
-            "x": -3.8,
-            "y": 0.0,
-            "z": 45.0
-        },
-        "rotation": {
-            "x": 0.0,
-            "y": 0.0,
-            "z": 0.0
-        },
-        "scale": {
-            "x": 1.0,
-            "y": 1.0,
-            "z": 1.0
-        },
-        "isStatic": true
-    },
-    {
-        "name": "Fortress_Sandbag_East",
-        "type": "Obstacle",
-        "modelDirectory": "Resources",
-        "modelFilename": "duckov_sandbag_wall.obj",
-        "position": {
-            "x": 3.8,
-            "y": 0.0,
-            "z": 45.0
-        },
-        "rotation": {
-            "x": 0.0,
-            "y": 0.0,
-            "z": 0.0
-        },
-        "scale": {
-            "x": 1.0,
-            "y": 1.0,
-            "z": 1.0
-        },
-        "isStatic": true
-    },
-    {
-        "name": "ShootingTarget_4",
+        "name": "Fortress_Objective_Target4",
         "type": "Target",
         "modelDirectory": "Resources",
         "modelFilename": "shooting_target.obj",
         "position": {
-            "x": 4.2,
+            "x": 8.2,
             "y": 0.0,
             "z": 47.5
         },
@@ -858,22 +2241,109 @@
             "y": 1.0,
             "z": 1.0
         },
-        "radius": 0.8,
         "isStatic": true
     },
     {
-        "name": "Fortress_Crate_Rear",
+        "name": "Enemy_Sentry_Fortress_EastCorridor",
+        "type": "EnemySpawn",
+        "modelDirectory": "Resources",
+        "modelFilename": "Enemy_Spawn_Point.obj",
+        "position": {
+            "x": 2.2,
+            "y": 0.0,
+            "z": 46.5
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 3.142,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "Fortress_Container_RearWest",
+        "type": "Container",
+        "modelDirectory": "Resources",
+        "modelFilename": "container.obj",
+        "position": {
+            "x": -6.5,
+            "y": 0.0,
+            "z": 50.5
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "Fortress_Container_RearEast",
+        "type": "Container",
+        "modelDirectory": "Resources",
+        "modelFilename": "container.obj",
+        "position": {
+            "x": 6.5,
+            "y": 0.0,
+            "z": 50.5
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "Fortress_Crate_RearCenter",
         "type": "Obstacle",
         "modelDirectory": "Resources",
         "modelFilename": "duckov_crate.obj",
         "position": {
-            "x": 0.0,
+            "x": -1.2,
             "y": 0.0,
-            "z": 48.0
+            "z": 50.5
         },
         "rotation": {
             "x": 0.0,
-            "y": 0.25,
+            "y": 0.0,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "Fortress_Barrels_RearCenter",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "duckov_barrel_stack.obj",
+        "position": {
+            "x": 1.2,
+            "y": 0.0,
+            "z": 50.5
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 0.0,
             "z": 0.0
         },
         "scale": {
@@ -889,35 +2359,13 @@
         "modelDirectory": "Resources",
         "modelFilename": "Enemy_Spawn_Point.obj",
         "position": {
-            "x": -2.0,
+            "x": 0.0,
             "y": 0.0,
-            "z": 44.0
+            "z": 42.5
         },
         "rotation": {
             "x": 0.0,
-            "y": 3.14,
-            "z": 0.0
-        },
-        "scale": {
-            "x": 1.0,
-            "y": 1.0,
-            "z": 1.0
-        },
-        "isStatic": true
-    },
-    {
-        "name": "Enemy_Sentry_FortressCenter",
-        "type": "EnemySpawn",
-        "modelDirectory": "Resources",
-        "modelFilename": "Enemy_Spawn_Point.obj",
-        "position": {
-            "x": 2.5,
             "y": 0.0,
-            "z": 46.5
-        },
-        "rotation": {
-            "x": 0.0,
-            "y": 3.14,
             "z": 0.0
         },
         "scale": {
@@ -933,13 +2381,13 @@
         "modelDirectory": "Resources",
         "modelFilename": "Enemy_Spawn_Point.obj",
         "position": {
-            "x": -6.5,
+            "x": -4.0,
             "y": 0.0,
-            "z": 48.0
+            "z": 49.0
         },
         "rotation": {
             "x": 0.0,
-            "y": 3.14,
+            "y": 0.0,
             "z": 0.0
         },
         "scale": {
@@ -955,13 +2403,13 @@
         "modelDirectory": "Resources",
         "modelFilename": "Enemy_Spawn_Point.obj",
         "position": {
-            "x": 6.5,
+            "x": 4.0,
             "y": 0.0,
-            "z": 48.0
+            "z": 49.0
         },
         "rotation": {
             "x": 0.0,
-            "y": 3.14,
+            "y": 0.0,
             "z": 0.0
         },
         "scale": {
@@ -983,7 +2431,7 @@
         },
         "rotation": {
             "x": 0.0,
-            "y": 0.3,
+            "y": 0.0,
             "z": 0.0
         },
         "scale": {
@@ -1005,7 +2453,7 @@
         },
         "rotation": {
             "x": 0.0,
-            "y": -0.3,
+            "y": 0.0,
             "z": 0.0
         },
         "scale": {
@@ -1043,13 +2491,35 @@
         "modelDirectory": "Resources",
         "modelFilename": "duckov_crate.obj",
         "position": {
-            "x": -5.5,
+            "x": -6.2,
             "y": 0.0,
-            "z": 57.5
+            "z": 56.5
         },
         "rotation": {
             "x": 0.0,
-            "y": 0.15,
+            "y": 0.0,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "FinalDefense_Crates_East",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "duckov_crate.obj",
+        "position": {
+            "x": 6.2,
+            "y": 0.0,
+            "z": 56.5
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 0.0,
             "z": 0.0
         },
         "scale": {
@@ -1067,11 +2537,11 @@
         "position": {
             "x": 0.0,
             "y": 0.0,
-            "z": 59.0
+            "z": 59.2
         },
         "rotation": {
             "x": 0.0,
-            "y": 3.14,
+            "y": 3.142,
             "z": 0.0
         },
         "scale": {
@@ -1082,62 +2552,18 @@
         "isStatic": true
     },
     {
-        "name": "Extraction_Sandbag_Left",
-        "type": "Obstacle",
+        "name": "Enemy_Sentry_Helipad_Left",
+        "type": "EnemySpawn",
         "modelDirectory": "Resources",
-        "modelFilename": "duckov_sandbag_wall.obj",
-        "position": {
-            "x": -3.8,
-            "y": 0.0,
-            "z": 62.0
-        },
-        "rotation": {
-            "x": 0.0,
-            "y": 1.57,
-            "z": 0.0
-        },
-        "scale": {
-            "x": 1.0,
-            "y": 1.0,
-            "z": 1.0
-        },
-        "isStatic": true
-    },
-    {
-        "name": "Extraction_Sandbag_Right",
-        "type": "Obstacle",
-        "modelDirectory": "Resources",
-        "modelFilename": "duckov_sandbag_wall.obj",
-        "position": {
-            "x": 3.8,
-            "y": 0.0,
-            "z": 62.0
-        },
-        "rotation": {
-            "x": 0.0,
-            "y": 1.57,
-            "z": 0.0
-        },
-        "scale": {
-            "x": 1.0,
-            "y": 1.0,
-            "z": 1.0
-        },
-        "isStatic": true
-    },
-    {
-        "name": "Extraction_Barrels_Left",
-        "type": "Obstacle",
-        "modelDirectory": "Resources",
-        "modelFilename": "duckov_barrel_stack.obj",
+        "modelFilename": "Enemy_Spawn_Point.obj",
         "position": {
             "x": -3.0,
             "y": 0.0,
-            "z": 64.0
+            "z": 62.5
         },
         "rotation": {
             "x": 0.0,
-            "y": 0.0,
+            "y": 2.5,
             "z": 0.0
         },
         "scale": {
@@ -1148,62 +2574,18 @@
         "isStatic": true
     },
     {
-        "name": "Extraction_Barrels_Right",
-        "type": "Obstacle",
+        "name": "Enemy_Sentry_Helipad_Right",
+        "type": "EnemySpawn",
         "modelDirectory": "Resources",
-        "modelFilename": "duckov_barrel_stack.obj",
+        "modelFilename": "Enemy_Spawn_Point.obj",
         "position": {
             "x": 3.0,
             "y": 0.0,
-            "z": 64.0
+            "z": 62.5
         },
         "rotation": {
             "x": 0.0,
-            "y": 0.0,
-            "z": 0.0
-        },
-        "scale": {
-            "x": 1.0,
-            "y": 1.0,
-            "z": 1.0
-        },
-        "isStatic": true
-    },
-    {
-        "name": "Extraction_Crates_Rear",
-        "type": "Obstacle",
-        "modelDirectory": "Resources",
-        "modelFilename": "duckov_crate.obj",
-        "position": {
-            "x": 0.0,
-            "y": 0.0,
-            "z": 66.0
-        },
-        "rotation": {
-            "x": 0.0,
-            "y": 0.0,
-            "z": 0.0
-        },
-        "scale": {
-            "x": 1.0,
-            "y": 1.0,
-            "z": 1.0
-        },
-        "isStatic": true
-    },
-    {
-        "name": "Player_Spawn_Point",
-        "type": "SpawnPoint",
-        "modelDirectory": "Resources",
-        "modelFilename": "Player_Spawn_Point.obj",
-        "position": {
-            "x": 0.0,
-            "y": 0.0,
-            "z": 0.0
-        },
-        "rotation": {
-            "x": 0.0,
-            "y": 0.0,
+            "y": 3.8,
             "z": 0.0
         },
         "scale": {
@@ -1217,11 +2599,11 @@
         "name": "Goal_Extraction_Ring",
         "type": "GoalRing",
         "modelDirectory": "Resources",
-        "modelFilename": "ring.obj",
+        "modelFilename": "Goal_Extraction_Ring.obj",
         "position": {
             "x": 0.0,
             "y": 0.0,
-            "z": 62.0
+            "z": 62.5
         },
         "rotation": {
             "x": 0.0,
@@ -1232,6 +2614,930 @@
             "x": 1.0,
             "y": 1.0,
             "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "Extraction_Sandbag_Left1",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "duckov_sandbag_wall.obj",
+        "position": {
+            "x": -3.8,
+            "y": 0.0,
+            "z": 60.5
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "Extraction_Sandbag_Right1",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "duckov_sandbag_wall.obj",
+        "position": {
+            "x": 3.8,
+            "y": 0.0,
+            "z": 60.5
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "Extraction_Sandbag_LeftWing",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "duckov_sandbag_wall.obj",
+        "position": {
+            "x": -4.6,
+            "y": 0.0,
+            "z": 63.0
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 1.571,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "Extraction_Sandbag_RightWing",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "duckov_sandbag_wall.obj",
+        "position": {
+            "x": 4.6,
+            "y": 0.0,
+            "z": 63.0
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 1.571,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "Extraction_Sandbag_RearLeft",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "duckov_sandbag_wall.obj",
+        "position": {
+            "x": -2.8,
+            "y": 0.0,
+            "z": 65.5
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "Extraction_Sandbag_RearRight",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "duckov_sandbag_wall.obj",
+        "position": {
+            "x": 2.8,
+            "y": 0.0,
+            "z": 65.5
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "Extraction_Crates_Left",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "duckov_crate.obj",
+        "position": {
+            "x": -6.8,
+            "y": 0.0,
+            "z": 63.0
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "Extraction_Crates_Right",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "duckov_crate.obj",
+        "position": {
+            "x": 6.8,
+            "y": 0.0,
+            "z": 63.0
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "isStatic": true
+    },
+    {
+        "name": "PineTree_South_01",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "duckov_pine_tree.obj",
+        "position": {
+            "x": -10.5,
+            "y": 0.0,
+            "z": -11.5
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 0.45,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.2,
+            "y": 1.4,
+            "z": 1.2
+        },
+        "isStatic": true
+    },
+    {
+        "name": "PineTree_South_02",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "duckov_pine_tree.obj",
+        "position": {
+            "x": -7.2,
+            "y": 0.0,
+            "z": -12.8
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 1.8,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.05,
+            "y": 1.15,
+            "z": 1.05
+        },
+        "isStatic": true
+    },
+    {
+        "name": "PineTree_South_03",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "duckov_pine_tree.obj",
+        "position": {
+            "x": -3.8,
+            "y": 0.0,
+            "z": -11.2
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 0.9,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.3,
+            "y": 1.5,
+            "z": 1.3
+        },
+        "isStatic": true
+    },
+    {
+        "name": "PineTree_South_04",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "duckov_pine_tree.obj",
+        "position": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": -13.0
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 2.3,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.1,
+            "y": 1.3,
+            "z": 1.1
+        },
+        "isStatic": true
+    },
+    {
+        "name": "PineTree_South_05",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "duckov_pine_tree.obj",
+        "position": {
+            "x": 3.5,
+            "y": 0.0,
+            "z": -11.4
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 1.2,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.25,
+            "y": 1.45,
+            "z": 1.25
+        },
+        "isStatic": true
+    },
+    {
+        "name": "PineTree_South_06",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "duckov_pine_tree.obj",
+        "position": {
+            "x": 7.0,
+            "y": 0.0,
+            "z": -12.5
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 2.7,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.05,
+            "y": 1.2,
+            "z": 1.05
+        },
+        "isStatic": true
+    },
+    {
+        "name": "PineTree_South_07",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "duckov_pine_tree.obj",
+        "position": {
+            "x": 10.8,
+            "y": 0.0,
+            "z": -11.6
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 0.6,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.3,
+            "y": 1.5,
+            "z": 1.3
+        },
+        "isStatic": true
+    },
+    {
+        "name": "PineTree_South_08",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "duckov_pine_tree.obj",
+        "position": {
+            "x": -8.5,
+            "y": 0.0,
+            "z": -15.5
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 1.1,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.4,
+            "y": 1.6,
+            "z": 1.4
+        },
+        "isStatic": true
+    },
+    {
+        "name": "PineTree_South_09",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "duckov_pine_tree.obj",
+        "position": {
+            "x": -4.5,
+            "y": 0.0,
+            "z": -16.2
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 2.5,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.2,
+            "y": 1.35,
+            "z": 1.2
+        },
+        "isStatic": true
+    },
+    {
+        "name": "PineTree_South_10",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "duckov_pine_tree.obj",
+        "position": {
+            "x": 1.5,
+            "y": 0.0,
+            "z": -15.8
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 0.3,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.35,
+            "y": 1.55,
+            "z": 1.35
+        },
+        "isStatic": true
+    },
+    {
+        "name": "PineTree_South_11",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "duckov_pine_tree.obj",
+        "position": {
+            "x": 5.5,
+            "y": 0.0,
+            "z": -16.0
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 1.7,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.25,
+            "y": 1.4,
+            "z": 1.25
+        },
+        "isStatic": true
+    },
+    {
+        "name": "PineTree_South_12",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "duckov_pine_tree.obj",
+        "position": {
+            "x": 9.2,
+            "y": 0.0,
+            "z": -15.2
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 2.1,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.4,
+            "y": 1.65,
+            "z": 1.4
+        },
+        "isStatic": true
+    },
+    {
+        "name": "PineTree_West_01",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "duckov_pine_tree.obj",
+        "position": {
+            "x": -14.5,
+            "y": 0.0,
+            "z": -8.0
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 0.85,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.2,
+            "y": 1.35,
+            "z": 1.2
+        },
+        "isStatic": true
+    },
+    {
+        "name": "PineTree_West_02",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "duckov_pine_tree.obj",
+        "position": {
+            "x": -15.2,
+            "y": 0.0,
+            "z": -3.5
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 2.1,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.35,
+            "y": 1.5,
+            "z": 1.35
+        },
+        "isStatic": true
+    },
+    {
+        "name": "PineTree_West_03",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "duckov_pine_tree.obj",
+        "position": {
+            "x": -14.0,
+            "y": 0.0,
+            "z": 1.5
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 1.4,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.15,
+            "y": 1.25,
+            "z": 1.15
+        },
+        "isStatic": true
+    },
+    {
+        "name": "PineTree_West_04",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "duckov_pine_tree.obj",
+        "position": {
+            "x": -15.8,
+            "y": 0.0,
+            "z": 6.8
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 0.5,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.3,
+            "y": 1.45,
+            "z": 1.3
+        },
+        "isStatic": true
+    },
+    {
+        "name": "PineTree_West_05",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "duckov_pine_tree.obj",
+        "position": {
+            "x": -14.2,
+            "y": 0.0,
+            "z": 12.0
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 2.8,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.25,
+            "y": 1.4,
+            "z": 1.25
+        },
+        "isStatic": true
+    },
+    {
+        "name": "PineTree_West_06",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "duckov_pine_tree.obj",
+        "position": {
+            "x": -15.5,
+            "y": 0.0,
+            "z": 18.0
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 1.9,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.4,
+            "y": 1.6,
+            "z": 1.4
+        },
+        "isStatic": true
+    },
+    {
+        "name": "PineTree_West_07",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "duckov_pine_tree.obj",
+        "position": {
+            "x": -14.0,
+            "y": 0.0,
+            "z": 24.0
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 0.35,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.2,
+            "y": 1.3,
+            "z": 1.2
+        },
+        "isStatic": true
+    },
+    {
+        "name": "PineTree_East_01",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "duckov_pine_tree.obj",
+        "position": {
+            "x": 14.5,
+            "y": 0.0,
+            "z": -8.0
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 1.5,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.25,
+            "y": 1.4,
+            "z": 1.25
+        },
+        "isStatic": true
+    },
+    {
+        "name": "PineTree_East_02",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "duckov_pine_tree.obj",
+        "position": {
+            "x": 15.5,
+            "y": 0.0,
+            "z": -3.0
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 0.7,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.3,
+            "y": 1.5,
+            "z": 1.3
+        },
+        "isStatic": true
+    },
+    {
+        "name": "PineTree_East_03",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "duckov_pine_tree.obj",
+        "position": {
+            "x": 14.2,
+            "y": 0.0,
+            "z": 2.0
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 2.4,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.1,
+            "y": 1.2,
+            "z": 1.1
+        },
+        "isStatic": true
+    },
+    {
+        "name": "PineTree_East_04",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "duckov_pine_tree.obj",
+        "position": {
+            "x": 15.6,
+            "y": 0.0,
+            "z": 7.5
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 1.1,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.35,
+            "y": 1.55,
+            "z": 1.35
+        },
+        "isStatic": true
+    },
+    {
+        "name": "PineTree_East_05",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "duckov_pine_tree.obj",
+        "position": {
+            "x": 14.0,
+            "y": 0.0,
+            "z": 13.0
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 2.9,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.2,
+            "y": 1.35,
+            "z": 1.2
+        },
+        "isStatic": true
+    },
+    {
+        "name": "PineTree_East_06",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "duckov_pine_tree.obj",
+        "position": {
+            "x": 15.8,
+            "y": 0.0,
+            "z": 19.0
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 0.4,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.4,
+            "y": 1.65,
+            "z": 1.4
+        },
+        "isStatic": true
+    },
+    {
+        "name": "PineTree_East_07",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "duckov_pine_tree.obj",
+        "position": {
+            "x": 14.5,
+            "y": 0.0,
+            "z": 25.0
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 1.8,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.25,
+            "y": 1.4,
+            "z": 1.25
+        },
+        "isStatic": true
+    },
+    {
+        "name": "PineTree_LZ_SW",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "duckov_pine_tree.obj",
+        "position": {
+            "x": -10.2,
+            "y": 0.0,
+            "z": -6.5
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 1.3,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.1,
+            "y": 1.25,
+            "z": 1.1
+        },
+        "isStatic": true
+    },
+    {
+        "name": "PineTree_LZ_SE",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "duckov_pine_tree.obj",
+        "position": {
+            "x": 10.2,
+            "y": 0.0,
+            "z": -6.5
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 2.0,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.1,
+            "y": 1.25,
+            "z": 1.1
+        },
+        "isStatic": true
+    },
+    {
+        "name": "PineTree_LZ_W",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "duckov_pine_tree.obj",
+        "position": {
+            "x": -10.8,
+            "y": 0.0,
+            "z": 0.5
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 0.9,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.05,
+            "y": 1.2,
+            "z": 1.05
+        },
+        "isStatic": true
+    },
+    {
+        "name": "PineTree_LZ_E",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "duckov_pine_tree.obj",
+        "position": {
+            "x": 10.8,
+            "y": 0.0,
+            "z": 0.5
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 2.6,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.05,
+            "y": 1.2,
+            "z": 1.05
+        },
+        "isStatic": true
+    },
+    {
+        "name": "PineTree_River_W",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "duckov_pine_tree.obj",
+        "position": {
+            "x": -10.0,
+            "y": 0.0,
+            "z": 27.5
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 0.8,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.25,
+            "y": 1.45,
+            "z": 1.25
+        },
+        "isStatic": true
+    },
+    {
+        "name": "PineTree_River_E",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "duckov_pine_tree.obj",
+        "position": {
+            "x": 10.0,
+            "y": 0.0,
+            "z": 27.5
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 2.2,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.25,
+            "y": 1.45,
+            "z": 1.25
+        },
+        "isStatic": true
+    },
+    {
+        "name": "PineTree_Exit_W",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "duckov_pine_tree.obj",
+        "position": {
+            "x": -8.5,
+            "y": 0.0,
+            "z": 68.0
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 1.15,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.3,
+            "y": 1.5,
+            "z": 1.3
+        },
+        "isStatic": true
+    },
+    {
+        "name": "PineTree_Exit_E",
+        "type": "Obstacle",
+        "modelDirectory": "Resources",
+        "modelFilename": "duckov_pine_tree.obj",
+        "position": {
+            "x": 8.5,
+            "y": 0.0,
+            "z": 68.0
+        },
+        "rotation": {
+            "x": 0.0,
+            "y": 2.45,
+            "z": 0.0
+        },
+        "scale": {
+            "x": 1.3,
+            "y": 1.5,
+            "z": 1.3
         },
         "isStatic": true
     }
