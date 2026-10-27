@@ -1685,13 +1685,8 @@ void TitleScene::Update()
 		const float kDuckCryDuration = 3.15f;
 		if (startTransitionTimer_ >= kDuckCryDuration && (!StingerTransition::GetInstance() || !StingerTransition::GetInstance()->IsTransitioning()))
 		{
-#if !APP_DEBUG_UI || defined(NDEBUG)
-			// リリースモード：タイトルをループ再生（タイトル → トランジション → タイトル）
-			SceneTransition::Change("TITLE", 1.80f, TransitionTheme::TitleTactical);
-#else
-			// デバッグモード：ゲーム本編へ出撃
+			// ゲーム本編へ出撃（ヘリ降下・ステージ演出開始）
 			SceneTransition::Change("GAMEPLAY", 1.80f, TransitionTheme::TitleTactical);
-#endif
 		}
 	}
 

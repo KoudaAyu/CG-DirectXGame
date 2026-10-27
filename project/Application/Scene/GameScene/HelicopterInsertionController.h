@@ -95,6 +95,7 @@ private:
 	bool footstepDust2_ = false;
 	bool cockSparkEmitted_ = false;
 	bool duckVoiced_ = false;
+	bool wasSkipped_ = false;
 
 	// テクスチャインデックス
 	uint32_t heliTexIndex_ = UINT32_MAX;

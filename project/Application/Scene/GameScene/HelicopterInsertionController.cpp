@@ -7,6 +7,7 @@
 #include "ParticleManager.h"
 #include "TextureManager.h"
 #include "Baziru3_Engine/Framework/Audio/AudioManager.h"
+#include "Application/Transition/StingerTransition.h"
 #include "../../Player/Player.h"
 #include <cmath>
 #include <algorithm>
@@ -93,6 +94,7 @@ void HelicopterInsertionController::Initialize()
 {
 	if (!scene_ || !scene_->object3dCom) return;
 
+	wasSkipped_ = false;
 	heliTexIndex_ = TextureManager::GetInstance()->Load("Resources/helicopter_texture.png");
 	whiteTexIndex_ = TextureManager::GetInstance()->Load("Resources/white.png");
 	spotTexIndex_ = TextureManager::GetInstance()->Load("Resources/circle2.png");
@@ -237,6 +239,7 @@ void HelicopterInsertionController::Finalize()
 
 void HelicopterInsertionController::Skip()
 {
+	wasSkipped_ = true;
 	FinishInsertion();
 }
 
@@ -298,6 +301,20 @@ void HelicopterInsertionController::FinishInsertion()
 		heliShadow_->SetTranslate(Vector3{ 0.0f, -200.0f, 0.0f });
 		heliShadow_->Update();
 	}
+
+#if !APP_DEBUG_UI || defined(NDEBUG)
+	// 【リリースモード展示デモ仕様】
+	// スキップ操作が行われず、ステージ演出（ヘリ降下〜離脱）を最後まで観終わった場合、
+	// 自動的にタクティカルトランジション（StingerTransition）を起動してタイトル画面へ帰還する。
+	// ※途中でスキップ操作（SPACE / ENTER / クリック）をした場合はそのまま通常ゲームプレイを開始。
+	if (!wasSkipped_)
+	{
+		if (!StingerTransition::GetInstance() || !StingerTransition::GetInstance()->IsTransitioning())
+		{
+			SceneTransition::Change("TITLE", 1.80f, TransitionTheme::TitleTactical);
+		}
+	}
+#endif
 }
 
 void HelicopterInsertionController::Update(float deltaTime)
