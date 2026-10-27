@@ -37,6 +37,7 @@
 
 #include "Application/Config/GameConfig.h"
 #include "HelicopterInsertionController.h"
+#include "GameOverSequenceController.h"
 
 class Camera;
 class SpriteCom;
@@ -46,6 +47,7 @@ class CollisionSystem;
 class EnvironmentSystem;
 class CharacterEffectController;
 class HelicopterInsertionController;
+class GameOverSequenceController;
 struct SceneRenderRequests;
 
 /// <summary>
@@ -60,6 +62,7 @@ class GamePlayScene : public BaseScene
     friend class EnvironmentSystem;
     friend class CharacterEffectController;
     friend class HelicopterInsertionController;
+    friend class GameOverSequenceController;
 
 public:
     // =========================================================================
@@ -114,6 +117,7 @@ public:
     std::vector<std::unique_ptr<Target>>& GetTargets() { return targets_; }
     const std::vector<std::unique_ptr<TutorialSign>>& GetTutorialSigns() const { return tutorialSigns_; }
     LootSystem* GetLootSystem() const { return lootSystem_.get(); }
+    GameOverSequenceController* GetDeathSequenceController() const { return deathSequenceController_.get(); }
 
     /// <summary>
     /// カメラシェイク（揺れ）エフェクトの誘発（エンジン層 Camera::Shake に委譲）
@@ -205,6 +209,7 @@ private:
     std::unique_ptr<EnvironmentSystem> environmentSystem_;
     std::unique_ptr<CharacterEffectController> characterEffectController_;
     std::unique_ptr<HelicopterInsertionController> helicopterIntro_;
+    std::unique_ptr<GameOverSequenceController> deathSequenceController_;
     std::unique_ptr<GamePlayHUD> hud_;
     std::unique_ptr<LevelEditor> levelEditor_;
 
@@ -270,6 +275,7 @@ private:
     bool isPlayerInExtractionZone_ = false;
     bool isDeathSequenceActive_ = false;
     float deathSequenceTimer_ = 0.0f;
+    float autoDeathTimer_ = 0.0f; // 出動後3秒で自動死亡テスト用タイマー
     float sceneEntranceFadeTimer_ = 0.8f; // シーン入場時のフェードインタイマー
     std::chrono::steady_clock::time_point lastTime_;
 

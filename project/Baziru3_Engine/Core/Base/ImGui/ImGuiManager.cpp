@@ -1,4 +1,4 @@
-﻿#include"ImGuiManager.h"
+#include"ImGuiManager.h"
 #include"WindowsAPI.h"
 #include"DirectXCom.h"
 #include"SRVManager.h"
@@ -199,21 +199,26 @@ void ImGuiManager::CreateContext()
     // 日本語フォントの設定（メイリオ、MSゴシック、游ゴシック）
     io.Fonts->Clear(); // 既存のデフォルトASCIIフォントをクリア
 
+    // 硬派で引き締まった角形ミリタリー日本語フォント（BIZ UDゴシック Bold、游ゴシック Bold等）を優先
     const char* fontCandidates[] = {
-        "C:\\Windows\\Fonts\\meiryo.ttc",   // メイリオ（標準推奨）
-        "C:\\Windows\\Fonts\\msgothic.ttc", // MSゴシック
-        "C:\\Windows\\Fonts\\YuGothM.ttc"  // 游ゴシック Medium
+        "C:\\Windows\\Fonts\\BIZ-UDGothicB.ttc", // BIZ UDゴシック Bold（デジタル画面用に極限まで最適化された極めてシャープなゴシック）
+        "C:\\Windows\\Fonts\\YuGothB.ttc",       // 游ゴシック Bold（鋭利で角ばった硬派な日本語フォント）
+        "C:\\Windows\\Fonts\\YuGothM.ttc",       // 游ゴシック Medium
+        "C:\\Windows\\Fonts\\msgothic.ttc",      // MSゴシック
+        "C:\\Windows\\Fonts\\meiryob.ttc",       // メイリオ太字（フォールバック）
+        "C:\\Windows\\Fonts\\meiryo.ttc"
     };
 
+    const char* selectedJapanesePath = nullptr;
     ImFont* japaneseFont = nullptr;
     for (const char* fontPath : fontCandidates)
     {
         if (GetFileAttributesA(fontPath) != INVALID_FILE_ATTRIBUTES)
         {
-            // 日本語グリフ（JIS第1〜第2水準漢字、ひらがな、カタカナ、全角英数記号）を読み込み
-            japaneseFont = io.Fonts->AddFontFromFileTTF(fontPath, 18.0f, nullptr, io.Fonts->GetGlyphRangesJapanese());
+            japaneseFont = io.Fonts->AddFontFromFileTTF(fontPath, 16.0f, nullptr, io.Fonts->GetGlyphRangesJapanese());
             if (japaneseFont)
             {
+                selectedJapanesePath = fontPath;
                 break;
             }
         }
@@ -221,7 +226,27 @@ void ImGuiManager::CreateContext()
 
     if (japaneseFont)
     {
-        io.FontDefault = japaneseFont;
+        io.FontDefault = japaneseFont; // Fonts[0]: 一般標準 (16px)
+
+        // タイトル・大型ヘッダー用（角ばった硬派な日本語フォント 48px / 20px）
+        if (selectedJapanesePath)
+        {
+            io.Fonts->AddFontFromFileTTF(selectedJapanesePath, 56.0f, nullptr, io.Fonts->GetGlyphRangesJapanese()); // Fonts[1]: タイトル日本語大 (56px)
+            io.Fonts->AddFontFromFileTTF(selectedJapanesePath, 20.0f, nullptr, io.Fonts->GetGlyphRangesJapanese()); // Fonts[2]: サブタイトル日本語中 (20px)
+        }
+
+        // 軍用英数・タクティカルDINフォント（Bahnschrift: DIN 1451規格の無骨な軍用工業フォント）
+        const char* militaryPath = "C:\\Windows\\Fonts\\bahnschrift.ttf";
+        if (GetFileAttributesA(militaryPath) == INVALID_FILE_ATTRIBUTES)
+        {
+            militaryPath = "C:\\Windows\\Fonts\\arialbd.ttf";
+        }
+        if (GetFileAttributesA(militaryPath) != INVALID_FILE_ATTRIBUTES)
+        {
+            io.Fonts->AddFontFromFileTTF(militaryPath, 28.0f, nullptr, io.Fonts->GetGlyphRangesDefault()); // Fonts[3]: ミリタリー英数大 (28px)
+            io.Fonts->AddFontFromFileTTF(militaryPath, 13.0f, nullptr, io.Fonts->GetGlyphRangesDefault()); // Fonts[4]: ミリタリー英数小 (13px)
+            io.Fonts->AddFontFromFileTTF(militaryPath, 16.0f, nullptr, io.Fonts->GetGlyphRangesDefault()); // Fonts[5]: ミリタリー英数中 (16px)
+        }
     }
     else
     {

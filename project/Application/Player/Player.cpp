@@ -15,6 +15,69 @@
 // 初期化 & 解放 (Lifecycle)
 // =============================================================================
 
+// =============================================================================
+// 軍用アサルトライフル 3Dプロシージャルメッシュ生成 (BuildRifleModel)
+// =============================================================================
+
+void Player::BuildRifleModel(Object3d::ModelData& data)
+{
+    data.vertices.clear();
+    data.indices.clear();
+
+    auto AddBox = [&](const Vector3& minP, const Vector3& maxP)
+    {
+        uint32_t baseIdx = static_cast<uint32_t>(data.vertices.size());
+        Vector3 corners[8] = {
+            { minP.x, minP.y, minP.z }, { maxP.x, minP.y, minP.z },
+            { maxP.x, maxP.y, minP.z }, { minP.x, maxP.y, minP.z },
+            { minP.x, minP.y, maxP.z }, { maxP.x, minP.y, maxP.z },
+            { maxP.x, maxP.y, maxP.z }, { minP.x, maxP.y, maxP.z },
+        };
+        Vector3 normals[6] = {
+            { 0, 0, -1 }, { 0, 0, 1 }, { -1, 0, 0 }, { 1, 0, 0 }, { 0, -1, 0 }, { 0, 1, 0 }
+        };
+        int faces[6][4] = {
+            { 0, 3, 2, 1 }, { 4, 5, 6, 7 }, { 0, 4, 7, 3 },
+            { 1, 2, 6, 5 }, { 0, 1, 5, 4 }, { 3, 7, 6, 2 }
+        };
+        for (int f = 0; f < 6; ++f)
+        {
+            uint32_t faceStart = static_cast<uint32_t>(data.vertices.size());
+            for (int v = 0; v < 4; ++v)
+            {
+                Sprite::VertexData vert{};
+                vert.position = { corners[faces[f][v]].x, corners[faces[f][v]].y, corners[faces[f][v]].z, 1.0f };
+                vert.texcoord = { (v == 1 || v == 2) ? 1.0f : 0.0f, (v >= 2) ? 1.0f : 0.0f };
+                vert.normal = normals[f];
+                data.vertices.push_back(vert);
+            }
+            data.indices.push_back(faceStart + 0);
+            data.indices.push_back(faceStart + 1);
+            data.indices.push_back(faceStart + 2);
+            data.indices.push_back(faceStart + 0);
+            data.indices.push_back(faceStart + 2);
+            data.indices.push_back(faceStart + 3);
+        }
+    };
+
+    // 1. レシーバー（機関部）
+    AddBox({ -0.04f, -0.04f, -0.20f }, { 0.04f, 0.06f, 0.20f });
+    // 2. バレル（細長い銃身）
+    AddBox({ -0.02f, 0.01f, 0.20f }, { 0.02f, 0.04f, 0.65f });
+    // 3. マガジン（湾曲30連マガジン）
+    AddBox({ -0.025f, -0.22f, 0.02f }, { 0.025f, -0.04f, 0.12f });
+    // 4. ストック（銃床）
+    AddBox({ -0.035f, -0.08f, -0.48f }, { 0.035f, 0.04f, -0.20f });
+    // 5. ハンドガード（被筒）
+    AddBox({ -0.03f, -0.03f, 0.20f }, { 0.03f, 0.05f, 0.42f });
+    // 6. 光学タクティカルスコープ（機関部レール上）
+    AddBox({ -0.02f, 0.07f, -0.10f }, { 0.02f, 0.12f, 0.12f });
+    // 7. マズルブレーキ / 消炎器
+    AddBox({ -0.025f, 0.005f, 0.65f }, { 0.025f, 0.045f, 0.72f });
+
+    data.boundingRadius = 0.9f;
+}
+
 void Player::Initialize(Object3dCom* object3dCom, Camera* camera)
 {
     object3dCom_ = object3dCom;
@@ -54,6 +117,21 @@ void Player::Initialize(Object3dCom* object3dCom, Camera* camera)
 
     defaultTextureIndex_ = TextureManager::GetInstance()->Load("Resources/duck.png");
 
+    // ステージ開始時から携行する軍用アサルトライフル3Dモデルの初期化
+    Object3d::ModelData rifleModel{};
+    BuildRifleModel(rifleModel);
+    rifleTextureIndex_ = TextureManager::GetInstance()->Load("Resources/container_military.png");
+    rifleModel.material.textureFilePath = "Resources/container_military.png";
+    rifleModel.material.textureIndex = (rifleTextureIndex_ != TextureManager::kInvalidTextureIndex) ? rifleTextureIndex_ : 0;
+
+    rifleObject_ = std::make_unique<Object3d>();
+    rifleObject_->Initialize(object3dCom_, rifleModel);
+    rifleObject_->SetCamera(camera_);
+    rifleObject_->SetScale({ 1.0f, 1.0f, 1.0f });
+    rifleObject_->SetColor({ 0.20f, 0.20f, 0.22f, 1.0f }); // 軍用ガンメタルブラック
+    rifleObject_->SetEnableLighting(true);
+    rifleObject_->SetAllowWireframeOverlay(false);
+
     // 全ステータスをデフォルト定数でリセット
     Reset();
 }
@@ -70,6 +148,10 @@ void Player::Finalize()
     {
         object3d_.reset();
     }
+    if (rifleObject_)
+    {
+        rifleObject_.reset();
+    }
 }
 
 void Player::Reset()
@@ -79,6 +161,8 @@ void Player::Reset()
     isDead_ = false;
     invincibilityTimer_ = 0.0f;
     hitFlashTimer_ = 0.0f;
+    lastAttackerPosition_ = { 0.0f, 0.0f, 0.0f };
+    hasAttackerPosition_ = false;
 
     // 弾薬とリロードの初期化
     magazineAmmo_ = maxMagazineAmmo_ = kDefaultMaxMagazineAmmo;
@@ -112,6 +196,13 @@ void Player::Reset()
         object3d_->SetTranslate(position_);
         object3d_->SetRotate({ 0.0f, 0.0f, 0.0f });
         object3d_->SetColor({ 1.0f, 1.0f, 1.0f, 1.0f });
+    }
+
+    rifleRecoil_ = 0.0f;
+    if (rifleObject_)
+    {
+        rifleObject_->SetScale({ 1.0f, 1.0f, 1.0f });
+        rifleObject_->SetColor({ 0.20f, 0.20f, 0.22f, 1.0f });
     }
 }
 
@@ -459,6 +550,45 @@ void Player::Update(float deltaTime, MouseInput* mouseInput)
         object3d_->SetTranslate(position_);
     }
     object3d_->Update();
+
+    // --- 装備ライフルのトランスフォーム更新（アヒルの右翼/腰元にホールド） ---
+    if (rifleObject_)
+    {
+        if (rifleRecoil_ > 0.0f)
+        {
+            rifleRecoil_ -= deltaTime * 3.5f;
+            if (rifleRecoil_ < 0.0f) rifleRecoil_ = 0.0f;
+        }
+
+        Vector3 duckPos = isDodging_ ? drawPos_ : position_;
+        Vector3 duckRot = object3d_->GetRotate();
+        float yaw = duckRot.y;
+
+        // アヒルの向きに応じた前方・右方ベクトル
+        Vector3 fwd = { std::sin(yaw), 0.0f, std::cos(yaw) };
+        Vector3 right = { std::cos(yaw), 0.0f, -std::sin(yaw) };
+
+        // ライフルの右翼側ホールドオフセット: 右+0.42m, 高さ0.68m, 前方+0.25m - 反動
+        float fwdOffset = 0.25f - rifleRecoil_ * 0.08f;
+        riflePosition_ = duckPos + right * 0.42f + Vector3{ 0.0f, 0.68f, 0.0f } + fwd * fwdOffset;
+
+        // リロード中は銃口を少し上に向けてマガジン装填姿勢
+        float pitchOffset = 0.0f;
+        if (isReloading_)
+        {
+            pitchOffset = -0.35f; // 銃口を約20度上に傾ける
+            riflePosition_.y += 0.04f;
+        }
+
+        // 回避中（ローリング中）はアヒルのロール角と完全同期
+        rifleRotation_ = duckRot;
+        rifleRotation_.x += pitchOffset;
+
+        rifleObject_->SetTranslate(riflePosition_);
+        rifleObject_->SetRotate(rifleRotation_);
+        rifleObject_->SetScale(object3d_->GetScale());
+        rifleObject_->Update();
+    }
 }
 
 void Player::PostCollisionUpdate()
@@ -479,6 +609,19 @@ void Player::PostCollisionUpdate()
             object3d_->SetTranslate(position_);
         }
         object3d_->Update();
+
+        if (rifleObject_)
+        {
+            Vector3 duckPos = isDodging_ ? drawPos_ : position_;
+            Vector3 duckRot = object3d_->GetRotate();
+            float yaw = duckRot.y;
+            Vector3 fwd = { std::sin(yaw), 0.0f, std::cos(yaw) };
+            Vector3 right = { std::cos(yaw), 0.0f, -std::sin(yaw) };
+            float fwdOffset = 0.25f - rifleRecoil_ * 0.08f;
+            riflePosition_ = duckPos + right * 0.42f + Vector3{ 0.0f, 0.68f, 0.0f } + fwd * fwdOffset;
+            rifleObject_->SetTranslate(riflePosition_);
+            rifleObject_->Update();
+        }
     }
 }
 
@@ -491,6 +634,18 @@ void Player::SetIntroTransform(const Vector3& offset, const Vector3& scale, cons
         object3d_->SetScale(scale);
         object3d_->SetRotate(rotate);
         object3d_->Update();
+
+        if (rifleObject_)
+        {
+            float yaw = rotate.y;
+            Vector3 fwd = { std::sin(yaw), 0.0f, std::cos(yaw) };
+            Vector3 right = { std::cos(yaw), 0.0f, -std::sin(yaw) };
+            riflePosition_ = p + right * (0.42f * scale.x) + Vector3{ 0.0f, 0.68f * scale.y, 0.0f } + fwd * (0.25f * scale.z);
+            rifleObject_->SetTranslate(riflePosition_);
+            rifleObject_->SetRotate(rotate);
+            rifleObject_->SetScale(scale);
+            rifleObject_->Update();
+        }
     }
 }
 
@@ -503,6 +658,18 @@ void Player::RestoreIntroPose()
         object3d_->SetRotate({ 0.0f, 0.0f, 0.0f });
         object3d_->Update();
         prevSpacePressed_ = true; // イントロ終了・スキップ直後のSPACEキー暴発を確実に抑止
+
+        if (rifleObject_)
+        {
+            float yaw = 0.0f;
+            Vector3 fwd = { std::sin(yaw), 0.0f, std::cos(yaw) };
+            Vector3 right = { std::cos(yaw), 0.0f, -std::sin(yaw) };
+            riflePosition_ = position_ + right * 0.42f + Vector3{ 0.0f, 0.68f, 0.0f } + fwd * 0.25f;
+            rifleObject_->SetTranslate(riflePosition_);
+            rifleObject_->SetRotate({ 0.0f, 0.0f, 0.0f });
+            rifleObject_->SetScale({ 1.0f, 1.0f, 1.0f });
+            rifleObject_->Update();
+        }
     }
 }
 
@@ -555,6 +722,7 @@ std::vector<std::unique_ptr<Bullet>> Player::TryShoot(const MouseInput* mouseInp
         // 弾薬消費 & レイド統計への記録
         magazineAmmo_--;
         shotCooldownTimer_ = shotCooldown_;
+        rifleRecoil_ = 1.0f;
         RaidStats::GetInstance().shotsFired++;
 
         // 射撃反動による照準拡散ペナルティの加算
@@ -579,15 +747,22 @@ bool Player::StartHealing()
     return true;
 }
 
-void Player::TakeDamage(float damage, const std::string& attackerName, const std::string& cause)
+void Player::TakeDamage(float damage, const std::string& attackerName, const std::string& cause, const Vector3* attackerPos)
 {
     if (isDead_ || invincibilityTimer_ > 0.0f || isDodging_) return;
 
     hp_ -= damage;
+    if (attackerPos)
+    {
+        lastAttackerPosition_ = *attackerPos;
+        hasAttackerPosition_ = true;
+    }
     if (hp_ <= 0.0f)
     {
         hp_ = 0.0f;
         isDead_ = true;
+        hitFlashTimer_ = 0.0f;
+        invincibilityTimer_ = 0.0f;
         lastAttackerName_ = attackerName;
         causeOfDeath_ = cause;
         RaidStats::GetInstance().causeOfDeath = cause;
@@ -678,6 +853,22 @@ void Player::Draw(const RenderContext& ctx)
     object3d_->Update();
 
     object3dCom_->Draw(object3d_.get(), playerCtx, modelData, true);
+
+    // ライフルの描画（ステージ開始時から携行、死亡演出中は手から吹き飛ぶため非表示）
+    if (!isDead_ && rifleObject_)
+    {
+        RenderContext rifleCtx = ctx;
+        if (rifleTextureIndex_ != TextureManager::kInvalidTextureIndex)
+        {
+            rifleCtx.textureHandle = TextureManager::GetInstance()->GetSrvHandleGPU(rifleTextureIndex_);
+        }
+        if (ctx.camera)
+        {
+            rifleObject_->SetCamera(ctx.camera);
+        }
+        rifleObject_->Update();
+        object3dCom_->Draw(rifleObject_.get(), rifleCtx, rifleObject_->GetModelData(), true);
+    }
 
     // 描画後は論理座標・回転を元に戻して座標ドリフトを防ぐ
     if (hitFlashTimer_ > 0.0f)

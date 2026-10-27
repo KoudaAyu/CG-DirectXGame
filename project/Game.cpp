@@ -17,6 +17,7 @@
 
 #include "Application/Config/AppDebugConfig.h"
 #include "Application/Transition/StingerTransition.h"
+#include "Application/Transition/DeathTransition.h"
 
 #ifdef USE_IMGUI
 #include <imgui.h>
@@ -122,7 +123,14 @@ void Game::Initialize() {
                                                  engine_->GetWindowAPI());
     StingerTransition::GetInstance()->SetOffScreenRendering(
         engine_->GetOffScreenRendering());
-    // エンジンのデフォルト黒フェードを無効化（即時切り替えにして、演出はアプリケーション層Stingerで完全制御）
+
+    // 死亡時専用の軍用メディバック・ヘビーシャッタートランジション初期化
+    DeathTransition::GetInstance()->Initialize(engine_->GetSpriteCom(),
+                                               engine_->GetWindowAPI());
+    DeathTransition::GetInstance()->SetOffScreenRendering(
+        engine_->GetOffScreenRendering());
+
+    // エンジンのデフォルト黒フェードを無効化（即時切り替えにして、演出はアプリケーション層トランジションで完全制御）
     SceneManager::GetInstance()->SetFadeApplication(nullptr);
   }
 
@@ -172,6 +180,7 @@ void Game::Finalize() {
 
   // 3.5. トランジション破棄
   StingerTransition::GetInstance()->Finalize();
+  DeathTransition::GetInstance()->Finalize();
 
   // 4. エンジンの一括破棄（SceneManager、サブシステム、DirectX12の逆順安全解放）
   // 【カプセル化】エンジン内部で依存関係を解決して安全にシャットダウン
@@ -201,6 +210,8 @@ void Game::Update() {
 
   // 2.5. アプリケーション層トランジション更新
   StingerTransition::GetInstance()->Update(kDeltaTime);
+  DeathTransition::GetInstance()->Update(kDeltaTime);
+  DeathTransition::GetInstance()->DrawUI();
 
   // 3. デバッグカメラ・サンプルオブジェクトの更新
   debugCamera_.Update();
@@ -261,7 +272,7 @@ void Game::Draw() {
   // （タイトルロゴ文字への輪郭線浸食やトランジション帯の輪郭線浮きを完全防止）
   if (engine_->GetOffScreenRendering()) {
     bool isTitle = (SceneManager::GetInstance() && SceneManager::GetInstance()->GetCurrentSceneName() == "TITLE");
-    if (StingerTransition::GetInstance()->IsTransitioning() || isTitle) {
+    if (StingerTransition::GetInstance()->IsTransitioning() || DeathTransition::GetInstance()->IsTransitioning() || isTitle) {
       if (engine_->GetOffScreenRendering()->GetPostEffect() != OffScreenRendering::PostEffect::Normal) {
         engine_->GetOffScreenRendering()->SetPostEffect(OffScreenRendering::PostEffect::Normal);
       }
@@ -406,8 +417,9 @@ void Game::DrawSprites(const RenderContext &ctx) {
     }
   }
 
-  // アプリケーション層トランジション描画（最前面に猫麦とろろ風スティンガーを重ねる）
+  // アプリケーション層トランジション描画（最前面にトランジションを重ねる）
   StingerTransition::GetInstance()->Draw(ctx);
+  DeathTransition::GetInstance()->Draw(ctx);
 }
 
 void Game::DrawParticles(const RenderContext &ctx) {

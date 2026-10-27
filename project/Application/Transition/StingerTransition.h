@@ -117,10 +117,17 @@ private:
     float stripeAngle_ = -0.42f;     // 斜めストライプの傾き角度（約 -24度）
 };
 
+#include "DeathTransition.h"
+
 /// @brief アプリケーション全体から呼び出せる簡易シーン遷移ヘルパー
 namespace SceneTransition {
     inline void Change(const std::string& sceneName, float duration = 1.80f,
                        TransitionTheme theme = TransitionTheme::TitleTactical) {
         StingerTransition::GetInstance()->StartTransition(sceneName, duration, theme);
+    }
+
+    /// @brief 死亡時専用の軍用メディバック・ヘビーシャッタートランジションによるGameOverScene遷移
+    inline void ChangeToGameOver(float duration = 1.70f) {
+        DeathTransition::GetInstance()->StartTransition("GAMEOVER", duration);
     }
 }

@@ -87,19 +87,28 @@ public:
     void SetPosition(const Vector3& pos) { position_ = pos; if (object3d_) object3d_->SetTranslate(pos); }
     SphereCollider* GetCollider() const { return collider_.get(); }
     Object3d* GetObject3d() const { return object3d_.get(); }
+    void SetTextureIndex(uint32_t texIdx) { defaultTextureIndex_ = texIdx; }
+    uint32_t GetTextureIndex() const { return defaultTextureIndex_; }
 
     // --- ゲーム開始演出制御 ---
     void SetIntroTransform(const Vector3& offset, const Vector3& scale, const Vector3& rotate);
     void RestoreIntroPose();
 
+    // --- 装備武器 (3Dライフル) ---
+    static void BuildRifleModel(Object3d::ModelData& data);
+    Object3d* GetRifleObject3d() const { return rifleObject_.get(); }
+    Vector3 GetRiflePosition() const { return riflePosition_; }
+
     // --- 体力 & ダメージ関連 ---
-    void TakeDamage(float damage, const std::string& attackerName = "HOSTILE PATROL", const std::string& cause = "7.62x39mm PS CARTRIDGE (CHEST PENETRATION)");
+    void TakeDamage(float damage, const std::string& attackerName = "HOSTILE PATROL", const std::string& cause = "7.62x39mm PS CARTRIDGE (CHEST PENETRATION)", const Vector3* attackerPos = nullptr);
     float GetHP() const { return hp_; }
     float GetMaxHP() const { return maxHp_; }
     float GetHPRatio() const { return maxHp_ > 0.0f ? hp_ / maxHp_ : 0.0f; }
     bool IsDead() const { return isDead_; }
     const std::string& GetCauseOfDeath() const { return causeOfDeath_; }
     const std::string& GetLastAttackerName() const { return lastAttackerName_; }
+    const Vector3& GetLastAttackerPosition() const { return lastAttackerPosition_; }
+    bool HasAttackerPosition() const { return hasAttackerPosition_; }
     void Reset();
 
     // --- 弾薬 & リロード関連 ---
@@ -160,13 +169,22 @@ private:
     float hitFlashTimer_ = 0.0f;
     const float hitFlashDuration_ = kHitFlashDuration;
     Vector3 hitFlinchOffset_ = { 0.0f, 0.0f, 0.0f };
+    Vector3 lastAttackerPosition_ = { 0.0f, 0.0f, 0.0f };
+    bool hasAttackerPosition_ = false;
 
     // --- 射撃パラメータ ---
-    Vector3 bulletSpawnOffset_ = { 0.0f, 0.70f, 0.95f };
+    Vector3 bulletSpawnOffset_ = { 0.42f, 0.68f, 0.97f };
     float bulletSpeed_ = kBulletSpeed;
     float bulletLifeTime_ = kBulletLifeTime;
     float shotCooldown_ = kShotCooldown;
     float shotCooldownTimer_ = 0.0f;
+
+    // --- 装備ライフル (3D武器) ---
+    std::unique_ptr<Object3d> rifleObject_;
+    Vector3 riflePosition_ = { 0.0f, 0.0f, 0.0f };
+    Vector3 rifleRotation_ = { 0.0f, 0.0f, 0.0f };
+    float rifleRecoil_ = 0.0f;
+    uint32_t rifleTextureIndex_ = UINT32_MAX;
 
     // --- 弾薬 & リロード ---
     int maxMagazineAmmo_ = kDefaultMaxMagazineAmmo;

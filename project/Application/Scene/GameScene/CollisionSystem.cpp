@@ -503,8 +503,29 @@ void CollisionSystem::ResolveBulletCollisions()
 						}
 					}
 
+					// 弾丸の飛来方向からキラー（射撃を行った敵）の位置を推定・特定
+					Vector3 bDir = bullet->GetDirection();
+					Vector3 attackerPos = playerPos - bDir * 16.0f;
+					float bestDot = 0.5f;
+					for (const auto& e : scene_->GetEnemies())
+					{
+						if (!e || e->IsDead()) continue;
+						Vector3 toE = e->GetPosition() - playerPos;
+						float dist = std::sqrt(toE.x * toE.x + toE.z * toE.z);
+						if (dist > 0.1f)
+						{
+							Vector3 dirNorm = { toE.x / dist, 0.0f, toE.z / dist };
+							float dot = -bDir.x * dirNorm.x + -bDir.z * dirNorm.z;
+							if (dot > bestDot)
+							{
+								bestDot = dot;
+								attackerPos = e->GetPosition();
+							}
+						}
+					}
+
 					float prevHp = scene_->player_->GetHP();
-					scene_->player_->TakeDamage(20.0f, "HOSTILE SENTRY (AK-74M)", "5.45x39mm PS CARTRIDGE (CHEST PENETRATION)");
+					scene_->player_->TakeDamage(20.0f, "HOSTILE SENTRY (AK-74M)", "5.45x39mm PS CARTRIDGE (CHEST PENETRATION)", &attackerPos);
 					if (scene_->player_->GetHP() < prevHp)
 					{
 						// 💥 被弾リアクション演出の全発動
@@ -621,7 +642,8 @@ void CollisionSystem::ResolveContactDamage()
 		if (scene_->IsWithinRadius(scene_->player_->GetPosition(), enemy->GetPosition(), GamePlayScene::kPlayerHitRadius + GamePlayScene::kEnemyHitRadius))
 		{
 			float prevHp = scene_->player_->GetHP();
-			scene_->player_->TakeDamage(GamePlayScene::kContactDamage, "HOSTILE GUARD", "CQC CLOSE COMBAT (BLUNT TRAUMA)");
+			Vector3 enemyPos = enemy->GetPosition();
+			scene_->player_->TakeDamage(GamePlayScene::kContactDamage, "HOSTILE GUARD", "CQC CLOSE COMBAT (BLUNT TRAUMA)", &enemyPos);
 			if (scene_->player_->GetHP() < prevHp)
 			{
 				scene_->vignetteAlpha_ = 0.6f;

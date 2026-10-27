@@ -25,6 +25,7 @@
 #include "Application/Config/GameConfig.h"
 #include "Application/Config/AppDebugConfig.h"
 #include "Application/Transition/StingerTransition.h"
+#include "Application/Transition/DeathTransition.h"
 #include "RaidStats.h"
 #include "Baziru3_Engine/Core/Base/Allocator/ConstantBufferAllocator.h"
 #include "imgui.h"
@@ -92,6 +93,7 @@ void GamePlayScene::InitializeScene()
 	isGameCleared_ = false;
 	isPlayerInExtractionZone_ = false;
 	extractionTimer_ = kExtractionMaxTime;
+	autoDeathTimer_ = 0.0f;
 	goalRingTransform_.translate = GameConfig::Environment::kExtractionPadPosition;
 
 	InitializeEnvironment();
@@ -123,6 +125,10 @@ void GamePlayScene::InitializeScene()
 	helicopterIntro_ = std::make_unique<HelicopterInsertionController>(this);
 	helicopterIntro_->Initialize();
 	isGameIntroActive_ = true;
+
+	// 軍用シネマティック・ゲームオーバー演出コントローラーの初期化
+	deathSequenceController_ = std::make_unique<GameOverSequenceController>(this);
+	deathSequenceController_->Initialize();
 
 	// 初回フレーム描画用のWVP行列をイントロカメラ（Act 1アングル）で全3Dオブジェクト同期
 	UpdateObstacles();
@@ -454,6 +460,12 @@ void GamePlayScene::Finalize()
 		helicopterIntro_.reset();
 	}
 
+	if (deathSequenceController_)
+	{
+		deathSequenceController_->Finalize();
+		deathSequenceController_.reset();
+	}
+
 	if (hitEffect_)
 	{
 		hitEffect_->Finalize();
@@ -752,6 +764,27 @@ void GamePlayScene::UpdateDebugInput()
 		{
 			cameraZoom_ = (std::max)(cameraZoom_ - 0.015f, GameConfig::Camera::kMinZoomScale);
 		}
+	}
+
+	// 🧪 デバッグ・検証機能: KキーまたはF4キーで即座にHP0・戦死シネマティック演出を発動テスト
+	{
+		static bool prevKeyK = false;
+		const bool curKeyK = (GetAsyncKeyState('K') & 0x8000) != 0 || (GetAsyncKeyState(VK_F4) & 0x8000) != 0;
+		if (curKeyK && !prevKeyK)
+		{
+			if (player_ && !player_->IsDead() && !isDeathSequenceActive_)
+			{
+				float yaw = player_->GetRotation().y;
+				Vector3 forward = { std::sin(yaw), 0.0f, std::cos(yaw) };
+				if (std::sqrt(forward.x * forward.x + forward.z * forward.z) < 0.1f)
+				{
+					forward = { 0.0f, 0.0f, 1.0f };
+				}
+				Vector3 dummyAttackerPos = player_->GetPosition() + forward * 14.0f;
+				player_->TakeDamage(9999.0f, "HOSTILE SENTRY (SVD SNIPER)", "CRITICAL HIT // CHEST VITAL PENETRATION (7.62x54mmR)", &dummyAttackerPos);
+			}
+		}
+		prevKeyK = curKeyK;
 	}
 }
 
@@ -1212,12 +1245,62 @@ void GamePlayScene::UpdatePlayerHpBar()
 
 void GamePlayScene::CheckGameOver()
 {
+	// 🧪 スタート演出完了後、5秒で自動戦死（検証・テスト用フォールバック）
+	if (!isGameIntroActive_ && player_ && !player_->IsDead() && !isDeathSequenceActive_)
+	{
+		if (autoDeathTimer_ >= 5.0f)
+		{
+			float yaw = player_->GetRotation().y;
+			Vector3 forward = { std::sin(yaw), 0.0f, std::cos(yaw) };
+			if (std::sqrt(forward.x * forward.x + forward.z * forward.z) < 0.1f)
+			{
+				forward = { 0.0f, 0.0f, 1.0f };
+			}
+			Vector3 dummyAttackerPos = player_->GetPosition() + forward * 14.0f;
+			player_->TakeDamage(9999.0f, "HOSTILE SENTRY (SVD SNIPER)", "CRITICAL HIT // CHEST VITAL PENETRATION (7.62x54mmR)", &dummyAttackerPos);
+		}
+	}
+
 	if (player_ && player_->IsDead())
 	{
 		if (!isDeathSequenceActive_)
 		{
 			isDeathSequenceActive_ = true;
 			deathSequenceTimer_ = kDeathSequenceDuration;
+
+			// キラー（トドメを刺した敵）の位置を特定
+			Vector3 deathPos = player_->GetPosition();
+			Vector3 killerPos = player_->HasAttackerPosition()
+				? player_->GetLastAttackerPosition()
+				: (deathPos + Vector3{ 0.0f, 0.0f, 15.0f });
+
+			if (!player_->HasAttackerPosition())
+			{
+				float closestDist = 9999.0f;
+				for (const auto& e : enemies_)
+				{
+					if (!e || e->IsDead()) continue;
+					Vector3 diff = e->GetPosition() - deathPos;
+					float dist = std::sqrt(diff.x * diff.x + diff.z * diff.z);
+					if (dist < closestDist)
+					{
+						closestDist = dist;
+						killerPos = e->GetPosition();
+					}
+				}
+			}
+
+			// 軍用シネマティック・ゲームオーバー演出の開始
+			if (deathSequenceController_)
+			{
+				deathSequenceController_->Start(
+					deathPos,
+					killerPos,
+					player_->GetLastAttackerName(),
+					player_->GetCauseOfDeath(),
+					RaidStats::GetInstance().isMIA
+				);
+			}
 		}
 	}
 }
@@ -1273,36 +1356,56 @@ void GamePlayScene::Update()
 	float realDeltaTime = AdvanceDeltaTime();
 	float deltaTime = realDeltaTime;
 
-	// 軍用ヘリ急襲・ファストロープ降下演出中
+	// 軍用ヘリ急襲・ファストロープ降下演出中（スタート演出）
 	if (helicopterIntro_ && helicopterIntro_->IsActive())
 	{
 		UpdateGameIntro(realDeltaTime);
 		return;
 	}
-	isGameIntroActive_ = false;
-	// 死亡シーケンス中: SPACEキーまたはENTERキーが押されるまで待機
+
+	// 💀 軍用シネマティック・ゲームオーバー演出中（3幕構成シネマティック）
 	if (isDeathSequenceActive_)
 	{
-		deltaTime *= 0.15f; // ゲーム内時間をスローダウン
+		if (deathSequenceController_ && deathSequenceController_->IsActive())
+		{
+			deathSequenceController_->Update(realDeltaTime);
+		}
+		// 死亡シネマティック中も全3DオブジェクトのWVP行列を最新カメラと完全同期
+		UpdateObstacles();
+		if (extractionPadObject_) extractionPadObject_->Update();
+		for (auto& enemy : enemies_)
+		{
+			if (enemy && enemy->GetObject3d()) enemy->GetObject3d()->Update();
+		}
+		for (auto& t : targets_)
+		{
+			if (t) t->Update(0.0f);
+		}
+		if (SceneManager::GetInstance() && SceneManager::GetInstance()->GetSkyBox())
+		{
+			SceneManager::GetInstance()->GetSkyBox()->Update();
+		}
 
-		// SPACEキーまたはENTERキーでフェード（GAMEOVER）へ移行
-		bool proceedPressed = false;
-		if ((GetAsyncKeyState(VK_SPACE) & 0x8000) != 0 || (GetAsyncKeyState(VK_RETURN) & 0x8000) != 0)
+		UpdateEnvironment();
+		UpdateParticles(realDeltaTime * 0.15f);
+		return;
+	}
+
+	// 🧪 スタート演出完了後、5秒後に自動死亡演出（テスト・検証機能）
+	if (player_ && !player_->IsDead() && !isDeathSequenceActive_)
+	{
+		autoDeathTimer_ += realDeltaTime;
+		if (autoDeathTimer_ >= 5.0f)
 		{
-			proceedPressed = true;
-		}
-#ifdef USE_IMGUI
-		if (ImGui::IsKeyPressed(ImGuiKey_Space) || ImGui::IsKeyPressed(ImGuiKey_Enter))
-		{
-			proceedPressed = true;
-		}
-#endif
-		if (proceedPressed)
-		{
-			// 型安全 Scene Context でゲームオーバー画面へ戦績を転送
-			SetSceneData<RaidStats>("RaidStats", RaidStats::GetInstance());
-			SceneTransition::Change("GAMEOVER", 0.5f);
-			return;
+			float yaw = player_->GetRotation().y;
+			Vector3 forward = { std::sin(yaw), 0.0f, std::cos(yaw) };
+			if (std::sqrt(forward.x * forward.x + forward.z * forward.z) < 0.1f)
+			{
+				forward = { 0.0f, 0.0f, 1.0f };
+			}
+			Vector3 dummyAttackerPos = player_->GetPosition() + forward * 14.0f;
+			player_->TakeDamage(9999.0f, "HOSTILE SENTRY (SVD SNIPER)", "CRITICAL HIT // CHEST VITAL PENETRATION (7.62x54mmR)", &dummyAttackerPos);
+			CheckGameOver();
 		}
 	}
 
@@ -1994,6 +2097,12 @@ void GamePlayScene::Draw(SceneRenderRequests& renderRequests)
 		helicopterIntro_->Draw3D(ctx);
 	}
 
+	// 軍用シネマティック・ゲームオーバー（地面血痕デカール・吹き飛ぶライフル）の3D描画
+	if (deathSequenceController_ && deathSequenceController_->IsActive())
+	{
+		deathSequenceController_->Draw3D(ctx);
+	}
+
 	if (hitEffect_)
 	{
 		hitEffect_->Draw();
@@ -2021,7 +2130,9 @@ void GamePlayScene::Draw(SceneRenderRequests& renderRequests)
 #ifdef USE_IMGUI
 	// --- タクティカルHUD統合描画 ---
 	// トランジション実行中および開始演出中はHUDを描画しない
-	if (hud_ && !isGameIntroActive_ && (!StingerTransition::GetInstance() || !StingerTransition::GetInstance()->IsTransitioning()))
+	if (hud_ && !isGameIntroActive_ &&
+		(!StingerTransition::GetInstance() || !StingerTransition::GetInstance()->IsTransitioning()) &&
+		(!DeathTransition::GetInstance() || !DeathTransition::GetInstance()->IsTransitioning()))
 	{
 		GamePlayHUDContext hudCtx;
 		hudCtx.camera = camera_;
@@ -2055,6 +2166,12 @@ void GamePlayScene::Draw(SceneRenderRequests& renderRequests)
 	if (helicopterIntro_ && helicopterIntro_->IsActive())
 	{
 		helicopterIntro_->DrawUI();
+	}
+
+	// 軍用シネマティック・ゲームオーバー演出UI（映画風シネマスコープ・衛星偵察HUD・キラー捕捉・心電図フラットライン・KIA刻印）の描画
+	if (deathSequenceController_ && deathSequenceController_->IsActive())
+	{
+		deathSequenceController_->DrawUI();
 	}
 #endif
 

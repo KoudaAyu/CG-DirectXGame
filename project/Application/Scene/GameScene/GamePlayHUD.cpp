@@ -19,6 +19,7 @@
 #endif
 
 #include "Application/Transition/StingerTransition.h"
+#include "Application/Transition/DeathTransition.h"
 
 void GamePlayHUD::Initialize()
 {
@@ -44,6 +45,7 @@ void GamePlayHUD::Draw(const GamePlayHUDContext& ctx, float deltaTime)
 #ifdef USE_IMGUI
     // トランジション（画面切り替え演出）実行中は全HUD（レーザーサイト含む）を完全に非表示
     if (StingerTransition::GetInstance() && StingerTransition::GetInstance()->IsTransitioning()) return;
+    if (DeathTransition::GetInstance() && DeathTransition::GetInstance()->IsTransitioning()) return;
 
     ImGuiIO& io = ImGui::GetIO();
     float screenW = io.DisplaySize.x;
@@ -459,37 +461,11 @@ void GamePlayHUD::DrawLowHpRedVignetteEffect(const GamePlayHUDContext& ctx)
 #endif
 }
 
-void GamePlayHUD::DrawDeathSequenceHUD(const GamePlayHUDContext& ctx)
+void GamePlayHUD::DrawDeathSequenceHUD(const GamePlayHUDContext& /*ctx*/)
 {
 #ifdef USE_IMGUI
-    if (!ctx.isDeathSequenceActive) return;
-
-    ImGuiIO& io = ImGui::GetIO();
-    ImDrawList* drawList = ImGui::GetForegroundDrawList();
-    float screenW = io.DisplaySize.x;
-    float screenH = io.DisplaySize.y;
-
-    float progress = ctx.deathSequenceTimer / 2.0f;
-    float fadeAlpha = (std::min)(1.0f, progress * 1.5f);
-
-    drawList->AddRectFilled(ImVec2(0, 0), ImVec2(screenW, screenH), IM_COL32(10, 5, 5, static_cast<int>(fadeAlpha * 225.0f)));
-
-    float bannerH = 120.0f;
-    float bannerY = (screenH - bannerH) * 0.45f;
-    drawList->AddRectFilled(ImVec2(0, bannerY), ImVec2(screenW, bannerY + bannerH), IM_COL32(35, 10, 12, static_cast<int>(fadeAlpha * 240.0f)));
-    drawList->AddLine(ImVec2(0, bannerY), ImVec2(screenW, bannerY), IM_COL32(255, 40, 40, static_cast<int>(fadeAlpha * 255.0f)), 2.0f);
-    drawList->AddLine(ImVec2(0, bannerY + bannerH), ImVec2(screenW, bannerY + bannerH), IM_COL32(255, 40, 40, static_cast<int>(fadeAlpha * 255.0f)), 2.0f);
-
-    const char* headText = "💀 KILLED IN ACTION // 戦闘不能";
-    ImVec2 headSz = ImGui::CalcTextSize(headText);
-    drawList->AddText(ImVec2((screenW - headSz.x) * 0.5f, bannerY + 22.0f), IM_COL32(255, 60, 60, static_cast<int>(fadeAlpha * 255.0f)), headText);
-
-    char detailBuf[256];
-    std::string killer = ctx.player ? ctx.player->GetLastAttackerName() : "HOSTILE FORCES";
-    std::string cause = ctx.player ? ctx.player->GetCauseOfDeath() : "GUNFIRE DAMAGE";
-    sprintf_s(detailBuf, "KILLER: %s  |  CAUSE: %s", killer.c_str(), cause.c_str());
-    ImVec2 detSz = ImGui::CalcTextSize(detailBuf);
-    drawList->AddText(ImVec2((screenW - detSz.x) * 0.5f, bannerY + 68.0f), IM_COL32(255, 200, 200, static_cast<int>(fadeAlpha * 240.0f)), detailBuf);
+    // 演出は専用の GameOverSequenceController に完全移行したため早期リターン
+    return;
 #endif
 }
 
@@ -504,6 +480,7 @@ void GamePlayHUD::DrawLaserSight(const GamePlayHUDContext& ctx)
 
     // トランジション実行中、およびシーン入場フェード中はレーザーサイトを絶対に描画しない
     if (StingerTransition::GetInstance() && StingerTransition::GetInstance()->IsTransitioning()) return;
+    if (DeathTransition::GetInstance() && DeathTransition::GetInstance()->IsTransitioning()) return;
     if (ctx.sceneEntranceFadeTimer > 0.05f) return;
 
     ImGuiIO& io = ImGui::GetIO();
@@ -536,9 +513,10 @@ void GamePlayHUD::DrawLaserSight(const GamePlayHUDContext& ctx)
                 float tMax = maxLaserDist;
 
                 auto checkAxis = [&](float o, float d, float minV, float maxV) -> bool {
-                    if (std::abs(d) < 1e-6f) return o >= minV && o <= maxV;
-                    float t1 = (minV - o) / d;
-                    float t2 = (maxV - o) / d;
+                    if (std::abs(d) < 1e-5f) return o >= minV && o <= maxV;
+                    float invD = 1.0f / d;
+                    float t1 = (minV - o) * invD;
+                    float t2 = (maxV - o) * invD;
                     if (t1 > t2) std::swap(t1, t2);
                     tMin = (std::max)(tMin, t1);
                     tMax = (std::min)(tMax, t2);

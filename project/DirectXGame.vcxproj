@@ -76,6 +76,7 @@
     <ClCompile Include="Application\Scene\GameScene\GamePlayScene.cpp" />
     <ClCompile Include="Application\Scene\GameScene\CollisionSystem.cpp" />
     <ClCompile Include="Application\Scene\GameScene\HelicopterInsertionController.cpp" />
+    <ClCompile Include="Application\Scene\GameScene\GameOverSequenceController.cpp" />
     <ClCompile Include="Application\Scene\GameScene\CombatSystem.cpp" />
     <ClCompile Include="Application\Scene\GameScene\EnvironmentSystem.cpp" />
     <ClCompile Include="Application\Scene\GameScene\CharacterEffectController.cpp" />
@@ -91,6 +92,7 @@
     <ClCompile Include="Application\Scene\GameOverScene\GameOverScene.cpp" />
     <ClCompile Include="Application\Obstacle.cpp" />
     <ClCompile Include="Application\Transition\StingerTransition.cpp" />
+    <ClCompile Include="Application\Transition\DeathTransition.cpp" />
     <ClCompile Include="Baziru3_Engine\Graphics\Light\Light.cpp" />
     <ClCompile Include="Baziru3_Engine\Graphics\Light\CascadingShadowMap.cpp" />
 
@@ -321,6 +323,7 @@
     <ClInclude Include="Application\Scene\GameScene\GamePlayScene.h" />
     <ClInclude Include="Application\Scene\GameScene\CollisionSystem.h" />
     <ClInclude Include="Application\Scene\GameScene\HelicopterInsertionController.h" />
+    <ClInclude Include="Application\Scene\GameScene\GameOverSequenceController.h" />
     <ClInclude Include="Application\Scene\GameScene\CombatSystem.h" />
     <ClInclude Include="Application\Scene\GameScene\EnvironmentSystem.h" />
     <ClInclude Include="Application\Scene\GameScene\CharacterEffectController.h" />
@@ -352,6 +355,7 @@
     <ClInclude Include="Application\Scene\GameScene\TutorialSign.h" />
     <ClInclude Include="Application\LevelEditor.h" />
     <ClInclude Include="Application\Transition\StingerTransition.h" />
+    <ClInclude Include="Application\Transition\DeathTransition.h" />
     <ClInclude Include="Baziru3_Engine\3D\Water\River.h" />
     <ClInclude Include="Baziru3_Engine\3D\Procedural\BioProceduralGenerator.h" />
     <ClInclude Include="Baziru3_Engine\Graphics\3D\Object\SkinningObject3dCom.h" />

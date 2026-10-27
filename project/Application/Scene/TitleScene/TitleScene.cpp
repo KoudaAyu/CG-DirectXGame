@@ -1633,17 +1633,21 @@ void TitleScene::Update()
 		}
 	}
 
+	mouseInput_.Update();
+
 	// ---------------------------------------------------------------
-	// 入力：SPACEで出撃（トランジション中は入力を受け付けない）
+	// 入力：SPACE/ENTER/クリックで出撃（トランジション中は入力を受け付けない）
 	// ---------------------------------------------------------------
-	if (!isStarting_ && input_ && (!StingerTransition::GetInstance() || !StingerTransition::GetInstance()->IsTransitioning()))
+	if (!isStarting_ && (!StingerTransition::GetInstance() || !StingerTransition::GetInstance()->IsTransitioning()))
 	{
-		bool pressed = input_->TriggerKey(DIK_SPACE) || input_->TriggerKey(DIK_RETURN);
+		bool pressed = (input_ && (input_->TriggerKey(DIK_SPACE) || input_->TriggerKey(DIK_RETURN))) || mouseInput_.TriggerButton(0);
 		if (pressed && !sLogoLanded)
 		{
 			sIntroTimer = kIntroDuration;
+			sLogoLanded = true;
 		}
-		else if (pressed)
+
+		if (pressed)
 		{
 			isStarting_ = true;
 			startTransitionTimer_ = 0.0f;
@@ -1671,7 +1675,7 @@ void TitleScene::Update()
 				sCameraLockedRot = camera_->GetRotate();
 			}
 		}
-		else if (input_->TriggerKey(DIK_ESCAPE))
+		else if (input_ && input_->TriggerKey(DIK_ESCAPE))
 		{
 			PostQuitMessage(0);
 		}
@@ -1681,16 +1685,14 @@ void TitleScene::Update()
 	{
 		startTransitionTimer_ += deltaTime;
 
-		// アヒルが完全に鳴き終わった後（約3.15秒）にトランジションを開始
-		const float kDuckCryDuration = 3.15f;
+		// スピーディに出動トランジションを開始（0.30秒後）
+		const float kDuckCryDuration = 0.30f;
 		if (startTransitionTimer_ >= kDuckCryDuration && (!StingerTransition::GetInstance() || !StingerTransition::GetInstance()->IsTransitioning()))
 		{
 			// ゲーム本編へ出撃（ヘリ降下・ステージ演出開始）
-			SceneTransition::Change("GAMEPLAY", 1.80f, TransitionTheme::TitleTactical);
+			SceneTransition::Change("GAMEPLAY", 0.60f, TransitionTheme::TitleTactical);
 		}
 	}
-
-	mouseInput_.Update();
 
 	// ---------------------------------------------------------------
 	// ロゴ着弾（落ち着いた金属音的な微小シェイク）
