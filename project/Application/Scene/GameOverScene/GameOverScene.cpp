@@ -446,7 +446,7 @@ void GameOverScene::InitializeDiorama()
 		stretcherBed_->SetScale({ 0.65f, 0.65f, 0.65f });
 		stretcherBed_->SetEnableLighting(true);
 
-		teamPos_ = { -4.2f, 0.0f, 1.4f };
+		teamPos_ = { -4.2f, 0.0f, 0.62f };
 		teamStartPos_ = teamPos_;
 		walkPhase_ = 0.0f;
 		stretcherLiftY_ = 0.0f;
@@ -816,6 +816,16 @@ void GameOverScene::UpdateDiorama(float deltaTime)
 		return heliPos_ + rotated;
 	};
 
+	auto WorldToHeliLocal = [&](const Vector3& worldPos) -> Vector3 {
+		Matrix4x4 R = Multiply(MakeRotateXMatrix(heliRot_.x), Multiply(MakeRotateYMatrix(heliRot_.y), MakeRotateZMatrix(heliRot_.z)));
+		Vector3 d = worldPos - heliPos_;
+		return {
+			(d.x * R.m[0][0] + d.y * R.m[0][1] + d.z * R.m[0][2]) / 0.65f,
+			(d.x * R.m[1][0] + d.y * R.m[1][1] + d.z * R.m[1][2]) / 0.65f,
+			(d.x * R.m[2][0] + d.y * R.m[2][1] + d.z * R.m[2][2]) / 0.65f
+		};
+	};
+
 	// スライドカーゴドアの開閉アニメーション（SPACE押下による離陸開始で速やかに密閉）
 	if (state_ == State::Takeoff)
 	{
@@ -848,136 +858,233 @@ void GameOverScene::UpdateDiorama(float deltaTime)
 		};
 	};
 
-	// ヘリキャビン内部の座席・配置ローカル座標（床面Y=0.10m、開口ドアZ=[-0.6, 2.1]を基準に完璧に配置）
-	const Vector3 kStretcherCabinLocal  = { -0.35f, 0.19f, 0.25f };       // キャビン中央奥・床面（脚が床上に着地）
-	const Vector3 kWoundedCabinLocal    = { -0.35f, 0.30f, 0.25f };       // 担架キャンバス上の負傷アヒル（ドア越しに顔が見える）
-	const Vector3 kFrontMedicCabinLocal = {  0.35f, 0.105f, 0.55f };      // 開口ドア前寄りで直立待機（右ピラーから十分な安全余白）
-	const Vector3 kRearMedicCabinLocal  = {  0.35f, 0.105f, -0.15f };     // 開口ドア後寄りで直立待機（左ピラーから十分な安全余白）
+	auto NormalizeAngleDelta = [](float target, float base) -> float {
+		float d = std::fmod(target - base + kPi, 2.0f * kPi);
+		if (d < 0.0f) d += 2.0f * kPi;
+		return d - kPi;
+	};
 
-	// キャビン内での担架の長手方向（機体前後Z軸方向）姿勢
-	const Vector3 kStretcherInsideRot  = { heliRot_.x, heliRot_.y + 1.57f, heliRot_.z };
-	const Vector3 kWoundedInsideRot    = { heliRot_.x - 0.10f, heliRot_.y + 1.57f, heliRot_.z - 1.55f };
-	const Vector3 kMedicInsideRot      = { heliRot_.x, heliRot_.y + 1.57f, heliRot_.z }; // ドア・カメラ側を向く (+90度)
+	// 担架ベッドのローカル座標（スケール 0.65f 前）をワールド座標へ変換するヘルパー
+	auto StretcherLocalToWorld = [](const Vector3& bedPos, const Vector3& bedRot, const Vector3& localUnscaled) -> Vector3 {
+		Matrix4x4 Rb = Multiply(MakeRotateXMatrix(bedRot.x), Multiply(MakeRotateYMatrix(bedRot.y), MakeRotateZMatrix(bedRot.z)));
+		Vector3 s = { localUnscaled.x * 0.65f, localUnscaled.y * 0.65f, localUnscaled.z * 0.65f };
+		return {
+			bedPos.x + s.x * Rb.m[0][0] + s.y * Rb.m[1][0] + s.z * Rb.m[2][0],
+			bedPos.y + s.x * Rb.m[0][1] + s.y * Rb.m[1][1] + s.z * Rb.m[2][1],
+			bedPos.z + s.x * Rb.m[0][2] + s.y * Rb.m[1][2] + s.z * Rb.m[2][2]
+		};
+	};
 
-	const float breath = std::sin(timer_ * 2.8f) * 0.015f;
+	// 負傷アヒルを担架と完全一体化した剛体として配置（頭部が必ず -X 側の救急枕に乗り、顔・くちばしがカメラ＆開放ドア側を向く）
+	auto UpdateWoundedOnStretcher = [&](const Vector3& bedPos, const Vector3& bedRot, float breathOffset) {
+		if (!duckWounded_) return;
+
+		Matrix4x4 Rb = Multiply(MakeRotateXMatrix(bedRot.x), Multiply(MakeRotateYMatrix(bedRot.y), MakeRotateZMatrix(bedRot.z)));
+		Matrix4x4 Rlocal = Multiply(MakeRotateYMatrix(0.36f), Multiply(MakeRotateXMatrix(-1.40f), MakeRotateYMatrix(kPi * 0.5f)));
+		Matrix4x4 Mw = Multiply(Rlocal, Rb);
+
+		float wy = std::asin(std::clamp(-Mw.m[0][2], -1.0f, 1.0f));
+		float wx = std::atan2(Mw.m[1][2], Mw.m[2][2]);
+		float wz = std::atan2(Mw.m[0][1], Mw.m[0][0]);
+
+		Vector3 woundedPos = StretcherLocalToWorld(bedPos, bedRot, { 0.44f, 0.20f, 0.0f }) + Vector3{ 0.0f, breathOffset, 0.0f };
+		duckWounded_->SetTranslate(woundedPos);
+		duckWounded_->SetRotate({ wx, wy, wz });
+		duckWounded_->Update();
+	};
+
+	// helicopter_body.obj 実寸（スキッド X=1.85/Y=-0.45, 開口ドア枠 X=1.45 / Z=[-0.54, +2.10] / 敷居 Y=0.16 / 天井 Y=2.25）に基づき、
+	// アヒル足元がスキッドとドア敷居を確実に跨いでキャビン床(Y=0.105)へ着地するヘリローカルY座標を算出
+	auto CalcSafeMedicFootYHeli = [](float xHeli, float groundYHeli) -> float {
+		if (xHeli >= 2.38f) return groundYHeli;
+		if (xHeli > 1.92f)
+		{
+			float u = EaseInOutCubic((2.38f - xHeli) / (2.38f - 1.92f));
+			return groundYHeli + (0.24f - groundYHeli) * u;
+		}
+		if (xHeli >= 1.18f)
+		{
+			return 0.24f; // スキッド(Y=-0.45)もドア敷居(Y=0.16)も余裕で飛び越えるクリアランス高さ
+		}
+		if (xHeli > 0.72f)
+		{
+			float u = EaseInOutCubic((1.18f - xHeli) / (1.18f - 0.72f));
+			return 0.24f + (0.105f - 0.24f) * u;
+		}
+		return 0.105f;
+	};
+
+	// 開放ドアの中央安全窓（X_heli=+3.60：右スキッド X=1.95 の十分外側、Z_heli=+0.82：開口部 [-0.54, +2.10] のど真ん中）を地上停止地点に設定！
+	Vector3 kTeamStopPos = LocalToHeliWorld({ 3.60f, 0.0f, 0.82f });
+	kTeamStopPos.y = 0.0f;
+
+	// キャビン内部の最終配置ローカル座標（内壁 X=±1.35, 隔壁 Z=[-1.10, +2.60], 開口ドア Z=[-0.54, +2.10] すべてに対して十分な余白を確保）
+	const Vector3 kStretcherCabinLocal  = { -0.02f, 0.19f, 0.82f };       // 開口ドアど真ん中フロア（全長 ±1.20 が [-0.38, +2.02] に完全収容！）
+	const Vector3 kFrontMedicCabinLocal = { -0.40f, 0.105f, 1.48f };      // 担架の足元奥側で付き添う前方衛生兵
+	const Vector3 kRearMedicCabinLocal  = { -0.36f, 0.105f, -0.32f };     // 担架の枕元奥側でバイタルを見守る後方衛生兵
+
+	const Vector3 kStretcherInsideRot  = { heliRot_.x, heliRot_.y - kPi * 0.5f, heliRot_.z };
+	const Vector3 kMedicInsideRot      = { heliRot_.x, heliRot_.y + kPi * 0.5f, heliRot_.z };
+
+	const float breath = std::sin(timer_ * 2.8f) * 0.012f;
 
 	if (state_ == State::Approaching)
 	{
 		walkPhase_ += deltaTime * 6.5f;
 		float t = std::clamp(actionTimer_ / kApproachDuration, 0.0f, 1.0f);
 		float progress = EaseOutQuad(t);
-		teamPos_ = LerpVec(teamStartPos_, { 1.50f, 0.0f, 1.45f }, progress);
+		teamPos_ = LerpVec(teamStartPos_, kTeamStopPos, progress);
 
-		float waddle = std::sin(walkPhase_) * 0.14f;
-		float bob = std::fabs(std::sin(walkPhase_)) * 0.07f;
+		float strideFade = 1.0f - progress * 0.25f;
+		float waddle = std::sin(walkPhase_) * 0.14f * strideFade;
+		float bob = std::fabs(std::sin(walkPhase_)) * 0.065f * strideFade;
 
-		// 後方衛生兵
+		Vector3 bedPos = teamPos_ + Vector3{ 0.0f, 0.24f + bob * 0.5f, 0.0f };
+		Vector3 bedRot = { 0.0f, 0.0f, waddle * 0.15f };
+
+		// 後方衛生兵（枕側のハンドルを保持）
 		if (duckRearMedic_)
 		{
-			duckRearMedic_->SetTranslate(teamPos_ + Vector3{ -0.95f, bob, 0.0f });
-			duckRearMedic_->SetRotate({ 0.0f, 1.57f, waddle });
+			duckRearMedic_->SetTranslate(teamPos_ + Vector3{ -0.86f, bob, 0.0f });
+			duckRearMedic_->SetRotate({ 0.0f, kPi * 0.5f, waddle });
 			duckRearMedic_->Update();
 		}
-		// 前方衛生兵
+		// 前方衛生兵（足元側のハンドルを保持）
 		if (duckFrontMedic_)
 		{
-			duckFrontMedic_->SetTranslate(teamPos_ + Vector3{ 0.95f, bob, 0.0f });
-			duckFrontMedic_->SetRotate({ 0.0f, 1.57f, -waddle });
+			duckFrontMedic_->SetTranslate(teamPos_ + Vector3{ 0.86f, bob, 0.0f });
+			duckFrontMedic_->SetRotate({ 0.0f, kPi * 0.5f, -waddle });
 			duckFrontMedic_->Update();
 		}
-		// 担架ベッド
-		if (stretcherBed_)
-		{
-			stretcherBed_->SetTranslate(teamPos_ + Vector3{ 0.0f, 0.24f + bob * 0.5f, 0.0f });
-			stretcherBed_->SetRotate({ 0.0f, 0.0f, 0.0f });
-			stretcherBed_->Update();
-		}
-		// 負傷した主役アヒル
-		if (duckWounded_)
-		{
-			duckWounded_->SetTranslate(teamPos_ + Vector3{ 0.0f, 0.35f + bob * 0.5f + breath, 0.0f });
-			duckWounded_->SetRotate({ -0.10f, 0.0f, -1.55f });
-			duckWounded_->Update();
-		}
-	}
-	else if (state_ == State::Loading)
-	{
-		float t = std::clamp(actionTimer_ / kLoadDuration, 0.0f, 1.0f);
-
-		// ドア前初期位置
-		const Vector3 frontStart   = { 1.50f + 0.95f, 0.0f, 1.45f };
-		const Vector3 rearStart    = { 1.50f - 0.95f, 0.0f, 1.45f };
-		const Vector3 bedStart     = { 1.50f, 0.24f, 1.45f };
-		const Vector3 woundedStart = { 1.50f, 0.35f, 1.45f };
-
-		// 前方衛生兵：ドアをくぐって機内前方座席へ
-		float frontT = EaseInOutCubic(std::clamp(t / 0.65f, 0.0f, 1.0f));
-		Vector3 frontPos = LerpVec(frontStart, LocalToHeliWorld(kFrontMedicCabinLocal), frontT);
-		Vector3 frontRot = LerpVec({ 0.0f, 1.57f, 0.0f }, kMedicInsideRot, frontT);
-		if (duckFrontMedic_)
-		{
-			duckFrontMedic_->SetTranslate(frontPos);
-			duckFrontMedic_->SetRotate(frontRot);
-			duckFrontMedic_->Update();
-		}
-
-		// 担架ベッド：少し持ち上げてドア敷居を跨ぎ、向きを変えながら機内中央へスライド収容
-		float bedT = EaseInOutCubic(std::clamp((t - 0.10f) / 0.80f, 0.0f, 1.0f));
-		float liftArc = std::sin(bedT * kPi) * 0.14f;
-		Vector3 bedPos = LerpVec(bedStart, LocalToHeliWorld(kStretcherCabinLocal), bedT) + Vector3{ 0.0f, liftArc, 0.0f };
-		Vector3 bedRot = LerpVec({ 0.0f, 0.0f, 0.0f }, kStretcherInsideRot, bedT);
+		// 担架ベッド ＆ 枕に頭を乗せた負傷主役アヒル
 		if (stretcherBed_)
 		{
 			stretcherBed_->SetTranslate(bedPos);
 			stretcherBed_->SetRotate(bedRot);
 			stretcherBed_->Update();
 		}
+		UpdateWoundedOnStretcher(bedPos, bedRot, breath);
+	}
+	else if (state_ == State::Loading)
+	{
+		float t = std::clamp(actionTimer_ / kLoadDuration, 0.0f, 1.0f);
 
-		// 負傷アヒル：担架に密着して一緒に機内へ
-		if (duckWounded_)
+		// Approaching 終了時の正確なヘリローカル座標（フレーム境界での位置ジャンプ 0.00m を保証）
+		const Vector3 bedStartHeli   = WorldToHeliLocal(kTeamStopPos + Vector3{  0.00f, 0.24f, 0.0f });
+		const Vector3 frontStartHeli = WorldToHeliLocal(kTeamStopPos + Vector3{  0.86f, 0.00f, 0.0f });
+		const Vector3 rearStartHeli  = WorldToHeliLocal(kTeamStopPos + Vector3{ -0.86f, 0.00f, 0.0f });
+
+		// 1. 前方衛生兵：最初にスキッドとドア敷居をぴょんと飛び越えて開口部中央前方(Z_heli≈+1.45)から機内奥へ先導搭乗（ピラー Z=+2.10 と一切接触しない！）
+		if (duckFrontMedic_)
 		{
-			Vector3 woundedPos = LerpVec(woundedStart, LocalToHeliWorld(kWoundedCabinLocal), bedT) + Vector3{ 0.0f, liftArc + breath, 0.0f };
-			Vector3 woundedRot = LerpVec({ -0.10f, 0.0f, -1.55f }, kWoundedInsideRot, bedT);
-			duckWounded_->SetTranslate(woundedPos);
-			duckWounded_->SetRotate(woundedRot);
-			duckWounded_->Update();
+			float fMove = EaseInOutCubic(std::clamp(t / 0.64f, 0.0f, 1.0f));
+			Vector3 fHeli = LerpVec(frontStartHeli, kFrontMedicCabinLocal, fMove);
+			// 開口ドア枠 (X_heli ∈ [1.05, 2.15]) 通過時は必ずドア中央安全帯 Z_heli ∈ [-0.05, +1.60] を通る
+			if (fHeli.x > 1.05f && fHeli.x < 2.15f)
+			{
+				fHeli.z = std::clamp(fHeli.z, -0.05f, 1.60f);
+			}
+			fHeli.y = CalcSafeMedicFootYHeli(fHeli.x, frontStartHeli.y);
+			float hopF = std::fabs(std::sin(t * kPi * 4.0f)) * 0.06f * (1.0f - fMove);
+			fHeli.y += hopF;
+
+			float turnF = EaseInOutCubic(std::clamp((t - 0.36f) / 0.50f, 0.0f, 1.0f));
+			float entryYaw = heliRot_.y - kPi * 0.5f;
+			float startYaw = kPi * 0.5f;
+			float midYaw = startYaw + NormalizeAngleDelta(entryYaw, startYaw) * EaseOutQuad(std::clamp(t / 0.36f, 0.0f, 1.0f));
+			float frontYaw = midYaw + NormalizeAngleDelta(kMedicInsideRot.y, midYaw) * turnF;
+			float frontWaddle = std::sin(t * kPi * 6.0f) * 0.08f * (1.0f - fMove);
+
+			duckFrontMedic_->SetTranslate(LocalToHeliWorld(fHeli));
+			duckFrontMedic_->SetRotate({ kMedicInsideRot.x * turnF, frontYaw, frontWaddle });
+			duckFrontMedic_->Update();
 		}
 
-		// 後方衛生兵：担架を押し込みながら機内後方座席へ乗り込む
-		float rearT = EaseInOutCubic(std::clamp((t - 0.30f) / 0.70f, 0.0f, 1.0f));
-		Vector3 rearPos = LerpVec(rearStart, LocalToHeliWorld(kRearMedicCabinLocal), rearT);
-		Vector3 rearRot = LerpVec({ 0.0f, 1.57f, 0.0f }, kMedicInsideRot, rearT);
+		// 2. 担架ベッド ＆ 負傷アヒル：スキッド手前(X_heli > 2.0)で先に開口部と平行(+62度)へ向きを揃えてから、
+		//    開口部ど真ん中 Z_heli=+0.82（両端 [-0.38, +2.02] が開口幅 [-0.54, +2.10] に完全収容）＆ 敷居越え高度 Y_heli=+0.38 で滑らかに機内へスライド！
+		{
+			float bedTurnT  = EaseInOutCubic(std::clamp(t / 0.42f, 0.0f, 1.0f));
+			float bedSlideT = EaseInOutCubic(std::clamp((t - 0.08f) / 0.76f, 0.0f, 1.0f));
+
+			Vector3 bedHeli = LerpVec(bedStartHeli, kStretcherCabinLocal, bedSlideT);
+			// ドア敷居 (X_heli ∈ [0.65, 2.35]) 通過中は担架脚が敷居(Y=0.16)に絶対当たらないよう +0.38 まで持ち上げる
+			float sillLift = std::sin(bedSlideT * kPi) * 0.24f;
+			bedHeli.y += sillLift;
+			if (bedHeli.x > 0.85f && bedHeli.x < 2.10f)
+			{
+				bedHeli.y = (std::max)(bedHeli.y, 0.36f);
+			}
+
+			Vector3 bedPos = LocalToHeliWorld(bedHeli);
+			Vector3 bedRot = {
+				kStretcherInsideRot.x * bedTurnT,
+				NormalizeAngleDelta(kStretcherInsideRot.y, 0.0f) * bedTurnT,
+				kStretcherInsideRot.z * bedTurnT
+			};
+
+			if (stretcherBed_)
+			{
+				stretcherBed_->SetTranslate(bedPos);
+				stretcherBed_->SetRotate(bedRot);
+				stretcherBed_->Update();
+			}
+			UpdateWoundedOnStretcher(bedPos, bedRot, breath);
+		}
+
+		// 3. 後方衛生兵：開口部中央寄り(Z_heli=+0.26：後部スライドドア Z=-0.54 から十分な余白！)を通って担架を機内へ押し込み、
+		//    完全にキャビン内部(X_heli < +0.72)へ入ってから枕元奥の付き添い位置へ回り込む！
 		if (duckRearMedic_)
 		{
-			duckRearMedic_->SetTranslate(rearPos);
-			duckRearMedic_->SetRotate(rearRot);
+			const Vector3 kRearDoorwayInside = { 0.68f, 0.105f, 0.28f }; // 開口ドアを完全に通過した機内ステップ位置
+			Vector3 rHeli{};
+			if (t < 0.70f)
+			{
+				float rBoard = EaseInOutCubic(std::clamp((t - 0.08f) / 0.62f, 0.0f, 1.0f));
+				rHeli = LerpVec(rearStartHeli, kRearDoorwayInside, rBoard);
+			}
+			else
+			{
+				float rSeat = EaseInOutCubic(std::clamp((t - 0.70f) / 0.30f, 0.0f, 1.0f));
+				rHeli = LerpVec(kRearDoorwayInside, kRearMedicCabinLocal, rSeat);
+			}
+
+			if (rHeli.x > 1.05f && rHeli.x < 2.15f)
+			{
+				rHeli.z = std::clamp(rHeli.z, -0.05f, 1.60f);
+			}
+			rHeli.y = CalcSafeMedicFootYHeli(rHeli.x, rearStartHeli.y);
+			float hopR = std::fabs(std::sin(t * kPi * 4.5f + 0.6f)) * 0.06f * (1.0f - EaseInOutCubic(t));
+			rHeli.y += hopR;
+
+			float pushDirYaw = heliRot_.y - kPi; // -X_heli（キャビン奥へ押し込む向き）
+			float startYaw = kPi * 0.5f;
+			float approachYaw = startYaw + NormalizeAngleDelta(pushDirYaw, startYaw) * EaseOutQuad(std::clamp(t / 0.40f, 0.0f, 1.0f));
+			float faceDoorBlend = EaseInOutCubic(std::clamp((t - 0.68f) / 0.32f, 0.0f, 1.0f));
+			float rearYaw = approachYaw + NormalizeAngleDelta(kMedicInsideRot.y, approachYaw) * faceDoorBlend;
+			float rearWaddle = -std::sin(t * kPi * 6.0f) * 0.08f * (1.0f - faceDoorBlend);
+
+			duckRearMedic_->SetTranslate(LocalToHeliWorld(rHeli));
+			duckRearMedic_->SetRotate({ kMedicInsideRot.x * faceDoorBlend, rearYaw, rearWaddle });
 			duckRearMedic_->Update();
 		}
 	}
-	else // State::Ready または State::Takeoff（全員ヘリ機内に搭乗し、ヘリの動きと完全同期！）
+	else // State::Ready または State::Takeoff（全員ヘリ機内に搭乗し、離陸時の機体ピッチ＆ロールとも完全剛体同期！）
 	{
-		// 担架ベッド（ヘリ機内床面に縦置き固定）
+		const Vector3 cabinBedWorld = LocalToHeliWorld(kStretcherCabinLocal);
 		if (stretcherBed_)
 		{
-			stretcherBed_->SetTranslate(LocalToHeliWorld(kStretcherCabinLocal));
+			stretcherBed_->SetTranslate(cabinBedWorld);
 			stretcherBed_->SetRotate(kStretcherInsideRot);
 			stretcherBed_->Update();
 		}
-		// 負傷アヒル（担架上で安静）
-		if (duckWounded_)
-		{
-			duckWounded_->SetTranslate(LocalToHeliWorld(kWoundedCabinLocal) + Vector3{ 0.0f, breath, 0.0f });
-			duckWounded_->SetRotate(kWoundedInsideRot);
-			duckWounded_->Update();
-		}
-		// 前方衛生兵（開口ドア付近で前方を向いて同乗）
+		UpdateWoundedOnStretcher(cabinBedWorld, kStretcherInsideRot, breath);
+
 		if (duckFrontMedic_)
 		{
 			duckFrontMedic_->SetTranslate(LocalToHeliWorld(kFrontMedicCabinLocal));
 			duckFrontMedic_->SetRotate(kMedicInsideRot);
 			duckFrontMedic_->Update();
 		}
-		// 後方衛生兵（担架横に座りドア側を向いて付き添い）
 		if (duckRearMedic_)
 		{
 			duckRearMedic_->SetTranslate(LocalToHeliWorld(kRearMedicCabinLocal));
