@@ -1,22 +1,189 @@
 #include "LevelEditor.h"
-#include <fstream>
-#include <sstream>
-#include <random>
-#include <filesystem>
-#include <imgui.h>
-#include <iostream>
-#include "SceneManager.h"
-#include "MaterialManager.h"
-#include "Light.h"
-#include <Windows.h>
-#include "externals/nlohmann/json.hpp"
-#include "Baziru3_Engine/Framework/IO/JsonSafeLoader.h"
+#include "Application/Config/AppDebugConfig.h"
+#include "Application/Config/GameConfig.h"
+#include "Application/UI/TacticalUICanvas.h"
 #include "Baziru3_Engine/3D/Procedural/BioProceduralGenerator.h"
-#include "Baziru3_Engine/Framework/Collision/CollisionManager.h"
 #include "Baziru3_Engine/Framework/Collision/BoxCollider.h"
 #include "Baziru3_Engine/Framework/Collision/CapsuleCollider.h"
+#include "Baziru3_Engine/Framework/Collision/CollisionManager.h"
+#include "Baziru3_Engine/Framework/IO/JsonSafeLoader.h"
+#include "Light.h"
+#include "MaterialManager.h"
+#include "SceneManager.h"
+#include "externals/nlohmann/json.hpp"
+
+#include <Windows.h>
+#include <algorithm>
+#include <cmath>
+#include <cstring>
+#include <filesystem>
+#include <fstream>
+#include <imgui.h>
+#include <iostream>
+#include <random>
+#include <sstream>
 
 namespace {
+    constexpr float kPi       = GameConfig::Math::kPi;
+    constexpr float kTwoPi    = GameConfig::Math::kTwoPi;
+    constexpr float kHalfPi   = GameConfig::Math::kHalfPi;
+    constexpr float kDegToRad = GameConfig::Math::kDegToRad;
+    constexpr float kRadToDeg = GameConfig::Math::kRadToDeg;
+
+    // 3D軸ギズモ・移動・ホットリロード定数
+    constexpr size_t   kAxisCount                 = 3;
+    constexpr uint32_t kAxisCylinderSlices        = 16;
+    constexpr float    kAxisCylinderRadius        = 0.015f;
+    constexpr float    kAxisCylinderHeight        = 1.2f;
+    constexpr float    kFastViewportMoveSpeed     = 12.0f;
+    constexpr float    kNormalViewportMoveSpeed   = 4.0f;
+    constexpr int      kReloadCheckIntervalFrames = 30;
+    constexpr float    kAddedObjectDefaultPosY    = 1.5f;
+
+    constexpr Vector4 kAxisColors[kAxisCount] = {
+        { 1.0f, 0.1f, 0.1f, 1.0f }, // X (Red)
+        { 0.1f, 1.0f, 0.1f, 1.0f }, // Y (Green)
+        { 0.1f, 0.1f, 1.0f, 1.0f }, // Z (Blue)
+    };
+
+    constexpr Vector3 kAxisRotations[kAxisCount] = {
+        { 0.0f,    0.0f, -kHalfPi }, // X軸
+        { 0.0f,    0.0f,  0.0f    }, // Y軸
+        { kHalfPi, 0.0f,  0.0f    }, // Z軸
+    };
+
+    // 描画マテリアルカラー・タイプ別カラーテーブル
+    constexpr Vector4 kTreeDrawMaterialColor{ 0.25f, 0.80f, 0.25f, 1.0f };
+    constexpr Vector4 kDefaultDrawMaterialColor{ 1.0f, 1.0f, 1.0f, 1.0f };
+
+    struct TypeColorSpec {
+        const char* typeName;
+        Vector4     color;
+    };
+
+    constexpr TypeColorSpec kObjectTypeColors[] = {
+        { "Tree",        { 0.25f, 0.85f, 0.30f, 1.0f } },
+        { "Rock",        { 0.55f, 0.55f, 0.55f, 1.0f } },
+        { "PlayerSpawn", { 0.20f, 0.60f, 1.00f, 1.0f } },
+        { "EnemySpawn",  { 1.00f, 0.25f, 0.25f, 1.0f } },
+        { "LootBox",     { 1.00f, 0.80f, 0.20f, 1.0f } },
+    };
+
+    constexpr Vector4 kDefaultBiomeZoneColor{ 0.5f, 0.5f, 0.5f, 0.4f };
+    constexpr TypeColorSpec kBiomeZoneColors[] = {
+        { "Forest",    { 0.1f, 0.7f, 0.1f, 0.4f } },
+        { "Desert",    { 0.7f, 0.6f, 0.2f, 0.4f } },
+        { "River",     { 0.1f, 0.4f, 0.8f, 0.4f } },
+        { "Grassland", { 0.5f, 0.8f, 0.1f, 0.4f } },
+    };
+
+    // ImGui UI定数
+    constexpr int   kPushedStyleColorCount = 4;
+    constexpr float kHierarchyListHeight   = 150.0f;
+    constexpr size_t kPathBufferSize       = 256;
+    constexpr size_t kLabelBufferSize      = 128;
+    constexpr size_t kPresetNameBufSize    = 64;
+    constexpr float kDragPosSpeed          = 0.05f;
+    constexpr float kDragPosLimit          = 1000.0f;
+    constexpr float kDragRotSpeed          = 0.5f;
+    constexpr float kDragRotLimit          = 360.0f;
+    constexpr float kDragScaleSpeed        = 0.01f;
+    constexpr float kDragScaleMin          = 0.001f;
+    constexpr float kDragScaleMax          = 1000.0f;
+
+    constexpr ImVec4 kUiColTitleBgActive{ 0.2f,  0.1f,  0.4f,  1.0f };
+    constexpr ImVec4 kUiColButton{ 0.26f, 0.22f, 0.45f, 1.0f };
+    constexpr ImVec4 kUiColButtonHovered{ 0.35f, 0.3f,  0.6f,  1.0f };
+    constexpr ImVec4 kUiColHeader{ 0.3f,  0.2f,  0.5f,  0.8f };
+    constexpr ImVec4 kUiColSectionHeader{ 0.7f,  0.6f,  0.9f,  1.0f };
+    constexpr ImVec4 kUiColEnemySection{ 1.0f,  0.4f,  0.4f,  1.0f };
+    constexpr ImVec4 kUiColWarningText{ 1.0f,  0.3f,  0.3f,  1.0f };
+    constexpr ImVec4 kUiColHotkeyHeader{ 0.4f,  0.8f,  0.4f,  1.0f };
+
+    // CSV / JSON 入出力定数
+    constexpr int    kJsonIndentSpaces   = 4;
+    constexpr size_t kCsvMinColumnCount  = 13;
+    constexpr size_t kCsvColName         = 0;
+    constexpr size_t kCsvColDir          = 1;
+    constexpr size_t kCsvColFile         = 2;
+    constexpr size_t kCsvColPosX         = 3;
+    constexpr size_t kCsvColPosY         = 4;
+    constexpr size_t kCsvColPosZ         = 5;
+    constexpr size_t kCsvColRotX         = 6;
+    constexpr size_t kCsvColRotY         = 7;
+    constexpr size_t kCsvColRotZ         = 8;
+    constexpr size_t kCsvColScaleX       = 9;
+    constexpr size_t kCsvColScaleY       = 10;
+    constexpr size_t kCsvColScaleZ       = 11;
+    constexpr size_t kCsvColIsStatic     = 12;
+
+    constexpr int   kJsonDefaultIterations   = 3;
+    constexpr float kJsonDefaultBranchLength = 1.0f;
+    constexpr float kJsonDefaultBranchRadius = 0.1f;
+    constexpr float kJsonDefaultTaperRate    = 0.8f;
+    constexpr float kJsonDefaultAngle        = 25.0f;
+    constexpr int   kJsonDefaultSubdivisions = 3;
+    constexpr float kJsonDefaultNoise        = 0.3f;
+    constexpr float kJsonDefaultVoronoi      = 0.2f;
+    constexpr float kJsonDefaultCrack        = 0.4f;
+
+    // 河川・沿岸プロシージャル生成定数
+    constexpr float    kDefaultRiverWidth     = 2.0f;
+    constexpr float    kDefaultRiverFlowSpeed = 1.0f;
+    constexpr float    kDefaultRiverWaveScale = 1.0f;
+    constexpr Vector4  kDefaultRiverColor{ 0.1f, 0.4f, 0.9f, 0.8f };
+    constexpr uint32_t kRiverProceduralSeed   = 12345u;
+    constexpr float    kDirNormalizeEps       = 0.0001f;
+    constexpr float    kMaxRandomSeedScale    = 99999.0f;
+
+    constexpr float kShorePosJitterSpan    = 0.4f;
+    constexpr float kShorePosJitterHalf    = 0.2f;
+    constexpr float kRockBaseOffset        = 0.5f;
+    constexpr float kRockOffsetSpan        = 1.2f;
+    constexpr float kBigBoulderProbability = 0.2f;
+    constexpr float kBigBoulderMinScale    = 0.6f;
+    constexpr float kBigBoulderScaleSpan   = 0.4f;
+    constexpr float kSmallRockMinScale     = 0.25f;
+    constexpr float kSmallRockScaleSpan    = 0.3f;
+    constexpr int   kShoreRockSubdivisions = 3;
+    constexpr float kShoreRockNoise        = 0.3f;
+    constexpr float kShoreRockVoronoi      = 0.2f;
+    constexpr float kShoreRockCrack        = 0.25f;
+
+    constexpr float kReedSpawnProbability = 0.55f;
+    constexpr float kReedBaseOffset       = 0.6f;
+    constexpr float kReedOffsetSpan       = 0.8f;
+    constexpr float kReedMinScale         = 0.3f;
+    constexpr float kReedScaleSpan        = 0.25f;
+    constexpr float kReedScaleXZRatio     = 0.7f;
+    constexpr float kReedScaleYRatio      = 0.65f;
+    constexpr int   kReedIterations       = 2;
+    constexpr float kReedBranchLength     = 0.12f;
+    constexpr float kReedBranchRadius     = 0.05f;
+    constexpr float kReedTaperRate        = 0.8f;
+    constexpr float kReedAngle            = 25.0f;
+
+    constexpr float kBankTreeSpawnProbability = 0.8f;
+    constexpr float kBankTreeBaseOffset       = 2.5f;
+    constexpr float kBankTreeOffsetSpan       = 4.5f;
+    constexpr float kBankTreeMinScale         = 0.8f;
+    constexpr float kBankTreeScaleSpan        = 0.7f;
+    constexpr float kBankTreeScaleYBase       = 0.9f;
+    constexpr float kBankTreeScaleYSpan       = 0.3f;
+    constexpr int   kBankTreeIterations       = 2;
+    constexpr float kBankTreeBranchLength     = 0.16f;
+    constexpr float kBankTreeBranchRadius     = 0.07f;
+    constexpr float kBankTreeTaperRate        = 0.8f;
+    constexpr float kBankTreeAngle            = 25.0f;
+
+    constexpr int   kTreeRadialSegments      = 8;
+    constexpr float kTreeColliderHeightScale = 3.0f;
+
+    constexpr const char* kCheckerTexPath     = "Resources/uvChecker.png";
+    constexpr const char* kWhiteTexPath       = "Resources/CG4/human/white.png";
+    constexpr const char* kRockAtlasTexPath   = "Resources/Outputs/ProceduralAsset_LOD0_atlas.tga";
+    constexpr const char* kEnemySpawnObjFile  = "Enemy_Spawn_Point.obj";
+
     bool FileExists(const std::string& path) {
         std::ifstream f(path);
         return f.good();
@@ -31,22 +198,43 @@ namespace {
         }
         return tokens;
     }
+
+    void UnregisterAndClearColliders(std::vector<std::unique_ptr<Collider>>& colliders) {
+        if (CollisionManager* colManager = CollisionManager::GetInstance()) {
+            for (auto& collider : colliders) {
+                if (collider) {
+                    colManager->UnregisterCollider(collider.get());
+                }
+            }
+        }
+        colliders.clear();
+    }
+
+    void CopyProceduralMeshToModelData(const BioProcedural::MeshData& src, Object3d::ModelData& dst) {
+        dst.vertices.resize(src.vertices.size());
+        for (size_t i = 0; i < src.vertices.size(); ++i) {
+            const auto& sv = src.vertices[i];
+            dst.vertices[i].position = { sv.position.x, sv.position.y, sv.position.z, 1.0f };
+            dst.vertices[i].normal   = { sv.normal.x, sv.normal.y, sv.normal.z };
+            dst.vertices[i].texcoord = { sv.texcoord.u, sv.texcoord.v };
+        }
+        dst.indices = src.indices;
+    }
+
+    void AssignTextureWithFallback(const char* preferredPath, Object3d::ModelData& modelData) {
+        const std::string resolved = FileExists(preferredPath) ? preferredPath : kCheckerTexPath;
+        modelData.material.textureFilePath = resolved;
+        modelData.material.textureIndex = TextureManager::GetInstance()->Load(resolved);
+    }
+
+    int ResolveSelectedAfterLoad(size_t objectCount) {
+        return (objectCount > 0) ? 0 : -1;
+    }
 } // namespace
 
 LevelEditor::~LevelEditor()
 {
-    CollisionManager* colManager = CollisionManager::GetInstance();
-    if (colManager)
-    {
-        for (auto& collider : colliders_)
-        {
-            if (collider)
-            {
-                colManager->UnregisterCollider(collider.get());
-            }
-        }
-    }
-    colliders_.clear();
+    UnregisterAndClearColliders(colliders_);
 }
 
 void LevelEditor::Initialize(DirectXCom* dxCommon, Object3dCom* object3dCom)
@@ -54,76 +242,61 @@ void LevelEditor::Initialize(DirectXCom* dxCommon, Object3dCom* object3dCom)
     dxCommon_ = dxCommon;
     object3dCom_ = object3dCom;
 
-    // 軸ヘルパー用シリンダーの作成 (X=赤, Y=緑, Z=青)
     MaterialManager* matManager = SceneManager::GetInstance()->GetMaterialManager();
     Light* light = SceneManager::GetInstance()->GetLight();
     Camera* camera = object3dCom_ ? object3dCom_->GetDefaultCamera() : nullptr;
 
-    for (int i = 0; i < 3; ++i)
+    for (size_t i = 0; i < kAxisCount; ++i)
     {
         axisCylinders_[i] = std::make_unique<Cylinder>();
-        // 細長いシリンダー: 半径0.015f, 高さ1.2f
-        axisCylinders_[i]->Initialize(dxCommon_, object3dCom_, matManager, light, camera, 16, 0.015f, 0.015f, 1.2f);
+        axisCylinders_[i]->Initialize(
+            dxCommon_, object3dCom_, matManager, light, camera,
+            kAxisCylinderSlices, kAxisCylinderRadius, kAxisCylinderRadius, kAxisCylinderHeight);
         axisCylinders_[i]->SetOverlayDraw(true);
-    }
-    axisTextureIndex_ = TextureManager::GetInstance()->Load("Resources/uvChecker.png");
 
-    // 軸用のマテリアルリソースを作成・初期化
-    Vector4 axisColors[3] = {
-        { 1.0f, 0.1f, 0.1f, 1.0f }, // X (Red)
-        { 0.1f, 1.0f, 0.1f, 1.0f }, // Y (Green)
-        { 0.1f, 0.1f, 1.0f, 1.0f }  // Z (Blue)
-    };
-
-    for (int i = 0; i < 3; ++i)
-    {
         axisMaterialResources_[i] = dxCommon_->CreateBufferResource(dxCommon_->GetDevice().Get(), sizeof(Material));
         Material* data = nullptr;
         axisMaterialResources_[i]->Map(0, nullptr, reinterpret_cast<void**>(&data));
         if (data)
         {
-            data->color = axisColors[i];
-            data->enableLighting = 0; // ライティング無効にして鮮明に見せる
+            data->color = kAxisColors[i];
+            data->enableLighting = 0;
             data->specularModel = 0;
             data->shininess = 0.0f;
             data->uvTransform = MakeIdentity4x4();
             data->reflectionFactor = 0.0f;
-            data->fresnelF0 = 0.00f;
+            data->fresnelF0 = 0.0f;
             std::memset(data->padding2, 0, sizeof(data->padding2));
             axisMaterialResources_[i]->Unmap(0, nullptr);
         }
     }
+    axisTextureIndex_ = TextureManager::GetInstance()->Load(kCheckerTexPath);
 
-    // 初期化時にサンプルデータを読み込み試行、なければデフォルト配置
-    if (!LoadFromFile(currentFilepath_))
+    if (!LoadFromFile(currentFilepath_) && !std::filesystem::exists(currentFilepath_))
     {
-        // ファイル自体が存在しない場合のみ、デフォルトの GroundPlane をメモリ上に追加（勝手に上書きセーブはしない）
-        if (!std::filesystem::exists(currentFilepath_))
-        {
-            AddObject("GroundPlane", "Resources", "plane.obj", true);
-        }
+        AddObject("GroundPlane", "Resources", "plane.obj", true);
     }
 }
 
 void LevelEditor::Update(float deltaTime)
 {
-    // キーボード入力による選択オブジェクトの移動 (ImGuiで文字入力中以外)
-    if (selectedIndex_ >= 0 && selectedIndex_ < static_cast<int>(objectDatas_.size()) && !ImGui::GetIO().WantTextInput)
+    if (AppDebugState::IsDeveloperImGuiVisible() &&
+        selectedIndex_ >= 0 && selectedIndex_ < static_cast<int>(objectDatas_.size()) &&
+        !ImGui::GetIO().WantTextInput && IsAppWindowFocused())
     {
-        float speed = (GetAsyncKeyState(VK_SHIFT) & 0x8000) ? 12.0f : 4.0f;
-        float moveDist = speed * deltaTime;
+        const float speed = IsAppKeyDown(VK_SHIFT) ? kFastViewportMoveSpeed : kNormalViewportMoveSpeed;
+        const float moveDist = speed * deltaTime;
 
         auto& obj = objectDatas_[selectedIndex_];
-        if (GetAsyncKeyState(VK_LEFT) & 0x8000)  { obj.position.x -= moveDist; }
-        if (GetAsyncKeyState(VK_RIGHT) & 0x8000) { obj.position.x += moveDist; }
-        if (GetAsyncKeyState(VK_UP) & 0x8000)    { obj.position.z += moveDist; }
-        if (GetAsyncKeyState(VK_DOWN) & 0x8000)  { obj.position.z -= moveDist; }
-        if (GetAsyncKeyState(VK_PRIOR) & 0x8000) { obj.position.y += moveDist; } // PageUp
-        if (GetAsyncKeyState(VK_NEXT) & 0x8000)  { obj.position.y -= moveDist; } // PageDown
+        if (IsAppKeyDown(VK_LEFT))  { obj.position.x -= moveDist; }
+        if (IsAppKeyDown(VK_RIGHT)) { obj.position.x += moveDist; }
+        if (IsAppKeyDown(VK_UP))    { obj.position.z += moveDist; }
+        if (IsAppKeyDown(VK_DOWN))  { obj.position.z -= moveDist; }
+        if (IsAppKeyDown(VK_PRIOR)) { obj.position.y += moveDist; }
+        if (IsAppKeyDown(VK_NEXT))  { obj.position.y -= moveDist; }
     }
 
-    // UI側のTransform変更を実行時の3Dオブジェクトに同期して更新
-    size_t count = std::min(objectDatas_.size(), runtimeObjects_.size());
+    const size_t count = (std::min)(objectDatas_.size(), runtimeObjects_.size());
     for (size_t i = 0; i < count; ++i)
     {
         if (!runtimeObjects_[i]) continue;
@@ -134,46 +307,33 @@ void LevelEditor::Update(float deltaTime)
         runtimeObjects_[i]->Update();
     }
 
-    // 川オブジェクトの更新
     for (auto& river : rivers_)
     {
         if (river) river->Update(deltaTime);
     }
 
-    // 軸ヘルパーシリンダーの座標・回転・スケールを更新
     if (selectedIndex_ >= 0 && selectedIndex_ < static_cast<int>(objectDatas_.size()))
     {
-        Vector3 center = objectDatas_[selectedIndex_].position;
-        
-        // X軸 (赤): ロールを-90度 (-1.5707963f)
-        Sprite::Transform tX = { {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, -1.5707963f}, center };
-        axisCylinders_[0]->SetTransform(tX);
-        axisCylinders_[0]->Update();
-
-        // Y軸 (緑): 無回転
-        Sprite::Transform tY = { {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, center };
-        axisCylinders_[1]->SetTransform(tY);
-        axisCylinders_[1]->Update();
-
-        // Z軸 (青): ピッチを90度 (1.5707963f)
-        Sprite::Transform tZ = { {1.0f, 1.0f, 1.0f}, {1.5707963f, 0.0f, 0.0f}, center };
-        axisCylinders_[2]->SetTransform(tZ);
-        axisCylinders_[2]->Update();
+        const Vector3 center = objectDatas_[selectedIndex_].position;
+        for (size_t i = 0; i < kAxisCount; ++i)
+        {
+            const Sprite::Transform axisTransform{ { 1.0f, 1.0f, 1.0f }, kAxisRotations[i], center };
+            axisCylinders_[i]->SetTransform(axisTransform);
+            axisCylinders_[i]->Update();
+        }
     }
 
-    // 自動リロード（ホットリロード）処理
     if (autoReloadEnabled_ && !currentFilepath_.empty())
     {
         static int reloadCheckCooldown = 0;
-        // 毎フレームのIO負荷を下げるため、約30フレームに1回チェック
-        if (++reloadCheckCooldown >= 30)
+        if (++reloadCheckCooldown >= kReloadCheckIntervalFrames)
         {
             reloadCheckCooldown = 0;
             try
             {
                 if (std::filesystem::exists(currentFilepath_))
                 {
-                    auto lastWrite = std::filesystem::last_write_time(currentFilepath_);
+                    const auto lastWrite = std::filesystem::last_write_time(currentFilepath_);
                     if (lastWrite > lastLoadedTime_)
                     {
                         if (currentFilepath_.rfind(".json") != std::string::npos)
@@ -190,7 +350,6 @@ void LevelEditor::Update(float deltaTime)
             }
             catch (...)
             {
-                // ファイル書き込み中のロック競合などによるエラーの防止
             }
         }
     }
@@ -200,7 +359,12 @@ void LevelEditor::Draw(const RenderContext& ctx)
 {
     if (!object3dCom_) return;
 
-    size_t count = std::min(objectDatas_.size(), runtimeObjects_.size());
+    MaterialManager* matMgr = SceneManager::GetInstance()->GetMaterialManager();
+    TextureManager* texMgr = TextureManager::GetInstance();
+    const uint32_t dummyTex = texMgr->Load(kCheckerTexPath);
+    const D3D12_GPU_DESCRIPTOR_HANDLE fallbackSrv = texMgr->GetSrvHandleGPU(dummyTex);
+
+    const size_t count = (std::min)(objectDatas_.size(), runtimeObjects_.size());
     for (size_t i = 0; i < count; ++i)
     {
         auto& obj = runtimeObjects_[i];
@@ -209,101 +373,65 @@ void LevelEditor::Draw(const RenderContext& ctx)
         const auto& modelData = obj->GetModelData();
         RenderContext localCtx = ctx;
 
-        // Tree の場合はプロシージャルカラー（鮮やかなグリーン）をセット
-        MaterialManager* matMgr = SceneManager::GetInstance()->GetMaterialManager();
         if (matMgr)
         {
-            if (objectDatas_[i].type == "Tree")
-            {
-                matMgr->GetMaterialDataColor() = { 0.25f, 0.80f, 0.25f, 1.0f }; // 鮮やかな森林グリーン
-            }
-            else
-            {
-                matMgr->GetMaterialDataColor() = { 1.0f, 1.0f, 1.0f, 1.0f }; // 通常カラー
-            }
+            matMgr->GetMaterialDataColor() = (objectDatas_[i].type == "Tree")
+                ? kTreeDrawMaterialColor
+                : kDefaultDrawMaterialColor;
         }
 
-        // モデル個別のテクスチャを指定
-        if (modelData.material.textureIndex != TextureManager::kInvalidTextureIndex)
-        {
-            localCtx.textureHandle = TextureManager::GetInstance()->GetSrvHandleGPU(modelData.material.textureIndex);
-        }
-        else
-        {
-            // D3D12の未初期化デスクリプタアクセスエラーを防ぐため、デフォルトのテクスチャをバインド
-            uint32_t dummyTex = TextureManager::GetInstance()->Load("Resources/uvChecker.png");
-            localCtx.textureHandle = TextureManager::GetInstance()->GetSrvHandleGPU(dummyTex);
-        }
+        localCtx.textureHandle = (modelData.material.textureIndex != TextureManager::kInvalidTextureIndex)
+            ? texMgr->GetSrvHandleGPU(modelData.material.textureIndex)
+            : fallbackSrv;
 
         object3dCom_->Draw(obj.get(), localCtx, modelData, true);
     }
 
-    // 川(River)の描画
     for (auto& river : rivers_)
     {
         if (river)
         {
-            uint32_t texIndex = TextureManager::GetInstance()->Load("Resources/uvChecker.png");
-            river->Draw(TextureManager::GetInstance()->GetSrvHandleGPU(texIndex));
+            river->Draw(fallbackSrv);
         }
     }
-
-    // 選択オブジェクトがあれば3D軸ヘルパー（赤、緑、青のシリンダー）を描画
-    /*
-    if (selectedIndex_ >= 0 && selectedIndex_ < static_cast<int>(objectDatas_.size()))
-    {
-        // ...
-    }
-    */
 }
 
 void LevelEditor::DrawImGui()
 {
-    // スタイル調整（モダンなダークカラー）
-    ImGui::PushStyleColor(ImGuiCol_TitleBgActive, ImVec4(0.2f, 0.1f, 0.4f, 1.0f));
-    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.26f, 0.22f, 0.45f, 1.0f));
-    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.35f, 0.3f, 0.6f, 1.0f));
-    ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(0.3f, 0.2f, 0.5f, 0.8f));
+    ImGui::PushStyleColor(ImGuiCol_TitleBgActive, kUiColTitleBgActive);
+    ImGui::PushStyleColor(ImGuiCol_Button,        kUiColButton);
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, kUiColButtonHovered);
+    ImGui::PushStyleColor(ImGuiCol_Header,        kUiColHeader);
 
-    // ==========================================
-    // 1. Level Editor ウィンドウ (File I/O, Hierarchy, Add)
-    // ==========================================
     if (ImGui::Begin("Level Editor"))
     {
-        // ファイル操作
-        ImGui::TextColored(ImVec4(0.7f, 0.6f, 0.9f, 1.0f), "[ File IO ]");
+        ImGui::TextColored(kUiColSectionHeader, "[ File IO ]");
         ImGui::Text("Current File: %s", currentFilepath_.c_str());
-        static char filepathBuf[256] = "Resources/stage_layout.json";
+        static char filepathBuf[kPathBufferSize] = "Resources/stage_layout.json";
         ImGui::InputText("File Path", filepathBuf, sizeof(filepathBuf));
-        if (ImGui::Button("Save Level"))
+        if (ImGui::Button("Save Level") && SaveToFile(filepathBuf))
         {
-            if (SaveToFile(filepathBuf))
-            {
-                currentFilepath_ = filepathBuf;
-            }
+            currentFilepath_ = filepathBuf;
         }
         ImGui::SameLine();
-        if (ImGui::Button("Load Level"))
+        if (ImGui::Button("Load Level") && LoadFromFile(filepathBuf))
         {
-            if (LoadFromFile(filepathBuf))
-            {
-                currentFilepath_ = filepathBuf;
-            }
+            currentFilepath_ = filepathBuf;
         }
         ImGui::SameLine();
         ImGui::Checkbox("Auto Reload", &autoReloadEnabled_);
 
         ImGui::Separator();
 
-        // オブジェクト一覧（ヒエラルキー）
-        ImGui::TextColored(ImVec4(0.7f, 0.6f, 0.9f, 1.0f), "[ Hierarchy ]");
-        if (ImGui::BeginChild("HierarchyList", ImVec2(0, 150), true))
+        ImGui::TextColored(kUiColSectionHeader, "[ Hierarchy ]");
+        if (ImGui::BeginChild("HierarchyList", ImVec2(0.0f, kHierarchyListHeight), true))
         {
             for (int i = 0; i < static_cast<int>(objectDatas_.size()); ++i)
             {
-                char label[128];
-                // 一意のIDを確保するため ##%d を末尾に付与
-                sprintf_s(label, "%s (%s)##%d", objectDatas_[i].name.c_str(), objectDatas_[i].isStatic ? "Static" : "Dynamic", i);
+                char label[kLabelBufferSize];
+                sprintf_s(label, "%s (%s)##%d",
+                    objectDatas_[i].name.c_str(),
+                    objectDatas_[i].isStatic ? "Static" : "Dynamic", i);
                 if (ImGui::Selectable(label, selectedIndex_ == i))
                 {
                     selectedIndex_ = i;
@@ -314,82 +442,65 @@ void LevelEditor::DrawImGui()
 
         ImGui::Separator();
 
-        // 新規オブジェクト追加パネル
-        ImGui::TextColored(ImVec4(0.7f, 0.6f, 0.9f, 1.0f), "[ Add New Object ]");
+        ImGui::TextColored(kUiColSectionHeader, "[ Add New Object ]");
         ImGui::InputText("New Name", addName_, sizeof(addName_));
         ImGui::InputText("New Model Dir", addDir_, sizeof(addDir_));
         ImGui::InputText("New Model File", addFile_, sizeof(addFile_));
         ImGui::Checkbox("New Is Static", &addIsStatic_);
-
         if (ImGui::Button("Add Object"))
         {
             AddObject(addName_, addDir_, addFile_, addIsStatic_);
         }
 
         ImGui::Spacing();
-        // 敵スポーン用クイックプリセット
-        ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "[ Enemy Spawner Presets ]");
-        if (ImGui::Button("+ Sentry Enemy"))
+        ImGui::TextColored(kUiColEnemySection, "[ Enemy Spawner Presets ]");
+
+        struct EnemyPresetSpec {
+            const char* buttonLabel;
+            const char* nameFormat;
+            const char* spawnType;
+            bool        sameLineBefore;
+        };
+        static constexpr EnemyPresetSpec kEnemyPresets[] = {
+            { "+ Sentry Enemy",    "Enemy_Sentry_%d",    "EnemySpawn",           false },
+            { "+ Patrol Enemy",    "Enemy_Patrol_%d",    "EnemySpawn_Patrol",    true  },
+            { "+ Reinforce Spawn", "Enemy_Reinforce_%d", "EnemySpawn_Reinforce", true  },
+        };
+        static int presetCounters[std::size(kEnemyPresets)] = { 1, 1, 1 };
+
+        for (size_t p = 0; p < std::size(kEnemyPresets); ++p)
         {
-            static int sentryCount = 1;
-            char sName[64];
-            sprintf_s(sName, "Enemy_Sentry_%d", sentryCount++);
-            AddObject(sName, "Resources", "Enemy_Spawn_Point.obj", false);
-            if (!objectDatas_.empty()) {
-                objectDatas_.back().type = "EnemySpawn";
-            }
-        }
-        ImGui::SameLine();
-        if (ImGui::Button("+ Patrol Enemy"))
-        {
-            static int patrolCount = 1;
-            char pName[64];
-            sprintf_s(pName, "Enemy_Patrol_%d", patrolCount++);
-            AddObject(pName, "Resources", "Enemy_Spawn_Point.obj", false);
-            if (!objectDatas_.empty()) {
-                objectDatas_.back().type = "EnemySpawn_Patrol";
-            }
-        }
-        ImGui::SameLine();
-        if (ImGui::Button("+ Reinforce Spawn"))
-        {
-            static int reinCount = 1;
-            char rName[64];
-            sprintf_s(rName, "Enemy_Reinforce_%d", reinCount++);
-            AddObject(rName, "Resources", "Enemy_Spawn_Point.obj", false);
-            if (!objectDatas_.empty()) {
-                objectDatas_.back().type = "EnemySpawn_Reinforce";
+            if (kEnemyPresets[p].sameLineBefore) ImGui::SameLine();
+            if (ImGui::Button(kEnemyPresets[p].buttonLabel))
+            {
+                char spawnerName[kPresetNameBufSize];
+                sprintf_s(spawnerName, kEnemyPresets[p].nameFormat, presetCounters[p]++);
+                AddObject(spawnerName, "Resources", kEnemySpawnObjFile, false);
+                if (!objectDatas_.empty())
+                {
+                    objectDatas_.back().type = kEnemyPresets[p].spawnType;
+                }
             }
         }
     }
     ImGui::End();
 
-    // ==========================================
-    // 2. Inspector (Parameters) ウィンドウ
-    // ==========================================
     if (ImGui::Begin("Inspector"))
     {
         if (selectedIndex_ >= 0 && selectedIndex_ < static_cast<int>(objectDatas_.size()))
         {
             auto& obj = objectDatas_[selectedIndex_];
-            ImGui::TextColored(ImVec4(0.7f, 0.6f, 0.9f, 1.0f), "[ Parameters: %s ]", obj.name.c_str());
+            ImGui::TextColored(kUiColSectionHeader, "[ Parameters: %s ]", obj.name.c_str());
 
-            char nameBuf[128];
+            char nameBuf[kLabelBufferSize];
             strcpy_s(nameBuf, obj.name.c_str());
-            if (ImGui::InputText("Name", nameBuf, sizeof(nameBuf)))
-            {
-                obj.name = nameBuf;
-            }
+            if (ImGui::InputText("Name", nameBuf, sizeof(nameBuf))) { obj.name = nameBuf; }
 
-            char typeBuf[128];
+            char typeBuf[kLabelBufferSize];
             strcpy_s(typeBuf, obj.type.c_str());
-            if (ImGui::InputText("Type", typeBuf, sizeof(typeBuf)))
-            {
-                obj.type = typeBuf;
-            }
+            if (ImGui::InputText("Type", typeBuf, sizeof(typeBuf))) { obj.type = typeBuf; }
 
-            // 既存オブジェクトのモデル情報編集
-            char dirBuf[256];
+            char dirBuf[kPathBufferSize];
             strcpy_s(dirBuf, obj.modelDirectory.c_str());
             if (ImGui::InputText("Model Dir", dirBuf, sizeof(dirBuf), ImGuiInputTextFlags_EnterReturnsTrue))
             {
@@ -397,7 +508,7 @@ void LevelEditor::DrawImGui()
                 RefreshRuntimeObjects();
             }
 
-            char fileBuf[256];
+            char fileBuf[kPathBufferSize];
             strcpy_s(fileBuf, obj.modelFilename.c_str());
             if (ImGui::InputText("Model File", fileBuf, sizeof(fileBuf), ImGuiInputTextFlags_EnterReturnsTrue))
             {
@@ -406,35 +517,23 @@ void LevelEditor::DrawImGui()
             }
             ImGui::TextDisabled("(Press Enter to apply model path changes)");
 
-            std::string fullPath = obj.modelDirectory + "/" + obj.modelFilename;
-            if (!FileExists(fullPath))
+            if (!FileExists(obj.modelDirectory + "/" + obj.modelFilename))
             {
-                ImGui::TextColored(ImVec4(1.0f, 0.3f, 0.3f, 1.0f), "Warning: Specified file not found!");
+                ImGui::TextColored(kUiColWarningText, "Warning: Specified file not found!");
             }
 
-            // 操作説明
-            ImGui::TextColored(ImVec4(0.4f, 0.8f, 0.4f, 1.0f), "Viewport Move Hotkeys:");
+            ImGui::TextColored(kUiColHotkeyHeader, "Viewport Move Hotkeys:");
             ImGui::Text("- Arrow keys: Move on X/Z plane\n- PageUp/PageDown: Move on Y axis\n- Hold Shift: Move faster\n- Ctrl+Click Drag to type exact value");
 
-            // Transformドラッグ入力 (微調整用)
-            ImGui::DragFloat3("Position", &obj.position.x, 0.05f, -1000.0f, 1000.0f);
+            ImGui::DragFloat3("Position", &obj.position.x, kDragPosSpeed, -kDragPosLimit, kDragPosLimit);
 
-            // 角度表示をラジアンから度数法(Degrees)に変換してドラッグ操作
-            Vector3 rotDegrees = {
-                obj.rotation.x * 180.0f / 3.14159265f,
-                obj.rotation.y * 180.0f / 3.14159265f,
-                obj.rotation.z * 180.0f / 3.14159265f
-            };
-            if (ImGui::DragFloat3("Rotation", &rotDegrees.x, 0.5f, -360.0f, 360.0f))
+            Vector3 rotDegrees = obj.rotation * kRadToDeg;
+            if (ImGui::DragFloat3("Rotation", &rotDegrees.x, kDragRotSpeed, -kDragRotLimit, kDragRotLimit))
             {
-                obj.rotation.x = rotDegrees.x * 3.14159265f / 180.0f;
-                obj.rotation.y = rotDegrees.y * 3.14159265f / 180.0f;
-                obj.rotation.z = rotDegrees.z * 3.14159265f / 180.0f;
+                obj.rotation = rotDegrees * kDegToRad;
             }
 
-            // スケールのドラッグ入力 (微調整用)
-            ImGui::DragFloat3("Scale", &obj.scale.x, 0.01f, 0.001f, 1000.0f);
-
+            ImGui::DragFloat3("Scale", &obj.scale.x, kDragScaleSpeed, kDragScaleMin, kDragScaleMax);
             ImGui::Checkbox("Is Static", &obj.isStatic);
 
             ImGui::Separator();
@@ -452,14 +551,7 @@ void LevelEditor::DrawImGui()
             {
                 objectDatas_.erase(objectDatas_.begin() + selectedIndex_);
                 RefreshRuntimeObjects();
-                if (!objectDatas_.empty())
-                {
-                    selectedIndex_ = 0;
-                }
-                else
-                {
-                    selectedIndex_ = -1;
-                }
+                selectedIndex_ = ResolveSelectedAfterLoad(objectDatas_.size());
             }
         }
         else
@@ -469,7 +561,7 @@ void LevelEditor::DrawImGui()
     }
     ImGui::End();
 
-    ImGui::PopStyleColor(4);
+    ImGui::PopStyleColor(kPushedStyleColorCount);
 }
 
 bool LevelEditor::SaveToFile(const std::string& filepath)
@@ -482,9 +574,7 @@ bool LevelEditor::SaveToFile(const std::string& filepath)
     std::ofstream file(filepath);
     if (!file.is_open()) return false;
 
-    // ヘッダー行
     file << "#Name,Directory,Filename,px,py,pz,rx,ry,rz,sx,sy,sz,isStatic\n";
-
     for (const auto& obj : objectDatas_)
     {
         file << obj.name << ","
@@ -495,7 +585,6 @@ bool LevelEditor::SaveToFile(const std::string& filepath)
              << obj.scale.x << "," << obj.scale.y << "," << obj.scale.z << ","
              << (obj.isStatic ? 1 : 0) << "\n";
     }
-
     return true;
 }
 
@@ -508,33 +597,31 @@ bool LevelEditor::SaveToJson(const std::string& filepath)
         nlohmann::json item;
         item["name"] = obj.name;
         item["type"] = obj.type;
-
-        item["position"] = { {"x", obj.position.x}, {"y", obj.position.y}, {"z", obj.position.z} };
-        item["rotation"] = { {"x", obj.rotation.x}, {"y", obj.rotation.y}, {"z", obj.rotation.z} };
-        item["scale"] = { {"x", obj.scale.x}, {"y", obj.scale.y}, {"z", obj.scale.z} };
+        item["position"] = { { "x", obj.position.x }, { "y", obj.position.y }, { "z", obj.position.z } };
+        item["rotation"] = { { "x", obj.rotation.x }, { "y", obj.rotation.y }, { "z", obj.rotation.z } };
+        item["scale"]    = { { "x", obj.scale.x },    { "y", obj.scale.y },    { "z", obj.scale.z } };
         item["isStatic"] = obj.isStatic;
 
         if (obj.type == "Tree" || obj.type == "Rock")
         {
-            nlohmann::json params;
-            params["seed"] = obj.seed;
-            params["iterations"] = obj.iterations;
-            params["branchLength"] = obj.branchLength;
-            params["branchRadius"] = obj.branchRadius;
-            params["taperRate"] = obj.taperRate;
-            params["angle"] = obj.angle;
-            params["subdivisions"] = obj.subdivisions;
-            params["noiseStrength"] = obj.noiseStrength;
-            params["voronoiStrength"] = obj.voronoiStrength;
-            params["crackStrength"] = obj.crackStrength;
-            item["parameters"] = params;
+            item["parameters"] = {
+                { "seed",            obj.seed },
+                { "iterations",      obj.iterations },
+                { "branchLength",    obj.branchLength },
+                { "branchRadius",    obj.branchRadius },
+                { "taperRate",       obj.taperRate },
+                { "angle",           obj.angle },
+                { "subdivisions",    obj.subdivisions },
+                { "noiseStrength",   obj.noiseStrength },
+                { "voronoiStrength", obj.voronoiStrength },
+                { "crackStrength",   obj.crackStrength },
+            };
         }
-
         j.push_back(item);
     }
 
-    // 安全なアトミック書き込み（中断・クラッシュによる0バイト破損を防止）
-    if (!BaziruEngine::IO::JsonSafeLoader::SaveSafe(filepath, j, 4)) {
+    if (!BaziruEngine::IO::JsonSafeLoader::SaveSafe(filepath, j, kJsonIndentSpaces))
+    {
         OutputDebugStringA(("[LevelEditor] Failed to save JSON: " + filepath + "\n").c_str());
         return false;
     }
@@ -556,33 +643,25 @@ bool LevelEditor::LoadFromFile(const std::string& filepath)
 
     while (std::getline(file, line))
     {
-        if (line.empty() || line[0] == '#') continue; // 空行・コメント行スキップ
+        if (line.empty() || line[0] == '#') continue;
 
-        auto tokens = SplitCSVLine(line, ',');
-        if (tokens.size() < 13) continue; // 不完全な行はスキップ
+        const auto tokens = SplitCSVLine(line, ',');
+        if (tokens.size() < kCsvMinColumnCount) continue;
 
         LevelObjectData obj;
-        obj.name = tokens[0];
-        obj.modelDirectory = tokens[1];
-        obj.modelFilename = tokens[2];
-        obj.position = { std::stof(tokens[3]), std::stof(tokens[4]), std::stof(tokens[5]) };
-        obj.rotation = { std::stof(tokens[6]), std::stof(tokens[7]), std::stof(tokens[8]) };
-        obj.scale = { std::stof(tokens[9]), std::stof(tokens[10]), std::stof(tokens[11]) };
-        obj.isStatic = (std::stoi(tokens[12]) != 0);
-
+        obj.name           = tokens[kCsvColName];
+        obj.modelDirectory = tokens[kCsvColDir];
+        obj.modelFilename  = tokens[kCsvColFile];
+        obj.position       = { std::stof(tokens[kCsvColPosX]),   std::stof(tokens[kCsvColPosY]),   std::stof(tokens[kCsvColPosZ]) };
+        obj.rotation       = { std::stof(tokens[kCsvColRotX]),   std::stof(tokens[kCsvColRotY]),   std::stof(tokens[kCsvColRotZ]) };
+        obj.scale          = { std::stof(tokens[kCsvColScaleX]), std::stof(tokens[kCsvColScaleY]), std::stof(tokens[kCsvColScaleZ]) };
+        obj.isStatic       = (std::stoi(tokens[kCsvColIsStatic]) != 0);
         tempDatas.push_back(obj);
     }
 
     objectDatas_ = std::move(tempDatas);
     RefreshRuntimeObjects();
-    if (!objectDatas_.empty())
-    {
-        selectedIndex_ = 0;
-    }
-    else
-    {
-        selectedIndex_ = -1;
-    }
+    selectedIndex_ = ResolveSelectedAfterLoad(objectDatas_.size());
 
     if (std::filesystem::exists(filepath))
     {
@@ -594,7 +673,8 @@ bool LevelEditor::LoadFromFile(const std::string& filepath)
 bool LevelEditor::LoadFromJson(const std::string& filepath)
 {
     nlohmann::json j;
-    if (!BaziruEngine::IO::JsonSafeLoader::LoadSafe(filepath, j)) {
+    if (!BaziruEngine::IO::JsonSafeLoader::LoadSafe(filepath, j))
+    {
         OutputDebugStringA(("[LevelEditor] Failed to load JSON (corrupted or missing): " + filepath + "\n").c_str());
         return false;
     }
@@ -610,18 +690,12 @@ bool LevelEditor::LoadFromJson(const std::string& filepath)
 
         if (obj.type == "River" && item.contains("parameters") && item["parameters"].contains("points"))
         {
-            // 旧カーブ形式の川オブジェクトのパースと生成
-            std::vector<Vector3> points;
-            float width = 2.0f;
-            float flowSpeed = 1.0f;
-            float waveScale = 1.0f;
-            Vector4 color = { 0.1f, 0.4f, 0.9f, 0.8f };
-
             const auto& params = item["parameters"];
-            width = params.value("river_width", 2.0f);
-            flowSpeed = params.value("river_flow_speed", 1.0f);
-            waveScale = params.value("river_wave_scale", 1.0f);
+            const float width     = params.value("river_width", kDefaultRiverWidth);
+            const float flowSpeed = params.value("river_flow_speed", kDefaultRiverFlowSpeed);
+            const float waveScale = params.value("river_wave_scale", kDefaultRiverWaveScale);
 
+            std::vector<Vector3> points;
             for (const auto& pt : params["points"])
             {
                 points.push_back({ pt.value("x", 0.0f), pt.value("y", 0.0f), pt.value("z", 0.0f) });
@@ -631,158 +705,148 @@ bool LevelEditor::LoadFromJson(const std::string& filepath)
             Camera* camera = object3dCom_ ? object3dCom_->GetDefaultCamera() : nullptr;
             MaterialManager* matManager = SceneManager::GetInstance()->GetMaterialManager();
             Light* light = SceneManager::GetInstance()->GetLight();
-
-            river->Initialize(dxCommon_, object3dCom_, matManager, light, camera, points, width, flowSpeed, waveScale, color);
+            river->Initialize(dxCommon_, object3dCom_, matManager, light, camera, points, width, flowSpeed, waveScale, kDefaultRiverColor);
             tempRivers.push_back(std::move(river));
 
-            // --- 🎉 川のカーブに沿って大岩・小石(ShoreRock)＆沿岸森林(Tree)を高密度プロシージャル構築 ---
             if (points.size() >= 2)
             {
-                float halfW = width * 0.5f;
-                static std::mt19937 rng(12345);
+                const float halfW = width * 0.5f;
+                static std::mt19937 rng(kRiverProceduralSeed);
                 static std::uniform_real_distribution<float> dist01(0.0f, 1.0f);
 
                 for (size_t pIdx = 0; pIdx < points.size(); ++pIdx)
                 {
-                    Vector3 pt = points[pIdx];
+                    const Vector3 pt = points[pIdx];
                     Vector3 dir = { 0.0f, 0.0f, 1.0f };
-                    if (pIdx + 1 < points.size()) dir = { points[pIdx + 1].x - pt.x, 0.0f, points[pIdx + 1].z - pt.z };
-                    else if (pIdx > 0) dir = { pt.x - points[pIdx - 1].x, 0.0f, pt.z - points[pIdx - 1].z };
-
-                    float dLen = std::sqrt(dir.x * dir.x + dir.z * dir.z);
-                    if (dLen > 0.0001f) { dir.x /= dLen; dir.z /= dLen; }
-                    Vector3 side = { -dir.z, 0.0f, dir.x };
-
-                    // 1. 水際の高密度小石・大岩 (Shore Rocks & Boulders: 川の外側陸地にのみ配置)
-                    for (float sideSign : {-1.0f, 1.0f})
+                    if (pIdx + 1 < points.size())
                     {
-                        int rockCount = 1 + static_cast<int>(dist01(rng) * 2.0f);
+                        dir = { points[pIdx + 1].x - pt.x, 0.0f, points[pIdx + 1].z - pt.z };
+                    }
+                    else if (pIdx > 0)
+                    {
+                        dir = { pt.x - points[pIdx - 1].x, 0.0f, pt.z - points[pIdx - 1].z };
+                    }
+
+                    const float dLen = std::sqrt(dir.x * dir.x + dir.z * dir.z);
+                    if (dLen > kDirNormalizeEps)
+                    {
+                        dir.x /= dLen;
+                        dir.z /= dLen;
+                    }
+                    const Vector3 side = { -dir.z, 0.0f, dir.x };
+
+                    // 1. 水際の小石・大岩
+                    for (float sideSign : { -1.0f, 1.0f })
+                    {
+                        const int rockCount = 1 + static_cast<int>(dist01(rng) * 2.0f);
                         for (int r = 0; r < rockCount; ++r)
                         {
-                            float offset = halfW + 0.5f + dist01(rng) * 1.2f; // 川幅の外側+0.5m以上の安全オフセット
-                            float randX = dist01(rng) * 0.4f - 0.2f;
-                            float randZ = dist01(rng) * 0.4f - 0.2f;
+                            const float offset = halfW + kRockBaseOffset + dist01(rng) * kRockOffsetSpan;
+                            const float randX  = dist01(rng) * kShorePosJitterSpan - kShorePosJitterHalf;
+                            const float randZ  = dist01(rng) * kShorePosJitterSpan - kShorePosJitterHalf;
 
                             LevelObjectData rockObj;
-                            rockObj.name = "ShoreRock";
-                            rockObj.type = "Rock";
+                            rockObj.name           = "ShoreRock";
+                            rockObj.type           = "Rock";
                             rockObj.modelDirectory = "Resources";
-                            rockObj.modelFilename = "sphere.obj";
-                            rockObj.position = { pt.x + sideSign * side.x * offset + randX, pt.y, pt.z + sideSign * side.z * offset + randZ };
-                            
-                            bool isBigBoulder = (dist01(rng) < 0.2f);
-                            float s = isBigBoulder ? (0.6f + dist01(rng) * 0.4f) : (0.25f + dist01(rng) * 0.3f);
-                            rockObj.scale = { s, s * (0.5f + dist01(rng) * 0.5f), s };
-                            rockObj.rotation = { dist01(rng) * 3.14f, dist01(rng) * 3.14f, dist01(rng) * 3.14f };
-                            rockObj.seed = static_cast<int>(dist01(rng) * 99999);
-                            rockObj.subdivisions = 3;
-                            rockObj.noiseStrength = 0.3f;
-                            rockObj.voronoiStrength = 0.2f;
-                            rockObj.crackStrength = 0.25f;
+                            rockObj.modelFilename  = "sphere.obj";
+                            rockObj.position       = { pt.x + sideSign * side.x * offset + randX, pt.y, pt.z + sideSign * side.z * offset + randZ };
 
+                            const bool isBigBoulder = (dist01(rng) < kBigBoulderProbability);
+                            const float s = isBigBoulder
+                                ? (kBigBoulderMinScale + dist01(rng) * kBigBoulderScaleSpan)
+                                : (kSmallRockMinScale + dist01(rng) * kSmallRockScaleSpan);
+                            rockObj.scale           = { s, s * (0.5f + dist01(rng) * 0.5f), s };
+                            rockObj.rotation        = { dist01(rng) * kPi, dist01(rng) * kPi, dist01(rng) * kPi };
+                            rockObj.seed            = static_cast<int>(dist01(rng) * kMaxRandomSeedScale);
+                            rockObj.subdivisions    = kShoreRockSubdivisions;
+                            rockObj.noiseStrength   = kShoreRockNoise;
+                            rockObj.voronoiStrength = kShoreRockVoronoi;
+                            rockObj.crackStrength   = kShoreRockCrack;
                             tempDatas.push_back(rockObj);
                         }
                     }
 
-                    // 2. 岸辺の自然な水辺の茂み (Shore Grass: 川の境界外側に配置)
-                    for (float sideSign : {-1.0f, 1.0f})
+                    // 2. 岸辺の水辺の茂み
+                    for (float sideSign : { -1.0f, 1.0f })
                     {
-                        if (dist01(rng) < 0.55f)
+                        if (dist01(rng) < kReedSpawnProbability)
                         {
-                            float offset = halfW + 0.6f + dist01(rng) * 0.8f; // 川の外側+0.6m以上の安全オフセット
-                            float randX = dist01(rng) * 0.4f - 0.2f;
-                            float randZ = dist01(rng) * 0.4f - 0.2f;
+                            const float offset = halfW + kReedBaseOffset + dist01(rng) * kReedOffsetSpan;
+                            const float randX  = dist01(rng) * kShorePosJitterSpan - kShorePosJitterHalf;
+                            const float randZ  = dist01(rng) * kShorePosJitterSpan - kShorePosJitterHalf;
 
                             LevelObjectData grassObj;
-                            grassObj.name = "ShoreReeds";
-                            grassObj.type = "Tree";
+                            grassObj.name           = "ShoreReeds";
+                            grassObj.type           = "Tree";
                             grassObj.modelDirectory = "Resources";
-                            grassObj.modelFilename = "tree.obj";
-                            grassObj.position = { pt.x + sideSign * side.x * offset + randX, pt.y, pt.z + sideSign * side.z * offset + randZ };
-                            
-                            float gs = 0.3f + dist01(rng) * 0.25f;
-                            grassObj.scale = { gs * 0.7f, gs * 0.65f, gs * 0.7f };
-                            grassObj.rotation = { 0.0f, dist01(rng) * 6.28f, 0.0f };
-                            grassObj.seed = static_cast<int>(dist01(rng) * 99999);
-                            grassObj.iterations = 2;
-                            grassObj.branchLength = 0.12f;
-                            grassObj.branchRadius = 0.05f;
-                            grassObj.taperRate = 0.8f;
-                            grassObj.angle = 25.0f;
+                            grassObj.modelFilename  = "tree.obj";
+                            grassObj.position       = { pt.x + sideSign * side.x * offset + randX, pt.y, pt.z + sideSign * side.z * offset + randZ };
 
+                            const float gs = kReedMinScale + dist01(rng) * kReedScaleSpan;
+                            grassObj.scale        = { gs * kReedScaleXZRatio, gs * kReedScaleYRatio, gs * kReedScaleXZRatio };
+                            grassObj.rotation     = { 0.0f, dist01(rng) * kTwoPi, 0.0f };
+                            grassObj.seed         = static_cast<int>(dist01(rng) * kMaxRandomSeedScale);
+                            grassObj.iterations   = kReedIterations;
+                            grassObj.branchLength = kReedBranchLength;
+                            grassObj.branchRadius = kReedBranchRadius;
+                            grassObj.taperRate    = kReedTaperRate;
+                            grassObj.angle        = kReedAngle;
                             tempDatas.push_back(grassObj);
                         }
                     }
 
-                    // 3. 沿岸の立体森林 (Dense Riverbank Forest: 川から十分離れた陸地)
-                    for (float sideSign : {-1.0f, 1.0f})
+                    // 3. 沿岸の立体森林
+                    for (float sideSign : { -1.0f, 1.0f })
                     {
-                        if (dist01(rng) < 0.8f)
+                        if (dist01(rng) < kBankTreeSpawnProbability)
                         {
-                            float offset = halfW + 2.5f + dist01(rng) * 4.5f; // 川から2.5m以上十分離す
-                            float randX = dist01(rng) * 1.0f - 0.5f;
-                            float randZ = dist01(rng) * 1.0f - 0.5f;
+                            const float offset = halfW + kBankTreeBaseOffset + dist01(rng) * kBankTreeOffsetSpan;
+                            const float randX  = dist01(rng) - 0.5f;
+                            const float randZ  = dist01(rng) - 0.5f;
 
                             LevelObjectData treeObj;
-                            treeObj.name = "RiverTree";
-                            treeObj.type = "Tree";
+                            treeObj.name           = "RiverTree";
+                            treeObj.type           = "Tree";
                             treeObj.modelDirectory = "Resources";
-                            treeObj.modelFilename = "tree.obj";
-                            treeObj.position = { pt.x + sideSign * side.x * offset + randX, pt.y, pt.z + sideSign * side.z * offset + randZ };
-                            
-                            float ts = 0.8f + dist01(rng) * 0.7f;
-                            treeObj.scale = { ts, ts * (0.9f + dist01(rng) * 0.3f), ts };
-                            treeObj.rotation = { 0.0f, dist01(rng) * 6.28f, 0.0f };
-                            treeObj.seed = static_cast<int>(dist01(rng) * 99999);
-                            treeObj.iterations = 2;
-                            treeObj.branchLength = 0.16f;
-                            treeObj.branchRadius = 0.07f;
-                            treeObj.taperRate = 0.8f;
-                            treeObj.angle = 25.0f;
+                            treeObj.modelFilename  = "tree.obj";
+                            treeObj.position       = { pt.x + sideSign * side.x * offset + randX, pt.y, pt.z + sideSign * side.z * offset + randZ };
 
+                            const float ts = kBankTreeMinScale + dist01(rng) * kBankTreeScaleSpan;
+                            treeObj.scale        = { ts, ts * (kBankTreeScaleYBase + dist01(rng) * kBankTreeScaleYSpan), ts };
+                            treeObj.rotation     = { 0.0f, dist01(rng) * kTwoPi, 0.0f };
+                            treeObj.seed         = static_cast<int>(dist01(rng) * kMaxRandomSeedScale);
+                            treeObj.iterations   = kBankTreeIterations;
+                            treeObj.branchLength = kBankTreeBranchLength;
+                            treeObj.branchRadius = kBankTreeBranchRadius;
+                            treeObj.taperRate    = kBankTreeTaperRate;
+                            treeObj.angle        = kBankTreeAngle;
                             tempDatas.push_back(treeObj);
                         }
                     }
                 }
             }
-
             continue;
         }
 
-        // CSV互換のためにデフォルトを設定
         obj.modelDirectory = "Resources";
-        if (obj.type == "Tree" || obj.type == "Rock")
-        {
-            obj.modelFilename = "Outputs/ProceduralAsset_LOD0.obj"; // ダミー
-        }
-        else
-        {
-            obj.modelFilename = "plane.obj";
-        }
+        obj.modelFilename  = (obj.type == "Tree" || obj.type == "Rock")
+            ? "Outputs/ProceduralAsset_LOD0.obj"
+            : "plane.obj";
 
-        // JSONに modelDirectory / modelFilename フィールドがあれば上書き読み込み
-        if (item.contains("modelDirectory"))
-        {
-            obj.modelDirectory = item["modelDirectory"].get<std::string>();
-        }
-        if (item.contains("modelFilename"))
-        {
-            obj.modelFilename = item["modelFilename"].get<std::string>();
-        }
+        if (item.contains("modelDirectory")) { obj.modelDirectory = item["modelDirectory"].get<std::string>(); }
+        if (item.contains("modelFilename"))  { obj.modelFilename  = item["modelFilename"].get<std::string>(); }
 
-        // position
         if (item.contains("position"))
         {
             const auto& pos = item["position"];
             obj.position = { pos.value("x", 0.0f), pos.value("y", 0.0f), pos.value("z", 0.0f) };
         }
-        // rotation
         if (item.contains("rotation"))
         {
             const auto& rot = item["rotation"];
             obj.rotation = { rot.value("x", 0.0f), rot.value("y", 0.0f), rot.value("z", 0.0f) };
         }
-        // scale
         if (item.contains("scale"))
         {
             const auto& scl = item["scale"];
@@ -791,21 +855,20 @@ bool LevelEditor::LoadFromJson(const std::string& filepath)
 
         obj.isStatic = item.value("isStatic", true);
 
-        // parameters
         if (item.contains("parameters"))
         {
             const auto& params = item["parameters"];
-            obj.seed = params.value("seed", 0);
-            obj.iterations = params.value("iterations", 3);
-            obj.branchLength = params.value("branchLength", 1.0f);
-            obj.branchRadius = params.value("branchRadius", 0.1f);
-            obj.taperRate = params.value("taperRate", 0.8f);
-            obj.angle = params.value("angle", 25.0f);
-            obj.subdivisions = params.value("subdivisions", 3);
-            obj.noiseStrength = params.value("noiseStrength", 0.3f);
-            obj.voronoiStrength = params.value("voronoiStrength", 0.2f);
-            obj.crackStrength = params.value("crackStrength", 0.4f);
-            obj.biomeZoneType = params.value("biome_zone_type", "");
+            obj.seed            = params.value("seed", 0);
+            obj.iterations      = params.value("iterations", kJsonDefaultIterations);
+            obj.branchLength    = params.value("branchLength", kJsonDefaultBranchLength);
+            obj.branchRadius    = params.value("branchRadius", kJsonDefaultBranchRadius);
+            obj.taperRate       = params.value("taperRate", kJsonDefaultTaperRate);
+            obj.angle           = params.value("angle", kJsonDefaultAngle);
+            obj.subdivisions    = params.value("subdivisions", kJsonDefaultSubdivisions);
+            obj.noiseStrength   = params.value("noiseStrength", kJsonDefaultNoise);
+            obj.voronoiStrength = params.value("voronoiStrength", kJsonDefaultVoronoi);
+            obj.crackStrength   = params.value("crackStrength", kJsonDefaultCrack);
+            obj.biomeZoneType   = params.value("biome_zone_type", "");
         }
 
         tempDatas.push_back(obj);
@@ -814,15 +877,7 @@ bool LevelEditor::LoadFromJson(const std::string& filepath)
     objectDatas_ = std::move(tempDatas);
     rivers_ = std::move(tempRivers);
     RefreshRuntimeObjects();
-
-    if (!objectDatas_.empty())
-    {
-        selectedIndex_ = 0;
-    }
-    else
-    {
-        selectedIndex_ = -1;
-    }
+    selectedIndex_ = ResolveSelectedAfterLoad(objectDatas_.size());
 
     if (std::filesystem::exists(filepath))
     {
@@ -833,48 +888,35 @@ bool LevelEditor::LoadFromJson(const std::string& filepath)
 
 void LevelEditor::RefreshRuntimeObjects()
 {
-    // 古いコライダーの登録解除とクリア
-    CollisionManager* colManager = CollisionManager::GetInstance();
-    if (colManager)
-    {
-        for (auto& collider : colliders_)
-        {
-            if (collider)
-            {
-                colManager->UnregisterCollider(collider.get());
-            }
-        }
-    }
-    colliders_.clear();
-
+    UnregisterAndClearColliders(colliders_);
     runtimeObjects_.clear();
+
+    CollisionManager* colManager = CollisionManager::GetInstance();
 
     for (size_t idx = 0; idx < objectDatas_.size(); ++idx)
     {
         const auto& objData = objectDatas_[idx];
-        std::string cacheKey;
-        bool isProcedural = (objData.type == "Tree" || objData.type == "Rock");
-        bool isBiome = (objData.type == "Biome");
-        bool isSpawnOrLoot = (objData.type == "PlayerSpawn" || objData.type == "EnemySpawn" || objData.type == "LootBox");
+        const bool isProcedural  = (objData.type == "Tree" || objData.type == "Rock");
+        const bool isBiome       = (objData.type == "Biome");
+        const bool isSpawnOrLoot = (objData.type == "PlayerSpawn" || objData.type == "EnemySpawn" || objData.type == "LootBox");
 
+        std::string cacheKey;
         if (isProcedural)
         {
+            std::ostringstream oss;
             if (objData.type == "Tree")
             {
-                std::ostringstream oss;
                 oss << "ProcTree_" << objData.seed << "_" << objData.iterations << "_"
                     << objData.branchLength << "_" << objData.branchRadius << "_"
                     << objData.taperRate << "_" << objData.angle;
-                cacheKey = oss.str();
             }
             else
             {
-                std::ostringstream oss;
                 oss << "ProcRock_" << objData.seed << "_" << objData.subdivisions << "_"
                     << objData.noiseStrength << "_" << objData.voronoiStrength << "_"
                     << objData.crackStrength;
-                cacheKey = oss.str();
             }
+            cacheKey = oss.str();
         }
         else if (isSpawnOrLoot)
         {
@@ -889,7 +931,6 @@ void LevelEditor::RefreshRuntimeObjects()
             cacheKey = objData.modelDirectory + "/" + objData.modelFilename;
         }
 
-        // キャッシュからロード、存在しなければ新規作成
         auto it = modelCache_.find(cacheKey);
         if (it == modelCache_.end())
         {
@@ -901,189 +942,114 @@ void LevelEditor::RefreshRuntimeObjects()
                 if (objData.type == "Tree")
                 {
                     BioProcedural::TreeParameters params;
-                    params.seed = objData.seed;
-                    params.iterations = objData.iterations;
-                    params.branchLength = objData.branchLength;
-                    params.branchRadius = objData.branchRadius;
-                    params.taperRate = objData.taperRate;
-                    params.angle = objData.angle;
-                    params.radialSegments = 8;
-                    
+                    params.seed           = objData.seed;
+                    params.iterations     = objData.iterations;
+                    params.branchLength   = objData.branchLength;
+                    params.branchRadius   = objData.branchRadius;
+                    params.taperRate      = objData.taperRate;
+                    params.angle          = objData.angle;
+                    params.radialSegments = kTreeRadialSegments;
                     procMesh = BioProcedural::BioProceduralGenerator::GenerateTree(params);
                 }
                 else
                 {
                     BioProcedural::RockParameters params;
-                    params.seed = objData.seed;
-                    params.subdivisions = objData.subdivisions;
-                    params.noiseStrength = objData.noiseStrength;
+                    params.seed            = objData.seed;
+                    params.subdivisions    = objData.subdivisions;
+                    params.noiseStrength   = objData.noiseStrength;
                     params.voronoiStrength = objData.voronoiStrength;
-                    params.crackStrength = objData.crackStrength;
-                    
+                    params.crackStrength   = objData.crackStrength;
                     procMesh = BioProcedural::BioProceduralGenerator::GenerateRock(params);
                 }
 
-                modelData.vertices.resize(procMesh.vertices.size());
-                for (size_t i = 0; i < procMesh.vertices.size(); ++i)
-                {
-                    modelData.vertices[i].position = { procMesh.vertices[i].position.x, procMesh.vertices[i].position.y, procMesh.vertices[i].position.z, 1.0f };
-                    modelData.vertices[i].normal = { procMesh.vertices[i].normal.x, procMesh.vertices[i].normal.y, procMesh.vertices[i].normal.z };
-                    modelData.vertices[i].texcoord = { procMesh.vertices[i].texcoord.u, procMesh.vertices[i].texcoord.v };
-                }
-                modelData.indices = procMesh.indices;
-
-                // プロシージャル樹木は無地白テクスチャを割り当て
-                if (objData.type == "Tree")
-                {
-                    std::string whiteTex = "Resources/CG4/human/white.png";
-                    if (!FileExists(whiteTex))
-                    {
-                        whiteTex = "Resources/uvChecker.png";
-                    }
-                    modelData.material.textureFilePath = whiteTex;
-                    modelData.material.textureIndex = TextureManager::GetInstance()->Load(whiteTex);
-                }
-                else
-                {
-                    std::string texturePath = "Resources/Outputs/ProceduralAsset_LOD0_atlas.tga";
-                    if (!FileExists(texturePath))
-                    {
-                        texturePath = "Resources/uvChecker.png";
-                    }
-                    modelData.material.textureFilePath = texturePath;
-                    modelData.material.textureIndex = TextureManager::GetInstance()->Load(texturePath);
-                }
+                CopyProceduralMeshToModelData(procMesh, modelData);
+                AssignTextureWithFallback((objData.type == "Tree") ? kWhiteTexPath : kRockAtlasTexPath, modelData);
             }
             else if (isSpawnOrLoot)
             {
-                BioProcedural::MeshData customMesh;
-                if (objData.type == "LootBox")
-                {
-                    customMesh = BioProcedural::BioProceduralGenerator::GenerateBoxShape();
-                }
-                else
-                {
-                    customMesh = BioProcedural::BioProceduralGenerator::GenerateHumanShape();
-                }
-
-                modelData.vertices.resize(customMesh.vertices.size());
-                for (size_t i = 0; i < customMesh.vertices.size(); ++i)
-                {
-                    modelData.vertices[i].position = { customMesh.vertices[i].position.x, customMesh.vertices[i].position.y, customMesh.vertices[i].position.z, 1.0f };
-                    modelData.vertices[i].normal = { customMesh.vertices[i].normal.x, customMesh.vertices[i].normal.y, customMesh.vertices[i].normal.z };
-                    modelData.vertices[i].texcoord = { customMesh.vertices[i].texcoord.u, customMesh.vertices[i].texcoord.v };
-                }
-                modelData.indices = customMesh.indices;
-
-                std::string whiteTex = "Resources/CG4/human/white.png";
-                if (!FileExists(whiteTex)) whiteTex = "Resources/uvChecker.png";
-                modelData.material.textureFilePath = whiteTex;
-                modelData.material.textureIndex = TextureManager::GetInstance()->Load(whiteTex);
+                const BioProcedural::MeshData customMesh = (objData.type == "LootBox")
+                    ? BioProcedural::BioProceduralGenerator::GenerateBoxShape()
+                    : BioProcedural::BioProceduralGenerator::GenerateHumanShape();
+                CopyProceduralMeshToModelData(customMesh, modelData);
+                AssignTextureWithFallback(kWhiteTexPath, modelData);
             }
             else if (isBiome)
             {
-                // バイオーム境界板
-                std::string fullPath = "Resources/plane.obj";
-                if (FileExists(fullPath))
+                if (FileExists("Resources/plane.obj"))
                 {
                     modelData = Object3d::LoadObjFile("Resources", "plane.obj");
                     modelData.material.textureIndex = TextureManager::kInvalidTextureIndex;
-                    modelData.material.textureFilePath = "";
+                    modelData.material.textureFilePath.clear();
                 }
             }
             else
             {
-                std::string fullPath = objData.modelDirectory + "/" + objData.modelFilename;
+                const std::string fullPath = objData.modelDirectory + "/" + objData.modelFilename;
                 if (!FileExists(fullPath))
                 {
                     runtimeObjects_.push_back(nullptr);
                     continue;
                 }
-                if (objData.modelFilename.rfind(".obj") != std::string::npos)
-                {
-                    modelData = Object3d::LoadObjFile(objData.modelDirectory, objData.modelFilename);
-                }
-                else
-                {
-                    modelData = Object3d::LoadModelFile(objData.modelDirectory, objData.modelFilename);
-                }
+                modelData = (objData.modelFilename.rfind(".obj") != std::string::npos)
+                    ? Object3d::LoadObjFile(objData.modelDirectory, objData.modelFilename)
+                    : Object3d::LoadModelFile(objData.modelDirectory, objData.modelFilename);
             }
 
-            modelCache_[cacheKey] = modelData;
-            it = modelCache_.find(cacheKey);
+            it = modelCache_.emplace(cacheKey, std::move(modelData)).first;
         }
 
         auto runtimeObj = std::make_unique<Object3d>();
         runtimeObj->Initialize(object3dCom_, it->second);
         runtimeObj->SetTranslate(objData.position);
 
-        if (isBiome)
-        {
-            // Blenderの水平面(Z-upのXY平面)をDirectXの水平面(Y-upのXZ平面)に合わせるため、X軸で90度(1.57079ラジアン)回転させる
-            Vector3 rotated = objData.rotation;
-            rotated.x += 1.57079f;
-            runtimeObj->SetRotate(rotated);
-        }
-        else
-        {
-            runtimeObj->SetRotate(objData.rotation);
-        }
-
+        Vector3 appliedRot = objData.rotation;
+        if (isBiome) { appliedRot.x += kHalfPi; }
+        runtimeObj->SetRotate(appliedRot);
         runtimeObj->SetScale(objData.scale);
         runtimeObj->SetEnableLighting(true);
 
-        // タイプに応じた確定マテリアルカラーを設定（白化を100%防止）
-        if (objData.type == "Tree")
+        for (const auto& entry : kObjectTypeColors)
         {
-            runtimeObj->SetColor({ 0.25f, 0.85f, 0.30f, 1.0f }); // 鮮やかな森林グリーン
-        }
-        else if (objData.type == "Rock")
-        {
-            runtimeObj->SetColor({ 0.55f, 0.55f, 0.55f, 1.0f }); // ナチュラルな岩グレー
-        }
-        else if (objData.type == "PlayerSpawn")
-        {
-            runtimeObj->SetColor({ 0.20f, 0.60f, 1.00f, 1.0f }); // 青色
-        }
-        else if (objData.type == "EnemySpawn")
-        {
-            runtimeObj->SetColor({ 1.00f, 0.25f, 0.25f, 1.0f }); // 赤色
-        }
-        else if (objData.type == "LootBox")
-        {
-            runtimeObj->SetColor({ 1.00f, 0.80f, 0.20f, 1.0f }); // 金色
+            if (objData.type == entry.typeName)
+            {
+                runtimeObj->SetColor(entry.color);
+                break;
+            }
         }
 
         if (isBiome)
         {
-            Vector4 color = { 0.5f, 0.5f, 0.5f, 0.4f }; // デフォルト (グレー半透明)
-            if (objData.biomeZoneType == "Forest")          { color = { 0.1f, 0.7f, 0.1f, 0.4f }; }
-            else if (objData.biomeZoneType == "Desert")     { color = { 0.7f, 0.6f, 0.2f, 0.4f }; }
-            else if (objData.biomeZoneType == "River")      { color = { 0.1f, 0.4f, 0.8f, 0.4f }; }
-            else if (objData.biomeZoneType == "Grassland")  { color = { 0.5f, 0.8f, 0.1f, 0.4f }; }
-            runtimeObj->SetColor(color);
-            runtimeObj->SetEnableLighting(false); // ライトを無効にしてゾーンカラーをクリアに描画
+            Vector4 zoneColor = kDefaultBiomeZoneColor;
+            for (const auto& entry : kBiomeZoneColors)
+            {
+                if (objData.biomeZoneType == entry.typeName)
+                {
+                    zoneColor = entry.color;
+                    break;
+                }
+            }
+            runtimeObj->SetColor(zoneColor);
+            runtimeObj->SetEnableLighting(false);
         }
 
         runtimeObj->Update();
-
         runtimeObjects_.push_back(std::move(runtimeObj));
 
-        // プロシージャルオブジェクトならコライダーも生成して登録する
         if (isProcedural && colManager)
         {
             std::unique_ptr<Collider> collider;
             if (objData.type == "Tree")
             {
-                float radius = objData.branchRadius * objData.scale.x;
-                float height = objData.branchLength * objData.scale.y * 3.0f; // 樹木の高さに比例
-                // vectorがリサイズされたり再配置されても安全なよう、&objData.position のアドレスは、RefreshRuntimeObjects が終わるまでは有効
-                collider = std::make_unique<CapsuleCollider>(radius, height, &const_cast<Vector3&>(objData.position), CollisionAttribute::Obstacle);
+                const float radius = objData.branchRadius * objData.scale.x;
+                const float height = objData.branchLength * objData.scale.y * kTreeColliderHeightScale;
+                collider = std::make_unique<CapsuleCollider>(
+                    radius, height, &const_cast<Vector3&>(objData.position), CollisionAttribute::Obstacle);
             }
-            else // Rock
+            else
             {
-                Vector3 size = { objData.scale.x * 2.0f, objData.scale.y * 2.0f, objData.scale.z * 2.0f };
-                collider = std::make_unique<BoxCollider>(size, &const_cast<Vector3&>(objData.position), nullptr, CollisionAttribute::Obstacle);
+                const Vector3 size = objData.scale * 2.0f;
+                collider = std::make_unique<BoxCollider>(
+                    size, &const_cast<Vector3&>(objData.position), nullptr, CollisionAttribute::Obstacle);
             }
 
             if (collider)
@@ -1098,14 +1064,13 @@ void LevelEditor::RefreshRuntimeObjects()
 void LevelEditor::AddObject(const std::string& name, const std::string& dir, const std::string& file, bool isStatic)
 {
     LevelObjectData obj;
-    obj.name = name;
+    obj.name           = name;
     obj.modelDirectory = dir;
-    obj.modelFilename = file;
-    // 重なりやZ-fightingを防ぐため、初期位置を少し上に浮かせます
-    obj.position = { 0.0f, 1.5f, 0.0f };
-    obj.rotation = { 0.0f, 0.0f, 0.0f };
-    obj.scale = { 1.0f, 1.0f, 1.0f };
-    obj.isStatic = isStatic;
+    obj.modelFilename  = file;
+    obj.position       = { 0.0f, kAddedObjectDefaultPosY, 0.0f };
+    obj.rotation       = { 0.0f, 0.0f, 0.0f };
+    obj.scale          = { 1.0f, 1.0f, 1.0f };
+    obj.isStatic       = isStatic;
 
     objectDatas_.push_back(obj);
     RefreshRuntimeObjects();
@@ -1115,8 +1080,8 @@ void LevelEditor::AddObject(const std::string& name, const std::string& dir, con
 void LevelEditor::Draw(SceneRenderRequests& renderRequests)
 {
     (void)renderRequests;
-    uint32_t defaultTex = TextureManager::GetInstance()->Load("Resources/uvChecker.png");
-    D3D12_GPU_DESCRIPTOR_HANDLE handle = TextureManager::GetInstance()->GetSrvHandleGPU(defaultTex);
+    const uint32_t defaultTex = TextureManager::GetInstance()->Load(kCheckerTexPath);
+    const D3D12_GPU_DESCRIPTOR_HANDLE handle = TextureManager::GetInstance()->GetSrvHandleGPU(defaultTex);
 
     for (auto& river : rivers_)
     {

@@ -1,5 +1,6 @@
 #pragma once
 #include <memory>
+#include <string>
 #include "Object3d.h"
 #include "Object3dCom.h"
 #include "Camera.h"
@@ -17,6 +18,9 @@ public:
 
     Vector3 GetPosition() const { return position_; }
     float GetRadius() const { return radius_; }
+    const std::string& GetModelFilename() const { return modelFilename_; }
+    bool IsTree() const { return isTree_; }
+    bool IsRiverWalkBarrier() const { return isRiverWalkBarrier_; }
     BoxCollider* GetCollider() const { return collider_.get(); }
     BoxCollider* GetCollider2() const { return extraColliders_.empty() ? nullptr : extraColliders_[0].get(); }
     const std::vector<std::unique_ptr<BoxCollider>>& GetExtraColliders() const { return extraColliders_; }
@@ -24,9 +28,13 @@ public:
 
 private:
     std::unique_ptr<Object3d> object3d_;
+    std::string modelFilename_;
     Vector3 position_;
     Vector3 rotation_;
     float radius_;
+    float treeSwayPhase_ = 0.0f;
+    bool isTree_ = false;
+    bool isRiverWalkBarrier_ = false;
     std::unique_ptr<BoxCollider> collider_;
     std::vector<std::unique_ptr<BoxCollider>> extraColliders_;
     std::unique_ptr<MeshCollider> meshCollider_;

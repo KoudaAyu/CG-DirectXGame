@@ -1,4 +1,5 @@
 #include "HelicopterInsertionController.h"
+#include "HelicopterInsertionTuning.h"
 #include "GamePlayScene.h"
 #include "SceneManager.h"
 #include "SkyBox.h"
@@ -8,40 +9,141 @@
 #include "TextureManager.h"
 #include "Baziru3_Engine/Framework/Audio/AudioManager.h"
 #include "Application/Transition/StingerTransition.h"
+#include "Application/UI/TacticalUICanvas.h"
 #include "../../Player/Player.h"
-#include <cmath>
+
 #include <algorithm>
+#include <cmath>
+#include <cstdio>
+#include <iterator>
+#include <span>
 
-#ifdef USE_IMGUI
-#include "imgui.h"
-#endif
+namespace
+{
+	using namespace HelicopterInsertionTuning;
+	using GameConfig::Math::kHalfPi;
+	using GameConfig::Math::kPi;
+	using GameConfig::Math::kTwoPi;
 
-namespace {
-	constexpr float kPi = 3.14159265358979323846f;
+	inline float Rand01() { return static_cast<float>(rand()) / static_cast<float>(RAND_MAX); }
+	inline float RandRange(float a, float b) { return a + (b - a) * Rand01(); }
+	inline float RandRangeVec(const Vector2& range) { return RandRange(range.x, range.y); }
 
-	inline float Length3(const Vector3& v)
+	inline Vector3 RandBoxVec3(float halfX, const Vector2& yRange, float halfZ)
 	{
-		return std::sqrt(v.x * v.x + v.y * v.y + v.z * v.z);
+		return { RandRange(-halfX, halfX), RandRangeVec(yRange), RandRange(-halfZ, halfZ) };
 	}
 
-	inline float Rand01()
+	inline void AdvanceWrappedAngle(float& angle, float speed, float dt)
 	{
-		return static_cast<float>(rand()) / static_cast<float>(RAND_MAX);
+		angle += speed * dt;
+		if (angle > kTwoPi) angle -= kTwoPi;
 	}
 
-	inline float RandRange(float a, float b)
+	inline float SmoothStep01(float x)
 	{
-		return a + (b - a) * Rand01();
+		const float t = std::clamp(x, 0.0f, 1.0f);
+		return t * t * (kSmoothStepLinear - 2.0f * t);
+	}
+
+	inline float EaseOutCubic(float x)
+	{
+		const float inv = 1.0f - std::clamp(x, 0.0f, 1.0f);
+		return 1.0f - inv * inv * inv;
+	}
+
+	inline Vector3 LerpVec3(const Vector3& a, const Vector3& b, float t)
+	{
+		return { a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t, a.z + (b.z - a.z) * t };
 	}
 
 	// 任意の視点(eye)から注視点(target)を捉える正確なカメラ回転（Pitch, Yaw, Roll）を算出
 	inline Vector3 CalcLookAtRotation(const Vector3& eye, const Vector3& target, float roll = 0.0f)
 	{
-		Vector3 dir = { target.x - eye.x, target.y - eye.y, target.z - eye.z };
-		float xzLen = std::sqrt(dir.x * dir.x + dir.z * dir.z);
-		float pitch = std::atan2(-dir.y, (std::max)(xzLen, 0.001f));
-		float yaw = std::atan2(dir.x, dir.z);
-		return { pitch, yaw, roll };
+		const Vector3 dir = { target.x - eye.x, target.y - eye.y, target.z - eye.z };
+		const float xzLen = std::sqrt(dir.x * dir.x + dir.z * dir.z);
+		return { std::atan2(-dir.y, (std::max)(xzLen, kLookAtMinXzLen)), std::atan2(dir.x, dir.z), roll };
+	}
+
+	// オイラー角から3D回転行列を生成し、ローカルオフセットを回転変換するヘルパー
+	inline Matrix4x4 MakeEulerRotationMatrix(const Vector3& rot)
+	{
+		return Multiply(MakeRotateXMatrix(rot.x), Multiply(MakeRotateYMatrix(rot.y), MakeRotateZMatrix(rot.z)));
+	}
+
+	inline Vector3 RotateByMatrix(const Matrix4x4& r, const Vector3& v)
+	{
+		return {
+			v.x * r.m[kAxisX][kAxisX] + v.y * r.m[kAxisY][kAxisX] + v.z * r.m[kAxisZ][kAxisX],
+			v.x * r.m[kAxisX][kAxisY] + v.y * r.m[kAxisY][kAxisY] + v.z * r.m[kAxisZ][kAxisY],
+			v.x * r.m[kAxisX][kAxisZ] + v.y * r.m[kAxisY][kAxisZ] + v.z * r.m[kAxisZ][kAxisZ]
+		};
+	}
+
+	inline Vector3 LocalToWorldWithMatrix(const Vector3& origin, const Matrix4x4& r, const Vector3& localOff)
+	{
+		return origin + RotateByMatrix(r, localOff);
+	}
+
+	inline uint32_t PackColor(const RgbColor& rgb, int alpha)
+	{
+		return UI_COL32(rgb.r, rgb.g, rgb.b, std::clamp(alpha, kAlphaMin, kAlphaMax));
+	}
+
+	inline uint32_t ResolveTex(uint32_t preferred, uint32_t fallback)
+	{
+		return (preferred != TextureManager::kInvalidTextureIndex) ? preferred : fallback;
+	}
+
+	inline void PlayDuckVoiceOnce(bool& playedFlag, int soundId)
+	{
+		if (!playedFlag && soundId >= 0 && SceneManager::GetInstance() && SceneManager::GetInstance()->GetAudioManager())
+		{
+			SceneManager::GetInstance()->GetAudioManager()->PlayOneShot(soundId, kDuckVoiceVolume);
+			playedFlag = true;
+		}
+	}
+
+	void BuildBoxListModel(Object3d::ModelData& data, std::span<const UvBoxSpec> boxes, float boundingRadius)
+	{
+		data.vertices.clear();
+		data.indices.clear();
+		data.vertices.reserve(boxes.size() * kBoxFaceCount * kFaceVertCount);
+		data.indices.reserve(boxes.size() * kBoxFaceCount * kFaceIndexCount);
+
+		for (const UvBoxSpec& box : boxes)
+		{
+			const Vector3 half = box.size * 0.5f;
+			Vector3 corners[kBoxCornerCount]{};
+			for (int c = 0; c < kBoxCornerCount; ++c)
+			{
+				corners[c] = {
+					box.center.x + half.x * kBoxCornerSigns[c].x,
+					box.center.y + half.y * kBoxCornerSigns[c].y,
+					box.center.z + half.z * kBoxCornerSigns[c].z
+				};
+			}
+
+			for (int f = 0; f < kBoxFaceCount; ++f)
+			{
+				const uint32_t fBase = static_cast<uint32_t>(data.vertices.size());
+				for (int v = 0; v < kFaceVertCount; ++v)
+				{
+					const Vector3& pt = corners[kBoxFaceVertices[f][v]];
+					Sprite::VertexData vd{};
+					vd.position = { pt.x, pt.y, pt.z, 1.0f };
+					vd.texcoord = { kFaceUseUvMaxX[v] ? box.uvMax.x : box.uvMin.x, kFaceUseUvMaxY[v] ? box.uvMax.y : box.uvMin.y };
+					vd.normal = kBoxFaceNormals[f];
+					data.vertices.push_back(vd);
+				}
+				for (int idx = 0; idx < kFaceIndexCount; ++idx)
+				{
+					data.indices.push_back(fBase + kQuadTriIndices[idx]);
+				}
+			}
+		}
+
+		data.boundingRadius = boundingRadius;
 	}
 
 	// 地上シャドウ用モデルデータ生成（円盤クアッドメッシュ）
@@ -49,34 +151,142 @@ namespace {
 	{
 		data.vertices.clear();
 		data.indices.clear();
-		Sprite::VertexData v0{}, v1{}, v2{}, v3{};
-		v0.position = { -rx, 0.0f, -rz, 1.0f };
-		v0.texcoord = { 0.0f, 0.0f };
-		v0.normal = { 0.0f, 1.0f, 0.0f };
+		data.vertices.reserve(kShadowVertCount);
+		data.indices.reserve(kShadowIndexCount);
 
-		v1.position = { rx, 0.0f, -rz, 1.0f };
-		v1.texcoord = { 1.0f, 0.0f };
-		v1.normal = { 0.0f, 1.0f, 0.0f };
+		for (int v = 0; v < kShadowVertCount; ++v)
+		{
+			Sprite::VertexData vd{};
+			vd.position = { rx * kShadowCornerSigns[v].x, 0.0f, rz * kShadowCornerSigns[v].y, 1.0f };
+			vd.texcoord = kShadowCornerUVs[v];
+			vd.normal = { 0.0f, 1.0f, 0.0f };
+			data.vertices.push_back(vd);
+		}
+		for (int i = 0; i < kShadowIndexCount; ++i)
+		{
+			data.indices.push_back(kShadowTriIndices[i]);
+		}
+	}
 
-		v2.position = { -rx, 0.0f, rz, 1.0f };
-		v2.texcoord = { 0.0f, 1.0f };
-		v2.normal = { 0.0f, 1.0f, 0.0f };
+	std::unique_ptr<Object3d> CreateModelObject(
+		auto* object3dCom, Camera* camera, const Object3d::ModelData& modelData, const Vector4& color, bool enableLighting = true)
+	{
+		auto obj = std::make_unique<Object3d>();
+		obj->Initialize(object3dCom, modelData);
+		obj->SetCamera(camera);
+		obj->SetColor(color);
+		obj->SetEnableLighting(enableLighting);
+		obj->SetAllowWireframeOverlay(false);
+		return obj;
+	}
 
-		v3.position = { rx, 0.0f, rz, 1.0f };
-		v3.texcoord = { 1.0f, 1.0f };
-		v3.normal = { 0.0f, 1.0f, 0.0f };
+	std::unique_ptr<Object3d> CreateSharedObject(auto* object3dCom, Camera* camera, Object3d* sharedSource, const Vector4& color)
+	{
+		auto obj = std::make_unique<Object3d>();
+		obj->InitializeShared(object3dCom, sharedSource);
+		obj->SetCamera(camera);
+		obj->SetColor(color);
+		obj->SetEnableLighting(true);
+		obj->SetAllowWireframeOverlay(false);
+		return obj;
+	}
 
-		data.vertices.push_back(v0);
-		data.vertices.push_back(v1);
-		data.vertices.push_back(v2);
-		data.vertices.push_back(v3);
+	std::unique_ptr<Object3d> CreateProceduralHeliPart(
+		auto* object3dCom, Camera* camera, std::span<const UvBoxSpec> boxes, float boundingRadius, uint32_t texIdx, const Vector4& color)
+	{
+		Object3d::ModelData data{};
+		BuildBoxListModel(data, boxes, boundingRadius);
+		data.material.textureFilePath = "Resources/helicopter_texture.png";
+		data.material.textureIndex = texIdx;
+		return CreateModelObject(object3dCom, camera, data, color);
+	}
 
-		data.indices.push_back(0);
-		data.indices.push_back(1);
-		data.indices.push_back(2);
-		data.indices.push_back(1);
-		data.indices.push_back(3);
-		data.indices.push_back(2);
+	Object3d::ModelData LoadHeliObjModel(const char* objFileName, uint32_t texIdx, float boundingRadius)
+	{
+		Object3d::ModelData data = Object3d::LoadObjFile("Resources", objFileName);
+		data.material.textureFilePath = "Resources/helicopter_texture.png";
+		data.material.textureIndex = texIdx;
+		data.boundingRadius = boundingRadius;
+		return data;
+	}
+
+	inline void UpdateObjectTransform(Object3d* obj, const Vector3& pos, const Vector3& rot, const Vector3& scale = kUnitScale)
+	{
+		if (!obj) return;
+		obj->SetTranslate(pos);
+		obj->SetRotate(rot);
+		obj->SetScale(scale);
+		obj->Update();
+	}
+
+	AppParticle MakeStyledParticle(
+		const Vector3& pos, const Vector3& vel, float rotZ, float initialScale,
+		float targetScale, float lifeTime, uint32_t texIdx, const ParticleStyleSpec& style)
+	{
+		AppParticle p{};
+		p.transform.Initialize();
+		p.transform.SetTranslate(pos);
+		if (rotZ != 0.0f) p.transform.SetRotate({ 0.0f, 0.0f, rotZ });
+		p.scaleAspect = style.scaleAspect;
+		p.initialScale = initialScale;
+		p.targetScale = targetScale;
+		p.transform.SetScale({ initialScale * style.scaleAspect.x, initialScale * style.scaleAspect.y, 1.0f });
+		p.velocity = vel;
+		p.color = style.color;
+		p.endColor = style.endColor;
+		p.hasColorShift = true;
+		p.lifeTime = lifeTime;
+		p.currentTime = 0.0f;
+		p.textureIndex = texIdx;
+		p.gravity = style.gravity;
+		p.drag = style.drag;
+		p.bounceElasticity = style.bounceElasticity;
+		p.fadeInRatio = style.fadeInRatio;
+		p.wobbleFreq = style.wobbleFreq;
+		p.wobbleAmp = style.wobbleAmp;
+		p.wobbleAxis = style.wobbleAxis;
+		p.slotLayer = style.slotLayer;
+		return p;
+	}
+
+	UIVec2 MeasureCineText(UIFontRole role, float fontSize, const char* text)
+	{
+		if (!text || !text[0]) return UIVec2(0.0f, 0.0f);
+		TacticalUICanvas* ui = TacticalUICanvas::GetInstance();
+		if (!ui) return UIVec2(0.0f, 0.0f);
+		return ui->CalcTextSize(text, nullptr, std::round(std::clamp(fontSize, kCineFontMinPx, kCineFontMaxPx)), role);
+	}
+
+	void DrawFramedBox(
+		TacticalDrawList* dl, float x, float y, float w, float h,
+		uint32_t bgCol, uint32_t borderCol, float borderThick = kBoxBorderThickness)
+	{
+		dl->AddRectFilled(UIVec2(x, y), UIVec2(x + w, y + h), bgCol, kBoxCornerRadius);
+		dl->AddRect(UIVec2(x, y), UIVec2(x + w, y + h), borderCol, kBoxCornerRadius, 0, borderThick);
+	}
+
+	void DrawCineTextAligned(
+		TacticalDrawList* dl, UIFontRole role, float fontSize,
+		float anchorX, float centerY, uint32_t col, const char* text, int align = kAlignLeft)
+	{
+		if (!dl || !text || !text[0]) return;
+		const uint32_t alphaByte = (col >> UI_COL32_A_SHIFT) & kByteMask;
+		if (alphaByte == 0u) return;
+		TacticalUICanvas* ui = TacticalUICanvas::GetInstance();
+		if (!ui) return;
+		const TacticalFont* font = ui->GetFont(role);
+		if (!font) return;
+
+		const float px = std::round(std::clamp(fontSize, kCineFontMinPx, kCineFontMaxPx));
+		const UIVec2 sz = ui->CalcTextSize(text, nullptr, px, role);
+		float tx = anchorX;
+		if (align == kAlignCenter) tx -= sz.x * 0.5f;
+		else if (align == kAlignRight) tx -= sz.x;
+		const float sx = std::round(tx);
+		const float sy = std::round(centerY - sz.y * 0.5f);
+		const int shA = static_cast<int>(alphaByte * kCineShadowAlphaRatio);
+		dl->AddText(font, px, UIVec2(sx + kCineShadowOffsetPx, sy + kCineShadowOffsetPx), PackColor(kColBlackRgb, shA), text);
+		dl->AddText(font, px, UIVec2(sx, sy), col, text);
 	}
 }
 
@@ -90,109 +300,75 @@ HelicopterInsertionController::~HelicopterInsertionController()
 	Finalize();
 }
 
+AppParticleManager* HelicopterInsertionController::GetSmokeMgr() const
+{
+	return scene_->smokeParticleManager_ ? scene_->smokeParticleManager_.get() : scene_->appParticleManager_.get();
+}
+
 void HelicopterInsertionController::Initialize()
 {
 	if (!scene_ || !scene_->object3dCom) return;
 
 	wasSkipped_ = false;
-	heliTexIndex_ = TextureManager::GetInstance()->Load("Resources/helicopter_texture.png");
-	whiteTexIndex_ = TextureManager::GetInstance()->Load("Resources/white.png");
-	spotTexIndex_ = TextureManager::GetInstance()->Load("Resources/circle2.png");
-	leafTexIndex_ = TextureManager::GetInstance()->Load("Resources/leaf.png");
+	auto* tm = TextureManager::GetInstance();
+	heliTexIndex_  = tm->Load("Resources/helicopter_texture.png");
+	whiteTexIndex_ = tm->Load("Resources/white.png");
+	spotTexIndex_  = tm->Load("Resources/circle2.png");
+	leafTexIndex_  = tm->Load("Resources/leaf.png");
 
-	// サウンドのプリロード
 	if (SceneManager::GetInstance() && SceneManager::GetInstance()->GetAudioManager())
 	{
 		duckSoundId_ = SceneManager::GetInstance()->GetAudioManager()->Load("Resources/Audio/SE_Duck.mp3");
 	}
 
-	uint32_t modelTexIdx = (heliTexIndex_ != TextureManager::kInvalidTextureIndex) ? heliTexIndex_ : whiteTexIndex_;
+	const uint32_t modelTexIdx = ResolveTex(heliTexIndex_, whiteTexIndex_);
 
-	// 1. ヘリコプター本体モデル (fuselage, cabin, tail, skids)
-	{
-		Object3d::ModelData bodyData = Object3d::LoadObjFile("Resources", "helicopter_body.obj");
-		bodyData.material.textureFilePath = "Resources/helicopter_texture.png";
-		bodyData.material.textureIndex = modelTexIdx;
-		bodyData.boundingRadius = 150.0f;
+	// 1. 機体本体・キャビン内装・スライドカーゴドア・ローター・ファストロープ・地上影
+	heliBody_ = CreateModelObject(
+		scene_->object3dCom, scene_->camera_, LoadHeliObjModel("helicopter_body.obj", modelTexIdx, kHeliModelBoundingRadius), kUnitWhiteColor);
+	heliCabinInterior_ = CreateProceduralHeliPart(
+		scene_->object3dCom, scene_->camera_, kCabinInteriorBoxes, kCabinInteriorBoundingRadius, modelTexIdx, kCabinInteriorColor);
+	heliCargoDoor_ = CreateProceduralHeliPart(
+		scene_->object3dCom, scene_->camera_, kCargoDoorBoxes, kCargoDoorBoundingRadius, modelTexIdx, kUnitWhiteColor);
 
-		heliBody_ = std::make_unique<Object3d>();
-		heliBody_->Initialize(scene_->object3dCom, bodyData);
-		heliBody_->SetCamera(scene_->camera_);
-		heliBody_->SetColor({ 1.0f, 1.0f, 1.0f, 1.0f });
-		heliBody_->SetEnableLighting(true);
-		heliBody_->SetAllowWireframeOverlay(false);
-	}
+	heliMainRotor_ = CreateModelObject(
+		scene_->object3dCom, scene_->camera_, LoadHeliObjModel("helicopter_rotor.obj", modelTexIdx, kHeliModelBoundingRadius), kUnitWhiteColor);
+	heliMainRotorBlur1_ = CreateSharedObject(scene_->object3dCom, scene_->camera_, heliMainRotor_.get(), kMainRotorBlur1Color);
+	heliMainRotorBlur2_ = CreateSharedObject(scene_->object3dCom, scene_->camera_, heliMainRotor_.get(), kMainRotorBlur2Color);
 
-	// 2. メインローターブレード (4枚羽・カーボンブラック ＆ イエロー警戒帯)
-	{
-		Object3d::ModelData rotorData = Object3d::LoadObjFile("Resources", "helicopter_rotor.obj");
-		rotorData.material.textureFilePath = "Resources/helicopter_texture.png";
-		rotorData.material.textureIndex = modelTexIdx;
-		rotorData.boundingRadius = 150.0f;
+	heliTailRotor_ = CreateModelObject(
+		scene_->object3dCom, scene_->camera_, LoadHeliObjModel("helicopter_tailrotor.obj", modelTexIdx, kHeliModelBoundingRadius), kUnitWhiteColor);
+	fastRope_ = CreateModelObject(
+		scene_->object3dCom, scene_->camera_, LoadHeliObjModel("fast_rope.obj", modelTexIdx, kFastRopeBoundingRadius), kUnitWhiteColor);
 
-		heliMainRotor_ = std::make_unique<Object3d>();
-		heliMainRotor_->Initialize(scene_->object3dCom, rotorData);
-		heliMainRotor_->SetCamera(scene_->camera_);
-		heliMainRotor_->SetColor({ 1.0f, 1.0f, 1.0f, 1.0f });
-		heliMainRotor_->SetEnableLighting(true);
-		heliMainRotor_->SetAllowWireframeOverlay(false);
-	}
+	Object3d::ModelData shadowData{};
+	BuildShadowDiscModel(shadowData, kShadowDiscRadiusX, kShadowDiscRadiusZ);
+	shadowData.material.textureFilePath = "Resources/circle2.png";
+	shadowData.material.textureIndex = ResolveTex(spotTexIndex_, whiteTexIndex_);
+	shadowData.boundingRadius = kShadowBoundingRadius;
+	heliShadow_ = CreateModelObject(scene_->object3dCom, scene_->camera_, shadowData, kInitialShadowColor, false);
 
-	// 3. テールローターブレード (2枚羽・カーボンブラック ＆ イエロー警戒帯)
-	{
-		Object3d::ModelData tailData = Object3d::LoadObjFile("Resources", "helicopter_tailrotor.obj");
-		tailData.material.textureFilePath = "Resources/helicopter_texture.png";
-		tailData.material.textureIndex = modelTexIdx;
-		tailData.boundingRadius = 150.0f;
-
-		heliTailRotor_ = std::make_unique<Object3d>();
-		heliTailRotor_->Initialize(scene_->object3dCom, tailData);
-		heliTailRotor_->SetCamera(scene_->camera_);
-		heliTailRotor_->SetColor({ 1.0f, 1.0f, 1.0f, 1.0f });
-		heliTailRotor_->SetEnableLighting(true);
-		heliTailRotor_->SetAllowWireframeOverlay(false);
-	}
-
-	// 4. 軍用ファストロープ (Braided Fast Rope, 21.0m長)
-	{
-		Object3d::ModelData ropeData = Object3d::LoadObjFile("Resources", "fast_rope.obj");
-		ropeData.material.textureFilePath = "Resources/helicopter_texture.png";
-		ropeData.material.textureIndex = modelTexIdx;
-		ropeData.boundingRadius = 50.0f;
-
-		fastRope_ = std::make_unique<Object3d>();
-		fastRope_->Initialize(scene_->object3dCom, ropeData);
-		fastRope_->SetCamera(scene_->camera_);
-		fastRope_->SetColor({ 1.0f, 1.0f, 1.0f, 1.0f });
-		fastRope_->SetEnableLighting(true);
-		fastRope_->SetAllowWireframeOverlay(false);
-	}
-
-	// 5. ヘリコプターの地上投影シャドウ (白昼光ソフトプロジェクション)
-	{
-		Object3d::ModelData shadowData{};
-		BuildShadowDiscModel(shadowData, 4.2f, 6.8f);
-		shadowData.material.textureFilePath = "Resources/circle2.png";
-		shadowData.material.textureIndex = (spotTexIndex_ != TextureManager::kInvalidTextureIndex) ? spotTexIndex_ : whiteTexIndex_;
-		shadowData.boundingRadius = 25.0f;
-
-		heliShadow_ = std::make_unique<Object3d>();
-		heliShadow_->Initialize(scene_->object3dCom, shadowData);
-		heliShadow_->SetCamera(scene_->camera_);
-		heliShadow_->SetColor({ 0.04f, 0.06f, 0.08f, 0.65f });
-		heliShadow_->SetEnableLighting(false);
-		heliShadow_->SetAllowWireframeOverlay(false);
-	}
-
-	// 初期状態セットアップ: ヘリは超遠空 (X: -45m, Y: 32m, Z: -80m) から高速急襲
+	// 初期状態セットアップ: 超遠空からの高速急襲アプローチ
 	isActive_ = true;
+	isExtractionVisible_ = false;
+	extractionApproachTimer_ = 0.0f;
+	pickupDescentBlend_ = 0.0f;
+	clearQuackPlayed_ = false;
+
 	timer_ = 0.0f;
-	heliPos_ = { -45.0f, 32.0f, -80.0f };
-	heliRot_ = { -0.15f, 0.08f, -0.32f };
+	heliPos_ = kInitialHeliPos;
+	heliRot_ = kInitialHeliRot;
 	mainRotorAngle_ = 0.0f;
 	tailRotorAngle_ = 0.0f;
+	doorSlideProgress_ = 1.0f;
+	ropeSwayAngleX_ = 0.0f;
+	ropeSwayAngleZ_ = 0.0f;
 	downwashDustTimer_ = 0.0f;
 	ropeSparkTimer_ = 0.0f;
+	rotorVortexTimer_ = 0.0f;
+	engineExhaustTimer_ = 0.0f;
+	beaconTimer_ = 0.0f;
+	tailRotorVortexTimer_ = 0.0f;
 	landed_ = false;
 	headSnapEmitted_ = false;
 	eyeGlintEmitted_ = false;
@@ -201,36 +377,38 @@ void HelicopterInsertionController::Initialize()
 	footstepDust2_ = false;
 	cockSparkEmitted_ = false;
 	duckVoiced_ = false;
+	wasSkipped_ = false;
+	skipInputArmed_ = false;
 
-	currentCut_ = 1;
-	prevCut_ = 1;
+	currentCut_ = kCutAct1;
+	prevCut_ = kCutAct1;
 	cutFlashAlpha_ = 0.0f;
 	impactFlashAlpha_ = 0.0f;
 
-	duckPos_ = heliPos_ + Vector3{ 0.0f, 0.10f, 0.75f };
-	duckScale_ = { 1.0f, 1.0f, 1.0f };
+	duckPos_ = LocalToWorldWithMatrix(heliPos_, MakeEulerRotationMatrix(heliRot_), kInitialCabinDuckOffset);
+	duckScale_ = kUnitScale;
 	duckRot_ = heliRot_;
 
-	// プレイヤー初期位置（ヘリキャビン内搭乗待機）
-	if (scene_->player_)
-	{
-		scene_->player_->SetIntroTransform(duckPos_, duckScale_, duckRot_);
-	}
+	if (scene_->player_) scene_->player_->SetIntroTransform(duckPos_, duckScale_, duckRot_);
 
-	// Cut 1 初回カメラ：低空樹木付近から遠空のヘリを仰ぎ見るシネマティック広角視点
 	if (scene_->camera_)
 	{
-		Vector3 eye = { -22.0f, 7.5f, -32.0f };
-		Vector3 target = heliPos_ + Vector3{ 0.0f, 0.4f, 0.0f };
-		scene_->camera_->SetTranslate(eye);
-		scene_->camera_->SetRotate(CalcLookAtRotation(eye, target, -0.06f));
+		scene_->camera_->SetTranslate(kAct1CamPosStart);
+		scene_->camera_->SetRotate(CalcLookAtRotation(kAct1CamPosStart, heliPos_ + kAct1CamLookOffset, kAct1CamRollStart));
 		scene_->camera_->Update();
 	}
+
+	UpdateHelicopterCommonParts(kInitRotorBlurOffset, true, 1.0f);
 }
 
 void HelicopterInsertionController::Finalize()
 {
+	rotorLoop_.Stop();
 	heliBody_.reset();
+	heliCabinInterior_.reset();
+	heliCargoDoor_.reset();
+	heliMainRotorBlur2_.reset();
+	heliMainRotorBlur1_.reset();
 	heliMainRotor_.reset();
 	heliTailRotor_.reset();
 	fastRope_.reset();
@@ -246,59 +424,46 @@ void HelicopterInsertionController::Skip()
 void HelicopterInsertionController::FinishInsertion()
 {
 	isActive_ = false;
+	rotorLoop_.Stop();
 
-	// プレイヤーを地面 (0, 0, 0) で通常戦闘待機状態に完全復帰
-	if (scene_ && scene_->player_)
-	{
-		scene_->player_->RestoreIntroPose();
-	}
+	if (scene_ && scene_->player_) scene_->player_->RestoreIntroPose();
 
-	// カメラを通常プレイ時のTPS斜め見下ろしプレイヤー追従へ合流
 	if (scene_ && scene_->camera_ && scene_->player_)
 	{
-		Vector3 targetCamPos = scene_->player_->GetPosition() + (GameConfig::Camera::kDefaultFollowOffset * scene_->cameraZoom_);
-		scene_->camera_->SetTranslate(targetCamPos);
+		scene_->camera_->SetTranslate(scene_->player_->GetPosition() + (GameConfig::Camera::kDefaultFollowOffset * scene_->cameraZoom_));
 		scene_->camera_->SetRotate(GameConfig::Camera::kFollowRotation);
 		scene_->camera_->Update();
 	}
 
-	// 全3Dオブジェクトを通常TPSカメラのWVP行列で即座に同期
 	if (scene_)
 	{
 		scene_->UpdateObstacles();
-		if (scene_->extractionPadObject_)
-		{
-			scene_->extractionPadObject_->Update();
-		}
+		if (scene_->extractionPadObject_) scene_->extractionPadObject_->Update();
+		if (scene_->extractionSignalFlareObject_) scene_->extractionSignalFlareObject_->Update();
 		for (auto& enemy : scene_->enemies_)
 		{
-			if (enemy && enemy->GetObject3d())
-			{
-				enemy->GetObject3d()->Update();
-			}
+			if (enemy && enemy->GetObject3d()) enemy->GetObject3d()->Update();
 		}
 		for (auto& t : scene_->targets_)
 		{
-			if (t)
-			{
-				t->Update(0.0f);
-			}
+			if (t) t->Update(0.0f);
 		}
-		if (scene_->player_ && scene_->player_->GetObject3d())
-		{
-			scene_->player_->GetObject3d()->Update();
-		}
+		if (scene_->player_ && scene_->player_->GetObject3d()) scene_->player_->GetObject3d()->Update();
 		if (SceneManager::GetInstance() && SceneManager::GetInstance()->GetSkyBox())
 		{
 			SceneManager::GetInstance()->GetSkyBox()->Update();
 		}
 	}
 
-	// ヘリ・ロープ・影モデルを画面外へ退避
-	heliPos_ = { 0.0f, -200.0f, 0.0f };
+	heliPos_ = kParkedHiddenPos;
+	if (fastRope_)
+	{
+		fastRope_->SetScale(kZeroVec3);
+		fastRope_->Update();
+	}
 	if (heliShadow_)
 	{
-		heliShadow_->SetTranslate(Vector3{ 0.0f, -200.0f, 0.0f });
+		heliShadow_->SetTranslate(kParkedHiddenPos);
 		heliShadow_->Update();
 	}
 }
@@ -307,22 +472,18 @@ void HelicopterInsertionController::Update(float deltaTime)
 {
 	if (!isActive_ || !scene_) return;
 
-	// スキップ入力検知（SPACE, ENTER, または マウスクリック）
-	bool skipPressed = false;
-	if ((GetAsyncKeyState(VK_SPACE) & 0x8000) != 0 ||
-		(GetAsyncKeyState(VK_RETURN) & 0x8000) != 0 ||
-		scene_->mouseInput.PushButton(0))
-	{
-		skipPressed = true;
-	}
-#ifdef USE_IMGUI
-	if (ImGui::IsKeyPressed(ImGuiKey_Space) || ImGui::IsKeyPressed(ImGuiKey_Enter))
-	{
-		skipPressed = true;
-	}
-#endif
+	// スキップ入力検知（タイトル画面からのクリック押しっぱなし持ち越しを吸収してから新規押下のみ反応）
+	const bool osLeftDown = IsAppWindowFocused() && ((GetAsyncKeyState(VK_LBUTTON) & kAsyncKeyDownMask) != 0);
+	const bool anySkipHeld =
+		IsAppKeyDown(VK_SPACE) || IsAppKeyDown(VK_RETURN) ||
+		scene_->mouseInput.PushButton(0) || osLeftDown ||
+		(TacticalUICanvas::GetInstance() && TacticalUICanvas::GetInstance()->IsMouseClicked(0));
 
-	if (skipPressed)
+	if (!skipInputArmed_)
+	{
+		if (!anySkipHeld) skipInputArmed_ = true;
+	}
+	else if (anySkipHeld)
 	{
 		Skip();
 		return;
@@ -331,769 +492,610 @@ void HelicopterInsertionController::Update(float deltaTime)
 	timer_ += deltaTime;
 
 	// 映画・アニメ的 5幕シネマティック判定
-	if (timer_ < kCut1Duration)
-	{
-		currentCut_ = 1;
-	}
-	else if (timer_ < kCut2Duration)
-	{
-		currentCut_ = 2;
-	}
-	else if (timer_ < kCut3Duration)
-	{
-		currentCut_ = 3;
-	}
-	else if (timer_ < kCut4Duration)
-	{
-		currentCut_ = 4;
-	}
-	else if (timer_ < kDuration)
-	{
-		currentCut_ = 5;
-	}
+	if (timer_ < kCut1Duration)      currentCut_ = kCutAct1;
+	else if (timer_ < kCut2Duration) currentCut_ = kCutAct2;
+	else if (timer_ < kCut3Duration) currentCut_ = kCutAct3;
+	else if (timer_ < kCut4Duration) currentCut_ = kCutAct4;
+	else if (timer_ < kDuration)     currentCut_ = kCutAct5;
 	else
 	{
 		FinishInsertion();
 		return;
 	}
 
-	// カット切り替え時の上品なホワイトフラッシュ
 	if (currentCut_ != prevCut_)
 	{
 		prevCut_ = currentCut_;
-		cutFlashAlpha_ = 0.50f;
+		cutFlashAlpha_ = kCutSwitchFlashAlpha;
 	}
-
-	// フラッシュの減衰
-	if (cutFlashAlpha_ > 0.0f)
-	{
-		cutFlashAlpha_ = (std::max)(0.0f, cutFlashAlpha_ - 6.0f * deltaTime);
-	}
-	if (impactFlashAlpha_ > 0.0f)
-	{
-		impactFlashAlpha_ = (std::max)(0.0f, impactFlashAlpha_ - 4.5f * deltaTime);
-	}
+	if (cutFlashAlpha_ > 0.0f)    cutFlashAlpha_    = (std::max)(0.0f, cutFlashAlpha_ - kCutFlashDecayRate * deltaTime);
+	if (impactFlashAlpha_ > 0.0f) impactFlashAlpha_ = (std::max)(0.0f, impactFlashAlpha_ - kImpactFlashDecayRate * deltaTime);
 
 	// 【完全同期パイプライン】
-	// 1. 各オブジェクトの目標ワールド座標・姿勢を算出
 	UpdateHelicopterMotion(deltaTime);
-	// 2. カメラのトランスフォームを更新し、ビュー・射影行列を即時再計算
 	UpdateCamera(deltaTime);
-	// 3. 最新のカメラ行列をもとにヘリ・ロープ・影・プレイヤーのWVPを更新
 	UpdateModelTransforms(deltaTime);
-	// 4. パーティクル・演出更新
 	UpdateParticles(deltaTime);
+
+	// 強襲ヘリ・メインローター空間音響ループ更新
+	const float camAtten = scene_->camera_
+		? TacticalAudio::ComputeAttenuation(heliPos_, scene_->camera_->GetTranslate(), kInsertAudioMinDist, kInsertAudioMaxDist)
+		: kInsertFallbackAtten;
+	const float cut5Fade = (currentCut_ == kCutAct5)
+		? std::clamp(1.0f - (timer_ - kCut4Duration) / (kDuration - kCut4Duration), 0.0f, 1.0f)
+		: 1.0f;
+	rotorLoop_.Update("Resources/Audio/SE_Heli_Rotor_Loop.wav", kRotorLoopDurationSec, kInsertRotorVolume * camAtten * cut5Fade, deltaTime);
 }
 
 void HelicopterInsertionController::UpdateHelicopterMotion(float deltaTime)
 {
-	// ローター超高速回転 (メインローター: 60 rad/s, テールローター: 85 rad/s)
-	mainRotorAngle_ += 60.0f * deltaTime;
-	if (mainRotorAngle_ > 2.0f * kPi) mainRotorAngle_ -= 2.0f * kPi;
+	AdvanceWrappedAngle(mainRotorAngle_, kMainRotorAngularSpeed, deltaTime);
+	AdvanceWrappedAngle(tailRotorAngle_, kTailRotorAngularSpeed, deltaTime);
 
-	tailRotorAngle_ += 85.0f * deltaTime;
-	if (tailRotorAngle_ > 2.0f * kPi) tailRotorAngle_ -= 2.0f * kPi;
-
-	// ホバリング高度: 高空 (Y: 18.0m)
-	const Vector3 kHoverPos = { 0.0f, 18.0f, 0.0f };
-
-	if (currentCut_ == 1)
+	switch (currentCut_)
 	{
-		// =====================================================================
-		// Act 1: 【白昼の超低空急襲・ロングレンジアプローチ＆フレア制動】 (0.0s 〜 3.40s, 計3.4s)
-		// 90m彼方の青空からヘリがバンク旋回しながら猛スピードで急行接近し、
-		// 降下地点（LZ）の直前で機首を大きく持ち上げて豪快なフレア制動でホバリングへ遷移！
-		// =====================================================================
-		float t = timer_ / kCut1Duration; // 0.0 -> 1.0
-
-		Vector3 startPos = { -45.0f, 32.0f, -80.0f };
-
-		// 緩やかなS字バンク旋回アプローチ（横方向へのスイング軌道）
-		float brake = 1.0f - std::pow(1.0f - t, 2.6f);
-		float sCurve = std::sin(t * 3.14159f) * 6.5f;
-
-		Vector3 curPos = startPos + (kHoverPos - startPos) * brake;
-		curPos.x += sCurve;
-		heliPos_ = curPos;
-
-		// 姿勢制御：前半は深い左バンク＆前傾急行、後半はノーズアップの強烈なフレア制動
-		float pitch = 0.0f;
-		float roll = 0.0f;
-		float yaw = 0.05f;
-
-		if (t < 0.60f)
-		{
-			float subT = t / 0.60f;
-			pitch = -0.16f + 0.10f * subT;
-			roll = -0.32f * (1.0f - subT * 0.5f);
-		}
-		else
-		{
-			float subT = (t - 0.60f) / 0.40f; // 0.0 -> 1.0
-			float flare = std::sin(subT * 3.14159f);
-			pitch = flare * 0.28f; // 強烈なフレアノーズアップ
-			roll = -0.16f * (1.0f - subT);
-		}
-
-		heliRot_ = { pitch, yaw, roll };
-
-		// プレイヤーはキャビン内に着席待機（広々とした機内中央床上に配置）
-		duckPos_ = heliPos_ + Vector3{ 0.0f, 0.10f, 0.75f };
-		duckScale_ = { 1.0f, 1.0f, 1.0f };
-		duckRot_ = heliRot_;
-	}
-	else if (currentCut_ == 2)
-	{
-		// =====================================================================
-		// Act 2: 【ドア前出撃準備・RED/GREEN LIGHT合図のタメ・飛び移り】 (3.40s 〜 5.60s, 計2.20s)
-		// ヘリがホバリング。ロープが地上へ投下され、アヒル兵士がドア敷居へ歩み寄り、
-		// 地上を目視確認して頷き（RED LIGHT待機）、GREEN LIGHT点灯と同時にロープへ飛び移る！
-		// =====================================================================
-		float phase = (timer_ - kCut1Duration) / (kCut2Duration - kCut1Duration); // 0.0 -> 1.0
-
-		// ホバリング微気流揺動
-		heliPos_ = kHoverPos + Vector3{
-			std::sin(timer_ * 2.2f) * 0.04f,
-			std::cos(timer_ * 1.8f) * 0.05f,
-			0.0f
-		};
-		heliRot_ = { std::sin(timer_ * 1.5f) * 0.012f, 0.0f, std::cos(timer_ * 2.0f) * 0.012f };
-
-		if (phase < 0.32f)
-		{
-			// 1. 序盤0.7s: 機内中央から開放ドア敷居（X = 1.40m）へと力強く前進歩行
-			float stepProgress = phase / 0.32f;
-			float smoothStep = stepProgress * stepProgress * (3.0f - 2.0f * stepProgress);
-
-			duckPos_ = heliPos_ + Vector3{ 1.40f * smoothStep, 0.10f, 0.75f };
-			duckRot_ = { 0.0f, -1.25f * smoothStep, 0.0f };
-			duckScale_ = { 1.0f, 1.0f, 1.0f };
-		}
-		else if (phase < 0.68f)
-		{
-			// 2. 中盤0.8s: ドア敷居に立ち、地上を見下ろして出撃準備（RED LIGHT待機）
-			// 4.6s付近で頭をコクッと下げる力強い頷き（Nod of readiness）
-			float prepT = (phase - 0.32f) / 0.36f; // 0.0 -> 1.0
-			float nod = 0.0f;
-			if (prepT >= 0.50f && prepT < 0.85f)
-			{
-				float nodProgress = (prepT - 0.50f) / 0.35f;
-				nod = std::sin(nodProgress * 3.14159f) * 0.18f; // 首を縦に振る頷き動作
-			}
-			float windBob = std::sin(timer_ * 6.5f) * 0.012f;
-			duckPos_ = heliPos_ + Vector3{ 1.40f, 0.10f + windBob, 0.75f };
-			duckRot_ = { 0.08f + nod, -1.30f, 0.04f }; // 身を乗り出す構え＋合図の頷き
-			duckScale_ = { 1.0f, 1.0f, 1.0f };
-		}
-		else
-		{
-			// 3. 終盤0.7s: 【GREEN LIGHT点灯！ GO! GO! GO!】
-			// ドア敷居からロープ（X = 1.65m）へ力強く身を乗り出して飛び移り、両足とグローブでがっしりホールド！
-			float leapT = (phase - 0.68f) / 0.32f; // 0.0 -> 1.0
-			float smoothLeap = leapT * leapT * (3.0f - 2.0f * leapT);
-
-			float leapProgress = smoothLeap;
-			float leapX = 1.40f + (1.34f - 1.40f) * leapProgress;
-			float leapZ = 0.75f + (-0.25f - 0.75f) * leapProgress;
-			float leapYaw = -1.30f + (0.30f - (-1.30f)) * leapProgress;
-			float leapHop = std::sin(leapT * 3.14159f) * 0.10f;
-
-			duckPos_ = heliPos_ + Vector3{ leapX, 0.10f + leapHop, leapZ };
-			duckRot_ = { 0.06f * leapProgress, leapYaw, 0.0f };
-			duckScale_ = { 1.0f + 0.05f * std::sin(leapT * 3.14159f), 1.0f - 0.05f * std::sin(leapT * 3.14159f), 1.0f };
-		}
-	}
-	else if (currentCut_ == 3)
-	{
-		// =====================================================================
-		// Act 3: 【緩急ファストロープ降下・急加速＆地上直前コンバットブレーキ】 (5.60s 〜 7.10s, 計1.50s)
-		// 重力フリーフォールで急加速滑走し、地上3m直前でブーツとグローブをロープに強く
-		// 押し当ててコンバットブレーキ！火花と摩擦煙を激しく噴き出して減速！
-		// =====================================================================
-		float phase = (timer_ - kCut2Duration) / (kCut3Duration - kCut2Duration); // 0.0 -> 1.0
-
-		heliPos_ = kHoverPos + Vector3{
-			std::sin(timer_ * 2.4f) * 0.03f,
-			std::cos(timer_ * 2.0f) * 0.03f,
-			0.0f
-		};
-		heliRot_ = { 0.0f, 0.0f, 0.0f };
-
-		// 緩急のある降下カーブ（急加速 -> 地上直前急制動ブレーキ）
-		float dropProgress = 0.0f;
-		if (phase < 0.68f)
-		{
-			// 前半〜中盤：急加速で高度を一気に18mから地上4m付近へ（0.0 -> 0.82）
-			float t = phase / 0.68f;
-			dropProgress = 0.82f * (t * t);
-		}
-		else
-		{
-			// 終盤：地上3〜4mで強烈な摩擦ブレーキ！ググッと減速（0.82 -> 1.0）
-			float t = (phase - 0.68f) / 0.32f;
-			float brakeT = 1.0f - (1.0f - t) * (1.0f - t);
-			dropProgress = 0.82f + 0.18f * brakeT;
-		}
-
-		float duckY = (1.0f - dropProgress) * (kHoverPos.y + 0.10f);
-		if (duckY < 0.0f) duckY = 0.0f;
-
-		const float kRopeX = 1.65f;
-		const float kRopeZ = 0.75f;
-		const float kFacingYaw = 0.30f;
-		const float kRopeFrontOffset = 1.05f;
-
-		// アヒル本体はロープの後方（胸の前1.05mにロープが来る位置）に完全固定して直滑降
-		// 水平方向への不要なスイングやドリフトを一切排除し、ロープが胴体を貫通するのを物理的に完全防止！
-		const float kDuckX = kRopeX - std::sin(kFacingYaw) * kRopeFrontOffset; // 1.34f
-		const float kDuckZ = kRopeZ - std::cos(kFacingYaw) * kRopeFrontOffset; // -0.25f
-
-		duckPos_ = { kDuckX, duckY, kDuckZ };
-
-		if (phase < 0.68f)
-		{
-			// 加速滑空姿勢（身を細めて直滑降、胸の前でロープ把持）
-			duckScale_ = { 0.94f, 1.06f, 0.94f };
-			duckRot_ = { 0.06f, kFacingYaw, 0.0f };
-		}
-		else
-		{
-			// コンバットブレーキ姿勢（身体を起こして足を踏ん張り衝撃に備える）
-			float bT = (phase - 0.68f) / 0.32f;
-			duckScale_ = { 0.94f + 0.16f * bT, 1.06f - 0.14f * bT, 0.94f + 0.16f * bT };
-			duckRot_ = { 0.06f + 0.08f * bT, kFacingYaw, 0.0f };
-		}
-
-		// 手袋・ブーツとロープの接触摩擦スパーク火花＆摩擦白煙（ロープ位置 X=1.65, Z=0.75 から激しく噴出！）
-		if (phase > 0.05f && phase < 0.96f && scene_->particleManager && scene_->appParticleManager_)
-		{
-			ropeSparkTimer_ += deltaTime;
-			float interval = (phase >= 0.68f) ? 0.015f : 0.035f;
-			if (ropeSparkTimer_ >= interval)
-			{
-				ropeSparkTimer_ = 0.0f;
-				Vector3 sparkP = { kRopeX, duckY + 0.65f, kRopeZ };
-				float spdMul = (phase >= 0.68f) ? 2.6f : 1.2f;
-				Vector3 spkVel = { RandRange(-spdMul, spdMul), RandRange(1.2f, 3.2f), RandRange(-spdMul, spdMul) };
-				scene_->appParticleManager_->EmitSparkWithVelocity(
-					scene_->particleManager->GetRandomEngine(),
-					sparkP,
-					spkVel,
-					{ 1.0f, 0.90f, 0.40f, 1.0f },
-					0.16f,
-					(phase >= 0.68f) ? 0.32f : 0.22f,
-					scene_->starburstTextureIndex_
-				);
-
-				// ブレーキ時の摩擦白煙
-				if (phase >= 0.68f && scene_->smokeTextureIndex_ != TextureManager::kInvalidTextureIndex)
-				{
-					scene_->appParticleManager_->EmitDustWithVelocity(
-						scene_->particleManager->GetRandomEngine(),
-						sparkP + Vector3{ RandRange(-0.08f, 0.08f), -0.10f, RandRange(-0.08f, 0.08f) },
-						0.45f,
-						Vector4{ 0.88f, 0.88f, 0.88f, 0.45f },
-						Vector3{ RandRange(-0.6f, 0.6f), RandRange(0.4f, 1.2f), RandRange(-0.6f, 0.6f) },
-						0.45f,
-						scene_->smokeTextureIndex_
-					);
-				}
-			}
-		}
-	}
-	else if (currentCut_ == 4)
-	{
-		// =====================================================================
-		// Act 4: 【着地激突・左右セクター360クリアリング＆コッキング】 (7.10s 〜 8.80s, 計1.70s)
-		// 激突着地から即座に立ち上がり、銃口を左右へ素早く振って周囲をクリアリング警戒！
-		// 正面へビシッと構え直してショットガンコッキング＆サン・グリント！
-		// =====================================================================
-		float phase = (timer_ - kCut3Duration) / (kCut4Duration - kCut3Duration); // 0.0 -> 1.0
-
-		// 着地インパクトの瞬間 (7.10s)
-		if (!landed_)
-		{
-			landed_ = true;
-			impactFlashAlpha_ = 0.85f;
-			scene_->TriggerCameraShake(0.42f, 0.70f);
-
-			Vector3 impactPoint = { 1.34f, 0.05f, -0.25f };
-
-			// GPU着地バースト（爆風衝撃波 ＋ 48粒超高速スパーク ＋ 24方向爆風土煙）
-			if (scene_->particleManager && scene_->appParticleManager_)
-			{
-				scene_->appParticleManager_->EmitLandingGPUBurst(
-					scene_->particleManager->GetRandomEngine(),
-					impactPoint,
-					scene_->starburstTextureIndex_,
-					scene_->smokeTextureIndex_,
-					scene_->particleTextureB
-				);
-
-				// 地面を360度ドーナツ状に高速拡散する衝撃波ダストリング（24方向）
-				for (int i = 0; i < 24; ++i)
-				{
-					float a = i * (2.0f * kPi / 24.0f);
-					Vector3 sVel = { std::cos(a) * RandRange(3.8f, 5.5f), 0.25f, std::sin(a) * RandRange(3.8f, 5.5f) };
-					scene_->appParticleManager_->EmitDustWithVelocity(
-						scene_->particleManager->GetRandomEngine(),
-						impactPoint,
-						0.70f,
-						Vector4{ 0.82f, 0.76f, 0.65f, 0.55f },
-						sVel,
-						0.45f,
-						scene_->smokeTextureIndex_
-					);
-				}
-			}
-
-			// 出撃アヒルボイス
-			if (!duckVoiced_ && duckSoundId_ >= 0 && SceneManager::GetInstance() && SceneManager::GetInstance()->GetAudioManager())
-			{
-				SceneManager::GetInstance()->GetAudioManager()->PlayOneShot(duckSoundId_, 1.0f);
-				duckVoiced_ = true;
-			}
-		}
-
-		// =====================================================================
-		// アヒルの姿勢＆フルコンバットアクション：
-		// 1. 【慣性前進スキッド3点着地 ＆ 沈み込み衝撃吸収】 (phase 0.00 〜 0.14)
-		// 2. 【殺気ヘッドスナップ ＆ 戦闘アイ・グリント閃光】 (phase 0.14 〜 0.22)
-		// 3. 【タクティカル・ブルルッ！（プルプル身震い羽毛ダストオフ）＆立ち上がり】 (phase 0.22 〜 0.36)
-		// 4. 【ローセンター戦術歩行 ＆ 左右2セクターCQCクリアリング】 (phase 0.36 〜 0.70)
-		// 5. 【正面スナップ ➡️ ポンプアクション引き込み ➡️ ボルト激突＆排莢＆閃光】 (phase 0.70 〜 0.86)
-		// 6. 【正面ターゲットロック・アイドリング呼吸】 (phase 0.86 〜 1.00)
-		// =====================================================================
-
-		if (phase < 0.14f)
-		{
-			// 1. 【慣性前進スキッド3点着地 ＆ 沈み込み衝撃吸収】 (0.00 〜 0.14)
-			// ロープ降下の着地慣性で (1.34f, 0.0f, -0.25f) から (1.10f, 0.0f, -0.20f) へ地面をスキッド滑走！
-			float skidT = phase / 0.14f;
-			float smoothSkid = skidT * skidT * (3.0f - 2.0f * skidT);
-			float squatT = phase / 0.12f;
-			float squat = (phase < 0.12f) ? (1.0f - squatT * 0.35f) : 0.65f;
-
-			Vector3 skidStart = { 1.34f, 0.0f, -0.25f };
-			Vector3 skidEnd   = { 1.10f, 0.0f, -0.20f };
-			Vector3 curPos = skidStart + (skidEnd - skidStart) * smoothSkid;
-
-			duckPos_ = { curPos.x, -0.26f * squat, curPos.z };
-			duckScale_ = { 1.42f + 0.08f * squat, 0.52f - 0.08f * squat, 1.38f + 0.08f * squat };
-			// スライド着地姿勢：深く前傾し、左手接地＆右腕で武器を抱え込むバンク傾き
-			duckRot_ = { 0.44f * squat, 0.28f, -0.09f * (1.0f - smoothSkid) };
-
-			// 地面スキッド摩擦土煙
-			if (scene_->particleManager && scene_->appParticleManager_)
-			{
-				Vector3 skidPoint = duckPos_ + Vector3{ RandRange(-0.08f, 0.08f), 0.05f, RandRange(0.08f, 0.20f) };
-				scene_->appParticleManager_->EmitDustWithVelocity(
-					scene_->particleManager->GetRandomEngine(),
-					skidPoint,
-					0.35f,
-					Vector4{ 0.80f, 0.74f, 0.62f, 0.40f },
-					Vector3{ RandRange(-0.3f, 0.3f), 0.2f, RandRange(1.0f, 2.2f) },
-					0.30f,
-					scene_->smokeTextureIndex_
-				);
-			}
-		}
-		else if (phase < 0.22f)
-		{
-			// 2. 【殺気ヘッドスナップ ＆ 戦闘アイ・グリント閃光！】 (0.14 〜 0.22)
-			float snapT = (phase - 0.14f) / 0.08f;
-			float snapSmooth = snapT * snapT * (3.0f - 2.0f * snapT);
-			duckScale_ = { 1.25f - 0.18f * snapSmooth, 0.70f + 0.18f * snapSmooth, 1.22f - 0.18f * snapSmooth };
-			duckPos_ = { 1.10f, -0.16f * (1.0f - snapSmooth), -0.20f };
-			// 伏せた姿勢から正面へガッと鋭利に頭を持ち上げる
-			float pitch = 0.36f * (1.0f - snapSmooth) - 0.08f * snapSmooth;
-			duckRot_ = { pitch, 0.28f, 0.0f };
-
-			if (!headSnapEmitted_)
-			{
-				headSnapEmitted_ = true;
-				scene_->TriggerCameraShake(0.14f, 0.14f);
-			}
-
-			// 瞳の戦闘キラーン光（アイ・グリント閃光）
-			if (!eyeGlintEmitted_ && phase >= 0.16f && scene_->particleManager && scene_->appParticleManager_)
-			{
-				eyeGlintEmitted_ = true;
-				Vector3 glintPos = duckPos_ + Vector3{ -0.06f, 0.44f, 0.30f };
-				scene_->appParticleManager_->EmitMuzzleFlare(
-					scene_->particleManager->GetRandomEngine(),
-					glintPos,
-					0.55f,
-					Vector4{ 0.85f, 1.0f, 1.0f, 0.95f },
-					0.14f,
-					scene_->starburstTextureIndex_
-				);
-			}
-		}
-		else if (phase < 0.36f)
-		{
-			// 3. 【タクティカル・ブルルッ！（プルプル身震い羽毛ダストオフ）＆立ち上がり】 (0.22 〜 0.36)
-			float riseT = (phase - 0.22f) / 0.14f;
-			float ruffleFreq = riseT * 6.2831853f * 4.0f; // 高速身震い（4回転振動）
-			float ruffleEnv = std::sin(riseT * 3.14159265f); // 立ち上がりピークで最大振動
-			float roll = std::sin(ruffleFreq) * (ruffleEnv * 0.20f);
-			float pitch = -0.08f + std::abs(roll) * 0.6f;
-
-			duckScale_ = { 1.0f - ruffleEnv * 0.10f, 1.0f + ruffleEnv * 0.16f, 1.0f - ruffleEnv * 0.10f };
-			duckPos_ = { 1.10f, 0.03f * ruffleEnv, -0.20f };
-			duckRot_ = { pitch, 0.28f * (1.0f - riseT * 0.6f), roll };
-
-			// 身震いで舞い散る白羽パーティクル
-			if (!featherShakeEmitted_ && phase >= 0.25f)
-			{
-				featherShakeEmitted_ = true;
-				if (scene_->particleManager && scene_->appParticleManager_)
-				{
-					for (int i = 0; i < 6; ++i)
-					{
-						scene_->appParticleManager_->EmitFeather(
-							scene_->particleManager->GetRandomEngine(),
-							duckPos_ + Vector3{ RandRange(-0.25f, 0.25f), RandRange(0.20f, 0.55f), RandRange(-0.20f, 0.20f) },
-							Vector4{ 0.98f, 0.98f, 0.94f, 0.90f },
-							scene_->particleTextureB
-						);
-					}
-				}
-			}
-		}
-		else if (phase < 0.70f)
-		{
-			// 4. 【ローセンター戦術歩行 ＆ 左右2セクターCQCクリアリング】 (0.36 〜 0.70)
-			// (1.10f, 0.0f, -0.20f) から 正面 (0.0f, 0.0f, 0.0f) へ滑らかに戦術歩行
-			float strideT = (phase - 0.36f) / 0.34f;
-			float smoothStride = strideT * strideT * (3.0f - 2.0f * strideT);
-			// 踏み込みの上下ボビング
-			float bob = std::abs(std::sin(strideT * 3.14159265f * 2.0f)) * 0.045f;
-			duckPos_ = {
-				1.10f * (1.0f - smoothStride),
-				bob,
-				-0.20f * (1.0f - smoothStride)
-			};
-			duckScale_ = { 1.0f, 1.0f, 1.0f };
-
-			// 足元の踏み込み土煙
-			if (phase >= 0.44f && !footstepDust1_ && scene_->particleManager && scene_->appParticleManager_)
-			{
-				footstepDust1_ = true;
-				scene_->appParticleManager_->EmitFootstepDust(
-					scene_->particleManager->GetRandomEngine(),
-					duckPos_,
-					scene_->smokeTextureIndex_
-				);
-			}
-			if (phase >= 0.60f && !footstepDust2_ && scene_->particleManager && scene_->appParticleManager_)
-			{
-				footstepDust2_ = true;
-				scene_->appParticleManager_->EmitFootstepDust(
-					scene_->particleManager->GetRandomEngine(),
-					duckPos_,
-					scene_->smokeTextureIndex_
-				);
-			}
-
-			if (phase < 0.53f)
-			{
-				// Sector 1: 【左9時方向へ鋭くクリアリングスナップ！】 (0.36 〜 0.53)
-				float scanT = (phase - 0.36f) / 0.17f;
-				float snapWeight = (std::min)(scanT / 0.36f, 1.0f);
-				float smoothSnap = snapWeight * snapWeight * (3.0f - 2.0f * snapWeight);
-				float yaw = 0.12f * (1.0f - smoothSnap) + (-0.78f) * smoothSnap; // -45度左方向
-				duckRot_ = { 0.03f, yaw, -0.06f * smoothSnap }; // バンク角
-			}
-			else
-			{
-				// Sector 2: 【右2時方向へ一気にクロスホイップスキャン！】 (0.53 〜 0.70)
-				float scanT = (phase - 0.53f) / 0.17f;
-				float snapWeight = (std::min)(scanT / 0.36f, 1.0f);
-				float smoothSnap = snapWeight * snapWeight * (3.0f - 2.0f * snapWeight);
-				float yaw = -0.78f * (1.0f - smoothSnap) + 0.68f * smoothSnap; // +39度右方向
-				duckRot_ = { 0.03f, yaw, 0.06f * smoothSnap }; // バンク角
-			}
-		}
-		else
-		{
-			// 5〜6. 【正面スナップ ➡️ ポンプアクション引き込み ➡️ ボルト激突＆排莢＆閃光 ➡️ ロックオン呼吸】 (0.70 〜 1.00)
-			if (phase < 0.75f)
-			{
-				// 5-A. 正面12時方向へビシッとスナップ！ (0.70 〜 0.75)
-				float frontT = (phase - 0.70f) / 0.05f;
-				float sFront = frontT * frontT * (3.0f - 2.0f * frontT);
-				duckRot_ = { 0.02f, 0.68f * (1.0f - sFront), 0.0f };
-				duckPos_ = { 0.0f, 0.0f, 0.0f };
-				duckScale_ = { 1.0f, 1.0f, 1.0f };
-			}
-			else if (phase < 0.80f)
-			{
-				// 5-B. 【ショットガン・スライド後方引き込みコッキング！】 (0.75 〜 0.80)
-				float rackT = (phase - 0.75f) / 0.05f;
-				float sRack = rackT * rackT * (3.0f - 2.0f * rackT);
-				duckPos_ = { 0.0f, 0.015f * sRack, -0.10f * sRack };
-				duckRot_ = { -0.18f * sRack, 0.0f, 0.06f * sRack }; // 銃口を跳ね上げながら引き込む
-				duckScale_ = { 0.94f, 1.06f, 0.94f };
-			}
-			else if (phase < 0.86f)
-			{
-				// 5-C. 【ガシャンッ！！ ボルト前進激突＆真鍮薬莢エジェクト排莢！】 (0.80 〜 0.86)
-				float slamT = (phase - 0.80f) / 0.06f;
-				float rebound = std::sin(slamT * 3.14159265f);
-				duckPos_ = { 0.0f, 0.0f, 0.05f * rebound };
-				duckRot_ = { 0.07f * rebound, 0.0f, 0.0f };
-				duckScale_ = { 1.0f + 0.09f * rebound, 1.0f - 0.09f * rebound, 1.0f + 0.09f * rebound };
-			}
-			else
-			{
-				// 6. 【戦闘態勢ロックオン完了・静かな呼吸アイドリング】 (0.86 〜 1.00)
-				float idleT = (phase - 0.86f) / 0.14f;
-				float breath = std::sin(idleT * 3.14159265f * 2.0f) * 0.012f;
-				duckPos_ = { 0.0f, breath, 0.0f };
-				duckRot_ = { 0.0f, 0.0f, 0.0f };
-				duckScale_ = { 1.0f + breath * 0.5f, 1.0f - breath * 0.5f, 1.0f };
-			}
-		}
-
-		// 武器コッキング＆真鍮薬莢スピン排莢 ＆ 白昼サン・グリント（ボルト激突瞬間の phase 0.80）
-		if (!cockSparkEmitted_ && phase >= 0.80f && scene_->particleManager && scene_->appParticleManager_)
-		{
-			cockSparkEmitted_ = true;
-			// 1. 強烈なカメラパンチシェイク
-			scene_->TriggerCameraShake(0.26f, 0.30f);
-
-			// 2. 右側面への真鍮ショットシェル（薬莢）高速スピン排莢！
-			Vector3 chamberPos = { 0.22f, 0.50f, 0.25f };
-			Vector3 forwardDir = { 0.0f, 0.0f, 1.0f };
-			uint32_t shellTex = (scene_->cylinderTextureIndex_ != TextureManager::kInvalidTextureIndex)
-				? scene_->cylinderTextureIndex_
-				: (scene_->starburstTextureIndex_ != TextureManager::kInvalidTextureIndex ? scene_->starburstTextureIndex_ : scene_->particleTextureB);
-			scene_->appParticleManager_->EmitShellCasing(
-				scene_->particleManager->GetRandomEngine(),
-				chamberPos,
-				forwardDir,
-				Vector4{ 1.0f, 0.84f, 0.32f, 1.0f }, // 黄金色に輝く真鍮薬莢
-				Vector3{ 0.08f, 0.18f, 0.08f },
-				shellTex
-			);
-
-			// 3. 銃口マズルフレア＆太陽光サン・グリント爆光（放射スパーク14本）
-			Vector3 glintPos = { 0.28f, 0.52f, 0.52f };
-			scene_->appParticleManager_->EmitMuzzleFlare(
-				scene_->particleManager->GetRandomEngine(),
-				glintPos,
-				1.05f,
-				Vector4{ 1.0f, 0.98f, 0.85f, 1.0f },
-				0.24f,
-				scene_->starburstTextureIndex_
-			);
-			for (int i = 0; i < 14; ++i)
-			{
-				float a = i * (2.0f * kPi / 14.0f);
-				Vector3 spkVel = { std::cos(a) * 3.2f, std::sin(a) * 3.2f + 0.4f, 0.8f };
-				scene_->appParticleManager_->EmitSparkWithVelocity(
-					scene_->particleManager->GetRandomEngine(),
-					glintPos,
-					spkVel,
-					Vector4{ 1.0f, 0.95f, 0.80f, 1.0f },
-					0.18f,
-					0.26f,
-					scene_->starburstTextureIndex_
-				);
-			}
-		}
-
-		// ヘリは離脱準備で機首を下げ始める
-		heliPos_ = kHoverPos + Vector3{ 0.0f, std::sin(timer_ * 2.0f) * 0.03f, 0.0f };
-		heliRot_ = { 0.14f * phase, 0.0f, 0.0f };
-	}
-	else
-	{
-		// =====================================================================
-		// Act 5: 【ヘリ急上昇離脱＆シームレスTPS合流】 (6.30s 〜 7.20s, 計0.90s)
-		// =====================================================================
-		float phase = (timer_ - kCut4Duration) / (kDuration - kCut4Duration); // 0.0 -> 1.0
-		float accel = phase * phase * (3.0f - 2.0f * phase);
-
-		// 機首を下げてエンジン全開、北空（Z: +120m, Y: 42m）へ急上昇離脱！
-		heliPos_ = kHoverPos + Vector3{
-			std::sin(phase * 3.14159f) * 3.5f,
-			24.0f * (phase * phase),
-			120.0f * accel
-		};
-		heliRot_ = { 0.32f * (1.0f - phase * 0.4f), 0.0f, -0.15f * phase };
-
-		duckPos_ = { 0.0f, 0.0f, 0.0f };
-		duckScale_ = { 1.0f, 1.0f, 1.0f };
-		duckRot_ = { 0.0f, 0.0f, 0.0f };
+	case kCutAct1: UpdateAct1ApproachMotion(); break;
+	case kCutAct2: UpdateAct2CabinPrepMotion(); break;
+	case kCutAct3: UpdateAct3FastRopeMotion(deltaTime); break;
+	case kCutAct4: UpdateAct4LandingClearMotion(); break;
+	default:       UpdateAct5BreakawayMotion(); break;
 	}
 }
 
-void HelicopterInsertionController::UpdateCamera(float deltaTime)
+void HelicopterInsertionController::UpdateAct1ApproachMotion()
+{
+	// Act 1: 【白昼の超低空急襲・ロングレンジアプローチ＆フレア制動】 (0.0s 〜 3.40s)
+	const float t = timer_ / kCut1Duration;
+	const float brake = 1.0f - std::pow(1.0f - t, kAct1BrakeExponent);
+	heliPos_ = kInitialHeliPos + (kHoverAnchorPos - kInitialHeliPos) * brake;
+	heliPos_.x += std::sin(t * kPi) * kAct1SCurveAmpX;
+
+	float pitch = 0.0f;
+	float roll = 0.0f;
+	const float yaw = kAct1YawInitial * (1.0f - SmoothStep01((t - kAct1YawSettleStartT) / kAct1YawSettleSpanT));
+
+	if (t < kAct1FlareStartT)
+	{
+		const float subT = t / kAct1FlareStartT;
+		pitch = kAct1CruisePitchStart + kAct1CruisePitchGain * subT;
+		roll = kAct1CruiseRollStart * (1.0f - subT * kAct1CruiseRollDecayRat);
+	}
+	else
+	{
+		const float subT = (t - kAct1FlareStartT) / kAct1FlareSpanT;
+		pitch = std::sin(subT * kPi) * kAct1FlarePitchAmp;
+		roll = kAct1FlareRollStart * (1.0f - subT);
+	}
+	heliRot_ = { pitch, yaw, roll };
+
+	if (t >= kAct1DoorOpenStartT && !doorOpenSoundPlayed_)
+	{
+		doorOpenSoundPlayed_ = true;
+		TacticalAudio::Play2D("Resources/Audio/SE_Heli_Door.wav", kDoorOpenSoundVolume);
+	}
+	doorSlideProgress_ = 1.0f - kDoorOpenTravel * SmoothStep01((t - kAct1DoorOpenStartT) / kAct1DoorOpenSpanT);
+	ropeSwayAngleX_ = 0.0f;
+	ropeSwayAngleZ_ = 0.0f;
+
+	duckPos_ = LocalToWorldWithMatrix(heliPos_, MakeEulerRotationMatrix(heliRot_), kAct1CabinDuckOffset);
+	duckScale_ = kUnitScale;
+	duckRot_ = heliRot_;
+}
+
+void HelicopterInsertionController::UpdateAct2CabinPrepMotion()
+{
+	// Act 2: 【ドア前出撃準備・RED/GREEN LIGHT合図のタメ・飛び移り】 (3.40s 〜 5.60s)
+	const float phase = (timer_ - kCut1Duration) / (kCut2Duration - kCut1Duration);
+	doorSlideProgress_ = kDoorOpenRestProgress;
+
+	heliPos_ = kHoverAnchorPos + Vector3{
+		std::sin(timer_ * kAct2HoverOscFreqX) * kAct2HoverOscAmpX,
+		std::cos(timer_ * kAct2HoverOscFreqY) * kAct2HoverOscAmpY,
+		0.0f
+	};
+	heliRot_ = { std::sin(timer_ * kAct2RotOscFreqX) * kAct2RotOscAmp, 0.0f, std::cos(timer_ * kAct2RotOscFreqZ) * kAct2RotOscAmp };
+
+	const float deployDamp = std::exp(-phase * kRopeDeployDampRate);
+	ropeSwayAngleZ_ = std::sin(phase * kRopeDeployFreqZ) * kRopeDeployAmpZ * deployDamp + kRopeWindAmpZ * std::sin(timer_ * kRopeWindFreqZ);
+	ropeSwayAngleX_ = std::cos(phase * kRopeDeployFreqX) * kRopeDeployAmpX * deployDamp;
+
+	const Matrix4x4 rotMat = MakeEulerRotationMatrix(heliRot_);
+
+	if (phase < kAct2WalkEndPhase)
+	{
+		const float walkNorm = phase / kAct2WalkEndPhase;
+		const float smoothStep = SmoothStep01(walkNorm);
+		const float stepBob = std::fabs(std::sin(walkNorm * kTwoPi)) * kAct2WalkBobAmp;
+		duckPos_ = LocalToWorldWithMatrix(heliPos_, rotMat, {
+			kAct1CabinDuckOffset.x + kAct2WalkDeltaX * smoothStep,
+			kAct1CabinDuckOffset.y + stepBob,
+			kAct1CabinDuckOffset.z
+		});
+		duckRot_ = { heliRot_.x, heliRot_.y - kAct2WalkTurnYaw * smoothStep, heliRot_.z };
+		duckScale_ = kUnitScale;
+	}
+	else if (phase < kAct2PrepEndPhase)
+	{
+		if (phase >= kAct2GreenBeepPhase && !greenLightBeepPlayed_)
+		{
+			greenLightBeepPlayed_ = true;
+			TacticalAudio::Play2D("Resources/Audio/SE_Exfil_Tick.wav", kGreenLightBeepVolume);
+		}
+		const float prepT = (phase - kAct2WalkEndPhase) / kAct2PrepSpanPhase;
+		const float nod = (prepT >= kAct2NodStartT && prepT < kAct2NodEndT)
+			? (std::sin(((prepT - kAct2NodStartT) / kAct2NodSpanT) * kPi) * kAct2NodAmp)
+			: 0.0f;
+		const float windBob = std::sin(timer_ * kAct2WindBobFreq) * kAct2WindBobAmp;
+		duckPos_ = LocalToWorldWithMatrix(heliPos_, rotMat, { kAct2StandLocalX, kAct1CabinDuckOffset.y + windBob, kAct1CabinDuckOffset.z });
+		duckRot_ = { heliRot_.x + kAct2StandPitch + nod, heliRot_.y + kAct2StandYaw, heliRot_.z + kAct2StandRoll };
+		duckScale_ = kUnitScale;
+	}
+	else
+	{
+		if (!jumpSoundPlayed_)
+		{
+			jumpSoundPlayed_ = true;
+			TacticalAudio::Play2D("Resources/Audio/SE_Dodge_Roll.wav", kJumpSoundVolume);
+		}
+		const float leapT = (phase - kAct2PrepEndPhase) / kAct2LeapSpanPhase;
+		const float smoothLeap = SmoothStep01(leapT);
+		const float sinLeap = std::sin(leapT * kPi);
+
+		const float leapX   = kAct2StandLocalX + (kAct2LeapEndX - kAct2StandLocalX) * smoothLeap;
+		const float leapZ   = kAct1CabinDuckOffset.z + (kAct2LeapEndZ - kAct1CabinDuckOffset.z) * smoothLeap;
+		const float leapYaw = kAct2StandYaw + (kAct2LeapEndYaw - kAct2StandYaw) * smoothLeap;
+
+		duckPos_ = LocalToWorldWithMatrix(heliPos_, rotMat, { leapX, kAct1CabinDuckOffset.y + sinLeap * kAct2LeapHopAmp, leapZ });
+		duckRot_ = { heliRot_.x + kAct2LeapPitchGain * smoothLeap, heliRot_.y + leapYaw, heliRot_.z };
+		duckScale_ = { 1.0f + kAct2LeapStretchAmp * sinLeap, 1.0f - kAct2LeapStretchAmp * sinLeap, 1.0f };
+
+		const float tensionFactor = 1.0f - smoothLeap * kAct2RopeTensionDamp;
+		ropeSwayAngleZ_ *= tensionFactor;
+		ropeSwayAngleX_ *= tensionFactor;
+	}
+}
+
+void HelicopterInsertionController::UpdateAct3FastRopeMotion(float deltaTime)
+{
+	// Act 3: 【緩急ファストロープ降下・急加速＆地上直前コンバットブレーキ】 (5.60s 〜 7.10s)
+	if (!ropeSlideSoundPlayed_)
+	{
+		ropeSlideSoundPlayed_ = true;
+		TacticalAudio::Play2D("Resources/Audio/SE_Rope_Slide.wav", kRopeSlideSoundVolume);
+	}
+	const float phase = (timer_ - kCut2Duration) / (kCut3Duration - kCut2Duration);
+	doorSlideProgress_ = kDoorOpenRestProgress;
+
+	heliPos_ = kHoverAnchorPos + Vector3{
+		std::sin(timer_ * kAct3HoverOscFreqX) * kAct3HoverOscAmp,
+		std::cos(timer_ * kAct3HoverOscFreqY) * kAct3HoverOscAmp,
+		0.0f
+	};
+	heliRot_ = kZeroVec3;
+
+	const bool isBraking = (phase >= kAct3BrakeStartPhase);
+	ropeSwayAngleX_ = 0.0f;
+	ropeSwayAngleZ_ = isBraking ? (std::sin(timer_ * kAct3RopeVibFreq) * kAct3RopeVibAmp) : 0.0f;
+
+	float dropProgress = 0.0f;
+	if (!isBraking)
+	{
+		const float t = phase / kAct3BrakeStartPhase;
+		dropProgress = kAct3FreefallRatio * (t * t);
+	}
+	else
+	{
+		const float invT = 1.0f - (phase - kAct3BrakeStartPhase) / kAct3BrakeSpanPhase;
+		dropProgress = kAct3FreefallRatio + kAct3BrakeRatio * (1.0f - invT * invT);
+	}
+
+	const float duckY = (std::max)(0.0f, (1.0f - dropProgress) * (kHoverAnchorPos.y + kAct3DropTopExtraY));
+	duckPos_ = {
+		kRopeWorldX - std::sin(kRopeFacingYaw) * kRopeFrontBodyOffset,
+		duckY,
+		kRopeWorldZ - std::cos(kRopeFacingYaw) * kRopeFrontBodyOffset
+	};
+
+	if (!isBraking)
+	{
+		duckScale_ = kAct3FreefallScale;
+		duckRot_ = { kAct3FreefallPitch, kRopeFacingYaw, 0.0f };
+	}
+	else
+	{
+		const float bT = (phase - kAct3BrakeStartPhase) / kAct3BrakeSpanPhase;
+		duckScale_ = {
+			kAct3FreefallScale.x + kAct3BrakeScaleGainXZ * bT,
+			kAct3FreefallScale.y - kAct3BrakeScaleLossY * bT,
+			kAct3FreefallScale.z + kAct3BrakeScaleGainXZ * bT
+		};
+		duckRot_ = { kAct3FreefallPitch + kAct3BrakePitchGain * bT, kRopeFacingYaw, 0.0f };
+	}
+
+	// 手袋・ブーツとロープの接触摩擦スパーク火花＆リアル摩擦ウィスプ煙
+	if (phase > kRopeSparkStartPhase && phase < kRopeSparkEndPhase && scene_->particleManager && scene_->appParticleManager_)
+	{
+		ropeSparkTimer_ += deltaTime;
+		if (ropeSparkTimer_ >= (isBraking ? kRopeSparkIntervalBrk : kRopeSparkIntervalSld))
+		{
+			ropeSparkTimer_ = 0.0f;
+			const Vector3 sparkP = { kRopeWorldX, duckY + kRopeSparkOffsetY, kRopeWorldZ };
+			const float spdMul = isBraking ? kRopeSparkSpeedBrake : kRopeSparkSpeedSlide;
+			const uint32_t ropeSparkTex = ResolveTex(scene_->sparkStreakTextureIndex_, scene_->particleTextureB);
+			const Vector3 sparkVel = RandBoxVec3(spdMul, kRopeSparkUpVelRange, spdMul);
+
+			scene_->appParticleManager_->AddParticle(MakeStyledParticle(
+				sparkP, sparkVel, RandRange(0.0f, kTwoPi), 1.0f, kRopeSparkTargetScale,
+				isBraking ? kRopeSparkLifeBrake : kRopeSparkLifeSlide, ropeSparkTex,
+				isBraking ? kRopeSparkBrakeStyle : kRopeSparkSlideStyle));
+
+			AppParticleManager* smokeMgr = GetSmokeMgr();
+			const uint32_t wispyTex = ResolveTex(scene_->wispySmokeTextureIndex_, scene_->smokeTextureIndex_);
+			if (phase >= kRopeSmokeStartPhase && smokeMgr && wispyTex != TextureManager::kInvalidTextureIndex)
+			{
+				const float sc = RandRangeVec(kRopeSmokeScaleRange);
+				const Vector3 smokePos = sparkP + Vector3{
+					RandRange(-kRopeSmokeJitterXZ, kRopeSmokeJitterXZ), kRopeSmokeOffsetY, RandRange(-kRopeSmokeJitterXZ, kRopeSmokeJitterXZ)
+				};
+				const Vector3 smokeVel = RandBoxVec3(kRopeSmokeVelSpreadXZ, kRopeSmokeUpVelRange, kRopeSmokeVelSpreadXZ);
+				smokeMgr->AddParticle(MakeStyledParticle(
+					smokePos, smokeVel, 0.0f, sc, sc * kRopeSmokeTargetMul,
+					RandRangeVec(kRopeSmokeLifeRange), wispyTex, kRopeBrakeSmokeStyle));
+			}
+		}
+	}
+}
+
+void HelicopterInsertionController::EmitLandingImpactEffects()
+{
+	impactFlashAlpha_ = kLandingImpactFlash;
+	scene_->TriggerCameraShake(kLandingShakeDuration, kLandingShakeIntensity);
+	TacticalAudio::Play2D("Resources/Audio/SE_Boot_Land_Heavy.wav", kLandingBootVolume);
+
+	AppParticleManager* smokeMgr = GetSmokeMgr();
+	const uint32_t fallbackSmokeTex = ResolveTex(scene_->wispySmokeTextureIndex_, scene_->smokeTextureIndex_);
+	const uint32_t dustTex = ResolveTex(scene_->soilDustTextureIndex_, fallbackSmokeTex);
+	const uint32_t chipTex = ResolveTex(scene_->debrisChipTextureIndex_, scene_->particleTextureB);
+
+	// 1. リアルな360度ドーナツ状着地ダストリング ＆ 弾け飛ぶ小石粒
+	if (smokeMgr && dustTex != TextureManager::kInvalidTextureIndex)
+	{
+		const float dustStep = kTwoPi / static_cast<float>(kLandingDustCount);
+		for (int i = 0; i < kLandingDustCount; ++i)
+		{
+			const float a = static_cast<float>(i) * dustStep + RandRange(-kLandingDustAngleJit, kLandingDustAngleJit);
+			const float cosA = std::cos(a);
+			const float sinA = std::sin(a);
+			const float spd = RandRangeVec(kLandingDustSpdRange);
+			const float sc = RandRangeVec(kLandingDustScaleRange);
+			const Vector3 pos = kLandingImpactPoint + Vector3{ cosA * kLandingDustSpawnRad, kLandingDustSpawnY, sinA * kLandingDustSpawnRad };
+			const Vector3 vel = { cosA * spd, RandRangeVec(kLandingDustUpRange), sinA * spd };
+			smokeMgr->AddParticle(MakeStyledParticle(
+				pos, vel, 0.0f, sc, sc * kLandingDustTargetMul, RandRangeVec(kLandingDustLifeRange), dustTex, kLandingDustStyle));
+		}
+
+		for (int i = 0; i < kLandingChipCount; ++i)
+		{
+			const float a = RandRange(0.0f, kTwoPi);
+			const float cosA = std::cos(a);
+			const float sinA = std::sin(a);
+			const float sc = RandRangeVec(kLandingChipScaleRange);
+			const Vector3 pos = kLandingImpactPoint + Vector3{ cosA * kLandingChipSpawnRad, kLandingChipSpawnY, sinA * kLandingChipSpawnRad };
+			const Vector3 vel = { cosA * RandRangeVec(kLandingChipSpdRange), RandRangeVec(kLandingChipUpRange), sinA * RandRangeVec(kLandingChipSpdRange) };
+			AppParticle ch = MakeStyledParticle(
+				pos, vel, a, sc, sc * kLandingChipTargetMul, RandRangeVec(kLandingChipLifeRange), chipTex, kLandingChipStyle);
+			ch.angularVelocity = RandRange(-kLandingChipSpinMax, kLandingChipSpinMax);
+			smokeMgr->AddParticle(ch);
+		}
+	}
+
+	// 2. 着地ブーツ金具スパーク粒子 ＆ 3. 出撃アヒルボイス
+	if (scene_->particleManager && scene_->appParticleManager_)
+	{
+		const uint32_t spkTex = ResolveTex(scene_->sparkStreakTextureIndex_, scene_->particleTextureB);
+		for (int i = 0; i < kLandingSparkCount; ++i)
+		{
+			const float a = RandRange(0.0f, kTwoPi);
+			const Vector3 vel = { std::cos(a) * RandRangeVec(kLandingSparkSpdRange), RandRangeVec(kLandingSparkUpRange), std::sin(a) * RandRangeVec(kLandingSparkSpdRange) };
+			scene_->appParticleManager_->AddParticle(MakeStyledParticle(
+				kLandingImpactPoint, vel, a, 1.0f, kLandingSparkTargetScl, RandRangeVec(kLandingSparkLifeRange), spkTex, kLandingSparkStyle));
+		}
+	}
+	PlayDuckVoiceOnce(duckVoiced_, duckSoundId_);
+}
+
+void HelicopterInsertionController::EmitWeaponCockEffects()
+{
+	scene_->TriggerCameraShake(kCockShakeDuration, kCockShakeIntensity);
+	TacticalAudio::Play2D("Resources/Audio/SE_Reload_BoltRack.wav", kBoltRackVolume);
+	TacticalAudio::Play2D("Resources/Audio/SE_Casing_Bounce.wav", kCasingBounceVolume);
+
+	const uint32_t shellTex = ResolveTex(scene_->cylinderTextureIndex_, ResolveTex(scene_->starburstTextureIndex_, scene_->particleTextureB));
+	scene_->appParticleManager_->EmitShellCasing(
+		scene_->particleManager->GetRandomEngine(), kChamberEjectPos, kUnitForwardZ, kBrassCasingColor, kBrassCasingScale, shellTex);
+
+	const uint32_t cockSparkTex = ResolveTex(scene_->sparkStreakTextureIndex_, scene_->particleTextureB);
+	scene_->appParticleManager_->EmitMuzzleFlare(
+		scene_->particleManager->GetRandomEngine(), kCockGlintPos, kCockGlintScale, kCockGlintColor, kCockGlintLife, cockSparkTex);
+
+	const float step = kTwoPi / static_cast<float>(kCockSparkCount);
+	for (int i = 0; i < kCockSparkCount; ++i)
+	{
+		const float a = static_cast<float>(i) * step;
+		const Vector3 vel = { std::cos(a) * kCockSparkRadialSpeed, std::sin(a) * kCockSparkRadialSpeed + kCockSparkUpBias, kCockSparkForwardVel };
+		scene_->appParticleManager_->AddParticle(MakeStyledParticle(
+			kCockGlintPos, vel, a, 1.0f, kCockSparkTargetScale, kCockSparkLife, cockSparkTex, kCockSparkStyle));
+	}
+}
+
+void HelicopterInsertionController::UpdateAct4LandingClearMotion()
+{
+	// Act 4: 【着地激突・左右セクター360クリアリング＆コッキング】 (7.10s 〜 8.80s)
+	const float phase = (timer_ - kCut3Duration) / (kCut4Duration - kCut3Duration);
+	doorSlideProgress_ = kDoorOpenRestProgress;
+	ropeSwayAngleZ_ = std::sin(phase * kAct4RopeSwayFreq) * kAct4RopeSwayAmp * (1.0f - phase);
+
+	if (!landed_)
+	{
+		landed_ = true;
+		EmitLandingImpactEffects();
+	}
+
+	if (phase < kAct4SkidEndPhase)
+	{
+		const float smoothSkid = SmoothStep01(phase / kAct4SkidEndPhase);
+		const float squat = (phase < kAct4SquatEndPhase) ? (1.0f - (phase / kAct4SquatEndPhase) * kAct4SquatDrop) : kAct4SquatFloor;
+		const Vector3 curPos = LerpVec3(kAct4SkidStartPos, kAct4SkidEndPos, smoothSkid);
+
+		duckPos_ = { curPos.x, kAct4SkidSinkY * squat, curPos.z };
+		duckScale_ = {
+			kAct4SkidScaleBaseX + kAct4SkidScaleSquatDelta * squat,
+			kAct4SkidScaleBaseY - kAct4SkidScaleSquatDelta * squat,
+			kAct4SkidScaleBaseZ + kAct4SkidScaleSquatDelta * squat
+		};
+		duckRot_ = { kAct4SkidPitchScale * squat, kAct4SkidYaw, kAct4SkidRollStart * (1.0f - smoothSkid) };
+
+		AppParticleManager* smokeMgr = GetSmokeMgr();
+		const uint32_t wispyTex = ResolveTex(scene_->wispySmokeTextureIndex_, scene_->smokeTextureIndex_);
+		if (smokeMgr && wispyTex != TextureManager::kInvalidTextureIndex)
+		{
+			const float sc = RandRangeVec(kSkidSmokeScaleRange);
+			const Vector3 skPos = duckPos_ + Vector3{ RandRange(-kSkidSmokeJitterX, kSkidSmokeJitterX), kSkidSmokeOffsetY, RandRangeVec(kSkidSmokeOffsetZRange) };
+			const Vector3 skVel = { RandRange(-kSkidSmokeVelJitterX, kSkidSmokeVelJitterX), RandRangeVec(kSkidSmokeVelYRange), RandRangeVec(kSkidSmokeVelZRange) };
+			smokeMgr->AddParticle(MakeStyledParticle(
+				skPos, skVel, 0.0f, sc, sc * kSkidSmokeTargetMul, kSkidSmokeLife, wispyTex, kLandingSkidSmokeStyle));
+		}
+	}
+	else if (phase < kAct4SnapEndPhase)
+	{
+		const float snapSmooth = SmoothStep01((phase - kAct4SkidEndPhase) / kAct4SnapSpanPhase);
+		duckScale_ = {
+			kAct4SnapScaleStartX - kAct4SnapScaleDelta * snapSmooth,
+			kAct4SnapScaleStartY + kAct4SnapScaleDelta * snapSmooth,
+			kAct4SnapScaleStartZ - kAct4SnapScaleDelta * snapSmooth
+		};
+		duckPos_ = { kAct4SkidEndPos.x, kAct4SnapStartY * (1.0f - snapSmooth), kAct4SkidEndPos.z };
+		duckRot_ = { kAct4SnapPitchStart * (1.0f - snapSmooth) + kAct4SnapPitchEnd * snapSmooth, kAct4SkidYaw, 0.0f };
+
+		if (!headSnapEmitted_)
+		{
+			headSnapEmitted_ = true;
+			scene_->TriggerCameraShake(kHeadSnapShakeDuration, kHeadSnapShakeIntensity);
+		}
+		if (!eyeGlintEmitted_ && phase >= kEyeGlintPhase && scene_->particleManager && scene_->appParticleManager_)
+		{
+			eyeGlintEmitted_ = true;
+			const uint32_t eyeGlintTex = ResolveTex(scene_->sparkStreakTextureIndex_, scene_->starburstTextureIndex_);
+			scene_->appParticleManager_->EmitMuzzleFlare(
+				scene_->particleManager->GetRandomEngine(), duckPos_ + kEyeGlintOffset, kEyeGlintScale, kEyeGlintColor, kEyeGlintLife, eyeGlintTex);
+		}
+	}
+	else if (phase < kAct4RuffleEndPhase)
+	{
+		const float riseT = (phase - kAct4SnapEndPhase) / kAct4RuffleSpanPhase;
+		const float ruffleEnv = std::sin(riseT * kPi);
+		const float roll = std::sin(riseT * kTwoPi * kAct4RuffleCycles) * (ruffleEnv * kAct4RuffleRollAmp);
+
+		duckScale_ = { 1.0f - ruffleEnv * kAct4RuffleScaleLossXZ, 1.0f + ruffleEnv * kAct4RuffleScaleGainY, 1.0f - ruffleEnv * kAct4RuffleScaleLossXZ };
+		duckPos_ = { kAct4SkidEndPos.x, kAct4RuffleHopY * ruffleEnv, kAct4SkidEndPos.z };
+		duckRot_ = { kAct4SnapPitchEnd + std::fabs(roll) * kAct4RufflePitchGain, kAct4SkidYaw * (1.0f - riseT * kAct4RuffleYawDecay), roll };
+
+		if (!featherShakeEmitted_ && phase >= kFeatherShakePhase)
+		{
+			featherShakeEmitted_ = true;
+			AppParticleManager* fMgr = GetSmokeMgr();
+			const uint32_t fTex = ResolveTex(scene_->featherTextureIndex_, scene_->particleTextureB);
+			if (fMgr)
+			{
+				for (int i = 0; i < kFeatherShakeCount; ++i)
+				{
+					const float sc = RandRangeVec(kFeatherScaleRange);
+					const Vector3 fPos = duckPos_ + RandBoxVec3(kFeatherPosJitterX, kFeatherPosYRange, kFeatherPosJitterZ);
+					const Vector3 fVel = RandBoxVec3(kFeatherVelJitterXZ, kFeatherVelYRange, kFeatherVelJitterXZ);
+					AppParticle f = MakeStyledParticle(
+						fPos, fVel, RandRange(0.0f, kTwoPi), sc, sc * kFeatherTargetMul,
+						RandRangeVec(kFeatherLifeRange), fTex, kFeatherShakeStyle);
+					const Vector4& col = kFeatherAlternateCols[i & 1];
+					f.color = col;
+					f.endColor = { col.x, col.y, col.z, 0.0f };
+					f.angularVelocity = RandRange(-kFeatherSpinMax, kFeatherSpinMax);
+					fMgr->AddParticle(f);
+				}
+			}
+		}
+	}
+	else if (phase < kAct4StrideEndPhase)
+	{
+		const float strideT = (phase - kAct4RuffleEndPhase) / kAct4StrideSpanPhase;
+		const float smoothStride = SmoothStep01(strideT);
+		const float bob = std::fabs(std::sin(strideT * kTwoPi)) * kAct4StrideBobAmp;
+		duckPos_ = { kAct4SkidEndPos.x * (1.0f - smoothStride), bob, kAct4SkidEndPos.z * (1.0f - smoothStride) };
+		duckScale_ = kUnitScale;
+
+		AppParticleManager* stepMgr = GetSmokeMgr();
+		const uint32_t stepDustTex = ResolveTex(scene_->soilDustTextureIndex_, scene_->wispySmokeTextureIndex_);
+		auto tryEmitStep = [&](float triggerPhase, bool& emitted, const char* sePath) {
+			if (phase >= triggerPhase && !emitted && scene_->particleManager && stepMgr)
+			{
+				emitted = true;
+				TacticalAudio::Play2D(sePath, kFootstepVolume);
+				stepMgr->EmitFootstepDust(scene_->particleManager->GetRandomEngine(), duckPos_, stepDustTex);
+			}
+		};
+		tryEmitStep(kFootstep1Phase, footstepDust1_, "Resources/Audio/SE_Step_Dirt_1.wav");
+		tryEmitStep(kFootstep2Phase, footstepDust2_, "Resources/Audio/SE_Step_Dirt_2.wav");
+
+		const bool isLeftScan = (phase < kAct4ScanMidPhase);
+		const float scanStart = isLeftScan ? kAct4RuffleEndPhase : kAct4ScanMidPhase;
+		const float fromYaw   = isLeftScan ? kAct4ScanStartYaw   : kAct4ScanLeftYaw;
+		const float toYaw     = isLeftScan ? kAct4ScanLeftYaw    : kAct4ScanRightYaw;
+		const float bankSign  = isLeftScan ? -1.0f : 1.0f;
+		const float smoothSnap = SmoothStep01((std::min)(((phase - scanStart) / kAct4ScanHalfSpan) / kAct4ScanSnapPortion, 1.0f));
+		duckRot_ = { kAct4ScanPitch, fromYaw * (1.0f - smoothSnap) + toYaw * smoothSnap, bankSign * kAct4ScanBankRoll * smoothSnap };
+	}
+	else if (phase < kAct4FrontReturnEnd)
+	{
+		const float sFront = SmoothStep01((phase - kAct4StrideEndPhase) / kAct4SubStepSpan05);
+		duckRot_ = { kAct4FrontReturnPitch, kAct4ScanRightYaw * (1.0f - sFront), 0.0f };
+		duckPos_ = kZeroVec3;
+		duckScale_ = kUnitScale;
+	}
+	else if (phase < kAct4RackPullEnd)
+	{
+		const float sRack = SmoothStep01((phase - kAct4FrontReturnEnd) / kAct4SubStepSpan05);
+		duckPos_ = { 0.0f, kAct4RackLiftY * sRack, kAct4RackPullZ * sRack };
+		duckRot_ = { kAct4RackPitch * sRack, 0.0f, kAct4RackRoll * sRack };
+		duckScale_ = kAct3FreefallScale;
+	}
+	else if (phase < kAct4BoltSlamEnd)
+	{
+		const float rebound = std::sin(((phase - kAct4RackPullEnd) / kAct4BoltSlamSpan) * kPi);
+		duckPos_ = { 0.0f, 0.0f, kAct4SlamReboundZ * rebound };
+		duckRot_ = { kAct4SlamPitch * rebound, 0.0f, 0.0f };
+		duckScale_ = { 1.0f + kAct4SlamScaleDelta * rebound, 1.0f - kAct4SlamScaleDelta * rebound, 1.0f + kAct4SlamScaleDelta * rebound };
+	}
+	else
+	{
+		const float breath = std::sin(((phase - kAct4BoltSlamEnd) / kAct4IdleSpan) * kTwoPi) * kAct4IdleBreathAmp;
+		duckPos_ = { 0.0f, breath, 0.0f };
+		duckRot_ = kZeroVec3;
+		duckScale_ = { 1.0f + breath * 0.5f, 1.0f - breath * 0.5f, 1.0f };
+	}
+
+	if (!cockSparkEmitted_ && phase >= kAct4RackPullEnd && scene_->particleManager && scene_->appParticleManager_)
+	{
+		cockSparkEmitted_ = true;
+		EmitWeaponCockEffects();
+	}
+
+	heliPos_ = kHoverAnchorPos + Vector3{ 0.0f, std::sin(timer_ * kAct4HeliHoverFreq) * kAct4HeliHoverAmpY, 0.0f };
+	heliRot_ = { kAct4HeliNosePitch * phase, 0.0f, 0.0f };
+}
+
+void HelicopterInsertionController::UpdateAct5BreakawayMotion()
+{
+	// Act 5: 【ヘリ急上昇離脱（ドア閉鎖）＆シームレスTPS合流】 (8.80s 〜 9.70s)
+	if (!doorCloseSoundPlayed_)
+	{
+		doorCloseSoundPlayed_ = true;
+		TacticalAudio::Play2D("Resources/Audio/SE_Heli_Door.wav", kDoorCloseSoundVolume);
+	}
+	const float phase = (timer_ - kCut4Duration) / (kDuration - kCut4Duration);
+	doorSlideProgress_ = kDoorOpenRestProgress + kDoorOpenTravel * SmoothStep01(phase / kAct5DoorCloseSpan);
+
+	heliPos_ = kHoverAnchorPos + Vector3{
+		std::sin(phase * kPi) * kAct5ClimbBankAmpX,
+		kAct5ClimbGainY * (phase * phase),
+		kAct5ForwardDashZ * SmoothStep01(phase)
+	};
+	heliRot_ = { kAct5BreakPitchStart * (1.0f - phase * kAct5BreakPitchDecay), 0.0f, kAct5BreakRollEnd * phase };
+
+	duckPos_ = kZeroVec3;
+	duckScale_ = kUnitScale;
+	duckRot_ = kZeroVec3;
+}
+
+void HelicopterInsertionController::UpdateCamera(float /*deltaTime*/)
 {
 	if (!scene_ || !scene_->camera_) return;
 
 	Vector3 currentCamPos{};
 	Vector3 currentCamRot{};
 
-	if (currentCut_ == 1)
+	if (currentCut_ == kCutAct1)
 	{
-		// =====================================================================
-		// Act 1: 【白昼の超低空急襲・ロングレンジアプローチ＆フレア制動】 (0.0s 〜 3.40s)
-		// カメラワーク：低空の樹木・地面近くから見上げるダイナミック・パン＆トラッキング！
-		// 遠くの地平線から轟音とともに迫り来るヘリを追い、頭上付近で制動する姿を大迫力で捉える！
-		// =====================================================================
-		float t = timer_ / kCut1Duration;
-		float smoothT = t * t * (3.0f - 2.0f * t);
-
-		Vector3 camP0 = { -22.0f, 7.5f, -32.0f };  // 地面・木々の低空アングル
-		Vector3 camP1 = { -15.0f, 13.0f, -24.0f }; // ホバリングを仰ぎ見る見上げアングル
-
-		Vector3 eye = camP0 + (camP1 - camP0) * smoothT;
-		// 接近に伴うローターの重低音カメラ振動（ヘリが近づくほど強まる）
-		eye.y += std::sin(timer_ * 28.0f) * (0.008f + 0.020f * smoothT);
-
-		Vector3 target = heliPos_ + Vector3{ 0.0f, 0.4f, 0.0f };
+		const float smoothT = SmoothStep01(timer_ / kCut1Duration);
+		Vector3 eye = LerpVec3(kAct1CamPosStart, kAct1CamPosEnd, smoothT);
+		eye.y += std::sin(timer_ * kAct1CamVibFreq) * (kAct1CamVibBase + kAct1CamVibGain * smoothT);
 		currentCamPos = eye;
-		currentCamRot = CalcLookAtRotation(eye, target, -0.06f * (1.0f - smoothT));
+		currentCamRot = CalcLookAtRotation(eye, heliPos_ + kAct1CamLookOffset, kAct1CamRollStart * (1.0f - smoothT));
 	}
-	else if (currentCut_ == 2)
+	else if (currentCut_ == kCutAct2)
 	{
-		// =====================================================================
-		// Act 2: 【ドア前出撃準備・RED/GREEN LIGHT合図のタメ・飛び移り】 (3.40s 〜 5.60s)
-		// ヘリ後方上空から開放ドア・アヒル兵士・眼下の戦場降下ゾーンを見下ろすハイアングル俯瞰！
-		// 空虚なSkyboxではなく、眼下に広がる広大なステージ・ヘリパッド・土嚢陣地を捉える
-		// =====================================================================
-		float phase = (timer_ - kCut1Duration) / (kCut2Duration - kCut1Duration);
-		float camT = phase * phase * (3.0f - 2.0f * phase);
-
-		// ヘリ後方上空（X: +3.2, Y: +3.2, Z: -2.8）から、ドアと眼下の地上を見下ろす（下向きピッチ約-36度）
-		Vector3 camStart = heliPos_ + Vector3{ 3.2f, 3.2f, -2.8f };
-		Vector3 camEnd   = heliPos_ + Vector3{ 2.5f, 2.6f, -2.0f };
-		if (phase >= 0.68f)
-		{
-			// GREEN LIGHT点灯・飛び移り時はロープと飛び出すアヒルへさらにフォーカス
-			camEnd = heliPos_ + Vector3{ 2.0f, 2.2f, -1.6f };
-		}
-		Vector3 eye = camStart + (camEnd - camStart) * camT;
-		Vector3 target = heliPos_ + Vector3{ duckPos_.x - heliPos_.x, 0.20f, 0.75f };
-		currentCamPos = eye;
-		currentCamRot = CalcLookAtRotation(eye, target, 0.04f);
+		const float phase = (timer_ - kCut1Duration) / (kCut2Duration - kCut1Duration);
+		const Vector3 camEnd = heliPos_ + ((phase >= kAct2PrepEndPhase) ? kAct2CamLeapEndOff : kAct2CamHoldEndOff);
+		currentCamPos = LerpVec3(heliPos_ + kAct2CamStartOff, camEnd, SmoothStep01(phase));
+		currentCamRot = CalcLookAtRotation(currentCamPos, { duckPos_.x, duckPos_.y + kAct2CamTargetLiftY, duckPos_.z }, kAct2CamRoll);
 	}
-	else if (currentCut_ == 3)
+	else if (currentCut_ == kCutAct3)
 	{
-		// =====================================================================
-		// Act 3: 【緩急ファストロープ降下・急加速＆地上直前コンバットブレーキ】 (5.60s 〜 7.10s)
-		// 降下開始時はアヒル上方後方から眼下の着地ゾーン（ヘリパッド・地上）を見下ろす追尾ダイブ！
-		// 地上が画面いっぱいに迫り上がり、Skyboxではなく戦場へのダイナミック突入感を演出！
-		// 地上接近（後半）で滑らかに地上ローアングル（X=-0.5, Z=3.4）へと旋回ドリーイン
-		// =====================================================================
-		float phase = (timer_ - kCut2Duration) / (kCut3Duration - kCut2Duration);
+		const float phase = (timer_ - kCut2Duration) / (kCut3Duration - kCut2Duration);
+		const Vector3 highCamPos = { kAct3HighCamX, duckPos_.y + kAct3HighCamLiftY, kAct3HighCamZ };
+		const Vector3 highTarget = { duckPos_.x, duckPos_.y + kAct3HighTargetDropY, duckPos_.z + kAct3HighTargetLeadZ };
+		const Vector3 lowTarget  = { duckPos_.x, kAct3LowTargetY, duckPos_.z };
 
-		// 上空追尾カメラ（眼下の地上を大きく見下ろす俯瞰ダイブ視点）
-		Vector3 highCamPos = Vector3{ 1.8f, duckPos_.y + 2.8f, -2.2f };
-		Vector3 highTarget = Vector3{ duckPos_.x, duckPos_.y - 0.3f, duckPos_.z + 0.5f };
-
-		// 地上着地カメラ（Act 4の camP0 へ完全一致するミドルアングル）
-		Vector3 lowCamPos = Vector3{ -0.5f, 1.25f, 3.4f };
-		Vector3 lowTarget = Vector3{ duckPos_.x, 0.45f, duckPos_.z };
-
-		// 後半（phase >= 0.45, 地上高6m以下）にかけて、地上カメラへ滑らかにスウープ合流
-		float blendT = (std::max)(0.0f, (phase - 0.45f) / 0.55f);
-		float blendSmooth = blendT * blendT * (3.0f - 2.0f * blendT);
-
-		Vector3 eye = highCamPos + (lowCamPos - highCamPos) * blendSmooth;
-		Vector3 target = highTarget + (lowTarget - highTarget) * blendSmooth;
-
-		currentCamPos = eye;
-		currentCamRot = CalcLookAtRotation(eye, target, 0.03f * (1.0f - blendSmooth));
+		const float blendSmooth = SmoothStep01((std::max)(0.0f, (phase - kAct3CamBlendStartPhase) / kAct3CamBlendSpanPhase));
+		currentCamPos = LerpVec3(highCamPos, kAct3LowCamPos, blendSmooth);
+		currentCamRot = CalcLookAtRotation(currentCamPos, LerpVec3(highTarget, lowTarget, blendSmooth), kAct3CamRollStart * (1.0f - blendSmooth));
 	}
-	else if (currentCut_ == 4)
+	else if (currentCut_ == kCutAct4)
 	{
-		// =====================================================================
-		// Act 4: 【着地激突・左右セクター360クリアリング＆コッキング】 (7.10s 〜 8.80s)
-		// 着地激突から立ち上がり＆クリアリングスキャン、正面構えまで適度な距離（Z: 3.4m 〜 4.4m）を保ち、
-		// アヒルの全身・足元土煙・舞い散る羽毛・真鍮排莢アクションをワイドに見渡せるシネマティック構図
-		// =====================================================================
-		float phase = (timer_ - kCut3Duration) / (kCut4Duration - kCut3Duration);
-		float camT = phase * phase * (3.0f - 2.0f * phase);
+		const float phase = (timer_ - kCut3Duration) / (kCut4Duration - kCut3Duration);
+		Vector3 eye = LerpVec3(kAct3LowCamPos, kAct4CamPosEnd, SmoothStep01(phase));
 
-		Vector3 camP0 = { -0.5f, 1.25f, 3.4f }; // 着地激突時：Act 3から完全接続するローミドルアングル
-		Vector3 camP1 = {  0.0f, 1.35f, 4.4f }; // 正面ロックオン構え時：全身が綺麗に収まるミディアムフル構図
-
-		Vector3 eye = camP0 + (camP1 - camP0) * camT;
-
-		// カメラロール傾き＆着地衝撃沈み込み：着地ダッチアングル ➡️ 左右クリアリング追従 ➡️ 正面水平
 		float camRoll = 0.0f;
-		if (phase < 0.18f)
+		float targetX = duckPos_.x * kAct4CamFollowTrackRatio;
+		if (phase < kAct4CamDipEndPhase)
 		{
-			float dip = (1.0f - phase / 0.18f);
-			eye.y -= 0.12f * dip * dip; // カメラも着地衝撃でグッと下へ沈み込む！
-			camRoll = -0.05f * dip;     // キネティック・ダッチアングル傾き！
+			const float dip = 1.0f - phase / kAct4CamDipEndPhase;
+			eye.y -= kAct4CamDipAmpY * dip * dip;
+			camRoll = kAct4CamDipRoll * dip;
 		}
-		else if (phase >= 0.36f && phase < 0.53f)
+		else if (phase >= kAct4RuffleEndPhase && phase < kAct4StrideEndPhase)
 		{
-			// 左セクタースキャン追従傾き
-			camRoll = -0.028f * std::sin((phase - 0.36f) / 0.17f * 3.14159265f);
-		}
-		else if (phase >= 0.53f && phase < 0.70f)
-		{
-			// 右セクタースキャン追従傾き
-			camRoll = 0.028f * std::sin((phase - 0.53f) / 0.17f * 3.14159265f);
+			const bool isLeftScan = (phase < kAct4ScanMidPhase);
+			const float scanSin = std::sin(((phase - (isLeftScan ? kAct4RuffleEndPhase : kAct4ScanMidPhase)) / kAct4ScanHalfSpan) * kPi);
+			const float dirSign = isLeftScan ? -1.0f : 1.0f;
+			camRoll = dirSign * kAct4CamScanRollAmp * scanSin;
+			targetX += dirSign * kAct4CamScanLeadX * scanSin;
 		}
 
-		// ボルト前進激突＆排莢の瞬間に映画的マイクロパンチズーム！ (phase 0.78 〜 0.86)
-		if (phase >= 0.78f && phase < 0.86f)
+		if (phase >= kAct4CamPunchStartPhase && phase < kAct4CamPunchEndPhase)
 		{
-			float punchT = (phase - 0.78f) / 0.08f;
-			float punch = std::sin(punchT * 3.14159265f) * 0.25f;
+			const float punch = std::sin(((phase - kAct4CamPunchStartPhase) / kAct4CamPunchSpanPhase) * kPi) * kAct4CamPunchAmpZ;
 			eye.z -= punch;
-			eye.y -= punch * 0.15f;
+			eye.y -= punch * kAct4CamPunchYRatio;
 		}
 
-		// 視線注視点：duckPos_ の旋回に合わせてわずかに先行して追従
-		float targetX = duckPos_.x * 0.6f;
-		if (phase >= 0.36f && phase < 0.53f)
-		{
-			targetX -= 0.15f * std::sin((phase - 0.36f) / 0.17f * 3.14159265f);
-		}
-		else if (phase >= 0.53f && phase < 0.70f)
-		{
-			targetX += 0.15f * std::sin((phase - 0.53f) / 0.17f * 3.14159265f);
-		}
-		Vector3 target = { targetX, 0.65f, duckPos_.z * 0.6f };
 		currentCamPos = eye;
-		currentCamRot = CalcLookAtRotation(eye, target, camRoll);
+		currentCamRot = CalcLookAtRotation(eye, { targetX, kAct4CamTargetY, duckPos_.z * kAct4CamFollowTrackRatio }, camRoll);
 	}
 	else
 	{
-		// =====================================================================
-		// Act 5: 【ヘリ急上昇離脱＆シームレスTPSドリーアウト】 (8.80s 〜 9.70s)
-		// 地上ヒーロー視点（Z: 4.4m）から、上昇気流に乗って通常TPSカメラへ滑らかにドリーアウト！
-		// =====================================================================
-		float phase = (timer_ - kCut4Duration) / (kDuration - kCut4Duration);
-		float smoothT = phase * phase * (3.0f - 2.0f * phase);
+		const float smoothT = SmoothStep01((timer_ - kCut4Duration) / (kDuration - kCut4Duration));
+		const Vector3 playerPos = scene_->player_->GetPosition();
+		const Vector3 camEndPos = playerPos + (GameConfig::Camera::kDefaultFollowOffset * scene_->cameraZoom_);
 
-		Vector3 camStartPos = { 0.0f, 1.35f, 4.4f };
-		Vector3 camEndPos = scene_->player_->GetPosition() + (GameConfig::Camera::kDefaultFollowOffset * scene_->cameraZoom_);
+		currentCamPos = {
+			kAct4CamPosEnd.x + (camEndPos.x - kAct4CamPosEnd.x) * smoothT - std::sin(smoothT * kPi) * kAct5CamSwerveAmpX,
+			kAct4CamPosEnd.y + (camEndPos.y - kAct4CamPosEnd.y) * std::sin(smoothT * kHalfPi),
+			kAct4CamPosEnd.z + (camEndPos.z - kAct4CamPosEnd.z) * smoothT
+		};
 
-		// 素早く高度を稼いで地上の土嚢・柵の上空を安全に抜け、通常TPS位置へ上昇ドリーアウト
-		float heightT = std::sin(smoothT * 1.5707963f);
-		currentCamPos.y = camStartPos.y + (camEndPos.y - camStartPos.y) * heightT;
-		currentCamPos.z = camStartPos.z + (camEndPos.z - camStartPos.z) * smoothT;
-		currentCamPos.x = camStartPos.x + (camEndPos.x - camStartPos.x) * smoothT - std::sin(smoothT * 3.14159265f) * 1.2f;
-
-		// カメラ注視点を常にプレイヤー中心に合わせることで、不自然な回転揺れを防ぎ被写体を安定捕捉
-		Vector3 lookTarget = { scene_->player_->GetPosition().x, 0.70f, scene_->player_->GetPosition().z };
-		Vector3 lookRot = CalcLookAtRotation(currentCamPos, lookTarget, 0.0f);
-		Vector3 camEndRot = GameConfig::Camera::kFollowRotation;
-
-		// 終盤(smoothT > 0.65)でTPSの標準見下ろし角(0.805, 0, 0)に完全一致するようにスムーズブレンド
-		float blendFactor = (std::max)(0.0f, (smoothT - 0.65f) / 0.35f);
-		float blendSmooth = blendFactor * blendFactor * (3.0f - 2.0f * blendFactor);
+		const Vector3 lookRot = CalcLookAtRotation(currentCamPos, { playerPos.x, kAct5CamLookTargetY, playerPos.z }, 0.0f);
+		const float blendSmooth = SmoothStep01((std::max)(0.0f, (smoothT - kAct5CamRotBlendStartT) / kAct5CamRotBlendSpanT));
 		currentCamRot = {
-			lookRot.x + (camEndRot.x - lookRot.x) * blendSmooth,
+			lookRot.x + (GameConfig::Camera::kFollowRotation.x - lookRot.x) * blendSmooth,
 			lookRot.y * (1.0f - blendSmooth),
 			0.0f
 		};
@@ -1104,477 +1106,459 @@ void HelicopterInsertionController::UpdateCamera(float deltaTime)
 	scene_->camera_->Update();
 }
 
-void HelicopterInsertionController::UpdateModelTransforms(float deltaTime)
+void HelicopterInsertionController::UpdateHelicopterCommonParts(float blurOffset, bool showShadow, float shadowAlphaScale)
 {
-	// 3Dモデルトランスフォームの反映（※最新カメラのWVP行列を用いて更新）
-	if (heliBody_)
+	const Matrix4x4 rotMat = MakeEulerRotationMatrix(heliRot_);
+
+	UpdateObjectTransform(heliBody_.get(), heliPos_, heliRot_);
+	UpdateObjectTransform(heliCabinInterior_.get(), heliPos_, heliRot_);
+
+	if (heliCargoDoor_)
 	{
-		heliBody_->SetTranslate(heliPos_);
-		heliBody_->SetRotate(heliRot_);
-		heliBody_->SetScale({ 1.0f, 1.0f, 1.0f });
-		heliBody_->Update();
+		const float curX = kDoorClosedX - kDoorSlideDeltaX * doorSlideProgress_;
+		const float curZ = kDoorOpenZ + (kDoorClosedZ - kDoorOpenZ) * doorSlideProgress_;
+		UpdateObjectTransform(heliCargoDoor_.get(), LocalToWorldWithMatrix(heliPos_, rotMat, { curX, kDoorLocalY, curZ }), heliRot_);
 	}
 
 	if (heliMainRotor_)
 	{
-		Matrix4x4 R = Multiply(MakeRotateXMatrix(heliRot_.x), Multiply(MakeRotateYMatrix(heliRot_.y), MakeRotateZMatrix(heliRot_.z)));
-		Vector3 mastOffset = { 0.0f, 4.15f, 0.75f };
-		Vector3 mastWorld = {
-			mastOffset.x * R.m[0][0] + mastOffset.y * R.m[1][0] + mastOffset.z * R.m[2][0],
-			mastOffset.x * R.m[0][1] + mastOffset.y * R.m[1][1] + mastOffset.z * R.m[2][1],
-			mastOffset.x * R.m[0][2] + mastOffset.y * R.m[1][2] + mastOffset.z * R.m[2][2]
-		};
-
-		heliMainRotor_->SetTranslate(heliPos_ + mastWorld);
-		heliMainRotor_->SetRotate({ heliRot_.x, heliRot_.y + mainRotorAngle_, heliRot_.z });
-		heliMainRotor_->SetScale({ 1.0f, 1.0f, 1.0f });
-		heliMainRotor_->Update();
+		const Vector3 mastWorld = LocalToWorldWithMatrix(heliPos_, rotMat, kMainRotorMastLocal);
+		UpdateObjectTransform(heliMainRotor_.get(),      mastWorld, { heliRot_.x, heliRot_.y + mainRotorAngle_,                     heliRot_.z });
+		UpdateObjectTransform(heliMainRotorBlur1_.get(), mastWorld, { heliRot_.x, heliRot_.y + mainRotorAngle_ - blurOffset,        heliRot_.z });
+		UpdateObjectTransform(heliMainRotorBlur2_.get(), mastWorld, { heliRot_.x, heliRot_.y + mainRotorAngle_ - blurOffset * 2.0f, heliRot_.z });
 	}
 
-	if (heliTailRotor_)
-	{
-		Matrix4x4 R = Multiply(MakeRotateXMatrix(heliRot_.x), Multiply(MakeRotateYMatrix(heliRot_.y), MakeRotateZMatrix(heliRot_.z)));
-		Vector3 tailOffset = { 0.20f, 3.35f, -8.60f };
-		Vector3 tailWorld = {
-			tailOffset.x * R.m[0][0] + tailOffset.y * R.m[1][0] + tailOffset.z * R.m[2][0],
-			tailOffset.x * R.m[0][1] + tailOffset.y * R.m[1][1] + tailOffset.z * R.m[2][1],
-			tailOffset.x * R.m[0][2] + tailOffset.y * R.m[1][2] + tailOffset.z * R.m[2][2]
-		};
+	UpdateObjectTransform(
+		heliTailRotor_.get(), LocalToWorldWithMatrix(heliPos_, rotMat, kTailRotorHubLocal),
+		{ heliRot_.x + tailRotorAngle_, heliRot_.y, heliRot_.z });
 
-		heliTailRotor_->SetTranslate(heliPos_ + tailWorld);
-		heliTailRotor_->SetRotate({ heliRot_.x + tailRotorAngle_, heliRot_.y, heliRot_.z });
-		heliTailRotor_->SetScale({ 1.0f, 1.0f, 1.0f });
-		heliTailRotor_->Update();
-	}
-
-	// ヘリコプターの地上投影シャドウ (昼光ソフトシャドウ)
 	if (heliShadow_)
 	{
-		// 地上高0.035m（草地テクスチャとZファイティングしない高さ）
-		// 太陽光の傾き（南東からの日射）に合わせてわずかに北西にオフセット
-		Vector3 shadowPos = { heliPos_.x + 0.10f * heliPos_.y, 0.035f, heliPos_.z + 0.15f * heliPos_.y };
-		float heightRatio = std::clamp(heliPos_.y / 24.0f, 0.5f, 2.5f);
-		float shadowScale = 2.4f + 0.35f * (heightRatio - 1.0f);
-		float shadowAlpha = std::clamp(0.68f - 0.008f * heliPos_.y, 0.15f, 0.65f);
-
-		// 離脱中（Act 5）は離脱加速に伴い滑らかに薄くなる
-		if (currentCut_ == 5)
+		if (showShadow && shadowAlphaScale > kShadowMinAlphaScale)
 		{
-			float exitPhase = (timer_ - kCut4Duration) / (kDuration - kCut4Duration);
-			shadowAlpha *= (1.0f - exitPhase);
-		}
+			const Vector3 shadowPos = {
+				heliPos_.x + kShadowSunOffsetXPerY * heliPos_.y, kShadowGroundY, heliPos_.z + kShadowSunOffsetZPerY * heliPos_.y
+			};
+			const float heightRatio = std::clamp(heliPos_.y / kShadowRefHeight, kShadowHeightRatioMin, kShadowHeightRatioMax);
+			const float shadowScale = kShadowBaseScale + kShadowHeightScaleGain * (heightRatio - 1.0f);
+			const float shadowAlpha = std::clamp(kShadowBaseAlpha - kShadowAlphaDropPerY * heliPos_.y, kShadowAlphaMin, kShadowAlphaMax) * shadowAlphaScale;
 
-		heliShadow_->SetTranslate(shadowPos);
-		heliShadow_->SetRotate({ 0.0f, heliRot_.y, 0.0f });
-		heliShadow_->SetScale({ shadowScale, 1.0f, shadowScale * 1.55f });
-		heliShadow_->SetColor({ 0.03f, 0.05f, 0.07f, shadowAlpha });
-		heliShadow_->Update();
-	}
-
-	// ファストロープ (Act 2 & Act 3 でヘリから地面0mへ垂らす)
-	if (fastRope_)
-	{
-		if (timer_ >= kCut1Duration && timer_ < kCut4Duration + 0.15f)
-		{
-			Vector3 ropeTop = heliPos_ + Vector3{ 1.65f, 2.38f, 0.75f };
-			fastRope_->SetTranslate(ropeTop);
-			fastRope_->SetRotate({ 0.0f, 0.0f, 0.0f });
-
-			// Act 2 序盤0.60sでロープが地上まで急速伸長
-			float deployProgress = 1.0f;
-			if (timer_ < kCut1Duration + 0.60f)
-			{
-				deployProgress = (timer_ - kCut1Duration) / 0.60f;
-				deployProgress = (std::min)(deployProgress, 1.0f);
-			}
-			float ropeLen = ropeTop.y * deployProgress;
-			fastRope_->SetScale({ 1.0f, (std::max)(ropeLen / 25.0f, 0.01f), 1.0f });
-			fastRope_->Update();
+			heliShadow_->SetColor({ kShadowRuntimeRgb.x, kShadowRuntimeRgb.y, kShadowRuntimeRgb.z, shadowAlpha });
+			UpdateObjectTransform(heliShadow_.get(), shadowPos, { 0.0f, heliRot_.y, 0.0f }, { shadowScale, 1.0f, shadowScale * kShadowAspectZ });
 		}
 		else
 		{
-			fastRope_->SetScale({ 0.0f, 0.0f, 0.0f });
+			heliShadow_->SetTranslate(kParkedHiddenPos);
+			heliShadow_->Update();
+		}
+	}
+}
+
+void HelicopterInsertionController::UpdateModelTransforms(float /*deltaTime*/)
+{
+	const float shadowFade = (currentCut_ == kCutAct5)
+		? (std::max)(0.0f, 1.0f - (timer_ - kCut4Duration) / (kDuration - kCut4Duration))
+		: 1.0f;
+	const float blurOff = (currentCut_ == kCutAct1 || currentCut_ == kCutAct5) ? kHighSpeedRotorBlurOff : kHoverRotorBlurOff;
+	UpdateHelicopterCommonParts(blurOff, true, shadowFade);
+
+	// ファストロープ (Act 2 & Act 3 & Act 4序盤で機体の3D姿勢から地面へ垂らす)
+	if (fastRope_)
+	{
+		if (timer_ >= kCut1Duration && timer_ < kCut4Duration + kFastRopeVisibleExtraSec)
+		{
+			const Vector3 ropeTop = LocalToWorldWithMatrix(heliPos_, MakeEulerRotationMatrix(heliRot_), kFastRopeAnchorLocal);
+			const float deployProgress = (timer_ < kCut1Duration + kFastRopeDeployDuration)
+				? SmoothStep01((timer_ - kCut1Duration) / kFastRopeDeployDuration)
+				: 1.0f;
+			const float scaleY = (std::max)((ropeTop.y * deployProgress) / kFastRopeMeshBaseLen, kFastRopeMinScaleY);
+			UpdateObjectTransform(fastRope_.get(), ropeTop, { ropeSwayAngleX_, 0.0f, ropeSwayAngleZ_ }, { 1.0f, scaleY, 1.0f });
+		}
+		else
+		{
+			fastRope_->SetScale(kZeroVec3);
 			fastRope_->Update();
 		}
 	}
 
-	// プレイヤー（アヒル兵士）のトランスフォーム反映
-	if (scene_->player_)
+	if (scene_->player_) scene_->player_->SetIntroTransform(duckPos_, duckScale_, duckRot_);
+}
+
+void HelicopterInsertionController::EmitHelicopterFlightParticles(float deltaTime, bool isHighG, bool isFullThrottle, float washHeightLimit)
+{
+	if (!scene_ || !scene_->particleManager || !scene_->appParticleManager_) return;
+
+	AppParticleManager* smokeMgr = GetSmokeMgr();
+	const uint32_t wispyTex = ResolveTex(scene_->wispySmokeTextureIndex_, scene_->smokeTextureIndex_);
+	const Matrix4x4 rotMat = MakeEulerRotationMatrix(heliRot_);
+
+	// 1. メインローター翼端渦ベイパー
+	rotorVortexTimer_ += deltaTime;
+	if (rotorVortexTimer_ >= kRotorVortexInterval && smokeMgr && wispyTex != TextureManager::kInvalidTextureIndex)
 	{
-		scene_->player_->SetIntroTransform(duckPos_, duckScale_, duckRot_);
+		rotorVortexTimer_ = 0.0f;
+		const Vector3 mastWorld = LocalToWorldWithMatrix(heliPos_, rotMat, kMainRotorMastLocal);
+		const float vaporAlpha = isHighG ? kVortexAlphaHighG : kVortexAlphaNormal;
+		const float vaporScale = isHighG ? kVortexScaleHighG : kVortexScaleNormal;
+		const float vaporLife  = isHighG ? kVortexLifeHighG  : kVortexLifeNormal;
+		const Vector3 downwashVec = RotateByMatrix(rotMat, { 0.0f, kRotorTipDownwashVelY, 0.0f });
+
+		for (int i = 0; i < kRotorBladeCount; ++i)
+		{
+			const float angle = mainRotorAngle_ + static_cast<float>(i) * kHalfPi;
+			const float cosA = std::cos(angle);
+			const float sinA = std::sin(angle);
+			const Vector3 tipWorld = mastWorld + RotateByMatrix(rotMat, { cosA * kRotorTipRadius, kRotorTipDropY, sinA * kRotorTipRadius });
+			const Vector3 tipVel = RotateByMatrix(rotMat, { -sinA, 0.0f, cosA }) * kRotorTipTangentSpd + downwashVec;
+
+			AppParticle vp = MakeStyledParticle(
+				tipWorld, tipVel, 0.0f, vaporScale, vaporScale * kVortexTargetMul, vaporLife, wispyTex, kRotorVortexStyle);
+			vp.color.w = vaporAlpha;
+			smokeMgr->AddParticle(vp);
+		}
+	}
+
+	// 2. ツインタービンエンジンの黒煙排気トレイル
+	engineExhaustTimer_ += deltaTime;
+	if (engineExhaustTimer_ >= kExhaustInterval && smokeMgr && wispyTex != TextureManager::kInvalidTextureIndex)
+	{
+		engineExhaustTimer_ = 0.0f;
+		const float exhaustSpeed = isFullThrottle ? kExhaustSpeedFull : kExhaustSpeedCruise;
+		const float scBase       = isFullThrottle ? kExhaustScaleFull : kExhaustScaleCruise;
+		const float alphaBase    = isFullThrottle ? kExhaustAlphaFull : kExhaustAlphaCruise;
+
+		for (float sideF : kExhaustNozzleSides)
+		{
+			const Vector3 nozzlePos = LocalToWorldWithMatrix(heliPos_, rotMat, { sideF * kExhaustNozzleSideX, kExhaustNozzleY, kExhaustNozzleZ });
+			const Vector3 exVel = RotateByMatrix(rotMat, { sideF * kExhaustVelSideX, kExhaustVelDownY, -exhaustSpeed })
+				+ RandBoxVec3(kExhaustJitterXZ, kExhaustJitterYRange, kExhaustJitterXZ);
+
+			AppParticle ex = MakeStyledParticle(
+				nozzlePos, exVel, 0.0f, scBase, scBase * kExhaustTargetMul,
+				RandRangeVec(kExhaustLifeRange), wispyTex, kEngineExhaustStyle);
+			ex.color.w = alphaBase;
+			smokeMgr->AddParticle(ex);
+		}
+	}
+
+	// 3. 航空衝突防止ビーコン（尾翼レッド ＆ ベリーダブルストロボ）
+	beaconTimer_ += deltaTime;
+	const uint32_t flashTex = ResolveTex(scene_->starburstTextureIndex_, scene_->particleTextureB);
+	const float gateWindow = deltaTime * kBeaconGateDtMul;
+
+	if (std::fmod(beaconTimer_, kTailBeaconPeriod) < gateWindow)
+	{
+		scene_->appParticleManager_->EmitMuzzleFlare(
+			scene_->particleManager->GetRandomEngine(),
+			LocalToWorldWithMatrix(heliPos_, rotMat, kTailBeaconLocal),
+			kTailBeaconScale, kTailBeaconColor, kTailBeaconLife, flashTex);
+	}
+
+	const float bellyCycle = std::fmod(beaconTimer_, kBellyStrobePeriod);
+	if ((bellyCycle < gateWindow) || (bellyCycle >= kBellySecondPulseSec && bellyCycle < kBellySecondPulseSec + gateWindow))
+	{
+		scene_->appParticleManager_->EmitMuzzleFlare(
+			scene_->particleManager->GetRandomEngine(),
+			LocalToWorldWithMatrix(heliPos_, rotMat, kBellyStrobeLocal),
+			kBellyStrobeScale, kBellyStrobeColor, kBellyStrobeLife, flashTex);
+	}
+
+	// 4. ローターダウンウォッシュ（煙柱への風圧渦 ＆ 地表砂塵リング ＆ 舞い散る木の葉）
+	if (heliPos_.y < washHeightLimit && smokeMgr && wispyTex != TextureManager::kInvalidTextureIndex)
+	{
+		const float washRatio = std::clamp(
+			1.0f - (heliPos_.y - kWashBaseHeightMin) / (std::max)(washHeightLimit - kWashBaseHeightMin, 1.0f),
+			kWashRatioMin, 1.0f);
+		smokeMgr->ApplyRotorDownwash(
+			{ heliPos_.x, (std::min)(heliPos_.y * 0.5f, kWashCenterMaxY), heliPos_.z },
+			kWashEffectRadius, kWashStrengthBase + kWashStrengthGain * washRatio, deltaTime);
+
+		downwashDustTimer_ += deltaTime;
+		if (downwashDustTimer_ >= kDownwashDustInterval)
+		{
+			downwashDustTimer_ = 0.0f;
+			const Vector3 groundCenter = { heliPos_.x, kDownwashGroundY, heliPos_.z };
+
+			for (int i = 0; i < kDownwashDustCount; ++i)
+			{
+				const float angle = RandRange(0.0f, kTwoPi);
+				const float rad = RandRangeVec(kDownwashSpawnRadRange);
+				const float dirX = std::cos(angle);
+				const float dirZ = std::sin(angle);
+				const float outSpd = (kDownwashOutSpdBase + kDownwashOutSpdGain * washRatio) * RandRangeVec(kDownwashSpdMulRange);
+				const float sc = RandRangeVec(kDownwashScaleRange);
+
+				const Vector3 dPos = groundCenter + Vector3{ dirX * rad, RandRangeVec(kDownwashPosYRange), dirZ * rad };
+				const Vector3 dVel = { dirX * outSpd, RandRangeVec(kDownwashUpVelRange) * washRatio, dirZ * outSpd };
+				AppParticle dust = MakeStyledParticle(
+					dPos, dVel, 0.0f, sc, RandRangeVec(kDownwashTargetRange), RandRangeVec(kDownwashLifeRange), wispyTex, kDownwashDustStyle);
+				dust.color.w = kDownwashBaseAlpha * washRatio;
+				smokeMgr->AddParticle(dust);
+			}
+
+			if (Rand01() < kDownwashLeafChance)
+			{
+				const float leafAngle = RandRange(0.0f, kTwoPi);
+				const float cosL = std::cos(leafAngle);
+				const float sinL = std::sin(leafAngle);
+				const Vector3 leafPos = groundCenter + Vector3{ cosL * kDownwashLeafSpawnRad, RandRangeVec(kDownwashLeafPosYRange), sinL * kDownwashLeafSpawnRad };
+				const Vector3 leafVel = { cosL * RandRangeVec(kDownwashLeafSpdRange), RandRangeVec(kDownwashLeafUpRange), sinL * RandRangeVec(kDownwashLeafSpdRange) };
+				const Vector4& leafCol = (Rand01() < kDownwashLeafAltChance) ? kLeafBrightGreen : kLeafOliveGreen;
+
+				scene_->appParticleManager_->EmitSparkWithVelocity(
+					scene_->particleManager->GetRandomEngine(), leafPos, leafVel, leafCol,
+					kDownwashLeafScale, kDownwashLeafLife, ResolveTex(leafTexIndex_, scene_->particleTextureB));
+			}
+		}
 	}
 }
 
 void HelicopterInsertionController::UpdateParticles(float deltaTime)
 {
-	if (!scene_ || !scene_->particleManager || !scene_->appParticleManager_) return;
+	const bool isHighG = (currentCut_ == kCutAct1 && timer_ >= kAct1HighGStartSec) || (currentCut_ == kCutAct5);
+	const bool isFullThrottle = (currentCut_ == kCutAct5) || (currentCut_ == kCutAct1 && timer_ < kAct1ThrottleEndSec);
+	const float washHeightLimit = (timer_ >= kInsertWashStartSec && timer_ < kCut4Duration + kInsertWashExtraEndSec)
+		? kInsertWashHeightLimit
+		: 0.0f;
+	EmitHelicopterFlightParticles(deltaTime, isHighG, isFullThrottle, washHeightLimit);
+}
 
-	// ヘリのトランスフォーム行列（ローカル座標系からワールド座標系への方向変換用）
-	Matrix4x4 R = Multiply(MakeRotateXMatrix(heliRot_.x), Multiply(MakeRotateYMatrix(heliRot_.y), MakeRotateZMatrix(heliRot_.z)));
-	auto LocalToWorldDir = [&](const Vector3& v) -> Vector3 {
-		return {
-			v.x * R.m[0][0] + v.y * R.m[1][0] + v.z * R.m[2][0],
-			v.x * R.m[0][1] + v.y * R.m[1][1] + v.z * R.m[2][1],
-			v.x * R.m[0][2] + v.y * R.m[1][2] + v.z * R.m[2][2]
-		};
+void HelicopterInsertionController::UpdateExtractionPickup(float realDeltaTime)
+{
+	if (!scene_ || isActive_ || !scene_->allTargetsDestroyed_ || scene_->isDeathSequenceActive_)
+	{
+		if (!isActive_) rotorLoop_.Stop();
+		isExtractionVisible_ = false;
+		return;
+	}
+
+	isExtractionVisible_ = true;
+	extractionApproachTimer_ += realDeltaTime;
+	AdvanceWrappedAngle(mainRotorAngle_, kPickupMainRotorSpeed, realDeltaTime);
+	AdvanceWrappedAngle(tailRotorAngle_, kPickupTailRotorSpeed, realDeltaTime);
+
+	const Vector3 goalPos = scene_->goalRingTransform_.translate;
+	const float approachT = EaseOutCubic(std::clamp(extractionApproachTimer_ / kPickupApproachDuration, 0.0f, 1.0f));
+
+	// 1. 北東上空からのアプローチ ＆ パッド後方での警戒ホバリング軌道
+	const Vector3 holdOrbitPos = goalPos + Vector3{
+		kPickupHoldBaseOffset.x + std::sin(extractionApproachTimer_ * kPickupHoldOscFreq.x) * kPickupHoldOscAmp.x,
+		kPickupHoldBaseOffset.y + std::cos(extractionApproachTimer_ * kPickupHoldOscFreq.y) * kPickupHoldOscAmp.y,
+		kPickupHoldBaseOffset.z + std::cos(extractionApproachTimer_ * kPickupHoldOscFreq.z) * kPickupHoldOscAmp.z
+	};
+	const Vector3 basePos = LerpVec3(goalPos + kPickupSkyEntryOffset, holdOrbitPos, approachT);
+
+	// 2. 脱出ゾーン滞在時〜クリア確定時の低空ピックアップ進入
+	float targetDescent = 0.0f;
+	if (scene_->isGameCleared_)
+	{
+		targetDescent = 1.0f;
+	}
+	else if (scene_->isPlayerInExtractionZone_)
+	{
+		const float extractProgress = 1.0f - std::clamp(scene_->extractionTimer_ / GamePlayScene::kExtractionMaxTime, 0.0f, 1.0f);
+		targetDescent = kPickupZoneBaseDescent + kPickupZoneGainDescent * extractProgress;
+	}
+
+	const float blendSpeed = scene_->isGameCleared_ ? kPickupBlendSpeedCleared : kPickupBlendSpeedZone;
+	pickupDescentBlend_ += (targetDescent - pickupDescentBlend_) * (std::min)(1.0f, blendSpeed * realDeltaTime);
+	const float smoothDescent = SmoothStep01(pickupDescentBlend_);
+
+	const float climaxSmooth = SmoothStep01(scene_->isGameCleared_
+		? std::clamp(1.0f - (scene_->clearSlowMoTimer_ / GamePlayScene::kClearSlowMoDuration), 0.0f, 1.0f)
+		: 0.0f);
+
+	const Vector3 pickupHoverPos = goalPos + Vector3{
+		kPickupHoverBaseOffset.x + kPickupClimaxDeltaOffset.x * climaxSmooth,
+		kPickupHoverBaseOffset.y + kPickupClimaxDeltaOffset.y * climaxSmooth + std::sin(extractionApproachTimer_ * kPickupHoverBobFreq) * kPickupHoverBobAmpY,
+		kPickupHoverBaseOffset.z + kPickupClimaxDeltaOffset.z * climaxSmooth
+	};
+	heliPos_ = LerpVec3(basePos, pickupHoverPos, smoothDescent);
+
+	// 姿勢制御：北東からバンク旋回進入し、パッドへ右キャビン開放ドアを向ける
+	const float approachBank = 1.0f - approachT;
+	heliRot_ = {
+		kPickupApproachPitch * approachBank + std::sin(smoothDescent * kPi) * kPickupFlarePulseAmp + kPickupClimaxPitchDelta * climaxSmooth,
+		kPickupOrbitYaw * (1.0f - smoothDescent) + kPickupPadFacingYaw * smoothDescent,
+		kPickupApproachRoll * approachBank + std::cos(extractionApproachTimer_ * kPickupRollOscFreq) * kPickupRollOscAmp
 	};
 
-	// 1. メインローターブレード先端からの翼端渦・凝結ベイパー雲 (Rotor Tip Vortices)
-	// 高速回転（60 rad/s）する4枚羽の翼端から、圧力差による螺旋状の白い気流ベイパーを連続放出
-	rotorVortexTimer_ += deltaTime;
-	if (rotorVortexTimer_ >= 0.022f)
+	// スライドドア開放 ＆ 空間3Dサウンド
+	const float doorOpenRatio = (std::max)(std::clamp((approachT - kPickupDoorOpenStartT) / kPickupDoorOpenSpanT, 0.0f, 1.0f), smoothDescent);
+	doorSlideProgress_ = 1.0f - kPickupDoorTravel * SmoothStep01(doorOpenRatio);
+
+	const Vector3 listenerPos = scene_->player_ ? scene_->player_->GetPosition() : goalPos;
+	if (doorOpenRatio > kPickupDoorSoundTrigger && !extractionDoorSoundPlayed_)
 	{
-		rotorVortexTimer_ = 0.0f;
-		Vector3 mastWorld = heliPos_ + LocalToWorldDir({ 0.0f, 4.15f, 0.75f });
-
-		// フレア制動（Act 1後半）および急上昇離脱（Act 5）時はローター高負荷でベイパーが濃厚化
-		bool isHighG = (currentCut_ == 1 && timer_ >= 2.0f) || (currentCut_ == 5);
-		float vaporAlpha = isHighG ? 0.45f : 0.26f;
-		float vaporScale = isHighG ? 0.38f : 0.25f;
-
-		for (int i = 0; i < 4; ++i)
-		{
-			float angle = mainRotorAngle_ + i * (kPi * 0.5f);
-			Vector3 localTip = { std::cos(angle) * 3.25f, -0.06f, std::sin(angle) * 3.25f };
-			Vector3 tipWorld = mastWorld + LocalToWorldDir(localTip);
-
-			// 接線方向速度 ＋ 下降気流（ダウンウォッシュ成分）
-			Vector3 localTangent = { -std::sin(angle), 0.0f, std::cos(angle) };
-			Vector3 tipVel = LocalToWorldDir(localTangent) * 4.6f + LocalToWorldDir({ 0.0f, -2.4f, 0.0f })
-				+ Vector3{ RandRange(-0.2f, 0.2f), RandRange(-0.15f, 0.15f), RandRange(-0.2f, 0.2f) };
-
-			scene_->appParticleManager_->EmitDustWithVelocity(
-				scene_->particleManager->GetRandomEngine(),
-				tipWorld,
-				vaporScale,
-				{ 0.95f, 0.98f, 1.0f, vaporAlpha },
-				tipVel,
-				isHighG ? 0.26f : 0.18f,
-				scene_->smokeTextureIndex_
-			);
-		}
+		extractionDoorSoundPlayed_ = true;
+		TacticalAudio::Play3D("Resources/Audio/SE_Heli_Door.wav", heliPos_, listenerPos, kPickupDoorSoundVolume, kPickupDoorAudioMinDist, kPickupDoorAudioMaxDist);
 	}
 
-	// 2. ツインタービンエンジンの排気ポート（左右）からの高温排気陽炎＆スモーク (Engine Exhaust Trails)
-	// 機体上部キャビン後方の左右ノズルから後下方へ高速噴射
-	engineExhaustTimer_ += deltaTime;
-	if (engineExhaustTimer_ >= 0.030f)
+	const float atten = TacticalAudio::ComputeAttenuation(heliPos_, listenerPos, kPickupRotorAudioMinDist, kPickupRotorAudioMaxDist);
+	rotorLoop_.Update("Resources/Audio/SE_Heli_Rotor_Loop.wav", kRotorLoopDurationSec, kPickupRotorVolume * atten, realDeltaTime);
+
+	if (fastRope_)
 	{
-		engineExhaustTimer_ = 0.0f;
-		Vector3 leftExhaustPos = heliPos_ + LocalToWorldDir({ -0.75f, 3.45f, -0.45f });
-		Vector3 rightExhaustPos = heliPos_ + LocalToWorldDir({ +0.75f, 3.45f, -0.45f });
-
-		// 離脱中（Act 5）や急行中（Act 1）はエンジンスロットル全開で排気ガスが濃縮
-		bool isFullThrottle = (currentCut_ == 5) || (currentCut_ == 1 && timer_ < 1.8f);
-		Vector4 exhaustColor = isFullThrottle
-			? Vector4{ 0.32f, 0.30f, 0.28f, 0.32f } // フルスロットルの排気微粒子
-			: Vector4{ 0.48f, 0.46f, 0.44f, 0.18f }; // アイドリング／ホバリング時の熱風陽炎
-		float exhaustScale = isFullThrottle ? 0.48f : 0.35f;
-		float exhaustSpeed = isFullThrottle ? 6.5f : 4.5f;
-
-		Vector3 exhaustBaseVel = LocalToWorldDir({ 0.0f, -0.30f, -exhaustSpeed });
-
-		// 左排気
-		Vector3 leftVel = exhaustBaseVel + LocalToWorldDir({ -0.4f, 0.0f, 0.0f })
-			+ Vector3{ RandRange(-0.2f, 0.2f), RandRange(-0.2f, 0.2f), RandRange(-0.2f, 0.2f) };
-		scene_->appParticleManager_->EmitDustWithVelocity(
-			scene_->particleManager->GetRandomEngine(),
-			leftExhaustPos,
-			exhaustScale,
-			exhaustColor,
-			leftVel,
-			0.38f,
-			scene_->smokeTextureIndex_
-		);
-
-		// 右排気
-		Vector3 rightVel = exhaustBaseVel + LocalToWorldDir({ +0.4f, 0.0f, 0.0f })
-			+ Vector3{ RandRange(-0.2f, 0.2f), RandRange(-0.2f, 0.2f), RandRange(-0.2f, 0.2f) };
-		scene_->appParticleManager_->EmitDustWithVelocity(
-			scene_->particleManager->GetRandomEngine(),
-			rightExhaustPos,
-			exhaustScale,
-			exhaustColor,
-			rightVel,
-			0.38f,
-			scene_->smokeTextureIndex_
-		);
+		fastRope_->SetScale(kZeroVec3);
+		fastRope_->Update();
 	}
+	UpdateHelicopterCommonParts(kPickupRotorBlurOff, true, 1.0f);
 
-	// 3. テールローターのアンチトルク側方気流ジェット (Tail Rotor Jet)
-	tailRotorVortexTimer_ += deltaTime;
-	if (tailRotorVortexTimer_ >= 0.045f)
-	{
-		tailRotorVortexTimer_ = 0.0f;
-		Vector3 tailRotorPos = heliPos_ + LocalToWorldDir({ 0.35f, 3.35f, -8.60f });
-		Vector3 tailJetVel = LocalToWorldDir({ RandRange(3.5f, 5.5f), RandRange(-0.4f, 0.4f), RandRange(-0.6f, 0.6f) });
+	if (scene_->isGameCleared_) PlayDuckVoiceOnce(clearQuackPlayed_, duckSoundId_);
 
-		scene_->appParticleManager_->EmitDustWithVelocity(
-			scene_->particleManager->GetRandomEngine(),
-			tailRotorPos,
-			0.24f,
-			{ 0.90f, 0.94f, 1.0f, 0.16f },
-			tailJetVel,
-			0.16f,
-			scene_->smokeTextureIndex_
-		);
-	}
-
-	// 4. 航空警告灯・衝突防止ストロボ閃光パルス (Anti-Collision Beacon & Strobe)
-	beaconTimer_ += deltaTime;
-	uint32_t flashTex = (scene_->starburstTextureIndex_ != TextureManager::kInvalidTextureIndex)
-		? scene_->starburstTextureIndex_ : scene_->particleTextureB;
-
-	// (A) 垂直尾翼頂部の赤色ビーコン閃光（0.80秒周期パルス）
-	float tailCycle = std::fmod(beaconTimer_, 0.80f);
-	if (tailCycle < deltaTime * 1.25f)
-	{
-		Vector3 tailBeaconPos = heliPos_ + LocalToWorldDir({ 0.05f, 4.35f, -8.70f });
-		scene_->appParticleManager_->EmitMuzzleFlare(
-			scene_->particleManager->GetRandomEngine(),
-			tailBeaconPos,
-			1.25f,
-			{ 1.0f, 0.10f, 0.06f, 1.0f },
-			0.08f,
-			flashTex
-		);
-	}
-
-	// (B) 機体腹部（ベリー）の白色高輝度ダブルストロボ閃光（1.20秒周期: ピカッ、ピカッと2連打）
-	float bellyCycle = std::fmod(beaconTimer_, 1.20f);
-	if ((bellyCycle < deltaTime * 1.25f) || (bellyCycle >= 0.15f && bellyCycle < 0.15f + deltaTime * 1.25f))
-	{
-		Vector3 bellyStrobePos = heliPos_ + LocalToWorldDir({ 0.0f, 0.15f, 0.50f });
-		scene_->appParticleManager_->EmitMuzzleFlare(
-			scene_->particleManager->GetRandomEngine(),
-			bellyStrobePos,
-			1.50f,
-			{ 1.0f, 1.0f, 1.0f, 1.0f },
-			0.06f,
-			flashTex
-		);
-	}
-
-	// 5. ヘリのローター下降風圧（ダウンウォッシュ）による地面砂塵・舞い散る木の葉の大拡散
-	// Act 1後半（ヘリ接近時 1.4s以降）からAct 4終了まで継続
-	if (timer_ >= 1.4f && timer_ < kCut4Duration + 0.2f)
-	{
-		downwashDustTimer_ += deltaTime;
-		if (downwashDustTimer_ >= 0.040f)
-		{
-			downwashDustTimer_ = 0.0f;
-			Vector3 groundCenter = { 0.0f, 0.05f, 0.0f };
-
-			// 8方向に吹き荒れる放射状サンドダスト (太陽光に透ける明るい白砂煙)
-			for (int i = 0; i < 8; ++i)
-			{
-				float angle = i * (2.0f * kPi / 8.0f) + RandRange(-0.2f, 0.2f);
-				float spd = RandRange(3.0f, 5.5f);
-				Vector3 vel = { std::cos(angle) * spd, RandRange(0.25f, 0.60f), std::sin(angle) * spd };
-				Vector3 spawnP = groundCenter + Vector3{ std::cos(angle) * 1.5f, 0.02f, std::sin(angle) * 1.5f };
-
-				scene_->appParticleManager_->EmitDustWithVelocity(
-					scene_->particleManager->GetRandomEngine(),
-					spawnP,
-					0.90f,
-					{ 0.92f, 0.88f, 0.76f, 0.42f }, // 日差しに照らされた白砂塵
-					vel,
-					0.45f,
-					scene_->smokeTextureIndex_
-				);
-			}
-
-			// 風圧で激しく舞い散る白昼の木の葉（発生頻度0.65、新緑〜針葉樹オリーブのバリエーション）
-			if (Rand01() < 0.65f)
-			{
-				float leafAngle = RandRange(0.0f, 2.0f * kPi);
-				Vector3 leafPos = groundCenter + Vector3{ std::cos(leafAngle) * 3.5f, RandRange(0.15f, 0.70f), std::sin(leafAngle) * 3.5f };
-				Vector3 leafVel = { std::cos(leafAngle) * RandRange(3.2f, 5.8f), RandRange(1.4f, 3.2f), std::sin(leafAngle) * RandRange(3.2f, 5.8f) };
-
-				Vector4 leafCol = (Rand01() < 0.5f)
-					? Vector4{ 0.24f, 0.58f, 0.16f, 0.95f }
-					: Vector4{ 0.35f, 0.48f, 0.14f, 0.95f };
-
-				uint32_t leafTex = (leafTexIndex_ != TextureManager::kInvalidTextureIndex)
-					? leafTexIndex_ : scene_->particleTextureB;
-
-				scene_->appParticleManager_->EmitSparkWithVelocity(
-					scene_->particleManager->GetRandomEngine(),
-					leafPos,
-					leafVel,
-					leafCol,
-					0.25f,
-					0.75f,
-					leafTex
-				);
-			}
-		}
-	}
+	EmitHelicopterFlightParticles(realDeltaTime, smoothDescent > kPickupHighGDescent, approachT < kPickupFullThrottleT, kPickupWashHeightLimit);
 }
 
 void HelicopterInsertionController::Draw3D(const RenderContext& ctx)
 {
-	if (!isActive_) return;
+	if (!isActive_ && !isExtractionVisible_) return;
 
-	// 地上シャドウを先に描画（地面に密着投影）
-	if (heliShadow_) heliShadow_->Draw(ctx);
-	if (heliBody_) heliBody_->Draw(ctx);
-	if (heliMainRotor_) heliMainRotor_->Draw(ctx);
-	if (heliTailRotor_) heliTailRotor_->Draw(ctx);
-	if (fastRope_) fastRope_->Draw(ctx);
+	if (heliShadow_)         heliShadow_->Draw(ctx);
+	if (heliCabinInterior_)  heliCabinInterior_->Draw(ctx);
+	if (heliBody_)           heliBody_->Draw(ctx);
+	if (heliCargoDoor_)      heliCargoDoor_->Draw(ctx);
+	if (heliMainRotorBlur2_) heliMainRotorBlur2_->Draw(ctx);
+	if (heliMainRotorBlur1_) heliMainRotorBlur1_->Draw(ctx);
+	if (heliMainRotor_)      heliMainRotor_->Draw(ctx);
+	if (heliTailRotor_)      heliTailRotor_->Draw(ctx);
+	if (isActive_ && fastRope_) fastRope_->Draw(ctx);
 }
 
 void HelicopterInsertionController::DrawUI()
 {
-#ifdef USE_IMGUI
-	if (!isActive_) return;
+	if (!isActive_ || !scene_) return;
 
-	ImDrawList* drawList = ImGui::GetForegroundDrawList();
-	ImVec2 disp = ImGui::GetIO().DisplaySize;
-	if (disp.x <= 0.0f || disp.y <= 0.0f) return;
+	TacticalUICanvas* ui = TacticalUICanvas::GetInstance();
+	if (!ui) return;
+	TacticalDrawList* drawList = ui->GetForegroundDrawList();
+	const UIVec2 disp = ui->GetDisplaySize();
+	if (!drawList || disp.x <= 0.0f || disp.y <= 0.0f) return;
 
-	// =========================================================================
-	// ⚡ 1. 上品なカット切り替えフラッシュ ＆ 着地インパクトフレーム
-	// =========================================================================
-	float totalWhiteFlash = (std::min)(cutFlashAlpha_ + impactFlashAlpha_, 1.0f);
-	if (totalWhiteFlash > 0.02f)
+	const float uiScale = std::clamp(disp.x / kUiRefWidth, kUiScaleMin, kUiScaleMax);
+
+	// 1. 控えめな光学シャッター＆着地ショックフラッシュ（ウォームアンバー寄り）
+	const float totalFlash = (std::min)(cutFlashAlpha_ + impactFlashAlpha_, kMaxTotalFlashAlpha);
+	if (totalFlash > kMinVisibleFlashAlpha)
 	{
-		int flashA = static_cast<int>(230 * totalWhiteFlash);
-		drawList->AddRectFilled(ImVec2(0.0f, 0.0f), disp, IM_COL32(255, 255, 255, flashA));
+		drawList->AddRectFilled(UIVec2(0.0f, 0.0f), disp, PackColor(kColWarmFlashRgb, static_cast<int>(kAlphaMaxF * totalFlash)));
 	}
 
-	// =========================================================================
-	// 🎬 2. 映画風シネマスコープ黒帯（21:9 アスペクト比演出）
-	// =========================================================================
-	float maxBarH = disp.y * 0.085f; // 画面上下8.5%
-	float barRatio = 1.0f;
-	if (currentCut_ == 5)
+	// 2. 21:9 シネマスコープ黒帯 ＆ シャープ作戦ヘッダー / スキップガイド
+	const float barRatio = (currentCut_ == kCutAct5)
+		? (std::max)(1.0f - SmoothStep01(((timer_ - kCut4Duration) / (kDuration - kCut4Duration)) * kLetterboxExitSpeed), 0.0f)
+		: 1.0f;
+	const float curBarH = (disp.y * kLetterboxHeightRatio) * barRatio;
+
+	if (curBarH > 1.0f)
 	{
-		float exitT = (timer_ - kCut4Duration) / (kDuration - kCut4Duration);
-		barRatio = (std::max)(1.0f - exitT * 1.4f, 0.0f);
-	}
-	float curBarH = maxBarH * barRatio;
+		drawList->AddRectFilled(UIVec2(0.0f, 0.0f), UIVec2(disp.x, curBarH), kColLetterboxFill);
+		drawList->AddRectFilled(UIVec2(0.0f, disp.y - curBarH), disp, kColLetterboxFill);
+		drawList->AddLine(UIVec2(0.0f, curBarH), UIVec2(disp.x, curBarH),
+			PackColor(kColTopAmberLineRgb, static_cast<int>(kTopAmberLineAlpha * barRatio)), kTopLineThickness);
+		drawList->AddLine(UIVec2(0.0f, disp.y - curBarH), UIVec2(disp.x, disp.y - curBarH),
+			PackColor(kColBottomSteelLineRgb, static_cast<int>(kBottomSteelLineAlpha * barRatio)), 1.0f);
 
-	if (curBarH > 0.5f)
-	{
-		// 漆黒シネマスコープバー
-		drawList->AddRectFilled(ImVec2(0.0f, 0.0f), ImVec2(disp.x, curBarH), IM_COL32(4, 6, 8, 250));
-		drawList->AddRectFilled(ImVec2(0.0f, disp.y - curBarH), ImVec2(disp.x, disp.y), IM_COL32(4, 6, 8, 250));
-
-		// 上下の極細チタンアクセントライン（控えめで洗練されたデザイン）
-		drawList->AddLine(ImVec2(0.0f, curBarH), ImVec2(disp.x, curBarH), IM_COL32(50, 80, 95, 140), 1.0f);
-		drawList->AddLine(ImVec2(0.0f, disp.y - curBarH), ImVec2(disp.x, disp.y - curBarH), IM_COL32(50, 80, 95, 140), 1.0f);
-
-		// 上部バー：洗練された軍用コード
-		const char* topCode = "/// TASK FORCE DUCKOV ///  OPERATION: IRON FEATHER  [DAYLIGHT AIRBORNE ASSAULT]";
-		ImVec2 tSize = ImGui::CalcTextSize(topCode);
-		drawList->AddText(ImVec2((disp.x - tSize.x) * 0.5f, curBarH * 0.5f - tSize.y * 0.5f), IM_COL32(140, 175, 190, 180), topCode);
-
-		// 下部バー：スキップキーガイド（控えめなブリージング表示）
-		float pulse = 0.55f + 0.35f * std::sin(timer_ * 5.0f);
-		int alpha = static_cast<int>(180 * pulse);
-		const char* skipPrompt = "[ SPACE ] SKIP";
-		ImVec2 sSize = ImGui::CalcTextSize(skipPrompt);
-		drawList->AddText(ImVec2((disp.x - sSize.x) * 0.5f, disp.y - curBarH * 0.5f - sSize.y * 0.5f), IM_COL32(180, 190, 195, alpha), skipPrompt);
-	}
-
-	// =========================================================================
-	// 🛰️ 3. 洗練されたミニマル軍用OSD（ブラックホーク・ダウン調 白昼作戦HUD）
-	// =========================================================================
-	if (timer_ < kCut4Duration + 0.4f)
-	{
-		float osdX = 45.0f;
-		float osdY = disp.y - maxBarH - 46.0f;
-
-		// 録画インジケーター（点滅する赤い丸）
-		bool recBlink = (std::fmod(timer_, 1.0f) < 0.65f);
-		if (recBlink)
+		if (barRatio > kLetterboxContentMinRat)
 		{
-			drawList->AddCircleFilled(ImVec2(osdX, osdY + 5.0f), 4.0f, IM_COL32(235, 45, 45, 230));
-		}
-		drawList->AddText(ImVec2(osdX + 12.0f, osdY), IM_COL32(220, 230, 240, 220), "REC  00:0");
+			DrawCineTextAligned(
+				drawList, UIFontRole::TitleBoldJP, kHeaderFontSize * uiScale, disp.x * 0.5f, curBarH * 0.5f,
+				PackColor(kColHeaderGoldRgb, static_cast<int>(kHeaderMaxAlpha * barRatio)),
+				reinterpret_cast<const char*>(u8"OPERATION: IRON FEATHER // 強襲ヘリ降下作戦"), kAlignCenter);
 
-		char timeSecBuf[16];
-		sprintf_s(timeSecBuf, "%d", static_cast<int>(timer_));
-		drawList->AddText(ImVec2(osdX + 68.0f, osdY), IM_COL32(220, 230, 240, 220), timeSecBuf);
-		drawList->AddText(ImVec2(osdX + 88.0f, osdY), IM_COL32(160, 185, 205, 180), "// DAYLIGHT ASSAULT");
+			const float pulse = kSkipPulseBase + kSkipPulseAmp * std::sin(timer_ * kSkipPulseFreq);
+			const int skA = static_cast<int>(kSkipMaxAlpha * pulse * barRatio);
+			const char* skipTxt = reinterpret_cast<const char*>(u8"[SPACE] スキップ");
+			const UIVec2 skSz = MeasureCineText(UIFontRole::SubBoldJP, kSkipFontSize * uiScale, skipTxt);
+			const float skBoxW = skSz.x + (kSkipPadX * uiScale) * 2.0f;
+			const float skBoxH = skSz.y + kSkipPadY * uiScale;
+			const float skBoxX = disp.x - skBoxW - kRightEdgeMargin * uiScale;
+			const float skBoxY = disp.y - curBarH * 0.5f - skBoxH * 0.5f;
+			DrawFramedBox(drawList, skBoxX, skBoxY, skBoxW, skBoxH,
+				PackColor(kColSkipBgRgb, static_cast<int>(kSkipBgMaxAlpha * barRatio)), PackColor(kColSkipBorderRgb, skA));
+			DrawCineTextAligned(drawList, UIFontRole::SubBoldJP, kSkipFontSize * uiScale,
+				skBoxX + skBoxW * 0.5f, disp.y - curBarH * 0.5f, PackColor(kColSkipTextRgb, skA), skipTxt, kAlignCenter);
 
-		// ロケーション＆時刻表示
-		drawList->AddText(ImVec2(osdX, osdY + 16.0f), IM_COL32(170, 190, 205, 200), "LOC: SECTOR-01 OUTPOST | 14:24 HRS");
-
-		// ステータスライン
-		const char* statusText = nullptr;
-		ImU32 statusColor = IM_COL32(140, 200, 220, 220);
-
-		if (currentCut_ == 1)
-		{
-			statusText = "INGRESS: LOW-ALTITUDE AIRBORNE APPROACH [ALT 24M]";
-			statusColor = IM_COL32(245, 205, 80, 230);
-		}
-		else if (currentCut_ == 2)
-		{
-			float act2Phase = (timer_ - kCut1Duration) / (kCut2Duration - kCut1Duration);
-			if (act2Phase < 0.68f)
+			const float recX = kLeftEdgeMargin * uiScale;
+			const float recY = disp.y - curBarH * 0.5f;
+			if (std::fmod(timer_, 1.0f) < kRecBlinkDutyRatio)
 			{
-				statusText = "[ RED LIGHT ] STANDBY // CONFIRMING LZ PERIMETER";
-				statusColor = IM_COL32(255, 80, 80, 240);
-
-				// 画面右上RED LIGHTインジケーター
-				drawList->AddRectFilled(ImVec2(disp.x - 265.0f, curBarH + 18.0f), ImVec2(disp.x - 45.0f, curBarH + 50.0f), IM_COL32(45, 12, 12, 220));
-				drawList->AddRect(ImVec2(disp.x - 265.0f, curBarH + 18.0f), ImVec2(disp.x - 45.0f, curBarH + 50.0f), IM_COL32(230, 60, 60, 200), 0.0f, 0, 1.5f);
-				drawList->AddCircleFilled(ImVec2(disp.x - 245.0f, curBarH + 34.0f), 6.0f, IM_COL32(255, 50, 50, 255));
-				drawList->AddText(ImVec2(disp.x - 230.0f, curBarH + 26.0f), IM_COL32(255, 200, 200, 240), "HOLD POSITION: RED");
+				drawList->AddCircleFilled(UIVec2(recX, recY), kRecDotRadius * uiScale,
+					PackColor(kColRecDotRgb, static_cast<int>(kRecDotMaxAlpha * barRatio)));
 			}
-			else
-			{
-				statusText = "[ GREEN LIGHT ] EXECUTE INSERTION >> GO! GO! GO!";
-				statusColor = IM_COL32(50, 255, 120, 255);
-
-				// 画面右上GREEN LIGHTインジケーター（点滅発光）
-				drawList->AddRectFilled(ImVec2(disp.x - 265.0f, curBarH + 18.0f), ImVec2(disp.x - 45.0f, curBarH + 50.0f), IM_COL32(10, 48, 22, 230));
-				drawList->AddRect(ImVec2(disp.x - 265.0f, curBarH + 18.0f), ImVec2(disp.x - 45.0f, curBarH + 50.0f), IM_COL32(60, 245, 110, 230), 0.0f, 0, 2.0f);
-				drawList->AddCircleFilled(ImVec2(disp.x - 245.0f, curBarH + 34.0f), 7.0f, IM_COL32(50, 255, 110, 255));
-				drawList->AddText(ImVec2(disp.x - 230.0f, curBarH + 26.0f), IM_COL32(210, 255, 225, 255), "GREEN LIGHT: GO!");
-			}
-		}
-		else if (currentCut_ == 3)
-		{
-			float act3Phase = (timer_ - kCut2Duration) / (kCut3Duration - kCut2Duration);
-			if (act3Phase < 0.68f)
-			{
-				statusText = "FAST-ROPE RAPID COMBAT DESCENT [FREE-FALL SPEED]";
-				statusColor = IM_COL32(100, 230, 255, 230);
-			}
-			else
-			{
-				statusText = ">> COMBAT BRAKE ENGAGED [ALT 3M] - DECELERATING <<";
-				statusColor = IM_COL32(255, 225, 65, 255);
-			}
-		}
-		else if (currentCut_ == 4)
-		{
-			float act4Phase = (timer_ - kCut3Duration) / (kCut4Duration - kCut3Duration);
-			if (act4Phase < 0.25f)
-			{
-				statusText = "TOUCHDOWN IMPACT // ABSORBING LANDING";
-				statusColor = IM_COL32(255, 205, 75, 240);
-			}
-			else if (act4Phase < 0.72f)
-			{
-				statusText = "CLEARING 360-DEG PERIMETER // SCANNING FOR HOSTILES";
-				statusColor = IM_COL32(110, 225, 255, 245);
-			}
-			else
-			{
-				statusText = "LZ ALL CLEAR // WEAPONS HOT - COMMENCE OPERATION!";
-				statusColor = IM_COL32(65, 255, 135, 255);
-			}
-		}
-
-		if (statusText)
-		{
-			drawList->AddText(ImVec2(osdX, osdY + 31.0f), statusColor, statusText);
+			DrawCineTextAligned(drawList, UIFontRole::SubBoldJP, kRecFontSize * uiScale, recX + kRecTextOffsetX * uiScale, recY,
+				PackColor(kColRecTextRgb, static_cast<int>(kRecTextMaxAlpha * barRatio)), "REC // HELMET-CAM  [SECTOR-01 LZ]", kAlignLeft);
 		}
 	}
-#endif
+
+	// 3. 左上ライブ高度・経過時間テレメトリ
+	if (timer_ < kCut4Duration + kTelemetryFadeTailSec)
+	{
+		const float teleAlpha = (timer_ > kCut4Duration)
+			? std::clamp(1.0f - (timer_ - kCut4Duration) / kTelemetryFadeTailSec, 0.0f, 1.0f)
+			: 1.0f;
+		const float altMeters = (currentCut_ <= kCutAct2) ? heliPos_.y : (std::max)(0.0f, duckPos_.y);
+		char teleBuf[kTelemetryBufSize];
+		std::snprintf(teleBuf, sizeof(teleBuf), "ALT %.1fm   T+00:0%d", altMeters, (std::min)(kTelemetryMaxSingleSec, static_cast<int>(timer_)));
+		DrawCineTextAligned(drawList, UIFontRole::SubBoldJP, kTelemetryFontSize * uiScale,
+			kLeftEdgeMargin * uiScale, curBarH + kTelemetryOffsetY * uiScale,
+			PackColor(kColTelemetryRgb, static_cast<int>(kTelemetryMaxAlpha * teleAlpha)), teleBuf, kAlignLeft);
+	}
+
+	// 4. 右上 RED LIGHT -> GREEN LIGHT タクティカルジャンプランプ
+	if (timer_ >= kCut1Duration && timer_ < kCut2Duration + kLampExtraShowSec)
+	{
+		const float slideIn = SmoothStep01((timer_ - kCut1Duration) / kLampSlideInSec);
+		const float badgeAlpha = (timer_ > kCut2Duration + kLampFadeStartOffsetSec)
+			? std::clamp(1.0f - (timer_ - (kCut2Duration + kLampFadeStartOffsetSec)) / kLampFadeDurationSec, 0.0f, 1.0f)
+			: 1.0f;
+		const bool isGreen = (((timer_ - kCut1Duration) / (kCut2Duration - kCut1Duration)) >= kAct2PrepEndPhase);
+
+		const char* lampTxt = isGreen
+			? reinterpret_cast<const char*>(u8"GREEN LIGHT // 降下開始！")
+			: reinterpret_cast<const char*>(u8"RED LIGHT // 降下待機");
+		const UIVec2 lSz = MeasureCineText(UIFontRole::SubBoldJP, kLampFontSize * uiScale, lampTxt);
+		const float bdgW = lSz.x + kLampWidthPad * uiScale;
+		const float bdgH = kLampHeight * uiScale;
+		const float bdgX = disp.x - bdgW - kRightEdgeMargin * uiScale + (1.0f - slideIn) * kLampSlideOffsetX * uiScale;
+		const float bdgY = curBarH + kLampOffsetY * uiScale;
+
+		const int bA = static_cast<int>(kLampMaxAlpha * badgeAlpha);
+		const uint32_t bgC = PackColor(isGreen ? kColGreenLampBgRgb     : kColRedLampBgRgb,     bA);
+		const uint32_t bdC = PackColor(isGreen ? kColGreenLampBorderRgb : kColRedLampBorderRgb, bA);
+		const uint32_t txC = PackColor(isGreen ? kColGreenLampTextRgb   : kColRedLampTextRgb,   bA);
+
+		DrawFramedBox(drawList, bdgX, bdgY, bdgW, bdgH, bgC, bdC, kLampBorderThickness);
+		drawList->AddCircleFilled(UIVec2(bdgX + kLampDotOffsetX * uiScale, bdgY + bdgH * 0.5f), kLampDotRadius * uiScale, bdC, kLampDotSegments);
+		DrawCineTextAligned(drawList, UIFontRole::SubBoldJP, kLampFontSize * uiScale,
+			bdgX + kLampTextOffsetX * uiScale, bdgY + bdgH * 0.5f, txC, lampTxt, kAlignLeft);
+	}
+
+	// 5. 下部タクティカル無線字幕（データテーブル駆動）
+	if (timer_ < kCut4Duration + kSubtitleEndExtraSec)
+	{
+		for (const RadioSubtitleCue& cue : kInsertionSubtitles)
+		{
+			if (timer_ >= cue.startTime && timer_ < cue.endTime)
+			{
+				const char* subText = reinterpret_cast<const char*>(cue.text);
+				const float subAlpha = SmoothStep01((timer_ - cue.startTime) / cue.fadeInDuration)
+					* SmoothStep01((cue.endTime - timer_) / cue.fadeOutDuration);
+				if (subAlpha > kSubtitleMinAlpha)
+				{
+					const UIVec2 sSz = MeasureCineText(UIFontRole::SubBoldJP, kSubtitleFontSize * uiScale, subText);
+					const float subW = sSz.x + kSubtitlePadW * uiScale;
+					const float subH = sSz.y + kSubtitlePadH * uiScale;
+					const float subX = (disp.x - subW) * 0.5f;
+					const float subY = disp.y - curBarH - subH - kSubtitleMarginBottom * uiScale;
+					DrawFramedBox(drawList, subX, subY, subW, subH,
+						PackColor(kColSubtitleBgRgb, static_cast<int>(kSubtitleBgMaxAlpha * subAlpha)),
+						PackColor(kColSubtitleBorderRgb, static_cast<int>(kSubtitleBorderMaxAlpha * subAlpha)));
+					DrawCineTextAligned(drawList, UIFontRole::SubBoldJP, kSubtitleFontSize * uiScale,
+						disp.x * 0.5f, subY + subH * 0.5f,
+						PackColor(kColSubtitleTextRgb, static_cast<int>(kSubtitleTextMaxAlpha * subAlpha)), subText, kAlignCenter);
+				}
+				break;
+			}
+		}
+	}
 }

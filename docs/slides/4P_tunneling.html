@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    width: 1920px;
+    height: 1080px;
+    background-color: #23262b;
+    color: #ffffff;
+    font-family: "Meiryo", "Yu Gothic UI", sans-serif;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 50px 70px;
+    overflow: hidden;
+  }
+  
+  /* ヘッダー */
+  .header {
+    border-bottom: 2px solid #3d424d;
+    padding-bottom: 20px;
+  }
+  .title-tag {
+    display: inline-block;
+    background: #e05353;
+    color: #fff;
+    font-size: 18px;
+    font-weight: bold;
+    padding: 6px 16px;
+    border-radius: 4px;
+    margin-bottom: 10px;
+  }
+  .title-main {
+    font-size: 38px;
+    font-weight: bold;
+    color: #ffffff;
+    letter-spacing: 0.5px;
+  }
+  .title-sub {
+    font-size: 20px;
+    color: #94a3b8;
+    margin-top: 6px;
+  }
+
+  /* メイン図解エリア */
+  .diagram-container {
+    position: relative;
+    width: 100%;
+    height: 580px;
+    background: #1a1d22;
+    border-radius: 12px;
+    border: 1px solid #333842;
+  }
+
+  /* 軌跡の水平ライン（y=260px に合わせる） */
+  .center-line-y {
+    position: absolute;
+    top: 250px;
+    width: 100%;
+  }
+
+  /* 中央の障害物（薄い壁） */
+  .wall {
+    position: absolute;
+    left: 50%;
+    top: 60px;
+    height: 380px;
+    width: 50px;
+    transform: translateX(-50%);
+    background: #604a37;
+    border: 3px solid #937356;
+    border-radius: 4px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.5);
+    z-index: 2;
+  }
+  .wall-label {
+    position: absolute;
+    top: -50px;
+    left: 50%;
+    transform: translateX(-50%);
+    white-space: nowrap;
+    font-size: 20px;
+    font-weight: bold;
+    color: #e2d1c0;
+    text-align: center;
+  }
+  .wall-dim {
+    font-size: 15px;
+    color: #a8927d;
+    margin-top: 2px;
+  }
+
+  /* 移動の矢印と軌跡（赤い破線） */
+  .trajectory {
+    position: absolute;
+    left: 280px;
+    right: 280px;
+    top: 250px;
+    height: 4px;
+    border-top: 4px dashed #ef476f;
+    z-index: 1;
+  }
+  .trajectory::after {
+    content: "";
+    position: absolute;
+    right: -2px;
+    top: -10px;
+    border-left: 18px solid #ef476f;
+    border-top: 9px solid transparent;
+    border-bottom: 9px solid transparent;
+  }
+  .trajectory-label {
+    position: absolute;
+    top: -42px;
+    left: 28%;
+    transform: translateX(-50%);
+    background: rgba(239, 71, 111, 0.15);
+    border: 1px solid #ef476f;
+    padding: 6px 16px;
+    border-radius: 6px;
+    font-size: 16px;
+    font-weight: bold;
+    color: #ff85a1;
+  }
+
+  /* 弾丸 Frame 1 */
+  .bullet-start {
+    position: absolute;
+    left: 250px;
+    top: 250px;
+    transform: translate(-50%, -50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    z-index: 5;
+  }
+  .bullet-circle {
+    width: 68px;
+    height: 68px;
+    border-radius: 50%;
+    background: #00b4d8;
+    border: 4px solid #ffffff;
+    box-shadow: 0 0 16px rgba(0, 180, 216, 0.6);
+  }
+  .bullet-info {
+    position: absolute;
+    top: 85px;
+    left: 50%;
+    transform: translateX(-50%);
+    white-space: nowrap;
+    text-align: center;
+  }
+  .frame-title {
+    font-size: 22px;
+    font-weight: bold;
+    color: #48cae4;
+  }
+  .frame-desc {
+    font-size: 16px;
+    color: #94a3b8;
+    margin-top: 4px;
+  }
+  .check-badge {
+    background: #2b313c;
+    border: 1px solid #475569;
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 15px;
+    color: #cbd5e1;
+    margin-top: 8px;
+    display: inline-block;
+  }
+
+  /* 弾丸 Frame 2 */
+  .bullet-end {
+    position: absolute;
+    right: 250px;
+    top: 250px;
+    transform: translate(50%, -50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    z-index: 5;
+  }
+
+  /* トンネリング警告バッジ */
+  .tunneling-alert {
+    position: absolute;
+    bottom: 40px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #991b1b;
+    border: 2px solid #ef4444;
+    border-radius: 8px;
+    padding: 16px 36px;
+    text-align: center;
+    box-shadow: 0 8px 30px rgba(153, 27, 27, 0.5);
+    z-index: 10;
+  }
+  .alert-title {
+    font-size: 24px;
+    font-weight: bold;
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+  }
+  .alert-sub {
+    font-size: 16px;
+    color: #fecaca;
+    margin-top: 6px;
+  }
+
+  /* フッター解説 */
+  .footer {
+    background: #1b1e23;
+    border-radius: 8px;
+    border-left: 6px solid #e05353;
+    padding: 18px 28px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .footer-row {
+    font-size: 18px;
+    line-height: 1.5;
+  }
+  .tag-danger {
+    color: #f87171;
+    font-weight: bold;
+  }
+  .tag-cause {
+    color: #94a3b8;
+    font-weight: bold;
+  }
+</style>
+</head>
+<body>
+
+  <div class="header">
+    <div class="title-tag">課題：離散衝突判定の限界</div>
+    <div class="title-main">高速移動時の「すり抜け（トンネリング現象）」</div>
+    <div class="title-sub">フレームごとの座標（点）だけで判定すると、障害物の内部に弾丸が存在する瞬間が消失する</div>
+  </div>
+
+  <div class="diagram-container">
+    
+    <!-- 軌跡の水平ライン -->
+    <div class="trajectory">
+      <div class="trajectory-label">1フレームの移動量: 80cm ＞ 板の厚み: 40cm</div>
+    </div>
+
+    <!-- 壁 -->
+    <div class="wall">
+      <div class="wall-label">
+        木のフェンス（薄い障害物）
+        <div class="wall-dim">板の厚み: 40cm</div>
+      </div>
+    </div>
+
+    <!-- 弾丸 Frame 1 -->
+    <div class="bullet-start">
+      <div class="bullet-circle"></div>
+      <div class="bullet-info">
+        <div class="frame-title">Frame 1 (前フレーム)</div>
+        <div class="frame-desc">壁の手前に位置</div>
+        <div class="check-badge">判定: 接触なし</div>
+      </div>
+    </div>
+
+    <!-- 弾丸 Frame 2 -->
+    <div class="bullet-end">
+      <div class="bullet-circle"></div>
+      <div class="bullet-info">
+        <div class="frame-title">Frame 2 (現フレーム)</div>
+        <div class="frame-desc">壁の向こう側へワープ</div>
+        <div class="check-badge">判定: 接触なし</div>
+      </div>
+    </div>
+
+    <!-- すり抜け警告 -->
+    <div class="tunneling-alert">
+      <div class="alert-title">❌ 接触検知ゼロ（すり抜け発生）</div>
+      <div class="alert-sub">中間位置（壁の中）を一度も通過判定しないまま通り抜けてしまう</div>
+    </div>
+
+  </div>
+
+  <div class="footer">
+    <div class="footer-row">
+      <span class="tag-cause">【発生原因】 </span>
+      フレームレート低下時や弾速が上がった際、1フレームあたりの移動量がコライダーの厚みを超過するため。
+    </div>
+    <div class="footer-row">
+      <span class="tag-danger">【ゲームへの影響】 </span>
+      「撃ったのに壁や敵をすり抜けてしまう」という、アクションゲームとして最も致命的な手触りの崩壊を引き起こす。
+    </div>
+  </div>
+
+</body>
+</html>

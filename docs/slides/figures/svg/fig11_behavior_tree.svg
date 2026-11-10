@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="810" height="380" viewBox="0 0 810 380"><defs><marker id="a-fg" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#E9EDF3"/></marker><marker id="a-sub" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#A6B0BE"/></marker><marker id="a-mint" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#86CBA8"/></marker><marker id="a-red" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#E5675F"/></marker><marker id="a-blue" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#4A86E8"/></marker><marker id="a-amber" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#F2B84B"/></marker></defs>
+<rect x="20.0" y="34.0" width="230.0" height="54.0" rx="6" fill="#232937" stroke="#86CBA8" stroke-width="1.8" opacity="1"/>
+<text x="135.0" y="57.0" font-size="14" fill="#E9EDF3" text-anchor="middle" font-weight="700" font-family="'Yu Gothic UI','Yu Gothic','Meiryo',sans-serif" opacity="1">ノードエディタ（ImGui）</text>
+<text x="135.0" y="77.0" font-size="12" fill="#A6B0BE" text-anchor="middle" font-weight="400" font-family="'Yu Gothic UI','Yu Gothic','Meiryo',sans-serif" opacity="1">ノードをつないで編集</text>
+<line x1="135.0" y1="92.0" x2="135.0" y2="116.0" stroke="#86CBA8" stroke-width="2" stroke-linecap="round" opacity="1" marker-end="url(#a-mint)" marker-start="url(#a-mint)"/>
+<text x="145.0" y="108.0" font-size="12" fill="#86CBA8" text-anchor="start" font-weight="400" font-family="'Yu Gothic UI','Yu Gothic','Meiryo',sans-serif" opacity="1">保存 ／ 読み込み</text>
+<rect x="20.0" y="120.0" width="230.0" height="170.0" rx="6" fill="#232937" stroke="#5F6A7B" stroke-width="1.5" opacity="1"/>
+<text x="32.0" y="141.0" font-size="12" fill="#F2B84B" text-anchor="start" font-weight="400" font-family="Consolas,'Courier New',monospace" opacity="1">test_cover_tree.json</text>
+<text x="32.0" y="164.0" font-size="11.5" fill="#E9EDF3" text-anchor="start" font-weight="400" font-family="Consolas,'Courier New',monospace" opacity="1">{ &quot;Type&quot;: &quot;SequenceNode&quot;,</text>
+<text x="32.0" y="181.0" font-size="11.5" fill="#A6B0BE" text-anchor="start" font-weight="400" font-family="Consolas,'Courier New',monospace" opacity="1">  &quot;Children&quot;: [</text>
+<text x="32.0" y="198.0" font-size="11.5" fill="#E9EDF3" text-anchor="start" font-weight="400" font-family="Consolas,'Courier New',monospace" opacity="1">    { &quot;Type&quot;: &quot;DetectCoverNode&quot;,</text>
+<text x="32.0" y="215.0" font-size="11.5" fill="#A6B0BE" text-anchor="start" font-weight="400" font-family="Consolas,'Courier New',monospace" opacity="1">      &quot;RayCount&quot;: 16, ... },</text>
+<text x="32.0" y="232.0" font-size="11.5" fill="#E9EDF3" text-anchor="start" font-weight="400" font-family="Consolas,'Courier New',monospace" opacity="1">    { &quot;Type&quot;: &quot;FindPathNode&quot; },</text>
+<text x="32.0" y="249.0" font-size="11.5" fill="#E9EDF3" text-anchor="start" font-weight="400" font-family="Consolas,'Courier New',monospace" opacity="1">    { &quot;Type&quot;: &quot;FollowPathNode&quot;,</text>
+<text x="32.0" y="266.0" font-size="11.5" fill="#A6B0BE" text-anchor="start" font-weight="400" font-family="Consolas,'Courier New',monospace" opacity="1">      &quot;Speed&quot;: 4.5 } ] }</text>
+<line x1="135.0" y1="294.0" x2="135.0" y2="316.0" stroke="#A6B0BE" stroke-width="2" stroke-linecap="round" opacity="1" marker-end="url(#a-sub)"/>
+<text x="145.0" y="309.0" font-size="12" fill="#A6B0BE" text-anchor="start" font-weight="400" font-family="'Yu Gothic UI','Yu Gothic','Meiryo',sans-serif" opacity="1">読み込み</text>
+<rect x="20.0" y="320.0" width="230.0" height="50.0" rx="6" fill="#232937" stroke="#4A86E8" stroke-width="1.8" opacity="1"/>
+<text x="135.0" y="342.0" font-size="13" fill="#E9EDF3" text-anchor="middle" font-weight="700" font-family="Consolas,'Courier New',monospace" opacity="1">BehaviorNodeFactory</text>
+<text x="135.0" y="360.0" font-size="12" fill="#A6B0BE" text-anchor="middle" font-weight="400" font-family="'Yu Gothic UI','Yu Gothic','Meiryo',sans-serif" opacity="1">型名の文字列からノードを生成</text>
+<polyline points="252.0,345.0 282.0,345.0 282.0,73.0 436.0,73.0" fill="none" stroke="#A6B0BE" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" opacity="1" marker-end="url(#a-sub)"/>
+<text x="290.0" y="110.0" font-size="12" fill="#A6B0BE" text-anchor="start" font-weight="400" font-family="'Yu Gothic UI','Yu Gothic','Meiryo',sans-serif" opacity="1">ツリーを組み立て</text>
+<rect x="440.0" y="50.0" width="220.0" height="46.0" rx="6" fill="#232937" stroke="#E9EDF3" stroke-width="1.8" opacity="1"/>
+<text x="550.0" y="70.0" font-size="14" fill="#E9EDF3" text-anchor="middle" font-weight="700" font-family="Consolas,'Courier New',monospace" opacity="1">Sequence</text>
+<text x="550.0" y="88.0" font-size="12" fill="#A6B0BE" text-anchor="middle" font-weight="400" font-family="'Yu Gothic UI','Yu Gothic','Meiryo',sans-serif" opacity="1">上から順に実行・失敗したら中断</text>
+<line x1="550.0" y1="96.0" x2="550.0" y2="122.0" stroke="#5F6A7B" stroke-width="1.8" stroke-linecap="round" opacity="1"/>
+<line x1="385.0" y1="122.0" x2="715.0" y2="122.0" stroke="#5F6A7B" stroke-width="1.8" stroke-linecap="round" opacity="1"/>
+<line x1="385.0" y1="122.0" x2="385.0" y2="150.0" stroke="#5F6A7B" stroke-width="1.8" stroke-linecap="round" opacity="1"/>
+<rect x="310.0" y="150.0" width="150.0" height="112.0" rx="6" fill="#232937" stroke="#86CBA8" stroke-width="1.8" opacity="1"/>
+<text x="385.0" y="174.0" font-size="13" fill="#E9EDF3" text-anchor="middle" font-weight="700" font-family="Consolas,'Courier New',monospace" opacity="1">① DetectCover</text>
+<text x="385.0" y="200.0" font-size="14" fill="#E9EDF3" text-anchor="middle" font-weight="400" font-family="'Yu Gothic UI','Yu Gothic','Meiryo',sans-serif" opacity="1">隠れ場所を探す</text>
+<text x="385.0" y="224.0" font-size="12" fill="#A6B0BE" text-anchor="middle" font-weight="400" font-family="'Yu Gothic UI','Yu Gothic','Meiryo',sans-serif" opacity="1">レイ16本・20m</text>
+<text x="385.0" y="242.0" font-size="12" fill="#A6B0BE" text-anchor="middle" font-weight="400" font-family="'Yu Gothic UI','Yu Gothic','Meiryo',sans-serif" opacity="1">壁の1.5m手前</text>
+<line x1="550.0" y1="122.0" x2="550.0" y2="150.0" stroke="#5F6A7B" stroke-width="1.8" stroke-linecap="round" opacity="1"/>
+<rect x="475.0" y="150.0" width="150.0" height="112.0" rx="6" fill="#232937" stroke="#86CBA8" stroke-width="1.8" opacity="1"/>
+<text x="550.0" y="174.0" font-size="13" fill="#E9EDF3" text-anchor="middle" font-weight="700" font-family="Consolas,'Courier New',monospace" opacity="1">② FindPath</text>
+<text x="550.0" y="200.0" font-size="14" fill="#E9EDF3" text-anchor="middle" font-weight="400" font-family="'Yu Gothic UI','Yu Gothic','Meiryo',sans-serif" opacity="1">A*で経路を作る</text>
+<text x="550.0" y="224.0" font-size="12" fill="#A6B0BE" text-anchor="middle" font-weight="400" font-family="'Yu Gothic UI','Yu Gothic','Meiryo',sans-serif" opacity="1">敵の半径 0.85m</text>
+<line x1="715.0" y1="122.0" x2="715.0" y2="150.0" stroke="#5F6A7B" stroke-width="1.8" stroke-linecap="round" opacity="1"/>
+<rect x="640.0" y="150.0" width="150.0" height="112.0" rx="6" fill="#232937" stroke="#86CBA8" stroke-width="1.8" opacity="1"/>
+<text x="715.0" y="174.0" font-size="13" fill="#E9EDF3" text-anchor="middle" font-weight="700" font-family="Consolas,'Courier New',monospace" opacity="1">③ FollowPath</text>
+<text x="715.0" y="200.0" font-size="14" fill="#E9EDF3" text-anchor="middle" font-weight="400" font-family="'Yu Gothic UI','Yu Gothic','Meiryo',sans-serif" opacity="1">経路にそって移動</text>
+<text x="715.0" y="224.0" font-size="12" fill="#A6B0BE" text-anchor="middle" font-weight="400" font-family="'Yu Gothic UI','Yu Gothic','Meiryo',sans-serif" opacity="1">速さ 4.5m/s</text>
+<text x="715.0" y="242.0" font-size="12" fill="#A6B0BE" text-anchor="middle" font-weight="400" font-family="'Yu Gothic UI','Yu Gothic','Meiryo',sans-serif" opacity="1">到着判定 0.3m</text>
+<rect x="310.0" y="300.0" width="480.0" height="52.0" rx="6" fill="#232937" stroke="#5F6A7B" stroke-width="1.5" opacity="1" stroke-dasharray="5 4"/>
+<text x="470.0" y="323.0" font-size="12" fill="#F2B84B" text-anchor="middle" font-weight="400" font-family="Consolas,'Courier New',monospace" opacity="1">CoverPosition</text>
+<text x="645.0" y="323.0" font-size="12" fill="#F2B84B" text-anchor="middle" font-weight="400" font-family="Consolas,'Courier New',monospace" opacity="1">CoverPath</text>
+<text x="322.0" y="343.0" font-size="12" fill="#A6B0BE" text-anchor="start" font-weight="400" font-family="'Yu Gothic UI','Yu Gothic','Meiryo',sans-serif" opacity="1">Blackboard（ノード間で共有するデータ）</text>
+<line x1="410.0" y1="264.0" x2="410.0" y2="300.0" stroke="#F2B84B" stroke-width="2" stroke-linecap="round" opacity="1" marker-end="url(#a-amber)"/>
+<line x1="530.0" y1="300.0" x2="530.0" y2="266.0" stroke="#A6B0BE" stroke-width="2" stroke-linecap="round" opacity="1" marker-end="url(#a-sub)"/>
+<line x1="585.0" y1="264.0" x2="585.0" y2="300.0" stroke="#F2B84B" stroke-width="2" stroke-linecap="round" opacity="1" marker-end="url(#a-amber)"/>
+<line x1="705.0" y1="300.0" x2="705.0" y2="266.0" stroke="#A6B0BE" stroke-width="2" stroke-linecap="round" opacity="1" marker-end="url(#a-sub)"/>
+<text x="790.0" y="373.0" font-size="12" fill="#A6B0BE" text-anchor="end" font-weight="400" font-family="'Yu Gothic UI','Yu Gothic','Meiryo',sans-serif" opacity="1">↓ 書き込む　↑ 読み取る</text>
+</svg>

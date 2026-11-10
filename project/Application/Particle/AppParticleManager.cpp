@@ -1,18 +1,170 @@
 #include "AppParticleManager.h"
+#include "AppParticlePresets.h"
 #include "ParticleEmitter.h"
-#include <algorithm>
-#include <cmath>
-#include <vector>
-#include <unordered_map>
 #include "DirectXCom.h"
-#include <cassert>
 #include "RootParam.h"
 #include "TextureManager.h"
 #include "Light.h"
 #include "Camera.h"
-#include <iostream>
 #include "Application/Config/GameConfig.h"
+#include <algorithm>
+#include <array>
+#include <cassert>
+#include <cmath>
+#include <cstdlib>
+#include <cstring>
 
+namespace
+{
+	using namespace AppParticlePresets;
+
+	constexpr float kPi    = GameConfig::Math::kPi;
+	constexpr float kTwoPi = GameConfig::Math::kTwoPi;
+
+	constexpr std::array<uint32_t, 3> kLayerStartSlots = {
+		0u, 682u, 1364u
+	};
+	constexpr std::array<uint32_t, 3> kLayerEndSlots = {
+		682u, 1364u, 2048u
+	};
+	constexpr uint16_t kMaxSlotLayerIndex = 2;
+	constexpr size_t   kTranslationZCol   = 2;
+
+	constexpr bool IsEven(int i) { return (i & 1) == 0; }
+
+	float RandRange(std::mt19937& rng, float minVal, float maxVal)
+	{
+		return std::uniform_real_distribution<float>(minVal, maxVal)(rng);
+	}
+
+	float RandRange(std::mt19937& rng, const RangeF& r)
+	{
+		return std::uniform_real_distribution<float>(r.min, r.max)(rng);
+	}
+
+	float RandAngle(std::mt19937& rng)
+	{
+		return std::uniform_real_distribution<float>(0.0f, kTwoPi)(rng);
+	}
+
+	Vector3 RandOffset3D(std::mt19937& rng, float halfExtent)
+	{
+		std::uniform_real_distribution<float> d(-halfExtent, halfExtent);
+		const float ox = d(rng);
+		const float oy = d(rng);
+		const float oz = d(rng);
+		return { ox, oy, oz };
+	}
+
+	float CRand01()
+	{
+		return static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX);
+	}
+
+	float CRandRange(const RangeF& r)
+	{
+		return r.min + CRand01() * (r.max - r.min);
+	}
+
+	ColorShiftSpec SolidColor(const Vector4& col)
+	{
+		return { col, { 0.0f, 0.0f, 0.0f, 0.0f }, false };
+	}
+
+	AppParticle BuildParticle(
+		const Vector3& pos,
+		float rotZ,
+		const Vector3& quadScale,
+		const Vector3& velocity,
+		float lifeTime,
+		uint32_t textureIndex,
+		const ColorShiftSpec& colorSpec,
+		const DynamicsSpec& dyn = {},
+		float angularVelocity = 0.0f,
+		float twinklePhase = 0.0f)
+	{
+		AppParticle p{};
+		p.transform.Initialize();
+		p.transform.SetTranslate(pos);
+		p.transform.SetRotate({ 0.0f, 0.0f, rotZ });
+		p.transform.SetScale(quadScale);
+		p.velocity = velocity;
+		p.color = colorSpec.color;
+		p.endColor = colorSpec.endColor;
+		p.hasColorShift = colorSpec.hasColorShift;
+		p.lifeTime = lifeTime;
+		p.currentTime = 0.0f;
+		p.textureIndex = textureIndex;
+		p.gravity = dyn.gravity;
+		p.drag = dyn.drag;
+		p.bounceElasticity = dyn.bounceElasticity;
+		p.angularVelocity = angularVelocity;
+		p.curlFreq = dyn.curlFreq;
+		p.curlAmp = dyn.curlAmp;
+		p.fadeInRatio = dyn.fadeInRatio;
+		p.twinkleSpeed = dyn.twinkleSpeed;
+		p.twinklePhase = twinklePhase;
+		p.slotLayer = dyn.slotLayer;
+		return p;
+	}
+
+	AppParticle BuildScaledParticle(
+		const Vector3& pos,
+		float rotZ,
+		float baseScale,
+		const ScaleSpec& scaleSpec,
+		const Vector3& velocity,
+		float lifeTime,
+		uint32_t textureIndex,
+		const ColorShiftSpec& colorSpec,
+		const DynamicsSpec& dyn = {},
+		float angularVelocity = 0.0f,
+		float twinklePhase = 0.0f)
+	{
+		AppParticle p = BuildParticle(
+			pos, rotZ,
+			{ baseScale * scaleSpec.aspect.x, baseScale * scaleSpec.aspect.y, 1.0f },
+			velocity, lifeTime, textureIndex, colorSpec, dyn, angularVelocity, twinklePhase);
+		p.scaleAspect = scaleSpec.aspect;
+		if (scaleSpec.initScaleMul > 0.0f)
+		{
+			p.initialScale = baseScale * scaleSpec.initScaleMul;
+			p.targetScale = baseScale * scaleSpec.targetScaleMul;
+		}
+		return p;
+	}
+
+	AppParticle BuildJitteredParticle(
+		std::mt19937& rng,
+		const Vector3& position,
+		const Vector3& baseVel,
+		float uniformScaleMul,
+		const Vector4& color,
+		uint32_t textureIndex,
+		const JitterEmitPreset& preset)
+	{
+		const Vector3 pos = position + RandOffset3D(rng, preset.posJitter);
+		const float rotZ = RandAngle(rng);
+		Vector3 quadScale = { 1.0f, 1.0f, 1.0f };
+		if (preset.uniformScale)
+		{
+			const float s = RandRange(rng, preset.scaleX) * uniformScaleMul;
+			quadScale = { s, s, 1.0f };
+		}
+		else
+		{
+			const float sx = RandRange(rng, preset.scaleX);
+			const float sy = RandRange(rng, preset.scaleY);
+			quadScale = { sx, sy, 1.0f };
+		}
+		const float vx = RandRange(rng, preset.velXZ);
+		const float vy = RandRange(rng, preset.velY);
+		const float vz = RandRange(rng, preset.velXZ);
+		const float life = RandRange(rng, preset.life);
+		const float spin = (preset.spin.min == preset.spin.max) ? preset.spin.min : RandRange(rng, preset.spin);
+		return BuildParticle(pos, rotZ, quadScale, baseVel + Vector3{ vx, vy, vz }, life, textureIndex, SolidColor(color), preset.dynamics, spin);
+	}
+}
 
 void AppParticleManager::Initialize(ParticleManager* enginePM)
 {
@@ -22,23 +174,8 @@ void AppParticleManager::Initialize(ParticleManager* enginePM)
 	if (enginePM_ && enginePM_->GetDxCommon())
 	{
 		DirectXCom* dxCommon = enginePM_->GetDxCommon();
-		instancingResource_ = dxCommon->CreateBufferResource(dxCommon->GetDevice().Get(), sizeof(ParticleManager::ParticleCS) * kNumMaxInstances);
-		instancingResource_->Map(0, nullptr, reinterpret_cast<void**>(&instanceData_));
 
-		auto* srvManager = TextureManager::GetInstance()->GetSRVManager();
-		if (srvManager)
-		{
-			instancingSrvIndex_ = srvManager->Allocate();
-			srvManager->CreateSRVForStructuredBuffer(
-				instancingSrvIndex_,
-				instancingResource_.Get(),
-				kNumMaxInstances,
-				sizeof(ParticleManager::ParticleCS)
-			);
-			instancingSrvHandleGPU_ = srvManager->GetGPUDescriptorHandle(instancingSrvIndex_);
-		}
-
-		Vertex vertices[6] = {
+		constexpr Vertex kQuadVertices[Core::kQuadVertexCount] = {
 			{ { -0.5f, -0.5f, 0.0f, 1.0f }, { 0.0f, 1.0f }, { 0.0f, 0.0f, -1.0f } },
 			{ { -0.5f,  0.5f, 0.0f, 1.0f }, { 0.0f, 0.0f }, { 0.0f, 0.0f, -1.0f } },
 			{ {  0.5f, -0.5f, 0.0f, 1.0f }, { 1.0f, 1.0f }, { 0.0f, 0.0f, -1.0f } },
@@ -47,14 +184,14 @@ void AppParticleManager::Initialize(ParticleManager* enginePM)
 			{ {  0.5f, -0.5f, 0.0f, 1.0f }, { 1.0f, 1.0f }, { 0.0f, 0.0f, -1.0f } },
 		};
 
-		quadVertexBuffer_ = dxCommon->CreateBufferResource(dxCommon->GetDevice().Get(), sizeof(vertices));
+		quadVertexBuffer_ = dxCommon->CreateBufferResource(dxCommon->GetDevice().Get(), sizeof(kQuadVertices));
 		void* mapped = nullptr;
 		quadVertexBuffer_->Map(0, nullptr, &mapped);
-		std::memcpy(mapped, vertices, sizeof(vertices));
+		std::memcpy(mapped, kQuadVertices, sizeof(kQuadVertices));
 		quadVertexBuffer_->Unmap(0, nullptr);
 
 		quadVertexBufferView_.BufferLocation = quadVertexBuffer_->GetGPUVirtualAddress();
-		quadVertexBufferView_.SizeInBytes = sizeof(vertices);
+		quadVertexBufferView_.SizeInBytes = sizeof(kQuadVertices);
 		quadVertexBufferView_.StrideInBytes = sizeof(Vertex);
 
 		perViewResource_ = dxCommon->CreateBufferResource(dxCommon->GetDevice().Get(), sizeof(ParticleManager::PerView));
@@ -65,7 +202,7 @@ void AppParticleManager::Initialize(ParticleManager* enginePM)
 		{
 			Vector4 color{ 1.0f, 1.0f, 1.0f, 1.0f };
 			int32_t enableLighting = 0;
-			float padding[3]{};
+			float padding[Core::kMatPaddingFloats]{};
 			Matrix4x4 uvTransform = MakeIdentity4x4();
 		};
 		defaultMaterialResource_ = dxCommon->CreateBufferResource(dxCommon->GetDevice().Get(), sizeof(DefaultMatCB));
@@ -77,7 +214,6 @@ void AppParticleManager::Initialize(ParticleManager* enginePM)
 	}
 }
 
-
 AppParticleManager::~AppParticleManager()
 {
 	if (perViewResource_ && perViewData_)
@@ -86,31 +222,189 @@ AppParticleManager::~AppParticleManager()
 		perViewData_ = nullptr;
 	}
 
-	if (instancingResource_ && instanceData_)
+	auto* srvManager = TextureManager::GetInstance() ? TextureManager::GetInstance()->GetSRVManager() : nullptr;
+	for (uint32_t b = 0; b < kMaxTextureBatches; ++b)
 	{
-		D3D12_RANGE writtenRange = { 0, static_cast<SIZE_T>(sizeof(ParticleManager::ParticleCS) * kNumMaxInstances) };
-		instancingResource_->Unmap(0, &writtenRange);
-		instanceData_ = nullptr;
-	}
+		TextureBatch& batch = textureBatches_[b];
+		if (!batch.allocated) continue;
 
-	if (instancingSrvIndex_ != 0)
-	{
-		auto* srvManager = TextureManager::GetInstance()->GetSRVManager();
-		if (srvManager)
+		if (batch.resource && batch.mappedData)
 		{
-			srvManager->Free(instancingSrvIndex_);
+			D3D12_RANGE writtenRange = { 0, static_cast<SIZE_T>(sizeof(ParticleManager::ParticleCS) * kBatchMaxInstances) };
+			batch.resource->Unmap(0, &writtenRange);
+			batch.mappedData = nullptr;
 		}
+		if (batch.srvIndex != 0 && srvManager)
+		{
+			srvManager->Free(batch.srvIndex);
+			batch.srvIndex = 0;
+		}
+		batch.allocated = false;
 	}
 }
 
+int16_t AppParticleManager::GetOrCreateTextureBatch(uint32_t textureIndex)
+{
+	for (uint32_t b = 0; b < kMaxTextureBatches; ++b)
+	{
+		if (textureBatches_[b].allocated && textureBatches_[b].textureIndex == textureIndex)
+		{
+			return static_cast<int16_t>(b);
+		}
+	}
+
+	if (!enginePM_ || !enginePM_->GetDxCommon()) return -1;
+	DirectXCom* dxCommon = enginePM_->GetDxCommon();
+	auto* srvManager = TextureManager::GetInstance() ? TextureManager::GetInstance()->GetSRVManager() : nullptr;
+	if (!srvManager) return -1;
+
+	for (uint32_t b = 0; b < kMaxTextureBatches; ++b)
+	{
+		TextureBatch& batch = textureBatches_[b];
+		if (!batch.allocated)
+		{
+			batch.resource = dxCommon->CreateBufferResource(
+				dxCommon->GetDevice().Get(),
+				sizeof(ParticleManager::ParticleCS) * kBatchMaxInstances);
+			batch.resource->Map(0, nullptr, reinterpret_cast<void**>(&batch.mappedData));
+			std::memset(batch.mappedData, 0, sizeof(ParticleManager::ParticleCS) * kBatchMaxInstances);
+
+			batch.srvIndex = srvManager->Allocate();
+			srvManager->CreateSRVForStructuredBuffer(
+				batch.srvIndex, batch.resource.Get(), kBatchMaxInstances, sizeof(ParticleManager::ParticleCS));
+			batch.srvHandleGPU = srvManager->GetGPUDescriptorHandle(batch.srvIndex);
+
+			batch.slotOccupied.assign(kBatchMaxInstances, 0);
+			for (uint32_t l = 0; l < kSlotLayerCount; ++l)
+			{
+				batch.layerSlotCursor[l] = kLayerStartSlots[l];
+			}
+			batch.textureIndex = textureIndex;
+			batch.allocated = true;
+			return static_cast<int16_t>(b);
+		}
+	}
+
+	return 0;
+}
+
+void AppParticleManager::AllocateParticleSlot(AppParticle& p)
+{
+	if (p.batchIndex >= 0 && p.batchIndex < static_cast<int16_t>(kMaxTextureBatches) &&
+		p.stableSlot >= 0 && p.stableSlot < static_cast<int32_t>(kBatchMaxInstances))
+	{
+		if (textureBatches_[p.batchIndex].allocated &&
+			textureBatches_[p.batchIndex].textureIndex == p.textureIndex)
+		{
+			return;
+		}
+		ReleaseParticleSlot(p);
+	}
+
+	const int16_t bIdx = GetOrCreateTextureBatch(p.textureIndex);
+	if (bIdx < 0) return;
+
+	TextureBatch& batch = textureBatches_[bIdx];
+	if (batch.slotOccupied.size() < kBatchMaxInstances)
+	{
+		batch.slotOccupied.assign(kBatchMaxInstances, 0);
+	}
+
+	const uint16_t clampedLayer = (p.slotLayer >= kMaxSlotLayerIndex) ? kMaxSlotLayerIndex : p.slotLayer;
+	const uint32_t rangeBegin = kLayerStartSlots[clampedLayer];
+	const uint32_t rangeEnd   = kLayerEndSlots[clampedLayer];
+	const uint32_t rangeCount = rangeEnd - rangeBegin;
+
+	uint32_t cursor = batch.layerSlotCursor[clampedLayer];
+	if (cursor < rangeBegin || cursor >= rangeEnd) cursor = rangeBegin;
+
+	for (uint32_t i = 0; i < rangeCount; ++i)
+	{
+		const uint32_t s = rangeBegin + ((cursor - rangeBegin + i) % rangeCount);
+		if (batch.slotOccupied[s] == 0)
+		{
+			batch.slotOccupied[s] = 1;
+			batch.layerSlotCursor[clampedLayer] = rangeBegin + ((s - rangeBegin + 1) % rangeCount);
+			p.batchIndex = bIdx;
+			p.stableSlot = static_cast<int32_t>(s);
+			return;
+		}
+	}
+
+	for (uint32_t s = 0; s < kBatchMaxInstances; ++s)
+	{
+		if (batch.slotOccupied[s] == 0)
+		{
+			batch.slotOccupied[s] = 1;
+			p.batchIndex = bIdx;
+			p.stableSlot = static_cast<int32_t>(s);
+			return;
+		}
+	}
+
+	p.batchIndex = -1;
+	p.stableSlot = -1;
+}
+
+void AppParticleManager::ReleaseParticleSlot(AppParticle& p)
+{
+	if (p.batchIndex >= 0 && p.batchIndex < static_cast<int16_t>(kMaxTextureBatches))
+	{
+		TextureBatch& batch = textureBatches_[p.batchIndex];
+		if (batch.allocated && p.stableSlot >= 0 && static_cast<size_t>(p.stableSlot) < batch.slotOccupied.size())
+		{
+			batch.slotOccupied[static_cast<size_t>(p.stableSlot)] = 0;
+		}
+	}
+	p.batchIndex = -1;
+	p.stableSlot = -1;
+}
+
+void AppParticleManager::TriggerGPUEmitter(const Vector3& position, float scale, uint32_t count)
+{
+	if (enginePM_ && enginePM_->GetGPUEmitter() && enginePM_->GetGPUEmitter()->GetEmitterData())
+	{
+		auto* emitter = enginePM_->GetGPUEmitter()->GetEmitterData();
+		emitter->translate = position;
+		emitter->radius = (scale > Ballistics::kGpuEmitMinScaleThreshold) ? scale : Ballistics::kGpuEmitFallbackRadius;
+		emitter->count = count;
+		emitter->emit = 1;
+	}
+}
+
+void AppParticleManager::AddParticle(const AppParticle& particle)
+{
+	AppParticle copy = particle;
+	AllocateParticleSlot(copy);
+	particles_.push_back(copy);
+}
+
+void AppParticleManager::ClearParticles()
+{
+	particles_.clear();
+	for (uint32_t b = 0; b < kMaxTextureBatches; ++b)
+	{
+		TextureBatch& batch = textureBatches_[b];
+		if (!batch.allocated) continue;
+		if (!batch.slotOccupied.empty())
+		{
+			std::fill(batch.slotOccupied.begin(), batch.slotOccupied.end(), static_cast<uint8_t>(0));
+		}
+		for (uint32_t l = 0; l < kSlotLayerCount; ++l)
+		{
+			batch.layerSlotCursor[l] = kLayerStartSlots[l];
+		}
+	}
+}
 
 void AppParticleManager::Update(float deltaTime, const Vector3& playerPos)
 {
 	if (!enginePM_) return;
 
 	// パーティクル数が上限を超えた場合、古い順に即時回収して処理落ちを完全防止
-	while (particles_.size() > 7600)
+	while (particles_.size() > Core::kMaxActiveParticles)
 	{
+		ReleaseParticleSlot(particles_.front());
 		particles_.pop_front();
 	}
 
@@ -120,14 +414,20 @@ void AppParticleManager::Update(float deltaTime, const Vector3& playerPos)
 		it->currentTime += deltaTime;
 		if (it->currentTime >= it->lifeTime)
 		{
+			ReleaseParticleSlot(*it);
 			it = particles_.erase(it);
 			continue;
+		}
+
+		if (it->stableSlot < 0)
+		{
+			AllocateParticleSlot(*it);
 		}
 
 		// 空気抵抗（Drag）減速
 		if (it->drag > 0.0f)
 		{
-			float decay = (std::max)(0.0f, 1.0f - it->drag * deltaTime);
+			const float decay = (std::max)(0.0f, 1.0f - it->drag * deltaTime);
 			it->velocity = it->velocity * decay;
 		}
 
@@ -143,21 +443,20 @@ void AppParticleManager::Update(float deltaTime, const Vector3& playerPos)
 			it->velocity.y -= it->gravity * deltaTime;
 			pos = it->transform.GetTranslate() + it->velocity * deltaTime;
 
-			float groundY = groundY_;
-			if (pos.y < groundY && it->velocity.y < 0.0f && it->bounceElasticity > 0.0f)
+			if (pos.y < groundY_ && it->velocity.y < 0.0f && it->bounceElasticity > 0.0f)
 			{
-				pos.y = groundY;
+				pos.y = groundY_;
 				it->velocity.y = -it->velocity.y * it->bounceElasticity;
-				it->velocity.x *= 0.7f;
-				it->velocity.z *= 0.7f;
+				it->velocity.x *= Core::kBounceHorizDamping;
+				it->velocity.z *= Core::kBounceHorizDamping;
 			}
 		}
 
 		// カール乱流（Fluid Curl Turbulence）
 		if (it->curlAmp > 0.0f && it->curlFreq > 0.0f)
 		{
-			float waveY = std::sin(pos.y * it->curlFreq + it->currentTime * 4.2f);
-			float waveX = std::cos(pos.x * it->curlFreq + it->currentTime * 3.8f);
+			const float waveY = std::sin(pos.y * it->curlFreq + it->currentTime * Core::kCurlTimeFreqY);
+			const float waveX = std::cos(pos.x * it->curlFreq + it->currentTime * Core::kCurlTimeFreqX);
 			pos.x += waveY * it->curlAmp * deltaTime;
 			pos.z += waveX * it->curlAmp * deltaTime;
 		}
@@ -165,17 +464,17 @@ void AppParticleManager::Update(float deltaTime, const Vector3& playerPos)
 		// 有機的ゆらぎ（Sinusoidal Flutter / Wobble）
 		if (it->wobbleFreq > 0.0f && it->wobbleAmp > 0.0f)
 		{
-			float sine = std::sin(it->currentTime * it->wobbleFreq);
+			const float sine = std::sin(it->currentTime * it->wobbleFreq);
 			pos += it->wobbleAxis * (sine * it->wobbleAmp * deltaTime);
 		}
 		it->transform.SetTranslate(pos);
 
-		// スケール補間（発生時ふわりと膨らみ、消滅時小さく輝く）
+		// スケール補間（非一様アスペクト比 scaleAspect を維持しながら膨張・収縮）
 		if (it->initialScale > 0.0f && it->targetScale > 0.0f && it->lifeTime > 0.0f)
 		{
-			float t = std::clamp(it->currentTime / it->lifeTime, 0.0f, 1.0f);
-			float s = it->initialScale + (it->targetScale - it->initialScale) * t;
-			it->transform.SetScale({ s, s, 1.0f });
+			const float t = std::clamp(it->currentTime / it->lifeTime, 0.0f, 1.0f);
+			const float s = it->initialScale + (it->targetScale - it->initialScale) * t;
+			it->transform.SetScale({ s * it->scaleAspect.x, s * it->scaleAspect.y, 1.0f });
 		}
 
 		Vector3 rot = it->transform.GetRotate();
@@ -188,1774 +487,929 @@ void AppParticleManager::Update(float deltaTime, const Vector3& playerPos)
 
 void AppParticleManager::EmitSpark(std::mt19937& randomEngine, const Vector3& position, const Vector3& baseVelocity, const Vector4& color, float scale, float lifeTime, uint32_t textureIndex)
 {
-	if (enginePM_ && enginePM_->GetGPUEmitter() && enginePM_->GetGPUEmitter()->GetEmitterData())
-	{
-		auto* emitter = enginePM_->GetGPUEmitter()->GetEmitterData();
-		emitter->translate = position;
-		emitter->radius = (scale > 0.1f) ? scale : 0.4f;
-		emitter->count = 6;
-		emitter->emit = 1;
-	}
-
-	AppParticle p;
-	p.transform.Initialize();
-	p.transform.SetTranslate(position);
-
-	std::uniform_real_distribution<float> distRotate(0.0f, 6.2831853f);
-	p.transform.SetRotate({ 0.0f, 0.0f, distRotate(randomEngine) });
-
-	std::uniform_real_distribution<float> distScaleX(0.02f, 0.06f);
-	std::uniform_real_distribution<float> distScaleY(0.15f, 0.45f);
-	p.transform.SetScale({ distScaleX(randomEngine) * (scale / 0.12f), distScaleY(randomEngine) * (scale / 0.12f), 1.0f });
-
-	std::uniform_real_distribution<float> velXZ(-4.0f, 4.0f);
-	std::uniform_real_distribution<float> velY(2.0f, 6.0f);
-
-	p.velocity = baseVelocity + Vector3{ velXZ(randomEngine), velY(randomEngine), velXZ(randomEngine) };
-	p.color = color;
-	p.lifeTime = lifeTime;
-	p.currentTime = 0.0f;
-	p.textureIndex = textureIndex;
-
-	p.gravity = 9.8f;
-	p.bounceElasticity = 0.5f;
-
-	std::uniform_real_distribution<float> spinDist(-10.0f, 10.0f);
-	p.angularVelocity = spinDist(randomEngine);
-
-	particles_.push_back(p);
+	const Vector3 vel = baseVelocity + Vector3{
+		RandRange(randomEngine, Ballistics::kSparkVelXZ),
+		RandRange(randomEngine, Ballistics::kSparkVelY),
+		RandRange(randomEngine, Ballistics::kSparkVelXZ)
+	};
+	EmitSparkWithVelocity(randomEngine, position, vel, color, scale, lifeTime, textureIndex);
+	TriggerGPUEmitter(position, scale, Ballistics::kGpuEmitSparkCount);
 }
 
 void AppParticleManager::EmitSparkWithVelocity(std::mt19937& randomEngine, const Vector3& position, const Vector3& velocity, const Vector4& color, float scale, float lifeTime, uint32_t textureIndex)
 {
-	if (enginePM_ && enginePM_->GetGPUEmitter() && enginePM_->GetGPUEmitter()->GetEmitterData())
-	{
-		auto* emitter = enginePM_->GetGPUEmitter()->GetEmitterData();
-		emitter->translate = position;
-		emitter->radius = (scale > 0.1f) ? scale : 0.4f;
-		emitter->count = 4;
-		emitter->emit = 1;
-	}
-
-	AppParticle p;
-	p.transform.Initialize();
-	p.transform.SetTranslate(position);
-
-
-	std::uniform_real_distribution<float> distRotate(0.0f, 6.2831853f);
-	p.transform.SetRotate({ 0.0f, 0.0f, distRotate(randomEngine) });
-
-	std::uniform_real_distribution<float> distScaleX(0.02f, 0.06f);
-	std::uniform_real_distribution<float> distScaleY(0.15f, 0.45f);
-	p.transform.SetScale({ distScaleX(randomEngine) * (scale / 0.12f), distScaleY(randomEngine) * (scale / 0.12f), 1.0f });
-
-	p.velocity = velocity;
-	p.color = color;
-	p.lifeTime = lifeTime;
-	p.currentTime = 0.0f;
-	p.textureIndex = textureIndex;
-
-	p.gravity = 9.8f;
-	p.bounceElasticity = 0.5f;
-
-	std::uniform_real_distribution<float> spinDist(-10.0f, 10.0f);
-	p.angularVelocity = spinDist(randomEngine);
-
-	particles_.push_back(p);
+	TriggerGPUEmitter(position, scale, Ballistics::kGpuEmitSparkVelCount);
+	const float rotZ = RandAngle(randomEngine);
+	const float scaleMul = scale / Ballistics::kSparkScaleRef;
+	const float sx = RandRange(randomEngine, Ballistics::kSparkScaleX) * scaleMul;
+	const float sy = RandRange(randomEngine, Ballistics::kSparkScaleY) * scaleMul;
+	particles_.push_back(BuildParticle(
+		position, rotZ, { sx, sy, 1.0f }, velocity, lifeTime, textureIndex,
+		SolidColor(color), Ballistics::kSparkDyn, RandRange(randomEngine, Ballistics::kSparkSpin)));
 }
 
 void AppParticleManager::EmitDust(std::mt19937& randomEngine, const Vector3& position, float scale, const Vector4& color, uint32_t textureIndex)
 {
-	AppParticle p;
-	p.transform.Initialize();
-
-	// Tiny spawn offset
-	std::uniform_real_distribution<float> distOffset(-0.15f, 0.15f);
-	p.transform.SetTranslate({
-		position.x + distOffset(randomEngine),
-		position.y + distOffset(randomEngine),
-		position.z + distOffset(randomEngine)
-	});
-
-	std::uniform_real_distribution<float> distRotate(0.0f, 6.2831853f);
-	p.transform.SetRotate({ 0.0f, 0.0f, distRotate(randomEngine) });
-
-	// Scale: 0.12f to 0.28f adjusted by scale factor
-	std::uniform_real_distribution<float> distScale(0.12f, 0.28f);
-	float s = distScale(randomEngine) * scale;
-	p.transform.SetScale({ s, s, 1.0f });
-
-	std::uniform_real_distribution<float> velXZ(-0.4f, 0.4f);
-	std::uniform_real_distribution<float> velY(0.1f, 0.3f);
-	p.velocity = { velXZ(randomEngine), velY(randomEngine), velXZ(randomEngine) };
-	p.color = color;
-
-	std::uniform_real_distribution<float> lifeDist(0.3f, 0.55f);
-	p.lifeTime = lifeDist(randomEngine);
-	p.currentTime = 0.0f;
-	p.textureIndex = textureIndex;
-
-	p.gravity = 0.0f;
-	p.bounceElasticity = 0.0f;
-	p.angularVelocity = 0.0f;
-
-	particles_.push_back(p);
+	particles_.push_back(BuildJitteredParticle(randomEngine, position, {}, scale, color, textureIndex, Dust::kGenericDustPreset));
 }
 
 void AppParticleManager::EmitDustWithVelocity(std::mt19937& randomEngine, const Vector3& position, float scale, const Vector4& color, const Vector3& velocity, float lifeTime, uint32_t textureIndex)
 {
-	AppParticle p;
-	p.transform.Initialize();
-	p.transform.SetTranslate(position);
-
-	std::uniform_real_distribution<float> distRotate(0.0f, 6.2831853f);
-	p.transform.SetRotate({ 0.0f, 0.0f, distRotate(randomEngine) });
-
-	// Scale
-	std::uniform_real_distribution<float> distScale(0.12f, 0.28f);
-	float s = distScale(randomEngine) * scale;
-	p.transform.SetScale({ s, s, 1.0f });
-
-	p.velocity = velocity;
-	p.color = color;
-	p.lifeTime = lifeTime;
-	p.currentTime = 0.0f;
-	p.textureIndex = textureIndex;
-
-	p.gravity = 0.0f;
-	p.bounceElasticity = 0.0f;
-	p.angularVelocity = 0.0f;
-
-	particles_.push_back(p);
+	const float rotZ = RandAngle(randomEngine);
+	const float s = RandRange(randomEngine, Dust::kGenericDustPreset.scaleX) * scale;
+	particles_.push_back(BuildParticle(position, rotZ, { s, s, 1.0f }, velocity, lifeTime, textureIndex, SolidColor(color)));
 }
 
 void AppParticleManager::EmitShellCasing(std::mt19937& randomEngine, const Vector3& position, const Vector3& forward, const Vector4& color, const Vector3& scale, uint32_t textureIndex)
 {
-	AppParticle p;
-	p.transform.Initialize();
+	const float rotZ = RandAngle(randomEngine);
+	const Vector3 right = { forward.z, 0.0f, -forward.x };
+	Vector3 spawnPos = position + right * Ballistics::kShellRightOffset;
+	spawnPos.y += Ballistics::kShellUpOffset;
 
-	// Initial rotation
-	std::uniform_real_distribution<float> distRotate(0.0f, 6.2831853f);
-	p.transform.SetRotate({ 0.0f, 0.0f, distRotate(randomEngine) });
+	const float fr = RandRange(randomEngine, Ballistics::kShellForceRight);
+	const float fu = RandRange(randomEngine, Ballistics::kShellForceUp);
+	const float fb = RandRange(randomEngine, Ballistics::kShellForceBack);
+	const Vector3 vel = right * fr + Vector3{ 0.0f, fu, 0.0f } + forward * fb;
 
-	// Set scale (normally non-uniform but we respect the passed parameter)
-	p.transform.SetScale(scale);
-
-	// Offset relative to forward direction
-	Vector3 right = { forward.z, 0.0f, -forward.x };
-	Vector3 spawnPos = position + right * 0.15f;
-	spawnPos.y += 0.1f;
-	p.transform.SetTranslate(spawnPos);
-
-	// Eject velocity
-	std::uniform_real_distribution<float> forceRight(1.8f, 3.2f);
-	std::uniform_real_distribution<float> forceUp(1.5f, 3.0f);
-	std::uniform_real_distribution<float> forceBack(-1.2f, -0.4f);
-
-	float fr = forceRight(randomEngine);
-	float fu = forceUp(randomEngine);
-	float fb = forceBack(randomEngine);
-
-	p.velocity = right * fr + Vector3{ 0.0f, fu, 0.0f } + forward * fb;
-	p.color = color;
-	p.lifeTime = 2.0f;
-	p.currentTime = 0.0f;
-	p.textureIndex = textureIndex;
-
-	p.gravity = 9.8f;
-	p.bounceElasticity = 0.4f;
-
-	std::uniform_real_distribution<float> spinDist(15.0f, 30.0f);
-	p.angularVelocity = spinDist(randomEngine);
-
-	particles_.push_back(p);
+	particles_.push_back(BuildParticle(
+		spawnPos, rotZ, scale, vel, Ballistics::kShellLifeTime, textureIndex,
+		SolidColor(color), Ballistics::kShellDyn, RandRange(randomEngine, Ballistics::kShellSpin)));
 }
 
 void AppParticleManager::EmitFeather(std::mt19937& randomEngine, const Vector3& position, const Vector4& color, uint32_t textureIndex)
 {
-	AppParticle p;
-	p.transform.Initialize();
-
-	// Z rotation: 0.0f to 6.2831853f
-	std::uniform_real_distribution<float> distRotate(0.0f, 6.2831853f);
-	p.transform.SetRotate({ 0.0f, 0.0f, distRotate(randomEngine) });
-
-	// Non-uniform scale: X: 0.05f to 0.12f, Y: 0.15f to 0.35f
-	std::uniform_real_distribution<float> distScaleX(0.05f, 0.12f);
-	std::uniform_real_distribution<float> distScaleY(0.15f, 0.35f);
-	p.transform.SetScale({ distScaleX(randomEngine), distScaleY(randomEngine), 1.0f });
-
-	// Tiny spawn offset
-	std::uniform_real_distribution<float> distOffset(-0.2f, 0.2f);
-	p.transform.SetTranslate({
-		position.x + distOffset(randomEngine),
-		position.y + distOffset(randomEngine),
-		position.z + distOffset(randomEngine)
-	});
-
-	// Velocities
-	std::uniform_real_distribution<float> velXZ(-2.0f, 2.0f);
-	std::uniform_real_distribution<float> velY(1.5f, 4.0f);
-	p.velocity = { velXZ(randomEngine), velY(randomEngine), velXZ(randomEngine) };
-	p.color = color;
-
-	std::uniform_real_distribution<float> lifeDist(1.2f, 2.2f);
-	p.lifeTime = lifeDist(randomEngine);
-	p.currentTime = 0.0f;
-	p.textureIndex = textureIndex;
-
-	p.gravity = 3.5f; // Gentle drift down
-	p.bounceElasticity = 0.3f;
-
-	std::uniform_real_distribution<float> spinDist(-5.0f, 5.0f);
-	p.angularVelocity = spinDist(randomEngine);
-
-	particles_.push_back(p);
+	particles_.push_back(BuildJitteredParticle(randomEngine, position, {}, 1.0f, color, textureIndex, Gore::kFeatherPreset));
 }
 
 void AppParticleManager::EmitBloodDrop(std::mt19937& randomEngine, const Vector3& position, const Vector3& baseVelocity, float speed, uint32_t textureIndex)
 {
-	AppParticle p;
-	p.transform.Initialize();
-
-	// 飛び散る血液ドロップ（微細な位置オフセット）
-	std::uniform_real_distribution<float> distOffset(-0.1f, 0.1f);
-	p.transform.SetTranslate({
-		position.x + distOffset(randomEngine),
-		position.y + distOffset(randomEngine),
-		position.z + distOffset(randomEngine)
-	});
-
-	std::uniform_real_distribution<float> distRotate(0.0f, 6.2831853f);
-	p.transform.SetRotate({ 0.0f, 0.0f, distRotate(randomEngine) });
-
-	// 液滴のサイズ（大小さまざま、引き伸ばされた滴）
-	std::uniform_real_distribution<float> distScaleX(0.04f, 0.14f);
-	std::uniform_real_distribution<float> distScaleY(0.08f, 0.28f);
-	p.transform.SetScale({ distScaleX(randomEngine), distScaleY(randomEngine), 1.0f });
-
-	// ランダムな拡散ベクトル
-	std::uniform_real_distribution<float> spreadXZ(-2.5f, 2.5f);
-	std::uniform_real_distribution<float> spreadY(1.0f, 5.5f);
-	p.velocity = baseVelocity * speed + Vector3{ spreadXZ(randomEngine), spreadY(randomEngine), spreadXZ(randomEngine) };
-
-	// リアルな深紅・クリムゾンレッド〜鮮血のグラデーション
-	std::uniform_real_distribution<float> redTone(0.65f, 0.95f);
-	std::uniform_real_distribution<float> darkTone(0.02f, 0.08f);
-	p.color = { redTone(randomEngine), darkTone(randomEngine), darkTone(randomEngine), 0.95f };
-
-	std::uniform_real_distribution<float> lifeDist(0.8f, 1.8f);
-	p.lifeTime = lifeDist(randomEngine);
-	p.currentTime = 0.0f;
-	p.textureIndex = textureIndex;
-
-	p.gravity = 14.0f; // 強い重力で放物線を描いて地面に落ちる
-	p.bounceElasticity = 0.08f; // 地面にビチャッと落ちて弾まない
-
-	std::uniform_real_distribution<float> spinDist(-8.0f, 8.0f);
-	p.angularVelocity = spinDist(randomEngine);
-
-	particles_.push_back(p);
+	const float r = RandRange(randomEngine, Gore::kBloodDropRedTone);
+	const float g = RandRange(randomEngine, Gore::kBloodDropDarkTone);
+	const float b = RandRange(randomEngine, Gore::kBloodDropDarkTone);
+	const Vector4 bloodCol = { r, g, b, Gore::kBloodDropAlpha };
+	particles_.push_back(BuildJitteredParticle(randomEngine, position, baseVelocity * speed, 1.0f, bloodCol, textureIndex, Gore::kBloodDropPreset));
 }
 
 void AppParticleManager::EmitBloodMist(std::mt19937& randomEngine, const Vector3& position, float scale, uint32_t textureIndex)
 {
-	AppParticle p;
-	p.transform.Initialize();
-
-	std::uniform_real_distribution<float> distOffset(-0.2f, 0.2f);
-	p.transform.SetTranslate({
-		position.x + distOffset(randomEngine),
-		position.y + distOffset(randomEngine),
-		position.z + distOffset(randomEngine)
-	});
-
-	std::uniform_real_distribution<float> distRotate(0.0f, 6.2831853f);
-	p.transform.SetRotate({ 0.0f, 0.0f, distRotate(randomEngine) });
-
-	// 霧状の広がり
-	std::uniform_real_distribution<float> distScale(0.3f, 0.8f);
-	float s = distScale(randomEngine) * scale;
-	p.transform.SetScale({ s, s, 1.0f });
-
-	std::uniform_real_distribution<float> velXZ(-0.8f, 0.8f);
-	std::uniform_real_distribution<float> velY(0.2f, 1.2f);
-	p.velocity = { velXZ(randomEngine), velY(randomEngine), velXZ(randomEngine) };
-
-	// 鮮血色の半透明ミスト
-	p.color = { 0.85f, 0.05f, 0.05f, 0.65f };
-
-	std::uniform_real_distribution<float> lifeDist(0.6f, 1.2f);
-	p.lifeTime = lifeDist(randomEngine);
-	p.currentTime = 0.0f;
-	p.textureIndex = textureIndex;
-
-	p.gravity = 0.8f;
-	p.bounceElasticity = 0.0f;
-	p.angularVelocity = 0.5f;
-
-	particles_.push_back(p);
+	particles_.push_back(BuildJitteredParticle(randomEngine, position, {}, scale, Gore::kBloodMistColor, textureIndex, Gore::kBloodMistPreset));
 }
 
 void AppParticleManager::EmitBloodBurst(std::mt19937& randomEngine, const Vector3& position, const Vector3& hitDirection, uint32_t textureIndex, uint32_t flashTexIndex)
 {
-	// 1. 鮮血の大閃光 (Blood Flash)
-	EmitDeathFlash(randomEngine, position, 5.0f, { 0.95f, 0.05f, 0.05f, 1.0f }, 0.35f, flashTexIndex);
+	EmitDeathFlash(randomEngine, position, Gore::kBloodBurstFlashScale, Gore::kBloodBurstFlashColor, Gore::kBloodBurstFlashLife, flashTexIndex);
 
-	// 2. 大量の血液ドロップ飛沫 (60個)
-	for (int i = 0; i < 60; ++i)
+	for (int i = 0; i < Gore::kBloodBurstDropCount; ++i)
 	{
-		EmitBloodDrop(randomEngine, position, hitDirection, 2.0f, textureIndex);
+		EmitBloodDrop(randomEngine, position, hitDirection, Gore::kBloodBurstDropSpeed, textureIndex);
 	}
-
-	// 3. 全方位への高圧血しぶきスプラッター (30個)
-	for (int i = 0; i < 30; ++i)
+	for (int i = 0; i < Gore::kBloodBurstRingCount; ++i)
 	{
-		float angle = (static_cast<float>(i) / 30.0f) * 6.2831853f;
-		float speed = 2.5f + (static_cast<float>(rand()) / RAND_MAX) * 3.5f;
-		Vector3 dir = { std::cos(angle) * speed, 1.5f + (static_cast<float>(rand()) / RAND_MAX) * 4.0f, std::sin(angle) * speed };
+		const float angle = (static_cast<float>(i) / static_cast<float>(Gore::kBloodBurstRingCount)) * kTwoPi;
+		const float speed = CRandRange(Gore::kBloodBurstRingSpeed);
+		const Vector3 dir = { std::cos(angle) * speed, CRandRange(Gore::kBloodBurstRingUp), std::sin(angle) * speed };
 		EmitBloodDrop(randomEngine, position, dir, 1.0f, textureIndex);
 	}
-
-	// 4. 血霧・血煙 (25個)
-	for (int i = 0; i < 25; ++i)
+	for (int i = 0; i < Gore::kBloodBurstMistCount; ++i)
 	{
-		EmitBloodMist(randomEngine, position, 1.8f, textureIndex);
+		EmitBloodMist(randomEngine, position, Gore::kBloodBurstMistScale, textureIndex);
 	}
-
-	// 5. 飛び散る羽毛 (40個)
-	for (int i = 0; i < 40; ++i)
+	for (int i = 0; i < Gore::kBloodBurstFeatherCount; ++i)
 	{
-		// 敵の羽毛＋血染めの羽毛
-		Vector4 featherCol = (i % 2 == 0) ? Vector4{ 0.9f, 0.1f, 0.1f, 1.0f } : Vector4{ 1.0f, 0.85f, 0.2f, 1.0f };
+		const Vector4 featherCol = IsEven(i) ? Gore::kBloodFeatherRed : Gore::kBloodFeatherYellow;
 		EmitFeather(randomEngine, position, featherCol, textureIndex);
 	}
 }
 
 void AppParticleManager::EmitDarkBloodSmoke(std::mt19937& randomEngine, const Vector3& position, float scale, uint32_t smokeTexIndex)
 {
-	AppParticle p;
-	p.transform.Initialize();
-
-	std::uniform_real_distribution<float> distOffset(-0.25f, 0.25f);
-	p.transform.SetTranslate({
-		position.x + distOffset(randomEngine),
-		position.y + distOffset(randomEngine),
-		position.z + distOffset(randomEngine)
-	});
-
-	std::uniform_real_distribution<float> distRotate(0.0f, 6.2831853f);
-	p.transform.SetRotate({ 0.0f, 0.0f, distRotate(randomEngine) });
-
-	std::uniform_real_distribution<float> distScale(0.4f, 0.9f);
-	float s = distScale(randomEngine) * scale;
-	p.transform.SetScale({ s, s, 1.0f });
-
-	std::uniform_real_distribution<float> velXZ(-0.6f, 0.6f);
-	std::uniform_real_distribution<float> velY(0.3f, 1.5f);
-	p.velocity = { velXZ(randomEngine), velY(randomEngine), velXZ(randomEngine) };
-
-	// クリーンな灰白の硝煙・粉塵
-	std::uniform_real_distribution<float> alphaDist(0.35f, 0.65f);
-	p.color = { 0.75f, 0.75f, 0.78f, alphaDist(randomEngine) };
-
-	std::uniform_real_distribution<float> lifeDist(0.7f, 1.4f);
-	p.lifeTime = lifeDist(randomEngine);
-	p.currentTime = 0.0f;
-	p.textureIndex = smokeTexIndex;
-
-	p.gravity = -0.2f; // ふわりと上昇
-	p.bounceElasticity = 0.0f;
-	p.angularVelocity = 0.4f;
-
-	particles_.push_back(p);
+	const Vector4 smokeCol = {
+		Gore::kDarkSmokeRgb.x, Gore::kDarkSmokeRgb.y, Gore::kDarkSmokeRgb.z,
+		RandRange(randomEngine, Gore::kDarkSmokeAlpha)
+	};
+	particles_.push_back(BuildJitteredParticle(randomEngine, position, {}, scale, smokeCol, smokeTexIndex, Gore::kDarkSmokePreset));
 }
 
 void AppParticleManager::EmitViolentBloodSpray(std::mt19937& randomEngine, const Vector3& hitPoint, const Vector3& bulletDir, bool isCritical, uint32_t bloodTexIndex, uint32_t smokeTexIndex)
 {
-	// 弾丸の貫通方向奥へ噴き出す高初速タクティカルスパーク＆羽毛
-	int count = isCritical ? 24 : 12;
+	const int count = isCritical ? Gore::kSprayCritCount : Gore::kSprayNormalCount;
+	const float maxFwd = isCritical ? Gore::kSprayCritMaxFwd : Gore::kSprayNormMaxFwd;
+	const Vector3 perp1 = { -bulletDir.z, 0.0f, bulletDir.x };
+
 	for (int i = 0; i < count; ++i)
 	{
-		AppParticle p;
-		p.transform.Initialize();
-
-		std::uniform_real_distribution<float> offsetDist(-0.08f, 0.08f);
-		p.transform.SetTranslate(hitPoint + Vector3{ offsetDist(randomEngine), offsetDist(randomEngine), offsetDist(randomEngine) });
-
-		std::uniform_real_distribution<float> distRotate(0.0f, 6.2831853f);
-		p.transform.SetRotate({ 0.0f, 0.0f, distRotate(randomEngine) });
-
-		// スパーク・破片
-		std::uniform_real_distribution<float> sx(0.06f, 0.18f);
-		std::uniform_real_distribution<float> sy(0.12f, 0.40f);
-		p.transform.SetScale({ sx(randomEngine), sy(randomEngine), 1.0f });
-
-		// 貫通方向を主軸とした円錐状の鋭い噴出
-		std::uniform_real_distribution<float> coneSpread(-1.2f, 1.2f);
-		std::uniform_real_distribution<float> forwardSpeed(3.0f, isCritical ? 8.0f : 5.5f);
-		std::uniform_real_distribution<float> upSpeed(0.8f, 3.5f);
-
-		Vector3 perp1 = { -bulletDir.z, 0.0f, bulletDir.x };
-		p.velocity = bulletDir * forwardSpeed(randomEngine) + perp1 * coneSpread(randomEngine) + Vector3{ 0.0f, upSpeed(randomEngine), 0.0f };
-
-		// 眩しいゴールドスパーク / 白熱破片
-		bool isSpark = (i % 2 == 0);
-		p.color = isSpark
-			? Vector4{ 1.0f, 0.88f, 0.35f, 0.95f }
-			: Vector4{ 0.98f, 0.96f, 0.90f, 0.90f };
-
-		std::uniform_real_distribution<float> lifeDist(0.35f, 0.75f);
-		p.lifeTime = lifeDist(randomEngine);
-		p.currentTime = 0.0f;
-		p.textureIndex = bloodTexIndex;
-
-		p.gravity = 12.0f;
-		p.bounceElasticity = 0.05f;
-		p.angularVelocity = 6.0f;
-
-		particles_.push_back(p);
+		const Vector3 pos = hitPoint + RandOffset3D(randomEngine, Gore::kSprayPosJitter);
+		const float rotZ = RandAngle(randomEngine);
+		const float sx = RandRange(randomEngine, Gore::kSprayScaleX);
+		const float sy = RandRange(randomEngine, Gore::kSprayScaleY);
+		const Vector3 vel = bulletDir * RandRange(randomEngine, Gore::kSprayMinFwdSpeed, maxFwd)
+			+ perp1 * RandRange(randomEngine, Gore::kSprayConeSpread)
+			+ Vector3{ 0.0f, RandRange(randomEngine, Gore::kSprayUpSpeed), 0.0f };
+		const Vector4 col = IsEven(i) ? Gore::kSpraySparkColor : Gore::kSprayDebrisColor;
+		particles_.push_back(BuildParticle(
+			pos, rotZ, { sx, sy, 1.0f }, vel, RandRange(randomEngine, Gore::kSprayLife),
+			bloodTexIndex, SolidColor(col), Gore::kSprayDyn, Gore::kSpraySpin));
 	}
 
-	// 立ち込める硝煙
-	int smokeCount = isCritical ? 4 : 2;
+	const int smokeCount = isCritical ? Gore::kSprayCritSmoke : Gore::kSprayNormSmoke;
 	for (int i = 0; i < smokeCount; ++i)
 	{
-		EmitDarkBloodSmoke(randomEngine, hitPoint, 0.7f, smokeTexIndex);
+		EmitDarkBloodSmoke(randomEngine, hitPoint, Gore::kSpraySmokeScale, smokeTexIndex);
 	}
 }
 
 void AppParticleManager::EmitViolentBloodBurst(std::mt19937& randomEngine, const Vector3& enemyPos, const Vector3& hitDir, uint32_t bloodTexIndex, uint32_t smokeTexIndex, uint32_t flashTexIndex)
 {
-	// 1. 白熱とゴールドの大閃光フラッシュ
-	EmitDeathFlash(randomEngine, enemyPos, 6.0f, { 1.0f, 0.92f, 0.45f, 1.0f }, 0.40f, flashTexIndex);
+	EmitDeathFlash(randomEngine, enemyPos, Gore::kViolentFlashScale, Gore::kViolentFlashColor, Gore::kViolentFlashLife, flashTexIndex);
 
-	// 2. 貫通方向への指向性スパーク＆羽毛バースト (50個)
-	for (int i = 0; i < 50; ++i)
+	for (int i = 0; i < Gore::kViolentDirCount; ++i)
 	{
-		AppParticle p;
-		p.transform.Initialize();
-
-		std::uniform_real_distribution<float> offsetDist(-0.15f, 0.15f);
-		p.transform.SetTranslate(enemyPos + Vector3{ offsetDist(randomEngine), offsetDist(randomEngine) + 0.4f, offsetDist(randomEngine) });
-
-		std::uniform_real_distribution<float> distRotate(0.0f, 6.2831853f);
-		p.transform.SetRotate({ 0.0f, 0.0f, distRotate(randomEngine) });
-
-		std::uniform_real_distribution<float> sx(0.08f, 0.22f);
-		std::uniform_real_distribution<float> sy(0.15f, 0.50f);
-		p.transform.SetScale({ sx(randomEngine), sy(randomEngine), 1.0f });
-
-		std::uniform_real_distribution<float> spreadXZ(-3.5f, 3.5f);
-		std::uniform_real_distribution<float> spreadY(2.0f, 7.0f);
-		std::uniform_real_distribution<float> forwardP(2.0f, 6.5f);
-
-		p.velocity = hitDir * forwardP(randomEngine) + Vector3{ spreadXZ(randomEngine), spreadY(randomEngine), spreadXZ(randomEngine) };
-		p.color = (i % 2 == 0)
-			? Vector4{ 1.0f, 0.85f, 0.25f, 1.0f }  // ゴールドスパーク
-			: Vector4{ 0.98f, 0.98f, 1.0f, 0.95f }; // 白熱破片
-		p.lifeTime = 0.8f;
-		p.currentTime = 0.0f;
-		p.textureIndex = bloodTexIndex;
-
-		p.gravity = 12.0f;
-		p.bounceElasticity = 0.05f;
-		p.angularVelocity = 8.0f;
-
-		particles_.push_back(p);
+		Vector3 pos = enemyPos + RandOffset3D(randomEngine, Gore::kViolentDirJitter);
+		pos.y += Gore::kViolentDirOffsetY;
+		const float rotZ = RandAngle(randomEngine);
+		const float sx = RandRange(randomEngine, Gore::kViolentDirScaleX);
+		const float sy = RandRange(randomEngine, Gore::kViolentDirScaleY);
+		const Vector3 vel = hitDir * RandRange(randomEngine, Gore::kViolentDirFwd) + Vector3{
+			RandRange(randomEngine, Gore::kViolentDirSpreadXZ),
+			RandRange(randomEngine, Gore::kViolentDirSpreadY),
+			RandRange(randomEngine, Gore::kViolentDirSpreadXZ)
+		};
+		const Vector4 col = IsEven(i) ? Gore::kViolentDirColorEven : Gore::kViolentDirColorOdd;
+		particles_.push_back(BuildParticle(
+			pos, rotZ, { sx, sy, 1.0f }, vel, Gore::kViolentDirLife,
+			bloodTexIndex, SolidColor(col), Gore::kViolentDirDyn, Gore::kViolentDirSpin));
 	}
 
-	// 3. 360度全方位への激しいスパーク＆破片バースト (40個)
-	for (int i = 0; i < 40; ++i)
+	const Vector3 ringOrigin = enemyPos + Vector3{ 0.0f, Gore::kViolentDirOffsetY, 0.0f };
+	for (int i = 0; i < Gore::kViolentRingCount; ++i)
 	{
-		float angle = (static_cast<float>(i) / 40.0f) * 6.2831853f;
-		float speed = 3.0f + (static_cast<float>(rand()) / RAND_MAX) * 4.5f;
-		Vector3 vel = { std::cos(angle) * speed, 1.8f + (static_cast<float>(rand()) / RAND_MAX) * 5.0f, std::sin(angle) * speed };
-
-		AppParticle p;
-		p.transform.Initialize();
-		p.transform.SetTranslate(enemyPos + Vector3{ 0.0f, 0.4f, 0.0f });
-
-		std::uniform_real_distribution<float> distRotate(0.0f, 6.2831853f);
-		p.transform.SetRotate({ 0.0f, 0.0f, distRotate(randomEngine) });
-
-		std::uniform_real_distribution<float> s(0.08f, 0.20f);
-		p.transform.SetScale({ s(randomEngine), s(randomEngine), 1.0f });
-
-		p.velocity = vel;
-		p.color = (i % 2 == 0) ? Vector4{ 1.0f, 0.85f, 0.30f, 1.0f } : Vector4{ 0.95f, 0.95f, 1.0f, 0.95f };
-		p.lifeTime = 1.0f;
-		p.currentTime = 0.0f;
-		p.textureIndex = bloodTexIndex;
-
-		p.gravity = 14.0f;
-		p.bounceElasticity = 0.05f;
-		p.angularVelocity = 10.0f;
-
-		particles_.push_back(p);
+		const float angle = (static_cast<float>(i) / static_cast<float>(Gore::kViolentRingCount)) * kTwoPi;
+		const float speed = CRandRange(Gore::kViolentRingSpeed);
+		const Vector3 vel = { std::cos(angle) * speed, CRandRange(Gore::kViolentRingUp), std::sin(angle) * speed };
+		const float rotZ = RandAngle(randomEngine);
+		const float sx = RandRange(randomEngine, Gore::kViolentRingScale);
+		const float sy = RandRange(randomEngine, Gore::kViolentRingScale);
+		const Vector4 col = IsEven(i) ? Gore::kViolentRingColorEven : Gore::kViolentRingColorOdd;
+		particles_.push_back(BuildParticle(
+			ringOrigin, rotZ, { sx, sy, 1.0f }, vel, Gore::kViolentRingLife,
+			bloodTexIndex, SolidColor(col), Gore::kViolentRingDyn, Gore::kViolentRingSpin));
 	}
 
-	// 4. 立ち込める硝煙・粉塵 (20個)
-	for (int i = 0; i < 20; ++i)
+	const Vector3 upperOrigin = enemyPos + Vector3{ 0.0f, Gore::kViolentSmokeOffsetY, 0.0f };
+	for (int i = 0; i < Gore::kViolentSmokeCount; ++i)
 	{
-		EmitDarkBloodSmoke(randomEngine, enemyPos + Vector3{ 0.0f, 0.5f, 0.0f }, 1.5f, smokeTexIndex);
+		EmitDarkBloodSmoke(randomEngine, upperOrigin, Gore::kViolentSmokeScale, smokeTexIndex);
 	}
-
-	// 5. 吹き飛ぶ黄色と白のアヒル羽毛 (35個)
-	for (int i = 0; i < 35; ++i)
+	for (int i = 0; i < Gore::kViolentFeatherCount; ++i)
 	{
-		Vector4 featherCol = (i % 2 == 0) ? Vector4{ 1.0f, 0.88f, 0.22f, 1.0f } : Vector4{ 0.95f, 0.95f, 0.98f, 1.0f };
-		EmitFeather(randomEngine, enemyPos + Vector3{ 0.0f, 0.5f, 0.0f }, featherCol, bloodTexIndex);
+		const Vector4 featherCol = IsEven(i) ? Gore::kViolentFeatherYellow : Gore::kViolentFeatherWhite;
+		EmitFeather(randomEngine, upperOrigin, featherCol, bloodTexIndex);
 	}
 }
 
 void AppParticleManager::EmitMuzzleFlash(std::mt19937& randomEngine, const Vector3& position, const Vector3& direction, const Vector3& right, const Vector3& up, const Vector4& color, float speedMultiplier, uint32_t textureIndex)
 {
-	AppParticle p;
-	p.transform.Initialize();
-	p.transform.SetTranslate(position);
-
-	std::uniform_real_distribution<float> distRotate(0.0f, 6.2831853f);
-	p.transform.SetRotate({ 0.0f, 0.0f, distRotate(randomEngine) });
-
-	// Uniform scale 0.3f
-	p.transform.SetScale({ 0.3f, 0.3f, 1.0f });
-
-	float forwardSpeed = (4.0f + (static_cast<float>(rand()) / RAND_MAX) * 4.0f) * speedMultiplier;
-	float rightSpeed = (static_cast<float>(rand()) / RAND_MAX * 2.0f - 1.0f) * 1.8f * speedMultiplier;
-	float upSpeed = (static_cast<float>(rand()) / RAND_MAX * 2.0f - 1.0f) * 1.2f * speedMultiplier;
-
-	p.velocity = direction * forwardSpeed + right * rightSpeed + up * upSpeed;
-	p.color = color;
-
-	std::uniform_real_distribution<float> distTime(0.05f, 0.15f);
-	p.lifeTime = distTime(randomEngine);
-	p.currentTime = 0.0f;
-	p.textureIndex = textureIndex;
-
-	p.gravity = 0.0f;
-	p.bounceElasticity = 0.0f;
-	p.angularVelocity = 0.0f;
-
-	particles_.push_back(p);
+	const float rotZ = RandAngle(randomEngine);
+	const float forwardSpeed = CRandRange(Ballistics::kMuzzleForwardSpeed) * speedMultiplier;
+	const float rightSpeed   = (CRand01() * 2.0f - 1.0f) * Ballistics::kMuzzleRightSpread * speedMultiplier;
+	const float upSpeed      = (CRand01() * 2.0f - 1.0f) * Ballistics::kMuzzleUpSpread * speedMultiplier;
+	const Vector3 vel = direction * forwardSpeed + right * rightSpeed + up * upSpeed;
+	const float s = Ballistics::kMuzzleFlashScale;
+	particles_.push_back(BuildParticle(
+		position, rotZ, { s, s, 1.0f }, vel, RandRange(randomEngine, Ballistics::kMuzzleLifeTime),
+		textureIndex, SolidColor(color)));
 }
 
 void AppParticleManager::EmitMuzzleFlare(std::mt19937& randomEngine, const Vector3& position, float scale, const Vector4& color, float lifeTime, uint32_t textureIndex)
 {
-	// Emit particles to form a cross shape + one center glow
-	// Flare 1: Horizontal-ish (rotated 0)
+	(void)randomEngine;
+	for (const auto& layer : Ballistics::kMuzzleFlareLayers)
 	{
-		AppParticle p;
-		p.transform.Initialize();
-		p.transform.SetTranslate(position);
-		p.transform.SetRotate({ 0.0f, 0.0f, 0.0f });
-		p.transform.SetScale({ scale * 1.5f, scale * 0.3f, 1.0f });
-		p.velocity = { 0.0f, 0.0f, 0.0f };
-		p.color = color;
-		p.lifeTime = lifeTime;
-		p.currentTime = 0.0f;
-		p.textureIndex = textureIndex;
-		p.gravity = 0.0f;
-		p.bounceElasticity = 0.0f;
-		p.angularVelocity = 0.0f;
-		particles_.push_back(p);
-	}
-	// Flare 2: Vertical-ish (rotated 90 deg / 1.570796f)
-	{
-		AppParticle p;
-		p.transform.Initialize();
-		p.transform.SetTranslate(position);
-		p.transform.SetRotate({ 0.0f, 0.0f, 1.570796f });
-		p.transform.SetScale({ scale * 1.5f, scale * 0.3f, 1.0f });
-		p.velocity = { 0.0f, 0.0f, 0.0f };
-		p.color = color;
-		p.lifeTime = lifeTime;
-		p.currentTime = 0.0f;
-		p.textureIndex = textureIndex;
-		p.gravity = 0.0f;
-		p.bounceElasticity = 0.0f;
-		p.angularVelocity = 0.0f;
-		particles_.push_back(p);
-	}
-	// Flare 3: Center glow (rotated 45 deg, uniform scale)
-	{
-		AppParticle p;
-		p.transform.Initialize();
-		p.transform.SetTranslate(position);
-		p.transform.SetRotate({ 0.0f, 0.0f, 0.785398f });
-		p.transform.SetScale({ scale * 0.7f, scale * 0.7f, 1.0f });
-		p.velocity = { 0.0f, 0.0f, 0.0f };
-		p.color = color;
-		p.lifeTime = lifeTime;
-		p.currentTime = 0.0f;
-		p.textureIndex = textureIndex;
-		p.gravity = 0.0f;
-		p.bounceElasticity = 0.0f;
-		p.angularVelocity = 0.0f;
-		particles_.push_back(p);
+		particles_.push_back(BuildParticle(
+			position, layer.rotZ, { scale * layer.scaleMul.x, scale * layer.scaleMul.y, 1.0f },
+			{}, lifeTime, textureIndex, SolidColor(color)));
 	}
 }
 
 void AppParticleManager::EmitSparkPlayerRelative(std::mt19937& randomEngine, const Vector3& playerPos, const Vector3& offset, const Vector3& velocity, const Vector4& color, float scale, float lifeTime, uint32_t textureIndex)
 {
-	AppParticle p;
-	p.transform.Initialize();
-	p.transform.SetTranslate(playerPos + offset);
-
-	std::uniform_real_distribution<float> distRotate(0.0f, 6.2831853f);
-	p.transform.SetRotate({ 0.0f, 0.0f, distRotate(randomEngine) });
-
-	// Uniform scale for clean energy particles (glow rings)
-	p.transform.SetScale({ scale, scale, 1.0f });
-
-	p.velocity = velocity;
-	p.color = color;
-	p.lifeTime = lifeTime;
-	p.currentTime = 0.0f;
-	p.textureIndex = textureIndex;
-
-	p.gravity = 0.0f; // No gravity for clean energy ring expansion
-	p.bounceElasticity = 0.0f;
-	p.angularVelocity = 0.0f;
-
+	AppParticle p = BuildParticle(
+		playerPos + offset, RandAngle(randomEngine), { scale, scale, 1.0f },
+		velocity, lifeTime, textureIndex, SolidColor(color));
 	p.followPlayer = true;
 	p.offsetFromPlayer = offset;
-
 	particles_.push_back(p);
 }
 
 void AppParticleManager::EmitDeathFlash(std::mt19937& randomEngine, const Vector3& position, float scale, const Vector4& color, float lifeTime, uint32_t textureIndex)
 {
-	// 敵死亡時の超強力なレンズフレア・スターバースト型閃光エフェクト
-	// 異なる角度とサイズで3枚のスターバースト画像を重ねることで、動きと立体感を出す
-	
-	// 1枚目：中心の主ビーム（大）
+	for (const auto& layer : Ballistics::kDeathFlashLayers)
 	{
-		AppParticle p;
-		p.transform.Initialize();
-		p.transform.SetTranslate(position);
-		p.transform.SetRotate({ 0.0f, 0.0f, 0.0f });
-		p.transform.SetScale({ scale * 1.5f, scale * 1.5f, 1.0f });
-		p.velocity = { 0.0f, 0.0f, 0.0f };
-		p.color = color;
-		p.lifeTime = lifeTime;
-		p.currentTime = 0.0f;
-		p.textureIndex = textureIndex;
-		p.gravity = 0.0f;
-		p.bounceElasticity = 0.0f;
-		p.angularVelocity = 0.5f; // 少し回転させる
-		particles_.push_back(p);
-	}
-	
-	// 2枚目：斜め45度回転（中）
-	{
-		AppParticle p;
-		p.transform.Initialize();
-		p.transform.SetTranslate(position);
-		p.transform.SetRotate({ 0.0f, 0.0f, 0.785398f }); // 45 deg
-		p.transform.SetScale({ scale * 1.1f, scale * 1.1f, 1.0f });
-		p.velocity = { 0.0f, 0.0f, 0.0f };
-		p.color = color;
-		p.lifeTime = lifeTime * 0.8f; // 少し早く消す
-		p.currentTime = 0.0f;
-		p.textureIndex = textureIndex;
-		p.gravity = 0.0f;
-		p.bounceElasticity = 0.0f;
-		p.angularVelocity = -0.8f; // 逆方向に回転
-		particles_.push_back(p);
-	}
-
-	// 3枚目：コアの超高輝度フラッシュ（小、白め）
-	{
-		AppParticle p;
-		p.transform.Initialize();
-		p.transform.SetTranslate(position);
-		std::uniform_real_distribution<float> angleDist(0.0f, 6.2831853f);
-		p.transform.SetRotate({ 0.0f, 0.0f, angleDist(randomEngine) });
-		p.transform.SetScale({ scale * 0.7f, scale * 0.7f, 1.0f });
-		p.velocity = { 0.0f, 0.0f, 0.0f };
-		p.color = { 1.0f, 1.0f, 1.0f, 1.0f }; // コアは白
-		p.lifeTime = lifeTime * 0.6f;
-		p.currentTime = 0.0f;
-		p.textureIndex = textureIndex;
-		p.gravity = 0.0f;
-		p.bounceElasticity = 0.0f;
-		p.angularVelocity = 1.2f;
-		particles_.push_back(p);
+		const float rotZ = layer.randomRot ? RandAngle(randomEngine) : layer.rotZ;
+		const float s = scale * layer.scaleMul;
+		const Vector4 col = layer.forceWhiteCore ? Vector4{ 1.0f, 1.0f, 1.0f, 1.0f } : color;
+		particles_.push_back(BuildParticle(
+			position, rotZ, { s, s, 1.0f }, {}, lifeTime * layer.lifeMul,
+			textureIndex, SolidColor(col), {}, layer.angularVel));
 	}
 }
 
 void AppParticleManager::EmitEnemyDestroyGPUBurst(std::mt19937& randomEngine, const Vector3& position, const Vector3& hitDirection, uint32_t particleTexIndex, uint32_t flashTexIndex, uint32_t smokeTexIndex)
 {
-	// 1. 巨大スターバースト衝撃閃光
-	EmitDeathFlash(randomEngine, position, 4.8f, { 1.0f, 0.85f, 0.3f, 1.0f }, 0.28f, flashTexIndex);
+	EmitDeathFlash(randomEngine, position, Gore::kEnemyDestroyFlashScale, Gore::kEnemyDestroyFlashColor, Gore::kEnemyDestroyFlashLife, flashTexIndex);
 
-	// 2. 超高速GPUスパーク火花（全方位＆指向性 80個）
-	std::uniform_real_distribution<float> angleDist(0.0f, 6.2831853f);
-	std::uniform_real_distribution<float> pitchDist(-0.8f, 1.2f);
-	std::uniform_real_distribution<float> speedDist(3.5f, 9.5f);
-	std::uniform_real_distribution<float> scaleDist(0.08f, 0.22f);
-	std::uniform_real_distribution<float> lifeDist(0.5f, 1.4f);
-
-	for (int i = 0; i < 80; ++i)
+	for (int i = 0; i < Gore::kEnemyDestroySparkCount; ++i)
 	{
-		float a = angleDist(randomEngine);
-		float p = pitchDist(randomEngine);
-		float spd = speedDist(randomEngine);
-
-		Vector3 dir = { std::cos(a) * std::cos(p), std::sin(p), std::sin(a) * std::cos(p) };
-		// 弾丸の直撃方向へバイアスを加算
-		dir.x += hitDirection.x * 0.8f;
-		dir.y += hitDirection.y * 0.8f;
-		dir.z += hitDirection.z * 0.8f;
-
-		Vector3 vel = { dir.x * spd, dir.y * spd + 1.5f, dir.z * spd };
-		Vector4 col = (i % 3 == 0) ? Vector4{ 1.0f, 0.95f, 0.5f, 1.0f } : Vector4{ 1.0f, 0.45f, 0.1f, 1.0f };
-
-		EmitSparkWithVelocity(randomEngine, position, vel, col, scaleDist(randomEngine), lifeDist(randomEngine), particleTexIndex);
+		const float a = RandAngle(randomEngine);
+		const float p = RandRange(randomEngine, Gore::kEnemyDestroyPitch);
+		const float spd = RandRange(randomEngine, Gore::kEnemyDestroySpeed);
+		const float cosP = std::cos(p);
+		const Vector3 dir = Vector3{ std::cos(a) * cosP, std::sin(p), std::sin(a) * cosP } + hitDirection * Gore::kEnemyDestroyHitBias;
+		const Vector3 vel = { dir.x * spd, dir.y * spd + Gore::kEnemyDestroyUpBoost, dir.z * spd };
+		const Vector4 col = (i % Gore::kEnemyDestroyGoldStride == 0) ? Gore::kEnemyDestroySparkGold : Gore::kEnemyDestroySparkOrange;
+		EmitSparkWithVelocity(randomEngine, position, vel, col, RandRange(randomEngine, Gore::kEnemyDestroyScale), RandRange(randomEngine, Gore::kEnemyDestroyLife), particleTexIndex);
 	}
 
-	// 3. 衝撃波ダストスモーク（30個）
-	for (int i = 0; i < 30; ++i)
+	for (int i = 0; i < Gore::kEnemyDestroyDustCount; ++i)
 	{
-		float a = (static_cast<float>(i) / 30.0f) * 6.2831853f;
-		float s = 1.5f + (static_cast<float>(rand()) / RAND_MAX) * 2.0f;
-		Vector3 sVel = { std::cos(a) * s, 0.3f + (static_cast<float>(rand()) / RAND_MAX) * 0.8f, std::sin(a) * s };
-		Vector4 sCol = { 0.4f, 0.35f, 0.3f, 0.55f };
-		EmitDustWithVelocity(randomEngine, position, 0.9f, sCol, sVel, 0.8f, smokeTexIndex);
+		const float a = (static_cast<float>(i) / static_cast<float>(Gore::kEnemyDestroyDustCount)) * kTwoPi;
+		const float s = CRandRange(Gore::kEnemyDestroyDustSpeed);
+		const Vector3 sVel = { std::cos(a) * s, CRandRange(Gore::kEnemyDestroyDustUp), std::sin(a) * s };
+		EmitDustWithVelocity(randomEngine, position, Gore::kEnemyDestroyDustScale, Gore::kEnemyDestroyDustColor, sVel, Gore::kEnemyDestroyDustLife, smokeTexIndex);
 	}
 
-	// 4. アヒル羽毛デブリ飛散（40個）
-	for (int i = 0; i < 40; ++i)
+	for (int i = 0; i < Gore::kEnemyDestroyFeatherCount; ++i)
 	{
-		Vector4 featherCol = (i % 2 == 0) ? Vector4{ 1.0f, 0.88f, 0.25f, 1.0f } : Vector4{ 0.95f, 0.2f, 0.1f, 1.0f };
+		const Vector4 featherCol = IsEven(i) ? Gore::kEnemyDestroyFeatherEven : Gore::kEnemyDestroyFeatherOdd;
 		EmitFeather(randomEngine, position, featherCol, particleTexIndex);
 	}
 }
 
 void AppParticleManager::EmitTargetDestroyGPUBurst(std::mt19937& randomEngine, const Vector3& position, uint32_t particleTexIndex, uint32_t flashTexIndex, uint32_t smokeTexIndex)
 {
-	// 1. 標的破壊の強烈な閃光
-	EmitDeathFlash(randomEngine, position, 4.2f, { 1.0f, 0.9f, 0.4f, 1.0f }, 0.25f, flashTexIndex);
+	(void)smokeTexIndex;
 
-	// 2. 超高速破砕スパーク・破片（100個）
-	std::uniform_real_distribution<float> angleDist(0.0f, 6.2831853f);
-	std::uniform_real_distribution<float> pitchDist(-0.6f, 1.4f);
-	std::uniform_real_distribution<float> speedDist(4.0f, 11.0f);
-	std::uniform_real_distribution<float> scaleDist(0.06f, 0.20f);
-	std::uniform_real_distribution<float> lifeDist(0.4f, 1.2f);
+	const uint32_t coreTex = (flashTexIndex != TextureManager::kInvalidTextureIndex) ? flashTexIndex : particleTexIndex;
+	AppParticle core = BuildParticle(
+		position, 0.0f, { Ballistics::kTargetCoreInitScale, Ballistics::kTargetCoreInitScale, 1.0f },
+		{}, Ballistics::kTargetCoreLife, coreTex, Ballistics::kTargetCoreColor);
+	core.initialScale = Ballistics::kTargetCoreInitScale;
+	core.targetScale = Ballistics::kTargetCoreTargetScale;
+	AddParticle(core);
 
-	for (int i = 0; i < 100; ++i)
+	for (int i = 0; i < Ballistics::kTargetSparkCount; ++i)
 	{
-		float a = angleDist(randomEngine);
-		float p = pitchDist(randomEngine);
-		float spd = speedDist(randomEngine);
-
-		Vector3 dir = { std::cos(a) * std::cos(p), std::sin(p), std::sin(a) * std::cos(p) };
-		Vector3 vel = { dir.x * spd, dir.y * spd + 2.0f, dir.z * spd };
-
-		Vector4 col;
-		if (i % 4 == 0) col = { 1.0f, 0.2f, 0.2f, 1.0f };      // 標的の赤
-		else if (i % 4 == 1) col = { 1.0f, 1.0f, 1.0f, 1.0f }; // 標的の白
-		else col = { 1.0f, 0.7f, 0.15f, 1.0f };                // 破砕スパーク黄金
-
-		EmitSparkWithVelocity(randomEngine, position, vel, col, scaleDist(randomEngine), lifeDist(randomEngine), particleTexIndex);
-	}
-
-	// 3. 破砕ダスト衝撃波リング（35個）
-	for (int i = 0; i < 35; ++i)
-	{
-		float a = (static_cast<float>(i) / 35.0f) * 6.2831853f;
-		float s = 2.0f + (static_cast<float>(rand()) / RAND_MAX) * 2.5f;
-		Vector3 sVel = { std::cos(a) * s, 0.2f + (static_cast<float>(rand()) / RAND_MAX) * 0.6f, std::sin(a) * s };
-		Vector4 sCol = { 0.7f, 0.6f, 0.45f, 0.5f };
-		EmitDustWithVelocity(randomEngine, position, 0.8f, sCol, sVel, 0.7f, smokeTexIndex);
+		const float a = RandAngle(randomEngine);
+		const float p = RandRange(randomEngine, Ballistics::kTargetPitch);
+		const float spd = RandRange(randomEngine, Ballistics::kTargetSpeed);
+		const float cosP = std::cos(p);
+		const Vector3 dir = { std::cos(a) * cosP, std::sin(p), std::sin(a) * cosP };
+		const Vector3 vel = { dir.x * spd, dir.y * spd + Ballistics::kTargetUpBoost, dir.z * spd };
+		const float rotZ = RandAngle(randomEngine);
+		const ScaleSpec scSpec = {
+			{ RandRange(randomEngine, Ballistics::kTargetWidth), RandRange(randomEngine, Ballistics::kTargetLen) },
+			1.0f, Ballistics::kTargetTargetScale
+		};
+		const ColorShiftSpec colSpec = {
+			(i % Ballistics::kTargetHotColorStride == 0) ? Ballistics::kTargetColorHot : Ballistics::kTargetColorWarm,
+			Ballistics::kTargetEndColor, true
+		};
+		const float spin = IsEven(i) ? Ballistics::kTargetSpinSpeed : -Ballistics::kTargetSpinSpeed;
+		AddParticle(BuildScaledParticle(
+			position + dir * Ballistics::kTargetSpawnDirOffset, rotZ, 1.0f, scSpec, vel,
+			RandRange(randomEngine, Ballistics::kTargetLife), particleTexIndex, colSpec, Ballistics::kTargetSparkDyn, spin));
 	}
 }
 
 void AppParticleManager::EmitLandingGPUBurst(std::mt19937& randomEngine, const Vector3& position, uint32_t sparkTexIndex, uint32_t smokeTexIndex, uint32_t flashTexIndex)
 {
-	// 1. GPU Compute Shader パーティクルエミッター（大容量10240バッファ）の発動
-	if (enginePM_ && enginePM_->GetGPUEmitter() && enginePM_->GetGPUEmitter()->GetEmitterData())
+	(void)smokeTexIndex;
+	(void)flashTexIndex;
+
+	for (int i = 0; i < Ballistics::kLandingSparkCount; ++i)
 	{
-		auto* emitter = enginePM_->GetGPUEmitter()->GetEmitterData();
-		emitter->translate = position;
-		emitter->radius = 2.4f;
-		emitter->count = 64; // GPU側で超大量の粒子を一斉生成
-		emitter->emit = 1;
-	}
-
-	// 2. 着地激突の瞬間衝撃フラッシュ（プリミティブではなくテクスチャによるフラッシュ）
-	EmitDeathFlash(randomEngine, position + Vector3{ 0.0f, 0.12f, 0.0f }, 2.8f, { 1.0f, 0.95f, 0.7f, 0.9f }, 0.10f, flashTexIndex);
-
-	// 3. 超高速放射状スパーク（GPUインスタンシング火花・小石破片 48個）
-	std::uniform_real_distribution<float> angleDist(0.0f, 6.2831853f);
-	std::uniform_real_distribution<float> spdDist(3.5f, 8.5f);
-	std::uniform_real_distribution<float> scaleDist(0.12f, 0.28f);
-	std::uniform_real_distribution<float> lifeDist(0.35f, 0.70f);
-
-	for (int i = 0; i < 48; ++i)
-	{
-		float a = angleDist(randomEngine);
-		float spd = spdDist(randomEngine);
-		Vector3 vel = { std::cos(a) * spd, 1.8f + ((float)rand() / RAND_MAX) * 3.5f, std::sin(a) * spd };
-		Vector4 col = (i % 2 == 0) ? Vector4{ 1.0f, 0.88f, 0.35f, 1.0f } : Vector4{ 1.0f, 0.55f, 0.18f, 1.0f };
-		EmitSparkWithVelocity(randomEngine, position + Vector3{ 0.0f, 0.08f, 0.0f }, vel, col, scaleDist(randomEngine), lifeDist(randomEngine), sparkTexIndex);
-	}
-
-	// 4. 地面を這う高速な爆風土煙リング（24方向放射状）
-	for (int i = 0; i < 24; ++i)
-	{
-		float a = (static_cast<float>(i) / 24.0f) * 6.2831853f;
-		Vector3 vel = { std::cos(a) * 5.5f, 0.20f, std::sin(a) * 5.5f };
-		Vector4 sCol = { 0.85f, 0.80f, 0.72f, 0.75f };
-		EmitDustWithVelocity(randomEngine, position + Vector3{ 0.0f, 0.05f, 0.0f }, 1.15f, sCol, vel, 0.50f, smokeTexIndex);
-	}
-
-	// 5. ふんわりと立ち上るヘビーな煙雲（12方向）
-	for (int i = 0; i < 12; ++i)
-	{
-		float a = (static_cast<float>(i) / 12.0f) * 6.2831853f + 0.26f;
-		Vector3 vel = { std::cos(a) * 2.2f, 1.8f + ((float)rand() / RAND_MAX) * 1.4f, std::sin(a) * 2.2f };
-		Vector4 sCol = { 0.75f, 0.70f, 0.65f, 0.65f };
-		EmitDustWithVelocity(randomEngine, position + Vector3{ 0.0f, 0.10f, 0.0f }, 0.90f, sCol, vel, 0.75f, smokeTexIndex);
+		const float a = RandAngle(randomEngine);
+		const float cosA = std::cos(a), sinA = std::sin(a);
+		const float spd = RandRange(randomEngine, Ballistics::kLandingSpeed);
+		AddParticle(BuildScaledParticle(
+			position + Vector3{ cosA * Ballistics::kLandingSpawnRadius, Ballistics::kLandingSpawnY, sinA * Ballistics::kLandingSpawnRadius },
+			a, 1.0f, Ballistics::kLandingScale,
+			{ cosA * spd, CRandRange(Ballistics::kLandingUpVel), sinA * spd },
+			RandRange(randomEngine, Ballistics::kLandingLife), sparkTexIndex, Ballistics::kLandingColor, Ballistics::kLandingDyn));
 	}
 }
 
 void AppParticleManager::EmitDodgeRollDust(std::mt19937& randomEngine, const Vector3& position, const Vector3& moveDirection, uint32_t smokeTexIndex)
 {
-	// 回避時にプレイヤー足元後方から進行方向逆向きに吹き出す軽快な土煙（5個）
-	std::uniform_real_distribution<float> spreadDist(-0.35f, 0.35f);
-	std::uniform_real_distribution<float> speedDist(1.2f, 2.8f);
-	std::uniform_real_distribution<float> scaleDist(0.35f, 0.65f);
-	std::uniform_real_distribution<float> lifeDist(0.3f, 0.55f);
+	const Vector3 baseSpawn = position - Vector3{
+		moveDirection.x * Dust::kDodgeBackOffset,
+		Dust::kDodgeBaseLiftY,
+		moveDirection.z * Dust::kDodgeBackOffset
+	};
 
-	Vector3 baseSpawn = position - Vector3{ moveDirection.x * 0.45f, -0.08f, moveDirection.z * 0.45f };
-
-	for (int i = 0; i < 5; ++i)
+	for (int i = 0; i < Dust::kDodgeCount; ++i)
 	{
-		Vector3 oppDir = { -moveDirection.x + spreadDist(randomEngine), 0.25f + (static_cast<float>(rand()) / RAND_MAX) * 0.35f, -moveDirection.z + spreadDist(randomEngine) };
-		float spd = speedDist(randomEngine);
-		Vector3 vel = { oppDir.x * spd, oppDir.y * spd, oppDir.z * spd };
-		Vector4 col = { 0.70f, 0.65f, 0.55f, 0.45f };
-
-		Vector3 p = baseSpawn + Vector3{ spreadDist(randomEngine) * 0.2f, 0.0f, spreadDist(randomEngine) * 0.2f };
-		EmitDustWithVelocity(randomEngine, p, scaleDist(randomEngine), col, vel, lifeDist(randomEngine), smokeTexIndex);
+		const Vector3 pos = baseSpawn + Vector3{
+			RandRange(randomEngine, Dust::kDodgeSpread) * Dust::kDodgeJitterScale,
+			Dust::kDodgeSpawnY,
+			RandRange(randomEngine, Dust::kDodgeSpread) * Dust::kDodgeJitterScale
+		};
+		const float rotZ = RandAngle(randomEngine);
+		const float initSc = RandRange(randomEngine, Dust::kDodgeInitScale);
+		const float spd = RandRange(randomEngine, Dust::kDodgeSpeed);
+		const Vector3 vel = {
+			(-moveDirection.x + RandRange(randomEngine, Dust::kDodgeSpread)) * spd,
+			CRandRange(Dust::kDodgeUpVel),
+			(-moveDirection.z + RandRange(randomEngine, Dust::kDodgeSpread)) * spd
+		};
+		const float life = RandRange(randomEngine, Dust::kDodgeLife);
+		const float spin = RandRange(randomEngine, Dust::kDodgeSpread) * Dust::kDodgeSpinScale;
+		AddParticle(BuildScaledParticle(pos, rotZ, initSc, Dust::kDodgeScaleSpec, vel, life, smokeTexIndex, Dust::kDodgeColor, Dust::kDodgeDyn, spin));
 	}
 }
 
 void AppParticleManager::EmitFootstepDust(std::mt19937& randomEngine, const Vector3& position, uint32_t smokeTexIndex)
 {
-	// よちよち歩き・ダッシュ時の足元土埃（3個）
-	std::uniform_real_distribution<float> spreadDist(-0.25f, 0.25f);
-	for (int i = 0; i < 3; ++i)
+	for (int i = 0; i < Dust::kStepCount; ++i)
 	{
-		Vector3 vel = { spreadDist(randomEngine) * 0.8f, 0.2f + (static_cast<float>(rand()) / RAND_MAX) * 0.4f, spreadDist(randomEngine) * 0.8f };
-		Vector4 col = { 0.6f, 0.55f, 0.48f, 0.4f };
-		EmitDustWithVelocity(randomEngine, position + Vector3{ spreadDist(randomEngine), 0.05f, spreadDist(randomEngine) }, 0.35f, col, vel, 0.4f, smokeTexIndex);
+		const Vector3 pos = position + Vector3{
+			RandRange(randomEngine, Dust::kStepSpread),
+			Dust::kStepSpawnY,
+			RandRange(randomEngine, Dust::kStepSpread)
+		};
+		const float rotZ = RandAngle(randomEngine);
+		const float initSc = CRandRange(Dust::kStepInitScale);
+		const Vector3 vel = {
+			RandRange(randomEngine, Dust::kStepSpread) * Dust::kStepHorizVelMul,
+			CRandRange(Dust::kStepUpVel),
+			RandRange(randomEngine, Dust::kStepSpread) * Dust::kStepHorizVelMul
+		};
+		const float life = CRandRange(Dust::kStepLife);
+		const float spin = RandRange(randomEngine, Dust::kStepSpread) * Dust::kStepSpinScale;
+		AddParticle(BuildScaledParticle(pos, rotZ, initSc, Dust::kStepScaleSpec, vel, life, smokeTexIndex, Dust::kStepColor, Dust::kStepDyn, spin));
 	}
 }
 
 void AppParticleManager::EmitRicochetSparks(std::mt19937& randomEngine, const Vector3& hitPoint, const Vector3& hitNormal, uint32_t sparkTexIndex, uint32_t smokeTexIndex)
 {
-	// 弾丸着弾時の激しい跳弾火花（35個）＋着弾スモーク（8個）
-	std::uniform_real_distribution<float> spreadDist(-0.8f, 0.8f);
-	std::uniform_real_distribution<float> speedDist(3.0f, 8.5f);
-	std::uniform_real_distribution<float> lifeDist(0.25f, 0.7f);
+	(void)smokeTexIndex;
 
-	for (int i = 0; i < 35; ++i)
+	for (int i = 0; i < Ballistics::kRicochetCount; ++i)
 	{
-		Vector3 refl = {
-			hitNormal.x + spreadDist(randomEngine),
-			hitNormal.y + 0.3f + spreadDist(randomEngine) * 0.5f,
-			hitNormal.z + spreadDist(randomEngine)
+		const Vector3 refl = {
+			hitNormal.x + RandRange(randomEngine, Ballistics::kRicochetSpread),
+			hitNormal.y + Ballistics::kRicochetUpBias + RandRange(randomEngine, Ballistics::kRicochetSpread) * Ballistics::kRicochetUpSpreadMul,
+			hitNormal.z + RandRange(randomEngine, Ballistics::kRicochetSpread)
 		};
-		float spd = speedDist(randomEngine);
-		Vector3 vel = { refl.x * spd, refl.y * spd, refl.z * spd };
-		Vector4 col = (i % 2 == 0) ? Vector4{ 1.0f, 0.85f, 0.3f, 1.0f } : Vector4{ 1.0f, 0.4f, 0.05f, 1.0f };
-
-		EmitSparkWithVelocity(randomEngine, hitPoint, vel, col, 0.08f, lifeDist(randomEngine), sparkTexIndex);
-	}
-
-	for (int i = 0; i < 8; ++i)
-	{
-		Vector3 sVel = { hitNormal.x * 1.5f + spreadDist(randomEngine) * 0.5f, hitNormal.y * 1.5f + 0.3f, hitNormal.z * 1.5f + spreadDist(randomEngine) * 0.5f };
-		Vector4 sCol = { 0.5f, 0.48f, 0.45f, 0.45f };
-		EmitDustWithVelocity(randomEngine, hitPoint, 0.45f, sCol, sVel, 0.5f, smokeTexIndex);
+		const float spd = RandRange(randomEngine, Ballistics::kRicochetSpeed);
+		const float rotZ = RandRange(randomEngine, Ballistics::kRicochetSpread) * Ballistics::kRicochetRotScale;
+		const ColorShiftSpec colSpec = {
+			IsEven(i) ? Ballistics::kRicochetColorEven : Ballistics::kRicochetColorOdd,
+			Ballistics::kRicochetEndColor, true
+		};
+		AddParticle(BuildScaledParticle(
+			hitPoint, rotZ, 1.0f, Ballistics::kRicochetScale, refl * spd,
+			RandRange(randomEngine, Ballistics::kRicochetLife), sparkTexIndex, colSpec, Ballistics::kRicochetDyn));
 	}
 }
 
 void AppParticleManager::EmitWaterSplash(std::mt19937& randomEngine, const Vector3& hitPoint, uint32_t waterTexIndex)
 {
-	// 川面着弾時の高圧水飛沫（30個）
-	std::uniform_real_distribution<float> angleDist(0.0f, 6.2831853f);
-	std::uniform_real_distribution<float> speedDist(2.0f, 6.0f);
-
-	for (int i = 0; i < 30; ++i)
+	for (int i = 0; i < Water::kSplashCount; ++i)
 	{
-		float a = angleDist(randomEngine);
-		float spd = speedDist(randomEngine);
-		Vector3 vel = { std::cos(a) * spd, 3.5f + (static_cast<float>(rand()) / RAND_MAX) * 3.5f, std::sin(a) * spd };
-		Vector4 col = { 0.65f, 0.85f, 1.0f, 0.75f };
-
-		EmitDustWithVelocity(randomEngine, hitPoint, 0.3f, col, vel, 0.6f, waterTexIndex);
+		const float a = RandAngle(randomEngine);
+		const float cosA = std::cos(a), sinA = std::sin(a);
+		const float spd = RandRange(randomEngine, Water::kSplashSpeed);
+		const float sc = CRandRange(Water::kSplashInitScale);
+		AddParticle(BuildScaledParticle(
+			hitPoint + Vector3{ cosA * Water::kSplashRadius, Water::kSplashSpawnY, sinA * Water::kSplashRadius },
+			0.0f, sc, Water::kSplashScale,
+			{ cosA * spd, CRandRange(Water::kSplashUpVel), sinA * spd },
+			CRandRange(Water::kSplashLife), waterTexIndex, Water::kSplashColor, Water::kSplashDyn));
 	}
 }
 
 void AppParticleManager::EmitHelipadBeaconMotes(std::mt19937& randomEngine, const Vector3& helipadPos, uint32_t particleTexIndex)
 {
-	// 脱出ヘリパッドから天へ舞い上がるエメラルドグリーンの光粒子（毎フレーム数個）
-	std::uniform_real_distribution<float> rDist(0.0f, 2.8f);
-	std::uniform_real_distribution<float> angleDist(0.0f, 6.2831853f);
-
-	for (int i = 0; i < 4; ++i)
+	for (int i = 0; i < Minovsky::kBeaconCount; ++i)
 	{
-		float r = rDist(randomEngine);
-		float a = angleDist(randomEngine);
-		Vector3 p = { helipadPos.x + std::cos(a) * r, helipadPos.y + 0.1f, helipadPos.z + std::sin(a) * r };
-		Vector3 vel = { std::cos(a) * 0.2f, 1.5f + (static_cast<float>(rand()) / RAND_MAX) * 2.0f, std::sin(a) * 0.2f };
-		Vector4 col = { 0.2f, 1.0f, 0.6f, 0.8f };
-
-		EmitSparkWithVelocity(randomEngine, p, vel, col, 0.12f, 1.6f, particleTexIndex);
+		const float r = RandRange(randomEngine, Minovsky::kBeaconRadius);
+		const float a = RandAngle(randomEngine);
+		const float cosA = std::cos(a), sinA = std::sin(a);
+		const float sc = CRandRange(Minovsky::kBeaconInitScale);
+		const Vector3 pos = { helipadPos.x + cosA * r, helipadPos.y + Minovsky::kBeaconSpawnY, helipadPos.z + sinA * r };
+		const Vector3 vel = {
+			Minovsky::kBeaconDriftVelX + cosA * Minovsky::kBeaconRadialVel,
+			CRandRange(Minovsky::kBeaconUpVel),
+			Minovsky::kBeaconDriftVelZ + sinA * Minovsky::kBeaconRadialVel
+		};
+		AddParticle(BuildScaledParticle(
+			pos, 0.0f, sc, Minovsky::kBeaconScale, vel, CRandRange(Minovsky::kBeaconLife),
+			particleTexIndex, Minovsky::kBeaconColor, Minovsky::kBeaconDyn, 0.0f, a));
 	}
 }
 
 void AppParticleManager::EmitRiverWaveRipples(std::mt19937& randomEngine, uint32_t waterTexIndex)
 {
-	// 川の上流 (X: +22m) から下流 (X: -22m) へ勢いよく流れる水流リップル＆白泡 (5個)
-	std::uniform_real_distribution<float> zDist(GameConfig::Environment::kRiverZMin, GameConfig::Environment::kRiverZMax);
-	std::uniform_real_distribution<float> xDist(-20.0f, 22.0f);
-	std::uniform_real_distribution<float> speedDist(GameConfig::Environment::kRiverWaveSpeedMin, GameConfig::Environment::kRiverWaveSpeedMax);
-	std::uniform_real_distribution<float> scaleDist(GameConfig::Environment::kRiverWaveScaleMin, GameConfig::Environment::kRiverWaveScaleMax);
-	std::uniform_real_distribution<float> lifeDist(1.5f, 3.0f);
+	const RangeF zRange = { GameConfig::Environment::kRiverZMin, GameConfig::Environment::kRiverZMax };
+	const RangeF spdRange = { GameConfig::Environment::kRiverWaveSpeedMin, GameConfig::Environment::kRiverWaveSpeedMax };
+	const RangeF foamScRange = { GameConfig::Environment::kRiverWaveScaleMin, GameConfig::Environment::kRiverWaveScaleMax };
 
-	for (int i = 0; i < 5; ++i)
+	for (int i = 0; i < Water::kRippleCount; ++i)
 	{
-		// 水面高さに自動連動したY座標で生成（深度遮蔽を原理的に防止）
-		Vector3 spawnPos = { xDist(randomEngine), GameConfig::Environment::kRiverWaveParticleY, zDist(randomEngine) };
-		float spd = speedDist(randomEngine);
-		// X軸マイナス方向（左）へ流れる
-		Vector3 vel = { -spd, 0.0f, (static_cast<float>(rand()) / RAND_MAX - 0.5f) * 0.3f };
+		const float sx = RandRange(randomEngine, Water::kRippleXRange);
+		if (std::abs(sx + Water::kBridgeCenterAbsX) < Water::kBridgeExcludeHalf ||
+			std::abs(sx - Water::kBridgeCenterAbsX) < Water::kBridgeExcludeHalf)
+		{
+			continue;
+		}
 
-		// 白波・青白い水流リップル（白泡とクリアブルー）
-		Vector4 col = (i % 2 == 0) ? Vector4{ 0.95f, 0.98f, 1.0f, 0.85f } : Vector4{ 0.5f, 0.85f, 1.0f, 0.75f };
+		const float sz = RandRange(randomEngine, zRange);
+		const float spd = RandRange(randomEngine, spdRange);
+		const Vector3 pos = { sx, GameConfig::Environment::kRiverWaveParticleY, sz };
+		const Vector3 vel = { -spd, 0.0f, (CRand01() - 0.5f) * Water::kRippleDriftZ };
 
-		EmitDustWithVelocity(randomEngine, spawnPos, scaleDist(randomEngine), col, vel, lifeDist(randomEngine), waterTexIndex);
+		if (i % Water::kRippleFoamStride != 0)
+		{
+			const float gs = RandRange(randomEngine, Water::kRippleGlintScale);
+			const DynamicsSpec glintDyn = { 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, Water::kRippleFadeIn, Water::kRippleGlintTwinkle, 0 };
+			particles_.push_back(BuildScaledParticle(
+				pos, 0.0f, gs, Water::kRippleGlintSpec, vel,
+				RandRange(randomEngine, Water::kRippleLife) * Water::kRippleGlintLifeMul,
+				waterTexIndex, Water::kRippleGlintColor, glintDyn, 0.0f, static_cast<float>(i) * Water::kRipplePhaseStep));
+		}
+		else
+		{
+			const float fs = RandRange(randomEngine, foamScRange);
+			const DynamicsSpec foamDyn = { 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, Water::kRippleFadeIn, 0.0f, 0 };
+			particles_.push_back(BuildScaledParticle(
+				pos, 0.0f, fs, Water::kRippleFoamSpec, vel,
+				RandRange(randomEngine, Water::kRippleLife), waterTexIndex, Water::kRippleFoamColor, foamDyn));
+		}
 	}
 
-	// 橋脚 (X: -1.2m, +1.2m) に当たって跳ねる水流ウェーブ (白泡)
-	for (float pillarX : { -1.2f, 1.2f })
+	for (float pillarX : Water::kBridgePillarXs)
 	{
-		if (rand() % 100 < 50)
+		if (std::rand() % Water::kPercentModulo < Water::kPillarSprayChance)
 		{
-			Vector3 pPos = { pillarX, GameConfig::Environment::kRiverFoamPillarY, zDist(randomEngine) };
-			Vector3 pVel = { -2.5f, 0.8f + (static_cast<float>(rand()) / RAND_MAX) * 1.0f, (static_cast<float>(rand()) / RAND_MAX - 0.5f) * 1.5f };
-			Vector4 pCol = { 0.95f, 0.98f, 1.0f, 0.9f };
-			EmitDustWithVelocity(randomEngine, pPos, 1.8f, pCol, pVel, 0.7f, waterTexIndex);
+			const Vector3 pPos = { pillarX, GameConfig::Environment::kRiverSplashY, RandRange(randomEngine, zRange) };
+			EmitRealisticRiverSpray(randomEngine, pPos, { -1.0f, 0.0f, 0.0f }, Water::kPillarFlowSpeed, waterTexIndex, waterTexIndex);
 		}
 	}
 }
 
 void AppParticleManager::EmitRiverSplashDroplet(std::mt19937& randomEngine, const Vector3& position, uint32_t waterTexIndex)
 {
-	// 川面でパシャッと跳ねるリアルな水しぶき・水滴 (6〜8個)
-	std::uniform_real_distribution<float> angleDist(0.0f, 6.2831853f);
-	std::uniform_real_distribution<float> speedDist(0.8f, 2.2f);
-	std::uniform_real_distribution<float> scaleDist(0.025f, 0.055f);
-
-	for (int i = 0; i < 8; ++i)
+	for (int i = 0; i < Water::kRiverDropCount; ++i)
 	{
-		float a = angleDist(randomEngine);
-		float spd = speedDist(randomEngine);
-		Vector3 vel = { std::cos(a) * spd, 1.2f + (static_cast<float>(rand()) / RAND_MAX) * 1.6f, std::sin(a) * spd };
-		Vector4 col = { 0.92f, 0.97f, 1.0f, 0.90f };
-
-		AppParticle p{};
-		p.transform.Initialize();
-		p.transform.SetTranslate(position + Vector3{ (static_cast<float>(rand()) / RAND_MAX - 0.5f) * 0.1f, 0.01f, (static_cast<float>(rand()) / RAND_MAX - 0.5f) * 0.1f });
-
-		float s = scaleDist(randomEngine);
-		p.transform.SetScale({ s, s, 1.0f });
-		p.velocity = vel;
-		p.color = col;
-		p.endColor = { 0.65f, 0.88f, 1.0f, 0.15f };
-		p.hasColorShift = true;
-		p.lifeTime = 0.38f + (static_cast<float>(rand()) / RAND_MAX) * 0.22f;
-		p.currentTime = 0.0f;
-		p.textureIndex = waterTexIndex;
-
-		p.gravity = 13.5f; // 重力で弧を描いて川面に戻る
-		p.drag = 0.5f;
-		p.initialScale = s * 0.8f;
-		p.targetScale = s * 0.4f;
-
-		particles_.push_back(p);
+		const float a = RandAngle(randomEngine);
+		const float spd = RandRange(randomEngine, Water::kRiverDropSpeed);
+		const Vector3 vel = { std::cos(a) * spd, CRandRange(Water::kRiverDropUpVel), std::sin(a) * spd };
+		const Vector3 pos = position + Vector3{
+			(CRand01() - 0.5f) * Water::kRiverDropJitterXZ,
+			Water::kRiverDropSpawnY,
+			(CRand01() - 0.5f) * Water::kRiverDropJitterXZ
+		};
+		const float s = RandRange(randomEngine, Water::kRiverDropScale);
+		particles_.push_back(BuildScaledParticle(
+			pos, 0.0f, s, Water::kRiverDropScSpec, vel, CRandRange(Water::kRiverDropLife),
+			waterTexIndex, Water::kRiverDropColor, Water::kRiverDropDyn));
 	}
 }
 
 void AppParticleManager::EmitRealisticRiverSpray(std::mt19937& randomEngine, const Vector3& crestPos, const Vector3& currentDir, float currentSpeed, uint32_t dropletTex, uint32_t mistTex)
 {
-	// 1. 微細水滴の放物線スプレー（重力落下するきらめく水滴アーチ：8個）
-	std::uniform_real_distribution<float> lateralJitter(-0.35f, 0.35f);
-	std::uniform_real_distribution<float> speedJitter(0.7f, 1.4f);
-	std::uniform_real_distribution<float> upSpeedDist(0.75f, 1.9f);
-	std::uniform_real_distribution<float> scaleDist(0.022f, 0.048f);
-	std::uniform_real_distribution<float> lifeDist(0.30f, 0.50f);
+	const Vector3 perp = { -currentDir.z, 0.0f, currentDir.x };
+	const uint32_t actualMistTex = (mistTex != UINT32_MAX) ? mistTex : dropletTex;
 
-	Vector3 perp = { -currentDir.z, 0.0f, currentDir.x };
-
-	for (int i = 0; i < 8; ++i)
+	for (int i = 0; i < Water::kSprayDropCount; ++i)
 	{
-		AppParticle p{};
-		p.transform.Initialize();
-
-		Vector3 spawn = crestPos + perp * lateralJitter(randomEngine) + Vector3{ 0.0f, 0.015f, 0.0f };
-		p.transform.SetTranslate(spawn);
-
-		float sc = scaleDist(randomEngine);
-		p.transform.SetScale({ sc, sc, 1.0f });
-
-		// 川の流速ベクトル + 前方・上空への放物線射出
-		float forwardSpd = currentSpeed * speedJitter(randomEngine);
-		Vector3 vel = currentDir * forwardSpd + perp * (lateralJitter(randomEngine) * 0.8f) + Vector3{ 0.0f, upSpeedDist(randomEngine), 0.0f };
-		p.velocity = vel;
-
-		p.color = { 0.92f, 0.97f, 1.0f, 0.95f }; // 透き通る清流の水滴
-		p.endColor = { 0.65f, 0.88f, 1.0f, 0.15f };
-		p.hasColorShift = true;
-		p.lifeTime = lifeDist(randomEngine);
-		p.currentTime = 0.0f;
-		p.textureIndex = dropletTex;
-
-		p.gravity = 14.0f; // 重力で弧を描いて川面へ戻る
-		p.drag = 0.6f;
-
-		p.initialScale = sc * 0.8f;
-		p.targetScale = sc * 0.35f;
-
-		particles_.push_back(p);
+		const Vector3 spawn = crestPos + perp * RandRange(randomEngine, Water::kSprayLatJitter) + Vector3{ 0.0f, Water::kSprayDropSpawnY, 0.0f };
+		const float sc = RandRange(randomEngine, Water::kSprayDropScale);
+		const Vector3 vel = currentDir * (currentSpeed * RandRange(randomEngine, Water::kSpraySpeedJitter))
+			+ perp * (RandRange(randomEngine, Water::kSprayLatJitter) * Water::kSprayDropLatVelMul)
+			+ Vector3{ 0.0f, RandRange(randomEngine, Water::kSprayUpVel), 0.0f };
+		particles_.push_back(BuildScaledParticle(
+			spawn, 0.0f, sc, Water::kSprayDropScSpec, vel, RandRange(randomEngine, Water::kSprayDropLife),
+			dropletTex, Water::kSprayDropColor, Water::kSprayDropDyn));
 	}
 
-	// 2. エアロゾル水煙霧（波頭が砕けた瞬間にふわりと漂う極微細な霧：3個）
-	for (int i = 0; i < 3; ++i)
+	const Vector3 mistVel = currentDir * (currentSpeed * Water::kSprayMistFwdMul) + Vector3{ 0.0f, Water::kSprayMistUpVel, 0.0f };
+	for (int i = 0; i < Water::kSprayMistCount; ++i)
 	{
-		AppParticle p{};
-		p.transform.Initialize();
-
-		Vector3 spawn = crestPos + perp * (lateralJitter(randomEngine) * 0.8f) + Vector3{ 0.0f, 0.03f, 0.0f };
-		p.transform.SetTranslate(spawn);
-
-		float sc = 0.055f + (static_cast<float>(rand()) / RAND_MAX) * 0.045f;
-		p.transform.SetScale({ sc, sc, 1.0f });
-
-		Vector3 vel = currentDir * (currentSpeed * 0.65f) + Vector3{ 0.0f, 0.20f, 0.0f };
-		p.velocity = vel;
-
-		p.color = { 0.96f, 0.98f, 1.0f, 0.28f }; // ふわりと霞む白波ミスト
-		p.endColor = { 0.82f, 0.92f, 1.0f, 0.0f };
-		p.hasColorShift = true;
-		p.lifeTime = 0.60f + (static_cast<float>(rand()) / RAND_MAX) * 0.35f;
-		p.currentTime = 0.0f;
-		p.textureIndex = (mistTex != UINT32_MAX ? mistTex : dropletTex);
-
-		p.gravity = 0.05f;
-		p.drag = 3.2f; // 空気抵抗でふわりと滞留
-
-		p.initialScale = sc;
-		p.targetScale = sc * 2.8f; // 空気中で自然に拡散
-
-		particles_.push_back(p);
+		const Vector3 spawn = crestPos + perp * (RandRange(randomEngine, Water::kSprayLatJitter) * Water::kSprayMistLatMul) + Vector3{ 0.0f, Water::kSprayMistSpawnY, 0.0f };
+		const float sc = CRandRange(Water::kSprayMistScale);
+		particles_.push_back(BuildScaledParticle(
+			spawn, 0.0f, sc, Water::kSprayMistScSpec, mistVel, CRandRange(Water::kSprayMistLife),
+			actualMistTex, Water::kSprayMistColor, Water::kSprayMistDyn));
 	}
 
-	// 3. 水面に残る純白の泡パッチ（Crest Spume：2個）
-	for (int i = 0; i < 2; ++i)
+	const Vector3 spumeVel = currentDir * (currentSpeed * Water::kSpraySpumeFwdMul);
+	for (int i = 0; i < Water::kSpraySpumeCount; ++i)
 	{
-		AppParticle p{};
-		p.transform.Initialize();
-
-		Vector3 spawn = crestPos + perp * (lateralJitter(randomEngine) * 0.6f);
-		p.transform.SetTranslate(spawn);
-
-		float sc = 0.040f + (static_cast<float>(rand()) / RAND_MAX) * 0.035f;
-		p.transform.SetScale({ sc, sc, 1.0f });
-
-		// 水面と一体となって下流へ流れる
-		p.velocity = currentDir * (currentSpeed * 0.72f);
-		p.color = { 1.0f, 1.0f, 1.0f, 0.60f };
-		p.endColor = { 0.75f, 0.92f, 1.0f, 0.0f };
-		p.hasColorShift = true;
-		p.lifeTime = 1.0f + (static_cast<float>(rand()) / RAND_MAX) * 0.5f;
-		p.currentTime = 0.0f;
-		p.textureIndex = dropletTex;
-
-		p.gravity = 0.0f; // 水面に密着
-		p.drag = 0.4f;
-
-		p.initialScale = sc * 0.9f;
-		p.targetScale = sc * 1.5f;
-
-		particles_.push_back(p);
+		const Vector3 spawn = crestPos + perp * (RandRange(randomEngine, Water::kSprayLatJitter) * Water::kSpraySpumeLatMul);
+		const float sc = CRandRange(Water::kSpraySpumeScale);
+		particles_.push_back(BuildScaledParticle(
+			spawn, 0.0f, sc, Water::kSpraySpumeScSpec, spumeVel, CRandRange(Water::kSpraySpumeLife),
+			dropletTex, Water::kSpraySpumeColor, Water::kSpraySpumeDyn));
 	}
 }
 
 void AppParticleManager::EmitDuckHullSplash(std::mt19937& randomEngine, const Vector3& duckPos, const Vector3& currentDir, uint32_t dropletTex, uint32_t mistTex)
 {
-	// アヒルちゃんの胸元（上流側）と両側面から跳ねる水滴と航跡白泡
-	Vector3 perp = { -currentDir.z, 0.0f, currentDir.x };
+	(void)randomEngine;
+	(void)mistTex;
 
-	// 胸元の水跳ね (水流がアヒルの胸に当たって跳ね上がる：3個)
-	for (int i = 0; i < 3; ++i)
+	const Vector3 perp = { -currentDir.z, 0.0f, currentDir.x };
+	for (int i = 0; i < Water::kDuckBowCount; ++i)
 	{
-		AppParticle p{};
-		p.transform.Initialize();
-
-		float flank = (static_cast<float>(rand()) / RAND_MAX - 0.5f) * 0.28f;
-		// アヒルちゃんの胸（上流側 -X 方向）
-		Vector3 spawn = duckPos - currentDir * 0.16f + perp * flank + Vector3{ 0.0f, 0.015f, 0.0f };
-		p.transform.SetTranslate(spawn);
-
-		float sc = 0.016f + (static_cast<float>(rand()) / RAND_MAX) * 0.022f;
-		p.transform.SetScale({ sc, sc, 1.0f });
-
-		Vector3 vel = perp * (flank * 3.0f) + currentDir * 0.20f + Vector3{ 0.0f, 0.75f + (static_cast<float>(rand()) / RAND_MAX) * 0.75f, 0.0f };
-		p.velocity = vel;
-
-		p.color = { 0.94f, 0.98f, 1.0f, 0.92f };
-		p.endColor = { 0.70f, 0.90f, 1.0f, 0.15f };
-		p.hasColorShift = true;
-		p.lifeTime = 0.25f + (static_cast<float>(rand()) / RAND_MAX) * 0.15f;
-		p.currentTime = 0.0f;
-		p.textureIndex = dropletTex;
-
-		p.gravity = 14.0f;
-		p.drag = 0.5f;
-
-		particles_.push_back(p);
+		const float flank = (CRand01() - 0.5f) * Water::kDuckBowFlankSpan;
+		const Vector3 spawn = duckPos - currentDir * Water::kDuckBowFwdOffset + perp * flank + Vector3{ 0.0f, Water::kDuckBowSpawnY, 0.0f };
+		const float sc = CRandRange(Water::kDuckBowScale);
+		const Vector3 vel = perp * (flank * Water::kDuckBowLatVelMul) + currentDir * Water::kDuckBowFwdVel + Vector3{ 0.0f, CRandRange(Water::kDuckBowUpVel), 0.0f };
+		particles_.push_back(BuildParticle(
+			spawn, 0.0f, { sc, sc, 1.0f }, vel, CRandRange(Water::kDuckBowLife),
+			dropletTex, Water::kDuckBowColor, Water::kDuckBowDyn));
 	}
 
-	// 側面の航跡白泡 (両脇を流れる微細な泡：2個)
 	for (float side : { -1.0f, 1.0f })
 	{
-		AppParticle p{};
-		p.transform.Initialize();
-
-		float flankBack = (static_cast<float>(rand()) / RAND_MAX) * 0.22f;
-		Vector3 spawn = duckPos + perp * (side * 0.20f) + currentDir * flankBack;
-		p.transform.SetTranslate(spawn);
-
-		float sc = 0.030f + (static_cast<float>(rand()) / RAND_MAX) * 0.025f;
-		p.transform.SetScale({ sc, sc, 1.0f });
-
-		p.velocity = currentDir * 0.70f + perp * (side * 0.12f);
-		p.color = { 0.96f, 0.99f, 1.0f, 0.55f };
-		p.endColor = { 0.65f, 0.88f, 1.0f, 0.0f };
-		p.hasColorShift = true;
-		p.lifeTime = 0.80f + (static_cast<float>(rand()) / RAND_MAX) * 0.40f;
-		p.currentTime = 0.0f;
-		p.textureIndex = dropletTex;
-
-		p.gravity = 0.0f;
-		p.drag = 0.8f;
-		p.initialScale = sc;
-		p.targetScale = sc * 1.5f;
-
-		particles_.push_back(p);
+		const float flankBack = CRand01() * Water::kDuckWakeBackSpan;
+		const Vector3 spawn = duckPos + perp * (side * Water::kDuckWakeSideOff) + currentDir * flankBack;
+		const float sc = CRandRange(Water::kDuckWakeScale);
+		const Vector3 vel = currentDir * Water::kDuckWakeFwdVel + perp * (side * Water::kDuckWakeSideVel);
+		particles_.push_back(BuildScaledParticle(
+			spawn, 0.0f, sc, Water::kDuckWakeScSpec, vel, CRandRange(Water::kDuckWakeLife),
+			dropletTex, Water::kDuckWakeColor, Water::kDuckWakeDyn));
 	}
 }
 
 void AppParticleManager::EmitMouseWaterSplashFling(std::mt19937& randomEngine, const Vector3& waterPos, const Vector3& flingDir, float flingSpeed, uint32_t dropletTex, uint32_t mistTex)
 {
-	// マウス操作によって水面から飛び散る指向性水しぶき
-	Vector3 perp = { -flingDir.z, 0.0f, flingDir.x };
-	float spdClamped = std::clamp(flingSpeed * 0.25f, 1.2f, 4.5f);
+	(void)randomEngine;
 
-	// 水滴粒 (10個)
-	for (int i = 0; i < 10; ++i)
+	const Vector3 perp = { -flingDir.z, 0.0f, flingDir.x };
+	const float spdClamped = std::clamp(flingSpeed * Water::kFlingSpdScale, Water::kFlingSpdClamp.min, Water::kFlingSpdClamp.max);
+
+	for (int i = 0; i < Water::kFlingDropCount; ++i)
 	{
-		AppParticle p{};
-		p.transform.Initialize();
-
-		float jitter = (static_cast<float>(rand()) / RAND_MAX - 0.5f) * 0.10f;
-		p.transform.SetTranslate(waterPos + perp * jitter + Vector3{ 0.0f, 0.015f, 0.0f });
-
-		float sc = 0.022f + (static_cast<float>(rand()) / RAND_MAX) * 0.030f;
-		p.transform.SetScale({ sc, sc, 1.0f });
-
-		float spread = (static_cast<float>(rand()) / RAND_MAX - 0.5f) * 1.6f;
-		float up = 1.2f + (static_cast<float>(rand()) / RAND_MAX) * 2.0f;
-		p.velocity = flingDir * spdClamped + perp * spread + Vector3{ 0.0f, up, 0.0f };
-
-		p.color = { 0.94f, 0.98f, 1.0f, 0.95f };
-		p.endColor = { 0.55f, 0.85f, 1.0f, 0.15f };
-		p.hasColorShift = true;
-		p.lifeTime = 0.32f + (static_cast<float>(rand()) / RAND_MAX) * 0.22f;
-		p.currentTime = 0.0f;
-		p.textureIndex = dropletTex;
-
-		p.gravity = 14.5f; // 重力落下
-		p.drag = 0.4f;
-
-		particles_.push_back(p);
+		const float jitter = (CRand01() - 0.5f) * Water::kFlingPosJitter;
+		const Vector3 spawn = waterPos + perp * jitter + Vector3{ 0.0f, Water::kFlingDropSpawnY, 0.0f };
+		const float sc = CRandRange(Water::kFlingDropScale);
+		const float spread = (CRand01() - 0.5f) * Water::kFlingLatSpread;
+		const Vector3 vel = flingDir * spdClamped + perp * spread + Vector3{ 0.0f, CRandRange(Water::kFlingDropUpVel), 0.0f };
+		particles_.push_back(BuildParticle(
+			spawn, 0.0f, { sc, sc, 1.0f }, vel, CRandRange(Water::kFlingDropLife),
+			dropletTex, Water::kFlingDropColor, Water::kFlingDropDyn));
 	}
 
-	// 霧煙 (2個)
-	for (int i = 0; i < 2; ++i)
+	const uint32_t actualMistTex = (mistTex != UINT32_MAX) ? mistTex : dropletTex;
+	const Vector3 mistPos = waterPos + Vector3{ 0.0f, Water::kFlingMistSpawnY, 0.0f };
+	const Vector3 mistVel = flingDir * (spdClamped * Water::kFlingMistFwdMul) + Vector3{ 0.0f, Water::kFlingMistUpVel, 0.0f };
+	for (int i = 0; i < Water::kFlingMistCount; ++i)
 	{
-		AppParticle p{};
-		p.transform.Initialize();
-		p.transform.SetTranslate(waterPos + Vector3{ 0.0f, 0.025f, 0.0f });
-
-		float sc = 0.06f + (static_cast<float>(rand()) / RAND_MAX) * 0.05f;
-		p.transform.SetScale({ sc, sc, 1.0f });
-
-		p.velocity = flingDir * (spdClamped * 0.35f) + Vector3{ 0.0f, 0.40f, 0.0f };
-		p.color = { 0.95f, 0.98f, 1.0f, 0.30f };
-		p.endColor = { 0.80f, 0.92f, 1.0f, 0.0f };
-		p.hasColorShift = true;
-		p.lifeTime = 0.55f + (static_cast<float>(rand()) / RAND_MAX) * 0.25f;
-		p.currentTime = 0.0f;
-		p.textureIndex = (mistTex != UINT32_MAX ? mistTex : dropletTex);
-
-		p.gravity = 0.1f;
-		p.drag = 3.0f;
-		p.initialScale = sc;
-		p.targetScale = sc * 2.4f;
-
-		particles_.push_back(p);
+		const float sc = CRandRange(Water::kFlingMistScale);
+		particles_.push_back(BuildScaledParticle(
+			mistPos, 0.0f, sc, Water::kFlingMistScSpec, mistVel, CRandRange(Water::kFlingMistLife),
+			actualMistTex, Water::kFlingMistColor, Water::kFlingMistDyn));
 	}
 }
 
 void AppParticleManager::EmitShorelineWave(std::mt19937& randomEngine, const Vector3& shorePos, const Vector3& shoreNormal, float waveEnergy, uint32_t dropletTex, uint32_t /*mistTex*/)
 {
-	// 岸辺に沿った接線ベクトル（下流方向 -Z）
+	(void)waveEnergy;
+
 	Vector3 shoreTangent = { -shoreNormal.z, 0.0f, shoreNormal.x };
 	if (shoreTangent.z > 0.0f) { shoreTangent = shoreTangent * -1.0f; }
 
-	std::uniform_real_distribution<float> speedJitter(0.35f, 0.75f);
-	std::uniform_real_distribution<float> lateralJitter(-0.04f, 0.04f);
+	const Vector3 spawn = shorePos + shoreTangent * RandRange(randomEngine, Water::kShoreLatJitter) + Vector3{ 0.0f, Water::kShoreSpawnY, 0.0f };
+	const float angle = std::atan2(shoreTangent.x, -shoreTangent.z);
+	const Vector3 vel = shoreTangent * (Water::kShoreBaseSpeed * RandRange(randomEngine, Water::kShoreSpeedJitter));
 
-	// 汀線に沿って流れる極めて淡い半透明のフィラメント状水面シマー（丸粒子ではなく、水流方向に細長く馴染む筋）
-	AppParticle p{};
-	p.transform.Initialize();
-	Vector3 spawn = shorePos + shoreTangent * lateralJitter(randomEngine) + Vector3{ 0.0f, 0.003f, 0.0f };
-	p.transform.SetTranslate(spawn);
-
-	// 水流に沿った細長いアスペクト比（幅約6mm、長さ約3.5cm）で自然な水面の泡筋を形成
-	p.transform.SetScale({ 0.007f, 0.035f, 1.0f });
-	float angle = std::atan2(shoreTangent.x, -shoreTangent.z);
-	p.transform.SetRotate({ 0.0f, 0.0f, angle });
-
-	// 川の流れ（-Z方向）に沿って下流へ滑らかに漂う
-	p.velocity = shoreTangent * (0.42f * speedJitter(randomEngine));
-
-	// 不透明な白丸を完全排除し、極めて淡い半透明の清流水色（アルファ0.10f）
-	p.color = { 0.75f, 0.95f, 1.0f, 0.10f };
-	p.endColor = { 0.50f, 0.85f, 1.0f, 0.0f };
-	p.hasColorShift = true;
-	p.lifeTime = 0.60f + (static_cast<float>(rand()) / RAND_MAX) * 0.25f;
-	p.currentTime = 0.0f;
-	p.textureIndex = dropletTex;
-
-	p.gravity = 0.0f;
-	p.drag = 0.4f;
-	p.initialScale = 0.025f;
-	p.targetScale = 0.035f;
-
+	AppParticle p = BuildParticle(
+		spawn, angle, { Water::kShoreQuadSize.x, Water::kShoreQuadSize.y, 1.0f },
+		vel, CRandRange(Water::kShoreLife), dropletTex, Water::kShoreColor, Water::kShoreDyn);
+	p.initialScale = Water::kShoreInitScale;
+	p.targetScale = Water::kShoreTargetScale;
 	particles_.push_back(p);
 }
 
-
 void AppParticleManager::EmitMinovskySwirl(std::mt19937& randomEngine, const Vector3& center, float radius, float height, float angle, bool isMagenta, uint32_t textureIndex, float scale)
 {
-	std::uniform_real_distribution<float> jitterDist(-0.04f, 0.04f);
-	std::uniform_real_distribution<float> scaleJitter(0.8f, 1.25f);
-	std::uniform_real_distribution<float> lifeDist(1.2f, 2.2f);
-	std::uniform_real_distribution<float> spinDist(-6.0f, 6.0f);
-	std::uniform_real_distribution<float> twinklePhaseDist(0.0f, 6.2831853f);
-	std::uniform_real_distribution<float> twinkleSpeedDist(8.0f, 18.0f);
-
-	float r = radius + jitterDist(randomEngine);
-	Vector3 pos = {
+	const float r = radius + RandRange(randomEngine, Minovsky::kSwirlJitter);
+	const Vector3 pos = {
 		center.x + std::cos(angle) * r,
-		center.y + height + jitterDist(randomEngine),
+		center.y + height + RandRange(randomEngine, Minovsky::kSwirlJitter),
 		center.z + std::sin(angle) * r
 	};
+	const Vector3 tangent = { -std::sin(angle), Minovsky::kSwirlTangentY, std::cos(angle) };
+	const Vector3 vel = tangent * (Minovsky::kSwirlTangentSpd + RandRange(randomEngine, Minovsky::kSwirlJitter) * 2.0f)
+		+ Vector3{ 0.0f, Minovsky::kSwirlUpVel, 0.0f };
+	const float actualScale = scale * RandRange(randomEngine, Minovsky::kSwirlScaleJitter);
+	const float rotZ = RandAngle(randomEngine);
+	const ColorShiftSpec& colSpec = isMagenta ? Minovsky::kSwirlMagenta : Minovsky::kSwirlCyan;
 
-	// 軌道の接線速度 + 上昇気流（キルケーの魔女の有機的上昇）
-	Vector3 tangent = { -std::sin(angle), 0.38f, std::cos(angle) };
-	Vector3 vel = tangent * (0.85f + jitterDist(randomEngine) * 2.0f) + Vector3{ 0.0f, 0.55f, 0.0f };
-
-	AppParticle p{};
-	p.transform.Initialize();
-	p.transform.SetTranslate(pos);
-
-	float actualScale = scale * scaleJitter(randomEngine);
-	p.transform.SetScale({ actualScale, actualScale, 1.0f });
-
-	std::uniform_real_distribution<float> rotDist(0.0f, 6.2831853f);
-	p.transform.SetRotate({ 0.0f, 0.0f, rotDist(randomEngine) });
-
-	// 色設定: 発光シアン ⇔ ネオンマゼンタ（波長シフト）
-	if (isMagenta)
-	{
-		p.color = { 1.0f, 0.22f, 0.90f, 0.95f };
-		p.endColor = { 0.25f, 0.85f, 1.0f, 0.95f };
-	}
-	else
-	{
-		p.color = { 0.12f, 0.98f, 1.0f, 0.95f };
-		p.endColor = { 0.95f, 0.20f, 0.85f, 0.95f };
-	}
-	p.hasColorShift = true;
-
-	p.velocity = vel;
-	p.lifeTime = lifeDist(randomEngine);
-	p.currentTime = 0.0f;
-	p.textureIndex = textureIndex;
-
-	p.gravity = -0.18f; // 反重力浮遊
-	p.drag = 0.75f;
-	p.angularVelocity = spinDist(randomEngine);
-
-	// スケール補間（発生時ふわりと膨らみ、消滅時小さく輝く）
-	p.initialScale = actualScale * 0.4f;
-	p.targetScale = actualScale * 1.15f;
-
-	// 有機的ゆらぎ（Wobble）
-	p.wobbleFreq = 4.0f + jitterDist(randomEngine) * 10.0f;
-	p.wobbleAmp = 0.22f;
-	p.wobbleAxis = { std::sin(angle * 1.5f), 0.2f, std::cos(angle * 1.5f) };
-
-	p.twinklePhase = twinklePhaseDist(randomEngine);
-	p.twinkleSpeed = twinkleSpeedDist(randomEngine);
-	p.curlFreq = 3.2f;
-	p.curlAmp = 0.18f;
-
+	AppParticle p = BuildScaledParticle(
+		pos, rotZ, actualScale, Minovsky::kSwirlScale, vel, RandRange(randomEngine, Minovsky::kSwirlLife),
+		textureIndex, colSpec, Minovsky::kSwirlDyn, RandRange(randomEngine, Minovsky::kSwirlSpin));
+	p.wobbleFreq = Minovsky::kSwirlWobbleFreq + RandRange(randomEngine, Minovsky::kSwirlJitter) * Minovsky::kSwirlWobbleJitter;
+	p.wobbleAmp = Minovsky::kSwirlWobbleAmp;
+	const float axisAngle = angle * Minovsky::kSwirlAxisAngleMul;
+	p.wobbleAxis = { std::sin(axisAngle), Minovsky::kSwirlAxisY, std::cos(axisAngle) };
+	p.twinklePhase = RandAngle(randomEngine);
+	p.twinkleSpeed = RandRange(randomEngine, Minovsky::kSwirlTwinkleSpeed);
 	particles_.push_back(p);
 }
 
 void AppParticleManager::EmitMinovskyStream(std::mt19937& randomEngine, const Vector3& origin, const Vector3& velocity, bool isMagenta, uint32_t textureIndex, float scale)
 {
-	std::uniform_real_distribution<float> jitterDist(-0.08f, 0.08f);
-	std::uniform_real_distribution<float> lifeDist(0.6f, 1.2f);
-	std::uniform_real_distribution<float> spinDist(-5.0f, 5.0f);
+	const Vector3 pos = origin + RandOffset3D(randomEngine, Minovsky::kStreamJitter.max);
+	const float rotZ = RandAngle(randomEngine);
+	const Vector3 vel = velocity + RandOffset3D(randomEngine, Minovsky::kStreamJitter.max) * 2.0f;
+	const Vector4& col = isMagenta ? Minovsky::kStreamMagenta : Minovsky::kStreamCyan;
 
-	AppParticle p{};
-	p.transform.Initialize();
-	Vector3 pos = origin + Vector3{ jitterDist(randomEngine), jitterDist(randomEngine), jitterDist(randomEngine) };
-	p.transform.SetTranslate(pos);
-
-	p.transform.SetScale({ scale, scale, 1.0f });
-
-	std::uniform_real_distribution<float> rotDist(0.0f, 6.2831853f);
-	p.transform.SetRotate({ 0.0f, 0.0f, rotDist(randomEngine) });
-
-	if (isMagenta)
-	{
-		p.color = { 1.0f, 0.25f, 0.90f, 0.95f };
-	}
-	else
-	{
-		p.color = { 0.15f, 0.95f, 1.0f, 0.95f };
-	}
-
-	p.velocity = velocity + Vector3{ jitterDist(randomEngine) * 2.0f, jitterDist(randomEngine) * 2.0f, jitterDist(randomEngine) * 2.0f };
-	p.lifeTime = lifeDist(randomEngine);
-	p.currentTime = 0.0f;
-	p.textureIndex = textureIndex;
-
-	p.gravity = -0.2f;
-	p.drag = 1.8f;
-	p.angularVelocity = spinDist(randomEngine);
-
-	p.initialScale = scale;
-	p.targetScale = scale * 0.2f;
-
-	particles_.push_back(p);
+	particles_.push_back(BuildScaledParticle(
+		pos, rotZ, scale, Minovsky::kStreamScale, vel, RandRange(randomEngine, Minovsky::kStreamLife),
+		textureIndex, SolidColor(col), Minovsky::kStreamDyn, RandRange(randomEngine, Minovsky::kStreamSpin)));
 }
 
 void AppParticleManager::EmitMinovskyBurst(std::mt19937& randomEngine, const Vector3& center, int count, uint32_t circleTexIndex, uint32_t starTexIndex, float power)
 {
-	std::uniform_real_distribution<float> distDir(-1.0f, 1.0f);
-	std::uniform_real_distribution<float> distSpeed(power * 0.4f, power * 1.2f);
-	std::uniform_real_distribution<float> distScale(0.15f, 0.35f);
-	std::uniform_real_distribution<float> distLife(0.8f, 1.6f);
-	std::uniform_real_distribution<float> spinDist(-8.0f, 8.0f);
-	std::uniform_int_distribution<int> colorDist(0, 10);
+	std::uniform_int_distribution<int> colorDist(0, Minovsky::kBurstColorMaxRoll);
+	const RangeF speedRange = { power * Minovsky::kBurstMinSpdMul, power * Minovsky::kBurstMaxSpdMul };
 
 	for (int i = 0; i < count; ++i)
 	{
-		Vector3 dir = { distDir(randomEngine), distDir(randomEngine), distDir(randomEngine) };
-		float len = std::sqrt(dir.x * dir.x + dir.y * dir.y + dir.z * dir.z);
-		if (len > 0.0001f)
+		Vector3 dir = RandOffset3D(randomEngine, 1.0f);
+		const float len = std::sqrt(dir.x * dir.x + dir.y * dir.y + dir.z * dir.z);
+		dir = (len > Minovsky::kBurstDirEpsilon) ? (dir * (1.0f / len)) : Vector3{ 0.0f, 1.0f, 0.0f };
+
+		const Vector3 vel = dir * RandRange(randomEngine, speedRange);
+		float scale = RandRange(randomEngine, Minovsky::kBurstScale);
+		const Vector3 initQuadScale = { scale, scale, 1.0f };
+		const float rotZ = RandAngle(randomEngine);
+
+		const int colType = colorDist(randomEngine);
+		Vector4 col{};
+		uint32_t tex = circleTexIndex;
+		if (colType <= Minovsky::kBurstStarRollMax && starTexIndex != UINT32_MAX)
 		{
-			dir = dir * (1.0f / len);
+			col = { 1.0f, 1.0f, 1.0f, 1.0f };
+			tex = starTexIndex;
+			scale *= Minovsky::kBurstStarScaleMul;
+		}
+		else if (colType <= Minovsky::kBurstCyanRollMax)
+		{
+			col = Minovsky::kBurstCyanColor;
+			tex = (starTexIndex != UINT32_MAX && colType == Minovsky::kBurstCyanStarRoll) ? starTexIndex : circleTexIndex;
 		}
 		else
 		{
-			dir = { 0.0f, 1.0f, 0.0f };
+			col = Minovsky::kBurstMagentaColor;
+			tex = (starTexIndex != UINT32_MAX && colType == Minovsky::kBurstMagStarRoll) ? starTexIndex : circleTexIndex;
 		}
 
-		float speed = distSpeed(randomEngine);
-		Vector3 vel = dir * speed;
-
-		AppParticle p{};
-		p.transform.Initialize();
-		p.transform.SetTranslate(center);
-
-		float scale = distScale(randomEngine);
-		p.transform.SetScale({ scale, scale, 1.0f });
-
-		std::uniform_real_distribution<float> rotDist(0.0f, 6.2831853f);
-		p.transform.SetRotate({ 0.0f, 0.0f, rotDist(randomEngine) });
-
-		int colType = colorDist(randomEngine);
-		if (colType <= 1 && starTexIndex != UINT32_MAX)
-		{
-			p.color = { 1.0f, 1.0f, 1.0f, 1.0f };
-			p.textureIndex = starTexIndex;
-			scale *= 1.3f;
-		}
-		else if (colType <= 5)
-		{
-			p.color = { 0.15f, 0.95f, 1.0f, 0.95f };
-			p.textureIndex = (starTexIndex != UINT32_MAX && colType == 2) ? starTexIndex : circleTexIndex;
-		}
-		else
-		{
-			p.color = { 1.0f, 0.18f, 0.88f, 0.95f };
-			p.textureIndex = (starTexIndex != UINT32_MAX && colType == 6) ? starTexIndex : circleTexIndex;
-		}
-
-		p.velocity = vel;
-		p.lifeTime = distLife(randomEngine);
-		p.currentTime = 0.0f;
-
-		p.gravity = -0.1f;
-		p.drag = 2.5f;
-		p.angularVelocity = spinDist(randomEngine);
-
-		p.initialScale = scale * 0.5f;
-		p.targetScale = scale * 1.4f;
-
+		AppParticle p = BuildParticle(
+			center, rotZ, initQuadScale, vel, RandRange(randomEngine, Minovsky::kBurstLife),
+			tex, SolidColor(col), Minovsky::kBurstDyn, RandRange(randomEngine, Minovsky::kBurstSpin));
+		p.initialScale = scale * Minovsky::kBurstScaleSpec.initScaleMul;
+		p.targetScale = scale * Minovsky::kBurstScaleSpec.targetScaleMul;
 		particles_.push_back(p);
 	}
 }
 
 void AppParticleManager::EmitMinovskyBokeh(std::mt19937& randomEngine, const Vector3& position, float scale, bool isMagenta, uint32_t textureIndex)
 {
-	std::uniform_real_distribution<float> driftVel(-0.15f, 0.15f);
-	std::uniform_real_distribution<float> upVel(0.1f, 0.35f);
-	std::uniform_real_distribution<float> distLife(3.0f, 6.0f);
-	std::uniform_real_distribution<float> spinDist(-1.5f, 1.5f);
+	const float rotZ = RandAngle(randomEngine);
+	const Vector3 vel = {
+		RandRange(randomEngine, Minovsky::kBokehDriftVel),
+		RandRange(randomEngine, Minovsky::kBokehUpVel),
+		RandRange(randomEngine, Minovsky::kBokehDriftVel)
+	};
+	const Vector4& col = isMagenta ? Minovsky::kBokehMagenta : Minovsky::kBokehCyan;
 
-	AppParticle p{};
-	p.transform.Initialize();
-	p.transform.SetTranslate(position);
-	p.transform.SetScale({ scale, scale, 1.0f });
-
-	std::uniform_real_distribution<float> rotDist(0.0f, 6.2831853f);
-	p.transform.SetRotate({ 0.0f, 0.0f, rotDist(randomEngine) });
-
-	if (isMagenta)
-	{
-		p.color = { 0.95f, 0.22f, 0.80f, 0.65f };
-	}
-	else
-	{
-		p.color = { 0.15f, 0.88f, 1.0f, 0.65f };
-	}
-
-	p.velocity = { driftVel(randomEngine), upVel(randomEngine), driftVel(randomEngine) };
-	p.lifeTime = distLife(randomEngine);
-	p.currentTime = 0.0f;
-	p.textureIndex = textureIndex;
-
-	p.gravity = -0.05f;
-	p.drag = 0.2f;
-	p.angularVelocity = spinDist(randomEngine);
-
-	p.initialScale = scale * 0.7f;
-	p.targetScale = scale * 1.25f;
-
-	p.wobbleFreq = 1.8f;
-	p.wobbleAmp = 0.2f;
-	p.wobbleAxis = { 1.0f, 0.0f, 0.5f };
-
+	AppParticle p = BuildScaledParticle(
+		position, rotZ, scale, Minovsky::kBokehScale, vel, RandRange(randomEngine, Minovsky::kBokehLife),
+		textureIndex, SolidColor(col), Minovsky::kBokehDyn, RandRange(randomEngine, Minovsky::kBokehSpin));
+	p.wobbleFreq = Minovsky::kBokehWobbleFreq;
+	p.wobbleAmp = Minovsky::kBokehWobbleAmp;
+	p.wobbleAxis = Minovsky::kBokehWobbleAxis;
 	particles_.push_back(p);
 }
 
 void AppParticleManager::EmitMinovskyDashTrail(std::mt19937& randomEngine, const Vector3& position, const Vector3& moveDirection, uint32_t circleTexIndex, uint32_t starTexIndex)
 {
-	std::uniform_real_distribution<float> jitterDist(-0.25f, 0.25f);
-	std::uniform_real_distribution<float> distScale(0.18f, 0.32f);
 	std::uniform_int_distribution<int> colorDist(0, 1);
+	const Vector3 backDir = moveDirection * -1.0f;
 
-	Vector3 backDir = moveDirection * -1.0f;
-	for (int i = 0; i < 4; ++i)
+	for (int i = 0; i < Minovsky::kDashTrailCount; ++i)
 	{
-		Vector3 emitPos = position + Vector3{ jitterDist(randomEngine), 0.2f + jitterDist(randomEngine) * 0.5f, jitterDist(randomEngine) };
-		Vector3 vel = backDir * (3.0f + jitterDist(randomEngine) * 2.0f) + Vector3{ 0.0f, 0.8f, 0.0f };
-
-		bool isMagenta = (colorDist(randomEngine) == 1);
-		uint32_t tex = (i == 0 && starTexIndex != UINT32_MAX) ? starTexIndex : circleTexIndex;
-		float sc = distScale(randomEngine);
-
-		EmitMinovskyStream(randomEngine, emitPos, vel, isMagenta, tex, sc);
+		const Vector3 emitPos = position + Vector3{
+			RandRange(randomEngine, Minovsky::kDashJitter),
+			Minovsky::kDashOffsetY + RandRange(randomEngine, Minovsky::kDashJitter) * 0.5f,
+			RandRange(randomEngine, Minovsky::kDashJitter)
+		};
+		const Vector3 vel = backDir * (Minovsky::kDashBackSpeed + RandRange(randomEngine, Minovsky::kDashJitter) * 2.0f)
+			+ Vector3{ 0.0f, Minovsky::kDashUpVel, 0.0f };
+		const bool isMagenta = (colorDist(randomEngine) == 1);
+		const uint32_t tex = (i == 0 && starTexIndex != UINT32_MAX) ? starTexIndex : circleTexIndex;
+		EmitMinovskyStream(randomEngine, emitPos, vel, isMagenta, tex, RandRange(randomEngine, Minovsky::kDashScale));
 	}
 }
 
 void AppParticleManager::EmitMinovskyFlightAura(std::mt19937& randomEngine, const Vector3& center, int count, uint32_t circleTexIndex, uint32_t starTexIndex)
 {
-	std::uniform_real_distribution<float> angleDist(0.0f, 6.2831853f);
-	std::uniform_real_distribution<float> radDist(0.25f, 0.95f);
-	std::uniform_real_distribution<float> hDist(-0.45f, 0.65f);
-	std::uniform_real_distribution<float> scaleDist(0.022f, 0.045f);
-	std::uniform_real_distribution<float> lifeDist(1.4f, 2.6f);
-	std::uniform_real_distribution<float> spinDist(-7.0f, 7.0f);
-	std::uniform_real_distribution<float> twinklePhaseDist(0.0f, 6.2831853f);
-	std::uniform_real_distribution<float> twinkleSpeedDist(12.0f, 22.0f);
-	std::uniform_int_distribution<int> colorDist(0, 9);
+	std::uniform_int_distribution<int> colorDist(0, Minovsky::kAuraColorMaxRoll);
 
 	for (int i = 0; i < count; ++i)
 	{
-		float angle = angleDist(randomEngine);
-		float r = radDist(randomEngine);
-		float h = hDist(randomEngine);
+		const float angle = RandAngle(randomEngine);
+		const float r = RandRange(randomEngine, Minovsky::kAuraRadius);
+		const float h = RandRange(randomEngine, Minovsky::kAuraHeight);
+		const Vector3 pos = { center.x + std::cos(angle) * r, center.y + h, center.z + std::sin(angle) * r };
+		const Vector3 tangent = { -std::sin(angle), 0.5f, std::cos(angle) };
+		const Vector3 vel = tangent * Minovsky::kAuraTangentSpd + Vector3{ 0.0f, Minovsky::kAuraUpVel, 0.0f };
 
-		Vector3 pos = {
-			center.x + std::cos(angle) * r,
-			center.y + h,
-			center.z + std::sin(angle) * r
-		};
+		float sc = RandRange(randomEngine, Minovsky::kAuraScale);
+		const Vector3 initQuadScale = { sc, sc, 1.0f };
+		const float rotZ = RandAngle(randomEngine);
+		const int c = colorDist(randomEngine);
 
-		Vector3 tangent = { -std::sin(angle), 0.5f, std::cos(angle) };
-		Vector3 vel = tangent * 0.45f + Vector3{ 0.0f, 0.38f, 0.0f };
-
-		AppParticle p{};
-		p.transform.Initialize();
-		p.transform.SetTranslate(pos);
-
-		float sc = scaleDist(randomEngine);
-		p.transform.SetScale({ sc, sc, 1.0f });
-
-		p.transform.SetRotate({ 0.0f, 0.0f, angleDist(randomEngine) });
-
-		int c = colorDist(randomEngine);
-		if (c <= 1 && starTexIndex != UINT32_MAX)
+		ColorShiftSpec colSpec = Minovsky::kAuraMagentaColor;
+		uint32_t tex = circleTexIndex;
+		if (c <= Minovsky::kAuraStarRollMax && starTexIndex != UINT32_MAX)
 		{
-			p.color = { 1.0f, 1.0f, 1.0f, 1.0f };
-			p.endColor = { 0.3f, 0.95f, 1.0f, 0.8f };
-			p.textureIndex = starTexIndex;
-			sc *= 1.25f;
+			colSpec = Minovsky::kAuraStarColor;
+			tex = starTexIndex;
+			sc *= Minovsky::kAuraStarScaleMul;
 		}
-		else if (c <= 5)
+		else if (c <= Minovsky::kAuraCyanRollMax)
 		{
-			p.color = { 0.18f, 0.96f, 1.0f, 0.95f };
-			p.endColor = { 0.95f, 0.22f, 0.88f, 0.95f };
-			p.textureIndex = circleTexIndex;
+			colSpec = Minovsky::kAuraCyanColor;
 		}
-		else
-		{
-			p.color = { 1.0f, 0.25f, 0.90f, 0.95f };
-			p.endColor = { 0.15f, 0.92f, 1.0f, 0.95f };
-			p.textureIndex = circleTexIndex;
-		}
-		p.hasColorShift = true;
 
-		p.velocity = vel;
-		p.lifeTime = lifeDist(randomEngine);
-		p.currentTime = 0.0f;
-
-		p.gravity = -0.15f;
-		p.drag = 0.5f;
-		p.angularVelocity = spinDist(randomEngine);
-
-		p.initialScale = sc * 0.35f;
-		p.targetScale = sc * 1.2f;
-
-		p.twinklePhase = twinklePhaseDist(randomEngine);
-		p.twinkleSpeed = twinkleSpeedDist(randomEngine);
-		p.curlFreq = 3.5f;
-		p.curlAmp = 0.2f;
-
+		AppParticle p = BuildParticle(
+			pos, rotZ, initQuadScale, vel, RandRange(randomEngine, Minovsky::kAuraLife),
+			tex, colSpec, Minovsky::kAuraDyn, RandRange(randomEngine, Minovsky::kAuraSpin));
+		p.initialScale = sc * Minovsky::kAuraScaleSpec.initScaleMul;
+		p.targetScale = sc * Minovsky::kAuraScaleSpec.targetScaleMul;
+		p.twinklePhase = RandAngle(randomEngine);
+		p.twinkleSpeed = RandRange(randomEngine, Minovsky::kAuraTwinkleSpeed);
 		particles_.push_back(p);
 	}
 }
 
 void AppParticleManager::EmitMinovskyGlitter(std::mt19937& randomEngine, const Vector3& position, float scale, uint32_t starTexIndex)
 {
-	std::uniform_real_distribution<float> jitterDist(-0.06f, 0.06f);
-	std::uniform_real_distribution<float> lifeDist(0.5f, 1.1f);
-	std::uniform_real_distribution<float> spinDist(-12.0f, 12.0f);
-	std::uniform_real_distribution<float> twinklePhaseDist(0.0f, 6.2831853f);
-
-	AppParticle p{};
-	p.transform.Initialize();
-	p.transform.SetTranslate(position + Vector3{ jitterDist(randomEngine), jitterDist(randomEngine), jitterDist(randomEngine) });
-	p.transform.SetScale({ scale, scale, 1.0f });
-
-	std::uniform_real_distribution<float> rotDist(0.0f, 6.2831853f);
-	p.transform.SetRotate({ 0.0f, 0.0f, rotDist(randomEngine) });
-
-	p.color = { 1.0f, 1.0f, 1.0f, 1.0f };
-	p.endColor = { 0.4f, 1.0f, 1.0f, 0.85f };
-	p.hasColorShift = true;
-
-	p.velocity = { jitterDist(randomEngine) * 0.8f, 0.35f + jitterDist(randomEngine) * 0.5f, jitterDist(randomEngine) * 0.8f };
-	p.lifeTime = lifeDist(randomEngine);
-	p.currentTime = 0.0f;
-	p.textureIndex = starTexIndex;
-
-	p.gravity = -0.1f;
-	p.drag = 0.3f;
-	p.angularVelocity = spinDist(randomEngine);
-
-	p.initialScale = scale * 0.2f;
-	p.targetScale = scale * 1.5f;
-
-	p.twinklePhase = twinklePhaseDist(randomEngine);
-	p.twinkleSpeed = 24.0f;
-
-	particles_.push_back(p);
+	const Vector3 pos = position + RandOffset3D(randomEngine, Minovsky::kGlitterJitter.max);
+	const float rotZ = RandAngle(randomEngine);
+	const Vector3 vel = {
+		RandRange(randomEngine, Minovsky::kGlitterJitter) * Minovsky::kGlitterHorizMul,
+		Minovsky::kGlitterUpVel + RandRange(randomEngine, Minovsky::kGlitterJitter) * 0.5f,
+		RandRange(randomEngine, Minovsky::kGlitterJitter) * Minovsky::kGlitterHorizMul
+	};
+	particles_.push_back(BuildScaledParticle(
+		pos, rotZ, scale, Minovsky::kGlitterScale, vel, RandRange(randomEngine, Minovsky::kGlitterLife),
+		starTexIndex, Minovsky::kGlitterColor, Minovsky::kGlitterDyn,
+		RandRange(randomEngine, Minovsky::kGlitterSpin), RandAngle(randomEngine)));
 }
 
 void AppParticleManager::EmitMouseWaveWake(std::mt19937& randomEngine, const Vector3& pos, const Vector3& moveDir, float speed, uint32_t circleTex, uint32_t /*starTex*/)
 {
-	float dirLen = std::sqrt(moveDir.x * moveDir.x + moveDir.y * moveDir.y);
-	Vector3 perp = (dirLen > 0.001f)
+	const float dirLen = std::sqrt(moveDir.x * moveDir.x + moveDir.y * moveDir.y);
+	const Vector3 perp = (dirLen > Water::kWakeDirEpsilon)
 		? Vector3{ -moveDir.y / dirLen, moveDir.x / dirLen, 0.0f }
 		: Vector3{ 1.0f, 0.0f, 0.0f };
+	const float wavePower = std::clamp(speed * Water::kWakePowerSpeedMul, Water::kWakePowerClamp.min, Water::kWakePowerClamp.max);
 
-	std::uniform_real_distribution<float> jitterDist(-0.025f, 0.025f);
-	std::uniform_real_distribution<float> spreadDist(0.35f, 0.85f);
-	std::uniform_real_distribution<float> lifeDist(0.7f, 1.3f);
-	std::uniform_real_distribution<float> scaleDist(0.032f, 0.058f);
-	std::uniform_real_distribution<float> spinDist(-1.2f, 1.2f);
-
-	float wavePower = std::clamp(speed * 0.22f, 0.4f, 2.5f);
-
-	// 左右の波条（ケルビン航跡波：進行方向の斜め後方に広がるV字波面）
 	for (float side : { -1.0f, 1.0f })
 	{
-		for (int i = 0; i < 2; ++i)
+		for (int i = 0; i < Water::kWakeBandCount; ++i)
 		{
-			float spread = spreadDist(randomEngine);
-			// 進行方向の後方かつ左右に広がる波面位置
-			Vector3 spawnPos = pos + perp * (side * (0.05f + 0.07f * i)) - moveDir * (0.035f * i)
-				+ Vector3{ jitterDist(randomEngine), jitterDist(randomEngine), 0.0f };
-			Vector3 waveVel = (perp * (side * spread) - moveDir * 0.20f) * wavePower + Vector3{ 0.0f, 0.08f, 0.0f };
+			const float spread = RandRange(randomEngine, Water::kWakeSpread);
+			const Vector3 spawnPos = pos + perp * (side * (Water::kWakeSideBaseOff + Water::kWakeSideStepOff * i))
+				- moveDir * (Water::kWakeBackStepOff * i)
+				+ Vector3{ RandRange(randomEngine, Water::kWakeJitter), RandRange(randomEngine, Water::kWakeJitter), 0.0f };
+			const Vector3 waveVel = (perp * (side * spread) - moveDir * Water::kWakeBackVelMul) * wavePower
+				+ Vector3{ 0.0f, Water::kWakeUpVel, 0.0f };
+			const float sc = RandRange(randomEngine, Water::kWakeScale) * (1.0f + wavePower * Water::kWakeScalePowerMul);
+			const ColorShiftSpec& colSpec = (i == 0) ? Water::kWakeColorInner : Water::kWakeColorOuter;
 
-			AppParticle p{};
-			p.transform.Initialize();
-			p.transform.SetTranslate(spawnPos);
-
-			float sc = scaleDist(randomEngine) * (1.0f + wavePower * 0.15f);
-			p.transform.SetScale({ sc, sc, 1.0f });
-
-			std::uniform_real_distribution<float> rotDist(0.0f, 6.2831853f);
-			p.transform.SetRotate({ 0.0f, 0.0f, rotDist(randomEngine) });
-
-			// チカチカ・点滅を完全に排除し、透明感のある柔らかな川の白波・水流カラー
-			if (i == 0)
-			{
-				p.color = { 0.55f, 0.90f, 1.0f, 0.45f };    // 澄んだ淡いアクアブルー
-				p.endColor = { 0.18f, 0.65f, 0.92f, 0.12f }; // 水面に馴染む深いリバーブルー
-			}
-			else
-			{
-				p.color = { 0.25f, 0.80f, 0.98f, 0.35f };
-				p.endColor = { 0.12f, 0.48f, 0.88f, 0.06f };
-			}
-			p.textureIndex = circleTex; // 棘のある星テクスチャではなく滑らかな丸粒子
-			p.hasColorShift = true;
-
-			p.velocity = waveVel;
-			p.lifeTime = lifeDist(randomEngine);
-			p.currentTime = 0.0f;
-
-			p.gravity = -0.03f;
-			p.drag = 2.2f; // 水面の粘性抵抗で滑らかに減速
-			p.angularVelocity = spinDist(randomEngine);
-
-			p.initialScale = sc * 0.7f;
-			p.targetScale = sc * 1.6f; // 波紋が自然に広がりながら消滅
-
-			p.twinklePhase = 0.0f;
-			p.twinkleSpeed = 0.0f; // ★チカチカ点滅完全停止（滑らかなフェードアウト）
-			p.curlFreq = 2.0f;
-			p.curlAmp = 0.04f; // 穏やかな水流の揺らぎ
-
-			particles_.push_back(p);
+			particles_.push_back(BuildScaledParticle(
+				spawnPos, RandAngle(randomEngine), sc, Water::kWakeScaleSpec, waveVel,
+				RandRange(randomEngine, Water::kWakeLife), circleTex, colSpec, Water::kWakeDyn,
+				RandRange(randomEngine, Water::kWakeSpin)));
 		}
 	}
 }
 
 void AppParticleManager::EmitMouseRippleRing(std::mt19937& randomEngine, const Vector3& center, float power, uint32_t circleTex, uint32_t /*starTex*/)
 {
-	const int kRingCount = 20;
-	std::uniform_real_distribution<float> jitterDist(-0.02f, 0.02f);
-	std::uniform_real_distribution<float> lifeDist(0.7f, 1.2f);
-	std::uniform_real_distribution<float> scaleDist(0.032f, 0.055f);
-
-	float expSpeed = 1.1f * power;
-
-	for (int i = 0; i < kRingCount; ++i)
+	const float expSpeed = Water::kRingExpSpeedMul * power;
+	for (int i = 0; i < Water::kRingCount; ++i)
 	{
-		float angle = (static_cast<float>(i) / static_cast<float>(kRingCount)) * 6.2831853f;
-		Vector3 dir = { std::cos(angle), std::sin(angle), 0.0f };
-		Vector3 spawnPos = center + dir * 0.05f + Vector3{ jitterDist(randomEngine), jitterDist(randomEngine), 0.0f };
-		Vector3 vel = dir * expSpeed;
+		const float angle = (static_cast<float>(i) / static_cast<float>(Water::kRingCount)) * kTwoPi;
+		const Vector3 dir = { std::cos(angle), std::sin(angle), 0.0f };
+		const Vector3 spawnPos = center + dir * Water::kRingSpawnRadius
+			+ Vector3{ RandRange(randomEngine, Water::kRingJitter), RandRange(randomEngine, Water::kRingJitter), 0.0f };
+		const float sc = RandRange(randomEngine, Water::kRingScale);
 
-		AppParticle p{};
-		p.transform.Initialize();
-		p.transform.SetTranslate(spawnPos);
-
-		float sc = scaleDist(randomEngine);
-		p.transform.SetScale({ sc, sc, 1.0f });
-		p.transform.SetRotate({ 0.0f, 0.0f, angle });
-
-		// 点滅のない、透き通った穏やかな波紋
-		p.color = { 0.50f, 0.88f, 1.0f, 0.40f };
-		p.endColor = { 0.15f, 0.58f, 0.90f, 0.08f };
-		p.textureIndex = circleTex;
-		p.hasColorShift = true;
-
-		p.velocity = vel;
-		p.lifeTime = lifeDist(randomEngine);
-		p.currentTime = 0.0f;
-
-		p.gravity = 0.0f;
-		p.drag = 2.4f;
-		p.angularVelocity = 0.0f;
-
-		p.initialScale = sc * 0.6f;
-		p.targetScale = sc * 1.7f;
-
-		p.twinklePhase = 0.0f;
-		p.twinkleSpeed = 0.0f; // ★チカチカ点滅完全停止
-
-		particles_.push_back(p);
+		particles_.push_back(BuildScaledParticle(
+			spawnPos, angle, sc, Water::kRingScaleSpec, dir * expSpeed,
+			RandRange(randomEngine, Water::kRingLife), circleTex, Water::kRingColor, Water::kRingDyn));
 	}
 }
 
 void AppParticleManager::ApplyMouseWaveDisturbance(const Vector3& mouseWorldPos, const Vector3& mouseWorldVel, float radius, float force)
 {
-	float radSq = radius * radius;
+	const float radSq = radius * radius;
+	for (auto& p : particles_)
+	{
+		Vector3 diff = p.transform.GetTranslate() - mouseWorldPos;
+		diff.z *= 0.5f;
+		const float distSq = diff.x * diff.x + diff.y * diff.y + diff.z * diff.z;
+		if (distSq < radSq && distSq > Core::kDisturbMinDistSq)
+		{
+			const float dist = std::sqrt(distSq);
+			const float factor = (1.0f - dist / radius);
+			const Vector3 pushDir = diff * (1.0f / dist);
+			p.velocity += pushDir * (force * factor * Core::kDisturbPushForceScale) + mouseWorldVel * (Core::kDisturbVelInherit * factor);
+			p.wobbleAmp = (std::max)(p.wobbleAmp, Core::kDisturbMinWobbleAmp * factor);
+		}
+	}
+}
+
+void AppParticleManager::ApplyRotorDownwash(const Vector3& rotorPos, float rotorRadius, float strength, float deltaTime)
+{
+	if (strength <= Core::kDownwashMinEpsilon || rotorRadius <= Core::kDownwashMinEpsilon) return;
+
+	const float maxRadius = rotorRadius * Core::kDownwashRadiusMul;
+	const float maxRadiusSq = maxRadius * maxRadius;
+
 	for (auto& p : particles_)
 	{
 		Vector3 curPos = p.transform.GetTranslate();
-		Vector3 diff = curPos - mouseWorldPos;
-		diff.z *= 0.5f;
-		float distSq = diff.x * diff.x + diff.y * diff.y + diff.z * diff.z;
-		if (distSq < radSq && distSq > 0.0001f)
+
+		// ローターの下方空間（ローター高度+0.5m〜地上付近）を先に判定し、対象外の std::sqrt を回避
+		const float relY = rotorPos.y - curPos.y;
+		if (relY < Core::kDownwashMinRelY || relY > Core::kDownwashMaxRelY)
 		{
-			float dist = std::sqrt(distSq);
-			float factor = (1.0f - dist / radius);
-			Vector3 pushDir = diff * (1.0f / dist);
-			p.velocity += pushDir * (force * factor * 1.8f) + mouseWorldVel * (0.35f * factor);
-			p.wobbleAmp = (std::max)(p.wobbleAmp, 0.35f * factor);
+			continue;
 		}
+
+		const float dx = curPos.x - rotorPos.x;
+		const float dz = curPos.z - rotorPos.z;
+		const float distSq = dx * dx + dz * dz;
+		if (distSq >= maxRadiusSq || distSq <= Core::kDownwashMinDistSq)
+		{
+			continue;
+		}
+
+		const float dist = std::sqrt(distSq);
+		const float hFactor = std::clamp(1.0f - (relY / Core::kDownwashMaxRelY), Core::kDownwashMinHeightFactor, 1.0f);
+		const float dirX = dx / dist;
+		const float dirZ = dz / dist;
+
+		// 1. ローター直下の強力な下降気流（Downwash）：地面へ向かって吹き下ろす
+		if (dist < rotorRadius)
+		{
+			const float centerFactor = 1.0f - (dist / rotorRadius);
+			p.velocity.y -= strength * hFactor * centerFactor * Core::kDownwashVertForceScale * deltaTime;
+		}
+
+		// 2. 地面付近での外向き放射流（Ground Outflow / Radial Blast）
+		if (curPos.y < Core::kOutflowMaxHeightY)
+		{
+			const float groundFactor = std::clamp((Core::kOutflowMaxHeightY - curPos.y) / Core::kOutflowMaxHeightY, 0.0f, 1.0f);
+			const float normDist = std::clamp(dist / maxRadius, 0.0f, 1.0f);
+			const float radialProfile = std::sin(normDist * kPi);
+			const float radialSpeed = strength * hFactor * groundFactor * (Core::kOutflowBaseSpeedMul + radialProfile * Core::kOutflowProfileSpeedMul);
+
+			p.velocity.x += dirX * radialSpeed * deltaTime;
+			p.velocity.z += dirZ * radialSpeed * deltaTime;
+			p.wobbleAmp = (std::max)(p.wobbleAmp, Core::kOutflowWobbleScale * groundFactor);
+		}
+
+		// 3. 地面這い（地面以下にめり込まず水平へスライド）
+		if (curPos.y < Core::kGroundSlideClampY)
+		{
+			curPos.y = Core::kGroundSlideClampY;
+			if (p.velocity.y < 0.0f)
+			{
+				p.velocity.y = 0.0f;
+			}
+			p.transform.SetTranslate(curPos);
+		}
+	}
+}
+
+void AppParticleManager::DisperseAndFadeOutAll(float fadeSpeed, const Vector3& windVector, float deltaTime)
+{
+	for (auto& p : particles_)
+	{
+		p.velocity += windVector * deltaTime;
+		p.currentTime += deltaTime * fadeSpeed;
 	}
 }
 
@@ -1973,7 +1427,7 @@ void AppParticleManager::Draw()
 		p.velocity = ap.velocity;
 		p.color = ap.color;
 
-		float alpha = 1.0f - (ap.currentTime / ap.lifeTime);
+		const float alpha = 1.0f - (ap.currentTime / ap.lifeTime);
 		p.color.w = (std::clamp)(alpha * ap.color.w, 0.0f, 1.0f);
 
 		p.lifeTime = ap.lifeTime;
@@ -1988,103 +1442,131 @@ void AppParticleManager::Draw()
 
 void AppParticleManager::Draw(const RenderContext& ctx)
 {
-	if (!ctx.commandList || !enginePM_ || !instanceData_ || particles_.empty() || !ctx.camera || !perViewData_) return;
+	if (!ctx.commandList || !enginePM_ || particles_.empty() || !ctx.camera || !perViewData_) return;
 
-	// テクスチャインデックスごとにパーティクルをグループ化してバッチ描画
-	std::unordered_map<uint32_t, std::vector<const AppParticle*>> textureGroups;
+	auto BuildGPUData = [&](const AppParticle* ap) -> ParticleManager::ParticleCS {
+		ParticleManager::ParticleCS p{};
+		p.translate = ap->transform.GetTranslate();
+		p.scale = ap->transform.GetScale();
+		p.lifeTime = ap->lifeTime;
+		p.currentTime = ap->currentTime;
+		p.velocity = ap->velocity;
+
+		const float t = (ap->lifeTime > 0.0f) ? std::clamp(ap->currentTime / ap->lifeTime, 0.0f, 1.0f) : 1.0f;
+		if (ap->hasColorShift)
+		{
+			p.color.x = ap->color.x + (ap->endColor.x - ap->color.x) * t;
+			p.color.y = ap->color.y + (ap->endColor.y - ap->color.y) * t;
+			p.color.z = ap->color.z + (ap->endColor.z - ap->color.z) * t;
+		}
+		else
+		{
+			p.color.x = ap->color.x;
+			p.color.y = ap->color.y;
+			p.color.z = ap->color.z;
+		}
+
+		float twinkle = 1.0f;
+		if (ap->twinkleSpeed > 0.0f)
+		{
+			twinkle = Core::kTwinkleBase + Core::kTwinkleAmplitude * std::sin(ap->twinklePhase + ap->currentTime * ap->twinkleSpeed);
+		}
+
+		float alpha = 1.0f - t;
+		if (ap->fadeInRatio > Core::kFadeInEpsilon)
+		{
+			float fadeIn = std::clamp(t / ap->fadeInRatio, 0.0f, 1.0f);
+			fadeIn = fadeIn * fadeIn * (Core::kSmoothstepCubicC1 - 2.0f * fadeIn);
+			const float fadeOut = alpha * alpha * (Core::kSmoothstepCubicC1 - 2.0f * alpha);
+			alpha = fadeIn * fadeOut;
+		}
+		p.color.w = (std::clamp)(alpha * ap->color.w * twinkle, 0.0f, 1.0f);
+		if (premultiplyAlpha_ && !alphaBlend_)
+		{
+			p.color.x *= p.color.w;
+			p.color.y *= p.color.w;
+			p.color.z *= p.color.w;
+		}
+		return p;
+	};
+
+	int32_t maxSlotPerBatch[kMaxTextureBatches];
+	std::fill_n(maxSlotPerBatch, kMaxTextureBatches, -1);
+
+	bool hasAnyActiveBatch = false;
+	for (auto& ap : particles_)
+	{
+		if (ap.stableSlot < 0)
+		{
+			AllocateParticleSlot(ap);
+		}
+		if (ap.batchIndex >= 0 && ap.batchIndex < static_cast<int16_t>(kMaxTextureBatches) &&
+			ap.stableSlot >= 0 && ap.stableSlot < static_cast<int32_t>(kBatchMaxInstances))
+		{
+			maxSlotPerBatch[ap.batchIndex] = (std::max)(maxSlotPerBatch[ap.batchIndex], ap.stableSlot);
+			hasAnyActiveBatch = true;
+		}
+	}
+
+	if (!hasAnyActiveBatch) return;
+
+	for (uint32_t b = 0; b < kMaxTextureBatches; ++b)
+	{
+		if (maxSlotPerBatch[b] >= 0 && textureBatches_[b].allocated && textureBatches_[b].mappedData)
+		{
+			const uint32_t slotCount = static_cast<uint32_t>(maxSlotPerBatch[b] + 1);
+			std::memset(textureBatches_[b].mappedData, 0, sizeof(ParticleManager::ParticleCS) * slotCount);
+		}
+	}
+
 	for (const auto& ap : particles_)
 	{
-		textureGroups[ap.textureIndex].push_back(&ap);
-	}
-
-	struct BatchDrawInfo
-	{
-		uint32_t textureIndex;
-		uint32_t startInstance;
-		uint32_t count;
-	};
-	std::vector<BatchDrawInfo> batches;
-	batches.reserve(textureGroups.size());
-
-	uint32_t currentWriteIndex = 0;
-	for (auto& pair : textureGroups)
-	{
-		if (currentWriteIndex >= kNumMaxInstances) break;
-
-		BatchDrawInfo batch{};
-		batch.textureIndex = pair.first;
-		batch.startInstance = currentWriteIndex;
-
-		for (const auto* ap : pair.second)
+		if (ap.batchIndex >= 0 && ap.batchIndex < static_cast<int16_t>(kMaxTextureBatches) &&
+			ap.stableSlot >= 0 && ap.stableSlot <= maxSlotPerBatch[ap.batchIndex])
 		{
-			if (currentWriteIndex >= kNumMaxInstances) break;
-
-			ParticleManager::ParticleCS p{};
-			p.translate = ap->transform.GetTranslate();
-			p.scale = ap->transform.GetScale();
-			p.lifeTime = ap->lifeTime;
-			p.currentTime = ap->currentTime;
-			p.velocity = ap->velocity;
-
-			float t = std::clamp(ap->currentTime / ap->lifeTime, 0.0f, 1.0f);
-			if (ap->hasColorShift)
+			TextureBatch& batch = textureBatches_[ap.batchIndex];
+			if (batch.allocated && batch.mappedData)
 			{
-				p.color.x = ap->color.x + (ap->endColor.x - ap->color.x) * t;
-				p.color.y = ap->color.y + (ap->endColor.y - ap->color.y) * t;
-				p.color.z = ap->color.z + (ap->endColor.z - ap->color.z) * t;
+				batch.mappedData[ap.stableSlot] = BuildGPUData(&ap);
 			}
-			else
-			{
-				p.color.x = ap->color.x;
-				p.color.y = ap->color.y;
-				p.color.z = ap->color.z;
-			}
-
-			// きらめきシンチレーション（Twinkle）
-			float twinkle = 1.0f;
-			if (ap->twinkleSpeed > 0.0f)
-			{
-				twinkle = 0.70f + 0.30f * std::sin(ap->twinklePhase + ap->currentTime * ap->twinkleSpeed);
-			}
-
-			float alpha = 1.0f - t;
-			p.color.w = (std::clamp)(alpha * ap->color.w * twinkle, 0.0f, 1.0f);
-			if (premultiplyAlpha_)
-			{
-				p.color.x *= p.color.w;
-				p.color.y *= p.color.w;
-				p.color.z *= p.color.w;
-			}
-
-			instanceData_[currentWriteIndex++] = p;
-		}
-
-		batch.count = currentWriteIndex - batch.startInstance;
-		if (batch.count > 0)
-		{
-			batches.push_back(batch);
 		}
 	}
-
-	if (currentWriteIndex == 0 || batches.empty()) return;
 
 	// 1. PerView CBV の計算と転送
-	Matrix4x4 backToFrontMatrix = MakeRotateYMatrix(0.0f);
-	Matrix4x4 billboardMatrix = Multiply(backToFrontMatrix, ctx.camera->GetWorldMatrix());
-	billboardMatrix.m[3][0] = 0.0f;
-	billboardMatrix.m[3][1] = 0.0f;
-	billboardMatrix.m[3][2] = 0.0f;
+	Matrix4x4 billboardMatrix = Multiply(MakeRotateYMatrix(0.0f), ctx.camera->GetWorldMatrix());
+	billboardMatrix.m[Core::kMatrixTranslationRow][0] = 0.0f;
+	billboardMatrix.m[Core::kMatrixTranslationRow][1] = 0.0f;
+	billboardMatrix.m[Core::kMatrixTranslationRow][kTranslationZCol] = 0.0f;
 
-	Matrix4x4 viewProjection = Multiply(ctx.camera->GetViewMatrix(), ctx.camera->GetProjectionMatrix());
-
-	perViewData_->viewProjection = viewProjection;
+	perViewData_->viewProjection = Multiply(ctx.camera->GetViewMatrix(), ctx.camera->GetProjectionMatrix());
 	perViewData_->billboardMatrix = billboardMatrix;
-	perViewData_->deltaTime = 1.0f / 60.0f;
+	perViewData_->deltaTime = Core::kFixedFrameDeltaTime;
 	perViewData_->time = 0.0f;
-	perViewData_->maxParticles = kNumMaxInstances;
+	perViewData_->maxParticles = kBatchMaxInstances;
 
 	// 2. エンジン側の Particle 描画パイプラインをセットアップ
 	enginePM_->SetupDraw(ctx.commandList);
+
+	// ストレートアルファ合成モード時は専用PSOへ切り替え（煙・雲・土埃・破片の白飛びを根絶し自然な遮蔽を実現）
+	if (alphaBlend_)
+	{
+		if (!alphaBlendPipelineState_ && enginePM_->GetDxCommon() && enginePM_->GetDxCommon()->GetDevice())
+		{
+			D3D12_GRAPHICS_PIPELINE_STATE_DESC desc = enginePM_->GetGraphicPipelineStateDesc();
+			desc.BlendState.RenderTarget[0].BlendEnable = TRUE;
+			desc.BlendState.RenderTarget[0].SrcBlend = D3D12_BLEND_SRC_ALPHA;
+			desc.BlendState.RenderTarget[0].DestBlend = D3D12_BLEND_INV_SRC_ALPHA;
+			desc.BlendState.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
+			desc.BlendState.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_ONE;
+			desc.BlendState.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_INV_SRC_ALPHA;
+			desc.BlendState.RenderTarget[0].BlendOpAlpha = D3D12_BLEND_OP_ADD;
+			enginePM_->GetDxCommon()->GetDevice()->CreateGraphicsPipelineState(&desc, IID_PPV_ARGS(&alphaBlendPipelineState_));
+		}
+		if (alphaBlendPipelineState_)
+		{
+			ctx.commandList->SetPipelineState(alphaBlendPipelineState_.Get());
+		}
+	}
 
 	D3D12_GPU_VIRTUAL_ADDRESS matGpuAddress = ctx.materialGPUAddress;
 	if (matGpuAddress == 0 && defaultMaterialResource_)
@@ -2095,7 +1577,6 @@ void AppParticleManager::Draw(const RenderContext& ctx)
 	{
 		ctx.commandList->SetGraphicsRootConstantBufferView(RootParam::Particle::kMaterial, matGpuAddress);
 	}
-	ctx.commandList->SetGraphicsRootDescriptorTable(RootParam::Particle::kInstancing, instancingSrvHandleGPU_);
 
 	if (ctx.light)
 	{
@@ -2107,18 +1588,21 @@ void AppParticleManager::Draw(const RenderContext& ctx)
 		ctx.commandList->SetGraphicsRootConstantBufferView(RootParam::Particle::kCamera, ctx.camera->GetCameraGpuAddress());
 	}
 
-	// PerView CBV をルートパラメーターkPerViewへバインド
 	ctx.commandList->SetGraphicsRootConstantBufferView(RootParam::Particle::kPerView, perViewResource_->GetGPUVirtualAddress());
 
-	// ユニットビルボードクアッドの頂点バッファをIASetVertexBuffersでバインド
 	if (quadVertexBufferView_.SizeInBytes > 0)
 	{
 		ctx.commandList->IASetVertexBuffers(0, 1, &quadVertexBufferView_);
 	}
 
-	// 各テクスチャグループごとにSRVを切り替えてDrawInstancedを実行
-	for (const auto& batch : batches)
+	// 各テクスチャ専用 StructuredBuffer と テクスチャ SRV をペアでバインドして DrawInstanced を実行
+	for (uint32_t b = 0; b < kMaxTextureBatches; ++b)
 	{
+		if (maxSlotPerBatch[b] < 0 || !textureBatches_[b].allocated || !textureBatches_[b].mappedData) continue;
+
+		const TextureBatch& batch = textureBatches_[b];
+		ctx.commandList->SetGraphicsRootDescriptorTable(RootParam::Particle::kInstancing, batch.srvHandleGPU);
+
 		D3D12_GPU_DESCRIPTOR_HANDLE srvHandle = ctx.textureHandle;
 		if (batch.textureIndex != TextureManager::kInvalidTextureIndex && batch.textureIndex != 0)
 		{
@@ -2126,16 +1610,11 @@ void AppParticleManager::Draw(const RenderContext& ctx)
 		}
 		else if (srvHandle.ptr == 0)
 		{
-			uint32_t whiteTex = TextureManager::GetInstance()->Load("Resources/CG4/human/white.png");
+			const uint32_t whiteTex = TextureManager::GetInstance()->Load("Resources/CG4/human/white.png");
 			srvHandle = TextureManager::GetInstance()->GetSrvHandleGPU(whiteTex);
 		}
 
 		ctx.commandList->SetGraphicsRootDescriptorTable(RootParam::Particle::kTextureTable, srvHandle);
-		ctx.commandList->DrawInstanced(6, batch.count, 0, batch.startInstance);
+		ctx.commandList->DrawInstanced(Core::kQuadVertexCount, static_cast<uint32_t>(maxSlotPerBatch[b] + 1), 0, 0);
 	}
 }
-
-
-
-
-

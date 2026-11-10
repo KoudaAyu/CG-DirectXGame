@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="680" height="430" viewBox="0 0 680 430"><defs><marker id="a-fg" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#E9EDF3"/></marker><marker id="a-sub" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#A6B0BE"/></marker><marker id="a-mint" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#86CBA8"/></marker><marker id="a-red" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#E5675F"/></marker><marker id="a-blue" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#4A86E8"/></marker><marker id="a-amber" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#F2B84B"/></marker></defs>
+<line x1="220.0" y1="220.0" x2="335.0" y2="220.0" stroke="#4A86E8" stroke-width="1.6" stroke-linecap="round" opacity="0.85"/>
+<line x1="220.0" y1="220.0" x2="335.0" y2="267.6" stroke="#4A86E8" stroke-width="1.6" stroke-linecap="round" opacity="0.85"/>
+<line x1="220.0" y1="220.0" x2="361.4" y2="361.4" stroke="#5F6A7B" stroke-width="1.2" stroke-linecap="round" opacity="0.7" stroke-dasharray="4 4"/>
+<line x1="220.0" y1="220.0" x2="272.6" y2="347.0" stroke="#4A86E8" stroke-width="1.6" stroke-linecap="round" opacity="0.85"/>
+<line x1="220.0" y1="220.0" x2="220.0" y2="347.0" stroke="#4A86E8" stroke-width="1.6" stroke-linecap="round" opacity="0.85"/>
+<line x1="220.0" y1="220.0" x2="167.4" y2="347.0" stroke="#4A86E8" stroke-width="1.6" stroke-linecap="round" opacity="0.85"/>
+<line x1="220.0" y1="220.0" x2="78.6" y2="361.4" stroke="#5F6A7B" stroke-width="1.2" stroke-linecap="round" opacity="0.7" stroke-dasharray="4 4"/>
+<line x1="220.0" y1="220.0" x2="35.2" y2="296.5" stroke="#5F6A7B" stroke-width="1.2" stroke-linecap="round" opacity="0.7" stroke-dasharray="4 4"/>
+<line x1="220.0" y1="220.0" x2="20.0" y2="220.0" stroke="#5F6A7B" stroke-width="1.2" stroke-linecap="round" opacity="0.7" stroke-dasharray="4 4"/>
+<line x1="220.0" y1="220.0" x2="35.2" y2="143.5" stroke="#5F6A7B" stroke-width="1.2" stroke-linecap="round" opacity="0.7" stroke-dasharray="4 4"/>
+<line x1="220.0" y1="220.0" x2="104.7" y2="104.7" stroke="#4A86E8" stroke-width="1.6" stroke-linecap="round" opacity="0.85"/>
+<line x1="220.0" y1="220.0" x2="166.1" y2="89.9" stroke="#4A86E8" stroke-width="1.6" stroke-linecap="round" opacity="0.85"/>
+<line x1="220.0" y1="220.0" x2="220.0" y2="77.0" stroke="#4A86E8" stroke-width="1.6" stroke-linecap="round" opacity="0.85"/>
+<line x1="220.0" y1="220.0" x2="296.5" y2="35.2" stroke="#5F6A7B" stroke-width="1.2" stroke-linecap="round" opacity="0.7" stroke-dasharray="4 4"/>
+<line x1="220.0" y1="220.0" x2="361.4" y2="78.6" stroke="#5F6A7B" stroke-width="1.2" stroke-linecap="round" opacity="0.7" stroke-dasharray="4 4"/>
+<line x1="220.0" y1="220.0" x2="335.0" y2="172.4" stroke="#4A86E8" stroke-width="1.6" stroke-linecap="round" opacity="0.85"/>
+<polygon points="335.0,165.0 335.0,270.0 345.0,270.0 345.0,165.0" fill="#B5834F" stroke="#6E4520" stroke-width="2" stroke-linejoin="round" opacity="1"/>
+<polygon points="79.2,110.9 237.2,72.9 234.8,63.1 76.8,101.1" fill="#B5834F" stroke="#6E4520" stroke-width="2" stroke-linejoin="round" opacity="1"/>
+<polygon points="150.0,357.0 300.0,357.0 300.0,347.0 150.0,347.0" fill="#B5834F" stroke="#6E4520" stroke-width="2" stroke-linejoin="round" opacity="1"/>
+<line x1="600.0" y1="190.0" x2="220.0" y2="327.0" stroke="#E5675F" stroke-width="1.5" stroke-linecap="round" opacity="0.8" stroke-dasharray="5 5"/>
+<line x1="600.0" y1="190.0" x2="345.0" y2="216.8" stroke="#A6B0BE" stroke-width="1.5" stroke-linecap="round" opacity="1" stroke-dasharray="5 5"/>
+<text x="472.5" y="191.4" font-size="12" fill="#A6B0BE" text-anchor="middle" font-weight="400" font-family="'Yu Gothic UI','Yu Gothic','Meiryo',sans-serif" opacity="1">壁で遮られる</text>
+<text x="424.0" y="280.5" font-size="12" fill="#E5675F" text-anchor="start" font-weight="400" font-family="'Yu Gothic UI','Yu Gothic','Meiryo',sans-serif" opacity="1">見えている</text>
+<circle cx="315.0" cy="220.0" r="6" fill="#86CBA8" stroke="none" stroke-width="2" opacity="1"/>
+<circle cx="316.5" cy="260.0" r="6" fill="#86CBA8" stroke="none" stroke-width="2" opacity="1"/>
+<line x1="260.0" y1="323.5" x2="270.0" y2="333.5" stroke="#E5675F" stroke-width="2.5" stroke-linecap="round" opacity="1"/>
+<line x1="260.0" y1="333.5" x2="270.0" y2="323.5" stroke="#E5675F" stroke-width="2.5" stroke-linecap="round" opacity="1"/>
+<line x1="215.0" y1="322.0" x2="225.0" y2="332.0" stroke="#E5675F" stroke-width="2.5" stroke-linecap="round" opacity="1"/>
+<line x1="215.0" y1="332.0" x2="225.0" y2="322.0" stroke="#E5675F" stroke-width="2.5" stroke-linecap="round" opacity="1"/>
+<line x1="170.0" y1="323.5" x2="180.0" y2="333.5" stroke="#E5675F" stroke-width="2.5" stroke-linecap="round" opacity="1"/>
+<line x1="170.0" y1="333.5" x2="180.0" y2="323.5" stroke="#E5675F" stroke-width="2.5" stroke-linecap="round" opacity="1"/>
+<line x1="113.9" y1="113.9" x2="123.9" y2="123.9" stroke="#E5675F" stroke-width="2.5" stroke-linecap="round" opacity="1"/>
+<line x1="113.9" y1="123.9" x2="123.9" y2="113.9" stroke="#E5675F" stroke-width="2.5" stroke-linecap="round" opacity="1"/>
+<line x1="168.8" y1="103.4" x2="178.8" y2="113.4" stroke="#E5675F" stroke-width="2.5" stroke-linecap="round" opacity="1"/>
+<line x1="168.8" y1="113.4" x2="178.8" y2="103.4" stroke="#E5675F" stroke-width="2.5" stroke-linecap="round" opacity="1"/>
+<line x1="215.0" y1="92.0" x2="225.0" y2="102.0" stroke="#E5675F" stroke-width="2.5" stroke-linecap="round" opacity="1"/>
+<line x1="215.0" y1="102.0" x2="225.0" y2="92.0" stroke="#E5675F" stroke-width="2.5" stroke-linecap="round" opacity="1"/>
+<circle cx="316.5" cy="180.0" r="6" fill="#86CBA8" stroke="none" stroke-width="2" opacity="1"/>
+<circle cx="315.0" cy="220.0" r="13" fill="none" stroke="#86CBA8" stroke-width="2" opacity="1"/>
+<line x1="236.0" y1="222.0" x2="300.0" y2="220.0" stroke="#86CBA8" stroke-width="2.5" stroke-linecap="round" opacity="1" stroke-dasharray="6 4" marker-end="url(#a-mint)"/>
+<circle cx="220.0" cy="220.0" r="14" fill="#E5675F" stroke="#F3A6A0" stroke-width="2" opacity="1"/>
+<text x="198.0" y="225.0" font-size="15" fill="#E9EDF3" text-anchor="end" font-weight="400" font-family="'Yu Gothic UI','Yu Gothic','Meiryo',sans-serif" opacity="1">敵</text>
+<circle cx="600.0" cy="190.0" r="14" fill="#4A86E8" stroke="#9CC0F5" stroke-width="2" opacity="1"/>
+<text x="600.0" y="226.0" font-size="15" fill="#E9EDF3" text-anchor="middle" font-weight="400" font-family="'Yu Gothic UI','Yu Gothic','Meiryo',sans-serif" opacity="1">プレイヤー</text>
+<text x="20.0" y="26.0" font-size="13" fill="#A6B0BE" text-anchor="start" font-weight="400" font-family="'Yu Gothic UI','Yu Gothic','Meiryo',sans-serif" opacity="1">レイ16本・最大20m・当たった壁の1.5m手前を候補にする</text>
+<line x1="30.0" y1="404.0" x2="60.0" y2="404.0" stroke="#4A86E8" stroke-width="1.6" stroke-linecap="round" opacity="1"/>
+<text x="68.0" y="408.0" font-size="13" fill="#E9EDF3" text-anchor="start" font-weight="400" font-family="'Yu Gothic UI','Yu Gothic','Meiryo',sans-serif" opacity="1">レイ</text>
+<circle cx="140.0" cy="404.0" r="6" fill="#86CBA8" stroke="none" stroke-width="2" opacity="1"/>
+<text x="152.0" y="408.0" font-size="13" fill="#E9EDF3" text-anchor="start" font-weight="400" font-family="'Yu Gothic UI','Yu Gothic','Meiryo',sans-serif" opacity="1">隠れられる</text>
+<line x1="247.0" y1="399.0" x2="257.0" y2="409.0" stroke="#E5675F" stroke-width="2.5" stroke-linecap="round" opacity="1"/>
+<line x1="247.0" y1="409.0" x2="257.0" y2="399.0" stroke="#E5675F" stroke-width="2.5" stroke-linecap="round" opacity="1"/>
+<text x="264.0" y="408.0" font-size="13" fill="#E9EDF3" text-anchor="start" font-weight="400" font-family="'Yu Gothic UI','Yu Gothic','Meiryo',sans-serif" opacity="1">見えてしまう</text>
+<rect x="370.0" y="398.0" width="22.0" height="12.0" rx="0" fill="#B5834F" stroke="#6E4520" stroke-width="1.5" opacity="1"/>
+<text x="400.0" y="408.0" font-size="13" fill="#E9EDF3" text-anchor="start" font-weight="400" font-family="'Yu Gothic UI','Yu Gothic','Meiryo',sans-serif" opacity="1">遮蔽物</text>
+<line x1="470.0" y1="404.0" x2="500.0" y2="404.0" stroke="#86CBA8" stroke-width="2.5" stroke-linecap="round" opacity="1" stroke-dasharray="6 4"/>
+<text x="508.0" y="408.0" font-size="13" fill="#E9EDF3" text-anchor="start" font-weight="400" font-family="'Yu Gothic UI','Yu Gothic','Meiryo',sans-serif" opacity="1">一番近い安全な場所へ</text>
+</svg>

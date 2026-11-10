@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    width: 960px;
+    height: 520px;
+    background-color: #ffffff;
+    font-family: "Meiryo", "Yu Gothic UI", sans-serif;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+
+  .canvas {
+    width: 950px;
+    height: 500px;
+    background-color: #ffffff;
+    border: 2px solid #444444;
+    border-radius: 4px;
+    display: flex;
+    position: relative;
+  }
+
+  .panel-left {
+    flex: 1;
+    border-right: 2px solid #dddddd;
+    position: relative;
+    padding: 12px;
+  }
+
+  .panel-right {
+    flex: 1;
+    position: relative;
+    padding: 12px;
+  }
+
+  .panel-title {
+    font-size: 16px;
+    font-weight: bold;
+    text-align: center;
+    padding: 6px 10px;
+    border-radius: 4px;
+    margin-bottom: 10px;
+  }
+  .title-problem {
+    background-color: #fee2e2;
+    color: #b91c1c;
+    border: 1px solid #f87171;
+  }
+  .title-solution {
+    background-color: #dcfce7;
+    color: #15803d;
+    border: 1px solid #4ade80;
+  }
+
+  /* 木製フェンス（前回の9Pと同じ木目調） */
+  .fence-post {
+    position: absolute;
+    left: 50%;
+    top: 65px;
+    width: 28px;
+    height: 230px;
+    transform: translateX(-50%);
+    background-color: #8d5b32;
+    border: 2px solid #5a381e;
+    border-radius: 2px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-evenly;
+  }
+  .fence-slit {
+    width: 100%;
+    height: 3px;
+    background-color: #5a381e;
+  }
+
+  .fence-label {
+    position: absolute;
+    top: -22px;
+    left: 50%;
+    transform: translateX(-50%);
+    white-space: nowrap;
+    font-size: 13px;
+    font-weight: bold;
+    color: #5a381e;
+  }
+  .fence-thick {
+    position: absolute;
+    bottom: -20px;
+    left: 50%;
+    transform: translateX(-50%);
+    white-space: nowrap;
+    font-size: 11px;
+    color: #666666;
+  }
+
+  /* 弾丸の丸（水色） */
+  .bullet {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background-color: #38bdf8;
+    border: 2px solid #0284c7;
+    position: absolute;
+    top: 170px;
+    transform: translate(-50%, -50%);
+    z-index: 5;
+  }
+  .bullet-label {
+    position: absolute;
+    top: 190px;
+    transform: translateX(-50%);
+    white-space: nowrap;
+    font-size: 12px;
+    font-weight: bold;
+    color: #333333;
+    text-align: center;
+    line-height: 1.3;
+  }
+
+  /* 左パネル */
+  .b1-left { left: 65px; }
+  .l1-left { left: 65px; }
+  .b2-left { left: 405px; }
+  .l2-left { left: 405px; }
+
+  /* 右パネル */
+  .b1-right { left: 65px; }
+  .l1-right { left: 65px; }
+  .b2-virtual {
+    left: 405px;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background-color: transparent;
+    border: 2px dashed #94a3b8;
+    position: absolute;
+    top: 170px;
+    transform: translate(-50%, -50%);
+  }
+  .l2-virtual { left: 405px; }
+
+  /* 左パネル：すり抜け矢印 */
+  .arrow-problem {
+    position: absolute;
+    left: 79px;
+    width: 312px;
+    top: 170px;
+    height: 2px;
+    border-top: 3px dashed #ef4444;
+  }
+  .arrow-problem::after {
+    content: "";
+    position: absolute;
+    right: -2px;
+    top: -6px;
+    border-left: 10px solid #ef4444;
+    border-top: 5px solid transparent;
+    border-bottom: 5px solid transparent;
+  }
+  .traj-text-problem {
+    position: absolute;
+    top: -22px;
+    left: 45%;
+    transform: translateX(-50%);
+    white-space: nowrap;
+    font-size: 12px;
+    color: #dc2626;
+    font-weight: bold;
+  }
+
+  /* 右パネル：スイープ線分 */
+  .sweep-solid {
+    position: absolute;
+    left: 79px;
+    width: 144px; /* 壁左面 236-14=222px -> 222-79=143px */
+    top: 170px;
+    height: 4px;
+    background-color: #2563eb;
+    z-index: 4;
+  }
+  .sweep-dotted {
+    position: absolute;
+    left: 236px;
+    width: 155px;
+    top: 170px;
+    height: 2px;
+    border-top: 2px dotted #94a3b8;
+  }
+  .sweep-label-text {
+    position: absolute;
+    top: -24px;
+    left: 50%;
+    transform: translateX(-50%);
+    white-space: nowrap;
+    font-size: 12px;
+    color: #2563eb;
+    font-weight: bold;
+  }
+
+  /* 表面交点マーカー */
+  .hit-star {
+    position: absolute;
+    left: 222px;
+    top: 170px;
+    transform: translate(-50%, -50%);
+    width: 18px;
+    height: 18px;
+    background-color: #eab308;
+    border: 2px solid #ca8a04;
+    border-radius: 50%;
+    z-index: 10;
+  }
+  .hit-label {
+    position: absolute;
+    left: 222px;
+    top: 110px;
+    transform: translateX(-50%);
+    background-color: #fef08a;
+    border: 1px solid #eab308;
+    color: #854d0e;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: bold;
+    white-space: nowrap;
+    text-align: center;
+    z-index: 10;
+  }
+
+  /* 下部の結論バッジ（前回のスライド16Pと同じ手作り感） */
+  .result-box {
+    position: absolute;
+    bottom: 25px;
+    left: 20px;
+    right: 20px;
+    padding: 12px 14px;
+    border-radius: 6px;
+    text-align: center;
+    line-height: 1.4;
+  }
+  .result-problem {
+    background-color: #b91c1c;
+    color: #ffffff;
+  }
+  .result-solution {
+    background-color: #15803d;
+    color: #ffffff;
+  }
+  .result-main {
+    font-size: 15px;
+    font-weight: bold;
+  }
+  .result-sub {
+    font-size: 12px;
+    margin-top: 3px;
+    opacity: 0.95;
+  }
+</style>
+</head>
+<body>
+
+  <div class="canvas">
+    
+    <!-- 左側：離散判定の課題（すり抜け） -->
+    <div class="panel-left">
+      <div class="panel-title title-problem">【従来の離散判定】 点の判定</div>
+
+      <div class="fence-post">
+        <div class="fence-label">木製フェンス</div>
+        <div class="fence-slit"></div>
+        <div class="fence-slit"></div>
+        <div class="fence-slit"></div>
+        <div class="fence-thick">厚み: 40cm</div>
+      </div>
+
+      <div class="bullet b1-left"></div>
+      <div class="bullet-label l1-left">
+        Frame 1<br>(壁の手前)
+      </div>
+
+      <div class="bullet b2-left"></div>
+      <div class="bullet-label l2-left">
+        Frame 2<br>(壁の奥へワープ)
+      </div>
+
+      <div class="arrow-problem">
+        <div class="traj-text-problem">移動量: 80cm ＞ 厚み: 40cm</div>
+      </div>
+
+      <div class="result-box result-problem">
+        <div class="result-main">❌ 接触検知なし（すり抜け発生）</div>
+        <div class="result-sub">板の中に弾が存在する瞬間がなく、壁を素通りする</div>
+      </div>
+    </div>
+
+    <!-- 右側：CCDによる解決策（線分判定） -->
+    <div class="panel-right">
+      <div class="panel-title title-solution">【今回のCCD判定】 移動線分の判定</div>
+
+      <div class="fence-post">
+        <div class="fence-label">木製フェンス</div>
+        <div class="fence-slit"></div>
+        <div class="fence-slit"></div>
+        <div class="fence-slit"></div>
+        <div class="fence-thick">厚み: 40cm</div>
+      </div>
+
+      <div class="bullet b1-right"></div>
+      <div class="bullet-label l1-right">
+        始点 P_prev<br>(前フレーム)
+      </div>
+
+      <div class="b2-virtual"></div>
+      <div class="bullet-label l2-virtual" style="color: #64748b;">
+        終点 P_curr<br>(仮想到達点)
+      </div>
+
+      <div class="sweep-solid">
+        <div class="sweep-label-text">移動線分として計算</div>
+      </div>
+      <div class="sweep-dotted"></div>
+
+      <div class="hit-star"></div>
+      <div class="hit-label">
+        ★ 表面交点 P_hit<br>(媒介変数 t_min を算出)
+      </div>
+
+      <div class="result-box result-solution">
+        <div class="result-main">⭕ 表面で100%確実にキャッチ！</div>
+        <div class="result-sub">すり抜け率 0% ／ 表面で弾丸消滅・火花スパーク発生</div>
+      </div>
+    </div>
+
+  </div>
+
+</body>
+</html>

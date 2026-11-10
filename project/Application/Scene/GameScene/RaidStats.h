@@ -8,6 +8,13 @@
 /// </summary>
 struct RaidStats
 {
+    static constexpr float kDefaultMaxRaidTime = 300.0f; // 5分 (300秒)
+    static constexpr int   kDefaultTotalTargets = 3;
+    static constexpr float kDefaultMaxHp = 100.0f;
+    static constexpr float kPercentMultiplier = 100.0f;
+    static constexpr const char* kDefaultCauseOfDeath = "HOSTILE GUNFIRE (7.62x39mm PS)";
+    static constexpr const char* kDefaultKillerName   = "HOSTILE PATROL";
+
     static RaidStats& GetInstance()
     {
         static RaidStats instance;
@@ -16,38 +23,34 @@ struct RaidStats
 
     void Reset()
     {
-        raidTime = 0.0f;
-        maxRaidTime = 300.0f; // 5分 (300秒)
-        enemiesKilled = 0;
-        targetsDestroyed = 0;
-        totalTargets = 3;
-        shotsFired = 0;
-        shotsHit = 0;
-        totalLootValue = 0;
-        medkitsUsed = 0;
-        isSurvived = false;
-        isMIA = false;
-        causeOfDeath = "HOSTILE GUNFIRE (7.62x39mm PS)";
-        killerName = "HOSTILE PATROL";
+        *this = RaidStats{};
     }
 
     float raidTime = 0.0f;
-    float maxRaidTime = 300.0f; // 5分
+    float maxRaidTime = kDefaultMaxRaidTime;
     int enemiesKilled = 0;
     int targetsDestroyed = 0;
-    int totalTargets = 3;
+    int totalTargets = kDefaultTotalTargets;
     int shotsFired = 0;
     int shotsHit = 0;
     int totalLootValue = 0;
     int medkitsUsed = 0;
+    float remainingHp = kDefaultMaxHp;
+    float maxHp = kDefaultMaxHp;
+    int damageTakenCount = 0;
+    int lootedGoldDucks = 0;
+    int lootedCashCount = 0;
+    int lootedCashValue = 0;
+    int lootedMedkits = 0;
+    int lootedAmmoBoxes = 0;
     bool isSurvived = false;
     bool isMIA = false;
-    std::string causeOfDeath = "HOSTILE GUNFIRE (7.62x39mm PS)";
-    std::string killerName = "HOSTILE PATROL";
+    std::string causeOfDeath = kDefaultCauseOfDeath;
+    std::string killerName = kDefaultKillerName;
 
     float GetAccuracy() const
     {
-        return shotsFired > 0 ? (static_cast<float>(shotsHit) / static_cast<float>(shotsFired)) * 100.0f : 0.0f;
+        return shotsFired > 0 ? (static_cast<float>(shotsHit) / static_cast<float>(shotsFired)) * kPercentMultiplier : 0.0f;
     }
 
     float GetRemainingTime() const

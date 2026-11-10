@@ -93,6 +93,8 @@
     <ClCompile Include="Application\Obstacle.cpp" />
     <ClCompile Include="Application\Transition\StingerTransition.cpp" />
     <ClCompile Include="Application\Transition\DeathTransition.cpp" />
+    <ClCompile Include="Application\UI\TacticalUICanvas.cpp" />
+    <ClCompile Include="Application\Environment\SkyCloudSystem.cpp" />
     <ClCompile Include="Baziru3_Engine\Graphics\Light\Light.cpp" />
     <ClCompile Include="Baziru3_Engine\Graphics\Light\CascadingShadowMap.cpp" />
 
@@ -239,6 +241,16 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</ExcludedFromBuild>
     </FxCompile>
+    <FxCompile Include="Resources\shaders\TacticalUI.VS.hlsl">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </FxCompile>
+    <FxCompile Include="Resources\shaders\TacticalUI.PS.hlsl">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </FxCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Baziru3_Engine\Framework\Collision\SoftBodyDeformer.h" />
@@ -356,6 +368,8 @@
     <ClInclude Include="Application\LevelEditor.h" />
     <ClInclude Include="Application\Transition\StingerTransition.h" />
     <ClInclude Include="Application\Transition\DeathTransition.h" />
+    <ClInclude Include="Application\UI\TacticalUICanvas.h" />
+    <ClInclude Include="Application\Environment\SkyCloudSystem.h" />
     <ClInclude Include="Baziru3_Engine\3D\Water\River.h" />
     <ClInclude Include="Baziru3_Engine\3D\Procedural\BioProceduralGenerator.h" />
     <ClInclude Include="Baziru3_Engine\Graphics\3D\Object\SkinningObject3dCom.h" />
@@ -481,10 +495,6 @@
       <AdditionalDependencies>imgui.lib;assimp-vc143-mtd.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(ProjectDir)..\generated\output\$(Configuration);$(ProjectDir)..\generated\output\Debug;$(ProjectDir)externals\assimp\lib\$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
-    <PostBuildEvent>
-      <Command>if not exist "$(TargetDir)" mkdir "$(TargetDir)"
-xcopy /y /d "$(ProjectDir)externals\dxc\*.dll" "$(OutDir)"</Command>
-    </PostBuildEvent>
     <Manifest>
       <EnableDpiAwareness>PerMonitorHighDPIAware</EnableDpiAwareness>
     </Manifest>
@@ -513,11 +523,6 @@ xcopy /y /d "$(ProjectDir)externals\dxc\*.dll" "$(OutDir)"</Command>
       <AdditionalDependencies>imgui.lib;assimp-vc143-mt.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(ProjectDir)..\generated\output\$(Configuration);$(ProjectDir)..\generated\output\Release;$(ProjectDir)externals\assimp\lib\$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
-    <PostBuildEvent>
-      <Command>if not exist "$(TargetDir)" mkdir "$(TargetDir)"
-xcopy /E /Y /I /D "$(ProjectDir)Resources" "$(TargetDir)Resources"
-xcopy /y /d "$(ProjectDir)externals\dxc\*.dll" "$(OutDir)"</Command>
-    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Development|x64'">
     <ClCompile>
@@ -544,15 +549,19 @@ xcopy /y /d "$(ProjectDir)externals\dxc\*.dll" "$(OutDir)"</Command>
       <AdditionalDependencies>imgui.lib;assimp-vc143-mt.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(ProjectDir)..\generated\output\$(Configuration);$(ProjectDir)..\generated\output\Development;$(ProjectDir)..\generated\output\Release;$(ProjectDir)externals\assimp\lib\Release;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
-    <PostBuildEvent>
-      <Command>if not exist "$(TargetDir)" mkdir "$(TargetDir)"
-xcopy /E /Y /I /D "$(ProjectDir)Resources" "$(TargetDir)Resources"
-xcopy /y /d "$(ProjectDir)externals\dxc\*.dll" "$(OutDir)"</Command>
-    </PostBuildEvent>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
+  <Target Name="SyncRuntimeResources" AfterTargets="Build">
+    <ItemGroup>
+      <GameResourceFiles Include="$(ProjectDir)Resources\**\*.*" />
+      <DxcDllFiles Include="$(ProjectDir)externals\dxc\*.dll" />
+    </ItemGroup>
+    <MakeDir Directories="$(TargetDir);$(TargetDir)Resources;$(OutDir)" />
+    <Copy SourceFiles="@(GameResourceFiles)" DestinationFiles="@(GameResourceFiles->'$(TargetDir)Resources\%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="@(DxcDllFiles)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
+  </Target>
   <Target Name="CopyDxCompilerDll" AfterTargets="Build">
     <Copy SourceFiles="$(ProjectDir)externals\dxc\dxcompiler.dll" DestinationFiles="$(OutDir)dxcompiler.dll" Condition="Exists('$(ProjectDir)externals\dxc\dxcompiler.dll')" SkipUnchangedFiles="true" />
     <Copy SourceFiles="$(ProjectDir)externals\dxc\dxil.dll" DestinationFiles="$(OutDir)dxil.dll" Condition="Exists('$(ProjectDir)externals\dxc\dxil.dll')" SkipUnchangedFiles="true" />

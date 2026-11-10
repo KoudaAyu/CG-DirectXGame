@@ -14,14 +14,17 @@ class OffScreenRendering;
 /// 軍用メディバック・ヘビーシャッタートランジション (DeathTransition)
 /// 
 /// 死亡時（GamePlayScene -> GameOverScene）専用の超シネマティック軍用画面切り替え演出。
-/// 従来のポップな斜めストライプ（StingerTransition）を完全排除し、
-/// 上下から重厚な装甲ブラストシャッターがクランプ密閉。
-/// 画面中央の継ぎ目で心電図（ECG）がフラットライン化し、軍用救難テレメトリが表示。
+/// 上下から重厚な装甲ブラストシャッターがクランプ密閉し、中央で心電図（ECG）がフラットライン化。
 /// シーン切り替え完了後、救難ヘリのカーゴドアのようにシャッターが上下に開き、
-/// 夜間暴風雨の中を飛翔するメディバックヘリの3Dジオラマ（GameOverScene）へとシームレスに直結します。
+/// 夜間救難作戦の3Dジオラマ（GameOverScene）へとシームレスに直結します。
 /// </summary>
 class DeathTransition {
 public:
+    static constexpr const char* kDefaultTargetScene  = "GAMEOVER";
+    static constexpr float       kDefaultDuration     = 1.70f;
+    static constexpr float       kDefaultScreenWidth  = 1280.0f;
+    static constexpr float       kDefaultScreenHeight = 720.0f;
+
     static DeathTransition* GetInstance();
 
     /// @brief 初期化（スプライトリソースの生成）
@@ -36,15 +39,13 @@ public:
     /// @brief 3D/スプライト描画
     void Draw(const RenderContext& ctx);
 
-    /// @brief 2D ImGui HUD（心電図フラットライン・軍用テレメトリ）描画
+    /// @brief 2D DirectX 12 ネイティブHUD（心電図フラットライン）描画
     void DrawUI();
 
     /// <summary>
     /// 死亡専用トランジションを開始してGameOverSceneへ切り替える
     /// </summary>
-    /// @param nextSceneName 切り替え先（デフォルト: "GAMEOVER"）
-    /// @param duration トランジション全体の秒数（デフォルト 1.70秒）
-    void StartTransition(const std::string& nextSceneName = "GAMEOVER", float duration = 1.70f);
+    void StartTransition(const std::string& nextSceneName = kDefaultTargetScene, float duration = kDefaultDuration);
 
     [[nodiscard]] bool IsTransitioning() const { return isActive_; }
     [[nodiscard]] float GetProgress() const { return progress_; }
@@ -56,6 +57,9 @@ private:
     ~DeathTransition() = default;
     DeathTransition(const DeathTransition&) = delete;
     DeathTransition& operator=(const DeathTransition&) = delete;
+
+    void RefreshViewportMetrics();
+    void ApplyResponsiveSpriteSizes();
 
 private:
     SpriteCom* spriteCom_ = nullptr;
@@ -71,24 +75,26 @@ private:
     std::unique_ptr<Sprite> upperLip_;
     std::unique_ptr<Sprite> lowerLip_;
 
-    // ハザード警告ライン（ミリタリーアンバーゴールド＆クリムゾン）
+    // ハザード警告ライン（ミリタリーアンバーゴールド）
     std::unique_ptr<Sprite> upperHazardStripe_;
     std::unique_ptr<Sprite> lowerHazardStripe_;
 
     // 画面中央継ぎ目の密閉スリットライン
     std::unique_ptr<Sprite> centerSeamBar_;
 
-    // 完全密閉時の完全暗黒セーフティバックドロップ
+    // 完全密閉時の暗黒セーフティバックドロップ
     std::unique_ptr<Sprite> safetyBackdrop_;
 
     bool isActive_ = false;
     bool hasSwitched_ = false;
+    bool slamSoundPlayed_ = false;
+    bool openSoundPlayed_ = false;
     float timer_ = 0.0f;
-    float duration_ = 1.70f;
+    float duration_ = kDefaultDuration;
     float progress_ = 0.0f;
 
-    std::string pendingSceneName_ = "GAMEOVER";
+    std::string pendingSceneName_ = kDefaultTargetScene;
 
-    float screenWidth_ = 1280.0f;
-    float screenHeight_ = 720.0f;
+    float screenWidth_ = kDefaultScreenWidth;
+    float screenHeight_ = kDefaultScreenHeight;
 };

@@ -2,6 +2,7 @@
 #include <vector>
 #include <string>
 #include <memory>
+#include <cstdint>
 #include "Vector.h"
 
 class Player;
@@ -29,7 +30,8 @@ struct LootableProp
     int value             = 0;                    // 換金価値（ルーブル）または補給量
     bool isLooted         = false;                // 回収済みフラグ
     float searchTimer     = 0.0f;                 // 探索進捗タイマー (秒)
-    float maxSearchTime   = 1.2f;                 // 探索完了に必要な長押し秒数
+    static constexpr float kDefaultMaxSearchTime = 1.2f; // 既定の探索所要時間 (秒)
+    float maxSearchTime   = kDefaultMaxSearchTime;// 探索完了に必要な長押し秒数
 };
 
 /// <summary>
@@ -82,7 +84,15 @@ public:
     /// <summary>
     /// 毎フレームの更新（プレイヤー接近判定、[E]長押し探索進行、アイテム取得処理）
     /// </summary>
-    void Update(float deltaTime, Player* player, AppParticleManager* particleMgr, std::vector<FloatingText>& floatingTexts);
+    void Update(
+        float deltaTime,
+        Player* player,
+        AppParticleManager* particleMgr,
+        std::vector<FloatingText>& floatingTexts,
+        AppParticleManager* smokeMgr = nullptr,
+        uint32_t dustTex = UINT32_MAX,
+        uint32_t chipTex = UINT32_MAX,
+        uint32_t sparkTex = UINT32_MAX);
 
     /// <summary>
     /// 全物資プロップリストの参照を取得

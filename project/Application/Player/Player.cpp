@@ -1,676 +1,905 @@
 #include "Player.h"
+#include "PlayerTuning.h"
+#include "DuckPartRig.h"
 #include "Object3d.h"
 #include "Object3dCom.h"
 #include "TextureManager.h"
 #include "SceneManager.h"
 #include "Application/GameObject/Bullet.h"
+#include "Application/Audio/TacticalAudio.h"
+#include "Application/Config/AppDebugConfig.h"
+#include "Application/UI/TacticalUICanvas.h"
 #include "Baziru3_Engine/Core/IO/Mouse/MouseInput.h"
 #include "Matrix4x4.h"
 #include <Windows.h>
 #include <cmath>
 #include <algorithm>
+#include <filesystem>
 #include "../Scene/GameScene/RaidStats.h"
 
-// =============================================================================
-// 初期化 & 解放 (Lifecycle)
-// =============================================================================
+namespace
+{
+    constexpr Vector3 kZeroVec3  = { 0.0f, 0.0f, 0.0f };
+    constexpr Vector3 kUnitScale = { 1.0f, 1.0f, 1.0f };
+
+    inline float SmoothStep01(float t)
+    {
+        t = (std::clamp)(t, 0.0f, 1.0f);
+        return t * t * (PlayerTuning::kSmoothStepCubicBias - 2.0f * t);
+    }
+
+    inline float ComputeReloadCantEnvelope(float progress)
+    {
+        using namespace PlayerTuning::ReloadAnim;
+        return SmoothStep01(progress / kCantInSpan) * (1.0f - SmoothStep01((progress - kCantOutStart) / kCantOutSpan));
+    }
+
+    inline float RandRecoil01() { return static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX); }
+    inline float RandRecoilRange(float minVal, float maxVal) { return minVal + (maxVal - minVal) * RandRecoil01(); }
+
+    inline Vector2 ResolveClientSize(float rawW, float rawH)
+    {
+        return { (rawW > 0.0f) ? rawW : kUIDefaultDisplayWidth, (rawH > 0.0f) ? rawH : kUIDefaultDisplayHeight };
+    }
+
+    inline void SetObjectTransform(Object3d* obj, const Vector3& pos, const Vector3& rot, const Vector3& scale, bool doUpdate = false)
+    {
+        if (!obj) return;
+        obj->SetTranslate(pos);
+        obj->SetRotate(rot);
+        obj->SetScale(scale);
+        if (doUpdate) obj->Update();
+    }
+
+    inline void AttachLimbPreset(
+        Object3d* const (&limbs)[PlayerTuning::kDuckLimbCount],
+        const PlayerTuning::Anim::LimbPoseSpec (&poses)[PlayerTuning::kDuckLimbCount],
+        const Vector3& bodyPos, const Vector3& bodyScale, const Matrix4x4& bodyRotMat)
+    {
+        for (int i = 0; i < PlayerTuning::kDuckLimbCount; ++i)
+        {
+            DuckPartRig::AttachLimbToBody(limbs[i], poses[i].pivot, poses[i].extraOffset, poses[i].jointRot, bodyPos, bodyScale, bodyRotMat);
+        }
+    }
+}
 
 // =============================================================================
 // 軍用アサルトライフル 3Dプロシージャルメッシュ生成 (BuildRifleModel)
 // =============================================================================
 
-void Player::BuildRifleModel(Object3d::ModelData& data)
+void Player::BuildRifleModel(Object3d::ModelData& data, bool includeMagazine)
 {
+    using namespace PlayerTuning::Weapon;
+    const size_t totalBoxes = std::size(kRifleBaseBoxes) + (includeMagazine ? std::size(kRifleMagazineBoxes) : 0u);
     data.vertices.clear();
     data.indices.clear();
+    data.vertices.reserve(totalBoxes * static_cast<size_t>(DuckPartRig::kBoxFaceCount * DuckPartRig::kBoxFaceVertCount));
+    data.indices.reserve(totalBoxes * static_cast<size_t>(DuckPartRig::kBoxFaceCount * DuckPartRig::kBoxFaceCount));
 
-    auto AddBox = [&](const Vector3& minP, const Vector3& maxP)
+    for (const DuckPartRig::BoxBounds& box : kRifleBaseBoxes) DuckPartRig::AppendBox(data, box.minP, box.maxP);
+    if (includeMagazine)
     {
-        uint32_t baseIdx = static_cast<uint32_t>(data.vertices.size());
-        Vector3 corners[8] = {
-            { minP.x, minP.y, minP.z }, { maxP.x, minP.y, minP.z },
-            { maxP.x, maxP.y, minP.z }, { minP.x, maxP.y, minP.z },
-            { minP.x, minP.y, maxP.z }, { maxP.x, minP.y, maxP.z },
-            { maxP.x, maxP.y, maxP.z }, { minP.x, maxP.y, maxP.z },
-        };
-        Vector3 normals[6] = {
-            { 0, 0, -1 }, { 0, 0, 1 }, { -1, 0, 0 }, { 1, 0, 0 }, { 0, -1, 0 }, { 0, 1, 0 }
-        };
-        int faces[6][4] = {
-            { 0, 3, 2, 1 }, { 4, 5, 6, 7 }, { 0, 4, 7, 3 },
-            { 1, 2, 6, 5 }, { 0, 1, 5, 4 }, { 3, 7, 6, 2 }
-        };
-        for (int f = 0; f < 6; ++f)
-        {
-            uint32_t faceStart = static_cast<uint32_t>(data.vertices.size());
-            for (int v = 0; v < 4; ++v)
-            {
-                Sprite::VertexData vert{};
-                vert.position = { corners[faces[f][v]].x, corners[faces[f][v]].y, corners[faces[f][v]].z, 1.0f };
-                vert.texcoord = { (v == 1 || v == 2) ? 1.0f : 0.0f, (v >= 2) ? 1.0f : 0.0f };
-                vert.normal = normals[f];
-                data.vertices.push_back(vert);
-            }
-            data.indices.push_back(faceStart + 0);
-            data.indices.push_back(faceStart + 1);
-            data.indices.push_back(faceStart + 2);
-            data.indices.push_back(faceStart + 0);
-            data.indices.push_back(faceStart + 2);
-            data.indices.push_back(faceStart + 3);
-        }
-    };
-
-    // 1. レシーバー（機関部）
-    AddBox({ -0.04f, -0.04f, -0.20f }, { 0.04f, 0.06f, 0.20f });
-    // 2. バレル（細長い銃身）
-    AddBox({ -0.02f, 0.01f, 0.20f }, { 0.02f, 0.04f, 0.65f });
-    // 3. マガジン（湾曲30連マガジン）
-    AddBox({ -0.025f, -0.22f, 0.02f }, { 0.025f, -0.04f, 0.12f });
-    // 4. ストック（銃床）
-    AddBox({ -0.035f, -0.08f, -0.48f }, { 0.035f, 0.04f, -0.20f });
-    // 5. ハンドガード（被筒）
-    AddBox({ -0.03f, -0.03f, 0.20f }, { 0.03f, 0.05f, 0.42f });
-    // 6. 光学タクティカルスコープ（機関部レール上）
-    AddBox({ -0.02f, 0.07f, -0.10f }, { 0.02f, 0.12f, 0.12f });
-    // 7. マズルブレーキ / 消炎器
-    AddBox({ -0.025f, 0.005f, 0.65f }, { 0.025f, 0.045f, 0.72f });
-
-    data.boundingRadius = 0.9f;
+        for (const DuckPartRig::BoxBounds& box : kRifleMagazineBoxes) DuckPartRig::AppendBox(data, box.minP, box.maxP);
+    }
+    data.boundingRadius = kRifleBoundingRadius;
 }
+
+// =============================================================================
+// 初期化 & 解放 (Lifecycle)
+// =============================================================================
 
 void Player::Initialize(Object3dCom* object3dCom, Camera* camera)
 {
     object3dCom_ = object3dCom;
     camera_ = camera;
+    defaultTextureIndex_ = TextureManager::GetInstance()->Load("Resources/duck.png");
 
-    // OBJモデルの読み込みとObject3dコンポーネントの初期化
-    Object3d::ModelData model = Object3d::LoadObjFile("Resources", "player.obj");
-    if (model.material.textureFilePath.empty())
+    // アヒルの5分割アーティキュレーションメッシュ（胴体＋左右水かき足＋左右の翼）を初期化
+    const DuckPartRig::SplitMeshSet& split = DuckPartRig::GetCachedDuckSplitMeshes();
+    auto initDuckPart = [&](std::unique_ptr<Object3d>& dst, Object3d::ModelData partData)
     {
-        model.material.textureFilePath = "Resources/duck.png";
-    }
+        if (partData.material.textureFilePath.empty()) partData.material.textureFilePath = "Resources/duck.png";
+        partData.material.textureIndex = (defaultTextureIndex_ != TextureManager::kInvalidTextureIndex) ? defaultTextureIndex_ : 0u;
+        partData.boundingRadius = DuckPartRig::kDuckPartBoundingRadius;
 
-    float maxDistSq = 0.0f;
-    for (const auto& v : model.vertices)
-    {
-        float distSq = v.position.x * v.position.x + v.position.y * v.position.y + v.position.z * v.position.z;
-        if (distSq > maxDistSq) maxDistSq = distSq;
-    }
-    model.boundingRadius = (std::max)(std::sqrt(maxDistSq), 4.0f);
+        dst = std::make_unique<Object3d>();
+        dst->Initialize(object3dCom_, partData);
+        dst->SetCamera(camera_);
+        dst->SetScale(kUnitScale);
+        dst->SetRotate(kZeroVec3);
+        dst->SetColor(PlayerTuning::Visual::kDefaultBodyColor);
+    };
 
-    object3d_ = std::make_unique<Object3d>();
-    object3d_->Initialize(object3dCom_, model);
-    object3d_->SetCamera(camera_);
+    initDuckPart(object3d_, split.body);
+    initDuckPart(leftFootObject_, split.leftFoot);
+    initDuckPart(rightFootObject_, split.rightFoot);
+    initDuckPart(leftWingObject_, split.leftWing);
+    initDuckPart(rightWingObject_, split.rightWing);
 
-    // 初期トランスフォームの設定
-    position_ = { 0.0f, 0.0f, 0.0f };
-    drawPos_ = position_;
+    position_ = drawPos_ = kZeroVec3;
     object3d_->SetTranslate(position_);
-    object3d_->SetScale({ 1.0f, 1.0f, 1.0f });
-    object3d_->SetRotate({ 0.0f, 0.0f, 0.0f });
-    object3d_->SetColor({ 1.0f, 1.0f, 1.0f, 1.0f });
 
-    // アヒルモデルの体型に合わせたスフィアコライダーの初期化と登録
     collider_ = std::make_unique<SphereCollider>(kColliderRadius, &position_, CollisionAttribute::Player);
     collider_->SetPositionOffset({ 0.0f, kColliderRadius, 0.0f });
     CollisionManager::GetInstance()->RegisterCollider(collider_.get());
 
-    defaultTextureIndex_ = TextureManager::GetInstance()->Load("Resources/duck.png");
+    auto initWeaponPart = [&](std::unique_ptr<Object3d>& dst, const Object3d::ModelData& model, const Vector4& color)
+    {
+        dst = std::make_unique<Object3d>();
+        dst->Initialize(object3dCom_, model);
+        dst->SetCamera(camera_);
+        dst->SetScale(kUnitScale);
+        dst->SetColor(color);
+        dst->SetEnableLighting(true);
+        dst->SetAllowWireframeOverlay(false);
+    };
 
-    // ステージ開始時から携行する軍用アサルトライフル3Dモデルの初期化
+    // 軍用アサルトライフル3Dモデルの初期化（マグウェル開放型）
     Object3d::ModelData rifleModel{};
-    BuildRifleModel(rifleModel);
+    BuildRifleModel(rifleModel, false);
     rifleTextureIndex_ = TextureManager::GetInstance()->Load("Resources/container_military.png");
     rifleModel.material.textureFilePath = "Resources/container_military.png";
-    rifleModel.material.textureIndex = (rifleTextureIndex_ != TextureManager::kInvalidTextureIndex) ? rifleTextureIndex_ : 0;
+    rifleModel.material.textureIndex = (rifleTextureIndex_ != TextureManager::kInvalidTextureIndex) ? rifleTextureIndex_ : 0u;
+    initWeaponPart(rifleObject_, rifleModel, PlayerTuning::Weapon::kRifleGunmetalColor);
 
-    rifleObject_ = std::make_unique<Object3d>();
-    rifleObject_->Initialize(object3dCom_, rifleModel);
-    rifleObject_->SetCamera(camera_);
-    rifleObject_->SetScale({ 1.0f, 1.0f, 1.0f });
-    rifleObject_->SetColor({ 0.20f, 0.20f, 0.22f, 1.0f }); // 軍用ガンメタルブラック
-    rifleObject_->SetEnableLighting(true);
-    rifleObject_->SetAllowWireframeOverlay(false);
+    // 着脱式3D湾曲PMAGの初期化
+    rifleMagTextureIndex_ = TextureManager::GetInstance()->Load("Resources/duckov_magazine_tex.png");
+    if (rifleMagTextureIndex_ == TextureManager::kInvalidTextureIndex) rifleMagTextureIndex_ = rifleTextureIndex_;
 
-    // 全ステータスをデフォルト定数でリセット
+    const bool hasMagObj = std::filesystem::exists("Resources/duckov_magazine_rifle.obj")
+                        || std::filesystem::exists("project/Resources/duckov_magazine_rifle.obj");
+    Object3d::ModelData magModel{};
+    if (hasMagObj) magModel = Object3d::LoadObjFile("Resources", "duckov_magazine_rifle.obj");
+    else           BuildRifleModel(magModel, true);
+    magModel.material.textureFilePath = "Resources/duckov_magazine_tex.png";
+    magModel.material.textureIndex = (rifleMagTextureIndex_ != TextureManager::kInvalidTextureIndex) ? rifleMagTextureIndex_ : 0u;
+    magModel.boundingRadius = PlayerTuning::Weapon::kMagazineBoundingRadius;
+
+    initWeaponPart(rifleMagObject_, magModel, PlayerTuning::Visual::kDefaultBodyColor);
+    rifleMagObject_->SetReflectionFactor(PlayerTuning::Weapon::kMagazineReflection);
+    rifleMagObject_->SetFresnelF0(PlayerTuning::Weapon::kMagazineFresnelF0);
+
     Reset();
 }
 
 void Player::Finalize()
 {
-    // コライダーの登録解除とメモリ解放
-    if (collider_)
+    if (collider_) { CollisionManager::GetInstance()->UnregisterCollider(collider_.get()); collider_.reset(); }
+    for (auto* part : { &leftFootObject_, &rightFootObject_, &leftWingObject_, &rightWingObject_, &object3d_, &rifleMagObject_, &rifleObject_ })
     {
-        CollisionManager::GetInstance()->UnregisterCollider(collider_.get());
-        collider_.reset();
+        part->reset();
     }
-    if (object3d_)
-    {
-        object3d_.reset();
-    }
-    if (rifleObject_)
-    {
-        rifleObject_.reset();
-    }
+}
+
+void Player::SetPosition(const Vector3& pos)
+{
+    position_ = drawPos_ = pos;
+    if (object3d_) SyncDuckVisualAndWeaponPose();
+}
+
+bool Player::ConsumeFootstepDust(Vector3& outWorldPos)
+{
+    if (!pendingFootstepDust_) return false;
+    pendingFootstepDust_ = false;
+    outWorldPos = lastFootstepWorldPos_;
+    return true;
 }
 
 void Player::Reset()
 {
-    // 体力とステートの初期化
     hp_ = maxHp_ = kDefaultMaxHp;
-    isDead_ = false;
-    invincibilityTimer_ = 0.0f;
-    hitFlashTimer_ = 0.0f;
-    lastAttackerPosition_ = { 0.0f, 0.0f, 0.0f };
-    hasAttackerPosition_ = false;
+    isDead_ = hasAttackerPosition_ = false;
+    invincibilityTimer_ = hitFlashTimer_ = 0.0f;
+    lastAttackerPosition_ = kZeroVec3;
 
-    // 弾薬とリロードの初期化
     magazineAmmo_ = maxMagazineAmmo_ = kDefaultMaxMagazineAmmo;
     reserveAmmo_ = kDefaultReserveAmmo;
-    isReloading_ = false;
-    reloadTimer_ = 0.0f;
-    reloadCancelledTimer_ = 0.0f;
+    isReloading_ = wasDryReload_ = false;
+    reloadTimer_ = reloadCancelledTimer_ = 0.0f;
+    suppressShootUntilMouseRelease_ = true;
 
-    // 物資と治療の初期化
     medkitCount_ = kDefaultMedkitCount;
     lootValue_ = 0;
     isHealing_ = false;
     healTimer_ = 0.0f;
 
-    // 回避とスタミナの初期化
-    isDodging_ = false;
+    isDodging_ = prevSpacePressed_ = false;
     dodgeTimer_ = 0.0f;
     dodgeDirection_ = { 0.0f, 0.0f, 1.0f };
     stamina_ = maxStamina_ = kDefaultMaxStamina;
-    prevSpacePressed_ = false;
 
-    // 照準拡散とトランスフォームの初期化
-    currentSpread_ = 0.0f;
-    isMoving_ = false;
-    isInCover_ = false;
-    position_ = { 0.0f, 0.0f, 0.0f };
-    drawPos_ = position_;
+    currentSpread_ = recoilHeat_ = recoilKickVisual_ = 0.0f;
+    reticleRecoilOffset_ = reticleRecoilVel_ = { 0.0f, 0.0f };
+    effectiveReticleScreenPos_ = kDefaultReticleScreenPos;
+    aimRayDistance_ = kDefaultAimRayDistance;
+    recoilSideSign_ = 1;
+    isMoving_ = isInCover_ = false;
+    position_ = drawPos_ = kZeroVec3;
+
+    aimYaw_ = walkBlend_ = sprintBlend_ = idleAnimTime_ = smoothedLocalMoveRight_ = 0.0f;
+    walkPhase_ = PlayerTuning::Anim::kInitialWalkPhase;
+    moveInputDir_ = kZeroVec3;
+    smoothedLocalMoveFwd_ = 1.0f;
+    isInIntroPose_ = pendingFootstepDust_ = false;
+    lastFootstepWorldPos_ = position_;
+    currentBodyColor_ = PlayerTuning::Visual::kDefaultBodyColor;
 
     if (object3d_)
     {
-        object3d_->SetTranslate(position_);
-        object3d_->SetRotate({ 0.0f, 0.0f, 0.0f });
-        object3d_->SetColor({ 1.0f, 1.0f, 1.0f, 1.0f });
+        SetObjectTransform(object3d_.get(), position_, kZeroVec3, kUnitScale);
+        object3d_->SetColor(currentBodyColor_);
     }
 
     rifleRecoil_ = 0.0f;
-    if (rifleObject_)
-    {
-        rifleObject_->SetScale({ 1.0f, 1.0f, 1.0f });
-        rifleObject_->SetColor({ 0.20f, 0.20f, 0.22f, 1.0f });
-    }
+    rifleMagVisible_ = true;
+    isWeaponHolstered_ = prevCPressed_ = false;
+    if (rifleObject_)    { rifleObject_->SetScale(kUnitScale);    rifleObject_->SetColor(PlayerTuning::Weapon::kRifleGunmetalColor); }
+    if (rifleMagObject_) { rifleMagObject_->SetScale(kUnitScale); rifleMagObject_->SetColor(PlayerTuning::Visual::kDefaultBodyColor); }
+    SyncDuckVisualAndWeaponPose();
 }
 
 // =============================================================================
 // メイン更新ループ (Update)
 // =============================================================================
 
-void Player::Update(float deltaTime, MouseInput* mouseInput)
+void Player::CancelReloadWithNotify()
 {
-    if (!object3d_) return;
+    isReloading_ = false;
+    reloadTimer_ = 0.0f;
+    reloadCancelledTimer_ = kReloadCancelledNotifyDuration;
+}
 
-    // 死亡時は入力を受け付けず、描画トランスフォームの更新のみ行って早期リターン
-    if (isDead_)
-    {
-        object3d_->Update();
-        return;
-    }
+void Player::UpdateActionStates(float deltaTime, const MouseInput* mouseInput)
+{
+    using namespace PlayerTuning::Audio;
+    const bool textCaptured = AppDebugState::IsImGuiCapturingTextInput();
 
-    const float frameScale = deltaTime * 60.0f;
+    if (reloadCancelledTimer_ > 0.0f) reloadCancelledTimer_ = (std::max)(0.0f, reloadCancelledTimer_ - deltaTime);
 
-    // --- 1. リロードキャンセル通知タイマーの減算 ---
-    if (reloadCancelledTimer_ > 0.0f)
-    {
-        reloadCancelledTimer_ -= deltaTime;
-        if (reloadCancelledTimer_ < 0.0f) reloadCancelledTimer_ = 0.0f;
-    }
-
-    // --- 2. 救急キット回復処理の進行 ---
+    // 救急キット回復処理の進行 / [Q] または [1] キーで使用開始
     if (isHealing_)
     {
         if (isDodging_)
         {
-            // 回避（ローリング）動作で治療アクションを中断
             isHealing_ = false;
             healTimer_ = 0.0f;
         }
-        else
+        else if ((healTimer_ -= deltaTime) <= 0.0f)
         {
-            healTimer_ -= deltaTime;
-            if (healTimer_ <= 0.0f)
-            {
-                hp_ = (std::min)(maxHp_, hp_ + kMedkitHealAmount);
-                if (medkitCount_ > 0) medkitCount_--;
-                RaidStats::GetInstance().medkitsUsed++;
-                isHealing_ = false;
-                healTimer_ = 0.0f;
-            }
+            hp_ = (std::min)(maxHp_, hp_ + kMedkitHealAmount);
+            if (medkitCount_ > 0) medkitCount_--;
+            RaidStats::GetInstance().medkitsUsed++;
+            isHealing_ = false;
+            healTimer_ = 0.0f;
+            TacticalAudio::Play2D("Resources/Audio/SE_Heal_Complete.wav", kHealCompleteVolume);
         }
     }
-    else
+    else if (!isDodging_ && !textCaptured && (IsAppKeyDown('Q') || IsAppKeyDown('1')))
     {
-        // [Q] または [1] キーで救急キット使用開始
-        if (!isDodging_ && ((GetAsyncKeyState('Q') & 0x8000) != 0 || (GetAsyncKeyState('1') & 0x8000) != 0))
-        {
-            StartHealing();
-        }
+        StartHealing();
     }
 
-    // --- 3. リロード処理の進行 (予備弾薬からマガジンへ装填) ---
+    // [C] キー：銃収納ダッシュ切替 ＆ 左クリック押下時の即座の構え直し
+    const bool isCDown = !textCaptured && IsAppKeyDown('C');
+    const bool isCTriggered = isCDown && !prevCPressed_;
+    prevCPressed_ = isCDown;
+
+    if (isCTriggered && !isDodging_)
+    {
+        isWeaponHolstered_ = !isWeaponHolstered_;
+        TacticalAudio::Play2D("Resources/Audio/SE_Weapon_Holster.wav", kHolsterToggleVolume, kHolsterToggleCooldownMs);
+        if (isWeaponHolstered_ && isReloading_) { isReloading_ = false; reloadTimer_ = 0.0f; }
+    }
+    if (isWeaponHolstered_ && mouseInput && !AppDebugState::IsImGuiCapturingMouse() && mouseInput->PushButton(0))
+    {
+        isWeaponHolstered_ = false;
+        TacticalAudio::Play2D("Resources/Audio/SE_Weapon_Holster.wav", kUnholsterAimVolume, kUnholsterAimCooldownMs);
+    }
+
+    // リロード処理の進行 / [R] キーでリロード開始
     if (isReloading_)
     {
         if (isDodging_)
         {
-            // 回避（ローリング）動作でリロードを即座にキャンセル
+            CancelReloadWithNotify();
+        }
+        else if ((reloadTimer_ -= deltaTime) <= 0.0f)
+        {
+            const int loadAmount = (std::min)(maxMagazineAmmo_ - magazineAmmo_, reserveAmmo_);
+            magazineAmmo_ += loadAmount;
+            reserveAmmo_ -= loadAmount;
             isReloading_ = false;
             reloadTimer_ = 0.0f;
-            reloadCancelledTimer_ = kReloadCancelledNotifyDuration;
-        }
-        else
-        {
-            reloadTimer_ -= deltaTime;
-            if (reloadTimer_ <= 0.0f)
-            {
-                int needed = maxMagazineAmmo_ - magazineAmmo_;
-                int loadAmount = (std::min)(needed, reserveAmmo_);
-                magazineAmmo_ += loadAmount;
-                reserveAmmo_ -= loadAmount;
-                isReloading_ = false;
-                reloadTimer_ = 0.0f;
-            }
         }
     }
-    else
+    else if (!isDodging_ && !textCaptured && IsAppKeyDown('R') && magazineAmmo_ < maxMagazineAmmo_ && reserveAmmo_ > 0)
     {
-        // [R] キーでリロード開始（予備弾薬があり、マガジンに空きがある場合）
-        if (!isDodging_ && (GetAsyncKeyState('R') & 0x8000) != 0 && magazineAmmo_ < maxMagazineAmmo_ && reserveAmmo_ > 0)
-        {
-            isReloading_ = true;
-            reloadTimer_ = kReloadDuration;
-            reloadCancelledTimer_ = 0.0f;
-        }
+        isWeaponHolstered_ = false;
+        wasDryReload_ = (magazineAmmo_ <= 0);
+        isReloading_ = true;
+        reloadTimer_ = kReloadDuration;
+        reloadCancelledTimer_ = 0.0f;
     }
+}
 
-    // --- 4. 被弾フラッシュ & 無敵点滅演出の更新 ---
+void Player::UpdateDamageVisualTimers(float deltaTime)
+{
+    using namespace PlayerTuning::Visual;
     if (hitFlashTimer_ > 0.0f)
     {
-        hitFlashTimer_ -= deltaTime;
-        if (hitFlashTimer_ <= 0.0f)
-        {
-            hitFlashTimer_ = 0.0f;
-            object3d_->SetColor({ 1.0f, 1.0f, 1.0f, 1.0f });
-        }
-        else
-        {
-            object3d_->SetColor({ 4.5f, 0.35f, 0.35f, 1.0f }); // 鮮烈な高輝度レッド被弾フラッシュ
-        }
+        hitFlashTimer_ = (std::max)(0.0f, hitFlashTimer_ - deltaTime);
+        currentBodyColor_ = (hitFlashTimer_ > 0.0f) ? kHitActiveFlashColor : kDefaultBodyColor;
+        object3d_->SetColor(currentBodyColor_);
     }
     else if (invincibilityTimer_ > 0.0f)
     {
-        invincibilityTimer_ -= deltaTime;
-        if (invincibilityTimer_ <= 0.0f)
-        {
-            invincibilityTimer_ = 0.0f;
-            object3d_->SetColor({ 1.0f, 1.0f, 1.0f, 1.0f });
-        }
+        invincibilityTimer_ = (std::max)(0.0f, invincibilityTimer_ - deltaTime);
+        if (invincibilityTimer_ <= 0.0f) currentBodyColor_ = kDefaultBodyColor;
         else
         {
-            // 5フレームごとに点滅表示
             static int flashCount = 0;
-            flashCount++;
-            if ((flashCount / 5) % 2 == 0)
-            {
-                object3d_->SetColor({ 1.0f, 0.3f, 0.3f, 0.5f }); // 赤みがかった半透明
-            }
-            else
-            {
-                object3d_->SetColor({ 1.0f, 1.0f, 1.0f, 1.0f });
-            }
+            currentBodyColor_ = (((++flashCount / kInvincibleBlinkFrames) % 2) == 0) ? kInvincibleBlinkColor : kDefaultBodyColor;
         }
+        object3d_->SetColor(currentBodyColor_);
     }
+}
 
-    // --- 5. スタミナの自動回復 ---
-    if (!isDodging_ && !isDead_)
-    {
-        stamina_ += kStaminaRegenRate * deltaTime;
-        if (stamina_ > maxStamina_)
-        {
-            stamina_ = maxStamina_;
-        }
-    }
+bool Player::UpdateDodgeAndMovement(float deltaTime, float frameScale)
+{
+    isInIntroPose_ = false;
+    moveInputDir_ = kZeroVec3;
 
-    bool isMoving = false;
-
-    // --- 6. 回避（ローリング）または通常移動 ---
     if (isDodging_)
     {
-        isMoving = true;
         dodgeTimer_ -= deltaTime;
-        
-        // 回避方向への高速平行移動
         position_.x += dodgeDirection_.x * kDodgeSpeed * frameScale;
         position_.z += dodgeDirection_.z * kDodgeSpeed * frameScale;
-        
-        // ビジュアル演出：アヒルの形状を考慮した宙返りローリング放物線
-        float ratio = dodgeTimer_ / kDodgeDuration;
-        if (ratio < 0.0f) ratio = 0.0f;
-        float progress = 1.0f - ratio;
-        float rollAngle = progress * 6.2831853f; // 360度回転
 
-        // 地面へのくちばし・お尻の埋もれを防止するリフト包絡線（自然で軽快な前転高さ）
-        float rollSin = std::sin(rollAngle);
-        float rollCos = std::cos(rollAngle);
-        float clearanceLift = GameConfig::Player::kDodgeClearanceBase * (1.0f - rollCos) + GameConfig::Player::kDodgeClearanceSide * std::abs(rollSin);
-        float hopOffset = std::sin(progress * 3.14159f) * GameConfig::Player::kDodgeHopMax;
-
-        drawPos_ = position_;
-        drawPos_.y = position_.y + clearanceLift + hopOffset;
-        object3d_->SetTranslate(drawPos_);
-
-        Vector3 rot = object3d_->GetRotate();
-        rot.x = rollAngle;
-        rot.z = 0.0f;
-        object3d_->SetRotate(rot);
+        // アヒルの形状を考慮した宙返りローリング放物線と地面埋もれ防止リフト包絡線
+        const float progress  = 1.0f - (std::max)(0.0f, dodgeTimer_ / kDodgeDuration);
+        const float rollAngle = progress * DuckPartRig::kTwoPi;
+        const float liftY     = GameConfig::Player::kDodgeClearanceBase * (1.0f - std::cos(rollAngle))
+                              + GameConfig::Player::kDodgeClearanceSide * std::abs(std::sin(rollAngle))
+                              + std::sin(progress * DuckPartRig::kPi) * GameConfig::Player::kDodgeHopMax;
 
         if (dodgeTimer_ <= 0.0f)
         {
             isDodging_ = false;
             dodgeTimer_ = 0.0f;
-            object3d_->SetTranslate(position_);
-            Vector3 finalRot = object3d_->GetRotate();
-            finalRot.x = 0.0f;
-            finalRot.z = 0.0f;
-            object3d_->SetRotate(finalRot);
-        }
-    }
-    else
-    {
-        // WASD入力方向の計算
-        Vector3 moveDir = { 0.0f, 0.0f, 0.0f };
-        if ((GetAsyncKeyState('W') & 0x8000) != 0) moveDir.z += 1.0f;
-        if ((GetAsyncKeyState('S') & 0x8000) != 0) moveDir.z -= 1.0f;
-        if ((GetAsyncKeyState('A') & 0x8000) != 0) moveDir.x -= 1.0f;
-        if ((GetAsyncKeyState('D') & 0x8000) != 0) moveDir.x += 1.0f;
-
-        float len = std::sqrt(moveDir.x * moveDir.x + moveDir.z * moveDir.z);
-        if (len > 0.0f)
-        {
-            isMoving = true;
-            moveDir.x /= len;
-            moveDir.z /= len;
-        }
-
-        bool isSpaceDown = (GetAsyncKeyState(VK_SPACE) & 0x8000) != 0;
-        bool isSpaceTriggered = isSpaceDown && !prevSpacePressed_;
-        prevSpacePressed_ = isSpaceDown;
-
-        // [SPACE] キーで回避ローリング開始 (トリガー判定でスキップ直後の暴発を防止)
-        if (isSpaceTriggered && stamina_ >= kDodgeStaminaCost)
-        {
-            isDodging_ = true;
-            isMoving = true;
-            dodgeTimer_ = kDodgeDuration;
-            stamina_ -= kDodgeStaminaCost;
-
-            if (isReloading_)
-            {
-                isReloading_ = false;
-                reloadTimer_ = 0.0f;
-                reloadCancelledTimer_ = kReloadCancelledNotifyDuration;
-            }
-
-            if (len > 0.0f)
-            {
-                dodgeDirection_ = moveDir;
-            }
-            else
-            {
-                float yaw = GetRotation().y;
-                dodgeDirection_ = { std::sin(yaw), 0.0f, std::cos(yaw) };
-            }
-
-            float dodgeYaw = std::atan2(dodgeDirection_.x, dodgeDirection_.z);
-            Vector3 initRot = object3d_->GetRotate();
-            initRot.x = 0.0f;
-            initRot.y = dodgeYaw;
-            initRot.z = 0.0f;
-            object3d_->SetRotate(initRot);
+            drawPos_ = position_;
+            SetObjectTransform(object3d_.get(), position_, { 0.0f, aimYaw_, 0.0f }, kUnitScale);
         }
         else
         {
-            // 通常のWASD移動処理
-            if ((GetAsyncKeyState('W') & 0x8000) != 0)
-            {
-                position_.z += kMoveSpeed * frameScale;
-                isMoving = true;
-            }
-            if ((GetAsyncKeyState('S') & 0x8000) != 0)
-            {
-                position_.z -= kMoveSpeed * frameScale;
-                isMoving = true;
-            }
-            if ((GetAsyncKeyState('A') & 0x8000) != 0)
-            {
-                position_.x -= kMoveSpeed * frameScale;
-                isMoving = true;
-            }
-            if ((GetAsyncKeyState('D') & 0x8000) != 0)
-            {
-                position_.x += kMoveSpeed * frameScale;
-                isMoving = true;
-            }
-            object3d_->SetTranslate(position_);
+            drawPos_ = { position_.x, position_.y + liftY, position_.z };
+            SetObjectTransform(object3d_.get(), drawPos_, { rollAngle, aimYaw_, 0.0f }, kUnitScale);
         }
+        return true;
     }
 
-    // --- 7. マウス照準レイキャスト（3D地面交点への旋回） ---
-    if (!isDodging_ && mouseInput && camera_)
+    // WASD入力方向の計算（ImGuiテキスト入力中は移動入力を抑止）
+    const bool textCaptured = AppDebugState::IsImGuiCapturingTextInput();
+    Vector3 moveDir = kZeroVec3;
+    if (!textCaptured)
     {
-        WindowAPI* win = mouseInput->GetWindowAPI();
-        if (win)
-        {
-            Vector2 mousePos = mouseInput->GetScaledPosition();
-            float clientW = static_cast<float>(win->GetClientWidth());
-            float clientH = static_cast<float>(win->GetClientHeight());
-            if (clientW > 0.0f && clientH > 0.0f)
-            {
-                // NDC (正規化デバイス座標) の計算
-                float nx = (mousePos.x / clientW) * 2.0f - 1.0f;
-                float ny = 1.0f - (mousePos.y / clientH) * 2.0f;
-
-                Vector4 clipNear = { nx, ny, 0.0f, 1.0f };
-                Vector4 clipFar  = { nx, ny, 1.0f, 1.0f };
-
-                Matrix4x4 inv = Inverse(Multiply(camera_->GetViewMatrix(), camera_->GetProjectionMatrix()));
-
-                auto transformClip = [&](const Vector4& c) -> Vector3 {
-                    Vector3 r;
-                    r.x = c.x * inv.m[0][0] + c.y * inv.m[1][0] + c.z * inv.m[2][0] + c.w * inv.m[3][0];
-                    r.y = c.x * inv.m[0][1] + c.y * inv.m[1][1] + c.z * inv.m[2][1] + c.w * inv.m[3][1];
-                    r.z = c.x * inv.m[0][2] + c.y * inv.m[1][2] + c.z * inv.m[2][2] + c.w * inv.m[3][2];
-                    float w = c.x * inv.m[0][3] + c.y * inv.m[1][3] + c.z * inv.m[2][3] + c.w * inv.m[3][3];
-                    if (w != 0.0f)
-                    {
-                        r.x /= w; r.y /= w; r.z /= w;
-                    }
-                    return r;
-                };
-
-                Vector3 worldNear = transformClip(clipNear);
-                Vector3 worldFar  = transformClip(clipFar);
-                Vector3 dir = { worldFar.x - worldNear.x, worldFar.y - worldNear.y, worldFar.z - worldNear.z };
-
-                // 地面 (y = 0 平面) との交差判定
-                if (std::fabs(dir.y) > 1e-6f)
-                {
-                    float t = -worldNear.y / dir.y;
-                    if (t > 0.0f)
-                    {
-                        Vector3 hit = { worldNear.x + dir.x * t, 0.0f, worldNear.z + dir.z * t };
-                        Vector3 ppos = position_;
-                        Vector3 to = { hit.x - ppos.x, 0.0f, hit.z - ppos.z };
-                        float targetYaw = std::atan2(to.x, to.z);
-                        Vector3 r = object3d_->GetRotate();
-
-                        // 最短回転角 (-PI ~ +PI)
-                        float diff = targetYaw - r.y;
-                        while (diff > 3.14159265f) diff -= 6.2831853f;
-                        while (diff < -3.14159265f) diff += 6.2831853f;
-
-                        // 高いレスポンス性を維持しつつ急激な瞬間移動（カクつき）を完全に防ぐスムーズ旋回
-                        float rotFactor = (std::min)(1.0f - std::exp(-16.0f * deltaTime), 0.30f);
-                        r.x = 0.0f;
-                        r.y += diff * rotFactor;
-                        r.z = 0.0f;
-                        object3d_->SetRotate(r);
-                    }
-                }
-            }
-        }
+        if (IsAppKeyDown('W')) moveDir.z += 1.0f;
+        if (IsAppKeyDown('S')) moveDir.z -= 1.0f;
+        if (IsAppKeyDown('A')) moveDir.x -= 1.0f;
+        if (IsAppKeyDown('D')) moveDir.x += 1.0f;
     }
 
-    // --- 8. 照準拡散率（レティクルブレ）の更新 ---
-    UpdateSpread(deltaTime, isMoving);
-    isMoving_ = isMoving;
+    bool isMoving = false;
+    const float lenSq = moveDir.x * moveDir.x + moveDir.z * moveDir.z;
+    if (lenSq > 0.0f)
+    {
+        const float invLen = 1.0f / std::sqrt(lenSq);
+        moveDir.x *= invLen;
+        moveDir.z *= invLen;
+        moveInputDir_ = moveDir;
+        isMoving = true;
+    }
 
-    // 地面接地保証: 障害物との3D衝突押し出しによってY座標が上下に狂ったり地面下に沈むのを原理的に防止
+    const bool isSpaceDown = !textCaptured && IsAppKeyDown(VK_SPACE);
+    const bool isSpaceTriggered = isSpaceDown && !prevSpacePressed_;
+    prevSpacePressed_ = isSpaceDown;
+
+    // [SPACE] キーで回避ローリング開始
+    if (isSpaceTriggered && stamina_ >= kDodgeStaminaCost)
+    {
+        isDodging_ = true;
+        dodgeTimer_ = kDodgeDuration;
+        stamina_ -= kDodgeStaminaCost;
+        if (isReloading_) CancelReloadWithNotify();
+
+        dodgeDirection_ = (lenSq > 0.0f) ? moveDir : Vector3{ std::sin(aimYaw_), 0.0f, std::cos(aimYaw_) };
+        aimYaw_ = std::atan2(dodgeDirection_.x, dodgeDirection_.z);
+        drawPos_ = position_;
+        SetObjectTransform(object3d_.get(), drawPos_, { 0.0f, aimYaw_, 0.0f }, kUnitScale);
+        return true;
+    }
+
+    if (lenSq > 0.0f)
+    {
+        const float effectiveSpeed = kMoveSpeed * (isWeaponHolstered_ ? kHolsterSpeedMultiplier : 1.0f);
+        position_.x += moveDir.x * effectiveSpeed * frameScale;
+        position_.z += moveDir.z * effectiveSpeed * frameScale;
+    }
+    return isMoving;
+}
+
+void Player::Update(float deltaTime, MouseInput* mouseInput)
+{
+    if (!object3d_) return;
+    if (isDead_) { object3d_->Update(); return; }
+
+    const float frameScale = deltaTime * PlayerTuning::kReferenceFps;
+    UpdateActionStates(deltaTime, mouseInput);
+    UpdateDamageVisualTimers(deltaTime);
+
+    if (!isDodging_ && !isDead_) stamina_ = (std::min)(maxStamina_, stamina_ + kStaminaRegenRate * deltaTime);
+
+    const bool isMoving = UpdateDodgeAndMovement(deltaTime, frameScale);
+    isMoving_ = isMoving;
+    UpdateReticleRecoil(deltaTime);
+    UpdateSpread(deltaTime, isMoving);
+
+    // 地面接地保証・ロコモーション更新・ライフルストローク減衰
     position_.y = 0.0f;
+    UpdateLocomotionState(deltaTime, moveInputDir_);
+    if (rifleRecoil_ > 0.0f) rifleRecoil_ = (std::max)(0.0f, rifleRecoil_ - deltaTime * PlayerTuning::Weapon::kRifleRecoilDecayRate);
 
     if (isDodging_)
     {
+        SyncDuckVisualAndWeaponPose();
+        if (mouseInput) SyncAimWithCamera(mouseInput);
+    }
+    else if (mouseInput && camera_) SyncAimWithCamera(mouseInput);
+    else                            SyncDuckVisualAndWeaponPose();
+}
+
+void Player::UpdateLocomotionState(float deltaTime, const Vector3& moveDirWorld)
+{
+    using namespace PlayerTuning::Anim;
+    const float dt = (std::clamp)(deltaTime, 0.0f, PlayerTuning::kMaxPhysicsStepDt);
+    idleAnimTime_ += dt;
+    if (idleAnimTime_ > kIdleAnimWrapSec) idleAnimTime_ -= kIdleAnimWrapSec;
+
+    const float targetWalk   = (!isDodging_ && isMoving_) ? 1.0f : 0.0f;
+    const float targetSprint = (!isDodging_ && isMoving_ && isWeaponHolstered_) ? 1.0f : 0.0f;
+    const float blendRate    = (targetWalk > walkBlend_) ? kWalkBlendInRate : kWalkBlendOutRate;
+
+    walkBlend_ += (targetWalk - walkBlend_) * (std::min)(1.0f, blendRate * dt);
+    if (walkBlend_ < kBlendSnapEpsilon && targetWalk == 0.0f) walkBlend_ = 0.0f;
+
+    sprintBlend_ += (targetSprint - sprintBlend_) * (std::min)(1.0f, kSprintBlendRate * dt);
+    if (sprintBlend_ < kBlendSnapEpsilon && targetSprint == 0.0f) sprintBlend_ = 0.0f;
+
+    // [C] 銃収納ダッシュ中は進行方向へ素早く身体を向けて全力疾走する
+    const float moveLenSq = moveDirWorld.x * moveDirWorld.x + moveDirWorld.z * moveDirWorld.z;
+    if (!isDodging_ && isWeaponHolstered_ && isMoving_ && moveLenSq > kMoveDirMinLenSq)
+    {
+        const float targetRunYaw = std::atan2(moveDirWorld.x, moveDirWorld.z);
+        const float yawDiff      = GameConfig::Math::WrapAngleSigned(targetRunYaw - aimYaw_);
+        const float maxTurn      = kHolsterRunTurnRate * dt;
+        aimYaw_ = (std::abs(yawDiff) <= maxTurn)
+            ? targetRunYaw
+            : GameConfig::Math::WrapAngleSigned(aimYaw_ + ((yawDiff > 0.0f) ? maxTurn : -maxTurn));
+    }
+
+    // ローカル移動方向を滑らかに追従させてムーンウォークを完全防止
+    if (!isDodging_ && isMoving_ && moveLenSq > kMoveDirMinLenSq)
+    {
+        const float sy       = std::sin(aimYaw_);
+        const float cy       = std::cos(aimYaw_);
+        const float rawRight = moveDirWorld.x * cy - moveDirWorld.z * sy;
+        const float rawFwd   = moveDirWorld.x * sy + moveDirWorld.z * cy;
+        const float dirBlend = (std::min)(1.0f, kLocalMoveDirBlendRate * dt);
+        smoothedLocalMoveRight_ += (rawRight - smoothedLocalMoveRight_) * dirBlend;
+        smoothedLocalMoveFwd_   += (rawFwd   - smoothedLocalMoveFwd_)   * dirBlend;
+
+        const float localLenSq = smoothedLocalMoveRight_ * smoothedLocalMoveRight_ + smoothedLocalMoveFwd_ * smoothedLocalMoveFwd_;
+        if (localLenSq > GameConfig::Math::Square(PlayerTuning::kSmallLenEpsilon))
+        {
+            const float invLocalLen = 1.0f / std::sqrt(localLenSq);
+            smoothedLocalMoveRight_ *= invLocalLen;
+            smoothedLocalMoveFwd_   *= invLocalLen;
+        }
+    }
+
+    // よちよち歩きサイクル位相更新 ＆ 左右の水かき足着地時の土埃トリガー発行
+    if (!isDodging_ && walkBlend_ > kFootstepMinWalkBlend)
+    {
+        const float cadence   = kWalkCadenceBase + kWalkCadenceSprintAdd * sprintBlend_;
+        const float prevPhase = walkPhase_;
+        walkPhase_ += dt * cadence * (kWalkCadenceMinFactor + kWalkCadenceBlendFactor * walkBlend_);
+
+        const float strideLen = (kDustStrideBase + kStrideSprintAdd * sprintBlend_) * walkBlend_;
+        const float cy = std::cos(aimYaw_);
+        const float sy = std::sin(aimYaw_);
+        auto calcFootPlantWorld = [&](const Vector3& pivot) -> Vector3
+        {
+            const float lx = pivot.x + smoothedLocalMoveRight_ * strideLen * DuckPartRig::kFootLateralStrideRate;
+            const float lz = pivot.z + smoothedLocalMoveFwd_   * strideLen;
+            return { position_.x + lx * cy + lz * sy, position_.y, position_.z - lx * sy + lz * cy };
+        };
+
+        if (prevPhase < DuckPartRig::kPi && walkPhase_ >= DuckPartRig::kPi)
+        {
+            pendingFootstepDust_ = true;
+            lastFootstepWorldPos_ = calcFootPlantWorld(DuckPartRig::kLeftFootPivot);
+        }
+        if (walkPhase_ >= DuckPartRig::kTwoPi)
+        {
+            walkPhase_ = std::fmod(walkPhase_, DuckPartRig::kTwoPi);
+            pendingFootstepDust_ = true;
+            lastFootstepWorldPos_ = calcFootPlantWorld(DuckPartRig::kRightFootPivot);
+        }
+    }
+    else if (!isDodging_ && !isMoving_ && walkBlend_ <= kBlendSnapEpsilon)
+    {
+        walkPhase_ = kInitialWalkPhase;
+    }
+}
+
+Vector3 Player::GetMuzzleWorldPosition() const
+{
+    const float yaw = GetRotation().y;
+    return Bullet::ComputeSpawnPosition(position_, { std::sin(yaw), 0.0f, std::cos(yaw) }, bulletSpawnOffset_);
+}
+
+void Player::SyncAimWithCamera(const MouseInput* mouseInput)
+{
+    if (!object3d_ || !camera_ || !mouseInput || isDead_) return;
+
+    using namespace PlayerTuning;
+    WindowAPI* win = mouseInput->GetWindowAPI();
+    const Vector2 clientSize = ResolveClientSize(
+        win ? static_cast<float>(win->GetClientWidth())  : kUIDefaultDisplayWidth,
+        win ? static_cast<float>(win->GetClientHeight()) : kUIDefaultDisplayHeight);
+
+    const float resScale   = clientSize.y / kUIDefaultDisplayHeight;
+    const Vector2 rawMouse = mouseInput->GetScaledPosition();
+    effectiveReticleScreenPos_.x = (std::clamp)(rawMouse.x + reticleRecoilOffset_.x * resScale, kReticleScreenMarginPx, clientSize.x - kReticleScreenMarginPx);
+    effectiveReticleScreenPos_.y = (std::clamp)(rawMouse.y + reticleRecoilOffset_.y * resScale, kReticleScreenMarginPx, clientSize.y - kReticleScreenMarginPx);
+    if (isDodging_) return;
+
+    // NDCから最新カメラ ViewProjection 逆行列でワールド照準レイを復元
+    const float nx = (effectiveReticleScreenPos_.x / clientSize.x) * 2.0f - 1.0f;
+    const float ny = 1.0f - (effectiveReticleScreenPos_.y / clientSize.y) * 2.0f;
+    const Matrix4x4 inv = Inverse(camera_->GetViewProjectionMatrix());
+
+    auto transformClip = [&](float clipZ) -> Vector3
+    {
+        Vector3 r = {
+            nx * inv.m[0][0] + ny * inv.m[1][0] + clipZ * inv.m[2][0] + inv.m[kMatW][0],
+            nx * inv.m[0][1] + ny * inv.m[1][1] + clipZ * inv.m[2][1] + inv.m[kMatW][1],
+            nx * inv.m[0][2] + ny * inv.m[1][2] + clipZ * inv.m[2][2] + inv.m[kMatW][2]
+        };
+        const float w = nx * inv.m[0][kMatW] + ny * inv.m[1][kMatW] + clipZ * inv.m[2][kMatW] + inv.m[kMatW][kMatW];
+        if (std::fabs(w) > kRayParallelEpsilon)
+        {
+            const float invW = 1.0f / w;
+            r.x *= invW; r.y *= invW; r.z *= invW;
+        }
+        return r;
+    };
+
+    const Vector3 worldNear = transformClip(0.0f);
+    const Vector3 worldFar  = transformClip(1.0f);
+    const Vector3 dir       = { worldFar.x - worldNear.x, worldFar.y - worldNear.y, worldFar.z - worldNear.z };
+
+    // 3D銃口・レーザー・弾丸の水平飛行面 (y = position_.y + bulletSpawnOffset_.y) と厳密交差
+    const float aimPlaneY = position_.y + bulletSpawnOffset_.y;
+    if (std::fabs(dir.y) > kRayParallelEpsilon)
+    {
+        const float t = (aimPlaneY - worldNear.y) / dir.y;
+        if (t > 0.0f)
+        {
+            const Vector3 hit  = { worldNear.x + dir.x * t, aimPlaneY, worldNear.z + dir.z * t };
+            const float dx     = hit.x - position_.x;
+            const float dz     = hit.z - position_.z;
+            const float distXZ = std::sqrt(dx * dx + dz * dz);
+            if (distXZ > kSmallLenEpsilon)
+            {
+                const float baseYaw    = std::atan2(dx, dz);
+                const float closeBlend = SmoothStep01((distXZ - Aim::kCloseBlendStartDist) / Aim::kCloseBlendRange);
+                const float effRight   = (std::min)(bulletSpawnOffset_.x * closeBlend, distXZ * Aim::kMaxRightOffsetDistRatio);
+                const float sinArg     = (std::clamp)(effRight / distXZ, -Aim::kMaxSinArg, Aim::kMaxSinArg);
+                const float exactYaw   = baseYaw - std::asin(sinArg);
+
+                if (!(isWeaponHolstered_ && isMoving_)) aimYaw_ = exactYaw;
+
+                const Vector3 fwd    = { std::sin(exactYaw), 0.0f, std::cos(exactYaw) };
+                const Vector3 muzzle = Bullet::ComputeSpawnPosition(position_, fwd, bulletSpawnOffset_);
+                const float fwdProj  = (hit.x - muzzle.x) * fwd.x + (hit.z - muzzle.z) * fwd.z;
+                aimRayDistance_      = (std::clamp)(fwdProj, Aim::kAimRayMinDist, Aim::kAimRayMaxDist);
+            }
+        }
+    }
+    SyncDuckVisualAndWeaponPose();
+}
+
+void Player::SyncDuckVisualAndWeaponPose()
+{
+    if (!object3d_) return;
+
+    using namespace PlayerTuning::Anim;
+    Object3d* const limbs[PlayerTuning::kDuckLimbCount] = {
+        leftFootObject_.get(), rightFootObject_.get(), leftWingObject_.get(), rightWingObject_.get()
+    };
+    const Vector4 bodyTint = isDead_ ? PlayerTuning::Visual::kDeadLimbTint : currentBodyColor_;
+    for (Object3d* limb : limbs) { if (limb) limb->SetColor(bodyTint); }
+
+    if (isDead_ || isInIntroPose_)
+    {
+        AttachLimbPreset(
+            limbs, isDead_ ? kDeadLimbPoses : kIntroLimbPoses,
+            object3d_->GetTranslate(), object3d_->GetScale(),
+            DuckPartRig::MakeEulerMatrixXYZ(object3d_->GetRotate()));
+        return;
+    }
+
+    if (isDodging_)
+    {
+        const float progress  = 1.0f - (std::clamp)(dodgeTimer_ / kDodgeDuration, 0.0f, 1.0f);
+        const float tuckEnv   = std::sin(progress * DuckPartRig::kPi);
+        const float landFlare = (progress > kDodgeLandFlareStart)
+            ? std::sin(((progress - kDodgeLandFlareStart) / kDodgeLandFlareSpan) * DuckPartRig::kPi)
+            : 0.0f;
+
         object3d_->SetTranslate(drawPos_);
+        object3d_->SetScale(kUnitScale);
+        object3d_->Update();
+
+        const Matrix4x4 dodgeRot     = DuckPartRig::MakeEulerMatrixXYZ(object3d_->GetRotate());
+        const Vector3 footTuckOffset = { 0.0f, kDodgeFootTuckY * tuckEnv, kDodgeFootTuckZ * tuckEnv };
+        const float wingFlare        = kDodgeWingTuckFlare * tuckEnv + kDodgeWingLandFlare * landFlare;
+        const LimbPoseSpec dodgePoses[PlayerTuning::kDuckLimbCount] = {
+            { DuckPartRig::kLeftFootPivot,  footTuckOffset, { kDodgeFootPitch * tuckEnv, -kDodgeFootToeYaw, 0.0f } },
+            { DuckPartRig::kRightFootPivot, footTuckOffset, { kDodgeFootPitch * tuckEnv,  kDodgeFootToeYaw, 0.0f } },
+            { DuckPartRig::kLeftWingPivot,  kZeroVec3,      { kDodgeWingPitch * tuckEnv,  0.0f, -wingFlare } },
+            { DuckPartRig::kRightWingPivot, kZeroVec3,      { kDodgeWingPitch * tuckEnv,  0.0f,  wingFlare } },
+        };
+        AttachLimbPreset(limbs, dodgePoses, drawPos_, kUnitScale, dodgeRot);
+        SyncRifleAndMagazinePose();
+        return;
+    }
+
+    // 地上ロコモーション（待機呼吸・よちよち歩行・[C] 銃収納全力ダッシュ）
+    const float breathWave = std::sin(idleAnimTime_ * kBreathFreq);
+    const float idleWeight = 1.0f - walkBlend_;
+    const float idleBobY   = (breathWave * 0.5f + 0.5f) * kIdleBobAmp * idleWeight;
+    const float idleSquash = breathWave * kIdleSquashAmp * idleWeight;
+
+    const float hopAmp     = kHopAmpBase    + kHopAmpSprintAdd    * sprintBlend_;
+    const float waddleAmp  = kWaddleAmpBase + kWaddleAmpSprintAdd * sprintBlend_;
+    const float leanAmp    = kLeanAmpBase   + kLeanAmpSprintAdd   * sprintBlend_;
+    const float hopSin     = std::abs(std::sin(walkPhase_));
+    const float walkBobY   = hopSin * hopAmp * walkBlend_;
+    const float stepSquash = std::cos(walkPhase_ * 2.0f) * (kStepSquashBase + kStepSquashSprintAdd * sprintBlend_) * walkBlend_;
+
+    const float scaleXZ     = 1.0f + stepSquash * kScaleXZStepSquashRate + idleSquash;
+    const float scaleY      = 1.0f - stepSquash * kScaleYStepSquashRate  - idleSquash * kScaleYIdleSquashRate;
+    const Vector3 bodyScale = { scaleXZ, scaleY, scaleXZ };
+
+    const float localPitchX = smoothedLocalMoveFwd_ * leanAmp * walkBlend_ - rifleRecoil_ * kBodyRecoilPitchBack + (isHealing_ ? kHealingBodyPitchAdd : 0.0f);
+    const float localRollZ  = -std::sin(walkPhase_) * waddleAmp * walkBlend_ - smoothedLocalMoveRight_ * (kBodyStrafeRollRate * walkBlend_);
+
+    const Matrix4x4 bodyRotMat = DuckPartRig::MakeLocalPitchRollThenYawMatrix(localPitchX, localRollZ, aimYaw_);
+    const Vector3 bodyPos      = { position_.x, position_.y + idleBobY + walkBobY, position_.z };
+    SetObjectTransform(object3d_.get(), bodyPos, DuckPartRig::DecomposeRotationToEulerXYZ(bodyRotMat), bodyScale, true);
+
+    // 左右の水かき足IKソルバ
+    const float strideLen = kVisualStrideBase + kStrideSprintAdd   * sprintBlend_;
+    const float liftH     = kFootLiftBase     + kFootLiftSprintAdd * sprintBlend_;
+    DuckPartRig::SolveGroundedFoot(leftFootObject_.get(),  DuckPartRig::kLeftFootPivot,  -1.0f, walkPhase_,                    walkBlend_, strideLen, liftH, smoothedLocalMoveRight_, smoothedLocalMoveFwd_, position_, aimYaw_, 1.0f);
+    DuckPartRig::SolveGroundedFoot(rightFootObject_.get(), DuckPartRig::kRightFootPivot,  1.0f, walkPhase_ + DuckPartRig::kPi, walkBlend_, strideLen, liftH, smoothedLocalMoveRight_, smoothedLocalMoveFwd_, position_, aimYaw_, 1.0f);
+
+    // 左右の翼アニメーション（歩行スイング・ダッシュ羽ばたき・リロード/回復アクション）
+    const float nonSprint  = 1.0f - sprintBlend_;
+    const float sprintFlap = (kSprintFlapBase + kSprintFlapWave * std::abs(std::sin(walkPhase_ * kSprintFlapFreqMult))) * sprintBlend_;
+    const float cosWalk    = std::cos(walkPhase_);
+
+    float leftFlapOut  = (kLeftIdleFlapBase  + kLeftIdleFlapBreath  * breathWave) * idleWeight + (kLeftWalkFlapBase  + kLeftWalkFlapHop  * hopSin) * walkBlend_ * nonSprint + sprintFlap;
+    float rightFlapOut = (kRightIdleFlapBase + kRightIdleFlapBreath * breathWave) * idleWeight + (kRightWalkFlapBase + kRightWalkFlapHop * hopSin) * walkBlend_ * nonSprint + sprintFlap;
+    float leftPitchX   = kLeftWalkPitchAmp * cosWalk * walkBlend_ * (1.0f - kLeftWalkSprintDamp * sprintBlend_) + kSprintWingPitchAmp * cosWalk * sprintBlend_;
+    float rightPitchX  = kRightHoldRiflePitch * nonSprint - kSprintWingPitchAmp * cosWalk * sprintBlend_;
+    float leftYawY     = 0.0f;
+    float rightYawY    = 0.0f;
+
+    if (isReloading_)
+    {
+        const float cantEnv = ComputeReloadCantEnvelope((std::clamp)(GetReloadProgress(), 0.0f, 1.0f));
+        leftPitchX  = leftPitchX * (1.0f - cantEnv) + kReloadLeftWingPitch * cantEnv;
+        leftYawY    = kReloadLeftWingYaw * cantEnv;
+        leftFlapOut = (std::max)(leftFlapOut, kReloadLeftWingMinFlap * cantEnv);
+    }
+    else if (isHealing_)
+    {
+        const float pat = std::sin(idleAnimTime_ * kHealPatFreq) * kHealPatAmp;
+        leftPitchX  = kHealWingPitchBase + pat;
+        rightPitchX = kHealWingPitchBase - pat;
+        leftYawY    = -kHealWingYawAbs;
+        rightYawY   =  kHealWingYawAbs;
+        leftFlapOut = rightFlapOut = kHealWingFlapOut;
+    }
+
+    DuckPartRig::AttachLimbToBody(leftWingObject_.get(),  DuckPartRig::kLeftWingPivot,  kZeroVec3, { leftPitchX,  leftYawY,  -leftFlapOut  }, bodyPos, bodyScale, bodyRotMat);
+    DuckPartRig::AttachLimbToBody(rightWingObject_.get(), DuckPartRig::kRightWingPivot, kZeroVec3, { rightPitchX, rightYawY,  rightFlapOut }, bodyPos, bodyScale, bodyRotMat);
+
+    SyncRifleAndMagazinePose();
+}
+
+Vector3 Player::GetMagwellWorldPosition() const
+{
+    using namespace PlayerTuning::Weapon;
+    const float cp = std::cos(rifleRotation_.x);
+    const float sp = std::sin(rifleRotation_.x);
+    const float cy = std::cos(rifleRotation_.y);
+    const float sy = std::sin(rifleRotation_.y);
+    const float y1 = kMagwellLocalY * cp - kMagwellLocalZ * sp;
+    const float z1 = kMagwellLocalY * sp + kMagwellLocalZ * cp;
+    return { riflePosition_.x + z1 * sy, riflePosition_.y + y1, riflePosition_.z + z1 * cy };
+}
+
+void Player::ApplyWeaponTransforms(const Vector3& riflePos, const Vector3& rifleRot, const Vector3& magPos, const Vector3& magRot, const Vector3& scale)
+{
+    riflePosition_ = riflePos;
+    rifleRotation_ = rifleRot;
+    SetObjectTransform(rifleObject_.get(),    riflePosition_, rifleRotation_, scale, true);
+    SetObjectTransform(rifleMagObject_.get(), magPos,         magRot,         scale, true);
+}
+
+void Player::SyncRifleAndMagazinePose()
+{
+    if (!object3d_ || !rifleObject_) return;
+
+    using namespace PlayerTuning::Weapon;
+    using namespace PlayerTuning::ReloadAnim;
+
+    const Vector3 duckPos       = isDodging_ ? drawPos_ : position_;
+    const Vector3 bodyVisualPos = object3d_->GetTranslate();
+    const Vector3 bodyVisualRot = object3d_->GetRotate();
+    const float yaw             = isDodging_ ? bodyVisualRot.y : aimYaw_;
+
+    const Vector3 fwd   = { std::sin(yaw), 0.0f, std::cos(yaw) };
+    const Vector3 right = { std::cos(yaw), 0.0f, -std::sin(yaw) };
+    const Vector3 up    = { 0.0f, 1.0f, 0.0f };
+
+    rifleMagVisible_  = true;
+    Vector3 targetPos = { 0.0f, 0.0f, 0.0f };
+    Vector3 targetRot = { 0.0f, 0.0f, 0.0f };
+    Vector3 magPos    = { 0.0f, 0.0f, 0.0f };
+    Vector3 magRot    = { 0.0f, 0.0f, 0.0f };
+
+    if (isWeaponHolstered_)
+    {
+        // [C] 銃収納ダッシュ中：背中に斜め掛けスリング保持
+        const Matrix4x4 bodyRotMat = DuckPartRig::MakeEulerMatrixXYZ(bodyVisualRot);
+        targetPos = bodyVisualPos + DuckPartRig::TransformVec3ByRotation(kHolsterSlingOffset, bodyRotMat);
+        targetRot = DuckPartRig::DecomposeRotationToEulerXYZ(Multiply(DuckPartRig::MakeEulerMatrixXYZ(kHolsterSlingEuler), bodyRotMat));
+        magPos = targetPos;
+        magRot = targetRot;
+    }
+    else if (isDodging_ || !isReloading_)
+    {
+        // 回避中または通常射撃構え姿勢（レーザーサイト・弾道原点と完全同期）
+        const float fwdOffset = kHipAimOffset.z - rifleRecoil_ * kRifleRecoilFwdKick;
+        targetPos = duckPos + right * kHipAimOffset.x + Vector3{ 0.0f, kHipAimOffset.y, 0.0f } + fwd * fwdOffset;
+        targetRot = isDodging_ ? bodyVisualRot : Vector3{ -rifleRecoil_ * kRifleRecoilPitchKick, yaw, 0.0f };
+        magPos = targetPos;
+        magRot = targetRot;
     }
     else
     {
-        object3d_->SetTranslate(position_);
-    }
-    object3d_->Update();
+        // 3段階タクティカル/ドライ・リロードアニメーション
+        const float p           = (std::clamp)(GetReloadProgress(), 0.0f, 1.0f);
+        const float cantEnv     = ComputeReloadCantEnvelope(p);
+        const float rifleYawOff = kCantYawOffset * cantEnv;
+        float riflePitchOff     = kCantPitchOffset * cantEnv;
+        float liftY             = kCantLiftY * cantEnv + (bodyVisualPos.y - position_.y) * kBodyBobFollow;
+        const float rightPull   = kCantRightPull * cantEnv;
+        float fwdPull           = kCantFwdPull * cantEnv;
 
-    // --- 装備ライフルのトランスフォーム更新（アヒルの右翼/腰元にホールド） ---
-    if (rifleObject_)
-    {
-        if (rifleRecoil_ > 0.0f)
+        if (p >= kTapStart && p <= kTapEnd)
         {
-            rifleRecoil_ -= deltaTime * 3.5f;
-            if (rifleRecoil_ < 0.0f) rifleRecoil_ = 0.0f;
+            const float tapWave = std::sin(((p - kTapStart) / kTapSpan) * DuckPartRig::kPi);
+            liftY         += kTapLiftY * tapWave;
+            riflePitchOff -= kTapPitchDown * tapWave;
         }
 
-        Vector3 duckPos = isDodging_ ? drawPos_ : position_;
-        Vector3 duckRot = object3d_->GetRotate();
-        float yaw = duckRot.y;
-
-        // アヒルの向きに応じた前方・右方ベクトル
-        Vector3 fwd = { std::sin(yaw), 0.0f, std::cos(yaw) };
-        Vector3 right = { std::cos(yaw), 0.0f, -std::sin(yaw) };
-
-        // ライフルの右翼側ホールドオフセット: 右+0.42m, 高さ0.68m, 前方+0.25m - 反動
-        float fwdOffset = 0.25f - rifleRecoil_ * 0.08f;
-        riflePosition_ = duckPos + right * 0.42f + Vector3{ 0.0f, 0.68f, 0.0f } + fwd * fwdOffset;
-
-        // リロード中は銃口を少し上に向けてマガジン装填姿勢
-        float pitchOffset = 0.0f;
-        if (isReloading_)
+        if (wasDryReload_ && p >= kDryRackStart && p <= kDryRackEnd)
         {
-            pitchOffset = -0.35f; // 銃口を約20度上に傾ける
-            riflePosition_.y += 0.04f;
+            if (p < kDrySlamStart)
+            {
+                const float rackBack = SmoothStep01((p - kDryRackStart) / kDryRackSpan);
+                fwdPull       -= kDryRackFwdPull * rackBack;
+                riflePitchOff -= kDryRackPitchUp * rackBack;
+            }
+            else
+            {
+                const float slamFwd = 1.0f - SmoothStep01((p - kDrySlamStart) / kDrySlamSpan);
+                fwdPull -= kDryRackFwdPull * slamFwd - kDrySlamOvertravel * (1.0f - slamFwd);
+            }
+        }
+        else if (!wasDryReload_ && p >= kTacSnapStart && p <= kTacSnapEnd)
+        {
+            fwdPull += kTacSnapFwdPush * std::sin(((p - kTacSnapStart) / kTacSnapSpan) * DuckPartRig::kPi);
         }
 
-        // 回避中（ローリング中）はアヒルのロール角と完全同期
-        rifleRotation_ = duckRot;
-        rifleRotation_.x += pitchOffset;
+        targetPos = duckPos + right * (kHipAimOffset.x + rightPull) + up * (kHipAimOffset.y + liftY) + fwd * (kHipAimOffset.z + fwdPull);
+        targetRot = { riflePitchOff, yaw + rifleYawOff, 0.0f };
 
-        rifleObject_->SetTranslate(riflePosition_);
-        rifleObject_->SetRotate(rifleRotation_);
-        rifleObject_->SetScale(object3d_->GetScale());
-        rifleObject_->Update();
+        const float rPitch        = targetRot.x;
+        const float rYaw          = targetRot.y;
+        const Vector3 rFwd        = { std::sin(rYaw), 0.0f, std::cos(rYaw) };
+        const Vector3 rRight      = { std::cos(rYaw), 0.0f, -std::sin(rYaw) };
+        const Vector3 magAxisDown = { -std::sin(rPitch) * rFwd.x, -std::cos(rPitch), -std::sin(rPitch) * rFwd.z };
+
+        magPos = targetPos;
+        magRot = targetRot;
+        if (p >= kMagReleaseEnd && p < kMagDropEnd)
+        {
+            const float dropT = (p - kMagReleaseEnd) / kMagDropSpan;
+            magPos = targetPos + magAxisDown * (dropT * dropT * kMagDropSlideDist) + rFwd * (kMagDropFwdDrift * dropT);
+            magRot = { rPitch + kMagDropPitchTilt * dropT, rYaw, 0.0f };
+        }
+        else if (p >= kMagDropEnd && p < kMagEmptyEnd)
+        {
+            rifleMagVisible_ = false;
+        }
+        else if (p >= kMagEmptyEnd && p < kMagInsertEnd)
+        {
+            const float invT = 1.0f - SmoothStep01((p - kMagEmptyEnd) / kMagInsertSpan);
+            magPos = targetPos + magAxisDown * (kMagPouchDown * invT) - rRight * (kMagPouchLeft * invT) - rFwd * (kMagPouchBack * invT);
+            magRot = { rPitch + kMagInsertPitch * invT, rYaw - kMagInsertYaw * invT, 0.0f };
+        }
     }
+
+    ApplyWeaponTransforms(targetPos, targetRot, magPos, magRot, kUnitScale);
 }
 
 void Player::PostCollisionUpdate()
 {
-    // 物理エンジン（CollisionManager）の押し出し解決後にも、Y座標を確実に地面レベル(0.0f)に固定
     position_.y = 0.0f;
-
-    if (object3d_)
-    {
-        if (isDodging_)
-        {
-            drawPos_.x = position_.x;
-            drawPos_.z = position_.z;
-            object3d_->SetTranslate(drawPos_);
-        }
-        else
-        {
-            object3d_->SetTranslate(position_);
-        }
-        object3d_->Update();
-
-        if (rifleObject_)
-        {
-            Vector3 duckPos = isDodging_ ? drawPos_ : position_;
-            Vector3 duckRot = object3d_->GetRotate();
-            float yaw = duckRot.y;
-            Vector3 fwd = { std::sin(yaw), 0.0f, std::cos(yaw) };
-            Vector3 right = { std::cos(yaw), 0.0f, -std::sin(yaw) };
-            float fwdOffset = 0.25f - rifleRecoil_ * 0.08f;
-            riflePosition_ = duckPos + right * 0.42f + Vector3{ 0.0f, 0.68f, 0.0f } + fwd * fwdOffset;
-            rifleObject_->SetTranslate(riflePosition_);
-            rifleObject_->Update();
-        }
-    }
+    if (!object3d_) return;
+    if (isDodging_) { drawPos_.x = position_.x; drawPos_.z = position_.z; }
+    SyncDuckVisualAndWeaponPose();
 }
 
 void Player::SetIntroTransform(const Vector3& offset, const Vector3& scale, const Vector3& rotate)
 {
-    if (object3d_)
-    {
-        Vector3 p = { position_.x + offset.x, position_.y + offset.y, position_.z + offset.z };
-        object3d_->SetTranslate(p);
-        object3d_->SetScale(scale);
-        object3d_->SetRotate(rotate);
-        object3d_->Update();
+    if (!object3d_) return;
 
-        if (rifleObject_)
-        {
-            float yaw = rotate.y;
-            Vector3 fwd = { std::sin(yaw), 0.0f, std::cos(yaw) };
-            Vector3 right = { std::cos(yaw), 0.0f, -std::sin(yaw) };
-            riflePosition_ = p + right * (0.42f * scale.x) + Vector3{ 0.0f, 0.68f * scale.y, 0.0f } + fwd * (0.25f * scale.z);
-            rifleObject_->SetTranslate(riflePosition_);
-            rifleObject_->SetRotate(rotate);
-            rifleObject_->SetScale(scale);
-            rifleObject_->Update();
-        }
+    isInIntroPose_ = true;
+    aimYaw_ = rotate.y;
+
+    const Vector3 p = position_ + offset;
+    SetObjectTransform(object3d_.get(), p, rotate, scale, true);
+    SyncDuckVisualAndWeaponPose();
+
+    if (rifleObject_)
+    {
+        using namespace PlayerTuning::Weapon;
+        const Vector3 localOff = { kHipAimOffset.x * scale.x, kHipAimOffset.y * scale.y, kHipAimOffset.z * scale.z };
+        const Vector3 worldPos = p + DuckPartRig::TransformVec3ByRotation(localOff, DuckPartRig::MakeEulerMatrixXYZ(rotate));
+        rifleMagVisible_ = true;
+        ApplyWeaponTransforms(worldPos, rotate, worldPos, rotate, scale);
     }
 }
 
 void Player::RestoreIntroPose()
 {
-    if (object3d_)
-    {
-        object3d_->SetTranslate(position_);
-        object3d_->SetScale({ 1.0f, 1.0f, 1.0f });
-        object3d_->SetRotate({ 0.0f, 0.0f, 0.0f });
-        object3d_->Update();
-        prevSpacePressed_ = true; // イントロ終了・スキップ直後のSPACEキー暴発を確実に抑止
+    if (!object3d_) return;
 
-        if (rifleObject_)
-        {
-            float yaw = 0.0f;
-            Vector3 fwd = { std::sin(yaw), 0.0f, std::cos(yaw) };
-            Vector3 right = { std::cos(yaw), 0.0f, -std::sin(yaw) };
-            riflePosition_ = position_ + right * 0.42f + Vector3{ 0.0f, 0.68f, 0.0f } + fwd * 0.25f;
-            rifleObject_->SetTranslate(riflePosition_);
-            rifleObject_->SetRotate({ 0.0f, 0.0f, 0.0f });
-            rifleObject_->SetScale({ 1.0f, 1.0f, 1.0f });
-            rifleObject_->Update();
-        }
-    }
+    isInIntroPose_ = false;
+    aimYaw_ = walkBlend_ = sprintBlend_ = 0.0f;
+    walkPhase_ = PlayerTuning::Anim::kInitialWalkPhase;
+    SetObjectTransform(object3d_.get(), position_, kZeroVec3, kUnitScale, true);
+    prevSpacePressed_ = true;               // イントロ終了・スキップ直後のSPACEキー暴発を抑止
+    suppressShootUntilMouseRelease_ = true; // スタート・スキップ時の左クリック暴発を抑止
+    isWeaponHolstered_ = prevCPressed_ = false;
+    SyncDuckVisualAndWeaponPose();
 }
 
 // =============================================================================
@@ -680,70 +909,55 @@ void Player::RestoreIntroPose()
 std::vector<std::unique_ptr<Bullet>> Player::TryShoot(const MouseInput* mouseInput, float deltaTime)
 {
     std::vector<std::unique_ptr<Bullet>> bullets;
+    if (shotCooldownTimer_ > 0.0f) shotCooldownTimer_ = (std::max)(0.0f, shotCooldownTimer_ - deltaTime);
 
-    // クールダウンタイマーの減算
-    if (shotCooldownTimer_ > 0.0f)
-    {
-        shotCooldownTimer_ -= deltaTime;
-        if (shotCooldownTimer_ < 0.0f) shotCooldownTimer_ = 0.0f;
-    }
-
-    // 射撃不可条件（死亡・回避中・リロード中・弾薬切れ）
-    if (isDead_ || isDodging_ || !object3d_ || !object3dCom_ || !camera_ || !mouseInput)
-    {
-        return bullets;
-    }
-    if (isReloading_ || magazineAmmo_ <= 0)
+    if (isDead_ || isDodging_ || !object3d_ || !object3dCom_ || !camera_ || !mouseInput || AppDebugState::IsImGuiCapturingMouse())
     {
         return bullets;
     }
 
-    // 左クリック押下時かつクールダウン完了時に射撃実行
+    // スタート・演出スキップ時のマウス左クリック押しっぱなしによる初弾暴発を防止
+    if (suppressShootUntilMouseRelease_)
+    {
+        const bool osLeftDown = (GetAsyncKeyState(VK_LBUTTON) & kUIAsyncKeyDownMask) != 0;
+        if (mouseInput->PushButton(0) || osLeftDown) return bullets;
+        suppressShootUntilMouseRelease_ = false;
+    }
+
+    if (!isReloading_ && magazineAmmo_ <= 0 && mouseInput->TriggerButton(0))
+    {
+        TacticalAudio::Play2D("Resources/Audio/SE_Gun_DryFire.wav", PlayerTuning::Audio::kDryFireVolume, PlayerTuning::Audio::kDryFireCooldownMs);
+    }
+    if (isReloading_ || magazineAmmo_ <= 0) return bullets;
+
     if (mouseInput->PushButton(0) && shotCooldownTimer_ <= 0.0f)
     {
-        const float yaw = GetRotation().y;
+        isWeaponHolstered_ = false;
+        SyncAimWithCamera(mouseInput);
 
-        // 拡散角（レティクルブレ）の適用
-        float spreadOffset = 0.0f;
-        if (currentSpread_ > 0.001f)
-        {
-            float r = static_cast<float>(rand()) / static_cast<float>(RAND_MAX);
-            spreadOffset = (r * 2.0f - 1.0f) * currentSpread_;
-        }
-
-        const float finalYaw = yaw + spreadOffset;
+        const float finalYaw  = GetRotation().y;
         const Vector3 forward = { std::sin(finalYaw), 0.0f, std::cos(finalYaw) };
-        const Vector3 spawnPos = Bullet::ComputeSpawnPosition(GetPosition(), forward, bulletSpawnOffset_);
-
         auto bullet = std::make_unique<Bullet>();
-        bullet->Initialize(object3dCom_, camera_, spawnPos, forward, bulletSpeed_, bulletLifeTime_, BulletOwner::Player);
+        bullet->Initialize(object3dCom_, camera_, GetMuzzleWorldPosition(), forward, kBulletSpeed, kBulletLifeTime, BulletOwner::Player);
         bullets.push_back(std::move(bullet));
 
-        // 弾薬消費 & レイド統計への記録
         magazineAmmo_--;
-        shotCooldownTimer_ = shotCooldown_;
+        shotCooldownTimer_ = kShotCooldown;
         rifleRecoil_ = 1.0f;
         RaidStats::GetInstance().shotsFired++;
 
-        // 射撃反動による照準拡散ペナルティの加算
-        currentSpread_ += kShootSpreadPenalty;
-        if (currentSpread_ > kMaxSpread)
-        {
-            currentSpread_ = kMaxSpread;
-        }
+        ApplyReticleRecoilKick();
+        currentSpread_ = (std::min)(kMaxSpread, currentSpread_ + kShootSpreadPenalty);
     }
-
     return bullets;
 }
 
 bool Player::StartHealing()
 {
-    if (isDead_ || isDodging_ || isHealing_ || medkitCount_ <= 0 || hp_ >= maxHp_)
-    {
-        return false;
-    }
+    if (isDead_ || isDodging_ || isHealing_ || medkitCount_ <= 0 || hp_ >= maxHp_) return false;
     isHealing_ = true;
     healTimer_ = kHealDuration;
+    TacticalAudio::Play2D("Resources/Audio/SE_Heal_Start.wav", PlayerTuning::Audio::kHealStartVolume);
     return true;
 }
 
@@ -752,64 +966,132 @@ void Player::TakeDamage(float damage, const std::string& attackerName, const std
     if (isDead_ || invincibilityTimer_ > 0.0f || isDodging_) return;
 
     hp_ -= damage;
-    if (attackerPos)
-    {
-        lastAttackerPosition_ = *attackerPos;
-        hasAttackerPosition_ = true;
-    }
+    RaidStats::GetInstance().damageTakenCount++;
+    if (attackerPos) { lastAttackerPosition_ = *attackerPos; hasAttackerPosition_ = true; }
+
     if (hp_ <= 0.0f)
     {
-        hp_ = 0.0f;
+        hp_ = hitFlashTimer_ = invincibilityTimer_ = 0.0f;
         isDead_ = true;
-        hitFlashTimer_ = 0.0f;
-        invincibilityTimer_ = 0.0f;
         lastAttackerName_ = attackerName;
         causeOfDeath_ = cause;
         RaidStats::GetInstance().causeOfDeath = cause;
         RaidStats::GetInstance().killerName = attackerName;
-        if (object3d_)
-        {
-            object3d_->SetColor({ 0.2f, 0.2f, 0.2f, 1.0f }); // 死亡時は暗い灰色に変化
-        }
+        currentBodyColor_ = PlayerTuning::Visual::kDeadBodyDimColor;
+        if (object3d_) object3d_->SetColor(currentBodyColor_);
     }
     else
     {
-        invincibilityTimer_ = invincibilityDuration_;
-        hitFlashTimer_ = hitFlashDuration_;
-        object3d_->SetColor({ 5.0f, 5.0f, 5.0f, 1.0f });
+        invincibilityTimer_ = kInvincibilityDuration;
+        hitFlashTimer_ = kHitFlashDuration;
+        currentBodyColor_ = PlayerTuning::Visual::kHitInitialFlashColor;
+        object3d_->SetColor(currentBodyColor_);
     }
 }
 
 void Player::UpdateSpread(float deltaTime, bool isMoving)
 {
-    float targetSpread = kBaseSpread;
-    if (isMoving)
+    const float targetSpread = kBaseSpread + (isMoving ? kMoveSpreadPenalty : 0.0f);
+    currentSpread_ = (currentSpread_ > targetSpread)
+        ? (std::max)(targetSpread, currentSpread_ - kSpreadRecoverRate * deltaTime)
+        : (std::min)(targetSpread, currentSpread_ + kSpreadRecoverRate * 2.0f * deltaTime);
+    currentSpread_ = (std::min)(kMaxSpread, currentSpread_);
+}
+
+void Player::UpdateReticleRecoil(float deltaTime)
+{
+    using namespace PlayerTuning::Aim;
+    const float clampedDt = (std::clamp)(deltaTime, 0.0f, PlayerTuning::kMaxPhysicsStepDt);
+    const int steps       = (clampedDt > kRecoilSubstepThresholdDt) ? 2 : 1;
+    const float stepDt    = clampedDt / static_cast<float>(steps);
+
+    for (int i = 0; i < steps; ++i)
     {
-        targetSpread += kMoveSpreadPenalty;
+        const Vector2 accel = {
+            -GameConfig::Combat::kReticleSpringStiffness * reticleRecoilOffset_.x - GameConfig::Combat::kReticleSpringDamping * reticleRecoilVel_.x,
+            -GameConfig::Combat::kReticleSpringStiffness * reticleRecoilOffset_.y - GameConfig::Combat::kReticleSpringDamping * reticleRecoilVel_.y
+        };
+        reticleRecoilVel_.x    += accel.x * stepDt;
+        reticleRecoilVel_.y    += accel.y * stepDt;
+        reticleRecoilOffset_.x += reticleRecoilVel_.x * stepDt;
+        reticleRecoilOffset_.y += reticleRecoilVel_.y * stepDt;
     }
 
-    // 移動停止時は徐々に照準が収束（Recover）する
-    if (currentSpread_ > targetSpread)
+    const float maxR = GameConfig::Combat::kReticleMaxOffsetPx;
+    const float len  = std::sqrt(reticleRecoilOffset_.x * reticleRecoilOffset_.x + reticleRecoilOffset_.y * reticleRecoilOffset_.y);
+    if (len > maxR && len > PlayerTuning::kSmallLenEpsilon)
     {
-        currentSpread_ -= kSpreadRecoverRate * deltaTime;
-        if (currentSpread_ < targetSpread)
+        const float s = maxR / len;
+        reticleRecoilOffset_.x *= s;
+        reticleRecoilOffset_.y *= s;
+        const float nx     = reticleRecoilOffset_.x / maxR;
+        const float ny     = reticleRecoilOffset_.y / maxR;
+        const float outVel = reticleRecoilVel_.x * nx + reticleRecoilVel_.y * ny;
+        if (outVel > 0.0f)
         {
-            currentSpread_ = targetSpread;
+            reticleRecoilVel_.x -= nx * outVel * kRecoilBoundaryVelDamping;
+            reticleRecoilVel_.y -= ny * outVel * kRecoilBoundaryVelDamping;
         }
     }
-    else
+    else if (len < kRecoilRestOffsetPx && (reticleRecoilVel_.x * reticleRecoilVel_.x + reticleRecoilVel_.y * reticleRecoilVel_.y) < 1.0f)
     {
-        currentSpread_ += kSpreadRecoverRate * 2.0f * deltaTime;
-        if (currentSpread_ > targetSpread)
+        reticleRecoilOffset_ = { 0.0f, 0.0f };
+        reticleRecoilVel_    = { 0.0f, 0.0f };
+    }
+
+    if (shotCooldownTimer_ <= kRecoilCoolReadyTime) recoilHeat_ = (std::max)(0.0f, recoilHeat_ - kRecoilHeatCoolRate * clampedDt);
+    if (recoilKickVisual_ > 0.0f) recoilKickVisual_ = (std::max)(0.0f, recoilKickVisual_ - kRecoilKickVisualDecay * clampedDt);
+    recoilKickVisual_ = (std::max)(recoilKickVisual_, (std::clamp)(len / kRecoilVisualNormOffsetPx, 0.0f, 1.0f));
+}
+
+void Player::ApplyReticleRecoilKick()
+{
+    using namespace PlayerTuning;
+    using namespace PlayerTuning::Aim;
+
+    const Vector2 clientSize = ResolveClientSize(
+        static_cast<float>(WindowAPI::GetClientWidth()),
+        static_cast<float>(WindowAPI::GetClientHeight()));
+
+    Vector2 aimDir2D = { 0.0f, -1.0f };
+    if (camera_)
+    {
+        const Matrix4x4& vp  = camera_->GetViewProjectionMatrix();
+        const Vector3 anchor = { position_.x, position_.y + bulletSpawnOffset_.y, position_.z };
+        const float w = anchor.x * vp.m[0][kMatW] + anchor.y * vp.m[1][kMatW] + anchor.z * vp.m[2][kMatW] + vp.m[kMatW][kMatW];
+        if (w > kSmallLenEpsilon)
         {
-            currentSpread_ = targetSpread;
+            const float clipX    = (anchor.x * vp.m[0][0] + anchor.y * vp.m[1][0] + anchor.z * vp.m[2][0] + vp.m[kMatW][0]) / w;
+            const float clipY    = (anchor.x * vp.m[0][1] + anchor.y * vp.m[1][1] + anchor.z * vp.m[2][1] + vp.m[kMatW][1]) / w;
+            const float dx       = effectiveReticleScreenPos_.x - (clipX + 1.0f) * 0.5f * clientSize.x;
+            const float dy       = effectiveReticleScreenPos_.y - (1.0f - clipY) * 0.5f * clientSize.y;
+            const float dLen     = std::sqrt(dx * dx + dy * dy);
+            if (dLen > 2.0f) aimDir2D = { dx / dLen, dy / dLen };
         }
     }
 
-    if (currentSpread_ > kMaxSpread)
-    {
-        currentSpread_ = kMaxSpread;
-    }
+    Vector2 climbDir     = { aimDir2D.x * kClimbAimFollowX, kClimbBaseScreenUpY + aimDir2D.y * kClimbAimFollowY };
+    const float climbLen = std::sqrt(climbDir.x * climbDir.x + climbDir.y * climbDir.y);
+    climbDir = (climbLen > kSmallLenEpsilon) ? Vector2{ climbDir.x / climbLen, climbDir.y / climbLen } : Vector2{ 0.0f, -1.0f };
+
+    const Vector2 perpDir = { -aimDir2D.y, aimDir2D.x };
+    if (recoilHeat_ <= kSideFlipGuaranteedHeat || RandRecoil01() > kSideKeepProb) recoilSideSign_ = -recoilSideSign_;
+    const float side     = static_cast<float>(recoilSideSign_);
+    const float moveMult = isMoving_ ? kRecoilMovingMultiplier : 1.0f;
+    const float jitter   = RandRecoilRange(kRecoilJitterMin, kRecoilJitterMax);
+
+    const float climbSnap = (GameConfig::Combat::kReticleClimbSnapPx + kHeatClimbSnapAdd * recoilHeat_) * moveMult;
+    const float latSnap   = side * (GameConfig::Combat::kReticleLateralSnapPx + kHeatLatSnapAdd * recoilHeat_) * jitter * moveMult;
+    const float climbVel  = (GameConfig::Combat::kReticleClimbVelPx  + kHeatClimbVelAdd  * recoilHeat_) * moveMult;
+    const float latVel    = side * (GameConfig::Combat::kReticleLateralVelPx  + kHeatLatVelAdd  * recoilHeat_) * jitter * moveMult;
+
+    reticleRecoilOffset_.x += climbDir.x * climbSnap + perpDir.x * latSnap;
+    reticleRecoilOffset_.y += climbDir.y * climbSnap + perpDir.y * latSnap;
+    reticleRecoilVel_.x    += climbDir.x * climbVel  + perpDir.x * latVel;
+    reticleRecoilVel_.y    += climbDir.y * climbVel  + perpDir.y * latVel;
+
+    recoilHeat_ = (std::min)(1.0f, recoilHeat_ + kRecoilHeatPerShot);
+    recoilKickVisual_ = 1.0f;
 }
 
 // =============================================================================
@@ -819,62 +1101,79 @@ void Player::UpdateSpread(float deltaTime, bool isMoving)
 void Player::Draw(const RenderContext& ctx)
 {
     if (!object3dCom_ || !object3d_) return;
+    using namespace PlayerTuning::Visual;
 
-    RenderContext playerCtx = ctx;
-    const Object3d::ModelData& modelData = object3d_->GetModelData();
-    uint32_t texIdx = (defaultTextureIndex_ != TextureManager::kInvalidTextureIndex) ? defaultTextureIndex_ : modelData.material.textureIndex;
-    if (texIdx != TextureManager::kInvalidTextureIndex)
+    if (isDead_) SyncDuckVisualAndWeaponPose();
+
+    auto makePartContext = [&](uint32_t texIndex) -> RenderContext
     {
-        playerCtx.textureHandle = TextureManager::GetInstance()->GetSrvHandleGPU(texIdx);
-    }
+        RenderContext partCtx = ctx;
+        if (texIndex != TextureManager::kInvalidTextureIndex)
+        {
+            partCtx.textureHandle = TextureManager::GetInstance()->GetSrvHandleGPU(texIndex);
+        }
+        return partCtx;
+    };
 
-    // 被弾時のノックバック・震動シェイク＆仰け反り（Flinch）演出の適用
-    Vector3 originalPos = object3d_->GetTranslate();
-    Vector3 originalRot = object3d_->GetRotate();
+    auto drawPart = [&](Object3d* obj, const RenderContext& partCtx)
+    {
+        if (!obj || obj->GetModelData().vertices.empty()) return;
+        if (ctx.camera) obj->SetCamera(ctx.camera);
+        obj->Update();
+        object3dCom_->Draw(obj, partCtx, obj->GetModelData(), true);
+    };
+
+    const Object3d::ModelData& modelData = object3d_->GetModelData();
+    const uint32_t bodyTexIdx = (defaultTextureIndex_ != TextureManager::kInvalidTextureIndex)
+        ? defaultTextureIndex_
+        : modelData.material.textureIndex;
+    const RenderContext playerCtx = makePartContext(bodyTexIdx);
+
+    // 被弾時のノックバック・震動シェイク＆仰け反り（Flinch）演出
+    const Vector3 originalPos = object3d_->GetTranslate();
+    const Vector3 originalRot = object3d_->GetRotate();
+    Vector3 shakeDelta        = kZeroVec3;
     if (hitFlashTimer_ > 0.0f)
     {
-        float ratio = hitFlashTimer_ / hitFlashDuration_;
-        float shakeIntensity = 0.40f * ratio;
-        float rx = ((float)rand() / RAND_MAX * 2.0f - 1.0f) * shakeIntensity;
-        float rz = ((float)rand() / RAND_MAX * 2.0f - 1.0f) * shakeIntensity;
-        object3d_->SetTranslate(originalPos + Vector3{ rx, 0.05f * ratio, rz });
+        const float ratio          = hitFlashTimer_ / kHitFlashDuration;
+        const float shakeIntensity = kHitShakeIntensity * ratio;
+        const float rx             = (RandRecoil01() * 2.0f - 1.0f) * shakeIntensity;
+        const float rz             = (RandRecoil01() * 2.0f - 1.0f) * shakeIntensity;
+        shakeDelta = { rx, kHitShakeLiftY * ratio, rz };
+        object3d_->SetTranslate(originalPos + shakeDelta);
 
-        // 被弾による仰け反り角度
-        Vector3 flinchRot = originalRot;
-        flinchRot.x -= 0.50f * ratio;
-        object3d_->SetRotate(flinchRot);
+        const Matrix4x4 flinchMat = Multiply(MakeRotateXMatrix(kHitFlinchPitch * ratio), DuckPartRig::MakeEulerMatrixXYZ(originalRot));
+        object3d_->SetRotate(DuckPartRig::DecomposeRotationToEulerXYZ(flinchMat));
     }
 
-    // 描画直前に最新のカメラでトランスフォームおよびWVP行列を確実に更新（カリング誤判定による非表示を完全防止）
-    if (ctx.camera)
+    const Vector4 bodyColor = isDead_ ? kDeadLimbTint : currentBodyColor_;
+    Object3d* limbs[PlayerTuning::kDuckLimbCount] = {
+        leftFootObject_.get(), rightFootObject_.get(), leftWingObject_.get(), rightWingObject_.get()
+    };
+    Vector3 origLimbPos[PlayerTuning::kDuckLimbCount]{};
+    for (int i = 0; i < PlayerTuning::kDuckLimbCount; ++i)
     {
-        object3d_->SetCamera(ctx.camera);
+        if (!limbs[i]) continue;
+        origLimbPos[i] = limbs[i]->GetTranslate();
+        if (hitFlashTimer_ > 0.0f) limbs[i]->SetTranslate(origLimbPos[i] + shakeDelta);
+        limbs[i]->SetColor(bodyColor);
     }
-    object3d_->Update();
 
-    object3dCom_->Draw(object3d_.get(), playerCtx, modelData, true);
+    drawPart(object3d_.get(), playerCtx);
+    for (Object3d* limb : limbs) drawPart(limb, playerCtx);
 
-    // ライフルの描画（ステージ開始時から携行、死亡演出中は手から吹き飛ぶため非表示）
     if (!isDead_ && rifleObject_)
     {
-        RenderContext rifleCtx = ctx;
-        if (rifleTextureIndex_ != TextureManager::kInvalidTextureIndex)
-        {
-            rifleCtx.textureHandle = TextureManager::GetInstance()->GetSrvHandleGPU(rifleTextureIndex_);
-        }
-        if (ctx.camera)
-        {
-            rifleObject_->SetCamera(ctx.camera);
-        }
-        rifleObject_->Update();
-        object3dCom_->Draw(rifleObject_.get(), rifleCtx, rifleObject_->GetModelData(), true);
+        drawPart(rifleObject_.get(), makePartContext(rifleTextureIndex_));
+        if (rifleMagObject_ && rifleMagVisible_) drawPart(rifleMagObject_.get(), makePartContext(rifleMagTextureIndex_));
     }
 
-    // 描画後は論理座標・回転を元に戻して座標ドリフトを防ぐ
     if (hitFlashTimer_ > 0.0f)
     {
-        object3d_->SetTranslate(originalPos);
-        object3d_->SetRotate(originalRot);
-        object3d_->Update();
+        SetObjectTransform(object3d_.get(), originalPos, originalRot, object3d_->GetScale(), true);
+        for (int i = 0; i < PlayerTuning::kDuckLimbCount; ++i)
+        {
+            if (limbs[i]) { limbs[i]->SetTranslate(origLimbPos[i]); limbs[i]->Update(); }
+        }
     }
 }

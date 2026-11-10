@@ -1,0 +1,9 @@
+# Realistic Nature Material
+newmtl BridgeWakeMat
+Ka 1.000000 1.000000 1.000000
+Kd 1.000000 1.000000 1.000000
+Ks 0.050000 0.050000 0.050000
+Ns 16.000000
+d 1.000000
+illum 2
+map_Kd duckov_bridge_wake.png

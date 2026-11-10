@@ -1,2 +1,7 @@
-# Blender 5.2.0 LTS MTL File: 'None'
-# www.blender.org
+# Material for extraction_pad
+newmtl extraction_pad_mat
+Ka 1.0 1.0 1.0
+Kd 1.0 1.0 1.0
+Ks 0.12 0.12 0.12
+Ns 16.0
+map_Kd extraction_pad.png

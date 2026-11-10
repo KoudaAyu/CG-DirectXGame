@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    width: 900px;
+    height: 420px;
+    background-color: #14171c;
+    color: #ffffff;
+    font-family: "Meiryo", "MS Gothic", sans-serif;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+
+  .canvas-box {
+    position: relative;
+    width: 880px;
+    height: 400px;
+    border: 2px solid #0088ff;
+    background-color: #14171c;
+    border-radius: 4px;
+    padding: 15px;
+  }
+
+  .title-tag {
+    position: absolute;
+    top: 12px;
+    left: 15px;
+    font-size: 17px;
+    font-weight: bold;
+    color: #00b4d8;
+  }
+
+  /* 障害物（木のフェンス・厚み40cm） */
+  .obstacle-box {
+    position: absolute;
+    left: 440px;
+    top: 55px;
+    width: 40px;
+    height: 250px;
+    transform: translateX(-50%);
+    border: 2px solid #c97a3e;
+    background-color: #2b1f16;
+  }
+  .obstacle-label {
+    position: absolute;
+    top: -24px;
+    left: 50%;
+    transform: translateX(-50%);
+    white-space: nowrap;
+    font-size: 14px;
+    color: #e09f67;
+  }
+  .obstacle-thick {
+    position: absolute;
+    bottom: -22px;
+    left: 50%;
+    transform: translateX(-50%);
+    white-space: nowrap;
+    font-size: 12px;
+    color: #a8764e;
+  }
+
+  /* 弾丸 Frame 1 */
+  .bullet-f1 {
+    position: absolute;
+    left: 130px;
+    top: 150px;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background-color: #00b4d8;
+    border: 2px solid #ffffff;
+  }
+  .label-f1 {
+    position: absolute;
+    left: 144px;
+    top: 188px;
+    transform: translateX(-50%);
+    white-space: nowrap;
+    font-size: 14px;
+    color: #00b4d8;
+    text-align: center;
+    line-height: 1.3;
+  }
+
+  /* 弾丸 Frame 2 */
+  .bullet-f2 {
+    position: absolute;
+    left: 720px;
+    top: 150px;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background-color: #00b4d8;
+    border: 2px solid #ffffff;
+  }
+  .label-f2 {
+    position: absolute;
+    left: 734px;
+    top: 188px;
+    transform: translateX(-50%);
+    white-space: nowrap;
+    font-size: 14px;
+    color: #00b4d8;
+    text-align: center;
+    line-height: 1.3;
+  }
+
+  /* 移動ライン（赤い点線矢印） */
+  .arrow-line {
+    position: absolute;
+    left: 158px;
+    right: 160px;
+    top: 163px;
+    height: 2px;
+    border-top: 2px dashed #ff4d4d;
+  }
+  .arrow-line::after {
+    content: "";
+    position: absolute;
+    right: -2px;
+    top: -5px;
+    border-left: 10px solid #ff4d4d;
+    border-top: 5px solid transparent;
+    border-bottom: 5px solid transparent;
+  }
+  .arrow-text {
+    position: absolute;
+    top: -24px;
+    left: 35%;
+    transform: translateX(-50%);
+    white-space: nowrap;
+    font-size: 13px;
+    color: #ff6b6b;
+  }
+
+  /* 判定チェックテキスト */
+  .check-f1 {
+    position: absolute;
+    left: 144px;
+    top: 118px;
+    transform: translateX(-50%);
+    font-size: 12px;
+    color: #8899aa;
+    white-space: nowrap;
+  }
+  .check-f2 {
+    position: absolute;
+    left: 734px;
+    top: 118px;
+    transform: translateX(-50%);
+    font-size: 12px;
+    color: #8899aa;
+    white-space: nowrap;
+  }
+
+  /* 赤い吹き出しバッジ */
+  .alert-badge {
+    position: absolute;
+    bottom: 18px;
+    left: 440px;
+    transform: translateX(-50%);
+    background-color: #b32424;
+    border: 1px solid #ff6666;
+    border-radius: 6px;
+    padding: 8px 24px;
+    text-align: center;
+    white-space: nowrap;
+  }
+  .alert-title {
+    font-size: 15px;
+    font-weight: bold;
+    color: #ffffff;
+  }
+  .alert-desc {
+    font-size: 13px;
+    color: #ffcccc;
+    margin-top: 2px;
+  }
+</style>
+</head>
+<body>
+
+  <div class="canvas-box">
+    <div class="title-tag">◆ 従来の離散判定（球 / 現在位置判定）</div>
+
+    <!-- 障害物 -->
+    <div class="obstacle-box">
+      <div class="obstacle-label">木のフェンス</div>
+      <div class="obstacle-thick">厚み: 40cm</div>
+    </div>
+
+    <!-- 判定テキスト -->
+    <div class="check-f1">判定: 接触なし</div>
+    <div class="check-f2">判定: 接触なし</div>
+
+    <!-- 矢印線 -->
+    <div class="arrow-line">
+      <div class="arrow-text">1フレームで約80cm移動（板を飛び越える）</div>
+    </div>
+
+    <!-- 弾丸 Frame 1 -->
+    <div class="bullet-f1"></div>
+    <div class="label-f1">
+      <b>Frame 1</b><br>
+      壁の手前に位置
+    </div>
+
+    <!-- 弾丸 Frame 2 -->
+    <div class="bullet-f2"></div>
+    <div class="label-f2">
+      <b>Frame 2</b><br>
+      壁の向こうへワープ
+    </div>
+
+    <!-- 赤い吹き出し -->
+    <div class="alert-badge">
+      <div class="alert-title">【すり抜け（トンネリング）発生！】</div>
+      <div class="alert-desc">板が存在する空間を一度も踏まないため、壁を完全に素通りする</div>
+    </div>
+
+  </div>
+
+</body>
+</html>

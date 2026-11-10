@@ -40,6 +40,7 @@
 #include <random>
 #include <vector>
 
+#include "Application/Environment/SkyCloudSystem.h"
 #include "RenderContext.h"
 
 class Game : public Framework {
@@ -123,6 +124,7 @@ private:
 
   ParticleRenderer particleRenderer_;
   SphereRenderer sphereRenderer_;
+  std::unique_ptr<SkyCloudSystem> skyCloudSystem_;
 
 private:
   std::vector<std::unique_ptr<Sprite>> sprites;
@@ -140,6 +142,8 @@ private:
   // Objectの描画切り替え
   bool drawObject = false;
   bool drawSprite = false;
+  bool showDeveloperImGui_ = false;
+  bool prevToggleImGuiKey_ = false;
 
   uint32_t textureIndexUvChecker = TextureManager::kInvalidTextureIndex;
   uint32_t textureIndexModelTex = TextureManager::kInvalidTextureIndex;

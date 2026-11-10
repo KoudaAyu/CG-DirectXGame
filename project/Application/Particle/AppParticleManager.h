@@ -1,6 +1,8 @@
 #pragma once
 #include <list>
+#include <vector>
 #include <random>
+#include <cstdint>
 #include "Vector.h"
 #include "Transform.h"
 #include "ParticleManager.h"
@@ -42,6 +44,11 @@ struct AppParticle
 	bool hasColorShift = false;
 	float curlFreq = 0.0f;
 	float curlAmp = 0.0f;
+	Vector2 scaleAspect = { 1.0f, 1.0f };
+	float fadeInRatio = 0.0f;
+	uint16_t slotLayer = 0;
+	int16_t batchIndex = -1;
+	int32_t stableSlot = -1;
 };
 
 class AppParticleManager
@@ -92,9 +99,13 @@ public:
 	void EmitShorelineWave(std::mt19937& randomEngine, const Vector3& shorePos, const Vector3& shoreNormal, float waveEnergy, uint32_t dropletTex, uint32_t mistTex);
 
 	// ミノフスキー粒子エフェクト（閃光のハサウェイ・キルケーの魔女風 / 3D空間加算合成）
-	void EmitMinovskySwirl(std::mt19937& randomEngine, const Vector3& center, float radius, float height, float angle, bool isMagenta, uint32_t textureIndex, float scale = 0.22f);
-	void EmitMinovskyStream(std::mt19937& randomEngine, const Vector3& origin, const Vector3& velocity, bool isMagenta, uint32_t textureIndex, float scale = 0.16f);
-	void EmitMinovskyBurst(std::mt19937& randomEngine, const Vector3& center, int count, uint32_t circleTexIndex, uint32_t starTexIndex, float power = 4.0f);
+	static constexpr float kDefaultMinovskySwirlScale  = 0.22f;
+	static constexpr float kDefaultMinovskyStreamScale = 0.16f;
+	static constexpr float kDefaultMinovskyBurstPower  = 4.0f;
+
+	void EmitMinovskySwirl(std::mt19937& randomEngine, const Vector3& center, float radius, float height, float angle, bool isMagenta, uint32_t textureIndex, float scale = kDefaultMinovskySwirlScale);
+	void EmitMinovskyStream(std::mt19937& randomEngine, const Vector3& origin, const Vector3& velocity, bool isMagenta, uint32_t textureIndex, float scale = kDefaultMinovskyStreamScale);
+	void EmitMinovskyBurst(std::mt19937& randomEngine, const Vector3& center, int count, uint32_t circleTexIndex, uint32_t starTexIndex, float power = kDefaultMinovskyBurstPower);
 	void EmitMinovskyBokeh(std::mt19937& randomEngine, const Vector3& position, float scale, bool isMagenta, uint32_t textureIndex);
 	void EmitMinovskyDashTrail(std::mt19937& randomEngine, const Vector3& position, const Vector3& moveDirection, uint32_t circleTexIndex, uint32_t starTexIndex);
 	void EmitMinovskyFlightAura(std::mt19937& randomEngine, const Vector3& center, int count, uint32_t circleTexIndex, uint32_t starTexIndex);
@@ -104,18 +115,53 @@ public:
 	void EmitMouseWaveWake(std::mt19937& randomEngine, const Vector3& pos, const Vector3& moveDir, float speed, uint32_t circleTex, uint32_t starTex);
 	void EmitMouseRippleRing(std::mt19937& randomEngine, const Vector3& center, float power, uint32_t circleTex, uint32_t starTex);
 	void ApplyMouseWaveDisturbance(const Vector3& mouseWorldPos, const Vector3& mouseWorldVel, float radius, float force);
+	void ApplyRotorDownwash(const Vector3& rotorPos, float rotorRadius, float strength, float deltaTime);
+	void DisperseAndFadeOutAll(float fadeSpeed, const Vector3& windVector, float deltaTime);
 
 	// 汎用：完全に設定済みのパーティクルを直接投入（シーン側で自由に演出を組むため）
-	void AddParticle(const AppParticle& particle) { particles_.push_back(particle); }
+	void AddParticle(const AppParticle& particle);
 	// バウンド判定に使う地面の高さ（既定 0.0f）
 	void SetGroundY(float groundY) { groundY_ = groundY; }
 	// 加算合成時に RGB へ α を乗算し、寿命に合わせて自然にフェードさせる（既定 false）
 	void SetPremultiplyAlpha(bool enable) { premultiplyAlpha_ = enable; }
+	// ストレートアルファ合成（煙・雲・土埃など発光せず背景を自然に遮蔽するボリューム表現用）
+	void SetAlphaBlend(bool enable) { alphaBlend_ = enable; }
+	// 各パーティクルに寿命終了まで不変の GPU インスタンススロットを割り当て、自転シード飛びと描画順のちらつきを防止
+	void SetStableInstanceSlots(bool enable) { stableInstanceSlots_ = enable; }
 	size_t GetParticleCount() const { return particles_.size(); }
+	void ClearParticles();
 
 private:
+	int16_t GetOrCreateTextureBatch(uint32_t textureIndex);
+	void AllocateParticleSlot(AppParticle& p);
+	void ReleaseParticleSlot(AppParticle& p);
+	void TriggerGPUEmitter(const Vector3& position, float scale, uint32_t count);
+
 	float groundY_ = 0.0f;
 	bool premultiplyAlpha_ = false;
+	bool alphaBlend_ = false;
+	bool stableInstanceSlots_ = false;
+
+	static constexpr uint32_t kMaxTextureBatches = 16;
+	static constexpr uint32_t kBatchMaxInstances = 2048;
+	static constexpr uint32_t kSlotLayerCount    = 3;
+	static constexpr uint32_t kLayer0StartSlot   = 0;
+	static constexpr uint32_t kLayer1StartSlot   = 682;
+	static constexpr uint32_t kLayer2StartSlot   = 1364;
+
+	struct TextureBatch
+	{
+		bool allocated = false;
+		uint32_t textureIndex = 0;
+		Microsoft::WRL::ComPtr<ID3D12Resource> resource = nullptr;
+		ParticleManager::ParticleCS* mappedData = nullptr;
+		uint32_t srvIndex = 0;
+		D3D12_GPU_DESCRIPTOR_HANDLE srvHandleGPU{};
+		std::vector<uint8_t> slotOccupied;
+		uint32_t layerSlotCursor[kSlotLayerCount] = { kLayer0StartSlot, kLayer1StartSlot, kLayer2StartSlot };
+	};
+	TextureBatch textureBatches_[kMaxTextureBatches]{};
+	Microsoft::WRL::ComPtr<ID3D12PipelineState> alphaBlendPipelineState_ = nullptr;
 
 	struct Vertex
 	{
@@ -126,12 +172,6 @@ private:
 
 	ParticleManager* enginePM_ = nullptr;
 	std::list<AppParticle> particles_;
-
-	static const uint32_t kNumMaxInstances = 8192;
-	Microsoft::WRL::ComPtr<ID3D12Resource> instancingResource_ = nullptr;
-	ParticleManager::ParticleCS* instanceData_ = nullptr;
-	uint32_t instancingSrvIndex_ = 0;
-	D3D12_GPU_DESCRIPTOR_HANDLE instancingSrvHandleGPU_{};
 
 	Microsoft::WRL::ComPtr<ID3D12Resource> quadVertexBuffer_ = nullptr;
 	D3D12_VERTEX_BUFFER_VIEW quadVertexBufferView_{};
@@ -145,6 +185,3 @@ public:
 	void Draw();
 	void Draw(const RenderContext& ctx);
 };
-
-
-

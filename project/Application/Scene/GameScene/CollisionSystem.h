@@ -1,11 +1,13 @@
 #pragma once
+#include <cstdint>
 
 struct Vector3;
 class GamePlayScene;
+class Obstacle;
 
 /// <summary>
 /// 衝突判定・物理補正システムクラス
-/// ゲーム内の弾丸、キャラクター（プレイヤー・敵）、障害物（Obstacle）間の衝突判定と、めり込み補正・ダメージ適用等の衝突解決を行います。
+/// ゲーム内の弾丸、キャラクター（プレイヤー・敵）、障害物（Obstacle）間の衝突判定と、材質別着弾・跳弾演出および衝突解決を行います。
 /// </summary>
 class CollisionSystem
 {
@@ -44,15 +46,16 @@ private:
 	void ResolveCharacterObstacleCollisions();
 
 	/// <summary>
-	/// 障害物に着弾した際のエフェクト（跳弾スパーク・木片・ダスト煙）を発生させます
+	/// 障害物の材質（鋼鉄・コンクリート・土嚢・木材）と入射角に応じたリアルな着弾・跳弾エフェクトを発生させます
 	/// </summary>
-	void TriggerObstacleHitEffect(const Vector3& hitPos, const Vector3& bulletDir);
+	void TriggerObstacleHitEffect(const Vector3& hitPos, const Vector3& bulletDir, const Vector3& surfaceNormal, const Obstacle* hitObstacle = nullptr);
 
 	/// <summary>
-	/// シーン内の全障害物（Obstacle）とレイの精密交差判定を行います（OBB直接交差判定）
+	/// シーン内の全障害物（Obstacle）とレイの精密交差判定を行います（OBB法線・対象物取得対応）
 	/// </summary>
-	bool RaycastObstacles(const Vector3& rayStart, const Vector3& rayDir, float maxDist, float& outHitDist, Vector3& outHitPoint);
+	bool RaycastObstacles(const Vector3& rayStart, const Vector3& rayDir, float maxDist, float& outHitDist, Vector3& outHitPoint, Vector3* outHitNormal = nullptr, const Obstacle** outHitObstacle = nullptr);
 
 private:
 	GamePlayScene* scene_ = nullptr;    // ゲームプレイシーンへの参照
+	uint32_t impactFlashTexIndex_ = UINT32_MAX;
 };

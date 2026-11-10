@@ -1,5 +1,6 @@
 #pragma once
 #include <memory>
+#include <vector>
 #include "Object3d.h"
 #include "Object3dCom.h"
 #include "Camera.h"
@@ -35,26 +36,23 @@ public:
     void SetAlertSprites(Sprite* bar, Sprite* dot) { alertBar_ = bar; alertDot_ = dot; }
 
     // スプライン巡回移動システム
-    void SetPatrolPath(const std::vector<Vector3>& points, bool isLoop = true, float speed = 2.2f);
-    void SetSimplePatrolPoints(const Vector3& a, const Vector3& b, float speed = 0.035f);
+    void SetPatrolPath(const std::vector<Vector3>& points, bool isLoop = true, float speed = EnemyTuning::kDefaultSplineSpeed);
+    void SetSimplePatrolPoints(const Vector3& a, const Vector3& b, float speed = EnemyTuning::kDefaultSimpleSpeed);
+    void SetTacticalRole(TacticalRole role) override;
 
-    // 音源検知のトリガー
+    // 音源検知・無線リンクのトリガー
     void HearNoise(const Vector3& noisePosition) override;
     void AlertEnemy(const Vector3& targetPos) override;
-
-private:
-    bool FaceTarget(const Vector3& targetPosition, float deltaTime = 0.016f);
-    bool HasLineOfSight(const Vector3& playerPos, const std::vector<std::unique_ptr<Obstacle>>& obstacles);
 
 protected:
     Sprite* alertBar_ = nullptr;
     Sprite* alertDot_ = nullptr;
 
     // AI Patrol parameters
-    Vector3 patrolA_ = { -5.0f, 0.0f, 26.0f };
-    Vector3 patrolB_ = { 5.0f, 0.0f, 26.0f };
+    Vector3 patrolA_ = EnemyTuning::kDefaultPatrolPointA;
+    Vector3 patrolB_ = EnemyTuning::kDefaultPatrolPointB;
     bool movingToB_ = true;
-    float moveSpeed_ = 0.035f; // 歩き速度
+    float moveSpeed_ = EnemyTuning::kDefaultMoveSpeed; // 戦術機動速度
 
     // スプライン巡回制御
     std::unique_ptr<BaziruEngine::SplinePath> splinePath_;
@@ -64,10 +62,16 @@ protected:
     std::unique_ptr<BaziruEngine::AI::BehaviorTree> behaviorTree_;
     bool useBehaviorTree_ = true;
 
-    // --- カバー＆ピーク射撃用追加パラメータ ---
+    // --- カバー＆ピーク射撃・側面回り込み用パラメータ ---
     bool isPeeking_ = false;
     float peekTimer_ = 0.0f;
     Vector3 activePeekPos_ = { 0.0f, 0.0f, 0.0f };
     Vector3 actualCoverPos_ = { 0.0f, 0.0f, 0.0f };
     float coverIgnoreTimer_ = 0.0f;
+    float pathRepathTimer_ = 0.0f;
+    float patrolPauseTimer_ = 0.0f;
+    float patrolPauseCooldown_ = 0.0f;
+    bool returningToSpline_ = false;
+    Vector3 splineRejoinPos_ = { 0.0f, 0.0f, 0.0f };
+    std::vector<Vector3> cachedChasePath_;
 };

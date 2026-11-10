@@ -349,4 +349,12 @@ logs/
 *.json.bak
 *.json.tmp
 
+# Submission packages and archives (>100MB zip / duplicated build copies)
+/S28000942_公田亜優_作品データ/
+/S28000942_公田亜優_作品データ.zip
+/公田亜優_ダッシュダック_作品データ/
+/公田亜優_ダッシュダック_作品データ.zip
+/実行ファイル（ダッシューティングダック）/
+/実行ファイル（ダッシューティングダック）.zip
+
 

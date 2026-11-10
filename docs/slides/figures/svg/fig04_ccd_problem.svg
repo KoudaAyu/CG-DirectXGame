@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="600" height="360" viewBox="0 0 600 360"><defs><marker id="a-fg" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#E9EDF3"/></marker><marker id="a-sub" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#A6B0BE"/></marker><marker id="a-mint" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#86CBA8"/></marker><marker id="a-red" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#E5675F"/></marker><marker id="a-blue" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#4A86E8"/></marker><marker id="a-amber" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#F2B84B"/></marker></defs>
+<text x="20.0" y="26.0" font-size="13" fill="#A6B0BE" text-anchor="start" font-weight="400" font-family="'Yu Gothic UI','Yu Gothic','Meiryo',sans-serif" opacity="1">上から見た図</text>
+<line x1="273.0" y1="54.0" x2="321.0" y2="54.0" stroke="#A6B0BE" stroke-width="1.5" stroke-linecap="round" opacity="1"/>
+<line x1="273.0" y1="47.0" x2="273.0" y2="61.0" stroke="#A6B0BE" stroke-width="1.5" stroke-linecap="round" opacity="1"/>
+<line x1="321.0" y1="47.0" x2="321.0" y2="61.0" stroke="#A6B0BE" stroke-width="1.5" stroke-linecap="round" opacity="1"/>
+<text x="297.0" y="42.0" font-size="14" fill="#E9EDF3" text-anchor="middle" font-weight="400" font-family="'Yu Gothic UI','Yu Gothic','Meiryo',sans-serif" opacity="1">厚さ 0.15m</text>
+<rect x="273.0" y="72.0" width="48.0" height="210.0" rx="3" fill="#B5834F" stroke="#6E4520" stroke-width="2" opacity="1"/>
+<line x1="289.0" y1="82.0" x2="289.0" y2="272.0" stroke="#6E4520" stroke-width="1" stroke-linecap="round" opacity="0.5"/>
+<line x1="305.0" y1="82.0" x2="305.0" y2="272.0" stroke="#6E4520" stroke-width="1" stroke-linecap="round" opacity="0.5"/>
+<line x1="225.0" y1="172.0" x2="520.0" y2="172.0" stroke="#5F6A7B" stroke-width="2" stroke-linecap="round" opacity="1" stroke-dasharray="6 6" marker-end="url(#a-sub)"/>
+<circle cx="225.0" cy="172.0" r="13" fill="#4A86E8" stroke="#9CC0F5" stroke-width="2" opacity="1"/>
+<text x="225.0" y="212.0" font-size="15" fill="#E9EDF3" text-anchor="middle" font-weight="400" font-family="'Yu Gothic UI','Yu Gothic','Meiryo',sans-serif" opacity="1">1フレーム目</text>
+<text x="225.0" y="232.0" font-size="13" fill="#E5675F" text-anchor="middle" font-weight="400" font-family="'Yu Gothic UI','Yu Gothic','Meiryo',sans-serif" opacity="1">板と重ならない</text>
+<circle cx="369.0" cy="172.0" r="13" fill="#4A86E8" stroke="#9CC0F5" stroke-width="2" opacity="1"/>
+<text x="369.0" y="212.0" font-size="15" fill="#E9EDF3" text-anchor="middle" font-weight="400" font-family="'Yu Gothic UI','Yu Gothic','Meiryo',sans-serif" opacity="1">2フレーム目</text>
+<text x="369.0" y="232.0" font-size="13" fill="#E5675F" text-anchor="middle" font-weight="400" font-family="'Yu Gothic UI','Yu Gothic','Meiryo',sans-serif" opacity="1">板と重ならない</text>
+<circle cx="470.0" cy="172.0" r="13" fill="none" stroke="#9CC0F5" stroke-width="2" opacity="0.6" stroke-dasharray="3 3"/>
+<text x="470.0" y="212.0" font-size="14" fill="#A6B0BE" text-anchor="middle" font-weight="400" font-family="'Yu Gothic UI','Yu Gothic','Meiryo',sans-serif" opacity="1">そのまま奥へ</text>
+<line x1="225.0" y1="306.0" x2="369.0" y2="306.0" stroke="#A6B0BE" stroke-width="1.5" stroke-linecap="round" opacity="1"/>
+<line x1="225.0" y1="299.0" x2="225.0" y2="313.0" stroke="#A6B0BE" stroke-width="1.5" stroke-linecap="round" opacity="1"/>
+<line x1="369.0" y1="299.0" x2="369.0" y2="313.0" stroke="#A6B0BE" stroke-width="1.5" stroke-linecap="round" opacity="1"/>
+<text x="297.0" y="334.0" font-size="15" fill="#E9EDF3" text-anchor="middle" font-weight="400" font-family="'Yu Gothic UI','Yu Gothic','Meiryo',sans-serif" opacity="1">1フレームで 0.45m 進む</text>
+</svg>

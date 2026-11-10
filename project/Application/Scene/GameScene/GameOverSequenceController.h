@@ -66,10 +66,15 @@ public:
 
 private:
 	void UpdateMotion(float realDeltaTime);
+	void UpdateMedicTeamMotion(float realDeltaTime);
 	void UpdateCamera(float realDeltaTime);
 	void UpdateWeaponMotion(float realDeltaTime);
 	void UpdateAtmosphere(float realDeltaTime);
 	void UpdateParticles(float realDeltaTime);
+	void EmitStartImpactParticles();
+	void EmitGroundImpactParticles();
+	void StopFlatlineAudio();
+	void TriggerGameOverTransition(float shutterDuration);
 	void FinishSequence();
 
 	static bool Project3DTo2D(const Vector3& pos3D, const Matrix4x4& vp, float screenW, float screenH, Vector2& outPos);
@@ -86,6 +91,7 @@ private:
 	static constexpr float kAct2Duration = 1.70f; // Act 2: 倒れた兵士＆緊急救難無線・ヘリ接近 (0.85s - 1.70s)
 	static constexpr float kAct3Duration = 2.80f; // Act 3: 衛生兵チームが担架を持って駆けつけ！ (1.70s - 2.80s)
 	static constexpr float kDuration     = 2.90f; // Act 4: 軍用メディバック・ヘビーシャッター閉鎖トリガー (2.90s)
+	static constexpr float kDefaultInitialCamFov = 0.45f;
 
 	// 死亡時ステータス
 	Vector3 deathPos_{ 0.0f, 0.0f, 0.0f };
@@ -127,7 +133,7 @@ private:
 	// カメラワーク用トランスフォーム
 	Vector3 initialCamPos_{ 0.0f, 0.0f, 0.0f };
 	Vector3 initialCamRot_{ 0.0f, 0.0f, 0.0f };
-	float initialCamFov_ = 0.45f;
+	float initialCamFov_ = kDefaultInitialCamFov;
 
 	// 特撮エフェクト用フラグ・タイマー
 	float darkVignetteAlpha_ = 0.0f;    // 画面端のシネマティック暗転ヴィネット
@@ -136,9 +142,14 @@ private:
 	float featherTimer_ = 0.0f;
 	bool transitionTriggered_ = false;
 
-	// オーディオID
+	// オーディオID・再生状態
 	int32_t alarmSoundId_ = -1;
 	int32_t duckSoundId_ = -1;
+	int32_t flatlinePlayId_ = -1;
+	bool flatlineTriggered_ = false;
+	bool rifleBounceSoundPlayed_ = false;
+	int prevEcgCycle_ = -1;
+	int prevMedicStep_ = -1;
 
 	// テクスチャインデックス
 	uint32_t circle2TextureIndex_ = UINT32_MAX;

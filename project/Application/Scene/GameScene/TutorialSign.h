@@ -9,7 +9,9 @@
 class TutorialSign
 {
 public:
-    void Initialize(Object3dCom* object3dCom, Camera* camera, const Vector3& position, const std::string& message, float triggerRadius = 3.0f);
+    static constexpr float kDefaultTriggerRadius = 3.0f;
+
+    void Initialize(Object3dCom* object3dCom, Camera* camera, const Vector3& position, const std::string& message, float triggerRadius = kDefaultTriggerRadius);
     void Update(const Vector3& playerPosition);
     void Draw(const RenderContext& ctx);
     void Finalize();

@@ -5,6 +5,7 @@
 #include "Vector.h"
 #include "Matrix4x4.h"
 #include "LootSystem.h"
+#include "Application/Config/GameConfig.h"
 
 class Camera;
 class Player;
@@ -28,8 +29,13 @@ struct GamePlayHUDContext
     const std::vector<LootableProp>* lootProps              = nullptr;
     const std::vector<FloatingText>* floatingTexts          = nullptr;
 
-    Vector3 extractionGoalPos                = { 0.0f, 0.0f, 32.0f };
+    Vector3 extractionGoalPos                = GameConfig::Environment::kExtractionPadPosition;
     bool isReadyToExtract                    = false;
+    bool isPlayerInExtractionZone            = false;
+    float extractionTimer                    = GameConfig::Environment::kExtractionMaxTime;
+    float extractionMaxTime                  = GameConfig::Environment::kExtractionMaxTime;
+    float extractionUnlockBannerTimer        = 0.0f;
+    float clearClimaxProgress                = 0.0f;
     bool isGameCleared                       = false;
     bool isDeathSequenceActive               = false;
     float deathSequenceTimer                 = 0.0f;
@@ -39,15 +45,19 @@ struct GamePlayHUDContext
     float playerSoundMaxRadius               = 0.0f;
     float playerSoundTimer                   = 0.0f;
     bool showDebugGizmos                     = false;
-    bool showPerformanceTracker              = true;
+    bool showPerformanceTracker              = false;
     bool isStressTestActive                  = false;
     int stressTestCount                      = 0;
     float sceneEntranceFadeTimer             = 0.0f;
+    bool isOverheadCameraMode                = false;
+    bool isFullMapOpen                       = false;
+    float cameraZoom                         = 1.0f;
 };
 
 /// <summary>
 /// タクティカルゲームプレイHUD描画マネージャークラス
-/// 画面上部の作戦バー・タイマー、右下の弾薬・回復インベントリ、3D探索カード、被弾インジケーター、レーザーサイト、低体力ビネット等を一元描画します。
+/// 画面上部の作戦バー・タイマー、左上ミニマップ＆全体作戦マップ、右上クエスト進行ガイド、
+/// 3Dルート案内シェブロン、下部操作ガイドバー、右下兵装インベントリ等を一元描画します。
 /// </summary>
 class GamePlayHUD
 {
@@ -64,14 +74,22 @@ public:
 
 public:
     // --- 個別HUD描画メソッド ---
+    void DrawNavigationGuideHUD(const GamePlayHUDContext& ctx, float deltaTime);
     void DrawMissionObjectiveHUD(const GamePlayHUDContext& ctx);
+    void DrawQuestTrackerHUD(const GamePlayHUDContext& ctx);
+    void DrawControlsGuideHUD(const GamePlayHUDContext& ctx);
+    void DrawTacticalMapHUD(const GamePlayHUDContext& ctx);
+    void DrawExtractionSequenceHUD(const GamePlayHUDContext& ctx, float deltaTime);
     void DrawTutorialSignHUD(const GamePlayHUDContext& ctx);
+    void DrawPlayerVitalsHUD(const GamePlayHUDContext& ctx, float deltaTime);
     void DrawPlayerAmmoHUD(const GamePlayHUDContext& ctx, float deltaTime);
+    void DrawEnemyTacticalHUD(const GamePlayHUDContext& ctx);
     void DrawLootingHUD(const GamePlayHUDContext& ctx);
     void DrawDamageIndicator(const GamePlayHUDContext& ctx);
     void DrawLowHpRedVignetteEffect(const GamePlayHUDContext& ctx);
     void DrawDeathSequenceHUD(const GamePlayHUDContext& ctx);
     void DrawLaserSight(const GamePlayHUDContext& ctx);
+    void DrawTacticalReticle(const GamePlayHUDContext& ctx);
     void DrawFloatingTexts(const GamePlayHUDContext& ctx);
     void DrawVisionConesAndGizmos(const GamePlayHUDContext& ctx);
     void DrawPerformanceTrackerUI(const GamePlayHUDContext& ctx, float deltaTime);
@@ -82,8 +100,20 @@ private:
 
 private:
     // --- UIテクスチャインデックス ---
-    uint32_t medkitTextureIndex_   = UINT32_MAX;
-    uint32_t ammoTextureIndex_     = UINT32_MAX;
-    uint32_t goldDuckTextureIndex_ = UINT32_MAX;
-    uint32_t roublesTextureIndex_  = UINT32_MAX;
+    uint32_t medkitTextureIndex_      = UINT32_MAX;
+    uint32_t ammoTextureIndex_        = UINT32_MAX;
+    uint32_t goldDuckTextureIndex_    = UINT32_MAX;
+    uint32_t roublesTextureIndex_     = UINT32_MAX;
+    uint32_t cineAtlasTextureIndex_   = UINT32_MAX;
+    uint32_t hudAtlasTextureIndex_    = UINT32_MAX;
+    uint32_t clearDigitsTextureIndex_ = UINT32_MAX;
+    float displayedPlayerHpLag_       = 1.0f;
+    bool laserLockedOnTarget_         = false;
+
+    // --- NavMesh ルート案内キャッシュ ---
+    std::vector<Vector3> cachedGuidePath_;
+    std::vector<Vector3> smoothGuidePath_;
+    std::vector<Vector3> scratchGuidePath_;
+    Vector3 cachedGuideGoal_          = { 0.0f, 0.0f, 0.0f };
+    float guidePathRefreshTimer_      = 0.0f;
 };

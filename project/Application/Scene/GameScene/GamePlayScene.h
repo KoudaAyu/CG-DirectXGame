@@ -1,10 +1,12 @@
 #pragma once
 #include <chrono>
 #include <memory>
+#include <unordered_map>
 #include <vector>
 #include <string>
 
 #include "BaseScene.h"
+#include "Application/Audio/TacticalAudio.h"
 #include "Baziru3_Engine\Framework\Effect\HitEffect.h"
 #include "DirectXCom.h"
 #include "ParticleEmitter.h"
@@ -78,6 +80,9 @@ public:
     static constexpr float kBulletHitRadius        = GameConfig::Combat::kBulletHitRadius;             // 弾丸当たり判定半径
     static constexpr float kPlayerHitRadius        = GameConfig::Combat::kPlayerHitRadius;             // プレイヤー当たり判定半径
     static constexpr float kEnemyHitRadius         = GameConfig::Combat::kEnemyHitRadius;              // 敵当たり判定半径
+    static constexpr float kHitIndicatorDuration   = 0.65f;                                            // 被弾方向インジケーター表示時間
+    static constexpr float kAutoInitialYaw         = -999.0f;                                          // 初期Yaw自動設定センチネル値
+    static constexpr float kSceneEntranceFadeDuration = 0.8f;                                          // シーン入場フェード時間
 
 public:
     GamePlayScene();
@@ -109,6 +114,7 @@ public:
     bool IsGameCleared() const { return isGameCleared_; }
     float GetExtractionTimer() const { return extractionTimer_; }
     AppParticleManager* GetAppParticleManager() const { return appParticleManager_.get(); }
+    AppParticleManager* GetSmokeParticleManager() const { return smokeParticleManager_.get(); }
     const char* GetSceneType() const { return "GAMEPLAY"; }
     Vector3 GetPlayerPosition() const { return player_ ? player_->GetPosition() : Vector3{ 0.0f, 0.0f, 0.0f }; }
     Player* GetPlayer() const { return player_.get(); }
@@ -135,7 +141,7 @@ public:
     /// 被弾方向インジケーター（赤いアーク）の誘発
     /// </summary>
     void TriggerDamageIndicator(float worldAngle) {
-        hitIndicatorTimer_ = 0.65f;
+        hitIndicatorTimer_ = kHitIndicatorDuration;
         hitIndicatorAngle_ = worldAngle;
     }
 
@@ -158,7 +164,13 @@ public:
     /// <summary>
     /// 敵キャラクターの動的スポーン生成
     /// </summary>
-    Enemy* SpawnEnemy(const Vector3& position, bool isPatrol = false);
+    Enemy* SpawnEnemy(
+        const Vector3& position,
+        bool isPatrol = false,
+        float initialYaw = kAutoInitialYaw,
+        Enemy::TacticalRole role = Enemy::TacticalRole::Garrison,
+        const std::vector<Vector3>& customPatrolRoute = {},
+        bool loopPatrol = false);
 
     /// <summary>
     /// 脱出阻止・増援フェーズの発動
@@ -185,6 +197,13 @@ private:
     void UpdateObstacles();
     void UpdateStressTestMode();
     void UpdateGameIntro(float realDeltaTime);
+    void SyncStageObjectsForCamera(float targetDeltaTime, bool syncSkyBox);
+    void BuildGroundTilesAndRiver(bool insertAtFront);
+    void UpdatePlayerReloadAndMovementEffects(float deltaTime);
+    bool ComputePlayerCoverState(const Vector3& playerPos) const;
+    void UpdateEnemiesAndSquadTactics(float deltaTime, WindowAPI* windowAPI, const Vector3* target, bool isPlayerInCover);
+    void UpdateCameraAndAim(float realDeltaTime);
+    void UpdateSceneLightingAndTexts(float deltaTime);
 
     RenderContext BuildRenderContext() const;
     static bool IsWithinRadius(const Vector3& a, const Vector3& b, float radius);
@@ -200,6 +219,7 @@ private:
     SkinningObject3dCom* skinningObject3dCom = nullptr;
     ParticleManager* particleManager = nullptr;
     std::unique_ptr<AppParticleManager> appParticleManager_;
+    std::unique_ptr<AppParticleManager> smokeParticleManager_;
     SpriteCom* spriteCom = nullptr;
 
     // --- 分割されたモジュール サブシステム ---
@@ -225,6 +245,7 @@ private:
     std::unique_ptr<Ring> goalRing_;
     std::unique_ptr<Object3d> extractionPadObject_;
     uint32_t extractionPadTextureIndex_ = 0;
+    std::unique_ptr<Object3d> extractionSignalFlareObject_;
     std::unique_ptr<HitEffect> hitEffect_;
 
     // --- パーティクル & スプライト ---
@@ -255,9 +276,19 @@ private:
     uint32_t particleTextureB       = TextureManager::kInvalidTextureIndex;
     uint32_t bloodTextureIndex_     = TextureManager::kInvalidTextureIndex;
     uint32_t smokeTextureIndex_     = TextureManager::kInvalidTextureIndex;
+    uint32_t escapeSmokeTextureIndex_ = TextureManager::kInvalidTextureIndex;
     uint32_t fenceTextureIndex_     = TextureManager::kInvalidTextureIndex;
     uint32_t starburstTextureIndex_ = TextureManager::kInvalidTextureIndex;
     uint32_t minovskyCircleTextureIndex_ = TextureManager::kInvalidTextureIndex;
+    uint32_t wispySmokeTextureIndex_     = TextureManager::kInvalidTextureIndex;
+    uint32_t cineAtlasTextureIndex_      = TextureManager::kInvalidTextureIndex;
+    uint32_t clearDigitsTextureIndex_    = TextureManager::kInvalidTextureIndex;
+    uint32_t soilDustTextureIndex_       = TextureManager::kInvalidTextureIndex;
+    uint32_t sparkStreakTextureIndex_    = TextureManager::kInvalidTextureIndex;
+    uint32_t debrisChipTextureIndex_     = TextureManager::kInvalidTextureIndex;
+    uint32_t waterFoamTextureIndex_      = TextureManager::kInvalidTextureIndex;
+    uint32_t featherTextureIndex_        = TextureManager::kInvalidTextureIndex;
+    uint32_t leafTextureIndex_           = TextureManager::kInvalidTextureIndex;
 
     // --- ゲームステート & タイマー ---
     static constexpr float kGameIntroDuration = 5.00f; // 開始ドロップ＆カメラ回り込み演出時間 (秒)
@@ -270,13 +301,15 @@ private:
 
     bool allTargetsDestroyed_ = false;
     bool isGameCleared_ = false;
+    bool clearClimaxTriggered_ = false;
+    bool clearTransitionStarted_ = false;
     float clearSlowMoTimer_ = kClearSlowMoDuration;
     float extractionTimer_ = kExtractionMaxTime;
+    float extractionUnlockBannerTimer_ = 0.0f;
     bool isPlayerInExtractionZone_ = false;
     bool isDeathSequenceActive_ = false;
     float deathSequenceTimer_ = 0.0f;
-    float autoDeathTimer_ = 0.0f; // 出動後3秒で自動死亡テスト用タイマー
-    float sceneEntranceFadeTimer_ = 0.8f; // シーン入場時のフェードインタイマー
+    float sceneEntranceFadeTimer_ = kSceneEntranceFadeDuration; // シーン入場時のフェードインタイマー
     std::chrono::steady_clock::time_point lastTime_;
 
     // --- 演出パラメータ ---
@@ -305,7 +338,19 @@ private:
     bool showDebugGizmos_ = false;
 
     // --- パフォーマンストラッカー & ストレステスト ---
-    bool showPerformanceTracker_ = true;
+    bool showPerformanceTracker_ = false;
     bool isStressTestActive_ = false;
     std::vector<std::unique_ptr<Obstacle>> stressTestObstacles_;
+
+    // --- Escape from Duckov 視点切替 & 照準先読みカメラ & 全体作戦マップ ---
+    bool isOverheadCameraMode_ = false;
+    float overheadCameraBlend_ = 0.0f;
+    Vector3 cameraLookaheadOffset_ = { 0.0f, 0.0f, 0.0f };
+    bool isFullMapOpen_ = false;
+
+    // --- タクティカル音響管理（BGMループ・発煙筒空間ループ・敵AI索敵変化） ---
+    TacticalAudio::LoopHandle bgmLoop_;
+    TacticalAudio::LoopHandle flareHissLoop_;
+    std::unordered_map<Enemy*, int> prevEnemyAIStates_;
+    int prevHeartbeatCycle_ = -1;
 };

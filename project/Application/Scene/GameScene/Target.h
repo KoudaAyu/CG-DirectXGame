@@ -8,7 +8,10 @@
 class Target
 {
 public:
-    void Initialize(Object3dCom* object3dCom, Camera* camera, const Vector3& position, float radius = 1.0f);
+    static constexpr float kDefaultRadius = 1.0f;
+    static constexpr int   kDefaultMaxHp  = 3;
+
+    void Initialize(Object3dCom* object3dCom, Camera* camera, const Vector3& position, float radius = kDefaultRadius);
     void Update(float deltaTime);
     void Draw(const RenderContext& ctx);
     void Finalize();
@@ -29,7 +32,7 @@ private:
     Object3dCom* object3dCom_ = nullptr;
     uint32_t defaultTextureIndex_ = UINT32_MAX;
 
-    int hp_ = 3;
-    int maxHp_ = 3;
+    int hp_ = kDefaultMaxHp;
+    int maxHp_ = kDefaultMaxHp;
     bool isDead_ = false;
 };

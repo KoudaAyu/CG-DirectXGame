@@ -2,6 +2,7 @@
 
 #include "BaseScene.h"
 #include "../GameScene/RaidStats.h"
+#include "Application/Audio/TacticalAudio.h"
 #include "Object3d.h"
 #include "Camera.h"
 #include <string>
@@ -46,6 +47,8 @@ private:
 	void InitializeDiorama();
 	void UpdateDiorama(float deltaTime);
 	void DrawScreen();
+	void BeginTakeoff(bool toTitle);
+	bool IsAnyTransitionActive() const;
 
 private:
 	KeyInput* input_ = nullptr;
@@ -57,13 +60,22 @@ private:
 	bool transitionRequested_ = false;
 	std::string nextScene_ = "GAMEPLAY";
 	int duckSeSoundId_ = -1;
+	TacticalAudio::LoopHandle bgmLoop_{};
+	TacticalAudio::LoopHandle rotorLoop_{};
+	bool loadSoundPlayed_ = false;
+	bool takeoffSoundPlayed_ = false;
+	int prevWalkStep_ = -1;
 
-	// 演出時間定数（秒）
+	// 演出時間・初期配置定数
 	static constexpr float kEnterFadeDuration = 0.40f;
 	static constexpr float kApproachDuration  = 2.50f; // 自動歩行搬送時間
 	static constexpr float kLoadDuration      = 1.30f; // ヘリ機内収容時間
 	static constexpr float kTakeoffDuration   = 2.20f; // 離陸・上昇・フェード時間
 	static constexpr float kDoorCloseDuration = 0.65f; // SPACE押下後のスライドドア密閉時間
+
+	static constexpr Vector3 kInitialHeliPos{ 3.2f, 0.435f, 2.2f };
+	static constexpr Vector3 kInitialHeliRot{ 0.0f, 2.65f, 0.0f }; // 152度回転：開口カーゴドアが手前左を向き、機首は右奥へ逃げる
+	static constexpr Vector3 kInitialTeamPos{ -4.2f, 0.0f, 1.4f };
 
 	// -------------------------------------------------------------------------
 	// 3D ジオラマオブジェクト
@@ -77,8 +89,8 @@ private:
 	std::unique_ptr<Object3d> heliTailRotor_;
 	std::unique_ptr<Object3d> heliCargoDoor_; // スライド式大型カーゴドア（SPACE押下で自動密閉）
 	float doorSlideProgress_ = 0.0f;          // 0.0f = 全開（担架搬送・搭乗中）, 1.0f = 密閉完了
-	Vector3 heliPos_{ 3.2f, 0.435f, 2.2f };
-	Vector3 heliRot_{ 0.0f, 2.65f, 0.0f }; // 152度回転：開口カーゴドアが手前左（担架側）を向き、機首は右奥へ逃げる
+	Vector3 heliPos_ = kInitialHeliPos;
+	Vector3 heliRot_ = kInitialHeliRot;
 	float mainRotorAngle_ = 0.0f;
 	float tailRotorAngle_ = 0.0f;
 
@@ -87,8 +99,8 @@ private:
 	std::unique_ptr<Object3d> duckFrontMedic_;
 	std::unique_ptr<Object3d> duckWounded_;
 	std::unique_ptr<Object3d> stretcherBed_;
-	Vector3 teamPos_{ -4.2f, 0.0f, 1.4f };
-	Vector3 teamStartPos_{ -4.2f, 0.0f, 1.4f };
+	Vector3 teamPos_ = kInitialTeamPos;
+	Vector3 teamStartPos_ = kInitialTeamPos;
 	float walkPhase_ = 0.0f;
 	float stretcherLiftY_ = 0.0f;
 	float stretcherSlideX_ = 0.0f;

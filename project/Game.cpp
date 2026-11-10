@@ -16,8 +16,12 @@
 #include "RootParam.h"
 
 #include "Application/Config/AppDebugConfig.h"
+#include "Application/Audio/TacticalAudio.h"
 #include "Application/Transition/StingerTransition.h"
 #include "Application/Transition/DeathTransition.h"
+#include "Application/UI/TacticalUICanvas.h"
+#include "Baziru3_Engine/Graphics/Graphics/GpuProfiler.h"
+#include "SkyBox.h"
 
 #ifdef USE_IMGUI
 #include <imgui.h>
@@ -26,10 +30,10 @@
 #include <imgui_internal.h>
 #endif
 
-#if defined(USE_IMGUI) && !APP_DEBUG_UI
+#ifdef USE_IMGUI
 namespace {
 // エンジン側が無条件で出す開発用ウィンドウ。
-// Release では描画直前に非表示にして、画面にも入力にも関わらないようにする。
+// ImGuiオーバーレイ非表示時は描画直前に隠して、画面にも入力にも一切干渉しないようにする。
 constexpr const char *kEngineDebugWindows[] = {
     "Engine Scene Manager",
     "Collision Debug Overlay Settings",
@@ -62,10 +66,15 @@ void Game::Initialize() {
     return;
   }
 
+  // 全体のBGM・SE音量を耳に優しい適切なマスター音量へ設定
+  if (engine_ && engine_->GetAudioManager()) {
+    engine_->GetAudioManager()->SetMasterVolume(0.35f);
+  }
+
   LogEngineDiagnostics();
 
 #if defined(USE_IMGUI) && !APP_DEBUG_UI
-  // Release ではウィンドウ配置の imgui.ini を書き出さない
+  // Release (SHIPPING_BUILD) では ImGui を完全非表示・無効化し、imgui.ini の読み書きも行わない
   if (ImGui::GetCurrentContext()) {
     ImGui::GetIO().IniFilename = nullptr;
   }
@@ -74,6 +83,15 @@ void Game::Initialize() {
   auto *spriteCom = engine_->GetSpriteCom();
   auto *window = engine_->GetWindowAPI();
   auto *camera = engine_->GetCamera();
+
+  showDeveloperImGui_ = false;
+  prevToggleImGuiKey_ = false;
+  AppDebugState::SetDeveloperImGuiVisible(false);
+  AppDebugState::SetImGuiCapturingMouse(false);
+  AppDebugState::SetImGuiCapturingTextInput(false);
+#if APP_DEBUG_UI
+  (void)GetAsyncKeyState(VK_F12);
+#endif
 
   // 2. 描画に必要な共通リソース（サンプルのPlane等）を作る
   InitializeModelResources();
@@ -105,7 +123,8 @@ void Game::Initialize() {
   // デバッグカメラ初期化
   debugCamera_.Initialize(window);
 
-  // デバッグUIの初期化
+#if APP_DEBUG_UI
+  // デバッグUIの初期化（Debug / Development のみ）
   SpriteManager *uiSpriteManager = engine_->GetSpriteManager();
   debugUI = std::make_unique<DebugUI>(
       engine_->GetMaterialManager(), uiSpriteManager, camera, &transformObject,
@@ -113,6 +132,9 @@ void Game::Initialize() {
   debugUI->SetOffScreenRendering(engine_->GetOffScreenRendering());
   debugUI->SetLight(engine_->GetLight());
   debugUI->Initialize();
+#else
+  (void)camera;
+#endif
 
   // シーン登録と初期シーン設定
   SceneRegistration::RegisterScenes();
@@ -132,6 +154,10 @@ void Game::Initialize() {
 
     // エンジンのデフォルト黒フェードを無効化（即時切り替えにして、演出はアプリケーション層トランジションで完全制御）
     SceneManager::GetInstance()->SetFadeApplication(nullptr);
+
+    // DirectX 12 ネイティブ2D戦術UI描画基盤の初期化（ImGui非依存）
+    TacticalUICanvas::GetInstance()->Initialize(engine_->GetDirectXCom(),
+                                                engine_->GetWindowAPI());
   }
 
   SceneManager::GetInstance()->ChangeScene("TITLE");
@@ -142,14 +168,26 @@ void Game::Initialize() {
   textureIndexModelTex = TextureManager::GetInstance()->Load(
       modelData.material.textureFilePath);
   textureIndexSkybox_ = TextureManager::GetInstance()->Load(
-      "Resources/CG4/dds/CG4_test.dds");
+      "Resources/duckov_skybox.dds");
+  if (textureIndexSkybox_ == TextureManager::kInvalidTextureIndex) {
+    textureIndexSkybox_ = TextureManager::GetInstance()->Load(
+        "Resources/CG4/dds/CG4_test.dds");
+  }
   SceneManager::GetInstance()->SetSkyboxTextureIndex(textureIndexSkybox_);
+
+  // アプリケーション層・リアルタイムアニメーション雲システムの初期化
+  skyCloudSystem_ = std::make_unique<SkyCloudSystem>();
+  skyCloudSystem_->Initialize(engine_->GetDirectXCom());
 
   // 遅延していたアップロードバッファの解放とGPU同期待ちを一括実行
   TextureManager::GetInstance()->ReleaseUploadBuffers();
 }
 
 void Game::Finalize() {
+  AppDebugState::SetDeveloperImGuiVisible(false);
+  AppDebugState::SetImGuiCapturingMouse(false);
+  AppDebugState::SetImGuiCapturingTextInput(false);
+
   // 1. デバッグUI終了
   if (debugUI) {
     debugUI.reset();
@@ -178,7 +216,12 @@ void Game::Finalize() {
     object3d_.reset();
   }
 
-  // 3.5. トランジション破棄
+  // 3.5. トランジション・アニメーション雲・ネイティブUIキャンバスの破棄
+  if (skyCloudSystem_) {
+    skyCloudSystem_->Finalize();
+    skyCloudSystem_.reset();
+  }
+  TacticalUICanvas::GetInstance()->Finalize();
   StingerTransition::GetInstance()->Finalize();
   DeathTransition::GetInstance()->Finalize();
 
@@ -205,8 +248,69 @@ void Game::Update() {
     engine_->Update();
   }
 
+#if defined(USE_IMGUI) && APP_DEBUG_UI
+  {
+    const bool nowFocused = IsAppWindowFocused();
+    const bool ctrlHeld = IsAppKeyDown(VK_CONTROL);
+    const bool altHeld = IsAppKeyDown(VK_MENU);
+
+    // F2 / F9 / Ctrl+F12: Visual Studio (F5) デバッグ中も OS 強制ブレークを一切起こさず即座に開閉
+    // F12: Ctrl+F5（デバッグなしで開始）や exe 直接起動時にそのまま開閉可能
+    const int asyncF12State = GetAsyncKeyState(VK_F12);
+    const bool asyncF12Edge = nowFocused && !altHeld && ((asyncF12State & 0x0001) != 0);
+
+    const bool curF2 = (!ctrlHeld && !altHeld) && IsAppKeyDown(VK_F2);
+    const bool curF9 = (!ctrlHeld && !altHeld) && IsAppKeyDown(VK_F9);
+    const bool curF12 = (!altHeld) && IsAppKeyDown(VK_F12);
+    const bool curToggleKey = curF2 || curF9 || curF12;
+
+    if ((curToggleKey && !prevToggleImGuiKey_) || (!prevToggleImGuiKey_ && asyncF12Edge)) {
+      showDeveloperImGui_ = !showDeveloperImGui_;
+      AppDebugState::SetDeveloperImGuiVisible(showDeveloperImGui_);
+      TacticalAudio::Play2D(showDeveloperImGui_
+                                ? "Resources/Audio/SE_UI_Map_Open.wav"
+                                : "Resources/Audio/SE_UI_Map_Close.wav",
+                            0.42f, 80);
+    }
+    prevToggleImGuiKey_ = curToggleKey;
+  }
+
+  if (ImGui::GetCurrentContext()) {
+    ImGuiIO &io = ImGui::GetIO();
+    // GamePlayScene 中は ShowCursor(FALSE) で OS カーソルが非表示になるため、
+    // ImGui 表示中はソフトウェアカーソルを最前面に描画して確実なマウス操作を保証する
+    io.MouseDrawCursor = showDeveloperImGui_;
+    if (!showDeveloperImGui_) {
+      io.WantCaptureMouse = false;
+      io.WantCaptureKeyboard = false;
+      io.WantTextInput = false;
+    }
+    AppDebugState::SetImGuiCapturingMouse(showDeveloperImGui_ && io.WantCaptureMouse);
+    AppDebugState::SetImGuiCapturingTextInput(showDeveloperImGui_ && io.WantTextInput);
+  } else {
+    AppDebugState::SetImGuiCapturingMouse(false);
+    AppDebugState::SetImGuiCapturingTextInput(false);
+  }
+#elif defined(USE_IMGUI)
+  // Release (SHIPPING_BUILD) では F12 を含め ImGui の開閉を一切受け付けず常時非表示に固定
+  showDeveloperImGui_ = false;
+  if (ImGui::GetCurrentContext()) {
+    ImGuiIO &io = ImGui::GetIO();
+    io.MouseDrawCursor = false;
+    io.WantCaptureMouse = false;
+    io.WantCaptureKeyboard = false;
+    io.WantTextInput = false;
+  }
+#endif
+
+  // ネイティブ2D戦術UIキャンバスのフレーム開始（各Scene::Update / Draw内のUI記録を収集）
+  TacticalUICanvas::GetInstance()->BeginFrame();
+
   // 2. シーンマネージャの更新（固定タイムステップ 1/60s）
   SceneManager::GetInstance()->Update(kDeltaTime);
+  if (skyCloudSystem_) {
+    skyCloudSystem_->Update(kDeltaTime);
+  }
 
   // 2.5. アプリケーション層トランジション更新
   StingerTransition::GetInstance()->Update(kDeltaTime);
@@ -221,8 +325,8 @@ void Game::Update() {
     object3d_->Update();
   }
 
-#if APP_DEBUG_UI
-  if (debugUI) {
+#if defined(USE_IMGUI) && APP_DEBUG_UI
+  if (debugUI && showDeveloperImGui_) {
     debugUI->Update();
   }
 #endif
@@ -269,14 +373,14 @@ void Game::Draw() {
     return;
 
   // トランジション中およびタイトルシーン中は深度アウトラインポストプロセスを確実に抑制
-  // （タイトルロゴ文字への輪郭線浸食やトランジション帯の輪郭線浮きを完全防止）
+  // （開発者ImGuiが開いている間は、Settingsパネルからのポストエフェクト切替プレビューをそのまま許可する）
   if (engine_->GetOffScreenRendering()) {
     bool isTitle = (SceneManager::GetInstance() && SceneManager::GetInstance()->GetCurrentSceneName() == "TITLE");
     if (StingerTransition::GetInstance()->IsTransitioning() || DeathTransition::GetInstance()->IsTransitioning() || isTitle) {
       if (engine_->GetOffScreenRendering()->GetPostEffect() != OffScreenRendering::PostEffect::Normal) {
         engine_->GetOffScreenRendering()->SetPostEffect(OffScreenRendering::PostEffect::Normal);
       }
-    } else {
+    } else if (!showDeveloperImGui_) {
       if (engine_->GetOffScreenRendering()->GetPostEffect() != OffScreenRendering::PostEffect::DepthBasedOutline) {
         engine_->GetOffScreenRendering()->SetPostEffect(OffScreenRendering::PostEffect::DepthBasedOutline);
       }
@@ -292,7 +396,14 @@ void Game::Draw() {
       [this](const RenderContext &ctx) {
         // --- 3D描画パス ---
         if (SceneManager::GetInstance()) {
+          if (auto *skybox = SceneManager::GetInstance()->GetSkyBox()) {
+            skybox->Update();
+          }
           SceneManager::GetInstance()->DrawSkybox(ctx.commandList);
+          if (SceneManager::GetInstance()->GetShowSkybox() && skyCloudSystem_) {
+            skyCloudSystem_->Draw(ctx.commandList,
+                                  SceneManager::GetInstance()->GetCamera());
+          }
           SceneRenderRequests renderRequests{};
           SceneManager::GetInstance()->Draw(renderRequests);
           sphereRenderer_.Draw(ctx, renderRequests);
@@ -312,11 +423,70 @@ void Game::Draw() {
         DrawSprites(workerCtx);
       });
 
-  // 3. フレーム描画の終了（ポストプロセスバッファ描画、フェード、ImGui、画面フリップ）
-#if defined(USE_IMGUI) && !APP_DEBUG_UI
-  HideEngineDebugWindows();
+  // 3. フレーム描画の終了（オフスクリーン合成 → ネイティブDirectX12戦術UI → 画面フリップ）
+  auto *dx = engine_->GetDirectXCom();
+  if (dx) {
+    auto *cmdList = dx->GetCommandList().Get();
+    auto *offScreen = engine_->GetOffScreenRendering();
+    if (offScreen) {
+      offScreen->End(cmdList);
+      offScreen->SetMainRenderTarget(cmdList);
+      if (engine_->GetCamera()) {
+        offScreen->SetProjectionInverse(
+            Inverse(engine_->GetCamera()->GetProjectionMatrix()));
+      }
+      GpuProfiler::GetInstance()->BeginProfile(cmdList, "PostProcess Draw");
+      offScreen->DrawToBackBuffer(cmdList);
+      GpuProfiler::GetInstance()->EndProfile(cmdList, "PostProcess Draw");
+    }
+
+    // バックバッファへ直接 DirectX 12 ネイティブ戦術UI（TacticalUICanvas）を描画
+    const UINT backBufferIdx = dx->GetSwapChain()->GetCurrentBackBufferIndex();
+    D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = dx->GetRtvHandle(backBufferIdx);
+    cmdList->OMSetRenderTargets(1, &rtvHandle, false, nullptr);
+    TacticalUICanvas::GetInstance()->RenderAll(cmdList);
+
+    if (auto *fade = engine_->GetFade()) {
+      D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle =
+          dx->GetDsvHeap().GetCPUDescriptorHandle(0);
+      cmdList->OMSetRenderTargets(1, &rtvHandle, false, &dsvHandle);
+      fade->Draw();
+    }
+
+#ifdef USE_IMGUI
+    if (!showDeveloperImGui_) {
+      HideEngineDebugWindows();
+    }
+    if (auto *imguiMgr = engine_->GetImGuiManager()) {
+      imguiMgr->Render();
+      ImDrawData *drawData = ImGui::GetDrawData();
+      // ImGui 1.92+ (IMGUI_HAS_TEXTURES) は非表示フレームでもフォントアトラスの
+      // 生成・更新・破棄リクエスト (ImDrawData::Textures) を毎フレーム消化しておかないと、
+      // 表示切替フレームで未アップロードの旧テクスチャ参照 (TexID == 0) アサートが発生する。
+      if (drawData && drawData->Textures != nullptr) {
+        for (ImTextureData *tex : *drawData->Textures) {
+          if (tex && tex->Status != ImTextureStatus_OK) {
+            ImGui_ImplDX12_UpdateTexture(tex);
+          }
+        }
+      }
+#if APP_DEBUG_UI
+      if (showDeveloperImGui_ && drawData) {
+        D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle =
+            dx->GetDsvHeap().GetCPUDescriptorHandle(0);
+        cmdList->OMSetRenderTargets(1, &rtvHandle, false, &dsvHandle);
+        cmdList->RSSetViewports(1, &dx->GetViewport());
+        cmdList->RSSetScissorRects(1, &dx->GetScissorRect());
+        ID3D12DescriptorHeap *heaps[] = {dx->GetSrvDescriptorHeap().Get()};
+        cmdList->SetDescriptorHeaps(1, heaps);
+        ImGui_ImplDX12_RenderDrawData(drawData, cmdList);
+      }
 #endif
-  engine_->EndFrame();
+    }
+#endif
+
+    dx->PostDraw();
+  }
 }
 
 bool Game::ProcessMessage() {

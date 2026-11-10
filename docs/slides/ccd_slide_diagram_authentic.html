@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<style>
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+  body {
+    background: #f0f2f5;
+    font-family: "Yu Gothic", "Meiryo", "Hiragino Kaku Gothic ProN", sans-serif;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 24px;
+  }
+
+  /* Main presentation card */
+  .diagram-container {
+    width: 980px;
+    background: #ffffff;
+    border: 3px solid #1a5276;
+    border-radius: 4px;
+    padding: 22px 26px 20px 26px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  }
+
+  /* Slide header */
+  .diagram-header {
+    border-bottom: 2px solid #1a5276;
+    padding-bottom: 10px;
+    margin-bottom: 18px;
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+  }
+  .diagram-title {
+    font-size: 21px;
+    font-weight: bold;
+    color: #1a5276;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .diagram-subtitle {
+    font-size: 13px;
+    font-weight: bold;
+    color: #2e7d32;
+    background: #e8f5e9;
+    border: 1px solid #a5d6a7;
+    padding: 4px 12px;
+    border-radius: 4px;
+  }
+
+  /* 2-column layout */
+  .comparison-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 22px;
+    position: relative;
+  }
+
+  /* Dividing line between columns */
+  .comparison-row::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: calc(50% - 1px);
+    width: 2px;
+    background: #dcdcdc;
+  }
+
+  .col {
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Section Title */
+  .box-title {
+    font-size: 16px;
+    font-weight: bold;
+    padding: 7px 12px;
+    border-radius: 4px;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .box-title.left {
+    background: #ffebee;
+    color: #c62828;
+    border-left: 5px solid #d32f2f;
+  }
+  .box-title.right {
+    background: #e8f5e9;
+    color: #2e7d32;
+    border-left: 5px solid #388e3c;
+  }
+
+  /* Drawing canvas area */
+  .canvas-area {
+    height: 240px;
+    background: #fafafa;
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+    position: relative;
+  }
+
+  /* Step-by-step logic box like July slide 16 */
+  .logic-box {
+    margin-top: 12px;
+    background: #f7f9fa;
+    border: 1px solid #e2e8f0;
+    border-radius: 4px;
+    padding: 10px 14px;
+    font-size: 13px;
+    line-height: 1.6;
+    color: #333333;
+  }
+  .logic-item {
+    margin-bottom: 4px;
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+  }
+  .logic-num {
+    font-weight: bold;
+    color: #1a5276;
+    flex-shrink: 0;
+  }
+  .result-banner {
+    margin-top: 8px;
+    padding: 6px 10px;
+    font-size: 13.5px;
+    font-weight: bold;
+    border-radius: 3px;
+    text-align: center;
+  }
+  .result-banner.fail {
+    background: #ffcdd2;
+    color: #b71c1c;
+    border: 1px solid #ef9a9a;
+  }
+  .result-banner.success {
+    background: #c8e6c9;
+    color: #1b5e20;
+    border: 1px solid #a5d6a7;
+  }
+
+  /* Footer referencing actual code */
+  .footer-bar {
+    margin-top: 16px;
+    padding-top: 10px;
+    border-top: 1px dashed #b0bec5;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 12px;
+    color: #546e7a;
+  }
+  .footer-bar code {
+    background: #eceff1;
+    color: #0d47a1;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-family: Consolas, monospace;
+    font-weight: bold;
+  }
+</style>
+</head>
+<body>
+
+<div class="diagram-container">
+  <!-- Header -->
+  <div class="diagram-header">
+    <div class="diagram-title">
+      <span>◆ 高速弾丸の衝突判定比較（フェンスすり抜けバグの解決）</span>
+    </div>
+    <div class="diagram-subtitle">
+      7月課題の解決：すり抜け率 0% を達成
+    </div>
+  </div>
+
+  <div class="comparison-row">
+    <!-- LEFT: 従来の離散判定 -->
+    <div class="col">
+      <div class="box-title left">
+        <span>❌ 従来の離散判定（点サンプリング方式）</span>
+      </div>
+
+      <div class="canvas-area">
+        <svg width="100%" height="100%" viewBox="0 0 450 240">
+          <!-- Guide line -->
+          <line x1="20" y1="120" x2="430" y2="120" stroke="#eeeeee" stroke-width="1"/>
+
+          <!-- Top-down Wooden Cross Fence (Authentic to user's fence.obj) -->
+          <g transform="translate(205, 20)">
+            <!-- Main vertical rail -->
+            <rect x="0" y="0" width="34" height="200" rx="2" fill="#8d5b28" stroke="#533414" stroke-width="2"/>
+            <!-- Wooden slats -->
+            <rect x="-6" y="25" width="46" height="14" rx="2" fill="#aa733c" stroke="#533414" stroke-width="1.5"/>
+            <rect x="-6" y="65" width="46" height="14" rx="2" fill="#aa733c" stroke="#533414" stroke-width="1.5"/>
+            <rect x="-6" y="105" width="46" height="14" rx="2" fill="#aa733c" stroke="#533414" stroke-width="1.5"/>
+            <rect x="-6" y="145" width="46" height="14" rx="2" fill="#aa733c" stroke="#533414" stroke-width="1.5"/>
+            <rect x="-6" y="180" width="46" height="14" rx="2" fill="#aa733c" stroke="#533414" stroke-width="1.5"/>
+
+            <text x="17" y="-6" font-size="12" font-weight="bold" fill="#533414" text-anchor="middle">木製フェンス</text>
+            <text x="17" y="214" font-size="11" fill="#757575" text-anchor="middle">厚み: 40cm</text>
+          </g>
+
+          <!-- Bullet Movement Path -->
+          <line x1="55" y1="120" x2="385" y2="120" stroke="#d32f2f" stroke-width="2.5" stroke-dasharray="6,4"/>
+          <polygon points="385,115 397,120 385,125" fill="#d32f2f"/>
+
+          <!-- Movement amount badge -->
+          <rect x="100" y="85" width="95" height="20" rx="3" fill="#ffffff" stroke="#ef9a9a" stroke-width="1"/>
+          <text x="147" y="99" font-size="11" font-weight="bold" fill="#c62828" text-anchor="middle">1F移動量: 80cm</text>
+
+          <!-- Frame 1 (Start) -->
+          <g transform="translate(55, 120)">
+            <circle cx="0" cy="0" r="14" fill="#64b5f6" stroke="#1565c0" stroke-width="2"/>
+            <text x="0" y="27" font-size="12" font-weight="bold" fill="#212121" text-anchor="middle">Frame 1</text>
+            <text x="0" y="41" font-size="10.5" fill="#757575" text-anchor="middle">(壁の手前)</text>
+          </g>
+
+          <!-- Frame 2 (End / Tunneled) -->
+          <g transform="translate(370, 120)">
+            <circle cx="0" cy="0" r="14" fill="#e57373" stroke="#c62828" stroke-width="2"/>
+            <text x="0" y="27" font-size="12" font-weight="bold" fill="#c62828" text-anchor="middle">Frame 2</text>
+            <text x="0" y="41" font-size="10.5" fill="#d32f2f" text-anchor="middle">(壁の奥へワープ)</text>
+          </g>
+
+          <!-- Missing indicator on fence -->
+          <g transform="translate(222, 120)">
+            <circle cx="0" cy="0" r="16" fill="#ffffff" stroke="#d32f2f" stroke-width="2"/>
+            <text x="0" y="6" font-size="16" font-weight="bold" fill="#d32f2f" text-anchor="middle">✕</text>
+          </g>
+        </svg>
+      </div>
+
+      <div class="logic-box">
+        <div class="logic-item">
+          <span class="logic-num">①</span>
+          <span>毎フレーム「現在座標の点」のみで当たり判定を実行</span>
+        </div>
+        <div class="logic-item">
+          <span class="logic-num">②</span>
+          <span>弾速 48m/s（60FPSで1フレームあたり約80cm移動）</span>
+        </div>
+        <div class="logic-item">
+          <span class="logic-num">③</span>
+          <span>フェンス厚み（40cm）を跨いでしまい内外判定をすり抜ける</span>
+        </div>
+        <div class="result-banner fail">
+          ❌ 接触が検知されず、弾丸がフェンスを貫通
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT: CCD判定 -->
+    <div class="col">
+      <div class="box-title right">
+        <span>⭕ 今回のCCD判定（移動線分スイープ方式）</span>
+      </div>
+
+      <div class="canvas-area">
+        <svg width="100%" height="100%" viewBox="0 0 450 240">
+          <line x1="20" y1="120" x2="430" y2="120" stroke="#eeeeee" stroke-width="1"/>
+
+          <!-- Top-down Wooden Cross Fence -->
+          <g transform="translate(205, 20)">
+            <rect x="0" y="0" width="34" height="200" rx="2" fill="#8d5b28" stroke="#533414" stroke-width="2"/>
+            <rect x="-6" y="25" width="46" height="14" rx="2" fill="#aa733c" stroke="#533414" stroke-width="1.5"/>
+            <rect x="-6" y="65" width="46" height="14" rx="2" fill="#aa733c" stroke="#533414" stroke-width="1.5"/>
+            <rect x="-6" y="105" width="46" height="14" rx="2" fill="#aa733c" stroke="#533414" stroke-width="1.5"/>
+            <rect x="-6" y="145" width="46" height="14" rx="2" fill="#aa733c" stroke="#533414" stroke-width="1.5"/>
+            <rect x="-6" y="180" width="46" height="14" rx="2" fill="#aa733c" stroke="#533414" stroke-width="1.5"/>
+
+            <text x="17" y="-6" font-size="12" font-weight="bold" fill="#533414" text-anchor="middle">木製フェンス</text>
+            <text x="17" y="214" font-size="11" fill="#757575" text-anchor="middle">厚み: 40cm</text>
+          </g>
+
+          <!-- Swept segment to Hit Point -->
+          <line x1="55" y1="120" x2="205" y2="120" stroke="#1565c0" stroke-width="4"/>
+
+          <!-- Canceled movement path after hit -->
+          <line x1="205" y1="120" x2="370" y2="120" stroke="#bdbdbd" stroke-width="2" stroke-dasharray="4,4"/>
+
+          <!-- Swept segment label -->
+          <rect x="68" y="85" width="120" height="20" rx="3" fill="#e3f2fd" stroke="#90caf9" stroke-width="1"/>
+          <text x="128" y="99" font-size="11" font-weight="bold" fill="#1565c0" text-anchor="middle">移動線分として計算</text>
+
+          <!-- Start Point -->
+          <g transform="translate(55, 120)">
+            <circle cx="0" cy="0" r="14" fill="#64b5f6" stroke="#1565c0" stroke-width="2"/>
+            <text x="0" y="27" font-size="12" font-weight="bold" fill="#212121" text-anchor="middle">始点 P_prev</text>
+            <text x="0" y="41" font-size="10.5" fill="#757575" text-anchor="middle">(前フレーム)</text>
+          </g>
+
+          <!-- Virtual End Point -->
+          <g transform="translate(370, 120)">
+            <circle cx="0" cy="0" r="13" fill="#f5f5f5" stroke="#bdbdbd" stroke-width="2" stroke-dasharray="3,3"/>
+            <text x="0" y="27" font-size="11" fill="#9e9e9e" text-anchor="middle">仮想到達点</text>
+            <text x="0" y="41" font-size="10" fill="#bdbdbd" text-anchor="middle">(移動キャンセル)</text>
+          </g>
+
+          <!-- Hit Point Marker (Front surface of fence) -->
+          <g transform="translate(205, 120)">
+            <circle cx="0" cy="0" r="8" fill="#ffb300" stroke="#f57f17" stroke-width="2"/>
+            <circle cx="0" cy="0" r="14" fill="none" stroke="#ffb300" stroke-width="1.5" stroke-dasharray="2,2"/>
+          </g>
+
+          <!-- Callout Label: Placed neatly on the left above swept line to avoid crossing fence -->
+          <path d="M 205,112 L 175,55 L 90,55" fill="none" stroke="#f57f17" stroke-width="1.5"/>
+          <circle cx="205" cy="112" r="3" fill="#f57f17"/>
+          <rect x="60" y="38" width="135" height="34" rx="4" fill="#fff8e1" stroke="#ffe082" stroke-width="1.5"/>
+          <text x="127" y="53" font-size="11.5" font-weight="bold" fill="#b78103" text-anchor="middle">★ 表面交点 P_hit</text>
+          <text x="127" y="66" font-size="10" fill="#8d6e63" text-anchor="middle">表面で直ちに着弾処理</text>
+        </svg>
+      </div>
+
+      <div class="logic-box">
+        <div class="logic-item">
+          <span class="logic-num">①</span>
+          <span>前フレーム座標と現座標を結ぶ「線分ベクトル」を生成</span>
+        </div>
+        <div class="logic-item">
+          <span class="logic-num">②</span>
+          <span>線分とフェンス(OBB)の交差パラメータ t (0≦t≦1) を解く</span>
+        </div>
+        <div class="logic-item">
+          <span class="logic-num">③</span>
+          <span>フェンス表面 P_hit を正確に検知し、火花・木片を生成</span>
+        </div>
+        <div class="result-banner success">
+          ⭕ どんなに弾速が上がっても、すり抜け率 0% を達成
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Technical Engine Footer -->
+  <div class="footer-bar">
+    <span>実装関数: <code>CollisionSystem::CheckRayBoxIntersection()</code> / <code>CheckBulletCapsuleHit()</code></span>
+    <span>検証結果: <strong>100% 表面着弾保証</strong> ＋ 跳弾火花・破片パーティクル連動</span>
+  </div>
+</div>
+
+</body>
+</html>

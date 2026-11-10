@@ -15,20 +15,24 @@ class OffScreenRendering;
 enum class TransitionTheme {
     TitleTactical,    // タイトル調和: ダックアンバーゴールド × シグナルイエロー × タクティカルブラック × クリーンホワイト
     DuckovTactical,   // Duckov風: タクティカルブラック × シグナルイエロー × タクティカルオレンジ
-    TororoPastel,     // 猫麦とろろ風: パステルスカイブルー × ピュアホワイト × パステルピンク
+    TororoPastel,     // パステルスカイブルー × ピュアホワイト × パステルピンク
     CyberNeon,        // サイバーネオン: ネオンマゼンタ × サイバーシアン × エレクトリックイエロー
     Monochrome,       // ミニマルシック: ディープブラック × シルバーホワイト
 };
 
 /**
  * @brief アプリケーション層完結型スティンガートランジション（画面切り替え演出）
- * 
- * 猫麦とろろさんの配信で見られるような、シンプルでポップ・爽快な多重斜めストライプが
- * 画面を駆け抜けて瞬時にシーンを切り替えるハイクオリティなトランジションを提供します。
- * エンジン層（Baziru3_Engine）を一切変更せず、アプリケーション層だけで完結して動作します。
+ *
+ * 多重斜めストライプが画面を駆け抜けて瞬時にシーンを切り替えるトランジションを提供します。
  */
 class StingerTransition {
 public:
+    static constexpr float kDefaultDuration       = 1.80f;
+    static constexpr float kDefaultScreenWidth    = 1280.0f;
+    static constexpr float kDefaultScreenHeight   = 720.0f;
+    static constexpr float kDefaultTravelDistance = 3200.0f;
+    static constexpr float kDefaultStripeAngle    = -0.42f; // 約 -24度
+
     static StingerTransition* GetInstance();
 
     /// @brief トランジション初期化（スプライトリソースの生成）
@@ -44,10 +48,7 @@ public:
     void Draw(const RenderContext& ctx);
 
     /// @brief トランジションを開始して指定シーンへ切り替える
-    /// @param nextSceneName 切り替え先シーン名（例: "GAMEPLAY", "TITLE" など）
-    /// @param duration トランジション全体の秒数（デフォルト 1.8 秒）
-    /// @param theme カラーテーマ（デフォルトはタイトル調和タクティカル）
-    void StartTransition(const std::string& nextSceneName, float duration = 1.80f,
+    void StartTransition(const std::string& nextSceneName, float duration = kDefaultDuration,
                          TransitionTheme theme = TransitionTheme::TitleTactical);
 
     /// @brief 現在トランジション中かどうか
@@ -59,7 +60,7 @@ public:
     /// @brief カラーテーマを変更
     void SetTheme(TransitionTheme theme);
 
-    /// @brief オフスクリーンレンダリングの参照を設定（トランジション中のアウトラインポストプロセス抑制用）
+    /// @brief オフスクリーンレンダリングの参照を設定
     void SetOffScreenRendering(OffScreenRendering* offscreen) { offscreen_ = offscreen; }
 
 private:
@@ -75,6 +76,7 @@ private:
         float offsetX = 0.0f; // メイン覆い帯からの相対Xオフセット
     };
 
+    void RefreshViewportMetrics();
     void ApplyThemeColors();
     static float StingerInCurve(float t);
     static float StingerOutCurve(float t);
@@ -88,7 +90,7 @@ private:
     // 8層の多重ストライプ
     std::vector<StripeLayer> stripes_;
 
-    // 全画面完全密閉セーフティバックドロップ（回転なし水平プレートで四隅のチラ見えを100%遮断）
+    // 全画面完全密閉セーフティバックドロップ
     std::unique_ptr<Sprite> safetyBackdrop_;
 
     // シネマティック・レターボックス（画面上下のシネマ帯）
@@ -104,30 +106,30 @@ private:
     bool isActive_ = false;
     bool hasSwitched_ = false;
     float timer_ = 0.0f;
-    float duration_ = 1.80f;
+    float duration_ = kDefaultDuration;
     float progress_ = 0.0f;
-    float postSwitchTimer_ = 0.0f; // 切り替え後の安全フレームタイマー
+    float postSwitchTimer_ = 0.0f;
 
     std::string pendingSceneName_;
     TransitionTheme theme_ = TransitionTheme::TitleTactical;
 
-    float screenWidth_ = 1280.0f;
-    float screenHeight_ = 720.0f;
-    float travelDistance_ = 3200.0f; // 画面外から中心までの移動距離
-    float stripeAngle_ = -0.42f;     // 斜めストライプの傾き角度（約 -24度）
+    float screenWidth_ = kDefaultScreenWidth;
+    float screenHeight_ = kDefaultScreenHeight;
+    float travelDistance_ = kDefaultTravelDistance;
+    float stripeAngle_ = kDefaultStripeAngle;
 };
 
 #include "DeathTransition.h"
 
 /// @brief アプリケーション全体から呼び出せる簡易シーン遷移ヘルパー
 namespace SceneTransition {
-    inline void Change(const std::string& sceneName, float duration = 1.80f,
+    inline void Change(const std::string& sceneName, float duration = StingerTransition::kDefaultDuration,
                        TransitionTheme theme = TransitionTheme::TitleTactical) {
         StingerTransition::GetInstance()->StartTransition(sceneName, duration, theme);
     }
 
     /// @brief 死亡時専用の軍用メディバック・ヘビーシャッタートランジションによるGameOverScene遷移
-    inline void ChangeToGameOver(float duration = 1.70f) {
-        DeathTransition::GetInstance()->StartTransition("GAMEOVER", duration);
+    inline void ChangeToGameOver(float duration = DeathTransition::kDefaultDuration) {
+        DeathTransition::GetInstance()->StartTransition(DeathTransition::kDefaultTargetScene, duration);
     }
 }

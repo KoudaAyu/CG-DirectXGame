@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    width: 1920px;
+    height: 1080px;
+    background-color: #23262b;
+    color: #ffffff;
+    font-family: "Meiryo", "Yu Gothic UI", sans-serif;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 50px 70px;
+    overflow: hidden;
+  }
+  
+  /* ヘッダー */
+  .header {
+    border-bottom: 2px solid #3d424d;
+    padding-bottom: 20px;
+  }
+  .title-tag {
+    display: inline-block;
+    background: #10b981;
+    color: #fff;
+    font-size: 18px;
+    font-weight: bold;
+    padding: 6px 16px;
+    border-radius: 4px;
+    margin-bottom: 10px;
+  }
+  .title-main {
+    font-size: 38px;
+    font-weight: bold;
+    color: #ffffff;
+    letter-spacing: 0.5px;
+  }
+  .title-sub {
+    font-size: 20px;
+    color: #94a3b8;
+    margin-top: 6px;
+  }
+
+  /* メイン図解エリア */
+  .diagram-container {
+    position: relative;
+    width: 100%;
+    height: 580px;
+    background: #1a1d22;
+    border-radius: 12px;
+    border: 1px solid #333842;
+  }
+
+  /* 中央の障害物（薄い壁） */
+  .wall {
+    position: absolute;
+    left: 50%;
+    top: 60px;
+    height: 380px;
+    width: 50px;
+    transform: translateX(-50%);
+    background: #604a37;
+    border: 3px solid #937356;
+    border-radius: 4px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.5);
+    z-index: 2;
+  }
+  .wall-label {
+    position: absolute;
+    top: -50px;
+    left: 50%;
+    transform: translateX(-50%);
+    white-space: nowrap;
+    font-size: 20px;
+    font-weight: bold;
+    color: #e2d1c0;
+    text-align: center;
+  }
+  .wall-dim {
+    font-size: 15px;
+    color: #a8927d;
+    margin-top: 2px;
+  }
+
+  /* スイープ線分（太い青緑の実線） */
+  .sweep-line {
+    position: absolute;
+    left: 250px;
+    width: 685px; /* 壁の左面 (960px - 25px = 935px -> 935-250 = 685px) */
+    top: 250px;
+    height: 6px;
+    transform: translateY(-50%);
+    background: #06d6a0;
+    box-shadow: 0 0 16px rgba(6, 214, 160, 0.7);
+    z-index: 3;
+  }
+  .sweep-label {
+    position: absolute;
+    top: -42px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(6, 214, 160, 0.15);
+    border: 1px solid #06d6a0;
+    padding: 6px 18px;
+    border-radius: 6px;
+    font-size: 16px;
+    font-weight: bold;
+    color: #06d6a0;
+    white-space: nowrap;
+  }
+
+  /* 仮想延長線 */
+  .virtual-line {
+    position: absolute;
+    left: 960px;
+    right: 250px;
+    top: 250px;
+    height: 2px;
+    transform: translateY(-50%);
+    border-top: 3px dotted #64748b;
+    z-index: 1;
+  }
+
+  /* 弾丸 Frame 1 (始点) */
+  .bullet-start {
+    position: absolute;
+    left: 250px;
+    top: 250px;
+    transform: translate(-50%, -50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    z-index: 5;
+  }
+  .bullet-circle {
+    width: 68px;
+    height: 68px;
+    border-radius: 50%;
+    background: #00b4d8;
+    border: 4px solid #ffffff;
+    box-shadow: 0 0 16px rgba(0, 180, 216, 0.6);
+  }
+  .bullet-info {
+    position: absolute;
+    top: 85px;
+    left: 50%;
+    transform: translateX(-50%);
+    white-space: nowrap;
+    text-align: center;
+  }
+  .frame-title {
+    font-size: 22px;
+    font-weight: bold;
+    color: #48cae4;
+  }
+  .frame-desc {
+    font-size: 16px;
+    color: #94a3b8;
+    margin-top: 4px;
+  }
+
+  /* 仮想終点 Frame 2 */
+  .bullet-end-virtual {
+    position: absolute;
+    right: 250px;
+    top: 250px;
+    transform: translate(50%, -50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    opacity: 0.6;
+    z-index: 5;
+  }
+  .bullet-circle-virtual {
+    width: 68px;
+    height: 68px;
+    border-radius: 50%;
+    background: transparent;
+    border: 3px dashed #94a3b8;
+  }
+  .frame-title-virtual {
+    font-size: 22px;
+    font-weight: bold;
+    color: #94a3b8;
+  }
+  .frame-desc-virtual {
+    font-size: 16px;
+    color: #64748b;
+    margin-top: 4px;
+  }
+
+  /* 着弾点（ヒットマーカー） */
+  .hit-marker {
+    position: absolute;
+    left: 935px; /* 壁の左面 */
+    top: 250px;
+    transform: translate(-50%, -50%);
+    width: 50px;
+    height: 50px;
+    z-index: 10;
+  }
+  .hit-core {
+    width: 26px;
+    height: 26px;
+    background: #ffea00;
+    border: 4px solid #ffffff;
+    border-radius: 50%;
+    position: absolute;
+    left: 12px;
+    top: 12px;
+    box-shadow: 0 0 24px #ffea00;
+  }
+  .hit-spark1 {
+    position: absolute;
+    width: 35px;
+    height: 3px;
+    background: #ffea00;
+    left: -20px;
+    top: 12px;
+    transform: rotate(35deg);
+  }
+  .hit-spark2 {
+    position: absolute;
+    width: 35px;
+    height: 3px;
+    background: #ffea00;
+    left: -20px;
+    top: 36px;
+    transform: rotate(-35deg);
+  }
+  .hit-spark3 {
+    position: absolute;
+    width: 30px;
+    height: 3px;
+    background: #ffea00;
+    left: -26px;
+    top: 24px;
+  }
+
+  .hit-label-box {
+    position: absolute;
+    top: -100px;
+    left: 50%;
+    transform: translateX(-70%);
+    background: rgba(255, 234, 0, 0.15);
+    border: 2px solid #ffea00;
+    padding: 10px 20px;
+    border-radius: 8px;
+    white-space: nowrap;
+    text-align: center;
+  }
+  .hit-title {
+    font-size: 21px;
+    font-weight: bold;
+    color: #ffea00;
+  }
+  .hit-desc {
+    font-size: 15px;
+    color: #fef08a;
+    margin-top: 2px;
+  }
+
+  /* 成功バッジ */
+  .success-alert {
+    position: absolute;
+    bottom: 35px;
+    left: 68%;
+    transform: translateX(-50%);
+    background: #064e3b;
+    border: 2px solid #10b981;
+    border-radius: 8px;
+    padding: 16px 30px;
+    text-align: left;
+    box-shadow: 0 8px 30px rgba(6, 78, 59, 0.5);
+    z-index: 10;
+  }
+  .alert-title {
+    font-size: 23px;
+    font-weight: bold;
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .alert-list {
+    margin-top: 8px;
+    font-size: 16px;
+    color: #a7f3d0;
+    line-height: 1.6;
+    list-style: none;
+  }
+
+  /* フッター解説 */
+  .footer {
+    background: #1b1e23;
+    border-radius: 8px;
+    border-left: 6px solid #10b981;
+    padding: 18px 28px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .footer-row {
+    font-size: 18px;
+    line-height: 1.5;
+  }
+  .tag-success {
+    color: #34d399;
+    font-weight: bold;
+  }
+  .tag-math {
+    color: #94a3b8;
+    font-weight: bold;
+  }
+</style>
+</head>
+<body>
+
+  <div class="header">
+    <div class="title-tag">解決策：CCD（連続衝突判定）の実装</div>
+    <div class="title-main">線分スイープ（Segment Sweep）による完全衝突検知</div>
+    <div class="title-sub">移動前後の座標を「1本の線分」として捉え、障害物（OBB）との交差を数学的に解く</div>
+  </div>
+
+  <div class="diagram-container">
+    
+    <!-- スイープ線分 -->
+    <div class="sweep-line">
+      <div class="sweep-label">移動線分（スイープ軌跡）</div>
+    </div>
+
+    <!-- 壁 -->
+    <div class="wall">
+      <div class="wall-label">
+        木のフェンス（薄い障害物）
+        <div class="wall-dim">板の厚み: 40cm</div>
+      </div>
+    </div>
+
+    <!-- 着弾点（ヒットマーカー） -->
+    <div class="hit-marker">
+      <div class="hit-core"></div>
+      <div class="hit-spark1"></div>
+      <div class="hit-spark2"></div>
+      <div class="hit-spark3"></div>
+      <div class="hit-label-box">
+        <div class="hit-title">表面交点 P_hit (媒介変数 t_min)</div>
+        <div class="hit-desc">線分と板の表面が交差する最短位置</div>
+      </div>
+    </div>
+
+    <!-- 仮想延長線 -->
+    <div class="virtual-line"></div>
+
+    <!-- 弾丸 Frame 1 (始点) -->
+    <div class="bullet-start">
+      <div class="bullet-circle"></div>
+      <div class="bullet-info">
+        <div class="frame-title">始点 P_prev (Frame 1)</div>
+        <div class="frame-desc">射出・移動前の位置</div>
+      </div>
+    </div>
+
+    <!-- 仮想終点 Frame 2 -->
+    <div class="bullet-end-virtual">
+      <div class="bullet-circle-virtual"></div>
+      <div class="bullet-info">
+        <div class="frame-title-virtual">終点 P_curr (仮想到達点)</div>
+        <div class="frame-desc-virtual">壁がなければ到達する座標</div>
+      </div>
+    </div>
+
+    <!-- 成功アラート -->
+    <div class="success-alert">
+      <div class="alert-title">✔ 表面で100%確実に検知！</div>
+      <ul class="alert-list">
+        <li>・ すり抜け率: <b>0.0%</b>（トンネリング完全阻止）</li>
+        <li>・ 表面交点 P_hit で弾丸を即座に消滅・破片化</li>
+        <li>・ めり込まずに表面で木片・跳弾スパーク発生</li>
+      </ul>
+    </div>
+
+  </div>
+
+  <div class="footer">
+    <div class="footer-row">
+      <span class="tag-math">【アルゴリズム】 </span>
+      線分 P(t) = P_prev + t × 速度ベクトル (0 ≦ t ≦ 1) とOBB（回転ボックス）のスラブ法交差判定により、最小媒介変数 t_min を算出。
+    </div>
+    <div class="footer-row">
+      <span class="tag-success">【結果と効果】 </span>
+      どんなに弾速が上がっても、処理落ち（30FPS以下）しても、壁の表面で100%確実に命中し、破片エフェクトが綺麗に散る！
+    </div>
+  </div>
+
+</body>
+</html>

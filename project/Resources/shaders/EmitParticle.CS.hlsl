@@ -62,7 +62,7 @@ void main(uint3 DTid : SV_DispatchThreadID) {
     if (gEmitter.emit != 0) { // 射出許可が出たので射出
         RandomGenerator generator;
         // シードの初期化
-        generator.seed = (DTid + gPerFrame.time) * gPerFrame.time;
+        generator.seed = (DTid + gPerFrame.time + 1.234f) * (gPerFrame.time + 0.567f);
 
         for (uint32_t countIndex = 0; countIndex < gEmitter.count; ++countIndex) {
             int32_t freeListIndex;
@@ -73,28 +73,54 @@ void main(uint3 DTid : SV_DispatchThreadID) {
             if (0 <= freeListIndex && freeListIndex < kMaxParticles) {
                 uint32_t particleIndex = gFreeList[freeListIndex];
 
-                // 1. スケール
-                float32_t3 randScale = generator.Generate3d();
-                gParticles[particleIndex].scale = 0.1f + randScale * 0.2f;
+                // 1. スケール（ノズル出口サイズ 0.08〜0.12m：手のひら大の煙の塊）
+                float32_t randScale = generator.Generate1d();
+                float32_t initScale = 0.08f + randScale * 0.04f;
+                gParticles[particleIndex].scale = float32_t3(initScale, initScale, initScale);
 
-                // 2. 座標 (Emitter の位置 + 半径以内のランダムな球状オフセット)
+                // 2. 座標 (ノズル噴出口中心付近の微細なオフセット)
                 float32_t3 randPos = generator.Generate3d();
                 float32_t3 dir = normalize(randPos * 2.0f - 1.0f);
                 float32_t dist = generator.Generate1d() * gEmitter.radius;
                 gParticles[particleIndex].translate = gEmitter.translate + dir * dist;
 
-                // 3. 色
-                gParticles[particleIndex].color.rgb = generator.Generate3d();
-                gParticles[particleIndex].color.a = 1.0f;
+                // 3. 色（化学発煙筒特有の鮮烈なエメラルド〜ライムグリーン、微細な色相揺らぎ）
+                float32_t hueVariation = (generator.Generate1d() - 0.5f) * 0.06f;
+                float32_t3 baseColor = float32_t3(0.12f + hueVariation * 0.5f, 1.0f, 0.35f + hueVariation);
+                float32_t brightness = 0.92f + generator.Generate1d() * 0.22f;
+                gParticles[particleIndex].color.rgb = saturate(baseColor * brightness);
+                gParticles[particleIndex].color.a = 0.96f;
 
-                // 4. その他のパラメータ
+                // 4. その他のパラメータ（ヘリの進入高度まで届く十分な寿命 3.8〜5.0秒）
                 gParticles[particleIndex].currentTime = 0.0f;
-                gParticles[particleIndex].lifeTime = 1.0f + generator.Generate1d() * 2.0f; // 寿命を 1.0〜3.0 秒に設定
+                gParticles[particleIndex].lifeTime = 3.8f + generator.Generate1d() * 1.2f;
 
-                // 速度ベクトルもランダム（上方向をベースに周囲へ拡散）
-                float32_t3 randVel = generator.Generate3d();
-                float32_t3 velDir = normalize(float32_t3(randVel.x * 2.0f - 1.0f, 1.0f + randVel.y * 2.0f, randVel.z * 2.0f - 1.0f));
-                gParticles[particleIndex].velocity = velDir * (1.0f + generator.Generate1d() * 2.0f); // 速度 1.0〜3.0
+                // 5. スモークグレネードの斜め上噴出＆風下ドリフト（ヘリパイロットを誘導する煙の帯）
+                // 360度の方位角
+                float32_t azimuth = generator.Generate1d() * 6.2831853f;
+                float32_t elevRand = generator.Generate1d();
+                float32_t elevation;
+                float32_t speed;
+                
+                if (elevRand < 0.75f)
+                {
+                    // 75%: 上空へ勢いよく立ち昇る誘導煙柱（45〜65度）
+                    elevation = 0.78f + generator.Generate1d() * 0.35f;
+                    speed = 1.8f + generator.Generate1d() * 0.90f; // 1.8〜2.7 m/s
+                }
+                else
+                {
+                    // 25%: 低空〜中空を漂う外縁煙（25〜45度）
+                    elevation = 0.45f + generator.Generate1d() * 0.35f;
+                    speed = 1.2f + generator.Generate1d() * 0.70f;
+                }
+
+                float32_t cosElev = cos(elevation);
+                // パイロットに風向を示す環境風（+X: 0.55, +Z: 0.65）に吹かれて斜めに美しくたなびく
+                float32_t velX = cos(azimuth) * cosElev * speed * 0.40f + 0.55f;
+                float32_t velY = sin(elevation) * speed + 0.50f; // 力強い上空立ち昇り
+                float32_t velZ = sin(azimuth) * cosElev * speed * 0.40f + 0.65f;
+                gParticles[particleIndex].velocity = float32_t3(velX, velY, velZ);
             } else {
                 // 発生させられなかったので、減らしてしまった分をもとに戻す
                 InterlockedAdd(gFreeListIndex[0], 1);

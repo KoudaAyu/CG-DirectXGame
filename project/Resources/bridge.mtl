@@ -1,28 +1,9 @@
-# Material for bridge
-newmtl Material_bridge.mtl
-Ka 1.0 1.0 1.0
-Kd 1.0 1.0 1.0
-Ks 0.2 0.2 0.2
-Ns 20.0
-map_Kd duckov_bridge.png
-
+# Realistic Nature Material
 newmtl BridgeWood
-Ka 1.0 1.0 1.0
-Kd 1.0 1.0 1.0
-Ks 0.2 0.2 0.2
-Ns 20.0
-map_Kd duckov_bridge.png
-
-newmtl BridgePillar
-Ka 0.8 0.8 0.8
-Kd 0.8 0.8 0.8
-Ks 0.1 0.1 0.1
-Ns 10.0
-map_Kd duckov_bridge.png
-
-newmtl BridgeRailing
-Ka 0.9 0.9 0.9
-Kd 0.9 0.9 0.9
-Ks 0.25 0.25 0.25
-Ns 25.0
+Ka 1.000000 1.000000 1.000000
+Kd 1.000000 1.000000 1.000000
+Ks 0.250000 0.250000 0.250000
+Ns 32.000000
+d 1.000000
+illum 2
 map_Kd duckov_bridge.png

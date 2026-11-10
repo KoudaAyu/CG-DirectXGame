@@ -25,6 +25,17 @@ class Camera;
 struct SceneRenderRequests;
 
 struct LevelObjectData {
+    static constexpr int   kDefaultSeed            = 12345;
+    static constexpr int   kDefaultIterations      = 2;
+    static constexpr float kDefaultBranchLength    = 0.15f;
+    static constexpr float kDefaultBranchRadius    = 0.06f;
+    static constexpr float kDefaultTaperRate       = 0.8f;
+    static constexpr float kDefaultAngle           = 25.0f;
+    static constexpr int   kDefaultSubdivisions    = 2;
+    static constexpr float kDefaultNoiseStrength   = 0.25f;
+    static constexpr float kDefaultVoronoiStrength = 0.15f;
+    static constexpr float kDefaultCrackStrength   = 0.1f;
+
     std::string name;
     std::string type;
     std::string modelDirectory;
@@ -35,16 +46,16 @@ struct LevelObjectData {
     Vector3 rotation{ 0.0f, 0.0f, 0.0f };
     Vector3 scale{ 1.0f, 1.0f, 1.0f };
 
-    int seed = 12345;
-    int iterations = 2;
-    float branchLength = 0.15f;
-    float branchRadius = 0.06f;
-    float taperRate = 0.8f;
-    float angle = 25.0f;
-    int subdivisions = 2;
-    float noiseStrength = 0.25f;
-    float voronoiStrength = 0.15f;
-    float crackStrength = 0.1f;
+    int seed = kDefaultSeed;
+    int iterations = kDefaultIterations;
+    float branchLength = kDefaultBranchLength;
+    float branchRadius = kDefaultBranchRadius;
+    float taperRate = kDefaultTaperRate;
+    float angle = kDefaultAngle;
+    int subdivisions = kDefaultSubdivisions;
+    float noiseStrength = kDefaultNoiseStrength;
+    float voronoiStrength = kDefaultVoronoiStrength;
+    float crackStrength = kDefaultCrackStrength;
 };
 
 class LevelEditor {
@@ -68,6 +79,9 @@ public:
     void AddObject(const std::string& name, const std::string& dir, const std::string& file, bool isStatic);
 
 private:
+    static constexpr size_t kInputBufferSize = 128;
+    static constexpr size_t kAxisCount       = 3;
+
     DirectXCom* dxCommon_ = nullptr;
     Object3dCom* object3dCom_ = nullptr;
 
@@ -76,9 +90,9 @@ private:
     bool autoReloadEnabled_ = true;
 
     int selectedIndex_ = -1;
-    char addName_[128] = "";
-    char addDir_[128] = "";
-    char addFile_[128] = "";
+    char addName_[kInputBufferSize] = "";
+    char addDir_[kInputBufferSize] = "";
+    char addFile_[kInputBufferSize] = "";
     bool addIsStatic_ = true;
 
     uint32_t axisTextureIndex_ = 0;
@@ -90,6 +104,6 @@ private:
     std::vector<std::unique_ptr<Model>> models_;
     std::vector<std::unique_ptr<River>> rivers_;
     std::vector<std::unique_ptr<Collider>> colliders_;
-    std::unique_ptr<Cylinder> axisCylinders_[3];
-    ComPtr<ID3D12Resource> axisMaterialResources_[3];
+    std::unique_ptr<Cylinder> axisCylinders_[kAxisCount];
+    ComPtr<ID3D12Resource> axisMaterialResources_[kAxisCount];
 };
