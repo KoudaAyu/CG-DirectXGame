@@ -334,6 +334,15 @@
     <FxCompile Include="Resources\shaders\InitializeParticle.CS.hlsl">
       <Filter>リソース ファイル</Filter>
     </FxCompile>
+    <FxCompile Include="Resources\shaders\TacticalUI.VS.hlsl">
+      <Filter>リソース ファイル</Filter>
+    </FxCompile>
+    <FxCompile Include="Resources\shaders\TacticalUI.PS.hlsl">
+      <Filter>リソース ファイル</Filter>
+    </FxCompile>
+    <FxCompile Include="Resources\shaders\MedevacVolumetric.PS.hlsl">
+      <Filter>リソース ファイル</Filter>
+    </FxCompile>
 
   </ItemGroup>
   <ItemGroup>

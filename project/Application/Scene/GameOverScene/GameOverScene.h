@@ -75,7 +75,7 @@ private:
 
 	static constexpr Vector3 kInitialHeliPos{ 3.2f, 0.435f, 2.2f };
 	static constexpr Vector3 kInitialHeliRot{ 0.0f, 2.65f, 0.0f }; // 152度回転：開口カーゴドアが手前左を向き、機首は右奥へ逃げる
-	static constexpr Vector3 kInitialTeamPos{ -4.2f, 0.0f, 1.4f };
+	static constexpr Vector3 kInitialTeamPos{ -4.2f, 0.0f, 0.62f };
 
 	// -------------------------------------------------------------------------
 	// 3D ジオラマオブジェクト

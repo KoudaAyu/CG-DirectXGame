@@ -602,6 +602,15 @@ void GameOverScene::UpdateDiorama(float deltaTime)
 		return heliPos_ + TransformOffsetByRotation(localOffset * kHeliScale, heliRotMat);
 	};
 
+	auto WorldToHeliLocal = [&](const Vector3& worldPos) -> Vector3 {
+		const Vector3 d = worldPos - heliPos_;
+		return {
+			(d.x * heliRotMat.m[0][0] + d.y * heliRotMat.m[0][1] + d.z * heliRotMat.m[0][2]) / kHeliScale,
+			(d.x * heliRotMat.m[1][0] + d.y * heliRotMat.m[1][1] + d.z * heliRotMat.m[1][2]) / kHeliScale,
+			(d.x * heliRotMat.m[2][0] + d.y * heliRotMat.m[2][1] + d.z * heliRotMat.m[2][2]) / kHeliScale
+		};
+	};
+
 	if (heliMainRotor_)
 	{
 		const Vector3 mastWorldPos = LocalToHeliWorld(kMastLocalOffset);
@@ -640,6 +649,7 @@ void GameOverScene::UpdateDiorama(float deltaTime)
 	// -------------------------------------------------------------------------
 	// 2. スライドカーゴドア ＆ 担架チームのアニメーション
 	// -------------------------------------------------------------------------
+	// スライドカーゴドアの開閉アニメーション（SPACE押下による離陸開始で速やかに密閉）
 	if (state_ == State::Takeoff)
 	{
 		const float doorT = std::clamp(actionTimer_ / kDoorCloseDuration, 0.0f, 1.0f);
@@ -660,17 +670,68 @@ void GameOverScene::UpdateDiorama(float deltaTime)
 		heliCargoDoor_->Update();
 	}
 
-	const Vector3 stretcherInsideRot = { heliRot_.x, heliRot_.y + kHalfPi, heliRot_.z };
-	const Vector3 woundedInsideRot   = { heliRot_.x + kWoundedPitchTilt, heliRot_.y + kHalfPi, heliRot_.z + kWoundedSupineRoll };
-	const Vector3 medicInsideRot     = { heliRot_.x, heliRot_.y + kHalfPi, heliRot_.z };
-	const float breath = std::sin(timer_ * kBreathFreq) * kBreathAmp;
-
 	auto SetAndUpdateModel = [](Object3d* model, const Vector3& pos, const Vector3& rot) {
 		if (!model) return;
 		model->SetTranslate(pos);
 		model->SetRotate(rot);
 		model->Update();
 	};
+
+	auto NormalizeAngleDelta = [](float target, float base) -> float {
+		float d = std::fmod(target - base + kPi, 2.0f * kPi);
+		if (d < 0.0f) d += 2.0f * kPi;
+		return d - kPi;
+	};
+
+	// 担架ベッドのローカル座標（スケール kHeliScale 前）をワールド座標へ変換するヘルパー
+	auto StretcherLocalToWorld = [](const Vector3& bedPos, const Vector3& bedRot, const Vector3& localUnscaled) -> Vector3 {
+		const Matrix4x4 Rb = Multiply(MakeRotateXMatrix(bedRot.x), Multiply(MakeRotateYMatrix(bedRot.y), MakeRotateZMatrix(bedRot.z)));
+		return bedPos + TransformOffsetByRotation(localUnscaled * kHeliScale, Rb);
+	};
+
+	// 負傷アヒルを担架と完全一体化した剛体として配置（頭部が必ず -X 側の救急枕に乗り、顔・くちばしがカメラ＆開放ドア側を向く）
+	auto UpdateWoundedOnStretcher = [&](const Vector3& bedPos, const Vector3& bedRot, float breathOffset) {
+		if (!duckWounded_) return;
+
+		const Matrix4x4 Rb = Multiply(MakeRotateXMatrix(bedRot.x), Multiply(MakeRotateYMatrix(bedRot.y), MakeRotateZMatrix(bedRot.z)));
+		const Matrix4x4 Rlocal = Multiply(MakeRotateYMatrix(kWoundedLocalRotY), Multiply(MakeRotateXMatrix(kWoundedLocalRotX), MakeRotateYMatrix(kHalfPi)));
+		const Matrix4x4 Mw = Multiply(Rlocal, Rb);
+
+		const float wy = std::asin(std::clamp(-Mw.m[0][2], -1.0f, 1.0f));
+		const float wx = std::atan2(Mw.m[1][2], Mw.m[2][2]);
+		const float wz = std::atan2(Mw.m[0][1], Mw.m[0][0]);
+
+		const Vector3 woundedPos = StretcherLocalToWorld(bedPos, bedRot, kWoundedOnBedLocal) + Vector3{ 0.0f, breathOffset, 0.0f };
+		SetAndUpdateModel(duckWounded_.get(), woundedPos, { wx, wy, wz });
+	};
+
+	// helicopter_body.obj 実寸に基づき、アヒル足元がスキッドとドア敷居を確実に跨いでキャビン床へ着地するヘリローカルY座標を算出
+	auto CalcSafeMedicFootYHeli = [](float xHeli, float groundYHeli) -> float {
+		if (xHeli >= kSafeFootGroundX) return groundYHeli;
+		if (xHeli > kSafeFootStepUpX)
+		{
+			const float u = EaseInOutCubic((kSafeFootGroundX - xHeli) / (kSafeFootGroundX - kSafeFootStepUpX));
+			return groundYHeli + (kSafeFootClearHeightY - groundYHeli) * u;
+		}
+		if (xHeli >= kSafeFootStepDownX)
+		{
+			return kSafeFootClearHeightY;
+		}
+		if (xHeli > kSafeFootCabinX)
+		{
+			const float u = EaseInOutCubic((kSafeFootStepDownX - xHeli) / (kSafeFootStepDownX - kSafeFootCabinX));
+			return kSafeFootClearHeightY + (kSafeFootCabinFloorY - kSafeFootClearHeightY) * u;
+		}
+		return kSafeFootCabinFloorY;
+	};
+
+	// 開放ドアの中央安全窓を地上停止地点に設定
+	Vector3 teamStopPos = LocalToHeliWorld(kTeamStopHeliLocal);
+	teamStopPos.y = 0.0f;
+
+	const Vector3 stretcherInsideRot = { heliRot_.x, heliRot_.y - kHalfPi, heliRot_.z };
+	const Vector3 medicInsideRot     = { heliRot_.x, heliRot_.y + kHalfPi, heliRot_.z };
+	const float breath = std::sin(timer_ * kBreathFreq) * kBreathAmp;
 
 	if (state_ == State::Approaching)
 	{
@@ -688,53 +749,117 @@ void GameOverScene::UpdateDiorama(float deltaTime)
 		}
 
 		const float t = std::clamp(actionTimer_ / kApproachDuration, 0.0f, 1.0f);
-		teamPos_ = LerpVec3(teamStartPos_, kApproachTargetPos, EaseOutQuad(t));
+		const float progress = EaseOutQuad(t);
+		teamPos_ = LerpVec3(teamStartPos_, teamStopPos, progress);
 
-		const float waddle = std::sin(walkPhase_) * kWalkWaddleAmp;
-		const float bob = std::fabs(std::sin(walkPhase_)) * kWalkBobAmp;
+		const float strideFade = 1.0f - progress * kStrideFadeScale;
+		const float waddle = std::sin(walkPhase_) * kWalkWaddleAmp * strideFade;
+		const float bob = std::fabs(std::sin(walkPhase_)) * kWalkBobAmp * strideFade;
 
+		const Vector3 bedPos = teamPos_ + Vector3{ 0.0f, kStretcherCarryHeightY + bob * 0.5f, 0.0f };
+		const Vector3 bedRot = { 0.0f, 0.0f, waddle * kBedWaddleRollScale };
+
+		// 後方衛生兵（枕側のハンドルを保持）・前方衛生兵（足元側のハンドルを保持）
 		SetAndUpdateModel(duckRearMedic_.get(), teamPos_ + Vector3{ -kMedicCarryOffsetX, bob, 0.0f }, { 0.0f, kHalfPi, waddle });
 		SetAndUpdateModel(duckFrontMedic_.get(), teamPos_ + Vector3{ kMedicCarryOffsetX, bob, 0.0f }, { 0.0f, kHalfPi, -waddle });
-		SetAndUpdateModel(stretcherBed_.get(), teamPos_ + Vector3{ 0.0f, kStretcherCarryHeightY + bob * 0.5f, 0.0f }, { 0.0f, 0.0f, 0.0f });
-		SetAndUpdateModel(duckWounded_.get(), teamPos_ + Vector3{ 0.0f, kWoundedCarryHeightY + bob * 0.5f + breath, 0.0f }, { kWoundedPitchTilt, 0.0f, kWoundedSupineRoll });
+		// 担架ベッド ＆ 枕に頭を乗せた負傷主役アヒル
+		SetAndUpdateModel(stretcherBed_.get(), bedPos, bedRot);
+		UpdateWoundedOnStretcher(bedPos, bedRot, breath);
 	}
 	else if (state_ == State::Loading)
 	{
 		const float t = std::clamp(actionTimer_ / kLoadDuration, 0.0f, 1.0f);
 
-		const Vector3 frontStart   = { kApproachTargetPos.x + kMedicCarryOffsetX, 0.0f, kApproachTargetPos.z };
-		const Vector3 rearStart    = { kApproachTargetPos.x - kMedicCarryOffsetX, 0.0f, kApproachTargetPos.z };
-		const Vector3 bedStart     = { kApproachTargetPos.x, kStretcherCarryHeightY, kApproachTargetPos.z };
-		const Vector3 woundedStart = { kApproachTargetPos.x, kWoundedCarryHeightY, kApproachTargetPos.z };
+		// Approaching 終了時の正確なヘリローカル座標（フレーム境界での位置ジャンプ 0.00m を保証）
+		const Vector3 bedStartHeli   = WorldToHeliLocal(teamStopPos + Vector3{  0.0f, kStretcherCarryHeightY, 0.0f });
+		const Vector3 frontStartHeli = WorldToHeliLocal(teamStopPos + Vector3{  kMedicCarryOffsetX, 0.0f, 0.0f });
+		const Vector3 rearStartHeli  = WorldToHeliLocal(teamStopPos + Vector3{ -kMedicCarryOffsetX, 0.0f, 0.0f });
 
-		const float frontT = EaseInOutCubic(std::clamp(t / kFrontMedicLoadEndRatio, 0.0f, 1.0f));
-		SetAndUpdateModel(
-			duckFrontMedic_.get(),
-			LerpVec3(frontStart, LocalToHeliWorld(kFrontMedicCabinLocal), frontT),
-			LerpVec3({ 0.0f, kHalfPi, 0.0f }, medicInsideRot, frontT));
+		// 1. 前方衛生兵：スキッドとドア敷居を飛び越えて開口部中央前方から機内奥へ先導搭乗
+		if (duckFrontMedic_)
+		{
+			const float fMove = EaseInOutCubic(std::clamp(t / kFrontMedicMoveEnd, 0.0f, 1.0f));
+			Vector3 fHeli = LerpVec3(frontStartHeli, kFrontMedicCabinLocal, fMove);
+			if (fHeli.x > kDoorSafeClampXMin && fHeli.x < kDoorSafeClampXMax)
+			{
+				fHeli.z = std::clamp(fHeli.z, kDoorSafeClampZMin, kDoorSafeClampZMax);
+			}
+			fHeli.y = CalcSafeMedicFootYHeli(fHeli.x, frontStartHeli.y);
+			const float hopF = std::fabs(std::sin(t * kPi * kFrontMedicHopFreq)) * kMedicHopAmp * (1.0f - fMove);
+			fHeli.y += hopF;
 
-		const float bedT = EaseInOutCubic(std::clamp((t - kBedLoadStartRatio) / kBedLoadSpanRatio, 0.0f, 1.0f));
-		const float liftArc = std::sin(bedT * kPi) * kBedLoadLiftArcHeight;
-		SetAndUpdateModel(
-			stretcherBed_.get(),
-			LerpVec3(bedStart, LocalToHeliWorld(kStretcherCabinLocal), bedT) + Vector3{ 0.0f, liftArc, 0.0f },
-			LerpVec3({ 0.0f, 0.0f, 0.0f }, stretcherInsideRot, bedT));
+			const float turnF = EaseInOutCubic(std::clamp((t - kFrontMedicTurnStart) / kFrontMedicTurnSpan, 0.0f, 1.0f));
+			const float entryYaw = heliRot_.y - kHalfPi;
+			const float startYaw = kHalfPi;
+			const float midYaw = startYaw + NormalizeAngleDelta(entryYaw, startYaw) * EaseOutQuad(std::clamp(t / kFrontMedicTurnStart, 0.0f, 1.0f));
+			const float frontYaw = midYaw + NormalizeAngleDelta(medicInsideRot.y, midYaw) * turnF;
+			const float frontWaddle = std::sin(t * kPi * kMedicLoadWaddleFreq) * kMedicLoadWaddleAmp * (1.0f - fMove);
 
-		SetAndUpdateModel(
-			duckWounded_.get(),
-			LerpVec3(woundedStart, LocalToHeliWorld(kWoundedCabinLocal), bedT) + Vector3{ 0.0f, liftArc + breath, 0.0f },
-			LerpVec3({ kWoundedPitchTilt, 0.0f, kWoundedSupineRoll }, woundedInsideRot, bedT));
+			SetAndUpdateModel(duckFrontMedic_.get(), LocalToHeliWorld(fHeli), { medicInsideRot.x * turnF, frontYaw, frontWaddle });
+		}
 
-		const float rearT = EaseInOutCubic(std::clamp((t - kRearMedicLoadStartRatio) / kRearMedicLoadSpanRatio, 0.0f, 1.0f));
-		SetAndUpdateModel(
-			duckRearMedic_.get(),
-			LerpVec3(rearStart, LocalToHeliWorld(kRearMedicCabinLocal), rearT),
-			LerpVec3({ 0.0f, kHalfPi, 0.0f }, medicInsideRot, rearT));
+		// 2. 担架ベッド ＆ 負傷アヒル：スキッド手前で開口部と平行へ向きを揃えてから敷居越え高度で滑らかに機内へスライド
+		{
+			const float bedTurnT  = EaseInOutCubic(std::clamp(t / kBedTurnEnd, 0.0f, 1.0f));
+			const float bedSlideT = EaseInOutCubic(std::clamp((t - kBedSlideStart) / kBedSlideSpan, 0.0f, 1.0f));
+
+			Vector3 bedHeli = LerpVec3(bedStartHeli, kStretcherCabinLocal, bedSlideT);
+			const float sillLift = std::sin(bedSlideT * kPi) * kBedSillLiftArc;
+			bedHeli.y += sillLift;
+			if (bedHeli.x > kBedSillGuardXMin && bedHeli.x < kBedSillGuardXMax)
+			{
+				bedHeli.y = (std::max)(bedHeli.y, kBedSillMinHeightY);
+			}
+
+			const Vector3 bedPos = LocalToHeliWorld(bedHeli);
+			const Vector3 bedRot = {
+				stretcherInsideRot.x * bedTurnT,
+				NormalizeAngleDelta(stretcherInsideRot.y, 0.0f) * bedTurnT,
+				stretcherInsideRot.z * bedTurnT
+			};
+
+			SetAndUpdateModel(stretcherBed_.get(), bedPos, bedRot);
+			UpdateWoundedOnStretcher(bedPos, bedRot, breath);
+		}
+
+		// 3. 後方衛生兵：開口部中央寄りを通って担架を機内へ押し込み、キャビン内部へ入ってから枕元奥へ回り込む
+		if (duckRearMedic_)
+		{
+			Vector3 rHeli{};
+			if (t < kRearBoardSplitT)
+			{
+				const float rBoard = EaseInOutCubic(std::clamp((t - kRearBoardStart) / kRearBoardSpan, 0.0f, 1.0f));
+				rHeli = LerpVec3(rearStartHeli, kRearDoorwayInside, rBoard);
+			}
+			else
+			{
+				const float rSeat = EaseInOutCubic(std::clamp((t - kRearBoardSplitT) / kRearSeatSpan, 0.0f, 1.0f));
+				rHeli = LerpVec3(kRearDoorwayInside, kRearMedicCabinLocal, rSeat);
+			}
+
+			if (rHeli.x > kDoorSafeClampXMin && rHeli.x < kDoorSafeClampXMax)
+			{
+				rHeli.z = std::clamp(rHeli.z, kDoorSafeClampZMin, kDoorSafeClampZMax);
+			}
+			rHeli.y = CalcSafeMedicFootYHeli(rHeli.x, rearStartHeli.y);
+			const float hopR = std::fabs(std::sin(t * kPi * kRearMedicHopFreq + kRearMedicHopPhase)) * kMedicHopAmp * (1.0f - EaseInOutCubic(t));
+			rHeli.y += hopR;
+
+			const float pushDirYaw = heliRot_.y - kPi;
+			const float startYaw = kHalfPi;
+			const float approachYaw = startYaw + NormalizeAngleDelta(pushDirYaw, startYaw) * EaseOutQuad(std::clamp(t / kRearApproachTurnEnd, 0.0f, 1.0f));
+			const float faceDoorBlend = EaseInOutCubic(std::clamp((t - kRearFaceDoorStart) / kRearFaceDoorSpan, 0.0f, 1.0f));
+			const float rearYaw = approachYaw + NormalizeAngleDelta(medicInsideRot.y, approachYaw) * faceDoorBlend;
+			const float rearWaddle = -std::sin(t * kPi * kMedicLoadWaddleFreq) * kMedicLoadWaddleAmp * (1.0f - faceDoorBlend);
+
+			SetAndUpdateModel(duckRearMedic_.get(), LocalToHeliWorld(rHeli), { medicInsideRot.x * faceDoorBlend, rearYaw, rearWaddle });
+		}
 	}
-	else
+	else // State::Ready または State::Takeoff（全員ヘリ機内に搭乗し、離陸時の機体ピッチ＆ロールとも完全剛体同期）
 	{
-		SetAndUpdateModel(stretcherBed_.get(), LocalToHeliWorld(kStretcherCabinLocal), stretcherInsideRot);
-		SetAndUpdateModel(duckWounded_.get(), LocalToHeliWorld(kWoundedCabinLocal) + Vector3{ 0.0f, breath, 0.0f }, woundedInsideRot);
+		const Vector3 cabinBedWorld = LocalToHeliWorld(kStretcherCabinLocal);
+		SetAndUpdateModel(stretcherBed_.get(), cabinBedWorld, stretcherInsideRot);
+		UpdateWoundedOnStretcher(cabinBedWorld, stretcherInsideRot, breath);
 		SetAndUpdateModel(duckFrontMedic_.get(), LocalToHeliWorld(kFrontMedicCabinLocal), medicInsideRot);
 		SetAndUpdateModel(duckRearMedic_.get(), LocalToHeliWorld(kRearMedicCabinLocal), medicInsideRot);
 	}

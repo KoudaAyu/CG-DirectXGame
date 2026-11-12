@@ -196,18 +196,39 @@ namespace GameOverSceneTuning
 	constexpr float kDoorOpenLocalX = 1.470f, kDoorSlideDeltaX = 0.015f, kDoorLocalY = 1.14f, kDoorOpenLocalZ = -1.90f;
 	constexpr float kDoorClosedLocalZ = 0.75f;
 
-	constexpr Vector3 kStretcherCabinLocal{ -0.35f, 0.19f, 0.25f }, kWoundedCabinLocal{ -0.35f, 0.30f, 0.25f };
-	constexpr Vector3 kFrontMedicCabinLocal{ 0.35f, 0.105f, 0.55f }, kRearMedicCabinLocal{ 0.35f, 0.105f, -0.15f };
+	// 開放ドアの中央安全窓（X_heli=+3.60：右スキッド外側、Z_heli=+0.82：開口部 [-0.54, +2.10] 中央）および機内最終配置
+	constexpr Vector3 kTeamStopHeliLocal{ 3.60f, 0.0f, 0.82f };
+	constexpr Vector3 kStretcherCabinLocal{ -0.02f, 0.19f, 0.82f };
+	constexpr Vector3 kFrontMedicCabinLocal{ -0.40f, 0.105f, 1.48f };
+	constexpr Vector3 kRearMedicCabinLocal{ -0.36f, 0.105f, -0.32f };
+	constexpr Vector3 kRearDoorwayInside{ 0.68f, 0.105f, 0.28f };
 
-	constexpr float kWoundedPitchTilt = -0.10f, kWoundedSupineRoll = -1.55f, kBreathFreq = 2.8f, kBreathAmp = 0.015f;
+	// 負傷アヒルの担架上剛体配置・呼吸定数
+	constexpr Vector3 kWoundedOnBedLocal{ 0.44f, 0.20f, 0.0f };
+	constexpr float kWoundedLocalRotY = 0.36f, kWoundedLocalRotX = -1.40f;
+	constexpr float kBreathFreq = 2.8f, kBreathAmp = 0.012f;
 
-	constexpr float kWalkPhaseSpeed = 6.5f;
-	constexpr Vector3 kApproachTargetPos{ 1.50f, 0.0f, 1.45f };
-	constexpr float kWalkWaddleAmp = 0.14f, kWalkBobAmp = 0.07f, kMedicCarryOffsetX = 0.95f;
-	constexpr float kStretcherCarryHeightY = 0.24f, kWoundedCarryHeightY = 0.35f;
+	// 歩行搬送（State::Approaching）定数
+	constexpr float kWalkPhaseSpeed = 6.5f, kStrideFadeScale = 0.25f;
+	constexpr float kWalkWaddleAmp = 0.14f, kWalkBobAmp = 0.065f, kBedWaddleRollScale = 0.15f;
+	constexpr float kMedicCarryOffsetX = 0.86f, kStretcherCarryHeightY = 0.24f;
 
-	constexpr float kFrontMedicLoadEndRatio = 0.65f, kBedLoadStartRatio = 0.10f, kBedLoadSpanRatio = 0.80f;
-	constexpr float kBedLoadLiftArcHeight = 0.14f, kRearMedicLoadStartRatio = 0.30f, kRearMedicLoadSpanRatio = 0.70f;
+	// スキッド ＆ ドア敷居跨ぎクリアランス・機内収容（State::Loading）定数
+	constexpr float kSafeFootGroundX = 2.38f, kSafeFootStepUpX = 1.92f, kSafeFootClearHeightY = 0.24f;
+	constexpr float kSafeFootStepDownX = 1.18f, kSafeFootCabinX = 0.72f, kSafeFootCabinFloorY = 0.105f;
+	constexpr float kDoorSafeClampXMin = 1.05f, kDoorSafeClampXMax = 2.15f;
+	constexpr float kDoorSafeClampZMin = -0.05f, kDoorSafeClampZMax = 1.60f;
+
+	constexpr float kFrontMedicMoveEnd = 0.64f, kFrontMedicHopFreq = 4.0f, kMedicHopAmp = 0.06f;
+	constexpr float kFrontMedicTurnStart = 0.36f, kFrontMedicTurnSpan = 0.50f;
+	constexpr float kMedicLoadWaddleFreq = 6.0f, kMedicLoadWaddleAmp = 0.08f;
+
+	constexpr float kBedTurnEnd = 0.42f, kBedSlideStart = 0.08f, kBedSlideSpan = 0.76f;
+	constexpr float kBedSillLiftArc = 0.24f, kBedSillGuardXMin = 0.85f, kBedSillGuardXMax = 2.10f, kBedSillMinHeightY = 0.36f;
+
+	constexpr float kRearBoardSplitT = 0.70f, kRearBoardStart = 0.08f, kRearBoardSpan = 0.62f, kRearSeatSpan = 0.30f;
+	constexpr float kRearMedicHopFreq = 4.5f, kRearMedicHopPhase = 0.6f;
+	constexpr float kRearApproachTurnEnd = 0.40f, kRearFaceDoorStart = 0.68f, kRearFaceDoorSpan = 0.32f;
 
 	// --- 2D 映画的HUD ＆ カラーパレット定数 ---
 	constexpr float kHudEnterDelay = 0.20f, kHudEnterDuration = 0.80f, kLetterboxHeightRatio = 0.065f, kRuleThickness = 1.0f;
