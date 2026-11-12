@@ -25,7 +25,7 @@ namespace GameOverSequenceTuning
 	inline constexpr float kDuckVoiceVolume         = 0.85f;
 	inline constexpr float kBodyCollapseVolume      = 0.78f;
 	inline constexpr float kRifleBounceVolume       = 0.62f;
-	inline constexpr float kBeaconAlarmVolume       = 0.75f;
+	inline constexpr float kBeaconAlarmVolume       = 0.68f;
 	inline constexpr float kHeliDoorVolume          = 0.58f;
 	inline constexpr float kRadioCallVolume         = 0.52f;
 	inline constexpr float kSkipClickVolume         = 0.60f;

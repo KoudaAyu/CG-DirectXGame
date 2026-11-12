@@ -863,7 +863,7 @@ void GameOverSequenceController::Initialize()
 	if (SceneManager::GetInstance() && SceneManager::GetInstance()->GetAudioManager())
 	{
 		auto* am = SceneManager::GetInstance()->GetAudioManager();
-		alarmSoundId_ = am->Load("Resources/Alarm01.wav");
+		TacticalAudio::ResolveSoundId(am, "Resources/Audio/SE_Rescue_Beacon.wav");
 		duckSoundId_ = am->Load("Resources/Audio/SE_Duck.mp3");
 	}
 }
@@ -1829,11 +1829,7 @@ void GameOverSequenceController::Update(float realDeltaTime)
 	if (timer_ >= 0.58f && !alarmTriggered_)
 	{
 		alarmTriggered_ = true;
-		if (SceneManager::GetInstance() && SceneManager::GetInstance()->GetAudioManager())
-		{
-			auto* am = SceneManager::GetInstance()->GetAudioManager();
-			if (alarmSoundId_ >= 0) am->PlayOneShot(alarmSoundId_, kBeaconAlarmVolume);
-		}
+		TacticalAudio::Play2D("Resources/Audio/SE_Rescue_Beacon.wav", kBeaconAlarmVolume);
 	}
 
 	UpdateMotion(simDelta);

@@ -245,7 +245,6 @@ private:
 	float skidDustTimer_ = 0.0f;
 
 	// オーディオID ＆ 空間ループハンドル
-	int32_t alarmSoundId_ = -1;
 	int32_t duckSoundId_ = -1;
 	TacticalAudio::LoopHandle flareHissLoop_{};
 	TacticalAudio::LoopHandle rotorLoop_{};
