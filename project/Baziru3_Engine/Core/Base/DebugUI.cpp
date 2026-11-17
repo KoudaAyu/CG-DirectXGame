@@ -43,7 +43,7 @@ void DebugUI::Update()
     // GPUプロファイル結果を前フレームから回収する
     GpuProfiler::GetInstance()->ResolveResults();
 
-    ImGui::ShowDemoWindow();
+    static bool showImGuiDemoWindow = false; if (showImGuiDemoWindow) { ImGui::ShowDemoWindow(&showImGuiDemoWindow); }
 
     ImGui::Begin("Windows");
 

@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "SubsystemFactory.h"
 #include "RenderContext.h"
@@ -90,6 +90,7 @@ private:
     std::ostream*   logStream_ = nullptr;
     InitConfig      cfg_;
     bool            finalized_ = false;
+    bool            showImGuiOverlay_ = true;
 
     std::unique_ptr<AudioManager>        audioManager_;
     std::unique_ptr<KeyInput>            keyInput_;

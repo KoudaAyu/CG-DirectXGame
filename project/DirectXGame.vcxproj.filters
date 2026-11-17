@@ -121,6 +121,9 @@
     <Filter Include="Engine\Graphics\3D">
       <UniqueIdentifier>{0b7be4c5-c912-70f4-c111-666b8dfd37a9}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Engine\Graphics\3D\Environment">
+      <UniqueIdentifier>{40712d87-4901-625b-37bc-f38f3ff20fea}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Engine\Graphics\3D\Model">
       <UniqueIdentifier>{7ec4a57d-deb2-4366-1352-295f81540db2}</UniqueIdentifier>
     </Filter>
@@ -399,6 +402,15 @@
     <ClCompile Include="Baziru3_Engine\Graphics\2D\Texture\TextureManager.cpp">
       <Filter>Engine\Graphics\2D\Texture</Filter>
     </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Graphics\3D\Environment\FoliageField.cpp">
+      <Filter>Engine\Graphics\3D\Environment</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Graphics\3D\Environment\NatureMeshRenderer.cpp">
+      <Filter>Engine\Graphics\3D\Environment</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Graphics\3D\Environment\WindSystem.cpp">
+      <Filter>Engine\Graphics\3D\Environment</Filter>
+    </ClCompile>
     <ClCompile Include="Baziru3_Engine\Graphics\3D\Model\Model.cpp">
       <Filter>Engine\Graphics\3D\Model</Filter>
     </ClCompile>
@@ -424,6 +436,9 @@
       <Filter>Engine\Graphics\3D\Procedural</Filter>
     </ClCompile>
     <ClCompile Include="Baziru3_Engine\Graphics\3D\Water\River.cpp">
+      <Filter>Engine\Graphics\3D\Water</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Graphics\3D\Water\WaterSurface.cpp">
       <Filter>Engine\Graphics\3D\Water</Filter>
     </ClCompile>
     <ClCompile Include="Baziru3_Engine\Graphics\Graphics\GpuProfiler.cpp">
@@ -749,6 +764,15 @@
     <ClInclude Include="Baziru3_Engine\Graphics\2D\Texture\TextureManager.h">
       <Filter>Engine\Graphics\2D\Texture</Filter>
     </ClInclude>
+    <ClInclude Include="Baziru3_Engine\Graphics\3D\Environment\FoliageField.h">
+      <Filter>Engine\Graphics\3D\Environment</Filter>
+    </ClInclude>
+    <ClInclude Include="Baziru3_Engine\Graphics\3D\Environment\NatureMeshRenderer.h">
+      <Filter>Engine\Graphics\3D\Environment</Filter>
+    </ClInclude>
+    <ClInclude Include="Baziru3_Engine\Graphics\3D\Environment\WindSystem.h">
+      <Filter>Engine\Graphics\3D\Environment</Filter>
+    </ClInclude>
     <ClInclude Include="Baziru3_Engine\Graphics\3D\Model\Model.h">
       <Filter>Engine\Graphics\3D\Model</Filter>
     </ClInclude>
@@ -774,6 +798,9 @@
       <Filter>Engine\Graphics\3D\Procedural</Filter>
     </ClInclude>
     <ClInclude Include="Baziru3_Engine\Graphics\3D\Water\River.h">
+      <Filter>Engine\Graphics\3D\Water</Filter>
+    </ClInclude>
+    <ClInclude Include="Baziru3_Engine\Graphics\3D\Water\WaterSurface.h">
       <Filter>Engine\Graphics\3D\Water</Filter>
     </ClInclude>
     <ClInclude Include="Baziru3_Engine\Graphics\Graphics\GpuProfiler.h">
@@ -832,6 +859,12 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
+    <None Include="Resources\shaders\Botanical.PS.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="Resources\shaders\Botanical.VS.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
     <None Include="Resources\shaders\BoxFilter.PS.hlsl">
       <Filter>Shaders</Filter>
     </None>
@@ -854,6 +887,12 @@
       <Filter>Shaders</Filter>
     </None>
     <None Include="Resources\shaders\GaussianFilter.PS.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="Resources\shaders\GrassBlade.PS.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="Resources\shaders\GrassBlade.VS.hlsl">
       <Filter>Shaders</Filter>
     </None>
     <None Include="Resources\shaders\InitializeParticle.CS.hlsl">
@@ -887,6 +926,12 @@
       <Filter>Shaders</Filter>
     </None>
     <None Include="Resources\shaders\RandomNoise.PS.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="Resources\shaders\RealisticWater.PS.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="Resources\shaders\RealisticWater.VS.hlsl">
       <Filter>Shaders</Filter>
     </None>
     <None Include="Resources\shaders\Skinning.CS.hlsl">

@@ -1,4 +1,4 @@
-#include "EngineContext.h"
+﻿#include "EngineContext.h"
 
 #include <future>
 #include <iostream>
@@ -109,6 +109,7 @@ bool EngineContext::Initialize(std::ostream &log, const InitConfig &cfg) {
   // SceneManager への参照設定（エンジン内部ですべて解決し、アプリケーション側の手動設定を不要にする）
   SceneManager::GetInstance()->Initialize(res_.directXCom.get());
   SceneManager::GetInstance()->SetFadeApplication(fade_.get());
+  SceneManager::GetInstance()->SetOffScreenRendering(offScreenRendering_.get());
   SceneManager::GetInstance()->SetAudioManager(audioManager_.get());
   SceneManager::GetInstance()->SetParticleManager(particleManager_.get());
   SceneManager::GetInstance()->SetCamera(camera_.get());
@@ -205,6 +206,7 @@ void EngineContext::Finalize() {
 
   if (SceneManager::GetInstance()) {
     SceneManager::GetInstance()->SetFadeApplication(nullptr);
+    SceneManager::GetInstance()->SetOffScreenRendering(nullptr);
     SceneManager::GetInstance()->SetAudioManager(nullptr);
     SceneManager::GetInstance()->SetParticleManager(nullptr);
     SceneManager::GetInstance()->SetCamera(nullptr);
@@ -248,6 +250,7 @@ void EngineContext::Update() {
     camera_->Update();
   if (skybox_)
     skybox_->Update();
+if (GetAsyncKeyState(VK_F1) & 0x0001) { showImGuiOverlay_ = !showImGuiOverlay_; }
 #ifdef USE_IMGUI
   if (imguiManager_)
     imguiManager_->Update();
@@ -385,7 +388,17 @@ void EngineContext::EndFrame() {
 #ifdef USE_IMGUI
   if (imguiManager_) {
     imguiManager_->Render();
-    ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), dx->GetCommandList().Get());
+    ImDrawData* drawData = ImGui::GetDrawData();
+    if (drawData && drawData->Textures != nullptr) {
+      for (ImTextureData* tex : *drawData->Textures) {
+        if (tex && tex->Status != ImTextureStatus_OK) {
+          ImGui_ImplDX12_UpdateTexture(tex);
+        }
+      }
+    }
+    if (showImGuiOverlay_ && drawData) {
+      ImGui_ImplDX12_RenderDrawData(drawData, dx->GetCommandList().Get());
+    }
   }
 #endif
 

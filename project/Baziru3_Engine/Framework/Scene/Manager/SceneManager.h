@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include <iostream>
 #include "AbstractSceneFactory.h"
 #include "SceneFactory.h"
@@ -25,6 +25,7 @@ class AudioManager;
 class SkyBox;
 class SkyboxCom;
 class Fade;
+class OffScreenRendering;
 struct ID3D12GraphicsCommandList;
 struct SceneRenderRequests;
 
@@ -90,6 +91,9 @@ public:
 
     void SetFadeApplication(Fade* fade) { fadeApplication_ = fade; }
     [[nodiscard]] Fade* GetFadeApplication() const { return fadeApplication_; }
+
+    void SetOffScreenRendering(OffScreenRendering* offScreen) { offScreenRendering_ = offScreen; }
+    [[nodiscard]] OffScreenRendering* GetOffScreenRendering() const { return offScreenRendering_; }
 
     void SetAudioManager(AudioManager* audioManager) { audioManager_ = audioManager; }
     [[nodiscard]] AudioManager* GetAudioManager() const { return audioManager_; }
@@ -269,6 +273,7 @@ private:
     uint32_t             skyboxTextureIndex_  = 0;
     bool                 showSkybox_          = true;
     Fade*                fadeApplication_     = nullptr;
+    OffScreenRendering*  offScreenRendering_  = nullptr;
 
     std::unordered_map<std::string, std::string> sceneContextData_;
     std::unordered_map<std::string, std::any>    sceneAnyData_;

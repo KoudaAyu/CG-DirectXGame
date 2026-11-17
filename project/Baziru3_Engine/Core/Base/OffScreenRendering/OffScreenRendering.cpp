@@ -1,8 +1,9 @@
-#include "OffScreenRendering.h"
+﻿#include "OffScreenRendering.h"
 
 #include "Log.h"
 
 #include <cassert>
+#include <cstring>
 #include <format>
 
 OffScreenRendering::OffScreenRendering(std::ostream& logStream, DirectXCom* dxCommon)
@@ -31,29 +32,24 @@ void OffScreenRendering::Initialize(
 
 void OffScreenRendering::Finalize()
 {
-    if (srvIndex_ != TextureManager::kInvalidTextureIndex)
-    {
-        if (auto* textureManager = TextureManager::GetInstance())
+    auto freeSrv = [](uint32_t& idx) {
+        if (idx != TextureManager::kInvalidTextureIndex)
         {
-            if (auto* srvManager = textureManager->GetSRVManager())
+            if (auto* textureManager = TextureManager::GetInstance())
             {
-                srvManager->Free(srvIndex_);
+                if (auto* srvManager = textureManager->GetSRVManager())
+                {
+                    srvManager->Free(idx);
+                }
             }
+            idx = TextureManager::kInvalidTextureIndex;
         }
-        srvIndex_ = TextureManager::kInvalidTextureIndex;
-    }
+    };
 
-    if (depthSrvIndex_ != TextureManager::kInvalidTextureIndex)
-    {
-        if (auto* textureManager = TextureManager::GetInstance())
-        {
-            if (auto* srvManager = textureManager->GetSRVManager())
-            {
-                srvManager->Free(depthSrvIndex_);
-            }
-        }
-        depthSrvIndex_ = TextureManager::kInvalidTextureIndex;
-    }
+    freeSrv(srvIndex_);
+    freeSrv(depthSrvIndex_);
+    freeSrv(refractionColorSrvIndex_);
+    freeSrv(refractionDepthSrvIndex_);
 
     if (inverseProjectionBuffer_)
     {
@@ -80,11 +76,17 @@ void OffScreenRendering::Finalize()
     vertexShaderBlob_.Reset();
     offScreenTexture_.Reset();
     depthStencilResource_.Reset();
+    refractionColorTexture_.Reset();
+    refractionDepthTexture_.Reset();
     rtvDescriptorHeap_.Reset();
     dsvDescriptorHeap_.Reset();
     srvHandleGPU_ = {};
     depthSrvHandleGPU_ = {};
+    refractionColorSrvHandleGPU_ = {};
+    refractionDepthSrvHandleGPU_ = {};
     currentState_ = D3D12_RESOURCE_STATE_RENDER_TARGET;
+    refractionColorState_ = D3D12_RESOURCE_STATE_RENDER_TARGET;
+    refractionDepthState_ = D3D12_RESOURCE_STATE_DEPTH_WRITE;
 }
 
 void OffScreenRendering::Begin(ID3D12GraphicsCommandList* commandList)
@@ -93,12 +95,128 @@ void OffScreenRendering::Begin(ID3D12GraphicsCommandList* commandList)
 
     TransitionToRenderTarget(commandList);
 
+    // 初回フレーム等で屈折用スナップショットが初期状態のままなら PIXEL_SHADER_RESOURCE に遷移しておく
+    D3D12_RESOURCE_BARRIER initBarriers[2]{};
+    UINT barrierCount = 0;
+    if (refractionColorTexture_ && refractionColorState_ != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE)
+    {
+        initBarriers[barrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        initBarriers[barrierCount].Transition.pResource = refractionColorTexture_.Get();
+        initBarriers[barrierCount].Transition.StateBefore = refractionColorState_;
+        initBarriers[barrierCount].Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+        initBarriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        refractionColorState_ = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+        ++barrierCount;
+    }
+    if (refractionDepthTexture_ && refractionDepthState_ != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE)
+    {
+        initBarriers[barrierCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        initBarriers[barrierCount].Transition.pResource = refractionDepthTexture_.Get();
+        initBarriers[barrierCount].Transition.StateBefore = refractionDepthState_;
+        initBarriers[barrierCount].Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+        initBarriers[barrierCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        refractionDepthState_ = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+        ++barrierCount;
+    }
+    if (barrierCount > 0)
+    {
+        commandList->ResourceBarrier(barrierCount, initBarriers);
+    }
+
     commandList->OMSetRenderTargets(1, &rtvHandle_, false, &dsvHandle_);
     commandList->ClearRenderTargetView(rtvHandle_, &clearColor_.x, 0, nullptr);
     commandList->ClearDepthStencilView(dsvHandle_, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
     commandList->RSSetViewports(1, &dxCommon_->GetViewport());
     commandList->RSSetScissorRects(1, &dxCommon_->GetScissorRect());
 
+    ID3D12DescriptorHeap* descriptorHeaps[] = { dxCommon_->GetSrvDescriptorHeap().Get() };
+    commandList->SetDescriptorHeaps(1, descriptorHeaps);
+}
+
+void OffScreenRendering::CaptureSceneSnapshot(ID3D12GraphicsCommandList* commandList)
+{
+    if (!commandList || !offScreenTexture_ || !depthStencilResource_ || !refractionColorTexture_ || !refractionDepthTexture_)
+    {
+        return;
+    }
+
+    D3D12_RESOURCE_BARRIER preCopy[4]{};
+    UINT preCount = 0;
+
+    if (currentState_ != D3D12_RESOURCE_STATE_COPY_SOURCE)
+    {
+        preCopy[preCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        preCopy[preCount].Transition.pResource = offScreenTexture_.Get();
+        preCopy[preCount].Transition.StateBefore = currentState_;
+        preCopy[preCount].Transition.StateAfter = D3D12_RESOURCE_STATE_COPY_SOURCE;
+        preCopy[preCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        ++preCount;
+    }
+    preCopy[preCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+    preCopy[preCount].Transition.pResource = depthStencilResource_.Get();
+    preCopy[preCount].Transition.StateBefore = D3D12_RESOURCE_STATE_DEPTH_WRITE;
+    preCopy[preCount].Transition.StateAfter = D3D12_RESOURCE_STATE_COPY_SOURCE;
+    preCopy[preCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+    ++preCount;
+
+    if (refractionColorState_ != D3D12_RESOURCE_STATE_COPY_DEST)
+    {
+        preCopy[preCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        preCopy[preCount].Transition.pResource = refractionColorTexture_.Get();
+        preCopy[preCount].Transition.StateBefore = refractionColorState_;
+        preCopy[preCount].Transition.StateAfter = D3D12_RESOURCE_STATE_COPY_DEST;
+        preCopy[preCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        ++preCount;
+    }
+    if (refractionDepthState_ != D3D12_RESOURCE_STATE_COPY_DEST)
+    {
+        preCopy[preCount].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        preCopy[preCount].Transition.pResource = refractionDepthTexture_.Get();
+        preCopy[preCount].Transition.StateBefore = refractionDepthState_;
+        preCopy[preCount].Transition.StateAfter = D3D12_RESOURCE_STATE_COPY_DEST;
+        preCopy[preCount].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        ++preCount;
+    }
+
+    commandList->ResourceBarrier(preCount, preCopy);
+
+    commandList->CopyResource(refractionColorTexture_.Get(), offScreenTexture_.Get());
+    commandList->CopyResource(refractionDepthTexture_.Get(), depthStencilResource_.Get());
+
+    D3D12_RESOURCE_BARRIER postCopy[4]{};
+    postCopy[0].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+    postCopy[0].Transition.pResource = offScreenTexture_.Get();
+    postCopy[0].Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_SOURCE;
+    postCopy[0].Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
+    postCopy[0].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+
+    postCopy[1].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+    postCopy[1].Transition.pResource = depthStencilResource_.Get();
+    postCopy[1].Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_SOURCE;
+    postCopy[1].Transition.StateAfter = D3D12_RESOURCE_STATE_DEPTH_WRITE;
+    postCopy[1].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+
+    postCopy[2].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+    postCopy[2].Transition.pResource = refractionColorTexture_.Get();
+    postCopy[2].Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
+    postCopy[2].Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+    postCopy[2].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+
+    postCopy[3].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+    postCopy[3].Transition.pResource = refractionDepthTexture_.Get();
+    postCopy[3].Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
+    postCopy[3].Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+    postCopy[3].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+
+    commandList->ResourceBarrier(4, postCopy);
+
+    currentState_ = D3D12_RESOURCE_STATE_RENDER_TARGET;
+    refractionColorState_ = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+    refractionDepthState_ = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+
+    commandList->OMSetRenderTargets(1, &rtvHandle_, false, &dsvHandle_);
+    commandList->RSSetViewports(1, &dxCommon_->GetViewport());
+    commandList->RSSetScissorRects(1, &dxCommon_->GetScissorRect());
     ID3D12DescriptorHeap* descriptorHeaps[] = { dxCommon_->GetSrvDescriptorHeap().Get() };
     commandList->SetDescriptorHeaps(1, descriptorHeaps);
 }
@@ -127,7 +245,6 @@ void OffScreenRendering::DrawToBackBuffer(ID3D12GraphicsCommandList* commandList
     assert(srvHandleGPU_.ptr != 0);
     assert(depthSrvHandleGPU_.ptr != 0);
 
-    // Transition depth buffer resource barrier: WRITE -> PIXEL_SHADER_RESOURCE
     D3D12_RESOURCE_BARRIER barrier{};
     barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
     barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
@@ -154,7 +271,6 @@ void OffScreenRendering::DrawToBackBuffer(ID3D12GraphicsCommandList* commandList
     }
     commandList->DrawInstanced(3, 1, 0, 0);
 
-    // Transition depth buffer resource barrier back: PIXEL_SHADER_RESOURCE -> WRITE
     barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
     barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_DEPTH_WRITE;
     commandList->ResourceBarrier(1, &barrier);
@@ -172,7 +288,6 @@ ID3D12Resource* OffScreenRendering::GetTextureResource() const
 
 void OffScreenRendering::CreateRootSignature()
 {
-    // Color Texture (t0)
     descriptorRange_[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
     descriptorRange_[0].NumDescriptors = 1;
     descriptorRange_[0].BaseShaderRegister = 0;
@@ -184,7 +299,6 @@ void OffScreenRendering::CreateRootSignature()
     rootParameters_[0].DescriptorTable.pDescriptorRanges = &descriptorRange_[0];
     rootParameters_[0].DescriptorTable.NumDescriptorRanges = 1;
 
-    // Depth Texture (t1)
     descriptorRange_[1].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
     descriptorRange_[1].NumDescriptors = 1;
     descriptorRange_[1].BaseShaderRegister = 1;
@@ -196,19 +310,16 @@ void OffScreenRendering::CreateRootSignature()
     rootParameters_[1].DescriptorTable.pDescriptorRanges = &descriptorRange_[1];
     rootParameters_[1].DescriptorTable.NumDescriptorRanges = 1;
 
-    // Constant Buffer (b0) - RadialBlur
     rootParameters_[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
     rootParameters_[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
     rootParameters_[2].Descriptor.ShaderRegister = 0;
     rootParameters_[2].Descriptor.RegisterSpace = 0;
 
-    // Constant Buffer (b1) - ProjectionMatrix
     rootParameters_[3].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
     rootParameters_[3].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
     rootParameters_[3].Descriptor.ShaderRegister = 1;
     rootParameters_[3].Descriptor.RegisterSpace = 0;
 
-    // Sampler (s0) - Linear
     staticSamplers_[0].Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
     staticSamplers_[0].AddressU = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
     staticSamplers_[0].AddressV = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
@@ -218,7 +329,6 @@ void OffScreenRendering::CreateRootSignature()
     staticSamplers_[0].ShaderRegister = 0;
     staticSamplers_[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 
-    // Sampler (s1) - Point
     staticSamplers_[1].Filter = D3D12_FILTER_MIN_MAG_MIP_POINT;
     staticSamplers_[1].AddressU = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
     staticSamplers_[1].AddressV = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
@@ -399,7 +509,6 @@ void OffScreenRendering::CreateRenderTargets()
     srvManager->CreateSRVForTexture2D(srvIndex_, offScreenTexture_.Get(), format_, 1);
     srvHandleGPU_ = srvManager->GetGPUDescriptorHandle(srvIndex_);
 
-    // Create Depth SRV (Format: DXGI_FORMAT_R24_UNORM_X8_TYPELESS)
     depthSrvIndex_ = srvManager->Allocate();
     D3D12_SHADER_RESOURCE_VIEW_DESC depthTextureSrvDesc{};
     depthTextureSrvDesc.Format = DXGI_FORMAT_R24_UNORM_X8_TYPELESS;
@@ -411,6 +520,24 @@ void OffScreenRendering::CreateRenderTargets()
         &depthTextureSrvDesc,
         srvManager->GetCPUDescriptorHandle(depthSrvIndex_));
     depthSrvHandleGPU_ = srvManager->GetGPUDescriptorHandle(depthSrvIndex_);
+
+    // 水面屈折・水深透過用のスナップショットテクスチャ（Color & Depth 同一リソース構造）
+    refractionColorTexture_ = renderTexture_.CreateRenderTargetTexture(
+        dxCommon_->GetDevice(), width_, height_, format_, clearColor_);
+    refractionColorState_ = D3D12_RESOURCE_STATE_RENDER_TARGET;
+    refractionColorSrvIndex_ = srvManager->Allocate();
+    srvManager->CreateSRVForTexture2D(refractionColorSrvIndex_, refractionColorTexture_.Get(), format_, 1);
+    refractionColorSrvHandleGPU_ = srvManager->GetGPUDescriptorHandle(refractionColorSrvIndex_);
+
+    refractionDepthTexture_ = dxCommon_->CreateDepthStencilTextureResource(
+        dxCommon_->GetDevice(), static_cast<int32_t>(width_), static_cast<int32_t>(height_));
+    refractionDepthState_ = D3D12_RESOURCE_STATE_DEPTH_WRITE;
+    refractionDepthSrvIndex_ = srvManager->Allocate();
+    dxCommon_->GetDevice()->CreateShaderResourceView(
+        refractionDepthTexture_.Get(),
+        &depthTextureSrvDesc,
+        srvManager->GetCPUDescriptorHandle(refractionDepthSrvIndex_));
+    refractionDepthSrvHandleGPU_ = srvManager->GetGPUDescriptorHandle(refractionDepthSrvIndex_);
 
     // Create Constant Buffer for inverseProjection matrix
     D3D12_HEAP_PROPERTIES uploadHeapProperties{};
@@ -439,7 +566,6 @@ void OffScreenRendering::CreateRenderTargets()
     dxCommon_->SetHr(inverseProjectionBuffer_->Map(0, nullptr, &inverseProjectionMap_));
     assert(SUCCEEDED(dxCommon_->GetHr()));
 
-    // Create Constant Buffer for RadialBlur parameters
     D3D12_RESOURCE_DESC radialBlurBufferDesc{};
     radialBlurBufferDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
     radialBlurBufferDesc.Width = (sizeof(RadialBlurData) + 255) & ~255;
