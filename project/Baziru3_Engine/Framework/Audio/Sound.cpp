@@ -85,7 +85,10 @@ bool Sound::LoadFileToSoundData(const std::string& filename, SoundData& out)
 	std::wstring filePathW = StringUtil::ConvertString(filename);
 	Microsoft::WRL::ComPtr<IMFSourceReader> pReader;
 	HRESULT hr = MFCreateSourceReaderFromURL(filePathW.c_str(), nullptr, &pReader);
-	assert(SUCCEEDED(hr));
+	if (FAILED(hr))
+	{
+		return false;
+	}
 
 	Microsoft::WRL::ComPtr<IMFMediaType> pPCMType;
 	MFCreateMediaType(&pPCMType);

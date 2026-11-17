@@ -1,5 +1,4 @@
-#include "Game.h"
-#include "Application/Scene/GameScene/GamePlayScene.h"
+﻿#include "Game.h"
 #include "Baziru3_Engine/Core/Base/Pipeline/PipelineStateManager.h"
 #include "DebugUI.h"
 #include <future>
@@ -80,7 +79,7 @@ void Game::Initialize() {
 
   // シーン登録と初期シーン設定
   SceneRegistration::RegisterScenes();
-  SceneManager::GetInstance()->ChangeScene("TITLE");
+  SceneManager::GetInstance()->ChangeScene("DEFAULT");
 
   // テクスチャ読み込み
   textureIndexUvChecker =

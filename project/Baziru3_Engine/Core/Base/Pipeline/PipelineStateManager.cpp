@@ -559,6 +559,13 @@ void PipelineStateManager::CreateObject3dPipelines(DirectXCom* dxCommon)
 
 void PipelineStateManager::CreateSlimePipelines(DirectXCom* dxCommon)
 {
+	// シェーダーファイルが存在しないプロジェクト（Escape_from等）ではスキップ
+	if (!std::filesystem::exists("Resources/shaders/Slime.VS.hlsl") ||
+	    !std::filesystem::exists("Resources/shaders/Slime.PS.hlsl"))
+	{
+		return;
+	}
+
 	// 1. スライム専用ルートシグネチャの作成
 	D3D12_DESCRIPTOR_RANGE descriptorRange[2]{};
 	descriptorRange[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;

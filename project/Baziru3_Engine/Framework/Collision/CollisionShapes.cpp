@@ -138,7 +138,7 @@ namespace CollisionShapes
             ld = { ld.x, ld.y * cosP - ld.z * sinP, ld.y * sinP + ld.z * cosP };
             ld = { ld.x * cosY + ld.z * sinY, ld.y, -ld.x * sinY + ld.z * cosY };
 
-            bool isSoftBody = (col.attribute == CollisionAttribute::Player || col.attribute == CollisionAttribute::Minion);
+            bool isSoftBody = (col.attribute == CollisionAttribute::Minion);
             if (isSoftBody && col.shape.radius > 0.001f)
             {
                 Vector3 unitLd = Normalize(ld);

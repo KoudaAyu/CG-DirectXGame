@@ -78,7 +78,7 @@ namespace CollisionDebugDraw
             }
 
             ImU32 colColor = ImGui::ColorConvertFloat4ToU32({ 1.0f, 1.0f, 1.0f, 0.85f });
-            if (col->GetAttribute() == CollisionAttribute::Minion || (col->GetAttribute() == CollisionAttribute::Player && col->GetType() == ColliderType::Sphere && static_cast<SphereCollider*>(col)->GetRadius() <= 0.45f))
+            if (col->GetAttribute() == CollisionAttribute::Minion)
             {
                 colColor = ImGui::ColorConvertFloat4ToU32({ 1.0f, 0.5f, 0.1f, 0.95f }); // Minions
             }
@@ -111,7 +111,7 @@ namespace CollisionDebugDraw
                 float cosY = std::cos(rot.y), sinY = std::sin(rot.y);
                 float cosR = std::cos(rot.z), sinR = std::sin(rot.z);
 
-                bool isSoftBody = (col->GetAttribute() == CollisionAttribute::Player || col->GetAttribute() == CollisionAttribute::Minion);
+                bool isSoftBody = (col->GetAttribute() == CollisionAttribute::Minion);
 
                 auto transformLocal = [&](const Vector3& local) -> Vector3 {
                     Vector3 deformed = local;

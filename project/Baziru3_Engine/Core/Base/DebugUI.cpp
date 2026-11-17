@@ -1,4 +1,4 @@
-#include "DebugUI.h"
+﻿#include "DebugUI.h"
 #include "ParticleManager.h"
 #include "ParticleEmitter.h"
 #include "MaterialManager.h"
@@ -7,7 +7,6 @@
 #include "SceneManager.h"
 #include "OffScreenRendering.h"
 #include "ParticleManager.h"
-#include "Application/Scene/GameScene/GamePlayScene.h"
 #include "BehaviorTreeEditor.h"
 #include "GpuProfiler.h"
 #include "Baziru3_Engine/Framework/Collision/CollisionManager.h"
@@ -15,7 +14,9 @@
 #include "Baziru3_Engine/Core/Base/Allocator/StackAllocator.h"
 #include "DirectXCom.h"
 #include "Light.h"
+#ifdef USE_IMGUI
 #include <imgui.h>
+#endif
 
 
 DebugUI::DebugUI(MaterialManager* materialManager, SpriteManager* spriteManager, Camera* camera,
@@ -318,7 +319,7 @@ void DebugUI::Update()
             ImGui::Text("Active Count: %u particles", activeCount);
             ImGui::ProgressBar(static_cast<float>(activeCount) / 10240.0f, ImVec2(0.0f, 0.0f), "Spawn Load");
 
-            // エミッター設定は GamePlayScene 内の ImGui パネルで管理
+            // エミッター設定は 各シーン側の ImGui パネル等で管理
         }
         else
         {

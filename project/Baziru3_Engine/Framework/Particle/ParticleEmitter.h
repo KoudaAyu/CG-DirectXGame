@@ -1,5 +1,6 @@
 #pragma once
 #include "Transform.h"
+#include "Vector.h"
 #include <cstdint>
 #include <list>
 #include <random>
