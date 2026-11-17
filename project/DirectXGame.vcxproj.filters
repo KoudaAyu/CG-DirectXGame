@@ -1,492 +1,935 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <Filter Include="ソース ファイル">
-      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
-      <Extensions>cpp;c;cc;cxx;c++;cppm;ixx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    <Filter Include="App">
+      <UniqueIdentifier>{19b5bd50-ae75-7a7c-08c1-aa3f5103aeeb}</UniqueIdentifier>
     </Filter>
-    <Filter Include="ヘッダー ファイル">
-      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
-      <Extensions>h;hh;hpp;hxx;h++;hm;inl;inc;ipp;xsd</Extensions>
+    <Filter Include="Engine">
+      <UniqueIdentifier>{2a0696f5-bcd2-ec6c-3a15-0b682e81d704}</UniqueIdentifier>
     </Filter>
-    <Filter Include="リソース ファイル">
-      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
-      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    <Filter Include="Engine\Core">
+      <UniqueIdentifier>{98f1a244-8a4e-f3a0-9ac9-97f80bd0cf88}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Core\Base">
+      <UniqueIdentifier>{66614750-0242-8545-9c0b-015aa56ff60e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Core\Base\Allocator">
+      <UniqueIdentifier>{b09c79c7-f205-9a21-30dd-af6f46cad08a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Core\Base\ImGui">
+      <UniqueIdentifier>{cdcb9cbb-fee8-6598-b8d1-6c57a567d99b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Core\Base\Log">
+      <UniqueIdentifier>{80aedabb-5bd8-1c46-4a59-ed2f2ef13aac}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Core\Base\OffScreenRendering">
+      <UniqueIdentifier>{9690f130-11f4-ad80-67e0-c18ae4d445c2}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Core\Base\Pipeline">
+      <UniqueIdentifier>{b886d03e-52ef-6c16-e012-45236b9d72e5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Core\Base\Srv">
+      <UniqueIdentifier>{460d70dd-fa3e-7ffe-2916-444b1e27dfad}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Core\Base\Windows">
+      <UniqueIdentifier>{b97028dc-e904-4614-14bb-a6fcc139e96f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Core\Camera">
+      <UniqueIdentifier>{94c4fd29-8db3-ce1a-7262-290c337c33b8}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Core\Camera\DebugCamera">
+      <UniqueIdentifier>{f3475e70-ee43-41ee-20c5-aae209488345}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Core\IO">
+      <UniqueIdentifier>{1227206f-30c1-b5c0-3907-30c64f868b52}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Core\IO\Mouse">
+      <UniqueIdentifier>{3af65fca-a8cb-3ebb-fad5-6566d51935ae}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Core\Math">
+      <UniqueIdentifier>{36483ed0-9b52-61b5-89a0-247054a5739c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Core\Platform">
+      <UniqueIdentifier>{ac4315bb-dd2f-58a9-b8e7-9660809efefb}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Core\Platform\Windows">
+      <UniqueIdentifier>{67baa4d8-6d77-ae97-bf10-cc360c9212da}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Framework">
+      <UniqueIdentifier>{517be8ef-33d4-674e-760e-5e721f14391b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Framework\AI">
+      <UniqueIdentifier>{b0e6388f-9770-ddcb-02c5-b12d06f6d637}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Framework\Animation">
+      <UniqueIdentifier>{a04fcfc9-392d-0573-2b39-00c6fcc5e96b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Framework\Animation\Joint">
+      <UniqueIdentifier>{509dcb14-9599-1195-6adb-732a54ece4a7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Framework\Animation\Keyframe">
+      <UniqueIdentifier>{a9081dc5-6fc7-3659-516d-fab7506a4876}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Framework\Animation\NodeAnimation">
+      <UniqueIdentifier>{725a3d92-87a2-7668-0d9e-a78f2232a1ed}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Framework\Animation\Skeleton">
+      <UniqueIdentifier>{6e2a69f5-1ca9-107b-241c-45c46df8c961}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Framework\Audio">
+      <UniqueIdentifier>{50f8e8b0-a2cf-4e53-244a-12755086d7f2}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Framework\Collision">
+      <UniqueIdentifier>{629eb1d3-2f73-16e1-6d54-8b65d45d4f0c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Framework\Command">
+      <UniqueIdentifier>{a5e36a50-2536-f996-3f12-2c6e878e7aae}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Framework\Effect">
+      <UniqueIdentifier>{0d5a4036-9353-127a-57ac-222179550c11}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Framework\IO">
+      <UniqueIdentifier>{3bbfc34c-3e78-c486-efdb-368bf61f1c94}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Framework\Particle">
+      <UniqueIdentifier>{bfc6252c-ac96-081e-626d-6fa00e352876}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Framework\Scene">
+      <UniqueIdentifier>{f4d1f465-5670-57e0-b59f-51dab401cc28}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Framework\Scene\Factory">
+      <UniqueIdentifier>{3e224253-13c7-fe15-5f40-ca9c16f6e2f8}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Framework\Scene\Manager">
+      <UniqueIdentifier>{8d87b842-6235-2304-2b4f-1c596f77e512}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Framework\Spline">
+      <UniqueIdentifier>{39881a0d-8d65-4908-a4df-1aaebb7c5960}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Graphics">
+      <UniqueIdentifier>{5f1198d4-4c49-ed62-699c-3542585aff88}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Graphics\2D">
+      <UniqueIdentifier>{05d2ec6c-b823-4487-fff7-70554f0f5003}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Graphics\2D\Sprite">
+      <UniqueIdentifier>{e552b235-fd5b-cce4-a430-a4ab2dd10d31}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Graphics\2D\Texture">
+      <UniqueIdentifier>{32d9f0c9-b354-0b53-045a-dfa1292893ae}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Graphics\3D">
+      <UniqueIdentifier>{0b7be4c5-c912-70f4-c111-666b8dfd37a9}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Graphics\3D\Model">
+      <UniqueIdentifier>{7ec4a57d-deb2-4366-1352-295f81540db2}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Graphics\3D\Model\SkinCluster">
+      <UniqueIdentifier>{f93cdd78-bd0f-1de4-d5ec-341118688794}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Graphics\3D\Object">
+      <UniqueIdentifier>{9ff62560-6c1b-a1ab-a969-98cd7237179e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Graphics\3D\Procedural">
+      <UniqueIdentifier>{1ff7e39e-bba4-1e37-611b-8b859a724371}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Graphics\3D\Water">
+      <UniqueIdentifier>{26237b24-224f-e6d7-d903-3e71d42a2421}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Graphics\Graphics">
+      <UniqueIdentifier>{83232a39-4d76-f6b5-dcd8-725890b56dbc}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Graphics\Graphics\Material">
+      <UniqueIdentifier>{a4628ac3-46bb-024f-5afc-b66cf18dec4c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Graphics\Graphics\Particle">
+      <UniqueIdentifier>{71824a0d-30dd-860f-6f3d-cde64d872058}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Graphics\Graphics\Sphere">
+      <UniqueIdentifier>{b32f07b0-7dd9-e3c2-541f-bb012e7c5014}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Graphics\Light">
+      <UniqueIdentifier>{a0b357c5-6d3d-b6e4-819a-ea848e9a1b4b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Graphics\Primitive">
+      <UniqueIdentifier>{f85e20a0-bf7e-2f5e-28d2-a67a8a3705b2}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Graphics\Primitive\Cylinder">
+      <UniqueIdentifier>{4585ed42-fc72-0a9b-aaa4-bd7bdf325fe7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Graphics\Shapes">
+      <UniqueIdentifier>{5b5f137b-9fd9-52a9-a16c-2a5b4165e6d4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Graphics\Shapes\Sphere">
+      <UniqueIdentifier>{3f8afbb2-4ce4-53de-38ec-95057d6e9287}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Graphics\SkyBox">
+      <UniqueIdentifier>{b72d8c34-96bf-4bab-ca6f-8eb4c817b8ae}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Externals">
+      <UniqueIdentifier>{4f1f0844-1000-c5cc-9f3e-e73c98694055}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Externals\imgui-node-editor">
+      <UniqueIdentifier>{3becd140-5e20-1132-7289-95e000bab14f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shaders">
+      <UniqueIdentifier>{3723af03-506e-7584-6178-d6019f16e657}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Baziru3_Engine\Core\Camera\DebugCamera\DebugCamera.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="Baziru3_Engine\Core\Base\DirectXCom.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="Baziru3_Engine\Graphics\2D\Sprite\Sprite.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="Baziru3_Engine\Graphics\2D\Sprite\SpriteCom.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="Baziru3_Engine\Graphics\2D\Texture\TextureManager.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="Baziru3_Engine\Core\Base\Transform.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="Baziru3_Engine\Core\Camera\Camera.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="Baziru3_Engine\Graphics\3D\Object\Object3d.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="Baziru3_Engine\Graphics\3D\Object\Object3dCom.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="Baziru3_Engine\Core\Base\KeyInput.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="Baziru3_Engine\Core\Base\Matrix4x4.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="Baziru3_Engine\Core\Base\Log\Log.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="main.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="Baziru3_Engine\Core\Base\ResourceLeakCheck.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="Baziru3_Engine\Framework\Audio\Sound.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="Baziru3_Engine\Core\Base\StringUtil.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="Baziru3_Engine\Core\Base\Windows\WindowsAPI.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="Baziru3_Engine\Graphics\3D\Model\ModelCom.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="Baziru3_Engine\Graphics\3D\Model\Model.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="Baziru3_Engine\Graphics\3D\Model\ModelManager.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="Baziru3_Engine\Core\Base\Srv\SRVManager.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="Baziru3_Engine\Framework\Particle\ParticleManager.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="Baziru3_Engine\Framework\Particle\ParticleEmitter.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="Baziru3_Engine\Core\Math\Random.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-
-    <ClCompile Include="Baziru3_Engine\Core\Base\ImGui\ImGuiManager.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="Game.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="Baziru3_Engine\Core\Platform\Windows\CrashDump.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="Baziru3_Engine\Graphics\Shapes\Sphere\Sphere.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="Baziru3_Engine\Framework\Framework.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="Baziru3_Engine\Graphics\Light\Light.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="Baziru3_Engine\Graphics\Graphics\Material\MaterialManager.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="Baziru3_Engine\Framework\Scene\BaseScene.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="Baziru3_Engine\Framework\Scene\Manager\SceneManager.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="Baziru3_Engine\Framework\Scene\Factory\AbstractSceneFactory.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="Baziru3_Engine\Framework\Scene\Factory\SceneFactory.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="Baziru3_Engine\Framework\Scene\Factory\SceneRegistration.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="Baziru3_Engine\Framework\Scene\EngineDefaultScene.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="Baziru3_Engine\Graphics\2D\Sprite\SpriteManager.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="Baziru3_Engine\Framework\Collision\SoftBodyDeformer.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="Baziru3_Engine\Framework\Collision\CollisionShapes.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="Baziru3_Engine\Framework\Collision\CollisionDebugDraw.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="Baziru3_Engine\Framework\Audio\AudioManager.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="Baziru3_Engine\Core\Base\DebugUI.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="Baziru3_Engine\Core\Base\SubsystemFactory.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="Baziru3_Engine\Framework\Collision\CollisionManager.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="Baziru3_Engine\Framework\Collision\Collider.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="Baziru3_Engine\Framework\Collision\AABBTree.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="Baziru3_Engine\Framework\Collision\MeshCollider.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="Baziru3_Engine\Framework\Spline\SplinePath.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="Baziru3_Engine\Framework\Spline\SplineFollower.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="Baziru3_Engine\Graphics\SkyBox\SkyBox.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="Baziru3_Engine\Graphics\SkyBox\SkyboxCom.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="Baziru3_Engine\Core\Base\EngineAssert.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="Baziru3_Engine\Core\Base\EngineContext.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="Baziru3_Engine\Core\Base\RenderContext.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="Baziru3_Engine\Graphics\Graphics\Particle\ParticleRenderer.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="Baziru3_Engine\Graphics\Graphics\Sphere\SphereRenderer.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="Baziru3_Engine\Framework\Particle\Ring.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="Baziru3_Engine\Graphics\Primitive\Cylinder\Cylinder.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="Baziru3_Engine\Framework\Effect\HitEffect.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="Baziru3_Engine\Framework\Animation\Animation.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="Baziru3_Engine\Framework\Animation\Animator.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="Baziru3_Engine\Framework\Animation\AnimationUtils.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="Baziru3_Engine\Framework\Animation\NodeAnimation\Node.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="Baziru3_Engine\Framework\Animation\Skeleton\Skeleton.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="Baziru3_Engine\Framework\Animation\Joint\Joint.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="Baziru3_Engine\Framework\Animation\Skeleton\SkeletonDebug.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="Baziru3_Engine\Graphics\3D\Model\SkinCluster\SkinCluster.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="Baziru3_Engine\Graphics\3D\Object\SkinningObject3dCom.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="Baziru3_Engine\Graphics\Graphics\GpuProfiler.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="Baziru3_Engine\Core\Base\OffScreenRendering\OffScreenRendering.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="Baziru3_Engine\Framework\Scene\Fade.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="Baziru3_Engine\Core\Base\OffScreenRendering\RenderTexture.cpp">
-      <Filter>ソース ファイル</Filter>
+    <ClCompile Include="Baziru3_Engine\Core\Base\Allocator\ConstantBufferAllocator.cpp">
+      <Filter>Engine\Core\Base\Allocator</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Core\Base\Allocator\StackAllocator.cpp">
+      <Filter>Engine\Core\Base\Allocator</Filter>
     </ClCompile>
     <ClCompile Include="Baziru3_Engine\Core\Base\AsyncLoader.cpp">
-      <Filter>ソース ファイル</Filter>
+      <Filter>Engine\Core\Base</Filter>
     </ClCompile>
     <ClCompile Include="Baziru3_Engine\Core\Base\BinaryAssetUtil.cpp">
-      <Filter>ソース ファイル</Filter>
+      <Filter>Engine\Core\Base</Filter>
     </ClCompile>
-    <ClCompile Include="Baziru3_Engine\Framework\AI\Blackboard.cpp">
-      <Filter>ソース ファイル</Filter>
+    <ClCompile Include="Baziru3_Engine\Core\Base\ConstantBufferRingAllocator.cpp">
+      <Filter>Engine\Core\Base</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Core\Base\DebugUI.cpp">
+      <Filter>Engine\Core\Base</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Core\Base\DirectXCom.cpp">
+      <Filter>Engine\Core\Base</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Core\Base\EngineAssert.cpp">
+      <Filter>Engine\Core\Base</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Core\Base\EngineContext.cpp">
+      <Filter>Engine\Core\Base</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Core\Base\ImGui\ImGuiManager.cpp">
+      <Filter>Engine\Core\Base\ImGui</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Core\Base\KeyInput.cpp">
+      <Filter>Engine\Core\Base</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Core\Base\Log\Log.cpp">
+      <Filter>Engine\Core\Base\Log</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Core\Base\Matrix4x4.cpp">
+      <Filter>Engine\Core\Base</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Core\Base\OffScreenRendering\OffScreenRendering.cpp">
+      <Filter>Engine\Core\Base\OffScreenRendering</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Core\Base\OffScreenRendering\RenderTexture.cpp">
+      <Filter>Engine\Core\Base\OffScreenRendering</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Core\Base\Pipeline\PipelineStateManager.cpp">
+      <Filter>Engine\Core\Base\Pipeline</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Core\Base\RenderContext.cpp">
+      <Filter>Engine\Core\Base</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Core\Base\ResourceLeakCheck.cpp">
+      <Filter>Engine\Core\Base</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Core\Base\Srv\DescriptorHeap.cpp">
+      <Filter>Engine\Core\Base\Srv</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Core\Base\Srv\SRVManager.cpp">
+      <Filter>Engine\Core\Base\Srv</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Core\Base\StringUtil.cpp">
+      <Filter>Engine\Core\Base</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Core\Base\SubsystemFactory.cpp">
+      <Filter>Engine\Core\Base</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Core\Base\Transform.cpp">
+      <Filter>Engine\Core\Base</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Core\Base\Windows\WindowsAPI.cpp">
+      <Filter>Engine\Core\Base\Windows</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Core\Camera\Camera.cpp">
+      <Filter>Engine\Core\Camera</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Core\Camera\DebugCamera\DebugCamera.cpp">
+      <Filter>Engine\Core\Camera\DebugCamera</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Core\IO\Mouse\MouseInput.cpp">
+      <Filter>Engine\Core\IO\Mouse</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Core\Math\Random.cpp">
+      <Filter>Engine\Core\Math</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Core\Platform\Windows\CrashDump.cpp">
+      <Filter>Engine\Core\Platform\Windows</Filter>
     </ClCompile>
     <ClCompile Include="Baziru3_Engine\Framework\AI\BehaviorNode.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="Baziru3_Engine\Framework\AI\CompositeNodes.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="Baziru3_Engine\Framework\AI\BehaviorTree.cpp">
-      <Filter>ソース ファイル</Filter>
+      <Filter>Engine\Framework\AI</Filter>
     </ClCompile>
     <ClCompile Include="Baziru3_Engine\Framework\AI\BehaviorNodeFactory.cpp">
-      <Filter>ソース ファイル</Filter>
+      <Filter>Engine\Framework\AI</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Framework\AI\BehaviorTree.cpp">
+      <Filter>Engine\Framework\AI</Filter>
     </ClCompile>
     <ClCompile Include="Baziru3_Engine\Framework\AI\BehaviorTreeEditor.cpp">
-      <Filter>ソース ファイル</Filter>
+      <Filter>Engine\Framework\AI</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Framework\AI\Blackboard.cpp">
+      <Filter>Engine\Framework\AI</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Framework\AI\CompositeNodes.cpp">
+      <Filter>Engine\Framework\AI</Filter>
     </ClCompile>
     <ClCompile Include="Baziru3_Engine\Framework\AI\CoverNodes.cpp">
-      <Filter>ソース ファイル</Filter>
+      <Filter>Engine\Framework\AI</Filter>
     </ClCompile>
     <ClCompile Include="Baziru3_Engine\Framework\AI\NavMesh.cpp">
-      <Filter>ソース ファイル</Filter>
+      <Filter>Engine\Framework\AI</Filter>
     </ClCompile>
     <ClCompile Include="Baziru3_Engine\Framework\AI\PathfindingNodes.cpp">
-      <Filter>ソース ファイル</Filter>
+      <Filter>Engine\Framework\AI</Filter>
     </ClCompile>
-    <ClCompile Include="Baziru3_Engine\Framework\IO\JsonSafeLoader.cpp">
-      <Filter>ソース ファイル</Filter>
+    <ClCompile Include="Baziru3_Engine\Framework\Animation\Animation.cpp">
+      <Filter>Engine\Framework\Animation</Filter>
     </ClCompile>
-    <ClCompile Include="externals\imgui-node-editor\imgui_node_editor.cpp">
-      <Filter>ソース ファイル</Filter>
+    <ClCompile Include="Baziru3_Engine\Framework\Animation\AnimationUtils.cpp">
+      <Filter>Engine\Framework\Animation</Filter>
     </ClCompile>
-    <ClCompile Include="externals\imgui-node-editor\imgui_node_editor_api.cpp">
-      <Filter>ソース ファイル</Filter>
+    <ClCompile Include="Baziru3_Engine\Framework\Animation\Animator.cpp">
+      <Filter>Engine\Framework\Animation</Filter>
     </ClCompile>
-    <ClCompile Include="externals\imgui-node-editor\imgui_canvas.cpp">
-      <Filter>ソース ファイル</Filter>
+    <ClCompile Include="Baziru3_Engine\Framework\Animation\Joint\Joint.cpp">
+      <Filter>Engine\Framework\Animation\Joint</Filter>
     </ClCompile>
-    <ClCompile Include="externals\imgui-node-editor\crude_json.cpp">
-      <Filter>ソース ファイル</Filter>
+    <ClCompile Include="Baziru3_Engine\Framework\Animation\NodeAnimation\Node.cpp">
+      <Filter>Engine\Framework\Animation\NodeAnimation</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Framework\Animation\Skeleton\Skeleton.cpp">
+      <Filter>Engine\Framework\Animation\Skeleton</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Framework\Animation\Skeleton\SkeletonDebug.cpp">
+      <Filter>Engine\Framework\Animation\Skeleton</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Framework\Audio\AudioManager.cpp">
+      <Filter>Engine\Framework\Audio</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Framework\Audio\Sound.cpp">
+      <Filter>Engine\Framework\Audio</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Framework\Collision\AABBTree.cpp">
+      <Filter>Engine\Framework\Collision</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Framework\Collision\Collider.cpp">
+      <Filter>Engine\Framework\Collision</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Framework\Collision\CollisionDebugDraw.cpp">
+      <Filter>Engine\Framework\Collision</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Framework\Collision\CollisionManager.cpp">
+      <Filter>Engine\Framework\Collision</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Framework\Collision\CollisionShapes.cpp">
+      <Filter>Engine\Framework\Collision</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Framework\Collision\MeshCollider.cpp">
+      <Filter>Engine\Framework\Collision</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Framework\Collision\SoftBodyDeformer.cpp">
+      <Filter>Engine\Framework\Collision</Filter>
     </ClCompile>
     <ClCompile Include="Baziru3_Engine\Framework\Command\CommandManager.cpp">
-      <Filter>ソース ファイル</Filter>
+      <Filter>Engine\Framework\Command</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Framework\Effect\HitEffect.cpp">
+      <Filter>Engine\Framework\Effect</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Framework\Framework.cpp">
+      <Filter>Engine\Framework</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Framework\IO\JsonSafeLoader.cpp">
+      <Filter>Engine\Framework\IO</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Framework\Particle\ParticleEmitter.cpp">
+      <Filter>Engine\Framework\Particle</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Framework\Particle\ParticleManager.cpp">
+      <Filter>Engine\Framework\Particle</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Framework\Particle\Ring.cpp">
+      <Filter>Engine\Framework\Particle</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Framework\Scene\BaseScene.cpp">
+      <Filter>Engine\Framework\Scene</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Framework\Scene\EngineDefaultScene.cpp">
+      <Filter>Engine\Framework\Scene</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Framework\Scene\Factory\AbstractSceneFactory.cpp">
+      <Filter>Engine\Framework\Scene\Factory</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Framework\Scene\Factory\SceneFactory.cpp">
+      <Filter>Engine\Framework\Scene\Factory</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Framework\Scene\Factory\SceneRegistration.cpp">
+      <Filter>Engine\Framework\Scene\Factory</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Framework\Scene\Fade.cpp">
+      <Filter>Engine\Framework\Scene</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Framework\Scene\Manager\SceneManager.cpp">
+      <Filter>Engine\Framework\Scene\Manager</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Framework\Spline\SplineFollower.cpp">
+      <Filter>Engine\Framework\Spline</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Framework\Spline\SplinePath.cpp">
+      <Filter>Engine\Framework\Spline</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Graphics\2D\Sprite\Sprite.cpp">
+      <Filter>Engine\Graphics\2D\Sprite</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Graphics\2D\Sprite\SpriteCom.cpp">
+      <Filter>Engine\Graphics\2D\Sprite</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Graphics\2D\Sprite\SpriteManager.cpp">
+      <Filter>Engine\Graphics\2D\Sprite</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Graphics\2D\Texture\TextureManager.cpp">
+      <Filter>Engine\Graphics\2D\Texture</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Graphics\3D\Model\Model.cpp">
+      <Filter>Engine\Graphics\3D\Model</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Graphics\3D\Model\ModelCom.cpp">
+      <Filter>Engine\Graphics\3D\Model</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Graphics\3D\Model\ModelManager.cpp">
+      <Filter>Engine\Graphics\3D\Model</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Graphics\3D\Model\SkinCluster\SkinCluster.cpp">
+      <Filter>Engine\Graphics\3D\Model\SkinCluster</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Graphics\3D\Object\Object3d.cpp">
+      <Filter>Engine\Graphics\3D\Object</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Graphics\3D\Object\Object3dCom.cpp">
+      <Filter>Engine\Graphics\3D\Object</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Graphics\3D\Object\SkinningObject3dCom.cpp">
+      <Filter>Engine\Graphics\3D\Object</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Graphics\3D\Procedural\BioProceduralGenerator.cpp">
+      <Filter>Engine\Graphics\3D\Procedural</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Graphics\3D\Water\River.cpp">
+      <Filter>Engine\Graphics\3D\Water</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Graphics\Graphics\GpuProfiler.cpp">
+      <Filter>Engine\Graphics\Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Graphics\Graphics\Material\MaterialManager.cpp">
+      <Filter>Engine\Graphics\Graphics\Material</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Graphics\Graphics\Particle\ParticleRenderer.cpp">
+      <Filter>Engine\Graphics\Graphics\Particle</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Graphics\Graphics\Sphere\SphereRenderer.cpp">
+      <Filter>Engine\Graphics\Graphics\Sphere</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Graphics\Light\CascadingShadowMap.cpp">
+      <Filter>Engine\Graphics\Light</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Graphics\Light\Light.cpp">
+      <Filter>Engine\Graphics\Light</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Graphics\Primitive\Cylinder\Cylinder.cpp">
+      <Filter>Engine\Graphics\Primitive\Cylinder</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Graphics\Shapes\Sphere\Sphere.cpp">
+      <Filter>Engine\Graphics\Shapes\Sphere</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Graphics\SkyBox\SkyBox.cpp">
+      <Filter>Engine\Graphics\SkyBox</Filter>
+    </ClCompile>
+    <ClCompile Include="Baziru3_Engine\Graphics\SkyBox\SkyboxCom.cpp">
+      <Filter>Engine\Graphics\SkyBox</Filter>
+    </ClCompile>
+    <ClCompile Include="externals\imgui-node-editor\crude_json.cpp">
+      <Filter>Externals\imgui-node-editor</Filter>
+    </ClCompile>
+    <ClCompile Include="externals\imgui-node-editor\imgui_canvas.cpp">
+      <Filter>Externals\imgui-node-editor</Filter>
+    </ClCompile>
+    <ClCompile Include="externals\imgui-node-editor\imgui_node_editor.cpp">
+      <Filter>Externals\imgui-node-editor</Filter>
+    </ClCompile>
+    <ClCompile Include="externals\imgui-node-editor\imgui_node_editor_api.cpp">
+      <Filter>Externals\imgui-node-editor</Filter>
+    </ClCompile>
+    <ClCompile Include="Game.cpp">
+      <Filter>App</Filter>
+    </ClCompile>
+    <ClCompile Include="main.cpp">
+      <Filter>App</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <FxCompile Include="Resources\shaders\Skybox.PS.hlsl" />
-    <FxCompile Include="Resources\shaders\Skybox.VS.hlsl" />
-    <FxCompile Include="Resources\shaders\Object3d.PS.hlsl" />
-    <FxCompile Include="Resources\shaders\Particle.PS.hlsl" />
-    <FxCompile Include="Resources\shaders\Particle.VS.hlsl" />
-    <FxCompile Include="Resources\shaders\Object3d.VS.hlsl" />
-    <FxCompile Include="Resources\shaders\SkinningObject3d.VS.hlsl" />
-    <FxCompile Include="Resources\shaders\RadialBlur.PS.hlsl" />
-    <FxCompile Include="Resources\shaders\RandomNoise.PS.hlsl" />
-    <FxCompile Include="Resources\shaders\BoxFilter.PS.hlsl" />
-    <FxCompile Include="Resources\shaders\GaussianFilter.PS.hlsl" />
-    <FxCompile Include="Resources\shaders\LuminanceBaseOutline.PS.hlsl" />
-    <FxCompile Include="Resources\shaders\DepthBasedOutline.PS.hlsl" />
-    <FxCompile Include="Resources\shaders\CopyImage.PS.hlsl">
-      <Filter>リソース ファイル</Filter>
-    </FxCompile>
-    <FxCompile Include="Resources\shaders\CopyImage.VS.hlsl">
-      <Filter>リソース ファイル</Filter>
-    </FxCompile>
-    <FxCompile Include="Resources\shaders\Skinning.CS.hlsl">
-      <Filter>リソース ファイル</Filter>
-    </FxCompile>
-    <FxCompile Include="Resources\shaders\InitializeParticle.CS.hlsl">
-      <Filter>リソース ファイル</Filter>
-    </FxCompile>
-
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="Baziru3_Engine\Framework\Collision\SoftBodyDeformer.h" />
-    <ClInclude Include="Baziru3_Engine\Framework\Collision\CollisionShapes.h" />
-    <ClInclude Include="Baziru3_Engine\Framework\Collision\CollisionDebugDraw.h" />
-    <ClInclude Include="Baziru3_Engine\Framework\Scene\EngineDefaultScene.h" />
-    <ClInclude Include="Baziru3_Engine\Framework\Animation\NodeAnimation\Node.h" />
-    <ClInclude Include="Baziru3_Engine\Framework\Animation\NodeAnimation\NodeStruct.h" />
-    <ClInclude Include="Baziru3_Engine\Graphics\3D\Model\SkinCluster\SkinCluster.h" />
-    <ClInclude Include="Baziru3_Engine\Core\Base\OffScreenRendering\OffScreenRendering.h" />
-    <ClInclude Include="Baziru3_Engine\Framework\Animation\Animation.h" />
-    <ClInclude Include="Baziru3_Engine\Framework\Animation\AnimationData.h" />
-    <ClInclude Include="Baziru3_Engine\Framework\Animation\AnimationUtils.h" />
-    <ClInclude Include="Baziru3_Engine\Framework\Animation\Animator.h" />
-    <ClInclude Include="Baziru3_Engine\Framework\Animation\Joint\Joint.h" />
-    <ClInclude Include="Baziru3_Engine\Framework\Animation\Keyframe\Keyframe.h" />
-    <ClInclude Include="Baziru3_Engine\Framework\Animation\NodeAnimation\NodeAnimation.h" />
-    <ClInclude Include="Baziru3_Engine\Framework\Animation\Skeleton\Skeleton.h" />
-    <ClInclude Include="Baziru3_Engine\Framework\Animation\Skeleton\SkeletonDebug.h" />
-    <ClInclude Include="Baziru3_Engine\Framework\Effect\HitEffect.h" />
-    <ClInclude Include="Baziru3_Engine\Framework\Scene\Fade.h" />
-    <ClInclude Include="Baziru3_Engine\Graphics\Graphics\Particle\ParticleRenderer.h" />
-    <ClInclude Include="Baziru3_Engine\Graphics\Graphics\SceneRenderRequests.h" />
-    <ClInclude Include="Baziru3_Engine\Graphics\Graphics\Sphere\SphereDrawRequests.h" />
-    <ClInclude Include="Baziru3_Engine\Graphics\Graphics\Sphere\SphereRenderer.h" />
-    <ClInclude Include="Baziru3_Engine\Core\Math\EulerTransform.h" />
-    <ClInclude Include="Baziru3_Engine\Core\Math\Quaternion.h" />
-    <ClInclude Include="Baziru3_Engine\Graphics\Primitive\Cylinder\Cylinder.h" />
-    <ClInclude Include="Baziru3_Engine\Framework\Particle\Ring.h" />
-    <ClInclude Include="Baziru3_Engine\Framework\Scene\Factory\AbstractSceneFactory.h" />
-    <ClInclude Include="Baziru3_Engine\Framework\Audio\AudioManager.h" />
-    <ClInclude Include="Baziru3_Engine\Framework\Scene\BaseScene.h" />
-    <ClInclude Include="Baziru3_Engine\Graphics\3D\Object\Object3d.h" />
-    <ClInclude Include="Baziru3_Engine\Graphics\3D\Object\Object3dCom.h" />
-    <ClInclude Include="Baziru3_Engine\Framework\Collision\BoxCollider.h" />
-    <ClInclude Include="Baziru3_Engine\Framework\Collision\CapsuleCollider.h" />
-    <ClInclude Include="Baziru3_Engine\Framework\Collision\Collider.h" />
-    <ClInclude Include="Baziru3_Engine\Framework\Collision\CollisionManager.h" />
-    <ClInclude Include="Baziru3_Engine\Framework\Spline\SplinePath.h" />
-    <ClInclude Include="Baziru3_Engine\Framework\Spline\SplineFollower.h" />
-    <ClInclude Include="Baziru3_Engine\Framework\Collision\SphereCollider.h" />
-    <ClInclude Include="Baziru3_Engine\Framework\Audio\Sound.h" />
-    <ClInclude Include="Baziru3_Engine\Core\Base\MappedResource.h" />
-    <ClInclude Include="Baziru3_Engine\Core\Base\OffScreenRendering\RenderTexture.h" />
-    <ClInclude Include="Baziru3_Engine\Core\Base\RootParam.h" />
-    <ClInclude Include="Baziru3_Engine\Core\Camera\DebugCamera\DebugCamera.h" />
-    <ClInclude Include="Baziru3_Engine\Core\Base\DirectXCom.h" />
-    <ClInclude Include="Baziru3_Engine\Core\Base\ImGui\ImGuiManager.h" />
-    <ClInclude Include="Baziru3_Engine\Core\Base\KeyInput.h" />
-    <ClInclude Include="Baziru3_Engine\Core\Base\Log\Log.h" />
-    <ClInclude Include="Baziru3_Engine\Core\Base\Matrix4x4.h">
-      <Filter>ヘッダー ファイル</Filter>
+    <ClInclude Include="Baziru3_Engine\Core\Base\Allocator\ConstantBufferAllocator.h">
+      <Filter>Engine\Core\Base\Allocator</Filter>
     </ClInclude>
-    <ClInclude Include="Baziru3_Engine\Core\Base\ResourceLeakCheck.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
-    <ClInclude Include="Baziru3_Engine\Core\Base\StringUtil.h" />
-    <ClInclude Include="Baziru3_Engine\Core\Base\Transform.h" />
-    <ClInclude Include="Baziru3_Engine\Core\Base\Vector.h" />
-    <ClInclude Include="Baziru3_Engine\Core\Base\Windows\WindowsAPI.h" />
-    <ClInclude Include="Baziru3_Engine\Core\Camera\Camera.h" />
-    <ClInclude Include="Baziru3_Engine\Graphics\2D\Sprite\Sprite.h" />
-    <ClInclude Include="Baziru3_Engine\Graphics\2D\Sprite\SpriteCom.h" />
-    <ClInclude Include="Baziru3_Engine\Core\Base\Operator.h" />
-    <ClInclude Include="Baziru3_Engine\Graphics\2D\Texture\TextureManager.h" />
-    <ClInclude Include="Baziru3_Engine\Graphics\SkyBox\SkyboxCom.h" />
-    <ClInclude Include="Baziru3_Engine\Core\Platform\Windows\CrashDump.h" />
-    <ClInclude Include="Baziru3_Engine\Core\Base\DebugUI.h" />
-    <ClInclude Include="Baziru3_Engine\Framework\Framework.h" />
-    <ClInclude Include="Baziru3_Engine\Framework\Command\ICommand.h" />
-    <ClInclude Include="Baziru3_Engine\Framework\Command\CommandManager.h" />
-    <ClInclude Include="Baziru3_Engine\Core\Base\EngineAssert.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
-    <ClInclude Include="Baziru3_Engine\Core\Base\ObjectPool.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
-    <ClInclude Include="Baziru3_Engine\Core\Base\EngineContext.h" />
-    <ClInclude Include="Baziru3_Engine\Core\Base\RenderContext.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
-    <ClInclude Include="Game.h" />
-    <ClInclude Include="Baziru3_Engine\Core\IO\Mouse\MouseInput.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
-
-    <ClInclude Include="Baziru3_Engine\Core\Base\SubsystemFactory.h" />
-    <ClInclude Include="Baziru3_Engine\Core\Base\OffScreenRendering\OffScreenRendering.h" />
-    <ClInclude Include="Baziru3_Engine\Graphics\3D\Model\SkinCluster\SkinCluster.h" />
-    <ClInclude Include="Baziru3_Engine\Framework\Animation\NodeAnimation\Node.h" />
-    <ClInclude Include="Baziru3_Engine\Framework\Animation\NodeAnimation\NodeStruct.h" />
-    <ClInclude Include="Baziru3_Engine\Framework\Animation\Skeleton\Skeleton.h" />
-    <ClInclude Include="Baziru3_Engine\Framework\Animation\Joint\Joint.h" />
-    <ClInclude Include="Baziru3_Engine\Framework\Animation\Skeleton\SkeletonDebug.h" />
-    <ClInclude Include="Baziru3_Engine\Core\Math\EulerTransform.h" />
-    <ClInclude Include="Baziru3_Engine\Framework\Particle\ParticleEmitter.h" />
-    <ClInclude Include="Baziru3_Engine\Framework\Particle\ParticleManager.h" />
-    <ClInclude Include="Baziru3_Engine\Graphics\Light\Light.h" />
-    <ClInclude Include="Baziru3_Engine\Graphics\Graphics\Material\MaterialManager.h" />
-    <ClInclude Include="Baziru3_Engine\Core\Math\Random.h" />
-    <ClInclude Include="Baziru3_Engine\Graphics\3D\Model\Model.h" />
-    <ClInclude Include="Baziru3_Engine\Graphics\3D\Model\ModelCom.h" />
-    <ClInclude Include="Baziru3_Engine\Graphics\3D\Model\ModelManager.h" />
-    <ClInclude Include="Baziru3_Engine\Framework\Scene\Factory\SceneFactory.h" />
-    <ClInclude Include="Baziru3_Engine\Framework\Scene\Manager\SceneManager.h" />
-    <ClInclude Include="Baziru3_Engine\Framework\Scene\Factory\SceneRegistration.h" />
-    <ClInclude Include="Baziru3_Engine\Graphics\SkyBox\SkyBox.h" />
-    <ClInclude Include="Baziru3_Engine\Graphics\Shapes\Sphere\Sphere.h" />
-    <ClInclude Include="Baziru3_Engine\Graphics\2D\Sprite\SpriteManager.h" />
-    <ClInclude Include="Baziru3_Engine\Core\Base\Srv\SRVManager.h" />
-
-    <ClInclude Include="Baziru3_Engine\Graphics\3D\Object\SkinningObject3dCom.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
-    <ClInclude Include="Baziru3_Engine\Graphics\Graphics\GpuProfiler.h">
-      <Filter>ヘッダー ファイル</Filter>
+    <ClInclude Include="Baziru3_Engine\Core\Base\Allocator\StackAllocator.h">
+      <Filter>Engine\Core\Base\Allocator</Filter>
     </ClInclude>
     <ClInclude Include="Baziru3_Engine\Core\Base\AsyncLoader.h">
-      <Filter>ヘッダー ファイル</Filter>
+      <Filter>Engine\Core\Base</Filter>
     </ClInclude>
     <ClInclude Include="Baziru3_Engine\Core\Base\BinaryAssetUtil.h">
-      <Filter>ヘッダー ファイル</Filter>
+      <Filter>Engine\Core\Base</Filter>
     </ClInclude>
-    <ClInclude Include="Baziru3_Engine\Framework\AI\Blackboard.h">
-      <Filter>ヘッダー ファイル</Filter>
+    <ClInclude Include="Baziru3_Engine\Core\Base\BufferUtil.h">
+      <Filter>Engine\Core\Base</Filter>
+    </ClInclude>
+    <ClInclude Include="Baziru3_Engine\Core\Base\ConstantBufferRingAllocator.h">
+      <Filter>Engine\Core\Base</Filter>
+    </ClInclude>
+    <ClInclude Include="Baziru3_Engine\Core\Base\DebugUI.h">
+      <Filter>Engine\Core\Base</Filter>
+    </ClInclude>
+    <ClInclude Include="Baziru3_Engine\Core\Base\DirectXCom.h">
+      <Filter>Engine\Core\Base</Filter>
+    </ClInclude>
+    <ClInclude Include="Baziru3_Engine\Core\Base\EngineAssert.h">
+      <Filter>Engine\Core\Base</Filter>
+    </ClInclude>
+    <ClInclude Include="Baziru3_Engine\Core\Base\EngineContext.h">
+      <Filter>Engine\Core\Base</Filter>
+    </ClInclude>
+    <ClInclude Include="Baziru3_Engine\Core\Base\ImGui\ImGuiManager.h">
+      <Filter>Engine\Core\Base\ImGui</Filter>
+    </ClInclude>
+    <ClInclude Include="Baziru3_Engine\Core\Base\KeyInput.h">
+      <Filter>Engine\Core\Base</Filter>
+    </ClInclude>
+    <ClInclude Include="Baziru3_Engine\Core\Base\Log\Log.h">
+      <Filter>Engine\Core\Base\Log</Filter>
+    </ClInclude>
+    <ClInclude Include="Baziru3_Engine\Core\Base\MappedResource.h">
+      <Filter>Engine\Core\Base</Filter>
+    </ClInclude>
+    <ClInclude Include="Baziru3_Engine\Core\Base\Matrix4x4.h">
+      <Filter>Engine\Core\Base</Filter>
+    </ClInclude>
+    <ClInclude Include="Baziru3_Engine\Core\Base\ObjectPool.h">
+      <Filter>Engine\Core\Base</Filter>
+    </ClInclude>
+    <ClInclude Include="Baziru3_Engine\Core\Base\OffScreenRendering\OffScreenRendering.h">
+      <Filter>Engine\Core\Base\OffScreenRendering</Filter>
+    </ClInclude>
+    <ClInclude Include="Baziru3_Engine\Core\Base\OffScreenRendering\RenderTexture.h">
+      <Filter>Engine\Core\Base\OffScreenRendering</Filter>
+    </ClInclude>
+    <ClInclude Include="Baziru3_Engine\Core\Base\Operator.h">
+      <Filter>Engine\Core\Base</Filter>
+    </ClInclude>
+    <ClInclude Include="Baziru3_Engine\Core\Base\Pipeline\PipelineStateManager.h">
+      <Filter>Engine\Core\Base\Pipeline</Filter>
+    </ClInclude>
+    <ClInclude Include="Baziru3_Engine\Core\Base\RenderContext.h">
+      <Filter>Engine\Core\Base</Filter>
+    </ClInclude>
+    <ClInclude Include="Baziru3_Engine\Core\Base\ResourceLeakCheck.h">
+      <Filter>Engine\Core\Base</Filter>
+    </ClInclude>
+    <ClInclude Include="Baziru3_Engine\Core\Base\RootParam.h">
+      <Filter>Engine\Core\Base</Filter>
+    </ClInclude>
+    <ClInclude Include="Baziru3_Engine\Core\Base\Srv\DescriptorHeap.h">
+      <Filter>Engine\Core\Base\Srv</Filter>
+    </ClInclude>
+    <ClInclude Include="Baziru3_Engine\Core\Base\Srv\SRVManager.h">
+      <Filter>Engine\Core\Base\Srv</Filter>
+    </ClInclude>
+    <ClInclude Include="Baziru3_Engine\Core\Base\StringUtil.h">
+      <Filter>Engine\Core\Base</Filter>
+    </ClInclude>
+    <ClInclude Include="Baziru3_Engine\Core\Base\SubsystemFactory.h">
+      <Filter>Engine\Core\Base</Filter>
+    </ClInclude>
+    <ClInclude Include="Baziru3_Engine\Core\Base\Transform.h">
+      <Filter>Engine\Core\Base</Filter>
+    </ClInclude>
+    <ClInclude Include="Baziru3_Engine\Core\Base\Vector.h">
+      <Filter>Engine\Core\Base</Filter>
+    </ClInclude>
+    <ClInclude Include="Baziru3_Engine\Core\Base\Windows\WindowsAPI.h">
+      <Filter>Engine\Core\Base\Windows</Filter>
+    </ClInclude>
+    <ClInclude Include="Baziru3_Engine\Core\Camera\Camera.h">
+      <Filter>Engine\Core\Camera</Filter>
+    </ClInclude>
+    <ClInclude Include="Baziru3_Engine\Core\Camera\DebugCamera\DebugCamera.h">
+      <Filter>Engine\Core\Camera\DebugCamera</Filter>
+    </ClInclude>
+    <ClInclude Include="Baziru3_Engine\Core\IO\Mouse\MouseInput.h">
+      <Filter>Engine\Core\IO\Mouse</Filter>
+    </ClInclude>
+    <ClInclude Include="Baziru3_Engine\Core\Math\EulerTransform.h">
+      <Filter>Engine\Core\Math</Filter>
+    </ClInclude>
+    <ClInclude Include="Baziru3_Engine\Core\Math\Quaternion.h">
+      <Filter>Engine\Core\Math</Filter>
+    </ClInclude>
+    <ClInclude Include="Baziru3_Engine\Core\Math\Random.h">
+      <Filter>Engine\Core\Math</Filter>
+    </ClInclude>
+    <ClInclude Include="Baziru3_Engine\Core\Platform\Windows\CrashDump.h">
+      <Filter>Engine\Core\Platform\Windows</Filter>
     </ClInclude>
     <ClInclude Include="Baziru3_Engine\Framework\AI\BehaviorNode.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
-    <ClInclude Include="Baziru3_Engine\Framework\AI\CompositeNodes.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
-    <ClInclude Include="Baziru3_Engine\Framework\AI\BehaviorTree.h">
-      <Filter>ヘッダー ファイル</Filter>
+      <Filter>Engine\Framework\AI</Filter>
     </ClInclude>
     <ClInclude Include="Baziru3_Engine\Framework\AI\BehaviorNodeFactory.h">
-      <Filter>ヘッダー ファイル</Filter>
+      <Filter>Engine\Framework\AI</Filter>
+    </ClInclude>
+    <ClInclude Include="Baziru3_Engine\Framework\AI\BehaviorTree.h">
+      <Filter>Engine\Framework\AI</Filter>
     </ClInclude>
     <ClInclude Include="Baziru3_Engine\Framework\AI\BehaviorTreeEditor.h">
-      <Filter>ヘッダー ファイル</Filter>
+      <Filter>Engine\Framework\AI</Filter>
+    </ClInclude>
+    <ClInclude Include="Baziru3_Engine\Framework\AI\Blackboard.h">
+      <Filter>Engine\Framework\AI</Filter>
+    </ClInclude>
+    <ClInclude Include="Baziru3_Engine\Framework\AI\CompositeNodes.h">
+      <Filter>Engine\Framework\AI</Filter>
     </ClInclude>
     <ClInclude Include="Baziru3_Engine\Framework\AI\CoverNodes.h">
-      <Filter>ヘッダー ファイル</Filter>
+      <Filter>Engine\Framework\AI</Filter>
     </ClInclude>
     <ClInclude Include="Baziru3_Engine\Framework\AI\NavMesh.h">
-      <Filter>ヘッダー ファイル</Filter>
+      <Filter>Engine\Framework\AI</Filter>
     </ClInclude>
     <ClInclude Include="Baziru3_Engine\Framework\AI\PathfindingNodes.h">
-      <Filter>ヘッダー ファイル</Filter>
+      <Filter>Engine\Framework\AI</Filter>
+    </ClInclude>
+    <ClInclude Include="Baziru3_Engine\Framework\Animation\Animation.h">
+      <Filter>Engine\Framework\Animation</Filter>
+    </ClInclude>
+    <ClInclude Include="Baziru3_Engine\Framework\Animation\AnimationData.h">
+      <Filter>Engine\Framework\Animation</Filter>
+    </ClInclude>
+    <ClInclude Include="Baziru3_Engine\Framework\Animation\AnimationUtils.h">
+      <Filter>Engine\Framework\Animation</Filter>
+    </ClInclude>
+    <ClInclude Include="Baziru3_Engine\Framework\Animation\Animator.h">
+      <Filter>Engine\Framework\Animation</Filter>
+    </ClInclude>
+    <ClInclude Include="Baziru3_Engine\Framework\Animation\Joint\Joint.h">
+      <Filter>Engine\Framework\Animation\Joint</Filter>
+    </ClInclude>
+    <ClInclude Include="Baziru3_Engine\Framework\Animation\Keyframe\Keyframe.h">
+      <Filter>Engine\Framework\Animation\Keyframe</Filter>
+    </ClInclude>
+    <ClInclude Include="Baziru3_Engine\Framework\Animation\NodeAnimation\Node.h">
+      <Filter>Engine\Framework\Animation\NodeAnimation</Filter>
+    </ClInclude>
+    <ClInclude Include="Baziru3_Engine\Framework\Animation\NodeAnimation\NodeAnimation.h">
+      <Filter>Engine\Framework\Animation\NodeAnimation</Filter>
+    </ClInclude>
+    <ClInclude Include="Baziru3_Engine\Framework\Animation\NodeAnimation\NodeStruct.h">
+      <Filter>Engine\Framework\Animation\NodeAnimation</Filter>
+    </ClInclude>
+    <ClInclude Include="Baziru3_Engine\Framework\Animation\Skeleton\Skeleton.h">
+      <Filter>Engine\Framework\Animation\Skeleton</Filter>
+    </ClInclude>
+    <ClInclude Include="Baziru3_Engine\Framework\Animation\Skeleton\SkeletonDebug.h">
+      <Filter>Engine\Framework\Animation\Skeleton</Filter>
+    </ClInclude>
+    <ClInclude Include="Baziru3_Engine\Framework\Audio\AudioManager.h">
+      <Filter>Engine\Framework\Audio</Filter>
+    </ClInclude>
+    <ClInclude Include="Baziru3_Engine\Framework\Audio\Sound.h">
+      <Filter>Engine\Framework\Audio</Filter>
+    </ClInclude>
+    <ClInclude Include="Baziru3_Engine\Framework\Collision\AABBTree.h">
+      <Filter>Engine\Framework\Collision</Filter>
+    </ClInclude>
+    <ClInclude Include="Baziru3_Engine\Framework\Collision\BoxCollider.h">
+      <Filter>Engine\Framework\Collision</Filter>
+    </ClInclude>
+    <ClInclude Include="Baziru3_Engine\Framework\Collision\CapsuleCollider.h">
+      <Filter>Engine\Framework\Collision</Filter>
+    </ClInclude>
+    <ClInclude Include="Baziru3_Engine\Framework\Collision\Collider.h">
+      <Filter>Engine\Framework\Collision</Filter>
+    </ClInclude>
+    <ClInclude Include="Baziru3_Engine\Framework\Collision\CollisionDebugDraw.h">
+      <Filter>Engine\Framework\Collision</Filter>
+    </ClInclude>
+    <ClInclude Include="Baziru3_Engine\Framework\Collision\CollisionManager.h">
+      <Filter>Engine\Framework\Collision</Filter>
+    </ClInclude>
+    <ClInclude Include="Baziru3_Engine\Framework\Collision\CollisionShapes.h">
+      <Filter>Engine\Framework\Collision</Filter>
+    </ClInclude>
+    <ClInclude Include="Baziru3_Engine\Framework\Collision\MeshCollider.h">
+      <Filter>Engine\Framework\Collision</Filter>
+    </ClInclude>
+    <ClInclude Include="Baziru3_Engine\Framework\Collision\SkeletonCollider.h">
+      <Filter>Engine\Framework\Collision</Filter>
+    </ClInclude>
+    <ClInclude Include="Baziru3_Engine\Framework\Collision\SoftBodyDeformer.h">
+      <Filter>Engine\Framework\Collision</Filter>
+    </ClInclude>
+    <ClInclude Include="Baziru3_Engine\Framework\Collision\SphereCollider.h">
+      <Filter>Engine\Framework\Collision</Filter>
+    </ClInclude>
+    <ClInclude Include="Baziru3_Engine\Framework\Command\CommandManager.h">
+      <Filter>Engine\Framework\Command</Filter>
+    </ClInclude>
+    <ClInclude Include="Baziru3_Engine\Framework\Command\ICommand.h">
+      <Filter>Engine\Framework\Command</Filter>
+    </ClInclude>
+    <ClInclude Include="Baziru3_Engine\Framework\Effect\HitEffect.h">
+      <Filter>Engine\Framework\Effect</Filter>
+    </ClInclude>
+    <ClInclude Include="Baziru3_Engine\Framework\Framework.h">
+      <Filter>Engine\Framework</Filter>
     </ClInclude>
     <ClInclude Include="Baziru3_Engine\Framework\IO\JsonSafeLoader.h">
-      <Filter>ヘッダー ファイル</Filter>
+      <Filter>Engine\Framework\IO</Filter>
     </ClInclude>
-    <ClInclude Include="externals\imgui-node-editor\imgui_node_editor.h">
-      <Filter>ヘッダー ファイル</Filter>
+    <ClInclude Include="Baziru3_Engine\Framework\Particle\ParticleEmitter.h">
+      <Filter>Engine\Framework\Particle</Filter>
     </ClInclude>
-    <ClInclude Include="externals\imgui-node-editor\imgui_node_editor_internal.h">
-      <Filter>ヘッダー ファイル</Filter>
+    <ClInclude Include="Baziru3_Engine\Framework\Particle\ParticleManager.h">
+      <Filter>Engine\Framework\Particle</Filter>
     </ClInclude>
-    <ClInclude Include="externals\imgui-node-editor\imgui_node_editor_internal.inl">
-      <Filter>ヘッダー ファイル</Filter>
+    <ClInclude Include="Baziru3_Engine\Framework\Particle\Ring.h">
+      <Filter>Engine\Framework\Particle</Filter>
     </ClInclude>
-    <ClInclude Include="externals\imgui-node-editor\imgui_canvas.h">
-      <Filter>ヘッダー ファイル</Filter>
+    <ClInclude Include="Baziru3_Engine\Framework\Scene\BaseScene.h">
+      <Filter>Engine\Framework\Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="Baziru3_Engine\Framework\Scene\EngineDefaultScene.h">
+      <Filter>Engine\Framework\Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="Baziru3_Engine\Framework\Scene\Factory\AbstractSceneFactory.h">
+      <Filter>Engine\Framework\Scene\Factory</Filter>
+    </ClInclude>
+    <ClInclude Include="Baziru3_Engine\Framework\Scene\Factory\SceneFactory.h">
+      <Filter>Engine\Framework\Scene\Factory</Filter>
+    </ClInclude>
+    <ClInclude Include="Baziru3_Engine\Framework\Scene\Factory\SceneRegistration.h">
+      <Filter>Engine\Framework\Scene\Factory</Filter>
+    </ClInclude>
+    <ClInclude Include="Baziru3_Engine\Framework\Scene\Fade.h">
+      <Filter>Engine\Framework\Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="Baziru3_Engine\Framework\Scene\Manager\SceneManager.h">
+      <Filter>Engine\Framework\Scene\Manager</Filter>
+    </ClInclude>
+    <ClInclude Include="Baziru3_Engine\Framework\Spline\SplineFollower.h">
+      <Filter>Engine\Framework\Spline</Filter>
+    </ClInclude>
+    <ClInclude Include="Baziru3_Engine\Framework\Spline\SplinePath.h">
+      <Filter>Engine\Framework\Spline</Filter>
+    </ClInclude>
+    <ClInclude Include="Baziru3_Engine\Graphics\2D\Sprite\Sprite.h">
+      <Filter>Engine\Graphics\2D\Sprite</Filter>
+    </ClInclude>
+    <ClInclude Include="Baziru3_Engine\Graphics\2D\Sprite\SpriteCom.h">
+      <Filter>Engine\Graphics\2D\Sprite</Filter>
+    </ClInclude>
+    <ClInclude Include="Baziru3_Engine\Graphics\2D\Sprite\SpriteManager.h">
+      <Filter>Engine\Graphics\2D\Sprite</Filter>
+    </ClInclude>
+    <ClInclude Include="Baziru3_Engine\Graphics\2D\Texture\TextureManager.h">
+      <Filter>Engine\Graphics\2D\Texture</Filter>
+    </ClInclude>
+    <ClInclude Include="Baziru3_Engine\Graphics\3D\Model\Model.h">
+      <Filter>Engine\Graphics\3D\Model</Filter>
+    </ClInclude>
+    <ClInclude Include="Baziru3_Engine\Graphics\3D\Model\ModelCom.h">
+      <Filter>Engine\Graphics\3D\Model</Filter>
+    </ClInclude>
+    <ClInclude Include="Baziru3_Engine\Graphics\3D\Model\ModelManager.h">
+      <Filter>Engine\Graphics\3D\Model</Filter>
+    </ClInclude>
+    <ClInclude Include="Baziru3_Engine\Graphics\3D\Model\SkinCluster\SkinCluster.h">
+      <Filter>Engine\Graphics\3D\Model\SkinCluster</Filter>
+    </ClInclude>
+    <ClInclude Include="Baziru3_Engine\Graphics\3D\Object\Object3d.h">
+      <Filter>Engine\Graphics\3D\Object</Filter>
+    </ClInclude>
+    <ClInclude Include="Baziru3_Engine\Graphics\3D\Object\Object3dCom.h">
+      <Filter>Engine\Graphics\3D\Object</Filter>
+    </ClInclude>
+    <ClInclude Include="Baziru3_Engine\Graphics\3D\Object\SkinningObject3dCom.h">
+      <Filter>Engine\Graphics\3D\Object</Filter>
+    </ClInclude>
+    <ClInclude Include="Baziru3_Engine\Graphics\3D\Procedural\BioProceduralGenerator.h">
+      <Filter>Engine\Graphics\3D\Procedural</Filter>
+    </ClInclude>
+    <ClInclude Include="Baziru3_Engine\Graphics\3D\Water\River.h">
+      <Filter>Engine\Graphics\3D\Water</Filter>
+    </ClInclude>
+    <ClInclude Include="Baziru3_Engine\Graphics\Graphics\GpuProfiler.h">
+      <Filter>Engine\Graphics\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="Baziru3_Engine\Graphics\Graphics\Material\MaterialManager.h">
+      <Filter>Engine\Graphics\Graphics\Material</Filter>
+    </ClInclude>
+    <ClInclude Include="Baziru3_Engine\Graphics\Graphics\Particle\ParticleRenderer.h">
+      <Filter>Engine\Graphics\Graphics\Particle</Filter>
+    </ClInclude>
+    <ClInclude Include="Baziru3_Engine\Graphics\Graphics\SceneRenderRequests.h">
+      <Filter>Engine\Graphics\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="Baziru3_Engine\Graphics\Graphics\Sphere\SphereDrawRequests.h">
+      <Filter>Engine\Graphics\Graphics\Sphere</Filter>
+    </ClInclude>
+    <ClInclude Include="Baziru3_Engine\Graphics\Graphics\Sphere\SphereRenderer.h">
+      <Filter>Engine\Graphics\Graphics\Sphere</Filter>
+    </ClInclude>
+    <ClInclude Include="Baziru3_Engine\Graphics\Light\CascadingShadowMap.h">
+      <Filter>Engine\Graphics\Light</Filter>
+    </ClInclude>
+    <ClInclude Include="Baziru3_Engine\Graphics\Light\Light.h">
+      <Filter>Engine\Graphics\Light</Filter>
+    </ClInclude>
+    <ClInclude Include="Baziru3_Engine\Graphics\Primitive\Cylinder\Cylinder.h">
+      <Filter>Engine\Graphics\Primitive\Cylinder</Filter>
+    </ClInclude>
+    <ClInclude Include="Baziru3_Engine\Graphics\Shapes\Sphere\Sphere.h">
+      <Filter>Engine\Graphics\Shapes\Sphere</Filter>
+    </ClInclude>
+    <ClInclude Include="Baziru3_Engine\Graphics\SkyBox\SkyBox.h">
+      <Filter>Engine\Graphics\SkyBox</Filter>
+    </ClInclude>
+    <ClInclude Include="Baziru3_Engine\Graphics\SkyBox\SkyboxCom.h">
+      <Filter>Engine\Graphics\SkyBox</Filter>
     </ClInclude>
     <ClInclude Include="externals\imgui-node-editor\crude_json.h">
-      <Filter>ヘッダー ファイル</Filter>
+      <Filter>Externals\imgui-node-editor</Filter>
+    </ClInclude>
+    <ClInclude Include="externals\imgui-node-editor\imgui_canvas.h">
+      <Filter>Externals\imgui-node-editor</Filter>
+    </ClInclude>
+    <ClInclude Include="externals\imgui-node-editor\imgui_node_editor.h">
+      <Filter>Externals\imgui-node-editor</Filter>
+    </ClInclude>
+    <ClInclude Include="externals\imgui-node-editor\imgui_node_editor_internal.h">
+      <Filter>Externals\imgui-node-editor</Filter>
+    </ClInclude>
+    <ClInclude Include="externals\imgui-node-editor\imgui_node_editor_internal.inl">
+      <Filter>Externals\imgui-node-editor</Filter>
+    </ClInclude>
+    <ClInclude Include="Game.h">
+      <Filter>App</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <None Include="Resources\shaders\CopyImage.hlsli" />
-    <None Include="Resources\shaders\Skybox.hlsli" />
-    <None Include="Resources\shaders\Particle.hlsli" />
-    <None Include="Resources\shaders\Object3d.hlsli" />
+    <None Include="Resources\shaders\BoxFilter.PS.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="Resources\shaders\CopyImage.hlsli">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="Resources\shaders\CopyImage.PS.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="Resources\shaders\CopyImage.VS.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="Resources\shaders\DebugWireframe.PS.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="Resources\shaders\DepthBasedOutline.PS.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="Resources\shaders\EmitParticle.CS.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="Resources\shaders\GaussianFilter.PS.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="Resources\shaders\InitializeParticle.CS.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="Resources\shaders\LuminanceBaseOutline.PS.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="Resources\shaders\Object3d.hlsli">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="Resources\shaders\Object3d.PS.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="Resources\shaders\Object3d.VS.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="Resources\shaders\Object3dEnvMap.PS.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="Resources\shaders\Particle.hlsli">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="Resources\shaders\Particle.PS.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="Resources\shaders\Particle.VS.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="Resources\shaders\RadialBlur.PS.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="Resources\shaders\RandomNoise.PS.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="Resources\shaders\Skinning.CS.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="Resources\shaders\SkinningObject3d.VS.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="Resources\shaders\Skybox.hlsli">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="Resources\shaders\Skybox.PS.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="Resources\shaders\Skybox.VS.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="Resources\shaders\Slime.hlsli">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="Resources\shaders\Slime.PS.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="Resources\shaders\Slime.VS.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="Resources\shaders\Sprite.hlsli">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="Resources\shaders\Sprite.PS.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="Resources\shaders\Sprite.VS.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="Resources\shaders\UpdateParticle.CS.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="Resources\shaders\Water.PS.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="Resources\shaders\Water.VS.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
   </ItemGroup>
 </Project>
