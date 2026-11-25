@@ -43,8 +43,8 @@ namespace
     constexpr float kShimmerBase          = 0.96f;
     constexpr float kShimmerAmp           = 0.06f;
     constexpr float kShimmerFreq          = 72.0f;
-    constexpr float kWakePulseInterval    = 0.042f;
-    constexpr float kMinWakeDistance      = 0.85f;
+    constexpr float kWakePulseInterval    = 0.024f;
+    constexpr float kMinWakeDistance      = 0.55f;
 
     // 微細重力ドロップ演出定数
     constexpr float kGravityDropMinY      = 0.24f;
@@ -149,6 +149,12 @@ void Bullet::Initialize(Object3dCom* object3dCom, Camera* camera, const Vector3&
     tracerObject_->SetColor(isPlayer ? kPlayerTracerColor : kEnemyTracerColor);
 
     prevPosition_ = startPosition;
+    UpdateVisualTransforms();
+}
+
+void Bullet::SetDirection(const Vector3& newDir)
+{
+    direction_ = NormalizeOrFallback(newDir, kInitDirNormalizeEps, kDefaultForward);
     UpdateVisualTransforms();
 }
 

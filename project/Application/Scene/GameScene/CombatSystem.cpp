@@ -93,6 +93,59 @@ namespace
 		return master;
 	}
 
+	// 銃口から射線方向(+Z)へ正確に展開するリアル3D A2コンペンセイター・マズルフラッシュメッシュを構築
+	Object3d::ModelData BuildMuzzleFlashConeModel(uint32_t texIdx)
+	{
+		Object3d::ModelData data{};
+		data.material.textureFilePath = Assets::kMuzzleConeTexPath;
+		data.material.textureIndex = texIdx;
+		data.boundingRadius = 2.2f;
+
+		auto addQuad = [&](const Vector3& p0, const Vector3& p1, const Vector3& p2, const Vector3& p3,
+		                   const Vector2& uv0, const Vector2& uv1, const Vector2& uv2, const Vector2& uv3)
+		{
+			const uint32_t base = static_cast<uint32_t>(data.vertices.size());
+			const Vector3 n = { 0.0f, 1.0f, 0.0f };
+			data.vertices.push_back({ { p0.x, p0.y, p0.z, 1.0f }, uv0, n });
+			data.vertices.push_back({ { p1.x, p1.y, p1.z, 1.0f }, uv1, n });
+			data.vertices.push_back({ { p2.x, p2.y, p2.z, 1.0f }, uv2, n });
+			data.vertices.push_back({ { p3.x, p3.y, p3.z, 1.0f }, uv3, n });
+			data.indices.push_back(base + 0); data.indices.push_back(base + 1); data.indices.push_back(base + 2);
+			data.indices.push_back(base + 0); data.indices.push_back(base + 2); data.indices.push_back(base + 3);
+		};
+
+		// 左タイル (u: 0.00..0.50): 超音速マッハショック軸方向スピア炎 (v=0:銃口クラウン -> v=1:炎先端)
+		const Vector2 jUv0{ 0.01f, 0.02f }, jUv1{ 0.49f, 0.02f }, jUv2{ 0.49f, 0.98f }, jUv3{ 0.01f, 0.98f };
+		constexpr float kJetHalfW = 0.28f;
+		constexpr float kJetLen   = 1.38f;
+		constexpr float kDiag     = 0.198f; // kJetHalfW * 0.7071f
+
+		// 水平・垂直・±45度対角の4枚クロスで俯瞰・斜めどのカメラ角度からも立体的な槍状マズル炎を維持
+		addQuad({ -kJetHalfW, 0.0f, 0.0f }, {  kJetHalfW, 0.0f, 0.0f }, {  kJetHalfW, 0.0f, kJetLen }, { -kJetHalfW, 0.0f, kJetLen }, jUv0, jUv1, jUv2, jUv3);
+		addQuad({ 0.0f, -kJetHalfW, 0.0f }, { 0.0f,  kJetHalfW, 0.0f }, { 0.0f,  kJetHalfW, kJetLen }, { 0.0f, -kJetHalfW, kJetLen }, jUv0, jUv1, jUv2, jUv3);
+		addQuad({ -kDiag, -kDiag, 0.02f },  {  kDiag,  kDiag, 0.02f },  {  kDiag,  kDiag, kJetLen * 0.90f }, { -kDiag, -kDiag, kJetLen * 0.90f }, jUv0, jUv1, jUv2, jUv3);
+		addQuad({ -kDiag,  kDiag, 0.02f },  {  kDiag, -kDiag, 0.02f },  {  kDiag, -kDiag, kJetLen * 0.90f }, { -kDiag,  kDiag, kJetLen * 0.90f }, jUv0, jUv1, jUv2, jUv3);
+
+		// 左右マズルコンペンセイターV字サイドポート噴出炎（斜め前方±52度へ噴き出す高圧ガス）
+		for (float side : { -1.0f, 1.0f })
+		{
+			const Vector3 rootL = { side * 0.02f, 0.0f, -0.02f };
+			const Vector3 rootR = { side * 0.02f, 0.0f,  0.22f };
+			const Vector3 tipR  = { side * 0.56f, 0.0f,  0.46f };
+			const Vector3 tipL  = { side * 0.56f, 0.0f,  0.14f };
+			addQuad(rootL, rootR, tipR, tipL, jUv0, jUv1, jUv2, jUv3);
+		}
+
+		// 右タイル (u: 0.50..1.00): 6スリット・バードケージ銃口クラウンスターバースト
+		const Vector2 sUv0{ 0.51f, 0.01f }, sUv1{ 0.99f, 0.01f }, sUv2{ 0.99f, 0.99f }, sUv3{ 0.51f, 0.99f };
+		constexpr float kCrownR = 0.36f;
+		addQuad({ -kCrownR, -kCrownR, 0.08f }, { kCrownR, -kCrownR, 0.08f }, { kCrownR, kCrownR, 0.08f }, { -kCrownR, kCrownR, 0.08f }, sUv0, sUv1, sUv2, sUv3);
+		// 俯瞰カメラ向けに水平面にもクラウン閃光ディスクを重ねて視認性を確保
+		addQuad({ -kCrownR * 0.85f, 0.01f, -0.10f }, { kCrownR * 0.85f, 0.01f, -0.10f }, { kCrownR * 0.85f, 0.01f, 0.42f }, { -kCrownR * 0.85f, 0.01f, 0.42f }, sUv0, sUv1, sUv2, sUv3);
+
+		return data;
+	}
+
 	// 加算合成マズルフラッシュ粒子（コア閃光・前方ジェット・サイドベント共通）
 	void EmitAdditiveFlash(
 		AppParticleManager* mgr, const Vector3& pos, const Vector3& vel,
@@ -237,10 +290,13 @@ CombatSystem::CombatSystem(GamePlayScene* scene)
 	bullets_.reserve(Pool::kInitialBulletCapacity);
 	casings_.reserve(Pool::kMaxActiveCasings);
 	droppedMagazines_.reserve(Pool::kMaxDroppedMagazines);
+	muzzleFlashes3D_.reserve(MuzzleBlast::kMaxActiveMuzzleCones);
 }
 
 void CombatSystem::Finalize()
 {
+	muzzleFlashes3D_.clear();
+	muzzleConeMasterObj_.reset();
 	droppedMagazines_.clear();
 	enemyMagDroppedState_.clear();
 	magFullMasterObj_.reset();
@@ -269,9 +325,25 @@ void CombatSystem::EnsureBallisticAssetsLoaded()
 	{
 		muzzleFlashTexIndex_ = LoadTextureOrFallback(Assets::kMuzzleFlashTexPath, scene_->particleTextureB);
 	}
+	if (muzzleConeTexIndex_ == UINT32_MAX)
+	{
+		muzzleConeTexIndex_ = LoadTextureOrFallback(Assets::kMuzzleConeTexPath, muzzleFlashTexIndex_);
+	}
 	if (magazineTexIndex_ == UINT32_MAX)
 	{
 		magazineTexIndex_ = LoadTextureOrFallback(Assets::kMagazineTexPath, ballisticsAtlasTexIndex_);
+	}
+
+	if (!muzzleConeMasterObj_)
+	{
+		Object3d::ModelData coneModel = BuildMuzzleFlashConeModel(muzzleConeTexIndex_);
+		muzzleConeMasterObj_ = std::make_unique<Object3d>();
+		muzzleConeMasterObj_->Initialize(scene_->object3dCom, coneModel);
+		muzzleConeMasterObj_->SetCamera(scene_->camera_);
+		muzzleConeMasterObj_->SetEnableLighting(false);
+		muzzleConeMasterObj_->SetReflectionFactor(0.0f);
+		muzzleConeMasterObj_->SetAllowWireframeOverlay(false);
+		muzzleConeMasterObj_->SetColor(Assets::kWhiteColor);
 	}
 
 	if (!casingMasterObj_)
@@ -355,6 +427,8 @@ void CombatSystem::EnsureBallisticAssetsLoaded()
 void CombatSystem::Update(float deltaTime)
 {
 	UpdateCombat(deltaTime);
+	UpdateBarrelHeatSmoke(deltaTime);
+	UpdateMuzzleFlashes3D(deltaTime);
 	UpdateBullets(deltaTime);
 	UpdateShellCasings(deltaTime);
 	UpdateDroppedMagazines(deltaTime);
@@ -666,6 +740,153 @@ void CombatSystem::DrawDroppedMagazines(const RenderContext& ctx)
 	DrawSharedPropInstances(droppedMagazines_, scene_->object3dCom, ctx, magazineTexIndex_);
 }
 
+void CombatSystem::SpawnMuzzleFlashCone3D(const Vector3& muzzlePos, const Vector3& dir, bool isShotgun, bool isEnemy)
+{
+	EnsureBallisticAssetsLoaded();
+	if (!muzzleConeMasterObj_ || !scene_ || !scene_->object3dCom) return;
+
+	if (muzzleFlashes3D_.size() >= MuzzleBlast::kMaxActiveMuzzleCones)
+	{
+		muzzleFlashes3D_.erase(muzzleFlashes3D_.begin());
+	}
+
+	const float yaw = std::atan2(dir.x, dir.z);
+	const float clampedY = std::clamp(dir.y, -0.98f, 0.98f);
+	const float pitch = -std::asin(clampedY);
+	const float jitterScale = RandRange(0.90f, 1.14f);
+	const Vector3 baseSc = isShotgun
+		? MuzzleBlast::kConeScaleShotgun
+		: (isEnemy ? MuzzleBlast::kConeScaleEnemy : MuzzleBlast::kConeScalePlayer);
+
+	MuzzleFlash3DInstance mf{};
+	mf.obj = std::make_unique<Object3d>();
+	mf.obj->InitializeShared(scene_->object3dCom, muzzleConeMasterObj_.get());
+	mf.obj->SetCamera(scene_->camera_);
+	mf.obj->SetEnableLighting(false);
+	mf.obj->SetReflectionFactor(0.0f);
+	mf.obj->SetAllowWireframeOverlay(false);
+	mf.pos = muzzlePos;
+	mf.rot = { pitch, yaw, RandSym(0.22f) };
+	mf.baseScale = { baseSc.x * jitterScale, baseSc.y * jitterScale, baseSc.z * RandRange(0.92f, 1.18f) };
+	mf.baseColor = isShotgun
+		? MuzzleBlast::kConeColorShotgun
+		: (isEnemy ? MuzzleBlast::kConeColorEnemy : MuzzleBlast::kConeColorPlayer);
+	mf.age = 0.0f;
+	mf.lifeTime = isShotgun
+		? MuzzleBlast::kConeLifeShotgun
+		: (isEnemy ? MuzzleBlast::kConeLifeEnemy : MuzzleBlast::kConeLifeRifle);
+
+	mf.obj->SetTranslate(mf.pos);
+	mf.obj->SetRotate(mf.rot);
+	mf.obj->SetScale(mf.baseScale);
+	mf.obj->SetColor(mf.baseColor);
+	mf.obj->Update();
+	muzzleFlashes3D_.push_back(std::move(mf));
+}
+
+void CombatSystem::UpdateMuzzleFlashes3D(float deltaTime)
+{
+	if (muzzleFlashes3D_.empty()) return;
+
+	for (auto it = muzzleFlashes3D_.begin(); it != muzzleFlashes3D_.end(); )
+	{
+		it->age += deltaTime;
+		if (it->age >= it->lifeTime || !it->obj)
+		{
+			it = muzzleFlashes3D_.erase(it);
+			continue;
+		}
+
+		const float t = std::clamp(it->age / it->lifeTime, 0.0f, 1.0f);
+		// 初フレームで銃口から瞬間膨張し、以降は超音速燃焼ガスの急減衰カーブでキレ良く消光
+		const float expandZ = 0.85f + 0.32f * std::sin(std::min(1.0f, t * 2.2f) * (kTwoPi * 0.25f));
+		const float radialShrink = 1.0f - 0.35f * t;
+		const float lum = (1.0f - t) * (1.0f - t);
+		it->obj->SetScale({ it->baseScale.x * radialShrink, it->baseScale.y * radialShrink, it->baseScale.z * expandZ });
+		it->obj->SetColor({
+			it->baseColor.x * lum,
+			it->baseColor.y * lum * (1.0f - 0.22f * t),
+			it->baseColor.z * lum * (1.0f - 0.48f * t),
+			1.0f
+		});
+		it->obj->Update();
+		++it;
+	}
+}
+
+void CombatSystem::DrawMuzzleFlashes3D(const RenderContext& ctx)
+{
+	if (muzzleFlashes3D_.empty() || !scene_ || !scene_->object3dCom || !ctx.commandList) return;
+	EnsureBallisticAssetsLoaded();
+
+	ID3D12PipelineState* pso = additiveTracerPSO_.Get();
+	if (!pso) return;
+
+	RenderContext flashCtx = ctx;
+	if (muzzleConeTexIndex_ != UINT32_MAX && muzzleConeTexIndex_ != TextureManager::kInvalidTextureIndex)
+	{
+		flashCtx.SetTextureHandle(TextureManager::GetInstance()->GetSrvHandleGPU(muzzleConeTexIndex_));
+	}
+	flashCtx.commandList->SetPipelineState(pso);
+
+	for (auto& inst : muzzleFlashes3D_)
+	{
+		if (!inst.obj) continue;
+		if (ctx.camera)
+		{
+			inst.obj->SetCamera(ctx.camera);
+			inst.obj->Update();
+		}
+		inst.obj->DrawInternal(flashCtx);
+	}
+}
+
+void CombatSystem::UpdateBarrelHeatSmoke(float deltaTime)
+{
+	timeSinceLastPlayerShot_ += deltaTime;
+	if (barrelHeat_ <= 0.0f) return;
+
+	barrelHeat_ = (std::max)(0.0f, barrelHeat_ - MuzzleBlast::kHeatDecayRate * deltaTime);
+	if (!scene_ || !scene_->player_ || scene_->player_->IsDead() || scene_->player_->IsWeaponHolstered()) return;
+	if (barrelHeat_ < MuzzleBlast::kHeatSmokeMinThreshold || timeSinceLastPlayerShot_ < MuzzleBlast::kHeatSmokeMinPostShotSec) return;
+
+	AppParticleManager* smokeMgr = scene_->smokeParticleManager_ ? scene_->smokeParticleManager_.get() : nullptr;
+	if (!smokeMgr) return;
+	const uint32_t wispyTex = ResolveTexture3(scene_->wispySmokeTextureIndex_, scene_->soilDustTextureIndex_, scene_->smokeTextureIndex_);
+	if (wispyTex == TextureManager::kInvalidTextureIndex) return;
+
+	barrelSmokeTimer_ += deltaTime;
+	const float interval = MuzzleBlast::kHeatSmokeBaseInterval / (0.55f + barrelHeat_ * 0.85f);
+	if (barrelSmokeTimer_ >= interval)
+	{
+		barrelSmokeTimer_ = 0.0f;
+		const Vector3 muzzlePos = scene_->player_->GetMuzzleWorldPosition();
+		const float heatRatio = std::clamp((barrelHeat_ - MuzzleBlast::kHeatSmokeMinThreshold) / (1.0f - MuzzleBlast::kHeatSmokeMinThreshold), 0.0f, 1.0f);
+
+		SoftSmokeSpec hs{};
+		hs.pos = muzzlePos + Vector3{ RandSym(0.025f), 0.02f, RandSym(0.025f) };
+		hs.velocity = {
+			RandSym(MuzzleBlast::kHeatSmokeDriftXZ),
+			RandRange(MuzzleBlast::kHeatSmokeUpVelMin, MuzzleBlast::kHeatSmokeUpVelMax),
+			RandSym(MuzzleBlast::kHeatSmokeDriftXZ)
+		};
+		hs.aspect          = { 0.78f, 1.55f };
+		hs.initScale       = MuzzleBlast::kHeatSmokeInitSc * (0.85f + 0.35f * heatRatio);
+		hs.targetScale     = MuzzleBlast::kHeatSmokeTargetSc * (0.85f + 0.45f * heatRatio);
+		hs.startColor      = { 0.84f, 0.84f, 0.82f, MuzzleBlast::kHeatSmokeBaseAlpha * (0.45f + 0.55f * heatRatio) };
+		hs.endColor        = { 0.74f, 0.75f, 0.76f, 0.0f };
+		hs.drag            = 1.45f;
+		hs.curlFreq        = 2.8f;
+		hs.curlAmp         = 0.34f;
+		hs.lifeTime        = RandRange(MuzzleBlast::kHeatSmokeLifeMin, MuzzleBlast::kHeatSmokeLifeMax);
+		hs.angularVelRange = 1.6f;
+		hs.fadeInRatio     = 0.16f;
+		hs.textureIndex    = wispyTex;
+		hs.slotLayer       = 2;
+		EmitSoftSmokePuff(smokeMgr, hs);
+	}
+}
+
 void CombatSystem::EmitRealisticMuzzleBlast(const Vector3& muzzlePos, const Vector3& dir, bool isShotgun, bool isEnemy)
 {
 	if (!scene_ || !scene_->particleManager || !scene_->appParticleManager_) return;
@@ -674,6 +895,14 @@ void CombatSystem::EmitRealisticMuzzleBlast(const Vector3& muzzlePos, const Vect
 	AppParticleManager* flashMgr = scene_->appParticleManager_.get();
 	const Vector3 right = ComputeHorizontalRight(dir);
 	const uint32_t flashTex = ResolveTexture3(muzzleFlashTexIndex_, scene_->particleTextureB, scene_->particleTextureB);
+
+	// 0. 射線方向へ正確に伸びる3D A2コンペンセイター・マズルフラッシュコーンを発火
+	SpawnMuzzleFlashCone3D(muzzlePos, dir, isShotgun, isEnemy);
+	if (!isEnemy)
+	{
+		barrelHeat_ = (std::min)(1.0f, barrelHeat_ + (isShotgun ? MuzzleBlast::kHeatAddShotgun : MuzzleBlast::kHeatAddRifle));
+		timeSinceLastPlayerShot_ = 0.0f;
+	}
 
 	// 1. 銃口クラウン直前の白熱マッハディスク閃光
 	const float coreScale = isShotgun
@@ -783,6 +1012,29 @@ void CombatSystem::EmitRealisticMuzzleBlast(const Vector3& muzzlePos, const Vect
 		ch.fadeInRatio  = MuzzleBlast::kChamberFadeInRatio;
 		ch.textureIndex = wispyTex;
 		EmitSoftSmokePuff(smokeMgr, ch);
+
+		// 銃口ブラストの衝撃波が前方の地表砂塵を扇状に吹き払うリアル気流パフ
+		for (float side : { -1.0f, 1.0f })
+		{
+			SoftSmokeSpec gb{};
+			gb.pos = {
+				muzzlePos.x + dir.x * MuzzleBlast::kGroundBlastDist + right.x * (side * 0.16f),
+				MuzzleBlast::kGroundBlastY,
+				muzzlePos.z + dir.z * MuzzleBlast::kGroundBlastDist + right.z * (side * 0.16f)
+			};
+			gb.velocity     = dir * MuzzleBlast::kGroundBlastFwdSpd + right * (side * MuzzleBlast::kGroundBlastSideSpd) + Vector3{ 0.0f, 0.22f, 0.0f };
+			gb.aspect       = { 1.48f, 0.72f };
+			gb.initScale    = MuzzleBlast::kGroundBlastInitSc;
+			gb.targetScale  = MuzzleBlast::kGroundBlastEndSc;
+			gb.startColor   = { 0.68f, 0.60f, 0.46f, isShotgun ? (MuzzleBlast::kGroundBlastAlpha * 1.35f) : MuzzleBlast::kGroundBlastAlpha };
+			gb.endColor     = { 0.64f, 0.58f, 0.48f, 0.0f };
+			gb.drag         = 3.4f;
+			gb.lifeTime     = MuzzleBlast::kGroundBlastLife;
+			gb.fadeInRatio  = 0.10f;
+			gb.textureIndex = corditeTex;
+			gb.slotLayer    = 1;
+			EmitSoftSmokePuff(smokeMgr, gb);
+		}
 	}
 }
 
@@ -831,6 +1083,33 @@ void CombatSystem::UpdateCombat(float deltaTime)
 			}
 
 			const Vector3 muzzlePos = fired[0]->GetPosition();
+			const Vector3 baseDir = fired[0]->GetDirection();
+
+			// 川面（橋デッキ外）へレティクルを合わせて射撃した際、水面へ正確に弾頭を着水させて水柱スプラッシュを発生させる
+			const float aimDist = scene_->player_->GetAimRayDistance();
+			const Vector3 aimWaterCandidate = {
+				muzzlePos.x + baseDir.x * aimDist,
+				0.04f,
+				muzzlePos.z + baseDir.z * aimDist
+			};
+			const bool aimingAtOpenRiver =
+				(aimDist > 1.0f) &&
+				(aimWaterCandidate.z >= GameConfig::Environment::kRiverZMin + 0.15f) &&
+				(aimWaterCandidate.z <= GameConfig::Environment::kRiverZMax - 0.15f) &&
+				!IsOnWoodenBridgeDeck(aimWaterCandidate);
+
+			if (aimingAtOpenRiver)
+			{
+				const float slopeY = std::clamp((0.04f - muzzlePos.y) / (std::max)(aimDist, 1.4f), -0.52f, -0.025f);
+				for (auto& b : fired)
+				{
+					if (!b) continue;
+					Vector3 d = b->GetDirection();
+					d.y = slopeY;
+					b->SetDirection(d);
+				}
+			}
+
 			const Vector3 dir = fired[0]->GetDirection();
 			EmitRealisticMuzzleBlast(muzzlePos, dir, isShotgun, false);
 			SpawnShellCasing(muzzlePos - dir * Casing::kPlayerBreechBackOffset, dir, false);
@@ -894,6 +1173,212 @@ void CombatSystem::UpdateCombat(float deltaTime)
 	}
 }
 
+void CombatSystem::EmitRiverBallisticSplash(const Vector3& waterPos, const Vector3& bulletDir, bool fullPlunge)
+{
+	if (!scene_ || !scene_->particleManager) return;
+
+	AppParticleManager* smokeMgr = scene_->smokeParticleManager_ ? scene_->smokeParticleManager_.get() : nullptr;
+	AppParticleManager* addMgr   = scene_->appParticleManager_ ? scene_->appParticleManager_.get() : nullptr;
+	EnsureBallisticAssetsLoaded();
+
+	const uint32_t foamTex = ResolveTexture3(
+		scene_->waterFoamTextureIndex_, scene_->wispySmokeTextureIndex_, scene_->smokeTextureIndex_);
+	const uint32_t dropTex = ResolveTexture3(
+		scene_->minovskyCircleTextureIndex_, scene_->sparkStreakTextureIndex_, scene_->particleTextureB);
+	const Vector3 right = ComputeHorizontalRight(bulletDir);
+
+	if (!fullPlunge)
+	{
+		// 超音速弾頭が川面直上を通過した際の衝撃波ルースターテール（V字水しぶきウェイク）
+		if (smokeMgr && foamTex != TextureManager::kInvalidTextureIndex)
+		{
+			for (float side : { -1.0f, 1.0f })
+			{
+				AppParticle spray{};
+				spray.transform.Initialize();
+				spray.transform.SetTranslate({ waterPos.x + right.x * (side * 0.08f), 0.06f, waterPos.z + right.z * (side * 0.08f) });
+				spray.transform.SetRotate({ 0.0f, 0.0f, RandRange(0.0f, kTwoPi) });
+				spray.scaleAspect = { 0.85f, 1.45f };
+				spray.initialScale = RandRange(0.11f, 0.17f);
+				spray.targetScale = spray.initialScale * 2.15f;
+				spray.transform.SetScale({ spray.initialScale * spray.scaleAspect.x, spray.initialScale * spray.scaleAspect.y, 1.0f });
+				spray.velocity = right * (side * RandRange(0.95f, 1.85f)) + Vector3{ 0.45f, RandRange(1.25f, 2.45f), 0.0f };
+				spray.color = { 0.88f, 0.97f, 1.0f, 0.56f };
+				spray.endColor = { 0.72f, 0.90f, 0.98f, 0.0f };
+				spray.hasColorShift = true;
+				spray.gravity = 11.5f;
+				spray.drag = 1.8f;
+				spray.lifeTime = RandRange(0.30f, 0.48f);
+				spray.fadeInRatio = 0.08f;
+				spray.textureIndex = foamTex;
+				spray.slotLayer = 1;
+				smokeMgr->AddParticle(spray);
+			}
+		}
+		if (addMgr && dropTex != TextureManager::kInvalidTextureIndex)
+		{
+			for (int i = 0; i < 4; ++i)
+			{
+				const float side = (i % 2 == 0) ? 1.0f : -1.0f;
+				AppParticle drop{};
+				drop.transform.Initialize();
+				drop.transform.SetTranslate({ waterPos.x + RandSym(0.10f), 0.08f, waterPos.z + RandSym(0.10f) });
+				drop.scaleAspect = { 0.82f, 1.30f };
+				drop.initialScale = RandRange(0.032f, 0.052f);
+				drop.targetScale = drop.initialScale * 0.35f;
+				drop.transform.SetScale({ drop.initialScale * drop.scaleAspect.x, drop.initialScale * drop.scaleAspect.y, 1.0f });
+				drop.velocity = right * (side * RandRange(0.8f, 2.2f)) + Vector3{ RandSym(0.6f), RandRange(1.6f, 3.2f), RandSym(0.6f) };
+				drop.color = { 0.68f, 0.94f, 1.0f, 0.88f };
+				drop.endColor = { 0.24f, 0.72f, 0.98f, 0.0f };
+				drop.hasColorShift = true;
+				drop.gravity = 14.5f;
+				drop.drag = 1.0f;
+				drop.lifeTime = RandRange(0.32f, 0.52f);
+				drop.twinkleSpeed = 18.0f;
+				drop.twinklePhase = RandRange(0.0f, kTwoPi);
+				drop.textureIndex = dropTex;
+				drop.slotLayer = 2;
+				addMgr->AddParticle(drop);
+			}
+		}
+		return;
+	}
+
+	// === 水面直撃・着水：豪快な立体水柱ガイザー ＆ 白泡波紋リング ＆ きらめく飛沫クラウン ===
+	if (scene_->player_)
+	{
+		TacticalAudio::Play3D(
+			"Resources/Audio/SE_Water_Splash.wav", waterPos, scene_->player_->GetPosition(),
+			0.78f, 4.5f, 38.0f, 38, "water_bullet_splash");
+	}
+
+	if (smokeMgr && foamTex != TextureManager::kInvalidTextureIndex)
+	{
+		// 1. 高圧で噴き上がる立体水柱（ガイザー）コア 22本
+		for (int i = 0; i < 22; ++i)
+		{
+			const float ratio = static_cast<float>(i) / 21.0f;
+			const float ang = RandRange(0.0f, kTwoPi);
+			const float spreadR = RandRange(0.04f, 0.26f) * (1.0f - ratio * 0.45f);
+			AppParticle jet{};
+			jet.transform.Initialize();
+			jet.transform.SetTranslate({
+				waterPos.x + std::cos(ang) * spreadR * 0.45f,
+				0.06f + ratio * 0.24f,
+				waterPos.z + std::sin(ang) * spreadR * 0.45f
+			});
+			jet.transform.SetRotate({ 0.0f, 0.0f, RandSym(0.35f) });
+			jet.scaleAspect = { 0.60f, 1.90f };
+			jet.initialScale = RandRange(0.14f, 0.25f) * (1.10f - ratio * 0.35f);
+			jet.targetScale = jet.initialScale * RandRange(1.85f, 2.45f);
+			jet.transform.SetScale({ jet.initialScale * jet.scaleAspect.x, jet.initialScale * jet.scaleAspect.y, 1.0f });
+			jet.velocity = {
+				std::cos(ang) * RandRange(0.35f, 1.55f) + bulletDir.x * 1.15f + 0.35f,
+				RandRange(2.8f, 6.6f) * (0.55f + ratio * 0.65f),
+				std::sin(ang) * RandRange(0.35f, 1.55f) + bulletDir.z * 1.15f
+			};
+			jet.color = { 0.90f, 0.98f, 1.0f, RandRange(0.62f, 0.84f) };
+			jet.endColor = { 0.74f, 0.91f, 0.99f, 0.0f };
+			jet.hasColorShift = true;
+			jet.gravity = 13.8f;
+			jet.drag = 1.35f;
+			jet.lifeTime = RandRange(0.46f, 0.82f);
+			jet.fadeInRatio = 0.06f;
+			jet.textureIndex = foamTex;
+			jet.slotLayer = 1;
+			smokeMgr->AddParticle(jet);
+		}
+
+		// 2. 水面を同心円状に広がる白泡リップルリング 16分割
+		for (int k = 0; k < 16; ++k)
+		{
+			const float a = static_cast<float>(k) * (kTwoPi / 16.0f) + RandSym(0.08f);
+			const float cosA = std::cos(a);
+			const float sinA = std::sin(a);
+			const float radSpd = RandRange(1.75f, 3.05f);
+			AppParticle ring{};
+			ring.transform.Initialize();
+			ring.transform.SetTranslate({ waterPos.x + cosA * 0.14f, 0.048f, waterPos.z + sinA * 0.14f });
+			ring.transform.SetRotate({ 0.0f, 0.0f, a });
+			ring.scaleAspect = { 1.75f, 0.52f };
+			ring.initialScale = RandRange(0.13f, 0.20f);
+			ring.targetScale = ring.initialScale * 2.65f;
+			ring.transform.SetScale({ ring.initialScale * ring.scaleAspect.x, ring.initialScale * ring.scaleAspect.y, 1.0f });
+			ring.velocity = { cosA * radSpd + 0.55f, 0.04f, sinA * radSpd };
+			ring.color = { 0.86f, 0.96f, 1.0f, 0.60f };
+			ring.endColor = { 0.68f, 0.88f, 0.98f, 0.0f };
+			ring.hasColorShift = true;
+			ring.drag = 2.6f;
+			ring.lifeTime = RandRange(0.52f, 0.80f);
+			ring.fadeInRatio = 0.08f;
+			ring.textureIndex = foamTex;
+			ring.slotLayer = 0;
+			smokeMgr->AddParticle(ring);
+		}
+
+		// 3. 川風に乗って漂う冷たい水煙エアロゾルミスト 8個
+		for (int m = 0; m < 8; ++m)
+		{
+			AppParticle mist{};
+			mist.transform.Initialize();
+			mist.transform.SetTranslate({ waterPos.x + RandSym(0.28f), RandRange(0.14f, 0.38f), waterPos.z + RandSym(0.28f) });
+			mist.transform.SetRotate({ 0.0f, 0.0f, RandRange(0.0f, kTwoPi) });
+			mist.scaleAspect = { 1.35f, 0.92f };
+			mist.initialScale = RandRange(0.24f, 0.38f);
+			mist.targetScale = mist.initialScale * 2.55f;
+			mist.transform.SetScale({ mist.initialScale * mist.scaleAspect.x, mist.initialScale * mist.scaleAspect.y, 1.0f });
+			mist.velocity = { RandRange(0.65f, 1.65f), RandRange(0.45f, 1.25f), RandSym(0.65f) };
+			mist.color = { 0.84f, 0.94f, 1.0f, 0.32f };
+			mist.endColor = { 0.76f, 0.90f, 0.98f, 0.0f };
+			mist.hasColorShift = true;
+			mist.drag = 1.9f;
+			mist.curlFreq = 2.2f;
+			mist.curlAmp = 0.28f;
+			mist.lifeTime = RandRange(0.72f, 1.15f);
+			mist.fadeInRatio = 0.18f;
+			mist.textureIndex = foamTex;
+			mist.slotLayer = 0;
+			smokeMgr->AddParticle(mist);
+		}
+	}
+
+	// 4. 陽光を反射して放物線を描き水面に跳ねるクリスタル水滴 28粒
+	if (addMgr && dropTex != TextureManager::kInvalidTextureIndex)
+	{
+		for (int d = 0; d < 28; ++d)
+		{
+			const float a = RandRange(0.0f, kTwoPi);
+			const float hSpd = RandRange(1.1f, 4.3f);
+			AppParticle drop{};
+			drop.transform.Initialize();
+			drop.transform.SetTranslate({ waterPos.x + std::cos(a) * 0.10f, 0.10f + RandRange(0.0f, 0.18f), waterPos.z + std::sin(a) * 0.10f });
+			drop.scaleAspect = { 0.80f, 1.35f };
+			drop.initialScale = RandRange(0.036f, 0.068f);
+			drop.targetScale = drop.initialScale * 0.30f;
+			drop.transform.SetScale({ drop.initialScale * drop.scaleAspect.x, drop.initialScale * drop.scaleAspect.y, 1.0f });
+			drop.velocity = {
+				std::cos(a) * hSpd + bulletDir.x * 0.85f,
+				RandRange(2.5f, 6.4f),
+				std::sin(a) * hSpd + bulletDir.z * 0.85f
+			};
+			drop.color = (d % 3 == 0)
+				? Vector4{ 0.92f, 0.99f, 1.0f, 0.95f }
+				: Vector4{ 0.56f, 0.90f, 1.0f, 0.90f };
+			drop.endColor = { 0.18f, 0.65f, 0.96f, 0.0f };
+			drop.hasColorShift = true;
+			drop.gravity = 15.2f;
+			drop.bounceElasticity = 0.28f;
+			drop.drag = 0.85f;
+			drop.lifeTime = RandRange(0.45f, 0.88f);
+			drop.twinkleSpeed = 18.0f;
+			drop.twinklePhase = a;
+			drop.textureIndex = dropTex;
+			drop.slotLayer = 2;
+			addMgr->AddParticle(drop);
+		}
+	}
+}
+
 void CombatSystem::UpdateBullets(float deltaTime)
 {
 	AppParticleManager* smokeMgr = (scene_ && scene_->smokeParticleManager_) ? scene_->smokeParticleManager_.get() : nullptr;
@@ -911,6 +1396,19 @@ void CombatSystem::UpdateBullets(float deltaTime)
 		if (!bullet || bullet->IsDead()) continue;
 
 		bullet->Update(deltaTime);
+
+		// 川面への着水判定（水柱ガイザースプラッシュを発生させて弾頭を水没消滅）
+		const Vector3 curBulletPos = bullet->GetPosition();
+		const bool overOpenRiver =
+			(curBulletPos.z >= GameConfig::Environment::kRiverZMin + 0.15f) &&
+			(curBulletPos.z <= GameConfig::Environment::kRiverZMax - 0.15f) &&
+			!IsOnWoodenBridgeDeck(curBulletPos);
+		if (overOpenRiver && curBulletPos.y <= 0.16f)
+		{
+			EmitRiverBallisticSplash({ curBulletPos.x, 0.04f, curBulletPos.z }, bullet->GetDirection(), true);
+			bullet->Kill();
+			continue;
+		}
 
 		// 敵の弾丸とプレイヤーアヒルの「かすり判定(Graze/NearMiss)」
 		if (bullet->GetOwner() == BulletOwner::Enemy && scene_->player_ && !scene_->player_->IsDead() && !bullet->IsNearMissTriggered())
@@ -971,6 +1469,12 @@ void CombatSystem::UpdateBullets(float deltaTime)
 			wake.textureIndex = wispyTex;
 			wake.slotLayer    = 0;
 			EmitSoftSmokePuff(smokeMgr, wake);
+
+			// 水面上空を掠める超音速弾の衝撃波しぶき（ルースターテール）
+			if (overOpenRiver && pos.y > 0.16f && pos.y <= 1.25f)
+			{
+				EmitRiverBallisticSplash({ pos.x, 0.04f, pos.z }, dir, false);
+			}
 
 			if (scene_->particleManager && scene_->appParticleManager_ && (std::rand() % GrazeAndWake::kEmberChanceModulus == 0))
 			{

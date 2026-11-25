@@ -191,6 +191,13 @@ namespace
             DrawSlantedPlate(dl, x, y, w * ratio, h, slant, fillCol);
     }
 
+    uint32_t ScaleHudAlpha(uint32_t col, float alphaScale) noexcept
+    {
+        const uint32_t a = (col >> UI_COL32_A_SHIFT) & HudPalette::kChannelMask;
+        const uint32_t sa = static_cast<uint32_t>((std::clamp)(static_cast<int>(static_cast<float>(a) * alphaScale), 0, HudPalette::kMaxAlphaInt));
+        return (col & HudPalette::kRgbMask) | (sa << UI_COL32_A_SHIFT);
+    }
+
     void DrawKeycapBadge(
         TacticalDrawList* dl, float x, float y, float w, float h, float rounding,
         uint32_t bgCol, uint32_t bdCol, float bdThick, float fontSize, uint32_t textCol, const char* keyText, float textCenterY)
@@ -198,6 +205,45 @@ namespace
         dl->AddRectFilled(UIVec2(x, y), UIVec2(x + w, y + h), bgCol, rounding);
         dl->AddRect(UIVec2(x, y), UIVec2(x + w, y + h), bdCol, rounding, UIDrawFlags_None, bdThick);
         DrawShadowedTextAligned(dl, UIFontRole::SubBoldJP, fontSize, x + w * 0.5f, textCenterY, textCol, keyText, HudTextAlign::Center);
+    }
+
+    void DrawKeyPromptPill(
+        TacticalDrawList* dl, float centerX, float topY, float pillH, float slant, float uiScale,
+        const char* keyLabel, const char* actionText, float keyFontPx, float textFontPx,
+        uint32_t pillBg, uint32_t pillBd, uint32_t keyBg, uint32_t keyBd, uint32_t keyTx, uint32_t textCol,
+        float minClampX, float maxClampX, float alphaScale = 1.0f)
+    {
+        if (!dl || !actionText || !actionText[0] || alphaScale <= 0.01f) return;
+        namespace RT = HudLayout::Reticle;
+        const float padX   = RT::kPromptPadX * uiScale;
+        const UIVec2 actSz = MeasureSharpText(UIFontRole::SubBoldJP, textFontPx, actionText);
+        const bool hasKey  = (keyLabel && keyLabel[0]);
+        const float keyW   = hasKey ? (MeasureSharpText(UIFontRole::SubBoldJP, keyFontPx, keyLabel).x + RT::kPromptKeyPadW * uiScale) : 0.0f;
+        const float keyGap = hasKey ? (RT::kPromptKeyGapX * uiScale) : 0.0f;
+        const float pillW  = padX * 2.0f + keyW + keyGap + actSz.x;
+        const float safeMaxX = (std::max)(minClampX, maxClampX - pillW);
+        const float px = std::round((std::clamp)(centerX - pillW * 0.5f, minClampX, safeMaxX));
+        const float py = std::round(topY);
+        const float midY = py + pillH * 0.5f;
+
+        const uint32_t shCol  = ScaleHudAlpha(HudPalette::kPanelShadow140, alphaScale);
+        const uint32_t bgColS = ScaleHudAlpha(pillBg, alphaScale);
+        const uint32_t bdColS = ScaleHudAlpha(pillBd, alphaScale);
+        DrawSlantedPlate(dl, px + 1.5f, py + 2.0f, pillW, pillH, slant, shCol);
+        DrawSlantedPlate(dl, px, py, pillW, pillH, slant, bgColS, bdColS, 1.35f);
+        DrawSlantedPlate(dl, px, py, 3.4f * uiScale, pillH, slant, bdColS);
+
+        float textStartX = px + padX + 2.0f * uiScale;
+        if (hasKey)
+        {
+            const float kh = (std::max)(12.0f, pillH - RT::kPromptKeyHTrim * uiScale);
+            const float ky = py + (pillH - kh) * 0.5f;
+            DrawKeycapBadge(dl, textStartX, ky, keyW, kh, 2.5f,
+                ScaleHudAlpha(keyBg, alphaScale), ScaleHudAlpha(keyBd, alphaScale), 1.15f,
+                keyFontPx, ScaleHudAlpha(keyTx, alphaScale), keyLabel, midY);
+            textStartX += keyW + keyGap;
+        }
+        DrawShadowedTextAligned(dl, UIFontRole::SubBoldJP, textFontPx, textStartX, midY, ScaleHudAlpha(textCol, alphaScale), actionText, HudTextAlign::Left);
     }
 
     void DrawAccentedTag(
@@ -327,7 +373,7 @@ namespace
         info.accentCol   = spec.accentCol;
     }
 
-    ActiveObjectiveInfo ResolveActiveObjective(const GamePlayHUDContext& ctx)
+    ActiveObjectiveInfo ResolveActiveObjective(const GamePlayHUDContext& ctx, int prevChosenIdx = -1)
     {
         namespace Obj = HudLayout::Objective;
         ActiveObjectiveInfo info{};
@@ -401,17 +447,19 @@ namespace
             }
             else
             {
-                float bestDistSq = Obj::kMaxSearchDistSq;
+                float bestScore = Obj::kMaxSearchDistSq;
                 for (int i = 0; i < static_cast<int>(ctx.targets->size()); ++i)
                 {
                     if (!isAlive(i)) continue;
                     const Vector3 tp = (*ctx.targets)[i]->GetPosition();
                     const float dx = tp.x - pPos.x;
                     const float dz = tp.z - pPos.z;
-                    const float d2 = dx * dx + dz * dz;
-                    if (d2 < bestDistSq)
+                    const float dist = std::sqrt(dx * dx + dz * dz);
+                    // 等距離ライン付近での標的[3]⇔[4]の高速チラつきを防ぐヒステリシス補正
+                    const float score = (i == prevChosenIdx) ? (dist - 3.0f) : dist;
+                    if (score < bestScore)
                     {
-                        bestDistSq = d2;
+                        bestScore = score;
                         chosenIdx = i;
                     }
                 }
@@ -483,6 +531,9 @@ void GamePlayHUD::Initialize()
     scratchGuidePath_.reserve(HudLayout::Common::kSmoothPathReserve);
     cachedGuideGoal_         = { 0.0f, 0.0f, 0.0f };
     guidePathRefreshTimer_   = 0.0f;
+    smoothedOffscreenDir_    = { 0.0f, -1.0f };
+    hasOffscreenDir_         = false;
+    lastActiveTargetIdx_     = -1;
 }
 
 bool GamePlayHUD::Project3DTo2D(const Vector3& pos3D, const Matrix4x4& vp, float screenW, float screenH, Vector2& outPos)
@@ -646,6 +697,59 @@ void GamePlayHUD::DrawMissionObjectiveHUD(const GamePlayHUDContext& ctx)
     std::snprintf(distBuf, sizeof(distBuf), "%.0fm", distToExtract);
     DrawShadowedTextAligned(dl, UIFontRole::SubBoldJP, MH::kDistFont * uiScale, hudX + hudW - MH::kDistRightPadX * uiScale, midY,
         ctx.isReadyToExtract ? MH::kLzOpenDistCol : MH::kLzLockDistCol, distBuf, HudTextAlign::Right);
+
+    // 4. [F7] 自動デモプレイ稼働バナー ＆ [RMB] バレットタイム表示（上部ヘッダー直下）
+    float subBannerY = hudY + hudH + 7.0f * uiScale;
+    if (ctx.isAutoDemoPlay)
+    {
+        const bool isClearPass = ((ctx.autoDemoCycleIndex & 1) != 0);
+        const float pulse = 0.5f + 0.5f * std::sin(timeNow * 4.5f);
+        const char* mainTitle = AsUtf8(u8"DEMO PLAY  //  自動デモプレイ稼働中");
+        const char* subTitle  = isClearPass
+            ? AsUtf8(u8"【2/2周目：クリア実演】全標的制圧〜ヘリ脱出   |   [F7] キーで自分でプレイする")
+            : AsUtf8(u8"【1/2周目：敗北・救難演出】続いて2周目でクリア実演   |   [F7] キーで自分でプレイする");
+
+        const float mainFont = 19.0f * uiScale;
+        const float subFont  = 12.5f * uiScale;
+        const UIVec2 mSz     = MeasureSharpText(UIFontRole::TitleBoldJP, mainFont, mainTitle);
+        const UIVec2 sSz     = MeasureSharpText(UIFontRole::SubBoldJP, subFont, subTitle);
+        const float dW       = (std::max)(mSz.x + 56.0f * uiScale, sSz.x + 36.0f * uiScale);
+        const float dH       = 48.0f * uiScale;
+        const float dSlant   = 8.0f * uiScale;
+        const float dX       = std::round((vp.screenW - dW) * 0.5f);
+        const uint32_t bdCol = isClearPass
+            ? UI_COL32(70, 245, 185, static_cast<int>(200.0f + 55.0f * pulse))
+            : UI_COL32(255, 195, 75, static_cast<int>(200.0f + 55.0f * pulse));
+        const uint32_t recCol = UI_COL32(255, 75, 65, static_cast<int>(150.0f + 105.0f * pulse));
+
+        DrawSlantedPlate(dl, dX + 2.5f, subBannerY + 3.0f, dW, dH, dSlant, HudPalette::kPanelShadow140);
+        DrawSlantedPlate(dl, dX, subBannerY, dW, dH, dSlant, UI_COL32(8, 16, 26, 242), bdCol, 1.8f);
+        dl->AddLine(UIVec2(dX + dSlant, subBannerY), UIVec2(dX + dW + dSlant, subBannerY), bdCol, 2.6f * uiScale);
+
+        // 点滅インジケータードット ＋ 大見出し「DEMO PLAY // 自動デモプレイ稼働中」
+        const float row1Y = subBannerY + 15.5f * uiScale;
+        const float row2Y = subBannerY + 35.5f * uiScale;
+        dl->AddCircleFilled(UIVec2(vp.screenW * 0.5f - mSz.x * 0.5f - 12.0f * uiScale, row1Y), 5.0f * uiScale, recCol, 14);
+        DrawShadowedTextAligned(dl, UIFontRole::TitleBoldJP, mainFont, vp.screenW * 0.5f + 4.0f * uiScale, row1Y,
+            UI_COL32(255, 242, 165, 255), mainTitle, HudTextAlign::Center);
+        DrawShadowedTextAligned(dl, UIFontRole::SubBoldJP, subFont, vp.screenW * 0.5f, row2Y,
+            UI_COL32(225, 244, 255, 250), subTitle, HudTextAlign::Center);
+
+        subBannerY += dH + 6.0f * uiScale;
+    }
+    if (ctx.isBulletTimeActive)
+    {
+        const char* btTxt = AsUtf8(u8"BULLET TIME // 0.25x スロー鑑賞中");
+        const float bFont = 12.5f * uiScale;
+        const UIVec2 bSz  = MeasureSharpText(UIFontRole::SubBoldJP, bFont, btTxt);
+        const float bW    = bSz.x + 28.0f * uiScale;
+        const float bH    = 22.0f * uiScale;
+        const float bX    = std::round((vp.screenW - bW) * 0.5f);
+        DrawAccentedTag(dl, bX, subBannerY, bW, bH, 5.0f * uiScale,
+            2.0f, 2.0f, HudPalette::kPanelShadow120,
+            UI_COL32(14, 28, 42, 226), UI_COL32(255, 210, 85, 235), 1.3f,
+            4.0f * uiScale, bFont, 12.0f * uiScale, UI_COL32(255, 236, 165, 255), btTxt, UI_COL32(80, 230, 255, 255));
+    }
 }
 
 // =============================================================================
@@ -833,9 +937,9 @@ void GamePlayHUD::DrawPlayerVitalsHUD(const GamePlayHUDContext& ctx, float delta
     }
 
     // =========================================================================
-    // 4. プレイヤー足元のタクティカル・ラジアル進捗リング（交戦中に視線を逸らさずリロード・回復完了を把握）
+    // 4. プレイヤー足元のタクティカル・ラジアル進捗リング（リロード文字表記はレティクル直下に一本化して重複を解消）
     // =========================================================================
-    if (ctx.camera && (ctx.player->IsReloading() || ctx.player->IsHealing()))
+    if (ctx.camera && !ctx.isFullMapOpen && (ctx.player->IsReloading() || ctx.player->IsHealing()))
     {
         Vector2 feet2D{};
         if (Project3DTo2D(ctx.player->GetPosition() + Vector3{ 0.0f, SP::kFeetOffsetY, 0.0f },
@@ -1286,9 +1390,9 @@ void GamePlayHUD::DrawPlayerAmmoHUD(const GamePlayHUDContext& ctx, float /*delta
     const char* alertText = nullptr;
     uint32_t alertCol     = 0;
     if (isReloading)                         { alertText = AsUtf8(u8"RELOADING // 装填中"); alertCol = AP::kReloadTextCol; }
-    else if (isCancelled)                    { alertText = AsUtf8(u8"装填中断！");           alertCol = AP::kCancelTextCol; }
-    else if (ammo == 0)                      { alertText = AsUtf8(u8"弾切れ // [R] 装填");   alertCol = AP::kEmptyTextCol; }
-    else if (ammo <= AP::kLowAmmoThreshold)  { alertText = AsUtf8(u8"残弾少 // [R] 装填");   alertCol = AP::kLowAmmoTextCol; }
+    else if (isCancelled)                    { alertText = AsUtf8(u8"RELOAD CANCELLED");    alertCol = AP::kCancelTextCol; }
+    else if (ammo == 0)                      { alertText = AsUtf8(u8"EMPTY // 弾切れ");     alertCol = AP::kEmptyTextCol; }
+    else if (ammo <= AP::kLowAmmoThreshold)  { alertText = AsUtf8(u8"LOW AMMO // 残弾少");  alertCol = AP::kLowAmmoTextCol; }
 
     if (alertText)
     {
@@ -1596,10 +1700,12 @@ void GamePlayHUD::DrawLootingHUD(const GamePlayHUDContext& ctx)
 
         if (isNearby)
         {
-            const char* holdHint      = AsUtf8(u8"長押しで回収");
+            const char* keyBadgeTxt   = prop.isBreakableCrate ? "LMB" : "E";
+            const char* holdHint      = prop.isBreakableCrate ? AsUtf8(u8"射撃で破壊して回収") : AsUtf8(u8"長押しで回収");
+            const float keyBadgeW     = (std::max)(LC::kKeyW * uiScale, MeasureSharpText(UIFontRole::SubBoldJP, LC::kKeyFont * uiScale, keyBadgeTxt).x + 9.0f * uiScale);
             const UIVec2 nameSz       = MeasureSharpText(UIFontRole::SubBoldJP, LC::kNameFont * uiScale, prop.name.c_str());
             const UIVec2 hintSz       = MeasureSharpText(UIFontRole::SubBoldJP, LC::kHintFont * uiScale, holdHint);
-            const float rightContentW = (std::max)(LC::kHintKeyReserveW * uiScale + hintSz.x + LC::kHintRightPadW * uiScale,
+            const float rightContentW = (std::max)(keyBadgeW + LC::kHintGapX * uiScale + hintSz.x + LC::kHintRightPadW * uiScale,
                                                    nameSz.x + LC::kNameRightPadW * uiScale);
             const float cardW         = (std::max)(LC::kMinCardW * uiScale, LC::kLeftIconColW * uiScale + rightContentW);
             const float cardH         = LC::kCardH * uiScale;
@@ -1640,10 +1746,10 @@ void GamePlayHUD::DrawLootingHUD(const GamePlayHUDContext& ctx)
                 DrawShadowedTextAligned(dl, UIFontRole::SubBoldJP, LC::kNameFont * uiScale,
                     textX, cy + LC::kIdleNameCenterY * uiScale, isRare ? LC::kRareNameCol : LC::kNormalNameCol, prop.name.c_str(), HudTextAlign::Left);
 
-                // [E] キーキャップ ＋ 「長押しで回収」 1:1 シャープテキスト
-                const float kW = LC::kKeyW * uiScale, kH = LC::kKeyH * uiScale, kY = cy + LC::kKeyTopY * uiScale;
+                // キーキャップ ＋ 回収／破壊ガイドテキスト
+                const float kW = keyBadgeW, kH = LC::kKeyH * uiScale, kY = cy + LC::kKeyTopY * uiScale;
                 DrawKeycapBadge(dl, textX, kY, kW, kH, LC::kKeyRounding, LC::kKeyBg, cBorder, LC::kKeyBorderThick,
-                    LC::kKeyFont * uiScale, HudPalette::kTextPureWhite, "E", kY + kH * 0.5f);
+                    LC::kKeyFont * uiScale, HudPalette::kTextPureWhite, keyBadgeTxt, kY + kH * 0.5f);
                 DrawShadowedTextAligned(dl, UIFontRole::SubBoldJP, LC::kHintFont * uiScale,
                     textX + kW + LC::kHintGapX * uiScale, kY + kH * 0.5f, isRare ? LC::kRareHintCol : LC::kNormalHintCol, holdHint, HudTextAlign::Left);
             }
@@ -1901,6 +2007,27 @@ void GamePlayHUD::DrawLaserSight(const GamePlayHUDContext& ctx)
             if (t && !t->IsDead()) checkSphereHit(t->GetPosition(), t->GetRadius() * LS::kTargetHitRadMul);
         }
     }
+    if (ctx.lootProps)
+    {
+        // 未回収の破壊可能木箱も照準時にロックオン反応させ、「撃って壊せる」手応えを視覚的に提示
+        for (const auto& prop : *ctx.lootProps)
+        {
+            if (prop.isLooted || !prop.isBreakableCrate) continue;
+            const Vector3 m  = muzzlePos - prop.position;
+            const float b    = m.x * forward.x + m.z * forward.z;
+            const float cVal = (m.x * m.x + m.z * m.z) - 0.72f * 0.72f;
+            if (cVal > 0.0f && b > 0.0f) continue;
+            const float discr = b * b - cVal;
+            if (discr < 0.0f) continue;
+            const float t = -b - std::sqrt(discr);
+            if (t > LS::kMinSphereHitDist && t <= closestWallDist + 0.55f)
+            {
+                lockedOnTarget = true;
+                if (t < closestHitDist) closestHitDist = t;
+                blockedByWall = false;
+            }
+        }
+    }
 
     laserLockedOnTarget_ = lockedOnTarget;
 
@@ -1983,11 +2110,20 @@ void GamePlayHUD::DrawTacticalReticle(const GamePlayHUDContext& ctx)
         return;
     }
 
-    // 2. リロード中：視線を外さず完了タイミングが把握できる円形プログレスアーク＋中心ドット
+    const float timeNow       = static_cast<float>(TacticalUICanvas::GetInstance()->GetTime());
+    const float alertRatio    = (std::clamp)(ctx.player->GetEmptyTriggerAlertTimer() / 0.34f, 0.0f, 1.0f);
+    const float completeRatio = (std::clamp)(ctx.player->GetReloadCompleteFlashTimer() / RT::kCompleteFlashDuration, 0.0f, 1.0f);
+    const float minClampX     = RT::kPromptClampPadX * uiScale;
+    const float maxClampX     = vpInfo.screenW - minClampX;
+
+    // 2. リロード中：視線を外さず完了タイミングが把握できる3段階カラー円形アーク＋レティクル直下進捗ピル
     if (ctx.player->IsReloading())
     {
         const float prog = (std::clamp)(ctx.player->GetReloadProgress(), 0.0f, 1.0f);
-        const float rad  = RT::kReloadRadius * uiScale;
+        const float rad  = (RT::kReloadRadius + alertRatio * RT::kReloadBusyExpandPx) * uiScale;
+        const uint32_t stgCol = (prog < HudTiming::kReloadEjectEnd) ? RT::kReloadStageEjectCol
+                              : ((prog < HudTiming::kReloadSeatTickRatio) ? RT::kReloadStageInsCol : RT::kReloadStageBoltCol);
+
         dl->AddCircle(c, rad, RT::kReloadBgCol, RT::kReloadSegs, RT::kReloadBgThick * uiScale);
         dl->AddCircle(c, rad, RT::kReloadTrackCol, RT::kReloadSegs, RT::kReloadTrackThick * uiScale);
         if (prog > RT::kReloadMinProg)
@@ -1996,16 +2132,34 @@ void GamePlayHUD::DrawTacticalReticle(const GamePlayHUDContext& ctx)
             const float a1 = a0 + kPi * 2.0f * prog;
             dl->PathClear();
             dl->PathArcTo(c, rad, a0, a1, RT::kReloadSegs);
-            dl->PathStroke(RT::kReloadArcCol, 0, RT::kReloadArcThick * uiScale);
+            dl->PathStroke(stgCol, 0, RT::kReloadArcThick * uiScale);
         }
         dl->AddCircleFilled(c, RT::kReloadDotShadowR * uiScale, RT::kShadowCol, RT::kSmallDotSegs);
-        dl->AddCircleFilled(c, RT::kReloadDotFgR * uiScale, RT::kReloadDotCol, RT::kSmallDotSegs);
+        dl->AddCircleFilled(c, RT::kReloadDotFgR * uiScale, stgCol, RT::kSmallDotSegs);
+
+        // レティクル直下のコンパクト進捗ラベル＋ミニプログレスバー
+        const float pillH = RT::kPromptSubH * uiScale;
+        const float topY  = (std::clamp)(c.y + RT::kPromptOffsetY * uiScale, RT::kPromptClampTopY * uiScale, vpInfo.screenH - RT::kPromptClampBotY * uiScale - pillH);
+        const float shakeX = (alertRatio > 0.0f) ? (std::sin(timeNow * RT::kAlertShakeFreq) * 3.5f * uiScale * alertRatio) : 0.0f;
+        char relLabel[HudLayout::Common::kSmallBufSize];
+        std::snprintf(relLabel, sizeof(relLabel), AsUtf8(u8"リロード中 %d%%"), static_cast<int>(prog * 100.0f));
+        const float fPx = RT::kPromptSubFont * uiScale;
+        const UIVec2 sz = MeasureSharpText(UIFontRole::SubBoldJP, fPx, relLabel);
+        const float bw  = sz.x + 18.0f * uiScale;
+        const float bx  = std::round((std::clamp)(c.x + shakeX - bw * 0.5f, minClampX, (std::max)(minClampX, maxClampX - bw)));
+        DrawAccentedTag(dl, bx, topY, bw, pillH, RT::kPromptSlant * uiScale, 1.5f, 2.0f, HudPalette::kPanelShadow130,
+            RT::kReloadPillBg, stgCol, 1.2f, 3.0f * uiScale, fPx, 1.5f * uiScale, HudPalette::kTextBrightWhite, relLabel);
+        DrawProgressBar(dl, bx, topY + pillH + RT::kPromptReloadBarGapY * uiScale, bw, RT::kPromptReloadBarH * uiScale,
+            RT::kPromptSlant * 0.45f * uiScale, prog, HudLayout::AmmoPanel::kReloadBarBg, stgCol);
         return;
     }
 
     // 3. 通常射撃構え ＆ リコイル連動タクティカルクロスヘア（レーザー終端・弾丸着弾点と 0.00px 完全一致）
     const float kick       = (std::clamp)(ctx.player->GetRecoilKickAmount(), 0.0f, 1.0f);
-    const bool isEmptyMag  = (ctx.player->GetMagazineAmmo() <= 0);
+    const int magAmmo      = ctx.player->GetMagazineAmmo();
+    const int resAmmo      = ctx.player->GetReserveAmmo();
+    const bool isEmptyMag  = (magAmmo <= 0);
+    const bool isCancelled = (ctx.player->GetReloadCancelledTimer() > 0.0f);
 
     uint32_t mainCol = RT::kMainDefaultCol;
     uint32_t dotCol  = RT::kDotDefaultCol;
@@ -2039,8 +2193,26 @@ void GamePlayHUD::DrawTacticalReticle(const GamePlayHUDContext& ctx)
         dl->AddLine(p0, p1, mainCol, fgThick);
     }
 
-    // 敵・標的ロックオン時は斜め45度にマイクロロックオンコーナーを表示
-    if (laserLockedOnTarget_ && !isEmptyMag)
+    // 弾切れ時は45度警告コーナーブラケットを脈動表示、通常ロックオン時はロックオンコーナーを表示
+    if (isEmptyMag)
+    {
+        const float emptyPulse = 0.5f + 0.5f * std::sin(timeNow * RT::kEmptyPulseSpeed);
+        const float emptyOff   = (RT::kEmptyBracketBaseOff + alertRatio * RT::kEmptyBracketAlertAdd) * uiScale;
+        const uint32_t brkCol  = (alertRatio > 0.15f || emptyPulse > 0.55f) ? RT::kEmptyPillBdHi : RT::kMainEmptyCol;
+        DrawCornerBrackets(
+            dl, c, emptyOff, -RT::kEmptyBracketArm * uiScale,
+            RT::kShadowCol, RT::kLockShadowThick * uiScale,
+            brkCol, RT::kLockFgThick * uiScale);
+    }
+    else if (completeRatio > 0.02f)
+    {
+        const float compOff = (RT::kCompleteBracketOff + (1.0f - completeRatio) * 3.5f) * uiScale;
+        DrawCornerBrackets(
+            dl, c, compOff, -RT::kCompleteBracketArm * uiScale,
+            ScaleHudAlpha(RT::kShadowCol, completeRatio), RT::kLockShadowThick * uiScale,
+            ScaleHudAlpha(RT::kCompleteCol, completeRatio), RT::kLockFgThick * uiScale);
+    }
+    else if (laserLockedOnTarget_)
     {
         const float diagOff = (gap + RT::kLockDiagPad * uiScale) * RT::kLockDiagMul;
         DrawCornerBrackets(
@@ -2052,6 +2224,64 @@ void GamePlayHUD::DrawTacticalReticle(const GamePlayHUDContext& ctx)
     // 精密センタードット（レーザー終端および実弾の通過点と完全一致）
     dl->AddCircleFilled(c, RT::kCenterDotShadowR * uiScale, RT::kShadowCol, RT::kCenterDotSegs);
     dl->AddCircleFilled(c, RT::kCenterDotFgR * uiScale, dotCol, RT::kCenterDotSegs);
+
+    // 4. レティクル直下：視線移動ゼロで気づける `[R] リロード` 警告バッジ ／ 残弾少ヒント ／ 装填完了フラッシュ
+    if (isEmptyMag)
+    {
+        const float emptyPulse = 0.5f + 0.5f * std::sin(timeNow * RT::kEmptyPulseSpeed);
+        const float shakeX     = (alertRatio > 0.0f) ? (std::sin(timeNow * RT::kAlertShakeFreq) * RT::kAlertShakeAmpPx * uiScale * alertRatio) : 0.0f;
+        const float pillH      = RT::kPromptEmptyH * uiScale;
+        const float topY       = (std::clamp)(c.y + RT::kPromptOffsetY * uiScale, RT::kPromptClampTopY * uiScale, vpInfo.screenH - RT::kPromptClampBotY * uiScale - pillH);
+        const uint32_t bdCol   = (alertRatio > 0.15f || emptyPulse > 0.55f) ? RT::kEmptyPillBdHi : RT::kEmptyPillBdLo;
+
+        if (resAmmo > 0)
+        {
+            DrawKeyPromptPill(dl, c.x + shakeX, topY, pillH, RT::kPromptSlant * uiScale, uiScale,
+                "R", AsUtf8(u8"リロード"), RT::kPromptKeyFont * uiScale, RT::kPromptEmptyFont * uiScale,
+                RT::kEmptyPillBg, bdCol, RT::kEmptyKeyBg, RT::kEmptyKeyBd, RT::kEmptyKeyTx, RT::kEmptyTextCol,
+                minClampX, maxClampX);
+        }
+        else
+        {
+            DrawKeyPromptPill(dl, c.x + shakeX, topY, pillH, RT::kPromptSlant * uiScale, uiScale,
+                "", AsUtf8(u8"弾薬切れ // 木箱を破壊"), RT::kPromptKeyFont * uiScale, RT::kPromptEmptyFont * uiScale,
+                RT::kEmptyPillBg, HudPalette::kDangerRed, RT::kEmptyKeyBg, HudPalette::kDangerRed, RT::kEmptyTextCol, RT::kEmptyTextCol,
+                minClampX, maxClampX);
+        }
+    }
+    else if (isCancelled && resAmmo > 0)
+    {
+        const float pillH = RT::kPromptSubH * uiScale;
+        const float topY  = (std::clamp)(c.y + RT::kPromptOffsetY * uiScale, RT::kPromptClampTopY * uiScale, vpInfo.screenH - RT::kPromptClampBotY * uiScale - pillH);
+        DrawKeyPromptPill(dl, c.x, topY, pillH, RT::kPromptSlant * uiScale, uiScale,
+            "R", AsUtf8(u8"中断 // リロード"), RT::kPromptSubKeyFont * uiScale, RT::kPromptSubFont * uiScale,
+            RT::kEmptyPillBg, RT::kEmptyPillBdHi, RT::kEmptyKeyBg, RT::kEmptyKeyBd, RT::kEmptyKeyTx, RT::kEmptyTextCol,
+            minClampX, maxClampX);
+    }
+    else if (magAmmo <= RT::kReticleLowAmmoThreshold && resAmmo > 0)
+    {
+        const float pillH = RT::kPromptSubH * uiScale;
+        const float topY  = (std::clamp)(c.y + RT::kPromptOffsetY * uiScale, RT::kPromptClampTopY * uiScale, vpInfo.screenH - RT::kPromptClampBotY * uiScale - pillH);
+        char lowBuf[HudLayout::Common::kSmallBufSize];
+        std::snprintf(lowBuf, sizeof(lowBuf), AsUtf8(u8"残弾%d // リロード"), magAmmo);
+        DrawKeyPromptPill(dl, c.x, topY, pillH, RT::kPromptSlant * uiScale, uiScale,
+            "R", lowBuf, RT::kPromptSubKeyFont * uiScale, RT::kPromptSubFont * uiScale,
+            RT::kLowPillBg, RT::kLowPillBd, RT::kLowKeyBg, RT::kLowPillBd, RT::kEmptyKeyTx, RT::kLowTextCol,
+            minClampX, maxClampX, 0.92f);
+    }
+    else if (completeRatio > 0.04f)
+    {
+        const float pillH = RT::kPromptSubH * uiScale;
+        const float topY  = (std::clamp)(c.y + RT::kPromptOffsetY * uiScale, RT::kPromptClampTopY * uiScale, vpInfo.screenH - RT::kPromptClampBotY * uiScale - pillH);
+        const char* okTxt = AsUtf8(u8"装填完了！");
+        const float fPx   = RT::kPromptSubFont * uiScale;
+        const UIVec2 sz   = MeasureSharpText(UIFontRole::SubBoldJP, fPx, okTxt);
+        const float bw    = sz.x + 18.0f * uiScale;
+        const float bx    = std::round((std::clamp)(c.x - bw * 0.5f, minClampX, (std::max)(minClampX, maxClampX - bw)));
+        DrawAccentedTag(dl, bx, topY, bw, pillH, RT::kPromptSlant * uiScale, 0.0f, 0.0f, 0,
+            ScaleHudAlpha(RT::kCompletePillBg, completeRatio), ScaleHudAlpha(RT::kCompleteCol, completeRatio), 1.15f,
+            3.0f * uiScale, fPx, 1.5f * uiScale, ScaleHudAlpha(RT::kCompleteCol, completeRatio), okTxt);
+    }
 }
 
 void GamePlayHUD::DrawFloatingTexts(const GamePlayHUDContext& ctx)
@@ -2654,11 +2884,14 @@ namespace
                 const bool isPrimary = (i == obj.activeTargetIndex);
                 if (!isPrimary && dist > NV::kSecondaryTargetMaxDist) continue;
 
+                // 画面端境界でのボブ振動による高速ON/OFFチラつきを防ぐため、判定はボブ無しの基準座標で行う
+                Vector2 base2D{}, p2D{}, anchor2D{};
+                if (!ProjectWorldToScreen(tPos + Vector3{ 0.0f, NV::kTargetMarkerLiftY, 0.0f }, vp, screenW, screenH, base2D)) continue;
+                if (base2D.x < NV::kTargetScreenPad || base2D.x > screenW - NV::kTargetScreenPad ||
+                    base2D.y < NV::kTargetScreenPad || base2D.y > screenH - NV::kTargetScreenPad) continue;
+
                 const float bob = isPrimary ? (NV::kTargetBobAmp * std::sin(timeNow * HudTiming::kTargetMarkerBobSpeed)) : 0.0f;
-                Vector2 p2D{}, anchor2D{};
-                if (!ProjectWorldToScreen(tPos + Vector3{ 0.0f, NV::kTargetMarkerLiftY + bob, 0.0f }, vp, screenW, screenH, p2D)) continue;
-                if (p2D.x < NV::kTargetScreenPad || p2D.x > screenW - NV::kTargetScreenPad ||
-                    p2D.y < NV::kTargetScreenPad || p2D.y > screenH - NV::kTargetScreenPad) continue;
+                if (!ProjectWorldToScreen(tPos + Vector3{ 0.0f, NV::kTargetMarkerLiftY + bob, 0.0f }, vp, screenW, screenH, p2D)) p2D = base2D;
 
                 if (isPrimary)
                 {
@@ -2703,12 +2936,13 @@ namespace
             }
             else
             {
-                Vector2 l2D{}, anchor2D{};
-                const float bob = NV::kLootBobAmp * std::sin(timeNow * HudTiming::kLootMarkerBobSpeed);
-                if (ProjectWorldToScreen(obj.worldPos + Vector3{ 0.0f, NV::kLootMarkerLiftY + bob, 0.0f }, vp, screenW, screenH, l2D) &&
-                    l2D.x > NV::kLootScreenPad && l2D.x < screenW - NV::kLootScreenPad &&
-                    l2D.y > NV::kLootScreenPad && l2D.y < screenH - NV::kLootScreenPad)
+                Vector2 baseL2D{}, l2D{}, anchor2D{};
+                if (ProjectWorldToScreen(obj.worldPos + Vector3{ 0.0f, NV::kLootMarkerLiftY, 0.0f }, vp, screenW, screenH, baseL2D) &&
+                    baseL2D.x > NV::kLootScreenPad && baseL2D.x < screenW - NV::kLootScreenPad &&
+                    baseL2D.y > NV::kLootScreenPad && baseL2D.y < screenH - NV::kLootScreenPad)
                 {
+                    const float bob = NV::kLootBobAmp * std::sin(timeNow * HudTiming::kLootMarkerBobSpeed);
+                    if (!ProjectWorldToScreen(obj.worldPos + Vector3{ 0.0f, NV::kLootMarkerLiftY + bob, 0.0f }, vp, screenW, screenH, l2D)) l2D = baseL2D;
                     primaryVisible = true;
 
                     // 弾薬箱とマーカーを繋ぐホログラム垂直テザーライン
@@ -2746,8 +2980,8 @@ namespace
 
     void DrawOffscreenObjectivePointer(
         TacticalDrawList* dl, const GamePlayHUDContext& ctx, const ActiveObjectiveInfo& obj,
-        const std::vector<Vector3>& cachedPath, const Vector3& playerPos,
-        const Matrix4x4& vp, float screenW, float screenH, float uiScale, float timeNow)
+        const Vector3& playerPos, Vector2& ioSmoothedDir, bool& ioHasDir,
+        const Matrix4x4& vp, float screenW, float screenH, float uiScale, float deltaTime, float timeNow)
     {
         namespace NV = HudLayout::Navigation;
         namespace C  = HudLayout::Common;
@@ -2761,32 +2995,68 @@ namespace
             obj2D.x >= marginX && obj2D.x <= (screenW - marginX) &&
             obj2D.y >= marginT && obj2D.y <= (screenH - marginB);
 
-        if (safeOnScr || (ctx.isReadyToExtract && ctx.isPlayerInExtractionZone)) return;
+        if (safeOnScr || (ctx.isReadyToExtract && ctx.isPlayerInExtractionZone))
+        {
+            ioHasDir = false;
+            return;
+        }
 
-        // 次の経路ノード方向（壁向こうではなく実際に進むべき方向）と直線距離を算出
-        const Vector3 aimTarget  = (cachedPath.size() > 1) ? cachedPath[1] : obj.worldPos;
+        // 旧実装の cachedPath[1]（足元0.5mグリッドノード追い越しによる激しい角度反転）を廃止し、
+        // 目標ワールド座標への正確なスクリーン投影ベクトル＋指数平滑化でピタッと安定させる
         const float dirX         = obj.worldPos.x - playerPos.x;
         const float dirZ         = obj.worldPos.z - playerPos.z;
         const float straightDist = std::sqrt(dirX * dirX + dirZ * dirZ);
         if (straightDist <= NV::kMinStraightDist) return;
 
-        float sxDir = aimTarget.x - playerPos.x;
-        float syDir = -(aimTarget.z - playerPos.z);
-        float sLen  = std::sqrt(sxDir * sxDir + syDir * syDir);
-        if (sLen < NV::kMinDirLen)
+        const float ux = dirX / straightDist;
+        const float uz = dirZ / straightDist;
+
+        float rawSx = ux;
+        float rawSy = -uz;
+        const Vector3 pAnchor = playerPos + Vector3{ 0.0f, 0.65f, 0.0f };
+        Vector2 pScr{}, probeScr{};
+        if (ProjectWorldToScreen(pAnchor, vp, screenW, screenH, pScr) &&
+            ProjectWorldToScreen(pAnchor + Vector3{ ux * 1.8f, 0.0f, uz * 1.8f }, vp, screenW, screenH, probeScr))
         {
-            sxDir = dirX;
-            syDir = -dirZ;
-            sLen  = std::sqrt(sxDir * sxDir + syDir * syDir);
+            const float dx2 = probeScr.x - pScr.x;
+            const float dy2 = probeScr.y - pScr.y;
+            const float dLen = std::sqrt(dx2 * dx2 + dy2 * dy2);
+            if (dLen > NV::kMinDirLen)
+            {
+                rawSx = dx2 / dLen;
+                rawSy = dy2 / dLen;
+            }
         }
-        if (sLen <= NV::kMinDirLen) return;
 
-        sxDir /= sLen;
-        syDir /= sLen;
+        if (!ioHasDir)
+        {
+            ioSmoothedDir = { rawSx, rawSy };
+            ioHasDir      = true;
+        }
+        else
+        {
+            const float blend = 1.0f - std::exp(-12.0f * (std::clamp)(deltaTime, 0.0f, 0.1f));
+            ioSmoothedDir.x += (rawSx - ioSmoothedDir.x) * blend;
+            ioSmoothedDir.y += (rawSy - ioSmoothedDir.y) * blend;
+            const float sLen = std::sqrt(ioSmoothedDir.x * ioSmoothedDir.x + ioSmoothedDir.y * ioSmoothedDir.y);
+            if (sLen > NV::kMinDirLen)
+            {
+                ioSmoothedDir.x /= sLen;
+                ioSmoothedDir.y /= sLen;
+            }
+            else
+            {
+                ioSmoothedDir = { rawSx, rawSy };
+            }
+        }
 
-        const float arrowPulse = NV::kArrowPulseAmp * (0.5f + 0.5f * std::sin(timeNow * HudTiming::kOffscreenPulseSpeed)) * uiScale;
-        const float px = screenW * 0.5f + sxDir * (screenW * NV::kOrbitRatioX + arrowPulse);
-        const float py = screenH * NV::kCenterRatioY + syDir * (screenH * NV::kOrbitRatioY + arrowPulse);
+        const float sxDir = ioSmoothedDir.x;
+        const float syDir = ioSmoothedDir.y;
+
+        // ラベルや矢印座標自体を毎フレーム揺らさず固定軌道上に落ち着かせ、文字のガタつきを完全解消
+        const float px = screenW * 0.5f + sxDir * (screenW * NV::kOrbitRatioX);
+        const float py = screenH * NV::kCenterRatioY + syDir * (screenH * NV::kOrbitRatioY);
+        const float echoAlphaMul = 0.55f + 0.45f * (0.5f + 0.5f * std::sin(timeNow * HudTiming::kOffscreenPulseSpeed));
 
         // スイープウイング型タクティカル方向ポインター（2トーン凸ウイング＋ダブルシェブロン）
         const float nx = -syDir;
@@ -2803,12 +3073,12 @@ namespace
         const UIVec2 outlinePts[C::kQuadVertCount] = { tip, wingL, notch, wingR };
         dl->AddPolyline(outlinePts, C::kQuadVertCount, NV::kArrowOutlineCol, UIDrawFlags_Closed, NV::kArrowOutlineThick * uiScale);
 
-        // 後方エコーシェブロン
+        // 後方エコーシェブロン（位置は固定のまま輝度のみ穏やかに脈動）
         const UIVec2 eTip(px - sxDir * NV::kArrowEchoTipBack * uiScale, py - syDir * NV::kArrowEchoTipBack * uiScale);
         const UIVec2 eL(px - sxDir * NV::kArrowEchoWingBack * uiScale + nx * NV::kArrowEchoWingSide * uiScale, py - syDir * NV::kArrowEchoWingBack * uiScale + ny * NV::kArrowEchoWingSide * uiScale);
         const UIVec2 eR(px - sxDir * NV::kArrowEchoWingBack * uiScale - nx * NV::kArrowEchoWingSide * uiScale, py - syDir * NV::kArrowEchoWingBack * uiScale - ny * NV::kArrowEchoWingSide * uiScale);
         const UIVec2 ePts[C::kTriVertCount] = { eL, eTip, eR };
-        dl->AddPolyline(ePts, C::kTriVertCount, obj.accentCol, UIDrawFlags_None, NV::kArrowEchoThick * uiScale);
+        dl->AddPolyline(ePts, C::kTriVertCount, ScaleHudAlpha(obj.accentCol, echoAlphaMul), UIDrawFlags_None, NV::kArrowEchoThick * uiScale);
 
         char edgeText[C::kWideBufSize];
         std::snprintf(edgeText, sizeof(edgeText), "%s [%.0fm]", obj.markerLabel, straightDist);
@@ -2816,10 +3086,10 @@ namespace
         const UIVec2 eSz     = MeasureSharpText(UIFontRole::SubBoldJP, edgeFont, edgeText);
         const float pillW    = eSz.x + NV::kEdgePillPadW * uiScale;
         const float pillH    = eSz.y + NV::kEdgePillPadH * uiScale;
-        const float pillX    = (std::clamp)(px - sxDir * (pillW * 0.5f + NV::kEdgePillGap * uiScale) - pillW * 0.5f,
-                                            NV::kEdgeClampX * uiScale, screenW - pillW - NV::kEdgeClampX * uiScale);
-        const float pillY    = (std::clamp)(py - syDir * (pillH * 0.5f + NV::kEdgePillGap * uiScale) - pillH * 0.5f,
-                                            NV::kEdgeClampTop * uiScale, screenH - pillH - NV::kEdgeClampBot * uiScale);
+        const float pillX    = std::round((std::clamp)(px - sxDir * (pillW * 0.5f + NV::kEdgePillGap * uiScale) - pillW * 0.5f,
+                                                       NV::kEdgeClampX * uiScale, screenW - pillW - NV::kEdgeClampX * uiScale));
+        const float pillY    = std::round((std::clamp)(py - syDir * (pillH * 0.5f + NV::kEdgePillGap * uiScale) - pillH * 0.5f,
+                                                       NV::kEdgeClampTop * uiScale, screenH - pillH - NV::kEdgeClampBot * uiScale));
 
         DrawAccentedTag(dl, pillX, pillY, pillW, pillH, NV::kEdgePillSlant * uiScale,
             NV::kTargetShadowX, NV::kTargetShadowY, HudPalette::kPanelShadow130,
@@ -2843,7 +3113,8 @@ void GamePlayHUD::DrawNavigationGuideHUD(const GamePlayHUDContext& ctx, float de
     const Vector3 playerPos = ctx.player->GetPosition();
     const float timeNow     = static_cast<float>(TacticalUICanvas::GetInstance()->GetTime());
 
-    const ActiveObjectiveInfo obj = ResolveActiveObjective(ctx);
+    const ActiveObjectiveInfo obj = ResolveActiveObjective(ctx, lastActiveTargetIdx_);
+    lastActiveTargetIdx_          = obj.activeTargetIndex;
 
     // 1. NavMesh A* 経路の定期更新
     RefreshNavigationPath(cachedGuidePath_, cachedGuideGoal_, guidePathRefreshTimer_, deltaTime, playerPos, obj.worldPos);
@@ -2863,7 +3134,11 @@ void GamePlayHUD::DrawNavigationGuideHUD(const GamePlayHUDContext& ctx, float de
     // 4. 目標が画面外にある場合の画面端ナビゲーション方向ポインター
     if (!primaryVisible)
     {
-        DrawOffscreenObjectivePointer(dl, ctx, obj, cachedGuidePath_, playerPos, vp, screenW, screenH, uiScale, timeNow);
+        DrawOffscreenObjectivePointer(dl, ctx, obj, playerPos, smoothedOffscreenDir_, hasOffscreenDir_, vp, screenW, screenH, uiScale, deltaTime, timeNow);
+    }
+    else
+    {
+        hasOffscreenDir_ = false;
     }
 }
 
@@ -2882,7 +3157,7 @@ void GamePlayHUD::DrawQuestTrackerHUD(const GamePlayHUDContext& ctx)
     const float uiScale  = vpInfo.uiScale;
     namespace QT = HudLayout::QuestTracker;
 
-    const ActiveObjectiveInfo obj = ResolveActiveObjective(ctx);
+    const ActiveObjectiveInfo obj = ResolveActiveObjective(ctx, lastActiveTargetIdx_);
 
     const char* step1Txt = AsUtf8(QT::kStep1Text);
     char step2Buf[HudLayout::Common::kStepBufSize];
@@ -2892,9 +3167,9 @@ void GamePlayHUD::DrawQuestTrackerHUD(const GamePlayHUDContext& ctx)
     const float stepFont = QT::kStepFont * uiScale;
     const float actFont  = QT::kActionFont * uiScale;
     const float maxStepW = (std::max)({
-        MeasureSharpText(UIFontRole::DefaultJP, stepFont, step1Txt).x,
-        MeasureSharpText(UIFontRole::DefaultJP, stepFont, step2Buf).x,
-        MeasureSharpText(UIFontRole::DefaultJP, stepFont, step3Txt).x,
+        MeasureSharpText(UIFontRole::SubBoldJP, stepFont, step1Txt).x,
+        MeasureSharpText(UIFontRole::SubBoldJP, stepFont, step2Buf).x,
+        MeasureSharpText(UIFontRole::SubBoldJP, stepFont, step3Txt).x,
     });
     const float maxActW = (std::max)(
         MeasureSharpText(UIFontRole::SubBoldJP, actFont, obj.actionLine1).x,
@@ -2987,7 +3262,7 @@ void GamePlayHUD::DrawControlsGuideHUD(const GamePlayHUDContext& ctx)
         const float interactSq = GameConfig::Math::Square(LootSystem::kInteractRadius);
         for (const auto& prop : *ctx.lootProps)
         {
-            if (prop.isLooted) continue;
+            if (prop.isLooted || prop.isBreakableCrate) continue;
             const float dx = prop.position.x - pPos.x;
             const float dz = prop.position.z - pPos.z;
             if (dx * dx + dz * dz <= interactSq)
@@ -3033,15 +3308,28 @@ void GamePlayHUD::DrawControlsGuideHUD(const GamePlayHUDContext& ctx)
     dl->AddRectFilled(UIVec2(barX, barY), UIVec2(barX + barW, barY + barH), CG::kBarBg, CG::kBarRounding);
     dl->AddRect(UIVec2(barX, barY), UIVec2(barX + barW, barY + barH), CG::kBarBorder, CG::kBarRounding, 0, CG::kBarBorderThick);
 
-    const float cellW = (barW - CG::kInnerWidthTrim * uiScale) / static_cast<float>(CG::kItemCount);
+    // 各項目の実測幅に応じて均等余白で横並び配置（"SPACE" と "R リロード" の接触を完全防止）
+    float itemWidths[CG::kItemCount]{};
+    float keyWidths[CG::kItemCount]{};
+    float totalItemsW = 0.0f;
+    for (int i = 0; i < CG::kItemCount; ++i)
+    {
+        keyWidths[i]  = MeasureSharpText(UIFontRole::SubBoldJP, keyFont, CG::kItems[i].key).x + CG::kKeyPadW * uiScale;
+        const float dW = MeasureSharpText(UIFontRole::SubBoldJP, descFont, AsUtf8(CG::kItems[i].desc)).x;
+        itemWidths[i] = keyWidths[i] + CG::kDescGapX * uiScale + dW;
+        totalItemsW  += itemWidths[i];
+    }
+    const float availGap = (std::max)(6.0f * uiScale, (barW - CG::kCellStartPadX * 2.0f * uiScale - totalItemsW) / static_cast<float>(CG::kItemCount - 1));
+    float curX = barX + (barW - (totalItemsW + availGap * static_cast<float>(CG::kItemCount - 1))) * 0.5f;
+
     for (int i = 0; i < CG::kItemCount; ++i)
     {
         const auto& spec   = CG::kItems[i];
-        const float cx     = barX + CG::kCellStartPadX * uiScale + static_cast<float>(i) * cellW;
-        const UIVec2 kSz   = MeasureSharpText(UIFontRole::SubBoldJP, keyFont, spec.key);
-        const float kw     = kSz.x + CG::kKeyPadW * uiScale;
+        const float cx     = std::round(curX);
+        const float kw     = keyWidths[i];
         const float kh     = CG::kKeyH * uiScale;
         const float ky     = barY + (barH - kh) * 0.5f;
+        curX += itemWidths[i] + availGap;
 
         uint32_t kBg = CG::kKeyIdleBg;
         uint32_t kBd = CG::kKeyIdleBd;
@@ -3065,6 +3353,24 @@ void GamePlayHUD::DrawControlsGuideHUD(const GamePlayHUDContext& ctx)
 
         DrawKeycapBadge(dl, cx, ky, kw, kh, CG::kKeyRounding, kBg, kBd, CG::kKeyBorderThick, keyFont, kTx, spec.key, centerY);
         DrawShadowedTextAligned(dl, UIFontRole::SubBoldJP, descFont, cx + kw + CG::kDescGapX * uiScale, centerY, dTx, AsUtf8(spec.desc), HudTextAlign::Left);
+    }
+
+    // 下部操作バー直上に控えめで視認しやすい「[RMB] スロー鑑賞 / [F7] 自動デモ実演」ショートカットバッジを併記
+    {
+        const char* extraHint = ctx.isAutoDemoPlay
+            ? AsUtf8(u8"[F7] 手動操作に戻る   |   [Y] 俯瞰カメラ切替")
+            : AsUtf8(u8"[RMB長押し] スロー鑑賞   |   [F7] 自動デモ実演");
+        const float hFont = 11.5f * uiScale;
+        const UIVec2 hSz  = MeasureSharpText(UIFontRole::SubBoldJP, hFont, extraHint);
+        const float pillW = hSz.x + 22.0f * uiScale;
+        const float pillH = 19.0f * uiScale;
+        const float pillX = std::round(barX + (barW - pillW) * 0.5f);
+        const float pillY = std::round(barY - pillH - 4.0f * uiScale);
+        dl->AddRectFilled(UIVec2(pillX, pillY), UIVec2(pillX + pillW, pillY + pillH), UI_COL32(12, 18, 24, 196), 4.0f * uiScale);
+        dl->AddRect(UIVec2(pillX, pillY), UIVec2(pillX + pillW, pillY + pillH),
+            ctx.isAutoDemoPlay ? UI_COL32(70, 225, 255, 190) : UI_COL32(120, 155, 180, 135), 4.0f * uiScale, 0, 1.0f);
+        DrawShadowedTextAligned(dl, UIFontRole::SubBoldJP, hFont, pillX + pillW * 0.5f, pillY + pillH * 0.5f,
+            ctx.isAutoDemoPlay ? UI_COL32(165, 242, 255, 255) : UI_COL32(210, 228, 240, 235), extraHint, HudTextAlign::Center);
     }
 }
 
@@ -3365,7 +3671,7 @@ void GamePlayHUD::DrawTacticalMapHUD(const GamePlayHUDContext& ctx)
     const float pulse             = 0.5f + 0.5f * std::sin(timeNow * HudTiming::kMapPulseSpeed);
     const Vector3 pPos            = ctx.player->GetPosition();
     const float pYaw              = ctx.player->GetRotation().y;
-    const ActiveObjectiveInfo obj = ResolveActiveObjective(ctx);
+    const ActiveObjectiveInfo obj = ResolveActiveObjective(ctx, lastActiveTargetIdx_);
 
     // =========================================================================
     // A. 常時表示 左上タクティカルミニマップレーダー ＆ 回収戦利品(RUB)ポーチバー

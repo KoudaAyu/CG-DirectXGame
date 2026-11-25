@@ -1,6 +1,7 @@
 #include "GameOverSequenceController.h"
 #include "GameOverSequenceTuning.h"
 #include "GamePlayScene.h"
+#include "Application/Config/AppFastObjLoader.h"
 #include "RaidStats.h"
 #include "Application/Transition/StingerTransition.h"
 #include "Application/Transition/DeathTransition.h"
@@ -676,7 +677,7 @@ void GameOverSequenceController::Initialize()
 
 	// 3. GameOverScene と完全同一の 3D 救難ヘリコプター（MEDEVAC）＆ 機内衛生兵クルー生成
 	{
-		Object3d::ModelData bodyData = Object3d::LoadObjFile("Resources", "helicopter_body.obj");
+		Object3d::ModelData bodyData = AppFastObjLoader::LoadObjCached("Resources", "helicopter_body.obj");
 		bodyData.material.textureFilePath = "Resources/helicopter_texture.png";
 		bodyData.material.textureIndex = heliTex;
 		bodyData.boundingRadius = 100.0f;
@@ -687,7 +688,7 @@ void GameOverSequenceController::Initialize()
 		heliBody_->SetEnableLighting(true);
 		heliBody_->SetAllowWireframeOverlay(false);
 
-		Object3d::ModelData rotorData = Object3d::LoadObjFile("Resources", "helicopter_rotor.obj");
+		Object3d::ModelData rotorData = AppFastObjLoader::LoadObjCached("Resources", "helicopter_rotor.obj");
 		rotorData.material.textureFilePath = "Resources/helicopter_texture.png";
 		rotorData.material.textureIndex = heliTex;
 		rotorData.boundingRadius = 100.0f;
@@ -715,7 +716,7 @@ void GameOverSequenceController::Initialize()
 		heliMainRotorBlur2_->SetEnableLighting(true);
 		heliMainRotorBlur2_->SetAllowWireframeOverlay(false);
 
-		Object3d::ModelData tailData = Object3d::LoadObjFile("Resources", "helicopter_tailrotor.obj");
+		Object3d::ModelData tailData = AppFastObjLoader::LoadObjCached("Resources", "helicopter_tailrotor.obj");
 		tailData.material.textureFilePath = "Resources/helicopter_texture.png";
 		tailData.material.textureIndex = heliTex;
 		tailData.boundingRadius = 100.0f;
@@ -737,7 +738,7 @@ void GameOverSequenceController::Initialize()
 		heliCargoDoor_->SetEnableLighting(true);
 		heliCargoDoor_->SetAllowWireframeOverlay(false);
 
-		Object3d::ModelData ropeData = Object3d::LoadObjFile("Resources", "fast_rope.obj");
+		Object3d::ModelData ropeData = AppFastObjLoader::LoadObjCached("Resources", "fast_rope.obj");
 		ropeData.material.textureFilePath = "Resources/helicopter_texture.png";
 		ropeData.material.textureIndex = heliTex;
 		ropeData.boundingRadius = 50.0f;
@@ -828,7 +829,7 @@ void GameOverSequenceController::Initialize()
 		beaconWaveDisc2_->SetEnableLighting(false);
 		beaconWaveDisc2_->SetAllowWireframeOverlay(false);
 
-		Object3d::ModelData medicData = Object3d::LoadObjFile("Resources", "player.obj");
+		Object3d::ModelData medicData = AppFastObjLoader::LoadObjCached("Resources", "player.obj");
 		medicData.material.textureFilePath = "Resources/duck_medic.png";
 		medicData.material.textureIndex = medicTex;
 		medicData.boundingRadius = 8.0f;
@@ -3159,16 +3160,18 @@ void GameOverSequenceController::DrawUI()
 			drawList->AddText(fontDefault, kTelemetryFontSize, UIVec2(disp.x - rLabelSz.x - 24.0f, midTopY - 6.5f), UI_COL32(185, 205, 225, 215), rightBuf);
 		}
 
-		// 下部黒帯：スキップ案内
+		// 下部黒帯：スキップ案内（自動デモ中は1周目敗北演出→2周目クリア実演への進行案内を表示）
 		const float pulse = 0.55f + 0.45f * std::sin(timer_ * 5.0f);
-		const int alpha = static_cast<int>(210.0f * pulse);
-		const char* skipPrompt = reinterpret_cast<const char*>(u8"SPACE : スキップ");
+		const int alpha = static_cast<int>(225.0f * pulse);
+		const char* skipPrompt = RaidStats::GetInstance().autoDemoMode
+			? reinterpret_cast<const char*>(u8"自動デモ [1/2周目：敗北・救難ヘリ演出]  ──  続いて2周目でクリア実演を開始します")
+			: reinterpret_cast<const char*>(u8"SPACE : スキップ");
 		const UIVec2 sSize = fontDefault->CalcTextSizeA(kSkipFontSize, FLT_MAX, 0.0f, skipPrompt);
 		drawList->AddText(
 			fontDefault,
 			kSkipFontSize,
 			UIVec2((disp.x - sSize.x) * 0.5f, disp.y - curBarH * 0.5f - sSize.y * 0.5f),
-			UI_COL32(203, 213, 225, alpha),
+			RaidStats::GetInstance().autoDemoMode ? UI_COL32(255, 222, 130, alpha) : UI_COL32(203, 213, 225, alpha),
 			skipPrompt);
 	}
 

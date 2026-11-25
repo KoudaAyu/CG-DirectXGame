@@ -236,13 +236,14 @@ CollisionSystem::CollisionSystem(GamePlayScene* scene)
 }
 
 // 衝突判定とキャラクターの位置補正を毎フレーム実行
-void CollisionSystem::Update()
+void CollisionSystem::Update(float deltaTime)
 {
 	CollisionManager::GetInstance()->Update();
 	ResolveObstacleCollisions();          // ① 弾丸と障害物の衝突を最優先判定
 	ResolveBulletCollisions();            // ② 生き残った弾丸とキャラクター・標的の衝突
-	ResolveCharacterObstacleCollisions(); // ③ キャラクターと障害物の衝突
-	ResolveContactDamage();               // ④ プレイヤーと敵の直接接触によるダメージ
+	UpdateBarrelHazards(deltaTime);       // ③ 引火ドラム缶の火炎噴出・時限起爆・爆発後の地面炎上更新
+	ResolveCharacterObstacleCollisions(); // ④ キャラクターと障害物の衝突
+	ResolveContactDamage();               // ⑤ プレイヤーと敵の直接接触によるダメージ
 }
 
 // 障害物の材質（鋼鉄・コンクリート・土嚢・木材）と実入射角に応じたリアル着弾＆跳弾演出
@@ -253,10 +254,22 @@ void CollisionSystem::TriggerObstacleHitEffect(const Vector3& hitPos, const Vect
 	if (impactFlashTexIndex_ == UINT32_MAX)
 	{
 		impactFlashTexIndex_ = TextureManager::GetInstance()->Load(Impact::kMuzzleFlashTexPath);
-		if (impactFlashTexIndex_ == TextureManager::kInvalidTextureIndex)
-		{
-			impactFlashTexIndex_ = scene_->particleTextureB;
-		}
+		if (impactFlashTexIndex_ == TextureManager::kInvalidTextureIndex) impactFlashTexIndex_ = scene_->particleTextureB;
+	}
+	if (woodSplinterTexIndex_ == UINT32_MAX)
+	{
+		woodSplinterTexIndex_ = TextureManager::GetInstance()->Load("Resources/particle_wood_splinter.png");
+		if (woodSplinterTexIndex_ == TextureManager::kInvalidTextureIndex) woodSplinterTexIndex_ = scene_->debrisChipTextureIndex_;
+	}
+	if (pineNeedleTexIndex_ == UINT32_MAX)
+	{
+		pineNeedleTexIndex_ = TextureManager::GetInstance()->Load("Resources/particle_pine_needle_cluster.png");
+		if (pineNeedleTexIndex_ == TextureManager::kInvalidTextureIndex) pineNeedleTexIndex_ = scene_->leafTextureIndex_;
+	}
+	if (ricochetStarTexIndex_ == UINT32_MAX)
+	{
+		ricochetStarTexIndex_ = TextureManager::GetInstance()->Load("Resources/particle_ricochet_star.png");
+		if (ricochetStarTexIndex_ == TextureManager::kInvalidTextureIndex) ricochetStarTexIndex_ = scene_->starburstTextureIndex_;
 	}
 
 	const Vector3 bDir = NormalizeOrFallback(bulletDir, { 0.0f, 0.0f, 1.0f });
@@ -271,44 +284,62 @@ void CollisionSystem::TriggerObstacleHitEffect(const Vector3& hitPos, const Vect
 	};
 	const Vector3 reflDir = NormalizeOrFallback(rawRefl, rawRefl);
 
-	enum class SurfaceMat { Metal, Concrete, SandDirt, Wood };
-	SurfaceMat mat = SurfaceMat::Metal;
-	bool isTree = false;
+	// 6材質以上に細分化し、一目で何に当たったか分かるレベルで形状・色彩・物理挙動を切り替える
+	enum class SurfaceMat { SteelContainer, FuelBarrel, ChainlinkWire, Concrete, Sandbag, Tree, TimberWood };
+	SurfaceMat mat = SurfaceMat::SteelContainer;
+	bool isBirchTree = false;
 
 	if (hitObstacle)
 	{
 		const std::string& mf = hitObstacle->GetModelFilename();
-		if (mf.find("sandbag") != std::string::npos)
+		if (hitObstacle->IsTree() || mf.find("tree") != std::string::npos || mf.find("birch") != std::string::npos)
 		{
-			mat = SurfaceMat::SandDirt;
+			mat = SurfaceMat::Tree;
+			isBirchTree = hitObstacle->IsBirchTree();
+			const_cast<Obstacle*>(hitObstacle)->TriggerHitFlinch(bDir);
 		}
-		else if (mf.find("tree") != std::string::npos)
+		else if (mf.find("sandbag") != std::string::npos)
 		{
-			mat = SurfaceMat::Wood;
-			isTree = true;
+			mat = SurfaceMat::Sandbag;
+		}
+		else if (mf.find("barrel") != std::string::npos)
+		{
+			mat = SurfaceMat::FuelBarrel;
+			const_cast<Obstacle*>(hitObstacle)->TriggerHitFlinch(bDir);
 		}
 		else if (mf.find("crate") != std::string::npos || mf.find("bridge") != std::string::npos ||
 		         mf.find("watchtower") != std::string::npos)
 		{
-			mat = SurfaceMat::Wood;
+			mat = SurfaceMat::TimberWood;
 		}
-		else if ((mf.find("fence") != std::string::npos && hitPos.y < Geometry::kFenceConcreteMaxY) ||
-		         mf.find("rock") != std::string::npos || mf.find("stone") != std::string::npos ||
+		else if (mf.find("fence") != std::string::npos)
+		{
+			if (hitPos.y < Geometry::kFenceConcreteMaxY)
+			{
+				mat = SurfaceMat::Concrete;
+			}
+			else
+			{
+				mat = SurfaceMat::ChainlinkWire;
+				const_cast<Obstacle*>(hitObstacle)->TriggerHitFlinch(bDir);
+			}
+		}
+		else if (mf.find("rock") != std::string::npos || mf.find("stone") != std::string::npos ||
 		         mf.find("concrete") != std::string::npos)
 		{
 			mat = SurfaceMat::Concrete;
 		}
 		else
 		{
-			mat = SurfaceMat::Metal;
+			mat = SurfaceMat::SteelContainer;
 		}
 
 		if (scene_->player_)
 		{
 			const char* impPath = Impact::kSeMetalPath;
-			if (mat == SurfaceMat::Concrete)      impPath = Impact::kSeConcretePath;
-			else if (mat == SurfaceMat::SandDirt) impPath = Impact::kSeDirtPath;
-			else if (mat == SurfaceMat::Wood)     impPath = Impact::kSeWoodPath;
+			if (mat == SurfaceMat::Concrete)                                  impPath = Impact::kSeConcretePath;
+			else if (mat == SurfaceMat::Sandbag)                              impPath = Impact::kSeDirtPath;
+			else if (mat == SurfaceMat::Tree || mat == SurfaceMat::TimberWood) impPath = Impact::kSeWoodPath;
 
 			TacticalAudio::Play3D(
 				impPath, hitPos, scene_->player_->GetPosition(),
@@ -319,20 +350,23 @@ void CollisionSystem::TriggerObstacleHitEffect(const Vector3& hitPos, const Vect
 
 	AppParticleManager* addMgr = scene_->appParticleManager_.get();
 	AppParticleManager* smokeMgr = scene_->smokeParticleManager_ ? scene_->smokeParticleManager_.get() : nullptr;
-	const uint32_t flashTex = (impactFlashTexIndex_ != TextureManager::kInvalidTextureIndex) ? impactFlashTexIndex_ : scene_->particleTextureB;
-	const uint32_t sparkTex = (scene_->sparkStreakTextureIndex_ != TextureManager::kInvalidTextureIndex) ? scene_->sparkStreakTextureIndex_ : flashTex;
-	const uint32_t dustTex  = (scene_->soilDustTextureIndex_ != TextureManager::kInvalidTextureIndex) ? scene_->soilDustTextureIndex_ : scene_->wispySmokeTextureIndex_;
-	const uint32_t chipTex  = (scene_->debrisChipTextureIndex_ != TextureManager::kInvalidTextureIndex) ? scene_->debrisChipTextureIndex_ : scene_->particleTextureB;
-	const uint32_t leafTex  = (scene_->leafTextureIndex_ != TextureManager::kInvalidTextureIndex) ? scene_->leafTextureIndex_ : chipTex;
+	const uint32_t flashTex    = (impactFlashTexIndex_ != TextureManager::kInvalidTextureIndex) ? impactFlashTexIndex_ : scene_->particleTextureB;
+	const uint32_t starTex     = (ricochetStarTexIndex_ != TextureManager::kInvalidTextureIndex) ? ricochetStarTexIndex_ : flashTex;
+	const uint32_t sparkTex    = (scene_->sparkStreakTextureIndex_ != TextureManager::kInvalidTextureIndex) ? scene_->sparkStreakTextureIndex_ : flashTex;
+	const uint32_t dustTex     = (scene_->soilDustTextureIndex_ != TextureManager::kInvalidTextureIndex) ? scene_->soilDustTextureIndex_ : scene_->wispySmokeTextureIndex_;
+	const uint32_t chipTex     = (scene_->debrisChipTextureIndex_ != TextureManager::kInvalidTextureIndex) ? scene_->debrisChipTextureIndex_ : scene_->particleTextureB;
+	const uint32_t splinterTex = (woodSplinterTexIndex_ != TextureManager::kInvalidTextureIndex) ? woodSplinterTexIndex_ : chipTex;
+	const uint32_t leafTex     = (scene_->leafTextureIndex_ != TextureManager::kInvalidTextureIndex) ? scene_->leafTextureIndex_ : chipTex;
+	const uint32_t pineTex     = (pineNeedleTexIndex_ != TextureManager::kInvalidTextureIndex) ? pineNeedleTexIndex_ : leafTex;
 
-	auto emitSmokePuff = [&](const Impact::SmokePuffPreset& preset)
+	auto emitSmokePuff = [&](const Impact::SmokePuffPreset& preset, const Vector3& posOverride)
 	{
 		if (!smokeMgr || dustTex == TextureManager::kInvalidTextureIndex) return;
 		for (int i = 0; i < preset.count; ++i)
 		{
 			AppParticle sm{};
 			sm.transform.Initialize();
-			sm.transform.SetTranslate(hitPos + N * Impact::kSmokeNormalOffset);
+			sm.transform.SetTranslate(posOverride + N * Impact::kSmokeNormalOffset);
 			sm.transform.SetRotate({ 0.0f, 0.0f, RandRange(0.0f, kTwoPi) });
 			const float initSc = RandRange(preset.minScale * Impact::kSmokeInitScaleMinRatio, preset.minScale * Impact::kSmokeInitScaleMaxRatio);
 			const float endSc  = RandRange(preset.minScale, preset.maxScale);
@@ -370,231 +404,333 @@ void CollisionSystem::TriggerObstacleHitEffect(const Vector3& hitPos, const Vect
 		}
 	};
 
-	if (mat == SurfaceMat::Metal)
+	// 鏡面反射方向へ連なって飛び地面で跳ねる「跳弾レーザーコメット火花列」ヘルパー（鋼鉄専用の象徴的シルエット）
+	auto emitRicochetComet = [&](const Vector3& rayVel, const Vector4& headCol, const Vector4& tailCol, int tailSteps)
 	{
-		EmitImpactFragment(
-			addMgr, hitPos + N * Impact::kFlashNormalOffset, { 0.0f, 0.0f, 0.0f },
-			Impact::kMetalFlashStart, Impact::kMetalFlashEnd,
-			Impact::kMetalFlashSize, Impact::kMetalFlashSize, Impact::kMetalFlashLife,
-			0.0f, 0.0f, 0.0f, flashTex);
+		for (int s = 0; s < tailSteps; ++s)
+		{
+			const float velFactor = 1.0f - static_cast<float>(s) * 0.055f;
+			const float sc = (s == 0) ? 0.135f : (0.095f - static_cast<float>(s) * 0.012f);
+			EmitImpactFragment(
+				addMgr, hitPos + N * 0.03f, rayVel * velFactor,
+				(s == 0) ? headCol : tailCol, { 1.0f, 0.25f, 0.04f, 0.0f },
+				sc, sc, 0.36f + static_cast<float>(tailSteps - s) * 0.045f,
+				12.2f, 0.85f, 0.72f, (s == 0) ? starTex : sparkTex, 0.18f, 2);
+		}
+	};
 
-		for (int i = 0; i < Impact::kMetalSparkCount; ++i)
+	if (mat == SurfaceMat::SteelContainer)
+	{
+		// 【鋼鉄コンテナ】：砂埃ゼロ！ 青白いアーク溶接スター閃光 ＋ 地面を跳ねる3条の跳弾コメット火花 ＋ オリーブ塗装片
+		EmitImpactFragment(
+			addMgr, hitPos + N * 0.04f, { 0.0f, 0.0f, 0.0f },
+			{ 0.78f, 0.95f, 1.0f, 1.0f }, { 1.0f, 0.55f, 0.12f, 0.0f },
+			0.82f, 0.82f, 0.068f, 0.0f, 0.0f, 0.0f, starTex, 0.30f, 2);
+
+		for (int c = 0; c < 3; ++c)
+		{
+			const Vector3 cDir = NormalizeOrFallback({
+				reflDir.x + RandRange(-0.28f, 0.28f),
+				reflDir.y + RandRange(0.05f, 0.38f),
+				reflDir.z + RandRange(-0.28f, 0.28f)
+			}, reflDir);
+			emitRicochetComet(cDir * RandRange(11.5f, 17.5f), { 0.85f, 0.97f, 1.0f, 1.0f }, { 1.0f, 0.80f, 0.32f, 0.98f }, 5);
+		}
+
+		for (int i = 0; i < 44; ++i)
 		{
 			const Vector3 dir = {
-				reflDir.x + RandRange(-Impact::kMetalSparkJitterXZ, Impact::kMetalSparkJitterXZ),
-				reflDir.y + RandRange(Impact::kMetalSparkJitterYMin, Impact::kMetalSparkJitterYMax),
-				reflDir.z + RandRange(-Impact::kMetalSparkJitterXZ, Impact::kMetalSparkJitterXZ)
+				reflDir.x + RandRange(-0.68f, 0.68f),
+				reflDir.y + RandRange(-0.18f, 0.85f),
+				reflDir.z + RandRange(-0.68f, 0.68f)
 			};
-			const float spd = RandRange(Impact::kMetalSparkSpeedMin, Impact::kMetalSparkSpeedMax);
-			const Vector4& startC = (i % Impact::kMetalBrightSparkPeriod == 0)
-				? Impact::kMetalSparkBrightCol
-				: Impact::kMetalSparkGoldCol;
+			const float spd = RandRange(6.0f, 16.5f);
+			const bool isBlueHot = (i % 3 == 0);
+			const float sz = RandRange(0.055f, 0.115f);
 			EmitImpactFragment(
-				addMgr, hitPos + N * Impact::kSparkNormalOffset, dir * spd,
-				startC, Impact::kMetalSparkEndCol,
-				RandRange(Impact::kMetalSparkWMin, Impact::kMetalSparkWMax),
-				RandRange(Impact::kMetalSparkLMin, Impact::kMetalSparkLMax),
-				RandRange(Impact::kMetalSparkLifeMin, Impact::kMetalSparkLifeMax),
-				Impact::kMetalSparkGravity, Impact::kMetalSparkDrag, Impact::kMetalSparkBounce,
-				sparkTex, Impact::kMetalSparkEndScale, 2);
+				addMgr, hitPos + N * 0.03f, dir * spd,
+				isBlueHot ? Vector4{ 0.82f, 0.96f, 1.0f, 1.0f } : Vector4{ 1.0f, 0.78f, 0.26f, 0.98f },
+				{ 1.0f, 0.22f, 0.03f, 0.0f },
+				sz * 0.55f, sz * 2.2f, RandRange(0.24f, 0.68f),
+				12.4f, 1.35f, 0.66f, isBlueHot ? starTex : sparkTex, 0.20f, 2);
 		}
 
 		if (smokeMgr)
 		{
-			for (int i = 0; i < Impact::kMetalChipCount; ++i)
+			// 軍用コンテナのオリーブグリーン塗装剥がれ片
+			for (int i = 0; i < 10; ++i)
 			{
-				const Vector3 vel = N * RandRange(Impact::kMetalChipNormalSpdMin, Impact::kMetalChipNormalSpdMax)
-					+ Vector3{
-						RandRange(-Impact::kMetalChipHorizJitter, Impact::kMetalChipHorizJitter),
-						RandRange(Impact::kMetalChipUpMin, Impact::kMetalChipUpMax),
-						RandRange(-Impact::kMetalChipHorizJitter, Impact::kMetalChipHorizJitter)
-					};
+				const Vector3 vel = N * RandRange(2.2f, 5.4f) + Vector3{ RandRange(-1.8f, 1.8f), RandRange(1.2f, 3.4f), RandRange(-1.8f, 1.8f) };
+				const bool darkSteel = (i % 3 == 0);
 				EmitImpactFragment(
-					smokeMgr, hitPos + N * Impact::kChipNormalOffset, vel,
-					Impact::kMetalChipStartCol, Impact::kMetalChipEndCol,
-					RandRange(Impact::kMetalChipWMin, Impact::kMetalChipWMax),
-					RandRange(Impact::kMetalChipLMin, Impact::kMetalChipLMax),
-					RandRange(Impact::kMetalChipLifeMin, Impact::kMetalChipLifeMax),
-					Impact::kMetalChipGravity, 1.0f, Impact::kMetalChipBounce,
-					chipTex, Impact::kMetalChipEndScale, 2);
+					smokeMgr, hitPos + N * 0.04f, vel,
+					darkSteel ? Vector4{ 0.26f, 0.30f, 0.34f, 0.96f } : Vector4{ 0.18f, 0.46f, 0.27f, 0.96f },
+					{ 0.14f, 0.22f, 0.16f, 0.0f },
+					RandRange(0.065f, 0.125f), RandRange(0.075f, 0.145f),
+					RandRange(0.38f, 0.68f), 15.5f, 1.0f, 0.50f, chipTex, 0.82f, 2);
 			}
 		}
-		emitSmokePuff(Impact::kMetalSmoke);
+		emitSmokePuff({ 2, { 0.34f, 0.38f, 0.44f, 0.20f }, 0.26f, 0.48f, 1.8f, 0.38f }, hitPos);
+	}
+	else if (mat == SurfaceMat::FuelBarrel)
+	{
+		// 【赤ドラム缶】：鮮烈なオレンジ炎閃光 ＋ 気化燃料ミスト噴出 ＋ 真紅の塗装片 ＋ 火花
+		EmitImpactFragment(
+			addMgr, hitPos + N * 0.04f, { 0.0f, 0.0f, 0.0f },
+			{ 1.0f, 0.68f, 0.20f, 1.0f }, { 1.0f, 0.22f, 0.04f, 0.0f },
+			0.76f, 0.76f, 0.072f, 0.0f, 0.0f, 0.0f, flashTex, 0.35f, 2);
+		emitRicochetComet(reflDir * 13.5f, { 1.0f, 0.92f, 0.65f, 1.0f }, { 1.0f, 0.52f, 0.14f, 0.96f }, 5);
+
+		for (int i = 0; i < 28; ++i)
+		{
+			const Vector3 vel = reflDir * RandRange(5.0f, 13.5f) + Vector3{ RandRange(-2.4f, 2.4f), RandRange(0.6f, 3.6f), RandRange(-2.4f, 2.4f) };
+			const float sz = RandRange(0.055f, 0.110f);
+			EmitImpactFragment(
+				addMgr, hitPos + N * 0.03f, vel,
+				{ 1.0f, 0.72f, 0.22f, 0.98f }, { 1.0f, 0.18f, 0.02f, 0.0f },
+				sz * 0.55f, sz * 2.1f, RandRange(0.22f, 0.58f),
+				12.0f, 1.5f, 0.62f, sparkTex, 0.22f, 2);
+		}
+
+		if (smokeMgr)
+		{
+			const uint32_t mistTex = (scene_->waterFoamTextureIndex_ != TextureManager::kInvalidTextureIndex) ? scene_->waterFoamTextureIndex_ : dustTex;
+			for (int i = 0; i < 6; ++i)
+			{
+				AppParticle fm{};
+				fm.transform.Initialize();
+				fm.transform.SetTranslate(hitPos + N * 0.05f);
+				const float sc = RandRange(0.14f, 0.24f);
+				fm.scaleAspect = { 1.45f, 0.82f };
+				fm.initialScale = sc;
+				fm.targetScale = sc * 2.6f;
+				fm.transform.SetScale({ sc * 1.45f, sc * 0.82f, 1.0f });
+				fm.velocity = N * RandRange(3.8f, 7.2f) + Vector3{ RandRange(-0.9f, 0.9f), RandRange(0.3f, 1.4f), RandRange(-0.9f, 0.9f) };
+				fm.color = { 0.82f, 0.90f, 0.98f, 0.42f };
+				fm.endColor = { 0.60f, 0.68f, 0.76f, 0.0f };
+				fm.hasColorShift = true;
+				fm.lifeTime = RandRange(0.32f, 0.55f);
+				fm.textureIndex = mistTex;
+				fm.drag = 3.6f;
+				fm.fadeInRatio = 0.08f;
+				fm.slotLayer = 1;
+				smokeMgr->AddParticle(fm);
+			}
+
+			for (int i = 0; i < 12; ++i)
+			{
+				const Vector3 vel = N * RandRange(2.4f, 5.6f) + Vector3{ RandRange(-1.9f, 1.9f), RandRange(1.3f, 3.6f), RandRange(-1.9f, 1.9f) };
+				EmitImpactFragment(
+					smokeMgr, hitPos + N * 0.04f, vel,
+					{ 0.92f, 0.22f, 0.15f, 0.98f }, { 0.55f, 0.12f, 0.08f, 0.0f },
+					RandRange(0.065f, 0.130f), RandRange(0.075f, 0.150f),
+					RandRange(0.40f, 0.72f), 15.2f, 1.0f, 0.48f, chipTex, 0.84f, 2);
+			}
+		}
+	}
+	else if (mat == SurfaceMat::ChainlinkWire)
+	{
+		// 【金網フェンス上部】：煙ゼロ！ 鋭い銀白色ワイヤースパークのみが瞬く軽快な金属反応
+		EmitImpactFragment(
+			addMgr, hitPos + N * 0.02f, { 0.0f, 0.0f, 0.0f },
+			{ 0.85f, 0.96f, 1.0f, 0.96f }, { 0.45f, 0.75f, 1.0f, 0.0f },
+			0.54f, 0.54f, 0.048f, 0.0f, 0.0f, 0.0f, starTex, 0.25f, 2);
+
+		for (int i = 0; i < 22; ++i)
+		{
+			const Vector3 vel = reflDir * RandRange(4.5f, 12.0f) + Vector3{ RandRange(-3.2f, 3.2f), RandRange(-0.5f, 3.2f), RandRange(-3.2f, 3.2f) };
+			const float sz = RandRange(0.045f, 0.092f);
+			EmitImpactFragment(
+				addMgr, hitPos, vel,
+				{ 0.88f, 0.97f, 1.0f, 1.0f }, { 0.55f, 0.80f, 1.0f, 0.0f },
+				sz * 0.55f, sz * 1.9f, RandRange(0.14f, 0.34f),
+				11.5f, 1.8f, 0.58f, (i % 2 == 0) ? starTex : sparkTex, 0.20f, 2);
+		}
 	}
 	else if (mat == SurfaceMat::Concrete)
 	{
-		EmitImpactFragment(
-			addMgr, hitPos + N * Impact::kFlashNormalOffset, { 0.0f, 0.0f, 0.0f },
-			Impact::kConcFlashStart, Impact::kConcFlashEnd,
-			Impact::kConcFlashSize, Impact::kConcFlashSize, Impact::kConcFlashLife,
-			0.0f, 0.0f, 0.0f, flashTex);
-
-		for (int i = 0; i < Impact::kConcSparkCount; ++i)
+		// 【コンクリート防壁・岩】：火花を極小に抑え、真っ白なセメント粉塵雲 ＋ ゴロゴロ跳ねる灰色の石塊破片！
+		for (int i = 0; i < 3; ++i)
 		{
-			const Vector3 vel = reflDir * RandRange(Impact::kConcSparkReflSpdMin, Impact::kConcSparkReflSpdMax)
-				+ Vector3{
-					RandRange(-Impact::kConcSparkHorizJitter, Impact::kConcSparkHorizJitter),
-					RandRange(Impact::kConcSparkUpMin, Impact::kConcSparkUpMax),
-					RandRange(-Impact::kConcSparkHorizJitter, Impact::kConcSparkHorizJitter)
-				};
+			const Vector3 vel = reflDir * RandRange(3.5f, 7.2f) + Vector3{ RandRange(-1.4f, 1.4f), RandRange(0.8f, 2.2f), RandRange(-1.4f, 1.4f) };
 			EmitImpactFragment(
-				addMgr, hitPos + N * Impact::kSparkNormalOffset, vel,
-				Impact::kConcSparkStartCol, Impact::kConcSparkEndCol,
-				Impact::kConcSparkWidth, Impact::kConcSparkLength,
-				RandRange(Impact::kConcSparkLifeMin, Impact::kConcSparkLifeMax),
-				Impact::kConcSparkGravity, Impact::kConcSparkDrag, Impact::kConcSparkBounce,
-				sparkTex, Impact::kConcSparkEndScale, 2);
+				addMgr, hitPos + N * 0.02f, vel,
+				{ 1.0f, 0.92f, 0.72f, 0.80f }, { 0.9f, 0.5f, 0.2f, 0.0f },
+				0.032f, 0.095f, RandRange(0.10f, 0.18f), 13.0f, 2.2f, 0.45f, sparkTex, 0.24f, 2);
 		}
 
 		if (smokeMgr)
 		{
-			for (int i = 0; i < Impact::kConcChipCount; ++i)
+			for (int i = 0; i < 22; ++i)
 			{
-				const Vector3 vel = N * RandRange(Impact::kConcChipNormalSpdMin, Impact::kConcChipNormalSpdMax)
-					+ Vector3{
-						RandRange(-Impact::kConcChipHorizJitter, Impact::kConcChipHorizJitter),
-						RandRange(Impact::kConcChipUpMin, Impact::kConcChipUpMax),
-						RandRange(-Impact::kConcChipHorizJitter, Impact::kConcChipHorizJitter)
-					};
-				const float g = RandRange(Impact::kConcToneMin, Impact::kConcToneMax);
+				const Vector3 vel = N * RandRange(2.8f, 7.2f)
+					+ Vector3{ RandRange(-2.4f, 2.4f), RandRange(1.5f, 4.6f), RandRange(-2.4f, 2.4f) };
+				const float g = RandRange(0.68f, 0.90f);
 				EmitImpactFragment(
-					smokeMgr, hitPos + N * Impact::kChipNormalOffset, vel,
-					{ g, g * Impact::kConcGreenFactor, g * Impact::kConcBlueFactor, Impact::kConcStartAlpha },
-					{ g * Impact::kConcEndRedDim, g * Impact::kConcEndGreenDim, g * Impact::kConcEndBlueDim, 0.0f },
-					RandRange(Impact::kConcChipWMin, Impact::kConcChipWMax),
-					RandRange(Impact::kConcChipLMin, Impact::kConcChipLMax),
-					RandRange(Impact::kConcChipLifeMin, Impact::kConcChipLifeMax),
-					Impact::kConcChipGravity, 1.0f, Impact::kConcChipBounce,
-					chipTex, Impact::kConcChipEndScale, 2);
+					smokeMgr, hitPos + N * 0.04f, vel,
+					{ g, g * 0.99f, g * 0.97f, 0.98f },
+					{ g * 0.78f, g * 0.78f, g * 0.76f, 0.0f },
+					RandRange(0.075f, 0.155f), RandRange(0.085f, 0.175f),
+					RandRange(0.45f, 0.88f), 16.5f, 0.95f, 0.48f, chipTex, 0.85f, 2);
 			}
 		}
-		emitSmokePuff(Impact::kConcreteSmoke);
+		emitSmokePuff({ 12, { 0.92f, 0.92f, 0.90f, 0.58f }, 0.52f, 1.18f, 3.6f, 0.88f }, hitPos);
 	}
-	else if (mat == SurfaceMat::SandDirt)
+	else if (mat == SurfaceMat::Sandbag)
 	{
-		emitSmokePuff(Impact::kSandDirtSmoke);
+		// 【土嚢】：火花ゼロ！ 弾孔から勢いよく噴き出して地面に落ちる黄金色の砂ジェット ＋ 麻袋の布切れ ＋ 砂嵐雲
+		emitSmokePuff({ 12, { 0.78f, 0.66f, 0.44f, 0.58f }, 0.56f, 1.34f, 4.0f, 0.94f }, hitPos);
 
 		if (smokeMgr)
 		{
-			for (int i = 0; i < Impact::kSandClodCount; ++i)
+			for (int i = 0; i < 32; ++i)
 			{
-				const Vector3 vel = N * RandRange(Impact::kSandNormalSpdMin, Impact::kSandNormalSpdMax)
-					+ Vector3{
-						RandRange(-Impact::kSandHorizJitter, Impact::kSandHorizJitter),
-						RandRange(Impact::kSandUpMin, Impact::kSandUpMax),
-						RandRange(-Impact::kSandHorizJitter, Impact::kSandHorizJitter)
-					};
-				const float tone = RandRange(Impact::kSandToneMin, Impact::kSandToneMax);
+				const Vector3 vel = N * RandRange(2.8f, 7.4f)
+					+ Vector3{ RandRange(-1.5f, 1.5f), RandRange(1.8f, 5.4f), RandRange(-1.5f, 1.5f) };
+				const float tone = RandRange(0.88f, 1.15f);
 				EmitImpactFragment(
-					smokeMgr, hitPos + N * Impact::kChipNormalOffset, vel,
-					{ Impact::kSandBaseStart.x * tone, Impact::kSandBaseStart.y * tone, Impact::kSandBaseStart.z * tone, Impact::kSandBaseStart.w },
-					{ Impact::kSandBaseEndRGB.x * tone, Impact::kSandBaseEndRGB.y * tone, Impact::kSandBaseEndRGB.z * tone, 0.0f },
-					RandRange(Impact::kSandWMin, Impact::kSandWMax),
-					RandRange(Impact::kSandLMin, Impact::kSandLMax),
-					RandRange(Impact::kSandLifeMin, Impact::kSandLifeMax),
-					Impact::kSandGravity, Impact::kSandDrag, Impact::kSandBounce,
-					chipTex, Impact::kSandEndScale, 2);
+					smokeMgr, hitPos + N * 0.04f, vel,
+					{ 0.76f * tone, 0.64f * tone, 0.38f * tone, 0.96f },
+					{ 0.58f * tone, 0.48f * tone, 0.28f * tone, 0.0f },
+					RandRange(0.055f, 0.115f), RandRange(0.065f, 0.135f),
+					RandRange(0.42f, 0.82f), 18.8f, 1.05f, 0.08f, chipTex, 0.75f, 2);
+			}
+
+			for (int i = 0; i < 7; ++i)
+			{
+				AppParticle cloth{};
+				cloth.transform.Initialize();
+				cloth.transform.SetTranslate(hitPos + N * 0.05f);
+				const float sc = RandRange(0.11f, 0.19f);
+				cloth.scaleAspect = { 0.75f, 1.35f };
+				cloth.initialScale = sc;
+				cloth.targetScale = sc * 0.90f;
+				cloth.transform.SetScale({ sc * 0.75f, sc * 1.35f, 1.0f });
+				cloth.velocity = N * RandRange(1.6f, 3.8f) + Vector3{ RandRange(-1.6f, 1.6f), RandRange(1.4f, 3.2f), RandRange(-1.6f, 1.6f) };
+				cloth.color = { 0.72f, 0.63f, 0.40f, 0.95f };
+				cloth.endColor = { 0.56f, 0.48f, 0.30f, 0.0f };
+				cloth.hasColorShift = true;
+				cloth.lifeTime = RandRange(0.65f, 1.15f);
+				cloth.textureIndex = splinterTex;
+				cloth.gravity = 5.2f;
+				cloth.drag = 2.6f;
+				cloth.wobbleFreq = 8.5f;
+				cloth.wobbleAmp = 0.46f;
+				cloth.wobbleAxis = { 1.0f, 0.2f, 0.7f };
+				cloth.angularVelocity = RandRange(-9.0f, 9.0f);
+				cloth.slotLayer = 2;
+				smokeMgr->AddParticle(cloth);
 			}
 		}
 	}
-	else // SurfaceMat::Wood
+	else if (mat == SurfaceMat::Tree)
 	{
+		// 【樹木（松・トウヒ／白樺）】：火花ゼロ！ 樹冠全体から大量の大きな木の葉・松葉房がハラハラ降り注ぎ、樹皮と木片が飛び散る！
 		if (smokeMgr)
 		{
-			for (int i = 0; i < Impact::kWoodSplinterCount; ++i)
-			{
-				const Vector3 vel = N * RandRange(Impact::kWoodNormalSpdMin, Impact::kWoodNormalSpdMax)
-					+ Vector3{
-						RandRange(-Impact::kWoodHorizJitter, Impact::kWoodHorizJitter),
-						RandRange(Impact::kWoodUpMin, Impact::kWoodUpMax),
-						RandRange(-Impact::kWoodHorizJitter, Impact::kWoodHorizJitter)
-					};
-				const float tone = RandRange(Impact::kWoodToneMin, Impact::kWoodToneMax);
-				const bool isBark = (isTree && (i % Impact::kWoodBarkPeriod == 0));
-				const Vector4& baseC = isBark ? Impact::kWoodBarkBase : Impact::kWoodHeartBase;
-				const Vector4 startC = { baseC.x * tone, baseC.y * tone, baseC.z * tone, baseC.w };
-				EmitImpactFragment(
-					smokeMgr, hitPos + N * Impact::kChipNormalOffset, vel,
-					startC,
-					{ startC.x * Impact::kWoodEndDim, startC.y * Impact::kWoodEndDim, startC.z * Impact::kWoodEndDim, 0.0f },
-					RandRange(Impact::kWoodWMin, Impact::kWoodWMax),
-					RandRange(Impact::kWoodLMin, Impact::kWoodLMax),
-					RandRange(Impact::kWoodLifeMin, Impact::kWoodLifeMax),
-					Impact::kWoodGravity, Impact::kWoodDrag, Impact::kWoodBounce,
-					chipTex, Impact::kWoodEndScale, 2);
-			}
+			const Vector3 treeBase = hitObstacle ? hitObstacle->GetPosition() : hitPos;
 
-			// 針葉樹・白樺への被弾時は衝撃で枝葉が舞い落ちる
-			if (isTree && leafTex != TextureManager::kInvalidTextureIndex)
+			for (int i = 0; i < 22; ++i)
 			{
-				for (int i = 0; i < Impact::kTreeLeafCount; ++i)
+				const Vector3 vel = N * RandRange(2.6f, 6.6f)
+					+ Vector3{ RandRange(-2.2f, 2.2f), RandRange(1.4f, 4.4f), RandRange(-2.2f, 2.2f) };
+				const float tone = RandRange(0.88f, 1.12f);
+				const bool isBark = (i % 2 == 0);
+				Vector4 startC{};
+				if (isBark)
 				{
-					AppParticle lf{};
-					lf.transform.Initialize();
-					lf.transform.SetTranslate(hitPos + Vector3{
-						RandRange(-Impact::kLeafSpawnJitterXZ, Impact::kLeafSpawnJitterXZ),
-						RandRange(Impact::kLeafSpawnOffsetYMin, Impact::kLeafSpawnOffsetYMax),
-						RandRange(-Impact::kLeafSpawnJitterXZ, Impact::kLeafSpawnJitterXZ)
-					});
-					lf.transform.SetRotate({ 0.0f, 0.0f, RandRange(0.0f, kTwoPi) });
-					const float sc = RandRange(Impact::kLeafScaleMin, Impact::kLeafScaleMax);
-					lf.scaleAspect = Impact::kLeafAspect;
-					lf.initialScale = sc;
-					lf.targetScale = sc * Impact::kLeafTargetScaleRatio;
-					lf.transform.SetScale({ sc * Impact::kLeafAspect.x, sc * Impact::kLeafAspect.y, 1.0f });
-					lf.velocity = N * RandRange(Impact::kLeafNormalSpdMin, Impact::kLeafNormalSpdMax)
-						+ Vector3{
-							RandRange(-Impact::kLeafHorizJitter, Impact::kLeafHorizJitter),
-							RandRange(Impact::kLeafUpMin, Impact::kLeafUpMax),
-							RandRange(-Impact::kLeafHorizJitter, Impact::kLeafHorizJitter)
-						};
-					const float gTone = RandRange(Impact::kLeafToneMin, Impact::kLeafToneMax);
-					lf.color = {
-						Impact::kLeafStartBase.x * gTone,
-						Impact::kLeafStartBase.y * gTone,
-						Impact::kLeafStartBase.z * gTone,
-						Impact::kLeafStartBase.w
-					};
-					lf.endColor = {
-						Impact::kLeafEndBaseRGB.x * gTone,
-						Impact::kLeafEndBaseRGB.y * gTone,
-						Impact::kLeafEndBaseRGB.z * gTone,
-						0.0f
-					};
-					lf.hasColorShift = true;
-					lf.lifeTime = RandRange(Impact::kLeafLifeMin, Impact::kLeafLifeMax);
-					lf.currentTime = 0.0f;
-					lf.textureIndex = leafTex;
-					lf.gravity = Impact::kLeafGravity;
-					lf.drag = Impact::kLeafDrag;
-					lf.wobbleFreq = Impact::kLeafWobbleFreq;
-					lf.wobbleAmp = Impact::kLeafWobbleAmp;
-					lf.wobbleAxis = Impact::kLeafWobbleAxis;
-					lf.angularVelocity = RandRange(-Impact::kLeafAngularVel, Impact::kLeafAngularVel);
-					lf.slotLayer = 2;
-					smokeMgr->AddParticle(lf);
+					startC = isBirchTree
+						? Vector4{ 0.95f * tone, 0.93f * tone, 0.89f * tone, 0.98f }
+						: Vector4{ 0.38f * tone, 0.23f * tone, 0.14f * tone, 0.98f };
 				}
+				else
+				{
+					startC = { 0.90f * tone, 0.74f * tone, 0.44f * tone, 0.98f };
+				}
+				EmitImpactFragment(
+					smokeMgr, hitPos + N * 0.05f, vel,
+					startC, { startC.x * 0.80f, startC.y * 0.80f, startC.z * 0.80f, 0.0f },
+					RandRange(0.085f, 0.155f), RandRange(0.160f, 0.310f),
+					RandRange(0.45f, 0.92f), 14.2f, 1.2f, 0.38f, splinterTex, 0.86f, 2);
+			}
+
+			// 頭上の樹冠外周（y=1.8m〜3.8m, 半径0.7m〜1.95m）から一斉に舞い落ちる大きな木の葉・松葉房シャワー！
+			for (int i = 0; i < 26; ++i)
+			{
+				const float ang = static_cast<float>(i) * (kTwoPi / 26.0f) + RandRange(-0.22f, 0.22f);
+				const float rad = RandRange(0.68f, 1.95f);
+				const bool usePineCluster = (!isBirchTree && (i % 3 != 0));
+
+				AppParticle lf{};
+				lf.transform.Initialize();
+				lf.transform.SetTranslate({
+					treeBase.x + std::cos(ang) * rad,
+					RandRange(1.85f, 3.75f),
+					treeBase.z + std::sin(ang) * rad
+				});
+				const float sc = usePineCluster ? RandRange(0.20f, 0.34f) : RandRange(0.22f, 0.38f);
+				lf.scaleAspect = usePineCluster ? Vector2{ 1.0f, 1.0f } : Vector2{ 0.88f, 1.22f };
+				lf.initialScale = sc;
+				lf.targetScale = sc * 0.92f;
+				lf.transform.SetScale({ sc * lf.scaleAspect.x, sc * lf.scaleAspect.y, 1.0f });
+				lf.velocity = {
+					std::cos(ang) * RandRange(0.6f, 1.9f) + bDir.x * 0.55f,
+					RandRange(-0.85f, 0.65f),
+					std::sin(ang) * RandRange(0.6f, 1.9f) + bDir.z * 0.55f
+				};
+
+				const float gTone = RandRange(0.88f, 1.14f);
+				if (isBirchTree)
+				{
+					lf.color = (i % 3 == 0)
+						? Vector4{ 0.95f * gTone, 0.84f * gTone, 0.22f * gTone, 0.96f }
+						: Vector4{ 0.48f * gTone, 0.86f * gTone, 0.28f * gTone, 0.96f };
+				}
+				else if (usePineCluster)
+				{
+					lf.color = { 0.92f * gTone, 1.02f * gTone, 0.90f * gTone, 0.96f };
+				}
+				else
+				{
+					lf.color = { 0.36f * gTone, 0.72f * gTone, 0.28f * gTone, 0.96f };
+				}
+				lf.endColor = { lf.color.x * 0.82f, lf.color.y * 0.82f, lf.color.z * 0.82f, 0.0f };
+				lf.hasColorShift = true;
+				lf.lifeTime = RandRange(1.55f, 2.65f);
+				lf.textureIndex = usePineCluster ? pineTex : leafTex;
+				lf.gravity = 1.45f;
+				lf.drag = 2.15f;
+				lf.wobbleFreq = RandRange(6.2f, 8.8f);
+				lf.wobbleAmp = RandRange(0.58f, 0.88f);
+				lf.wobbleAxis = { 1.0f, 0.18f, 0.72f };
+				lf.angularVelocity = RandRange(-5.2f, 5.2f);
+				lf.slotLayer = 2;
+				smokeMgr->AddParticle(lf);
 			}
 		}
-
-		for (int i = 0; i < Impact::kWoodSparkCount; ++i)
+		emitSmokePuff({ 4, { 0.78f, 0.64f, 0.38f, 0.38f }, 0.34f, 0.68f, 2.2f, 0.58f }, hitPos);
+	}
+	else // SurfaceMat::TimberWood（木箱・木橋・監視塔）
+	{
+		// 【木材構造物】：火花ゼロ！ 大きく鋭い黄金松材スプリンター破片が四方へ弾け飛び、琥珀色のおが屑煙が舞う
+		if (smokeMgr)
 		{
-			const Vector3 vel = reflDir * RandRange(Impact::kWoodSparkReflSpdMin, Impact::kWoodSparkReflSpdMax)
-				+ Vector3{
-					RandRange(-Impact::kWoodSparkHorizJitter, Impact::kWoodSparkHorizJitter),
-					RandRange(Impact::kWoodSparkUpMin, Impact::kWoodSparkUpMax),
-					RandRange(-Impact::kWoodSparkHorizJitter, Impact::kWoodSparkHorizJitter)
-				};
-			EmitImpactFragment(
-				addMgr, hitPos + N * Impact::kSparkNormalOffset, vel,
-				Impact::kWoodSparkStartCol, Impact::kWoodSparkEndCol,
-				Impact::kWoodSparkWidth, Impact::kWoodSparkLength,
-				RandRange(Impact::kWoodSparkLifeMin, Impact::kWoodSparkLifeMax),
-				Impact::kWoodSparkGravity, Impact::kWoodSparkDrag, Impact::kWoodSparkBounce,
-				sparkTex, Impact::kWoodSparkEndScale, 2);
+			for (int i = 0; i < 28; ++i)
+			{
+				const Vector3 vel = N * RandRange(2.8f, 7.4f)
+					+ Vector3{ RandRange(-2.5f, 2.5f), RandRange(1.6f, 5.0f), RandRange(-2.5f, 2.5f) };
+				const float tone = RandRange(0.86f, 1.15f);
+				const Vector4 startC = (i % 4 == 0)
+					? Vector4{ 0.56f * tone, 0.40f * tone, 0.22f * tone, 0.98f }
+					: Vector4{ 0.92f * tone, 0.72f * tone, 0.40f * tone, 0.98f };
+				EmitImpactFragment(
+					smokeMgr, hitPos + N * 0.04f, vel,
+					startC, { startC.x * 0.78f, startC.y * 0.78f, startC.z * 0.78f, 0.0f },
+					RandRange(0.090f, 0.165f), RandRange(0.175f, 0.340f),
+					RandRange(0.45f, 0.92f), 14.6f, 1.2f, 0.44f, splinterTex, 0.86f, 2);
+			}
 		}
-
-		emitSmokePuff(Impact::kWoodSmoke);
+		emitSmokePuff({ 8, { 0.86f, 0.71f, 0.42f, 0.48f }, 0.44f, 0.92f, 2.8f, 0.72f }, hitPos);
 	}
 }
 
@@ -743,6 +879,55 @@ void CollisionSystem::ResolveBulletCollisions()
 							isCritical,
 							scene_->bloodTextureIndex_,
 							scene_->smokeTextureIndex_);
+
+						// 防弾プレート着弾スパーク＆舞い散るアヒルの羽毛（ストレートアルファで白飛びゼロ）
+						const uint32_t spkTex = (scene_->sparkStreakTextureIndex_ != TextureManager::kInvalidTextureIndex)
+							? scene_->sparkStreakTextureIndex_ : scene_->particleTextureB;
+						const int armorSparks = isCritical ? 12 : 6;
+						for (int s = 0; s < armorSparks; ++s)
+						{
+							const Vector3 sVel = {
+								-bulletDir.x * RandRange(2.2f, 5.8f) + RandRange(-2.6f, 2.6f),
+								RandRange(1.0f, 3.6f),
+								-bulletDir.z * RandRange(2.2f, 5.8f) + RandRange(-2.6f, 2.6f)
+							};
+							EmitImpactFragment(
+								scene_->appParticleManager_.get(), hitPoint, sVel,
+								isCritical ? CombatHit::kTargetRedPaintCol : CombatHit::kVestSparkStartCol,
+								CombatHit::kVestSparkEndCol,
+								0.020f, 0.13f, RandRange(0.14f, 0.30f),
+								11.8f, 1.9f, 0.48f, spkTex, 0.25f, 2);
+						}
+						if (scene_->smokeParticleManager_ && scene_->featherTextureIndex_ != TextureManager::kInvalidTextureIndex)
+						{
+							const int hitFeathers = isCritical ? 7 : 4;
+							for (int f = 0; f < hitFeathers; ++f)
+							{
+								AppParticle fp{};
+								fp.transform.Initialize();
+								fp.transform.SetTranslate(hitPoint + Vector3{ RandRange(-0.14f, 0.14f), RandRange(-0.08f, 0.18f), RandRange(-0.14f, 0.14f) });
+								fp.transform.SetRotate({ 0.0f, 0.0f, RandRange(0.0f, kTwoPi) });
+								const float sc = RandRange(0.085f, 0.145f);
+								fp.scaleAspect = CombatHit::kFeatherAspect;
+								fp.initialScale = sc;
+								fp.targetScale = sc * 0.90f;
+								fp.transform.SetScale({ sc * CombatHit::kFeatherAspect.x, sc * CombatHit::kFeatherAspect.y, 1.0f });
+								fp.velocity = bulletDir * RandRange(0.8f, 2.4f) + Vector3{ RandRange(-2.0f, 2.0f), RandRange(1.3f, 3.2f), RandRange(-2.0f, 2.0f) };
+								fp.color = (f % 3 == 0) ? CombatHit::kFeatherWhiteCol : CombatHit::kFeatherYellowCol;
+								fp.endColor = { fp.color.x, fp.color.y, fp.color.z, 0.0f };
+								fp.hasColorShift = true;
+								fp.lifeTime = RandRange(1.05f, 1.75f);
+								fp.textureIndex = scene_->featherTextureIndex_;
+								fp.gravity = CombatHit::kFeatherGravity;
+								fp.drag = CombatHit::kFeatherDrag;
+								fp.wobbleFreq = CombatHit::kFeatherWobbleFreq;
+								fp.wobbleAmp = CombatHit::kFeatherWobbleAmp;
+								fp.wobbleAxis = CombatHit::kFeatherWobbleAxis;
+								fp.angularVelocity = RandRange(-5.0f, 5.0f);
+								fp.slotLayer = 2;
+								scene_->smokeParticleManager_->AddParticle(fp);
+							}
+						}
 					}
 
 					if (enemy->IsDead())
@@ -797,6 +982,75 @@ void CollisionSystem::ResolveBulletCollisions()
 							scene_->particleTextureB,
 							scene_->starburstTextureIndex_,
 							scene_->smokeTextureIndex_);
+
+						// 撃破クライマックス：ストレートアルファでふわりと宙に舞い落ちる大量の羽毛＆地表衝撃波リング
+						if (scene_->smokeParticleManager_)
+						{
+							AppParticleManager* smMgr = scene_->smokeParticleManager_.get();
+							if (scene_->featherTextureIndex_ != TextureManager::kInvalidTextureIndex)
+							{
+								for (int f = 0; f < 22; ++f)
+								{
+									const float a = RandRange(0.0f, kTwoPi);
+									const float spd = RandRange(1.4f, 4.6f);
+									AppParticle fp{};
+									fp.transform.Initialize();
+									fp.transform.SetTranslate(enemyPos + Vector3{ RandRange(-0.22f, 0.22f), RandRange(0.35f, 1.05f), RandRange(-0.22f, 0.22f) });
+									fp.transform.SetRotate({ 0.0f, 0.0f, RandRange(0.0f, kTwoPi) });
+									const float sc = RandRange(0.095f, 0.175f);
+									fp.scaleAspect = CombatHit::kFeatherAspect;
+									fp.initialScale = sc;
+									fp.targetScale = sc * 0.88f;
+									fp.transform.SetScale({ sc * CombatHit::kFeatherAspect.x, sc * CombatHit::kFeatherAspect.y, 1.0f });
+									fp.velocity = { std::cos(a) * spd + hitDir.x * 1.4f, RandRange(1.8f, 4.8f), std::sin(a) * spd + hitDir.z * 1.4f };
+									fp.color = (f % 3 == 0) ? CombatHit::kFeatherWhiteCol : CombatHit::kFeatherYellowCol;
+									fp.endColor = { fp.color.x, fp.color.y, fp.color.z, 0.0f };
+									fp.hasColorShift = true;
+									fp.lifeTime = RandRange(1.35f, 2.35f);
+									fp.textureIndex = scene_->featherTextureIndex_;
+									fp.gravity = 1.55f;
+									fp.drag = 2.4f;
+									fp.wobbleFreq = 8.2f;
+									fp.wobbleAmp = 0.58f;
+									fp.wobbleAxis = CombatHit::kFeatherWobbleAxis;
+									fp.angularVelocity = RandRange(-5.8f, 5.8f);
+									fp.slotLayer = 2;
+									smMgr->AddParticle(fp);
+								}
+							}
+
+							const uint32_t dustTex = (scene_->soilDustTextureIndex_ != TextureManager::kInvalidTextureIndex)
+								? scene_->soilDustTextureIndex_ : scene_->wispySmokeTextureIndex_;
+							if (dustTex != TextureManager::kInvalidTextureIndex)
+							{
+								for (int d = 0; d < 12; ++d)
+								{
+									const float a = static_cast<float>(d) * (kTwoPi / 12.0f) + RandRange(-0.12f, 0.12f);
+									const float spd = RandRange(2.0f, 4.2f);
+									const float initSc = RandRange(0.22f, 0.36f);
+									AppParticle dp{};
+									dp.transform.Initialize();
+									dp.transform.SetTranslate(enemyPos + Vector3{ std::cos(a) * 0.22f, 0.14f, std::sin(a) * 0.22f });
+									dp.transform.SetRotate({ 0.0f, 0.0f, RandRange(0.0f, kTwoPi) });
+									dp.scaleAspect = { 1.35f, 0.85f };
+									dp.initialScale = initSc;
+									dp.targetScale = initSc * 2.9f;
+									dp.transform.SetScale({ initSc * 1.35f, initSc * 0.85f, 1.0f });
+									dp.velocity = { std::cos(a) * spd, RandRange(0.25f, 0.95f), std::sin(a) * spd };
+									dp.color = { 0.70f, 0.62f, 0.50f, 0.44f };
+									dp.endColor = { 0.66f, 0.60f, 0.52f, 0.0f };
+									dp.hasColorShift = true;
+									dp.lifeTime = RandRange(0.55f, 0.92f);
+									dp.textureIndex = dustTex;
+									dp.drag = 2.9f;
+									dp.curlFreq = 1.6f;
+									dp.curlAmp = 0.24f;
+									dp.fadeInRatio = 0.09f;
+									dp.slotLayer = 1;
+									smMgr->AddParticle(dp);
+								}
+							}
+						}
 					}
 				}
 
@@ -1232,6 +1486,58 @@ void CollisionSystem::ResolveObstacleCollisions()
 		if (hasHit)
 		{
 			TriggerObstacleHitEffect(hitPos, bullet->GetDirection(), hitNormal, hitObs);
+
+			// 赤ドラム缶への着弾時：1〜2発目で弾孔から高圧火炎ジェット噴出、3発目で大爆発！
+			if (hitObs && hitObs->IsExplosiveBarrel())
+			{
+				if (bullet->GetOwner() == BulletOwner::Player) RaidStats::GetInstance().shotsHit++;
+				Obstacle* mutableBarrel = const_cast<Obstacle*>(hitObs);
+				if (mutableBarrel->DamageBarrel(hitPos, hitNormal))
+				{
+					DetonateFuelBarrel(mutableBarrel, bullet->GetDirection());
+				}
+				else
+				{
+					TacticalAudio::Play3D(
+						"Resources/Audio/SE_Flare_Hiss_Loop.wav", hitPos,
+						scene_->player_ ? scene_->player_->GetPosition() : hitPos,
+						0.58f, 4.0f, 30.0f, 120, "barrel_leak_ignite");
+					scene_->TriggerCameraShake(0.08f, 0.11f);
+				}
+			}
+
+			// プレイヤー弾が未回収の物資木箱（最初の弾薬箱など）に当たった場合は木箱へダメージを与え、破壊で即座に物資支給
+			if (bullet->GetOwner() == BulletOwner::Player && hitObs && scene_->lootSystem_ &&
+			    hitObs->GetModelFilename().find("crate") != std::string::npos)
+			{
+				bool crateBroken = false;
+				if (scene_->lootSystem_->TryDamageBreakableCrate(
+					hitObs->GetPosition(),
+					scene_->player_.get(),
+					scene_->appParticleManager_.get(),
+					scene_->floatingTexts_,
+					crateBroken,
+					scene_->smokeParticleManager_.get(),
+					scene_->soilDustTextureIndex_,
+					scene_->debrisChipTextureIndex_,
+					scene_->sparkStreakTextureIndex_))
+				{
+					RaidStats::GetInstance().shotsHit++;
+					Obstacle* mutableObs = const_cast<Obstacle*>(hitObs);
+					if (crateBroken)
+					{
+						mutableObs->BreakObstacle(bullet->GetDirection());
+						scene_->TriggerCameraShake(0.16f, 0.19f);
+						scene_->TriggerHitStop(0.032f);
+					}
+					else
+					{
+						mutableObs->TriggerHitFlinch(bullet->GetDirection());
+						scene_->TriggerCameraShake(0.055f, 0.065f);
+					}
+				}
+			}
+
 			bullet->Finalize();
 		}
 	}
@@ -1276,4 +1582,384 @@ void CollisionSystem::ResolveContactDamage()
 void CollisionSystem::ResolveCharacterObstacleCollisions()
 {
 	// キャラクターと障害物の押し出し解決はエンジンの CollisionManager::Update に統合済み
+}
+
+void CollisionSystem::DetonateFuelBarrel(Obstacle* barrelObs, const Vector3& blastDir)
+{
+	if (!barrelObs || barrelObs->IsBroken() || !scene_) return;
+
+	const Vector3 bPos = barrelObs->GetPosition();
+	barrelObs->BreakObstacle(blastDir);
+
+	const Vector3 listenerPos = scene_->player_ ? scene_->player_->GetPosition() : bPos;
+	TacticalAudio::Play3D("Resources/Audio/SE_Barrel_Explode.wav", bPos, listenerPos, 1.0f, 10.0f, 65.0f, 40, "barrel_boom");
+	scene_->TriggerCameraShake(0.48f, 0.96f);
+	scene_->TriggerHitStop(0.068f);
+	scene_->AddFloatingText(bPos + Vector3{ 0.0f, 1.85f, 0.0f }, "FUEL DETONATION!!", { 1.0f, 0.58f, 0.14f, 1.0f }, true);
+
+	AppParticleManager* addMgr   = scene_->appParticleManager_.get();
+	AppParticleManager* smokeMgr = scene_->smokeParticleManager_ ? scene_->smokeParticleManager_.get() : nullptr;
+	const uint32_t flashTex = (impactFlashTexIndex_ != UINT32_MAX && impactFlashTexIndex_ != TextureManager::kInvalidTextureIndex)
+		? impactFlashTexIndex_ : scene_->particleTextureB;
+	const uint32_t starTex  = (ricochetStarTexIndex_ != UINT32_MAX && ricochetStarTexIndex_ != TextureManager::kInvalidTextureIndex)
+		? ricochetStarTexIndex_ : scene_->starburstTextureIndex_;
+	const uint32_t sparkTex = (scene_->sparkStreakTextureIndex_ != TextureManager::kInvalidTextureIndex) ? scene_->sparkStreakTextureIndex_ : flashTex;
+	const uint32_t dustTex  = (scene_->soilDustTextureIndex_ != TextureManager::kInvalidTextureIndex) ? scene_->soilDustTextureIndex_ : scene_->wispySmokeTextureIndex_;
+	const uint32_t smokeTex = (scene_->wispySmokeTextureIndex_ != TextureManager::kInvalidTextureIndex) ? scene_->wispySmokeTextureIndex_ : dustTex;
+
+	if (addMgr)
+	{
+		// 1. 中心部の強烈な白熱爆轟スター閃光
+		EmitImpactFragment(addMgr, bPos + Vector3{ 0.0f, 0.85f, 0.0f }, { 0.0f, 0.0f, 0.0f },
+			{ 1.0f, 0.98f, 0.86f, 1.0f }, { 1.0f, 0.45f, 0.08f, 0.0f }, 3.8f, 3.8f, 0.11f, 0.0f, 0.0f, 0.0f, starTex, 0.35f, 2);
+		EmitImpactFragment(addMgr, bPos + Vector3{ 0.0f, 0.75f, 0.0f }, { 0.0f, 0.0f, 0.0f },
+			{ 1.0f, 0.78f, 0.32f, 1.0f }, { 1.0f, 0.18f, 0.02f, 0.0f }, 4.6f, 4.6f, 0.22f, 0.0f, 0.0f, 0.0f, flashTex, 1.45f, 2);
+
+		// 2. 膨張しながら立ち昇る紅蓮のマッシュルームファイアボール（34発）
+		for (int i = 0; i < 34; ++i)
+		{
+			const float a = RandRange(0.0f, kTwoPi);
+			const float rSpd = RandRange(1.2f, 5.8f);
+			const float initSc = RandRange(0.55f, 1.05f);
+			AppParticle fb{};
+			fb.transform.Initialize();
+			fb.transform.SetTranslate(bPos + Vector3{ RandRange(-0.45f, 0.45f), RandRange(0.25f, 1.15f), RandRange(-0.45f, 0.45f) });
+			fb.scaleAspect = { RandRange(0.9f, 1.25f), RandRange(0.9f, 1.25f) };
+			fb.initialScale = initSc;
+			fb.targetScale = initSc * RandRange(2.1f, 3.0f);
+			fb.transform.SetScale({ initSc, initSc, 1.0f });
+			fb.velocity = { std::cos(a) * rSpd, RandRange(2.2f, 6.8f), std::sin(a) * rSpd };
+			fb.color = (i % 3 == 0) ? Vector4{ 1.0f, 0.94f, 0.62f, 0.96f } : Vector4{ 1.0f, 0.56f, 0.14f, 0.92f };
+			fb.endColor = { 0.85f, 0.10f, 0.02f, 0.0f };
+			fb.hasColorShift = true;
+			fb.lifeTime = RandRange(0.38f, 0.78f);
+			fb.textureIndex = flashTex;
+			fb.drag = 2.4f;
+			fb.curlFreq = 1.8f;
+			fb.curlAmp = 0.45f;
+			fb.slotLayer = 2;
+			addMgr->AddParticle(fb);
+		}
+
+		// 3. 四方八方の地面で跳ね回る90発の爆裂火の粉＆破片スパークシャワー
+		for (int i = 0; i < 90; ++i)
+		{
+			const float a = RandRange(0.0f, kTwoPi);
+			const float hSpd = RandRange(4.5f, 18.5f);
+			const Vector3 vel = { std::cos(a) * hSpd, RandRange(2.4f, 10.5f), std::sin(a) * hSpd };
+			const float sz = RandRange(0.065f, 0.140f);
+			const bool bright = (i % 4 == 0);
+			EmitImpactFragment(
+				addMgr, bPos + Vector3{ 0.0f, 0.55f, 0.0f }, vel,
+				bright ? Vector4{ 1.0f, 0.97f, 0.82f, 1.0f } : Vector4{ 1.0f, 0.68f, 0.18f, 0.98f },
+				{ 1.0f, 0.18f, 0.02f, 0.0f },
+				sz * 0.6f, sz * 2.4f, RandRange(0.55f, 1.45f),
+				12.2f, 1.05f, 0.66f, bright ? starTex : sparkTex, 0.22f, 2);
+		}
+	}
+
+	if (smokeMgr)
+	{
+		// 4. 地表を高速で押し広がる衝撃波ダストリング（28発）
+		for (int i = 0; i < 28; ++i)
+		{
+			const float a = static_cast<float>(i) * (kTwoPi / 28.0f) + RandRange(-0.08f, 0.08f);
+			const float spd = RandRange(6.5f, 11.5f);
+			const float initSc = RandRange(0.36f, 0.58f);
+			AppParticle sw{};
+			sw.transform.Initialize();
+			sw.transform.SetTranslate(bPos + Vector3{ std::cos(a) * 0.45f, 0.16f, std::sin(a) * 0.45f });
+			sw.scaleAspect = { 1.55f, 0.72f };
+			sw.initialScale = initSc;
+			sw.targetScale = initSc * 3.4f;
+			sw.transform.SetScale({ initSc * 1.55f, initSc * 0.72f, 1.0f });
+			sw.velocity = { std::cos(a) * spd, RandRange(0.18f, 0.75f), std::sin(a) * spd };
+			sw.color = { 0.76f, 0.66f, 0.52f, 0.58f };
+			sw.endColor = { 0.62f, 0.56f, 0.48f, 0.0f };
+			sw.hasColorShift = true;
+			sw.lifeTime = RandRange(0.65f, 1.15f);
+			sw.textureIndex = dustTex;
+			sw.drag = 2.8f;
+			sw.fadeInRatio = 0.06f;
+			sw.slotLayer = 1;
+			smokeMgr->AddParticle(sw);
+		}
+
+		// 5. 上空5mまでモクモクと立ち昇る重油黒煙柱（26発）
+		for (int i = 0; i < 26; ++i)
+		{
+			const float a = RandRange(0.0f, kTwoPi);
+			const float rSpd = RandRange(0.4f, 2.2f);
+			const float initSc = RandRange(0.45f, 0.78f);
+			AppParticle bs{};
+			bs.transform.Initialize();
+			bs.transform.SetTranslate(bPos + Vector3{ RandRange(-0.55f, 0.55f), RandRange(0.55f, 1.45f), RandRange(-0.55f, 0.55f) });
+			bs.scaleAspect = { RandRange(0.92f, 1.28f), RandRange(1.05f, 1.38f) };
+			bs.initialScale = initSc;
+			bs.targetScale = initSc * RandRange(3.0f, 4.4f);
+			bs.transform.SetScale({ initSc, initSc, 1.0f });
+			bs.velocity = { std::cos(a) * rSpd, RandRange(1.8f, 4.2f), std::sin(a) * rSpd };
+			const float dark = RandRange(0.12f, 0.24f);
+			bs.color = { dark, dark * 0.96f, dark * 0.94f, RandRange(0.62f, 0.80f) };
+			bs.endColor = { 0.22f, 0.22f, 0.24f, 0.0f };
+			bs.hasColorShift = true;
+			bs.lifeTime = RandRange(2.2f, 3.8f);
+			bs.textureIndex = smokeTex;
+			bs.drag = 0.95f;
+			bs.curlFreq = 1.5f;
+			bs.curlAmp = 0.48f;
+			bs.angularVelocity = RandRange(-1.4f, 1.4f);
+			bs.fadeInRatio = 0.12f;
+			bs.slotLayer = 1;
+			smokeMgr->AddParticle(bs);
+		}
+	}
+
+	// 6. 爆発跡地に5.5秒間燃え続ける残り火ゾーンを登録
+	activeFirePatches_.push_back({ bPos, 5.5f, 0.0f });
+
+	// 7. 爆風範囲ダメージ：周囲8mの敵を一掃、標的＆木箱を破壊、8.8m以内の別ドラム缶を連鎖誘爆！
+	constexpr float kEnemyBlastRadSq  = 8.2f * 8.2f;
+	constexpr float kTargetBlastRadSq = 6.5f * 6.5f;
+	constexpr float kCrateBlastRadSq  = 6.0f * 6.0f;
+	constexpr float kChainBarrelRadSq = 8.8f * 8.8f;
+
+	for (auto& enemy : scene_->GetEnemies())
+	{
+		if (!enemy || enemy->IsDead()) continue;
+		const Vector3 ePos = enemy->GetPosition();
+		const float dx = ePos.x - bPos.x, dz = ePos.z - bPos.z;
+		if (dx * dx + dz * dz <= kEnemyBlastRadSq)
+		{
+			for (int h = 0; h < 8 && !enemy->IsDead(); ++h) enemy->OnHit(bPos);
+			if (enemy->IsDead())
+			{
+				RaidStats::GetInstance().enemiesKilled++;
+				scene_->AddFloatingText(ePos + Vector3{ 0.0f, 1.55f, 0.0f }, "BARREL BLAST!", { 1.0f, 0.65f, 0.15f, 1.0f }, true);
+				if (scene_->lootSystem_) scene_->lootSystem_->SpawnCorpseLoot(ePos, "BLASTED SCAV");
+				if (scene_->particleManager && addMgr)
+				{
+					const Vector3 outDir = NormalizeOrFallback(ePos - bPos, { 0.0f, 0.0f, 1.0f });
+					addMgr->EmitEnemyDestroyGPUBurst(scene_->particleManager->GetRandomEngine(), ePos, outDir, scene_->particleTextureB, scene_->starburstTextureIndex_, scene_->smokeTextureIndex_);
+				}
+			}
+		}
+	}
+
+	for (auto& target : scene_->GetTargets())
+	{
+		if (!target || target->IsDead()) continue;
+		const Vector3 tPos = target->GetPosition();
+		const float dx = tPos.x - bPos.x, dz = tPos.z - bPos.z;
+		if (dx * dx + dz * dz <= kTargetBlastRadSq)
+		{
+			target->OnHit(99);
+			if (target->IsDead()) RaidStats::GetInstance().targetsDestroyed++;
+		}
+	}
+
+	for (auto& obs : scene_->GetObstacles())
+	{
+		if (!obs || obs.get() == barrelObs || obs->IsBroken()) continue;
+		const Vector3 oPos = obs->GetPosition();
+		const float dx = oPos.x - bPos.x, dz = oPos.z - bPos.z;
+		const float distSq = dx * dx + dz * dz;
+
+		if (obs->IsExplosiveBarrel() && distSq <= kChainBarrelRadSq)
+		{
+			obs->DamageBarrel(oPos + Vector3{ 0.0f, 0.7f, 0.0f }, NormalizeOrFallback(oPos - bPos, { 0.0f, 1.0f, 0.0f }), 0.28f);
+		}
+		else if (obs->IsBreakableSupplyCrate() && distSq <= kCrateBlastRadSq && scene_->lootSystem_ && scene_->player_)
+		{
+			bool crateBroken = false;
+			for (int hit = 0; hit < 4 && !crateBroken; ++hit)
+			{
+				if (!scene_->lootSystem_->TryDamageBreakableCrate(
+					oPos, scene_->player_.get(), addMgr, scene_->floatingTexts_, crateBroken,
+					smokeMgr, scene_->soilDustTextureIndex_, scene_->debrisChipTextureIndex_, scene_->sparkStreakTextureIndex_))
+				{
+					break;
+				}
+			}
+			if (crateBroken) obs->BreakObstacle(NormalizeOrFallback(oPos - bPos, { 0.0f, 0.0f, 1.0f }));
+		}
+	}
+}
+
+void CollisionSystem::UpdateBarrelHazards(float deltaTime)
+{
+	if (!scene_ || !scene_->appParticleManager_) return;
+
+	AppParticleManager* addMgr   = scene_->appParticleManager_.get();
+	AppParticleManager* smokeMgr = scene_->smokeParticleManager_ ? scene_->smokeParticleManager_.get() : nullptr;
+	const uint32_t flashTex = (impactFlashTexIndex_ != UINT32_MAX && impactFlashTexIndex_ != TextureManager::kInvalidTextureIndex)
+		? impactFlashTexIndex_ : scene_->particleTextureB;
+	const uint32_t sparkTex = (scene_->sparkStreakTextureIndex_ != TextureManager::kInvalidTextureIndex) ? scene_->sparkStreakTextureIndex_ : flashTex;
+	const uint32_t smokeTex = (scene_->wispySmokeTextureIndex_ != TextureManager::kInvalidTextureIndex) ? scene_->wispySmokeTextureIndex_ : scene_->smokeTextureIndex_;
+
+	// 1. 被弾して引火した赤ドラム缶の「高圧トーチ火炎ジェット噴出」＆時限爆発カウントダウン
+	std::vector<Obstacle*> toDetonate;
+	for (auto& obs : scene_->GetObstacles())
+	{
+		if (!obs || !obs->IsBarrelLeaking()) continue;
+
+		const Vector3 lPos = obs->GetBarrelLeakPos();
+		const Vector3 lDir = NormalizeOrFallback(obs->GetBarrelLeakDir(), { 0.0f, 0.5f, 0.86f });
+
+		for (int j = 0; j < 2; ++j)
+		{
+			AppParticle fj{};
+			fj.transform.Initialize();
+			fj.transform.SetTranslate(lPos + lDir * (0.04f + static_cast<float>(j) * 0.08f));
+			const float sc = RandRange(0.15f, 0.28f);
+			fj.scaleAspect = { 1.15f, 1.15f };
+			fj.initialScale = sc;
+			fj.targetScale = sc * 2.2f;
+			fj.transform.SetScale({ sc * 1.15f, sc * 1.15f, 1.0f });
+			fj.velocity = lDir * RandRange(4.8f, 8.8f) + Vector3{ RandRange(-0.7f, 0.7f), RandRange(0.5f, 1.8f), RandRange(-0.7f, 0.7f) };
+			fj.color = (j == 0) ? Vector4{ 1.0f, 0.94f, 0.58f, 0.95f } : Vector4{ 1.0f, 0.52f, 0.12f, 0.90f };
+			fj.endColor = { 0.90f, 0.12f, 0.02f, 0.0f };
+			fj.hasColorShift = true;
+			fj.lifeTime = RandRange(0.14f, 0.26f);
+			fj.textureIndex = flashTex;
+			fj.drag = 3.2f;
+			fj.slotLayer = 2;
+			addMgr->AddParticle(fj);
+		}
+
+		if (std::rand() % 2 == 0)
+		{
+			EmitImpactFragment(addMgr, lPos, lDir * RandRange(5.5f, 11.0f) + Vector3{ RandRange(-1.8f, 1.8f), RandRange(0.8f, 3.0f), RandRange(-1.8f, 1.8f) },
+				{ 1.0f, 0.86f, 0.35f, 0.98f }, { 1.0f, 0.20f, 0.02f, 0.0f }, 0.045f, 0.14f, RandRange(0.20f, 0.42f), 11.5f, 1.6f, 0.55f, sparkTex, 0.22f, 2);
+		}
+
+		if (smokeMgr && (std::rand() % 2 == 0) && smokeTex != TextureManager::kInvalidTextureIndex)
+		{
+			AppParticle ls{};
+			ls.transform.Initialize();
+			ls.transform.SetTranslate(lPos + lDir * 0.28f);
+			const float sc = RandRange(0.18f, 0.30f);
+			ls.scaleAspect = { 1.0f, 1.2f };
+			ls.initialScale = sc;
+			ls.targetScale = sc * 2.8f;
+			ls.transform.SetScale({ sc, sc * 1.2f, 1.0f });
+			ls.velocity = { lDir.x * 1.2f + RandRange(-0.4f, 0.4f), RandRange(1.5f, 2.8f), lDir.z * 1.2f + RandRange(-0.4f, 0.4f) };
+			ls.color = { 0.18f, 0.18f, 0.20f, 0.52f };
+			ls.endColor = { 0.24f, 0.24f, 0.26f, 0.0f };
+			ls.hasColorShift = true;
+			ls.lifeTime = RandRange(0.75f, 1.35f);
+			ls.textureIndex = smokeTex;
+			ls.drag = 1.4f;
+			ls.curlFreq = 2.0f;
+			ls.curlAmp = 0.35f;
+			ls.fadeInRatio = 0.12f;
+			ls.slotLayer = 1;
+			smokeMgr->AddParticle(ls);
+		}
+
+		if (obs->TickBarrelFuse(deltaTime))
+		{
+			toDetonate.push_back(obs.get());
+		}
+	}
+
+	for (Obstacle* b : toDetonate)
+	{
+		DetonateFuelBarrel(b, { 0.0f, 0.0f, 1.0f });
+	}
+
+	// 2. 爆発後の地面に残る炎上燃料プール＆舞い上がる残り火（5.5秒間持続）
+	for (auto it = activeFirePatches_.begin(); it != activeFirePatches_.end(); )
+	{
+		it->remainTime -= deltaTime;
+		if (it->remainTime <= 0.0f)
+		{
+			it = activeFirePatches_.erase(it);
+			continue;
+		}
+
+		it->emitTimer += deltaTime;
+		if (it->emitTimer >= 0.045f)
+		{
+			it->emitTimer = 0.0f;
+			const float intensity = std::clamp(it->remainTime / 1.8f, 0.20f, 1.0f);
+
+			for (int f = 0; f < 2; ++f)
+			{
+				const float a = RandRange(0.0f, kTwoPi);
+				const float r = RandRange(0.15f, 2.35f * intensity);
+				const Vector3 fPos = it->pos + Vector3{ std::cos(a) * r, 0.08f, std::sin(a) * r };
+				const float sc = RandRange(0.22f, 0.44f) * intensity;
+				AppParticle gf{};
+				gf.transform.Initialize();
+				gf.transform.SetTranslate(fPos);
+				gf.scaleAspect = { 0.88f, 1.35f };
+				gf.initialScale = sc;
+				gf.targetScale = sc * 1.65f;
+				gf.transform.SetScale({ sc * 0.88f, sc * 1.35f, 1.0f });
+				gf.velocity = { RandRange(-0.35f, 0.35f), RandRange(0.95f, 2.15f), RandRange(-0.35f, 0.35f) };
+				gf.color = { 1.0f, 0.65f, 0.16f, 0.82f * intensity };
+				gf.endColor = { 0.88f, 0.12f, 0.02f, 0.0f };
+				gf.hasColorShift = true;
+				gf.lifeTime = RandRange(0.26f, 0.48f);
+				gf.textureIndex = flashTex;
+				gf.curlFreq = 2.6f;
+				gf.curlAmp = 0.32f;
+				gf.slotLayer = 2;
+				addMgr->AddParticle(gf);
+			}
+
+			// 空へ舞い上がるオレンジ色の火の粉エンバー
+			{
+				const float a = RandRange(0.0f, kTwoPi);
+				const float r = RandRange(0.1f, 2.1f);
+				AppParticle em{};
+				em.transform.Initialize();
+				em.transform.SetTranslate(it->pos + Vector3{ std::cos(a) * r, 0.18f, std::sin(a) * r });
+				const float sc = RandRange(0.032f, 0.062f);
+				em.scaleAspect = { 0.8f, 1.3f };
+				em.initialScale = sc;
+				em.targetScale = sc * 0.35f;
+				em.transform.SetScale({ sc * 0.8f, sc * 1.3f, 1.0f });
+				em.velocity = { RandRange(-0.6f, 0.6f), RandRange(1.6f, 3.4f), RandRange(-0.6f, 0.6f) };
+				em.color = { 1.0f, 0.82f, 0.28f, 0.95f * intensity };
+				em.endColor = { 1.0f, 0.20f, 0.02f, 0.0f };
+				em.hasColorShift = true;
+				em.lifeTime = RandRange(0.85f, 1.65f);
+				em.textureIndex = sparkTex;
+				em.curlFreq = 3.2f;
+				em.curlAmp = 0.65f;
+				em.twinkleSpeed = 18.0f;
+				em.twinklePhase = a;
+				em.slotLayer = 2;
+				addMgr->AddParticle(em);
+			}
+
+			if (smokeMgr && smokeTex != TextureManager::kInvalidTextureIndex && (std::rand() % 2 == 0))
+			{
+				const float a = RandRange(0.0f, kTwoPi);
+				const float r = RandRange(0.2f, 1.8f);
+				const float sc = RandRange(0.24f, 0.42f);
+				AppParticle ps{};
+				ps.transform.Initialize();
+				ps.transform.SetTranslate(it->pos + Vector3{ std::cos(a) * r, 0.32f, std::sin(a) * r });
+				ps.scaleAspect = { 1.0f, 1.25f };
+				ps.initialScale = sc;
+				ps.targetScale = sc * 2.9f;
+				ps.transform.SetScale({ sc, sc * 1.25f, 1.0f });
+				ps.velocity = { RandRange(-0.35f, 0.35f), RandRange(1.1f, 2.2f), RandRange(-0.35f, 0.35f) };
+				ps.color = { 0.16f, 0.16f, 0.18f, 0.42f * intensity };
+				ps.endColor = { 0.24f, 0.24f, 0.26f, 0.0f };
+				ps.hasColorShift = true;
+				ps.lifeTime = RandRange(1.1f, 1.9f);
+				ps.textureIndex = smokeTex;
+				ps.curlFreq = 1.8f;
+				ps.curlAmp = 0.38f;
+				ps.fadeInRatio = 0.15f;
+				ps.slotLayer = 1;
+				smokeMgr->AddParticle(ps);
+			}
+		}
+		++it;
+	}
 }

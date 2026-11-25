@@ -46,7 +46,11 @@ namespace GamePlayLevelLayout
 	constexpr float kGroundTileSize = 25.0f, kGroundGridCenterZ = 25.0f, kGroundTileY = -0.020f;
 	constexpr size_t kMinValidObstacleCount = 2;
 	constexpr float kSpawnYawEpsilon = 1e-4f, kValidInitialYawMin = -900.0f;
+#ifdef _DEBUG
+	constexpr struct { float minX, maxX, minZ, maxZ, cellSize, agentRadius; } kNavMeshGrid = { -33.5f, 33.5f, -11.5f, 68.5f, 1.0f, 0.58f };
+#else
 	constexpr struct { float minX, maxX, minZ, maxZ, cellSize, agentRadius; } kNavMeshGrid = { -33.5f, 33.5f, -11.5f, 68.5f, 0.5f, 0.58f };
+#endif
 
 	constexpr float kFlankerPatrolSpeed = 2.65f, kStandardPatrolSpeed = 2.15f;
 	constexpr Vector2 kDefaultPatrolOffsets[] = { { -3.6f, -0.8f }, { -1.2f, 1.0f }, { 1.2f, -0.6f }, { 3.6f, 0.8f } };

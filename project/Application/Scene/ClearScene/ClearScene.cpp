@@ -1278,11 +1278,23 @@ void ClearScene::Update()
 
 	bool confirm = false;
 	bool toTitle = false;
+	bool toggleDemo = false;
 	if (input_ && !isTransitioning)
 	{
 		input_->Update();
 		confirm = input_->TriggerKey(DIK_SPACE) || input_->TriggerKey(DIK_RETURN);
 		toTitle = input_->TriggerKey(DIK_T);
+		toggleDemo = input_->TriggerKey(DIK_F7);
+		if (toggleDemo)
+		{
+			RaidStats::GetInstance().autoDemoMode = !RaidStats::GetInstance().autoDemoMode;
+			TacticalAudio::Play2D("Resources/Audio/SE_UI_Click.wav", Audio::kVolSkipClick);
+			if (RaidStats::GetInstance().autoDemoMode)
+			{
+				RaidStats::GetInstance().autoDemoCycleIndex = 0;
+				if (state_ == State::Result) confirm = true;
+			}
+		}
 	}
 
 	switch (state_)
@@ -1359,8 +1371,19 @@ void ClearScene::Update()
 		}
 		if (!transitionRequested_)
 		{
-			if (toTitle)      RequestSceneTransition("TITLE");
-			else if (confirm) HandleResultConfirmAction();
+			const bool autoLoopDemo = RaidStats::GetInstance().autoDemoMode && (actionTimer_ >= Timeline::kGradeRevealSec + 2.8f);
+			if (toTitle)
+			{
+				RequestSceneTransition("TITLE");
+			}
+			else if (confirm || autoLoopDemo)
+			{
+				if (RaidStats::GetInstance().autoDemoMode)
+				{
+					RaidStats::GetInstance().autoDemoCycleIndex = 0; // クリア実演後は再び1周目（即死→救難ジオラマ）へループ
+				}
+				HandleResultConfirmAction();
+			}
 		}
 		break;
 	}

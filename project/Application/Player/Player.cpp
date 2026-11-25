@@ -196,6 +196,7 @@ void Player::Reset()
     reserveAmmo_ = kDefaultReserveAmmo;
     isReloading_ = wasDryReload_ = false;
     reloadTimer_ = reloadCancelledTimer_ = 0.0f;
+    emptyTriggerAlertTimer_ = dryFireRepeatTimer_ = reloadCompleteFlashTimer_ = 0.0f;
     suppressShootUntilMouseRelease_ = true;
 
     medkitCount_ = kDefaultMedkitCount;
@@ -247,6 +248,7 @@ void Player::CancelReloadWithNotify()
     isReloading_ = false;
     reloadTimer_ = 0.0f;
     reloadCancelledTimer_ = kReloadCancelledNotifyDuration;
+    TacticalAudio::Play2D("Resources/Audio/SE_Gun_DryFire.wav", PlayerTuning::Audio::kReloadCancelVolume, PlayerTuning::Audio::kDryFireCooldownMs, "reload_cancel");
 }
 
 void Player::UpdateActionStates(float deltaTime, const MouseInput* mouseInput)
@@ -255,6 +257,8 @@ void Player::UpdateActionStates(float deltaTime, const MouseInput* mouseInput)
     const bool textCaptured = AppDebugState::IsImGuiCapturingTextInput();
 
     if (reloadCancelledTimer_ > 0.0f) reloadCancelledTimer_ = (std::max)(0.0f, reloadCancelledTimer_ - deltaTime);
+    if (emptyTriggerAlertTimer_ > 0.0f) emptyTriggerAlertTimer_ = (std::max)(0.0f, emptyTriggerAlertTimer_ - deltaTime);
+    if (reloadCompleteFlashTimer_ > 0.0f) reloadCompleteFlashTimer_ = (std::max)(0.0f, reloadCompleteFlashTimer_ - deltaTime);
 
     // 救急キット回復処理の進行 / [Q] または [1] キーで使用開始
     if (isHealing_)
@@ -274,26 +278,45 @@ void Player::UpdateActionStates(float deltaTime, const MouseInput* mouseInput)
             TacticalAudio::Play2D("Resources/Audio/SE_Heal_Complete.wav", kHealCompleteVolume);
         }
     }
-    else if (!isDodging_ && !textCaptured && (IsAppKeyDown('Q') || IsAppKeyDown('1')))
+    else if (!isDodging_ && ((demoCtrl_.active && demoCtrl_.triggerHeal) || (!demoCtrl_.active && !textCaptured && (IsAppKeyDown('Q') || IsAppKeyDown('1')))))
     {
+        if (demoCtrl_.active && medkitCount_ <= 0) medkitCount_ = 1;
         StartHealing();
     }
 
     // [C] キー：銃収納ダッシュ切替 ＆ 左クリック押下時の即座の構え直し
-    const bool isCDown = !textCaptured && IsAppKeyDown('C');
-    const bool isCTriggered = isCDown && !prevCPressed_;
-    prevCPressed_ = isCDown;
-
-    if (isCTriggered && !isDodging_)
+    if (demoCtrl_.active)
     {
-        isWeaponHolstered_ = !isWeaponHolstered_;
-        TacticalAudio::Play2D("Resources/Audio/SE_Weapon_Holster.wav", kHolsterToggleVolume, kHolsterToggleCooldownMs);
-        if (isWeaponHolstered_ && isReloading_) { isReloading_ = false; reloadTimer_ = 0.0f; }
+        const bool wantHolster = demoCtrl_.holsterSprint && !demoCtrl_.fireHeld && !isReloading_ && !isDodging_;
+        if (wantHolster != isWeaponHolstered_)
+        {
+            isWeaponHolstered_ = wantHolster;
+            if (isWeaponHolstered_ && isReloading_) { isReloading_ = false; reloadTimer_ = 0.0f; }
+        }
     }
-    if (isWeaponHolstered_ && mouseInput && !AppDebugState::IsImGuiCapturingMouse() && mouseInput->PushButton(0))
+    else
     {
-        isWeaponHolstered_ = false;
-        TacticalAudio::Play2D("Resources/Audio/SE_Weapon_Holster.wav", kUnholsterAimVolume, kUnholsterAimCooldownMs);
+        const bool isCDown = !textCaptured && IsAppKeyDown('C');
+        const bool isCTriggered = isCDown && !prevCPressed_;
+        prevCPressed_ = isCDown;
+
+        if (isCTriggered && !isDodging_)
+        {
+            isWeaponHolstered_ = !isWeaponHolstered_;
+            TacticalAudio::Play2D("Resources/Audio/SE_Weapon_Holster.wav", kHolsterToggleVolume, kHolsterToggleCooldownMs);
+            if (isWeaponHolstered_ && isReloading_) { isReloading_ = false; reloadTimer_ = 0.0f; }
+        }
+        if (isWeaponHolstered_ && mouseInput && !AppDebugState::IsImGuiCapturingMouse() && mouseInput->PushButton(0))
+        {
+            isWeaponHolstered_ = false;
+            TacticalAudio::Play2D("Resources/Audio/SE_Weapon_Holster.wav", kUnholsterAimVolume, kUnholsterAimCooldownMs);
+        }
+    }
+
+    // デモプレイ中は予備弾薬が尽きないよう自動補給して継続的に射撃＆リロード演出を見せる
+    if (demoCtrl_.active && reserveAmmo_ < 30)
+    {
+        reserveAmmo_ = 90;
     }
 
     // リロード処理の進行 / [R] キーでリロード開始
@@ -310,15 +333,30 @@ void Player::UpdateActionStates(float deltaTime, const MouseInput* mouseInput)
             reserveAmmo_ -= loadAmount;
             isReloading_ = false;
             reloadTimer_ = 0.0f;
+            emptyTriggerAlertTimer_ = 0.0f;
+            dryFireRepeatTimer_ = 0.0f;
+            reloadCompleteFlashTimer_ = kReloadCompleteFlashDuration;
+            TacticalAudio::Play2D("Resources/Audio/SE_Reload_Ready.wav", kReloadCompleteVolume, kEmptyMagAlertCooldownMs, "reload_ready");
         }
     }
-    else if (!isDodging_ && !textCaptured && IsAppKeyDown('R') && magazineAmmo_ < maxMagazineAmmo_ && reserveAmmo_ > 0)
+    else if (!isDodging_ && ((demoCtrl_.active && (demoCtrl_.triggerReload || magazineAmmo_ <= 0)) || (!demoCtrl_.active && !textCaptured && IsAppKeyDown('R'))))
     {
-        isWeaponHolstered_ = false;
-        wasDryReload_ = (magazineAmmo_ <= 0);
-        isReloading_ = true;
-        reloadTimer_ = kReloadDuration;
-        reloadCancelledTimer_ = 0.0f;
+        if (magazineAmmo_ < maxMagazineAmmo_ && reserveAmmo_ > 0)
+        {
+            isWeaponHolstered_ = false;
+            wasDryReload_ = (magazineAmmo_ <= 0);
+            isReloading_ = true;
+            reloadTimer_ = kReloadDuration;
+            reloadCancelledTimer_ = 0.0f;
+            emptyTriggerAlertTimer_ = 0.0f;
+            reloadCompleteFlashTimer_ = 0.0f;
+        }
+        else if (magazineAmmo_ < maxMagazineAmmo_ && reserveAmmo_ <= 0)
+        {
+            // 予備弾薬もゼロの状態で [R] を押した場合は弾薬切れアラート音＋UI強調
+            emptyTriggerAlertTimer_ = kEmptyTriggerAlertDuration;
+            TacticalAudio::Play2D("Resources/Audio/SE_Ammo_EmptyAlert.wav", kDryFireVolume, kNoReserveAlertCooldownMs, "no_reserve_alert");
+        }
     }
 }
 
@@ -377,10 +415,15 @@ bool Player::UpdateDodgeAndMovement(float deltaTime, float frameScale)
         return true;
     }
 
-    // WASD入力方向の計算（ImGuiテキスト入力中は移動入力を抑止）
+    // WASD入力方向の計算（ImGuiテキスト入力中は移動入力を抑止 / F7デモプレイ中はAIベクトルを使用）
     const bool textCaptured = AppDebugState::IsImGuiCapturingTextInput();
     Vector3 moveDir = kZeroVec3;
-    if (!textCaptured)
+    if (demoCtrl_.active)
+    {
+        moveDir = demoCtrl_.moveDir;
+        moveDir.y = 0.0f;
+    }
+    else if (!textCaptured)
     {
         if (IsAppKeyDown('W')) moveDir.z += 1.0f;
         if (IsAppKeyDown('S')) moveDir.z -= 1.0f;
@@ -399,8 +442,8 @@ bool Player::UpdateDodgeAndMovement(float deltaTime, float frameScale)
         isMoving = true;
     }
 
-    const bool isSpaceDown = !textCaptured && IsAppKeyDown(VK_SPACE);
-    const bool isSpaceTriggered = isSpaceDown && !prevSpacePressed_;
+    const bool isSpaceDown = !demoCtrl_.active && !textCaptured && IsAppKeyDown(VK_SPACE);
+    const bool isSpaceTriggered = demoCtrl_.active ? demoCtrl_.triggerDodge : (isSpaceDown && !prevSpacePressed_);
     prevSpacePressed_ = isSpaceDown;
 
     // [SPACE] キーで回避ローリング開始
@@ -420,7 +463,9 @@ bool Player::UpdateDodgeAndMovement(float deltaTime, float frameScale)
 
     if (lenSq > 0.0f)
     {
-        const float effectiveSpeed = kMoveSpeed * (isWeaponHolstered_ ? kHolsterSpeedMultiplier : 1.0f);
+        // F7自動デモ中は審査員がパーティクルをじっくり追えるよう 0.78倍 の落ち着いた歩調にする
+        const float demoSpeedScale = demoCtrl_.active ? 0.78f : 1.0f;
+        const float effectiveSpeed = kMoveSpeed * (isWeaponHolstered_ ? kHolsterSpeedMultiplier : 1.0f) * demoSpeedScale;
         position_.x += moveDir.x * effectiveSpeed * frameScale;
         position_.z += moveDir.z * effectiveSpeed * frameScale;
     }
@@ -558,6 +603,49 @@ void Player::SyncAimWithCamera(const MouseInput* mouseInput)
         win ? static_cast<float>(win->GetClientHeight()) : kUIDefaultDisplayHeight);
 
     const float resScale   = clientSize.y / kUIDefaultDisplayHeight;
+    if (demoCtrl_.active)
+    {
+        // F7自動デモプレイ時：3D照準ターゲットをスクリーンへ投影してレティクル＆レーザーサイトを滑らかに追従させる
+        const Matrix4x4& vp = camera_->GetViewProjectionMatrix();
+        const Vector3& wp = demoCtrl_.aimWorldPoint;
+        const float cw = wp.x * vp.m[0][kMatW] + wp.y * vp.m[1][kMatW] + wp.z * vp.m[2][kMatW] + vp.m[kMatW][kMatW];
+        if (cw > 0.05f)
+        {
+            const float cx = (wp.x * vp.m[0][0] + wp.y * vp.m[1][0] + wp.z * vp.m[2][0] + vp.m[kMatW][0]) / cw;
+            const float cy = (wp.x * vp.m[0][1] + wp.y * vp.m[1][1] + wp.z * vp.m[2][1] + vp.m[kMatW][1]) / cw;
+            const float sx = (cx + 1.0f) * 0.5f * clientSize.x;
+            const float sy = (1.0f - cy) * 0.5f * clientSize.y;
+            effectiveReticleScreenPos_.x = (std::clamp)(sx + reticleRecoilOffset_.x * resScale, kReticleScreenMarginPx, clientSize.x - kReticleScreenMarginPx);
+            effectiveReticleScreenPos_.y = (std::clamp)(sy + reticleRecoilOffset_.y * resScale, kReticleScreenMarginPx, clientSize.y - kReticleScreenMarginPx);
+        }
+        if (isDodging_) return;
+
+        const float dx = wp.x - position_.x;
+        const float dz = wp.z - position_.z;
+        const float distXZ = std::sqrt(dx * dx + dz * dz);
+        if (distXZ > kSmallLenEpsilon)
+        {
+            const float baseYaw    = std::atan2(dx, dz);
+            const float closeBlend = SmoothStep01((distXZ - Aim::kCloseBlendStartDist) / Aim::kCloseBlendRange);
+            const float effRight   = (std::min)(bulletSpawnOffset_.x * closeBlend, distXZ * Aim::kMaxRightOffsetDistRatio);
+            const float sinArg     = (std::clamp)(effRight / distXZ, -Aim::kMaxSinArg, Aim::kMaxSinArg);
+            const float exactYaw   = baseYaw - std::asin(sinArg);
+
+            if (!(isWeaponHolstered_ && isMoving_))
+            {
+                const float diff = GameConfig::Math::WrapAngleSigned(exactYaw - aimYaw_);
+                aimYaw_ = GameConfig::Math::WrapAngleSigned(aimYaw_ + diff * 0.22f);
+            }
+
+            const Vector3 fwd    = { std::sin(aimYaw_), 0.0f, std::cos(aimYaw_) };
+            const Vector3 muzzle = Bullet::ComputeSpawnPosition(position_, fwd, bulletSpawnOffset_);
+            const float fwdProj  = (wp.x - muzzle.x) * fwd.x + (wp.z - muzzle.z) * fwd.z;
+            aimRayDistance_      = (std::clamp)(fwdProj > 0.5f ? fwdProj : distXZ, Aim::kAimRayMinDist, Aim::kAimRayMaxDist);
+        }
+        SyncDuckVisualAndWeaponPose();
+        return;
+    }
+
     const Vector2 rawMouse = mouseInput->GetScaledPosition();
     effectiveReticleScreenPos_.x = (std::clamp)(rawMouse.x + reticleRecoilOffset_.x * resScale, kReticleScreenMarginPx, clientSize.x - kReticleScreenMarginPx);
     effectiveReticleScreenPos_.y = (std::clamp)(rawMouse.y + reticleRecoilOffset_.y * resScale, kReticleScreenMarginPx, clientSize.y - kReticleScreenMarginPx);
@@ -908,29 +996,69 @@ void Player::RestoreIntroPose()
 
 std::vector<std::unique_ptr<Bullet>> Player::TryShoot(const MouseInput* mouseInput, float deltaTime)
 {
+    using namespace PlayerTuning::Audio;
     std::vector<std::unique_ptr<Bullet>> bullets;
     if (shotCooldownTimer_ > 0.0f) shotCooldownTimer_ = (std::max)(0.0f, shotCooldownTimer_ - deltaTime);
+    if (dryFireRepeatTimer_ > 0.0f) dryFireRepeatTimer_ = (std::max)(0.0f, dryFireRepeatTimer_ - deltaTime);
 
-    if (isDead_ || isDodging_ || !object3d_ || !object3dCom_ || !camera_ || !mouseInput || AppDebugState::IsImGuiCapturingMouse())
+    if (isDead_ || isDodging_ || !object3d_ || !object3dCom_ || !camera_ || !mouseInput || (!demoCtrl_.active && AppDebugState::IsImGuiCapturingMouse()))
     {
         return bullets;
     }
 
     // スタート・演出スキップ時のマウス左クリック押しっぱなしによる初弾暴発を防止
-    if (suppressShootUntilMouseRelease_)
+    if (demoCtrl_.active)
+    {
+        suppressShootUntilMouseRelease_ = false;
+    }
+    else if (suppressShootUntilMouseRelease_)
     {
         const bool osLeftDown = (GetAsyncKeyState(VK_LBUTTON) & kUIAsyncKeyDownMask) != 0;
         if (mouseInput->PushButton(0) || osLeftDown) return bullets;
         suppressShootUntilMouseRelease_ = false;
     }
 
-    if (!isReloading_ && magazineAmmo_ <= 0 && mouseInput->TriggerButton(0))
-    {
-        TacticalAudio::Play2D("Resources/Audio/SE_Gun_DryFire.wav", PlayerTuning::Audio::kDryFireVolume, PlayerTuning::Audio::kDryFireCooldownMs);
-    }
-    if (isReloading_ || magazineAmmo_ <= 0) return bullets;
+    const bool trigFire = demoCtrl_.active ? (demoCtrl_.fireHeld && shotCooldownTimer_ <= 0.0f) : mouseInput->TriggerButton(0);
+    const bool holdFire = demoCtrl_.active ? demoCtrl_.fireHeld : mouseInput->PushButton(0);
 
-    if (mouseInput->PushButton(0) && shotCooldownTimer_ <= 0.0f)
+    // リロード中に左クリックした場合はリロード継続のままインジケーターを強調表示
+    if (isReloading_)
+    {
+        if (!demoCtrl_.active && trigFire)
+        {
+            emptyTriggerAlertTimer_ = kEmptyTriggerAlertDuration;
+            TacticalAudio::Play2D("Resources/Audio/SE_Gun_DryFire.wav", kReloadBusyClickVolume, kReloadBusyClickCooldownMs, "reload_busy");
+        }
+        return bullets;
+    }
+
+    // 弾切れ状態：単発クリック時だけでなくフルオート押しっぱなし中も周期的に空撃ち警告音＋UIシェイクを発動
+    if (magazineAmmo_ <= 0)
+    {
+        if (trigFire)
+        {
+            isWeaponHolstered_ = false;
+            emptyTriggerAlertTimer_ = kEmptyTriggerAlertDuration;
+            dryFireRepeatTimer_ = kHeldDryFireIntervalSec;
+            TacticalAudio::Play2D("Resources/Audio/SE_Ammo_EmptyAlert.wav", kDryFireVolume, kDryFireCooldownMs, "player_dryfire");
+        }
+        else if (holdFire)
+        {
+            if (shotCooldownTimer_ <= 0.0f && dryFireRepeatTimer_ <= 0.0f)
+            {
+                emptyTriggerAlertTimer_ = kEmptyTriggerAlertDuration;
+                dryFireRepeatTimer_ = kHeldDryFireIntervalSec;
+                TacticalAudio::Play2D("Resources/Audio/SE_Ammo_EmptyAlert.wav", kDryFireVolume, kDryFireCooldownMs, "player_dryfire");
+            }
+        }
+        else
+        {
+            dryFireRepeatTimer_ = 0.0f;
+        }
+        return bullets;
+    }
+
+    if (holdFire && shotCooldownTimer_ <= 0.0f)
     {
         isWeaponHolstered_ = false;
         SyncAimWithCamera(mouseInput);
@@ -945,6 +1073,19 @@ std::vector<std::unique_ptr<Bullet>> Player::TryShoot(const MouseInput* mouseInp
         shotCooldownTimer_ = kShotCooldown;
         rifleRecoil_ = 1.0f;
         RaidStats::GetInstance().shotsFired++;
+
+        // 最終弾発射時(1 -> 0)：ボルトストップ金属音＋弾切れアラートを即時再生、残弾わずか(1..4)では警告ティックを重ねる
+        if (magazineAmmo_ <= 0)
+        {
+            emptyTriggerAlertTimer_ = kEmptyTriggerAlertDuration;
+            dryFireRepeatTimer_ = kHeldDryFireIntervalSec;
+            TacticalAudio::Play2D("Resources/Audio/SE_Ammo_Empty.wav", kEmptyMagAlertVolume, kEmptyMagAlertCooldownMs, "ammo_empty");
+        }
+        else if (magazineAmmo_ <= kLowAmmoSoundThreshold)
+        {
+            const float lowVol = kLowAmmoTickVolumeBase + static_cast<float>(kLowAmmoSoundThreshold - magazineAmmo_) * kLowAmmoTickVolumeStep;
+            TacticalAudio::Play2D("Resources/Audio/SE_Ammo_LowTick.wav", lowVol, kLowAmmoTickCooldownMs, "ammo_low_tick");
+        }
 
         ApplyReticleRecoilKick();
         currentSpread_ = (std::min)(kMaxSpread, currentSpread_ + kShootSpreadPenalty);
@@ -963,9 +1104,21 @@ bool Player::StartHealing()
 
 void Player::TakeDamage(float damage, const std::string& attackerName, const std::string& cause, const Vector3* attackerPos)
 {
-    if (isDead_ || invincibilityTimer_ > 0.0f || isDodging_) return;
+    if (isDead_) return;
+    // 即死イベント（1周目デモ演出やデバッグF8など damage >= 1000）は無敵時間・回避中でも確実に発動させる
+    if (damage < 1000.0f && (invincibilityTimer_ > 0.0f || isDodging_)) return;
+    if (damage >= 1000.0f)
+    {
+        isDodging_ = false;
+        dodgeTimer_ = 0.0f;
+    }
 
     hp_ -= damage;
+    // F7自動デモプレイ中は実演が途中敗北で途切れないようHP下限を保護（救急キット回復パーティクル実演へ繋げる）
+    if (demoCtrl_.active && damage < 1000.0f && hp_ < 28.0f)
+    {
+        hp_ = 28.0f;
+    }
     RaidStats::GetInstance().damageTakenCount++;
     if (attackerPos) { lastAttackerPosition_ = *attackerPos; hasAttackerPosition_ = true; }
 

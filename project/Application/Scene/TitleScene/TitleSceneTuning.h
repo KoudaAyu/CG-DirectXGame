@@ -318,7 +318,7 @@ namespace TitleSceneTuning
 	{
 		enum BatchId : int
 		{
-			kTrunk = 0, kLeaf, kPine, kBush, kRock, kReed, kGrass, kLeafLight, kBatchCount
+			kTrunk = 0, kLeaf, kPine, kBush, kRock, kReed, kGrass, kLeafLight, kFarLeaf, kFarPine, kBatchCount
 		};
 
 		inline constexpr float kBatchBoundingRadius = 260.0f;
@@ -497,13 +497,15 @@ namespace TitleSceneTuning
 
 		inline constexpr Vector4 kBatchColors[kBatchCount] = {
 			{ 0.42f, 0.30f, 0.20f, 1.0f }, // 幹 
-			{ 0.96f, 0.98f, 0.94f, 6.0f }, // シラカバ広葉樹 
-			{ 0.95f, 0.98f, 0.93f, 6.0f }, // トウヒ・アカマツ 
+			{ 0.96f, 0.98f, 0.94f, 6.0f }, // シラカバ広葉樹 (近景) 
+			{ 0.95f, 0.98f, 0.93f, 6.0f }, // トウヒ・アカマツ (近景) 
 			{ 0.94f, 0.97f, 0.92f, 6.0f }, // 森林低木茂み 
 			{ 0.88f, 0.90f, 0.88f, 1.0f }, // 岩 
 			{ 0.60f, 0.62f, 0.32f, 1.0f }, // 葦 
 			{ 0.40f, 0.62f, 0.25f, 1.0f }, // 草 
 			{ 0.46f, 0.66f, 0.30f, 1.0f }, // 明るい葉 
+			{ 0.96f, 0.98f, 0.94f, 6.0f }, // シラカバ広葉樹 (遠景静的バッチ) 
+			{ 0.95f, 0.98f, 0.93f, 6.0f }, // トウヒ・アカマツ (遠景静的バッチ) 
 		};
 
 		// 頂点ごとの風揺れウェイト係数 & 土の小道デカール設定 

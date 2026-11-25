@@ -52,6 +52,9 @@ struct GamePlayHUDContext
     bool isOverheadCameraMode                = false;
     bool isFullMapOpen                       = false;
     float cameraZoom                         = 1.0f;
+    bool isAutoDemoPlay                      = false;
+    int autoDemoCycleIndex                   = 0;
+    bool isBulletTimeActive                  = false;
 };
 
 /// <summary>
@@ -110,10 +113,13 @@ private:
     float displayedPlayerHpLag_       = 1.0f;
     bool laserLockedOnTarget_         = false;
 
-    // --- NavMesh ルート案内キャッシュ ---
+    // --- NavMesh ルート案内 ＆ 画面外ポインター平滑化キャッシュ ---
     std::vector<Vector3> cachedGuidePath_;
     std::vector<Vector3> smoothGuidePath_;
     std::vector<Vector3> scratchGuidePath_;
     Vector3 cachedGuideGoal_          = { 0.0f, 0.0f, 0.0f };
     float guidePathRefreshTimer_      = 0.0f;
+    Vector2 smoothedOffscreenDir_     = { 0.0f, -1.0f };
+    bool hasOffscreenDir_             = false;
+    int lastActiveTargetIdx_          = -1;
 };

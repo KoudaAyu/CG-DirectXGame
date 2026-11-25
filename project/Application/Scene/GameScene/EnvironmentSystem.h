@@ -90,6 +90,8 @@ private:
 	float riverWaveTimer_ = 0.0f;
 	float riverSplashTimer_ = 0.0f;
 	float riverMistTimer_ = 0.0f;
+	float ambientMoteTimer_ = 0.0f;
+	float ambientLeafTimer_ = 0.0f;
 	float barrierTimer_ = 0.0f;
 	float natureAnimTime_ = 0.0f;
 	int lastExfilCountdownSec_ = -1;

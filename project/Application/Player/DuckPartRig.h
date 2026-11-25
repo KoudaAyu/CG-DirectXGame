@@ -1,5 +1,6 @@
 #pragma once
 #include "Object3d.h"
+#include "Application/Config/AppFastObjLoader.h"
 #include "Matrix4x4.h"
 #include <cmath>
 #include <algorithm>
@@ -99,7 +100,7 @@ namespace DuckPartRig
         static bool sBuilt = false;
         if (sBuilt) return sCache;
 
-        const Object3d::ModelData full = Object3d::LoadObjFile("Resources", "player.obj");
+        const Object3d::ModelData& full = AppFastObjLoader::LoadObjCached("Resources", "player.obj");
         Object3d::ModelData* allParts[] = { &sCache.body, &sCache.leftFoot, &sCache.rightFoot, &sCache.leftWing, &sCache.rightWing };
         for (Object3d::ModelData* part : allParts) part->material = full.material;
 

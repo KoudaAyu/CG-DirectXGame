@@ -4,6 +4,7 @@
 #include "SceneManager.h"
 #include "SkyBox.h"
 #include "Application/Config/GameConfig.h"
+#include "Application/Config/AppFastObjLoader.h"
 #include "Application/Particle/AppParticleManager.h"
 #include "ParticleManager.h"
 #include "TextureManager.h"
@@ -203,7 +204,7 @@ namespace
 
 	Object3d::ModelData LoadHeliObjModel(const char* objFileName, uint32_t texIdx, float boundingRadius)
 	{
-		Object3d::ModelData data = Object3d::LoadObjFile("Resources", objFileName);
+		Object3d::ModelData data = AppFastObjLoader::LoadObjCached("Resources", objFileName);
 		data.material.textureFilePath = "Resources/helicopter_texture.png";
 		data.material.textureIndex = texIdx;
 		data.boundingRadius = boundingRadius;
@@ -430,7 +431,11 @@ void HelicopterInsertionController::FinishInsertion()
 
 	if (scene_ && scene_->camera_ && scene_->player_)
 	{
-		scene_->camera_->SetTranslate(scene_->player_->GetPosition() + (GameConfig::Camera::kDefaultFollowOffset * scene_->cameraZoom_));
+		scene_->camera_->StopShake();
+		scene_->camera_->SetFovY(0.70f);
+		const Vector3 followCamPos = scene_->player_->GetPosition() + (GameConfig::Camera::kDefaultFollowOffset * scene_->cameraZoom_);
+		scene_->camera_->MoveTo(followCamPos, 0.0f);
+		scene_->camera_->SetTranslate(followCamPos);
 		scene_->camera_->SetRotate(GameConfig::Camera::kFollowRotation);
 		scene_->camera_->Update();
 	}
@@ -1269,9 +1274,13 @@ void HelicopterInsertionController::EmitHelicopterFlightParticles(float deltaTim
 		const float washRatio = std::clamp(
 			1.0f - (heliPos_.y - kWashBaseHeightMin) / (std::max)(washHeightLimit - kWashBaseHeightMin, 1.0f),
 			kWashRatioMin, 1.0f);
-		smokeMgr->ApplyRotorDownwash(
-			{ heliPos_.x, (std::min)(heliPos_.y * 0.5f, kWashCenterMaxY), heliPos_.z },
-			kWashEffectRadius, kWashStrengthBase + kWashStrengthGain * washRatio, deltaTime);
+		const Vector3 washOrigin = { heliPos_.x, (std::min)(heliPos_.y * 0.5f, kWashCenterMaxY), heliPos_.z };
+		const float washStrength = kWashStrengthBase + kWashStrengthGain * washRatio;
+		smokeMgr->ApplyRotorDownwash(washOrigin, kWashEffectRadius, washStrength, deltaTime);
+		if (scene_->appParticleManager_ && scene_->appParticleManager_.get() != smokeMgr)
+		{
+			scene_->appParticleManager_->ApplyRotorDownwash(washOrigin, kWashEffectRadius, washStrength, deltaTime);
+		}
 
 		downwashDustTimer_ += deltaTime;
 		if (downwashDustTimer_ >= kDownwashDustInterval)

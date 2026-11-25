@@ -5,6 +5,7 @@
 #include "SceneManager.h"
 #include "TextureManager.h"
 #include "Object3dCom.h"
+#include "ParticleManager.h"
 #include "RenderContext.h"
 #include "Baziru3_Engine/Graphics/Light/Light.h"
 #include "Baziru3_Engine/Graphics/Graphics/SceneRenderRequests.h"
@@ -296,7 +297,32 @@ void GameOverScene::InitializeDiorama()
 		logoTexIndex_      = tm->Load("Resources/gameover_logo.png");
 		promptTexIndex_    = tm->Load("Resources/gameover_prompt.png");
 		debriefTexIndex_   = tm->Load("Resources/gameover_debrief.png");
+
+		moteCircleTexIndex_ = tm->Load("Resources/particle_minovsky_circle.png");
+		if (moteCircleTexIndex_ == UINT32_MAX) moteCircleTexIndex_ = tm->Load("Resources/circle2.png");
+		rainStreakTexIndex_ = tm->Load("Resources/particle_spark_streak.png");
+		if (rainStreakTexIndex_ == UINT32_MAX) rainStreakTexIndex_ = moteCircleTexIndex_;
+		mistSmokeTexIndex_  = tm->Load("Resources/particle_wispy_smoke.png");
+		if (mistSmokeTexIndex_ == UINT32_MAX) mistSmokeTexIndex_ = tm->Load("Resources/title_smoke_puff.png");
+		if (mistSmokeTexIndex_ == UINT32_MAX) mistSmokeTexIndex_ = moteCircleTexIndex_;
 	}
+
+	// 2B. 夜間救難ジオラマ用 GPUパーティクルマネージャー初期化（冷たい霧雨・ハロゲン投光器ダスト・ローター夜霧）
+	if (ParticleManager* pm = GetParticleManager())
+	{
+		appParticleManager_ = std::make_unique<AppParticleManager>();
+		appParticleManager_->Initialize(pm);
+		appParticleManager_->SetGroundY(0.0f);
+		appParticleManager_->SetPremultiplyAlpha(true);
+		appParticleManager_->SetStableInstanceSlots(true);
+
+		smokeParticleManager_ = std::make_unique<AppParticleManager>();
+		smokeParticleManager_->Initialize(pm);
+		smokeParticleManager_->SetGroundY(0.02f);
+		smokeParticleManager_->SetAlphaBlend(true);
+		smokeParticleManager_->SetStableInstanceSlots(true);
+	}
+	rainEmitTimer_ = lightMoteTimer_ = rotorMistTimer_ = 0.0f;
 
 	// 3. 救難ヘリコプター（MEDEVAC HELICOPTER）
 	{
@@ -427,6 +453,8 @@ void GameOverScene::Finalize()
 	stretcherBed_.reset();
 	groundModel_.reset();
 	props_.clear();
+	smokeParticleManager_.reset();
+	appParticleManager_.reset();
 }
 
 // -----------------------------------------------------------------------------
@@ -452,6 +480,20 @@ void GameOverScene::Update()
 		input_->Update();
 		confirm = input_->TriggerKey(DIK_SPACE) || input_->TriggerKey(DIK_RETURN);
 		toTitle = input_->TriggerKey(DIK_T);
+		if (input_->TriggerKey(DIK_F7))
+		{
+			RaidStats::GetInstance().autoDemoMode = !RaidStats::GetInstance().autoDemoMode;
+			TacticalAudio::Play2D("Resources/Audio/SE_UI_Click.wav", 0.55f);
+			if (RaidStats::GetInstance().autoDemoMode)
+			{
+				RaidStats::GetInstance().autoDemoCycleIndex = 1;
+				confirm = true;
+			}
+		}
+	}
+	if (RaidStats::GetInstance().autoDemoMode && state_ == State::Ready && actionTimer_ >= 3.6f)
+	{
+		confirm = true;
 	}
 
 	switch (state_)
@@ -499,6 +541,11 @@ void GameOverScene::Update()
 		if (!transitionRequested_ && (actionTimer_ >= kTakeoffDuration || skip))
 		{
 			transitionRequested_ = true;
+			if (RaidStats::GetInstance().autoDemoMode && nextScene_ == "GAMEPLAY")
+			{
+				// 1周目の即死・救難ジオラマ実演が完了したら、次の出撃は必ず「2周目：全制圧＆脱出クリア実演」へ進める
+				RaidStats::GetInstance().autoDemoCycleIndex = 1;
+			}
 			bgmLoop_.Stop();
 			rotorLoop_.Stop();
 			SceneTransition::Change(nextScene_, kSceneTransitionDuration);
@@ -903,6 +950,130 @@ void GameOverScene::UpdateDiorama(float deltaTime)
 		camera_->SetFovY(kBaseCameraFovY);
 		camera_->Update();
 	}
+
+	// -------------------------------------------------------------------------
+	// 4. 夜間救難ジオラマ 3層パーティクル演出（霧雨ストリーク・投光器浮遊ダスト・ローター夜霧）
+	// -------------------------------------------------------------------------
+	auto rand01 = []() -> float { return static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX); };
+	auto randRange = [&](float a, float b) -> float { return a + (b - a) * rand01(); };
+	constexpr float kTwoPi = kPi * 2.0f;
+
+	if (appParticleManager_)
+	{
+		// (A) 黄昏の夜空から斜めに降り注ぐ冷たい霧雨ストリーク ＆ 地面水しぶきバウンド
+		rainEmitTimer_ += deltaTime;
+		while (rainEmitTimer_ >= 0.022f)
+		{
+			rainEmitTimer_ -= 0.022f;
+			for (int i = 0; i < 4; ++i)
+			{
+				AppParticle rain{};
+				rain.transform.Initialize();
+				rain.transform.SetTranslate({ randRange(-8.5f, 9.5f), randRange(5.2f, 7.6f), randRange(-4.5f, 8.5f) });
+				rain.scaleAspect = { 0.14f, 3.35f };
+				rain.initialScale = randRange(0.055f, 0.088f);
+				rain.targetScale = rain.initialScale * 0.72f;
+				rain.transform.SetScale({ rain.initialScale * rain.scaleAspect.x, rain.initialScale * rain.scaleAspect.y, 1.0f });
+				rain.velocity = { randRange(-2.6f, -1.8f), randRange(-16.5f, -12.8f), randRange(-0.8f, 0.4f) };
+				rain.color = { 0.62f, 0.80f, 1.0f, randRange(0.28f, 0.48f) };
+				rain.endColor = { 0.45f, 0.68f, 0.95f, 0.0f };
+				rain.hasColorShift = true;
+				rain.bounceElasticity = 0.14f;
+				rain.lifeTime = 0.52f;
+				rain.textureIndex = rainStreakTexIndex_;
+				rain.slotLayer = 1;
+				appParticleManager_->AddParticle(rain);
+			}
+		}
+
+		// (B) ヘリのハロゲン救難投光器ビーム内に浮かび上がる暖かい黄金ボリューメトリック・ダスト
+		lightMoteTimer_ += deltaTime;
+		if (lightMoteTimer_ >= 0.055f)
+		{
+			lightMoteTimer_ = std::fmod(lightMoteTimer_, 0.055f);
+			for (int m = 0; m < 2; ++m)
+			{
+				const float a = randRange(0.0f, kTwoPi);
+				AppParticle mote{};
+				mote.transform.Initialize();
+				mote.transform.SetTranslate({
+					randRange(-2.8f, 4.2f),
+					randRange(0.28f, 2.65f),
+					randRange(-1.2f, 3.6f)
+				});
+				mote.scaleAspect = { 0.92f, 1.15f };
+				mote.initialScale = randRange(0.032f, 0.058f);
+				mote.targetScale = mote.initialScale * 0.35f;
+				mote.transform.SetScale({ mote.initialScale * mote.scaleAspect.x, mote.initialScale * mote.scaleAspect.y, 1.0f });
+				mote.velocity = { randRange(-0.28f, 0.28f), randRange(0.18f, 0.55f), randRange(-0.28f, 0.28f) };
+				mote.color = { 1.0f, 0.84f, 0.46f, randRange(0.55f, 0.85f) };
+				mote.endColor = { 1.0f, 0.58f, 0.18f, 0.0f };
+				mote.hasColorShift = true;
+				mote.drag = 1.2f;
+				mote.curlFreq = 2.4f;
+				mote.curlAmp = 0.20f;
+				mote.lifeTime = randRange(0.95f, 1.55f);
+				mote.fadeInRatio = 0.22f;
+				mote.twinkleSpeed = 14.0f;
+				mote.twinklePhase = a;
+				mote.textureIndex = moteCircleTexIndex_;
+				mote.slotLayer = 2;
+				appParticleManager_->AddParticle(mote);
+			}
+		}
+
+		appParticleManager_->ApplyRotorDownwash(
+			heliPos_ + Vector3{ 0.0f, 1.85f, 0.0f }, 5.4f,
+			(state_ == State::Takeoff) ? 13.5f : 4.2f, deltaTime);
+		appParticleManager_->Update(deltaTime, teamPos_);
+	}
+
+	if (smokeParticleManager_)
+	{
+		// (C) ヘリパッド地表を渦巻きながら吹き広がるローター吹き下ろし夜霧（離陸時に大迫力で爆散！）
+		const float mistInterval = (state_ == State::Takeoff) ? 0.024f : 0.052f;
+		rotorMistTimer_ += deltaTime;
+		while (rotorMistTimer_ >= mistInterval)
+		{
+			rotorMistTimer_ -= mistInterval;
+			const int burst = (state_ == State::Takeoff) ? 3 : 2;
+			for (int k = 0; k < burst; ++k)
+			{
+				const float a = randRange(0.0f, kTwoPi);
+				const float r = randRange(0.65f, 2.45f);
+				const float outSpd = (state_ == State::Takeoff) ? randRange(3.6f, 6.8f) : randRange(1.25f, 2.65f);
+				AppParticle mist{};
+				mist.transform.Initialize();
+				mist.transform.SetTranslate({ kHelipadPos.x + std::cos(a) * r, randRange(0.05f, 0.24f), kHelipadPos.z + std::sin(a) * r });
+				mist.transform.SetRotate({ 0.0f, 0.0f, a });
+				mist.scaleAspect = { 1.65f, 0.72f };
+				mist.initialScale = randRange(0.28f, 0.46f);
+				mist.targetScale = mist.initialScale * ((state_ == State::Takeoff) ? 2.95f : 2.35f);
+				mist.transform.SetScale({ mist.initialScale * mist.scaleAspect.x, mist.initialScale * mist.scaleAspect.y, 1.0f });
+				mist.velocity = {
+					std::cos(a) * outSpd - std::sin(a) * 1.15f,
+					randRange(0.12f, 0.52f),
+					std::sin(a) * outSpd + std::cos(a) * 1.15f
+				};
+				mist.color = { 0.72f, 0.80f, 0.90f, (state_ == State::Takeoff) ? 0.34f : 0.22f };
+				mist.endColor = { 0.60f, 0.70f, 0.82f, 0.0f };
+				mist.hasColorShift = true;
+				mist.drag = 2.1f;
+				mist.curlFreq = 2.0f;
+				mist.curlAmp = 0.25f;
+				mist.lifeTime = randRange(0.70f, 1.15f);
+				mist.fadeInRatio = 0.18f;
+				mist.textureIndex = mistSmokeTexIndex_;
+				mist.slotLayer = 0;
+				smokeParticleManager_->AddParticle(mist);
+			}
+		}
+
+		smokeParticleManager_->ApplyRotorDownwash(
+			heliPos_ + Vector3{ 0.0f, 1.85f, 0.0f }, 5.8f,
+			(state_ == State::Takeoff) ? 16.0f : 5.5f, deltaTime);
+		smokeParticleManager_->Update(deltaTime, teamPos_);
+	}
 }
 
 // -----------------------------------------------------------------------------
@@ -954,6 +1125,26 @@ void GameOverScene::Draw(SceneRenderRequests& renderRequests)
 	}
 	DrawModel(com, heliMainRotor_.get(), base, heliTexIndex_);
 	DrawModel(com, heliTailRotor_.get(), base, heliTexIndex_);
+
+	// 5. 夜間救難ジオラマ GPUパーティクル描画（ストレートアルファ夜霧 ＆ 加算合成霧雨・投光器ダスト）
+	if (smokeParticleManager_ && GetParticleManager())
+	{
+		RenderContext sCtx = base;
+		if (mistSmokeTexIndex_ != UINT32_MAX)
+		{
+			sCtx.textureHandle = TextureManager::GetInstance()->GetSrvHandleGPU(mistSmokeTexIndex_);
+		}
+		smokeParticleManager_->Draw(sCtx);
+	}
+	if (appParticleManager_ && GetParticleManager())
+	{
+		RenderContext aCtx = base;
+		if (moteCircleTexIndex_ != UINT32_MAX)
+		{
+			aCtx.textureHandle = TextureManager::GetInstance()->GetSrvHandleGPU(moteCircleTexIndex_);
+		}
+		appParticleManager_->Draw(aCtx);
+	}
 }
 
 // -----------------------------------------------------------------------------
@@ -994,6 +1185,15 @@ void GameOverScene::DrawScreen()
 	dl->AddRectFilled(UIVec2(0.0f, sh - barHeight), UIVec2(sw, sh), kColLetterboxFill);
 	dl->AddLine(UIVec2(0.0f, barHeight), UIVec2(sw, barHeight), WithAlpha(kColLetterboxRule, enterT), kRuleThickness);
 	dl->AddLine(UIVec2(0.0f, sh - barHeight), UIVec2(sw, sh - barHeight), WithAlpha(kColLetterboxRule, enterT), kRuleThickness);
+
+	// 1B. 自動デモ稼働中：1周目救難ジオラマ実演 → 2周目クリア実演への自動出撃案内を上帯に表示
+	if (RaidStats::GetInstance().autoDemoMode)
+	{
+		const char* demoNotice = reinterpret_cast<const char*>(
+			u8"自動デモ [1/2周目：夜間救難パーティクル実演]  ──  まもなく 2/2周目（ステージクリア実演）へ自動出撃します  [F7] 手動操作");
+		AddCenteredText(dl, fontDefault, 15.0f, centerX, barHeight * 0.5f - 7.5f,
+			UI_COL32(255, 222, 130, 238), demoNotice);
+	}
 
 	// 2. 画面中央：映画タイトル調の重厚かつ静寂なタイトル
 	{

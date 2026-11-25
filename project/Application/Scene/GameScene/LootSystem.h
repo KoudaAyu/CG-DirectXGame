@@ -29,6 +29,9 @@ struct LootableProp
     LootType type         = LootType::Roubles;    // 物資種別
     int value             = 0;                    // 換金価値（ルーブル）または補給量
     bool isLooted         = false;                // 回収済みフラグ
+    bool isBreakableCrate = false;                // 射撃で木箱を破壊して即時回収可能か
+    int crateHp           = 2;                    // 木箱の残り耐久値（弾数）
+    int maxCrateHp        = 2;                    // 木箱の最大耐久値
     float searchTimer     = 0.0f;                 // 探索進捗タイマー (秒)
     static constexpr float kDefaultMaxSearchTime = 1.2f; // 既定の探索所要時間 (秒)
     float maxSearchTime   = kDefaultMaxSearchTime;// 探索完了に必要な長押し秒数
@@ -95,6 +98,20 @@ public:
         uint32_t sparkTex = UINT32_MAX);
 
     /// <summary>
+    /// プレイヤーの射撃が木箱障害物に命中した際のダメージ・破壊＆物資即時回収処理
+    /// </summary>
+    bool TryDamageBreakableCrate(
+        const Vector3& obstaclePos,
+        Player* player,
+        AppParticleManager* particleMgr,
+        std::vector<FloatingText>& floatingTexts,
+        bool& outBroken,
+        AppParticleManager* smokeMgr = nullptr,
+        uint32_t dustTex = UINT32_MAX,
+        uint32_t chipTex = UINT32_MAX,
+        uint32_t sparkTex = UINT32_MAX);
+
+    /// <summary>
     /// 全物資プロップリストの参照を取得
     /// </summary>
     const std::vector<LootableProp>& GetProps() const { return props_; }
@@ -102,4 +119,6 @@ public:
 
 private:
     std::vector<LootableProp> props_;
+    float auraPhase_     = 0.0f;
+    float auraEmitTimer_ = 0.0f;
 };

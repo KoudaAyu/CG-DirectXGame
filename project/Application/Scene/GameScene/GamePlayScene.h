@@ -191,6 +191,7 @@ private:
     void UpdateParticles(float deltaTime);
     void UpdateSprites(float deltaTime);
     void UpdateDebugInput();
+    void UpdateAutoDemoPlay(float realDeltaTime);
     void UpdateCharacters(float deltaTime);
     void UpdatePlayerHpBar();
     void CheckGameOver();
@@ -347,6 +348,29 @@ private:
     float overheadCameraBlend_ = 0.0f;
     Vector3 cameraLookaheadOffset_ = { 0.0f, 0.0f, 0.0f };
     bool isFullMapOpen_ = false;
+
+    // --- [F7] 自動デモプレイ実演 & [RMB] バレットタイム鑑賞状態 ---
+    bool isAutoDemoPlay_ = false;
+    bool isBulletTimeActive_ = false;
+    float demoRunElapsed_ = 0.0f;
+    float demoSlowMoTimer_ = 0.0f;
+    float demoShowcaseTimer_ = 0.0f;
+    float demoPathRefreshTimer_ = 0.0f;
+    float demoStuckTimer_ = 0.0f;
+    float demoNodeProgressTimer_ = 0.0f;
+    float demoBestNodeDistSq_ = 1.0e12f;
+    float demoDodgeCooldown_ = 0.0f;
+    float demoBarrelPauseTimer_ = 0.0f;
+    float demoBypassTimer_ = 0.0f;
+    float demoBypassSign_ = 1.0f;
+    float bulletTimeMoteTimer_ = 0.0f;
+    int demoShowcaseStage_ = 0;
+    int demoPrevBrokenCount_ = 0;
+    Vector3 demoLastPos_ = { 0.0f, 0.0f, 0.0f };
+    Vector3 demoProgressAnchorPos_ = { 0.0f, 0.0f, 0.0f };
+    Vector3 demoLastNavGoal_ = { 0.0f, 0.0f, 0.0f };
+    Vector3 demoSmoothedAim_ = { 0.0f, 0.70f, 10.0f };
+    std::vector<Vector3> demoNavPath_;
 
     // --- タクティカル音響管理（BGMループ・発煙筒空間ループ・敵AI索敵変化） ---
     TacticalAudio::LoopHandle bgmLoop_;

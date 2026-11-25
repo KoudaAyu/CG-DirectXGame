@@ -1,6 +1,7 @@
 #include "EnvironmentSystem.h"
 #include "GamePlayScene.h"
 #include "Application/Audio/TacticalAudio.h"
+#include "Application/Config/AppFastObjLoader.h"
 #include "Application/Config/GameConfig.h"
 #include "Application/Particle/AppParticleManager.h"
 #include "ParticleManager.h"
@@ -103,11 +104,11 @@ namespace
 	} kFlare = {
 		0.02f, { 1.8f, 0.026f, 1.2f }, { 0.0f, 0.18f, 0.0f }, { 0.0f, -200.0f, 0.0f },
 		0.66f, 0.82f, 0.32f, 0.38f, 999.0f,
-		22, 3, 4, 3, 2,
-		{ 1.0f, 3.2f }, { 2.2f, 5.2f }, { 0.015f, 0.024f }, { 1.8f, 3.4f },
-		0.060f, 0.042f, 2.2f, 0.58f, 0.35f, 0.95f,
-		0.026f, 0.045f, 0.04f, 0.35f, 0.95f, 0.16f, 0.1f, 0.68f, 0.36f,
-		{ 0.14f, 0.34f }, { 3.6f, 4.8f }, { 2.8f, 3.6f }, { 0.52f, 0.62f }, { 0.36f, 0.42f }
+		26, 2, 2, 3, 2,
+		{ 1.2f, 3.6f }, { 2.4f, 5.6f }, { 0.018f, 0.030f }, { 2.0f, 3.8f },
+		0.075f, 0.048f, 2.2f, 0.68f, 0.40f, 1.15f,
+		0.021f, 0.038f, 0.045f, 0.38f, 0.95f, 0.18f, 0.1f, 0.72f, 0.40f,
+		{ 0.16f, 0.38f }, { 3.8f, 5.1f }, { 2.9f, 3.8f }, { 0.56f, 0.66f }, { 0.38f, 0.44f }
 	};
 
 	struct SmokePuffLayerSpec
@@ -223,7 +224,7 @@ std::unique_ptr<Object3d> EnvironmentSystem::CreateNatureLayerObject(const std::
 	auto it = sNatureModelCache.find(objFilename);
 	if (it == sNatureModelCache.end())
 	{
-		Object3d::ModelData loaded = Object3d::LoadObjFile("Resources", objFilename);
+		Object3d::ModelData loaded = AppFastObjLoader::LoadObjCached("Resources", objFilename);
 		loaded.material.textureFilePath = "Resources/" + texFilename;
 		loaded.material.textureIndex = TextureManager::GetInstance()->Load(loaded.material.textureFilePath);
 		// 2400m全域をカバーする広域地面・河川・自然レイヤーが視錐台カリングで欠けないよう十分な境界球半径を確保
@@ -635,6 +636,76 @@ void EnvironmentSystem::UpdateRiverEffects(float deltaTime)
 				smokeMgr->AddParticle(BuildPresetParticle(pos, rotZ, initSc, kPresetRiverMist.aspect, vel, life, wispyTex, kPresetRiverMist));
 			}
 		}
+	}
+
+	// 3. ステージ全体の空気感を彩る午後の陽光ダスト粒子 ＆ 風に乗って舞う森林の木の葉（カメラ視界周辺のみ低負荷放出）
+	const Vector3 centerAnchor = scene_->player_ ? scene_->player_->GetPosition() : Vector3{ 0.0f, 0.0f, 18.0f };
+	ambientMoteTimer_ += deltaTime;
+	if (ambientMoteTimer_ >= 0.095f)
+	{
+		ambientMoteTimer_ = 0.0f;
+		for (int i = 0; i < 2; ++i)
+		{
+			AppParticle mote{};
+			mote.transform.Initialize();
+			mote.transform.SetTranslate({
+				centerAnchor.x + RandRange(-13.5f, 13.5f),
+				RandRange(0.45f, 3.40f),
+				centerAnchor.z + RandRange(-11.5f, 13.5f)
+			});
+			const float sc = RandRange(0.026f, 0.048f);
+			mote.scaleAspect = { 1.0f, 1.0f };
+			mote.initialScale = sc;
+			mote.targetScale = sc * 0.65f;
+			mote.transform.SetScale({ sc, sc, 1.0f });
+			mote.velocity = { RandRange(-0.28f, -0.05f), RandRange(0.04f, 0.18f), RandRange(-0.14f, 0.18f) };
+			mote.color = { 1.0f, 0.93f, 0.68f, RandRange(0.32f, 0.56f) };
+			mote.endColor = { 1.0f, 0.82f, 0.45f, 0.0f };
+			mote.hasColorShift = true;
+			mote.lifeTime = RandRange(2.6f, 4.2f);
+			mote.textureIndex = scene_->particleTextureB;
+			mote.curlFreq = 1.4f;
+			mote.curlAmp = 0.24f;
+			mote.fadeInRatio = 0.28f;
+			mote.twinkleSpeed = 7.5f;
+			mote.twinklePhase = RandRange(0.0f, kTwoPi);
+			mote.slotLayer = 1;
+			scene_->appParticleManager_->AddParticle(mote);
+		}
+	}
+
+	ambientLeafTimer_ += deltaTime;
+	if (ambientLeafTimer_ >= 0.30f && smokeMgr && scene_->leafTextureIndex_ != TextureManager::kInvalidTextureIndex)
+	{
+		ambientLeafTimer_ = 0.0f;
+		AppParticle lf{};
+		lf.transform.Initialize();
+		lf.transform.SetTranslate({
+			centerAnchor.x + RandRange(-12.0f, 15.0f),
+			RandRange(2.2f, 4.6f),
+			centerAnchor.z + RandRange(-10.0f, 14.0f)
+		});
+		const float sc = RandRange(0.075f, 0.125f);
+		lf.scaleAspect = { 0.82f, 1.28f };
+		lf.initialScale = sc;
+		lf.targetScale = sc * 0.92f;
+		lf.transform.SetScale({ sc * 0.82f, sc * 1.28f, 1.0f });
+		lf.velocity = { RandRange(-1.35f, -0.55f), RandRange(-0.55f, -0.22f), RandRange(-0.35f, 0.45f) };
+		const float gTone = RandRange(0.85f, 1.15f);
+		lf.color = { 0.35f * gTone, 0.58f * gTone, 0.24f * gTone, 0.86f };
+		lf.endColor = { 0.30f * gTone, 0.48f * gTone, 0.20f * gTone, 0.0f };
+		lf.hasColorShift = true;
+		lf.lifeTime = RandRange(3.0f, 4.6f);
+		lf.textureIndex = scene_->leafTextureIndex_;
+		lf.gravity = 0.18f;
+		lf.drag = 0.22f;
+		lf.wobbleFreq = 5.8f;
+		lf.wobbleAmp = 0.58f;
+		lf.wobbleAxis = { 0.85f, 0.25f, 0.65f };
+		lf.angularVelocity = RandRange(-3.6f, 3.6f);
+		lf.fadeInRatio = 0.16f;
+		lf.slotLayer = 2;
+		smokeMgr->AddParticle(lf);
 	}
 }
 

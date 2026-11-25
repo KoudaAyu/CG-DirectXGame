@@ -48,8 +48,15 @@ namespace PlayerTuning
     namespace Audio
     {
         inline constexpr float kHealStartVolume = 0.68f, kHealCompleteVolume = 0.72f;
-        inline constexpr float kHolsterToggleVolume = 0.62f, kUnholsterAimVolume = 0.48f, kDryFireVolume = 0.68f;
+        inline constexpr float kHolsterToggleVolume = 0.62f, kUnholsterAimVolume = 0.48f, kDryFireVolume = 0.82f;
+        inline constexpr float kEmptyMagAlertVolume = 0.94f, kLowAmmoTickVolumeBase = 0.46f, kLowAmmoTickVolumeStep = 0.09f;
+        inline constexpr float kReloadCompleteVolume = 0.80f, kReloadCancelVolume = 0.65f, kReloadBusyClickVolume = 0.52f;
         inline constexpr int kHolsterToggleCooldownMs = 90, kUnholsterAimCooldownMs = 120, kDryFireCooldownMs = 110;
+        inline constexpr int kEmptyMagAlertCooldownMs = 80, kLowAmmoTickCooldownMs = 60, kReloadBusyClickCooldownMs = 220;
+        inline constexpr int kNoReserveAlertCooldownMs = 260, kLowAmmoSoundThreshold = 4;
+        inline constexpr float kHeldDryFireIntervalSec = 0.24f;
+        inline constexpr float kEmptyTriggerAlertDuration = 0.34f;
+        inline constexpr float kReloadCompleteFlashDuration = 0.55f;
     }
 
     namespace Visual

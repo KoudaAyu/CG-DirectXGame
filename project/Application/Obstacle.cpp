@@ -1,9 +1,13 @@
 #include "Obstacle.h"
 #include "TextureManager.h"
+#include "Application/Audio/TacticalAudio.h"
+#include "Application/Config/AppFastObjLoader.h"
+#include "Application/Player/DuckPartRig.h"
 #include "Baziru3_Engine/Framework/Collision/CollisionManager.h"
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <cstdlib>
 #include <filesystem>
 #include <unordered_map>
 
@@ -31,6 +35,8 @@ namespace
     constexpr const char* kTexPineTree           = "Resources/duckov_pine_tree.png";
     constexpr const char* kTexBridge             = "Resources/duckov_bridge.png";
     constexpr const char* kTexCrate              = "Resources/duckov_crate.png";
+    constexpr const char* kTexBreakableWoodCrate = "Resources/duckov_wood_crate.png";
+    constexpr const char* kTexDamagedWoodCrate   = "Resources/duckov_wood_crate_damaged.png";
     constexpr const char* kTexSandbag            = "Resources/duckov_sandbag.png";
     constexpr const char* kTexBarrel             = "Resources/duckov_barrel.png";
     constexpr const char* kTexContainer          = "Resources/container_military.png";
@@ -194,9 +200,17 @@ namespace
 void Obstacle::Initialize(Object3dCom* object3dCom, Camera* camera, const Vector3& position, float radius, const std::string& modelFilename, const Vector3& scale, const Vector3& rotation)
 {
     object3dCom_ = object3dCom;
+    camera_ = camera;
     position_ = position;
     radius_ = radius;
     rotation_ = rotation;
+    isBreakableSupplyCrate_ = false;
+    isExplosiveBarrel_ = false;
+    isBarrelLeaking_ = false;
+    barrelHp_ = 3;
+    barrelFuseTimer_ = 2.6f;
+    customTextureIndex_ = UINT32_MAX;
+    debrisPieces_.clear();
 
     // 指定されたモデルファイルをロード (キャッシュがあれば即座に再利用)
     std::string filename = modelFilename.empty() ? kDefaultFenceModel : modelFilename;
@@ -206,6 +220,7 @@ void Obstacle::Initialize(Object3dCom* object3dCom, Camera* camera, const Vector
 
     modelFilename_ = filename;
     isTree_ = (HasSubstring(filename, "tree") || HasSubstring(filename, "Tree"));
+    isExplosiveBarrel_ = HasSubstring(filename, "barrel");
     isRiverWalkBarrier_ = (HasSubstring(filename, "river") || HasSubstring(filename, "water"));
     treeSwayPhase_ = position_.x * kSwayPhaseFactorX + position_.z * kSwayPhaseFactorZ;
 
@@ -221,11 +236,12 @@ void Obstacle::Initialize(Object3dCom* object3dCom, Camera* camera, const Vector
 
         if (!HasModelResource(visualFilename))   visualFilename = filename;
     }
+    isBirchTree_ = HasSubstring(visualFilename, "birch");
 
     auto it = sModelCache.find(visualFilename);
     if (it == sModelCache.end())
     {
-        Object3d::ModelData loaded = Object3d::LoadObjFile(kResourceDir, visualFilename);
+        Object3d::ModelData loaded = AppFastObjLoader::LoadObjCached(kResourceDir, visualFilename);
         loaded.material.textureFilePath = ResolveTextureForModel(visualFilename, loaded.material.textureFilePath);
         loaded.material.textureIndex = TextureManager::GetInstance()->Load(loaded.material.textureFilePath);
 
@@ -250,12 +266,16 @@ void Obstacle::Initialize(Object3dCom* object3dCom, Camera* camera, const Vector
 
     const Object3d::ModelData& model = it->second;
 
+    baseScale_ = { scale.x * radius_, scale.y * radius_, scale.z * radius_ };
+    isBroken_ = false;
+    hitFlinchTimer_ = 0.0f;
+
     object3d_ = std::make_unique<Object3d>();
     object3d_->Initialize(object3dCom, model);
     object3d_->SetCamera(camera);
     object3d_->SetTranslate(position_);
     object3d_->SetRotate(rotation_);
-    object3d_->SetScale({ scale.x * radius_, scale.y * radius_, scale.z * radius_ });
+    object3d_->SetScale(baseScale_);
 
     const bool isRiverOrWater = HasSubstring(filename, "river") || HasSubstring(filename, "water");
     const bool isGroundOrPlane = HasSubstring(filename, "ground") || HasSubstring(filename, "plane");
@@ -296,6 +316,16 @@ void Obstacle::Initialize(Object3dCom* object3dCom, Camera* camera, const Vector
         bridgeLight.directionalLight.intensity = kLowSpecLightIntensity;
         bridgeLight.pointLight.intensity = 0.0f;
         object3d_->SetColor(kBridgeLightColor);
+        object3d_->SetReflectionFactor(0.0f);
+        object3d_->SetEnableLighting(true);
+    }
+    else if (HasSubstring(filename, "crate"))
+    {
+        // 木箱天面のBlinn-Phong白色スペキュラ潰れを抑制し、天面・側面とも木目とステンシルが鮮明に見えるマット木材ライティング
+        auto& crateLight = object3d_->GetLightData();
+        crateLight.directionalLight.direction = kSunLightDirection;
+        crateLight.directionalLight.intensity = kLowSpecLightIntensity;
+        crateLight.pointLight.intensity = 0.0f;
         object3d_->SetReflectionFactor(0.0f);
         object3d_->SetEnableLighting(true);
     }
@@ -434,43 +464,387 @@ void Obstacle::Initialize(Object3dCom* object3dCom, Camera* camera, const Vector
         const float rTint = kTreeTintRBase + kTreeTintRRange * tintVar;
         const float gTint = kTreeTintGBase + kTreeTintGRange * (1.0f - std::abs(tintVar - 0.5f));
         const float bTint = kTreeTintBBase + kTreeTintBRange * (1.0f - tintVar);
-        object3d_->SetColor({
+        baseColor_ = {
             kTreeBaseLightColor.x * rTint,
             kTreeBaseLightColor.y * gTint,
             kTreeBaseLightColor.z * bTint,
             kTreeBaseLightColor.w
-        });
+        };
     }
     else
     {
         bool matchedPropColor = false;
-        for (const auto& entry : kPropColorTable)
+        if (HasSubstring(filename, "crate"))
         {
-            if (HasSubstring(filename, entry.keyword))
+            baseColor_ = { 18.0f * kCrateColor.x, 18.0f * kCrateColor.y, 18.0f * kCrateColor.z, 1.0f };
+            matchedPropColor = true;
+        }
+        else
+        {
+            for (const auto& entry : kPropColorTable)
             {
-                object3d_->SetColor(entry.color);
-                matchedPropColor = true;
-                break;
+                if (HasSubstring(filename, entry.keyword))
+                {
+                    baseColor_ = entry.color;
+                    matchedPropColor = true;
+                    break;
+                }
             }
         }
         if (!matchedPropColor)
         {
-            if (isRiverOrWater || HasSubstring(filename, "River") || HasSubstring(filename, "Shore")) object3d_->SetColor(kRiverBedColor);
-            else if (isBridge)        object3d_->SetColor(kBridgeLightColor);
-            else if (isFence)         object3d_->SetColor(kFenceColor);
-            else if (isGroundOrPlane) object3d_->SetColor(kGroundColor);
-            else                      object3d_->SetColor(kNeutralFallbackColor);
+            if (isRiverOrWater || HasSubstring(filename, "River") || HasSubstring(filename, "Shore")) baseColor_ = kRiverBedColor;
+            else if (isBridge)        baseColor_ = kBridgeLightColor;
+            else if (isFence)         baseColor_ = kFenceColor;
+            else if (isGroundOrPlane) baseColor_ = kGroundColor;
+            else                      baseColor_ = kNeutralFallbackColor;
         }
     }
 
+    object3d_->SetColor(baseColor_);
     object3d_->Update();
+}
+
+namespace
+{
+    float CrateRandRange(float a, float b)
+    {
+        return a + (b - a) * (static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX));
+    }
+
+    const Object3d::ModelData& GetBreakablePlankModel(uint32_t woodTexIdx)
+    {
+        static Object3d::ModelData sPlankModel{};
+        static bool sBuilt = false;
+        if (!sBuilt)
+        {
+            sBuilt = true;
+            // 木箱の木目＆黄色ステンシル帯を自然に切り出した立体木板メッシュ (0.98m x 0.065m x 0.24m)
+            const Vector3 minP = { -0.49f, -0.032f, -0.12f };
+            const Vector3 maxP = {  0.49f,  0.032f,  0.12f };
+            const Vector3 corners[DuckPartRig::kBoxCornerCount] = {
+                { minP.x, minP.y, minP.z }, { maxP.x, minP.y, minP.z }, { maxP.x, maxP.y, minP.z }, { minP.x, maxP.y, minP.z },
+                { minP.x, minP.y, maxP.z }, { maxP.x, minP.y, maxP.z }, { maxP.x, maxP.y, maxP.z }, { minP.x, maxP.y, maxP.z },
+            };
+            const Vector2 plankUVs[DuckPartRig::kBoxFaceVertCount] = {
+                { 0.12f, 0.28f }, { 0.88f, 0.28f }, { 0.88f, 0.52f }, { 0.12f, 0.52f }
+            };
+            for (int f = 0; f < DuckPartRig::kBoxFaceCount; ++f)
+            {
+                const uint32_t baseIdx = static_cast<uint32_t>(sPlankModel.vertices.size());
+                for (int c = 0; c < DuckPartRig::kBoxFaceVertCount; ++c)
+                {
+                    const Vector3& cp = corners[DuckPartRig::kBoxFaces[f][c]];
+                    Sprite::VertexData v{};
+                    v.position = { cp.x, cp.y, cp.z, 1.0f };
+                    v.texcoord = plankUVs[c];
+                    v.normal   = DuckPartRig::kBoxNormals[f];
+                    sPlankModel.vertices.push_back(v);
+                }
+                for (uint32_t triIdx : DuckPartRig::kQuadTriIndices)
+                {
+                    sPlankModel.indices.push_back(baseIdx + triIdx);
+                }
+            }
+            sPlankModel.material.textureFilePath = kTexBreakableWoodCrate;
+            sPlankModel.boundingRadius = 1.6f;
+        }
+        sPlankModel.material.textureIndex = woodTexIdx;
+        return sPlankModel;
+    }
+}
+
+void Obstacle::ConfigureAsBreakableSupplyCrate()
+{
+    isBreakableSupplyCrate_ = true;
+    TextureManager* tm = TextureManager::GetInstance();
+    woodCrateTexIndex_ = tm->Load(kTexBreakableWoodCrate);
+    woodCrateDamagedTexIndex_ = tm->Load(kTexDamagedWoodCrate);
+    if (woodCrateTexIndex_ != TextureManager::kInvalidTextureIndex)
+    {
+        customTextureIndex_ = woodCrateTexIndex_;
+    }
+    // 木橋と同じく directionalLight.intensity=0.04 で天面の白いスペキュラ膜を完全除去し、全方向から木目と弾薬ステンシルがくっきり見える設定
+    baseColor_ = { 17.5f, 16.8f, 15.6f, 1.0f };
+    if (object3d_)
+    {
+        auto& crateLight = object3d_->GetLightData();
+        crateLight.directionalLight.direction = kSunLightDirection;
+        crateLight.directionalLight.intensity = kLowSpecLightIntensity;
+        crateLight.pointLight.intensity = 0.0f;
+        object3d_->SetReflectionFactor(0.0f);
+        object3d_->SetFresnelF0(0.0f);
+        object3d_->SetColor(baseColor_);
+        object3d_->Update();
+    }
+}
+
+bool Obstacle::DamageBarrel(const Vector3& hitPos, const Vector3& leakNormal, float chainFuseOverride)
+{
+    if (isBroken_ || !isExplosiveBarrel_) return false;
+
+    if (chainFuseOverride > 0.0f)
+    {
+        isBarrelLeaking_ = true;
+        barrelLeakPos_ = position_ + Vector3{ 0.0f, 0.72f, 0.0f };
+        barrelLeakDir_ = { 0.0f, 0.85f, 0.25f };
+        barrelFuseTimer_ = (std::min)(barrelFuseTimer_, chainFuseOverride);
+        barrelHp_ = (std::min)(barrelHp_, 1);
+        TriggerHitFlinch(leakNormal);
+        return false;
+    }
+
+    barrelHp_--;
+    barrelLeakPos_ = hitPos;
+    barrelLeakDir_ = { leakNormal.x, (std::max)(0.28f, leakNormal.y + 0.25f), leakNormal.z };
+    isBarrelLeaking_ = true;
+    TriggerHitFlinch({ -leakNormal.x, 0.0f, -leakNormal.z });
+    return (barrelHp_ <= 0);
+}
+
+bool Obstacle::TickBarrelFuse(float dt)
+{
+    if (isBroken_ || !isExplosiveBarrel_ || !isBarrelLeaking_) return false;
+    barrelFuseTimer_ -= dt;
+    if (object3d_)
+    {
+        const float pulse = 0.5f + 0.5f * std::sin(barrelFuseTimer_ * 26.0f);
+        object3d_->SetColor({
+            baseColor_.x * (1.15f + 0.65f * pulse),
+            baseColor_.y * (1.0f + 0.45f * pulse),
+            baseColor_.z * (1.0f + 0.15f * pulse),
+            1.0f
+        });
+    }
+    return (barrelFuseTimer_ <= 0.0f);
+}
+
+void Obstacle::TriggerHitFlinch(const Vector3& hitDir)
+{
+    if (isBroken_) return;
+    hitFlinchTimer_ = 0.22f;
+    hitFlinchDir_ = hitDir;
+
+    // 1発目被弾時にヒビ割れ・弾痕入りテクスチャへ切り替え、「あと少しで壊れる！」視覚手応えを付与
+    if (isBreakableSupplyCrate_ && woodCrateDamagedTexIndex_ != UINT32_MAX &&
+        woodCrateDamagedTexIndex_ != TextureManager::kInvalidTextureIndex)
+    {
+        customTextureIndex_ = woodCrateDamagedTexIndex_;
+    }
+}
+
+void Obstacle::BreakObstacle(const Vector3& hitDir)
+{
+    if (isBroken_) return;
+    isBroken_ = true;
+    isBarrelLeaking_ = false;
+    hitFlinchTimer_ = 0.0f;
+    if (collider_) collider_->SetIsEnabled(false);
+    for (auto& col : extraColliders_)
+    {
+        if (col) col->SetIsEnabled(false);
+    }
+    if (meshCollider_) meshCollider_->SetIsEnabled(false);
+
+    // 3D木箱破砕演出：壁面・天板・斜め補強材を構成していた12枚の実体3D木板が物理演算で四方へ吹き飛び地面を跳ねる！
+    if (object3dCom_ && camera_)
+    {
+        const uint32_t plankTex = (woodCrateTexIndex_ != UINT32_MAX && woodCrateTexIndex_ != TextureManager::kInvalidTextureIndex)
+            ? woodCrateTexIndex_ : defaultTextureIndex_;
+        const Object3d::ModelData& plankModel = GetBreakablePlankModel(plankTex);
+
+        struct PlankSpawnSpec { Vector3 localOff; float yaw; Vector3 scale; bool isLid; };
+        constexpr PlankSpawnSpec kPlankSpecs[12] = {
+            { {  0.00f, 0.34f, -0.58f }, 0.0f,                { 1.05f, 1.0f, 1.00f }, false }, // 前面下段板
+            { {  0.00f, 0.84f, -0.58f }, 0.0f,                { 1.05f, 1.0f, 1.00f }, false }, // 前面上段板
+            { {  0.00f, 0.34f,  0.58f }, DuckPartRig::kPi,    { 1.05f, 1.0f, 1.00f }, false }, // 背面下段板
+            { {  0.00f, 0.84f,  0.58f }, DuckPartRig::kPi,    { 1.05f, 1.0f, 1.00f }, false }, // 背面上段板
+            { { -0.58f, 0.38f,  0.00f }, DuckPartRig::kPi*0.5f,{ 1.05f, 1.0f, 1.00f }, false }, // 左面下段板
+            { { -0.58f, 0.86f,  0.00f }, DuckPartRig::kPi*0.5f,{ 1.05f, 1.0f, 1.00f }, false }, // 左面上段板
+            { {  0.58f, 0.38f,  0.00f },-DuckPartRig::kPi*0.5f,{ 1.05f, 1.0f, 1.00f }, false }, // 右面下段板
+            { {  0.58f, 0.86f,  0.00f },-DuckPartRig::kPi*0.5f,{ 1.05f, 1.0f, 1.00f }, false }, // 右面上段板
+            { {  0.00f, 1.12f, -0.26f }, 0.15f,               { 1.12f, 1.0f, 1.15f }, true  }, // 天板前側
+            { {  0.00f, 1.12f,  0.26f },-0.15f,               { 1.12f, 1.0f, 1.15f }, true  }, // 天板奥側
+            { { -0.32f, 0.62f, -0.32f }, 0.78f,               { 0.92f, 1.1f, 0.58f }, false }, // 斜め角材A
+            { {  0.32f, 0.62f,  0.32f },-0.78f,               { 0.92f, 1.1f, 0.58f }, false }, // 斜め角材B
+        };
+
+        debrisPieces_.clear();
+        debrisPieces_.reserve(12);
+        const float cosY = std::cos(rotation_.y);
+        const float sinY = std::sin(rotation_.y);
+
+        for (const auto& sp : kPlankSpecs)
+        {
+            CrateDebrisPiece p{};
+            p.obj = std::make_unique<Object3d>();
+            p.obj->Initialize(object3dCom_, plankModel);
+            p.obj->SetCamera(camera_);
+            p.obj->SetEnableLighting(true);
+            p.obj->SetReflectionFactor(0.0f);
+            auto& plankLight = p.obj->GetLightData();
+            plankLight.directionalLight.direction = kSunLightDirection;
+            plankLight.directionalLight.intensity = kLowSpecLightIntensity;
+            plankLight.pointLight.intensity = 0.0f;
+
+            const float wx = sp.localOff.x * cosY + sp.localOff.z * sinY;
+            const float wz = -sp.localOff.x * sinY + sp.localOff.z * cosY;
+            p.pos = { position_.x + wx * baseScale_.x, position_.y + sp.localOff.y * baseScale_.y, position_.z + wz * baseScale_.z };
+
+            Vector3 outDir = { wx, 0.0f, wz };
+            const float outLen = std::sqrt(outDir.x * outDir.x + outDir.z * outDir.z);
+            if (outLen > 0.01f) { outDir.x /= outLen; outDir.z /= outLen; }
+            else { const float a = CrateRandRange(0.0f, DuckPartRig::kTwoPi); outDir = { std::cos(a), 0.0f, std::sin(a) }; }
+
+            const float radSpd = isExplosiveBarrel_
+                ? CrateRandRange(4.8f, 9.6f)
+                : (sp.isLid ? CrateRandRange(1.8f, 3.8f) : CrateRandRange(2.8f, 5.4f));
+            p.vel = {
+                outDir.x * radSpd + hitDir.x * CrateRandRange(1.2f, 2.5f) + CrateRandRange(-0.8f, 0.8f),
+                isExplosiveBarrel_ ? CrateRandRange(4.5f, 9.2f) : (sp.isLid ? CrateRandRange(3.8f, 6.2f) : CrateRandRange(2.0f, 4.6f)),
+                outDir.z * radSpd + hitDir.z * CrateRandRange(1.2f, 2.5f) + CrateRandRange(-0.8f, 0.8f)
+            };
+            p.rot = { sp.isLid ? 0.0f : CrateRandRange(-0.45f, 0.45f), rotation_.y + sp.yaw, CrateRandRange(-0.25f, 0.25f) };
+            p.angVel = { CrateRandRange(-13.5f, 13.5f), CrateRandRange(-9.5f, 9.5f), CrateRandRange(-12.5f, 12.5f) };
+            p.baseScale = { sp.scale.x * baseScale_.x, sp.scale.y * baseScale_.y, sp.scale.z * baseScale_.z };
+            const float tone = CrateRandRange(0.90f, 1.08f);
+            p.baseColor = isExplosiveBarrel_
+                ? Vector4{ 8.5f * tone, 2.2f * tone, 1.6f * tone, 1.0f }
+                : Vector4{ 17.5f * tone, 16.5f * tone, 15.2f * tone, 1.0f };
+            p.age = 0.0f;
+            p.lifeTime = CrateRandRange(2.3f, 2.9f);
+
+            p.obj->SetTranslate(p.pos);
+            p.obj->SetRotate(p.rot);
+            p.obj->SetScale(p.baseScale);
+            p.obj->SetColor(p.baseColor);
+            p.obj->Update();
+            debrisPieces_.push_back(std::move(p));
+        }
+    }
 }
 
 void Obstacle::Update()
 {
-    // カメラが動いても障害物が追従しないよう、毎フレームWVP行列を更新する
-    // 樹木はコライダー座標を固定したまま、梢が微風にわずかに呼吸する自然なスウェイを付与
     if (!object3d_) return;
+
+    // 破壊後の3D木板破片の重力落下・回転・地面バウンド・消滅フェード更新
+    if (isBroken_)
+    {
+        if (debrisPieces_.empty()) return;
+        constexpr float dt = 1.0f / 60.0f;
+        for (auto it = debrisPieces_.begin(); it != debrisPieces_.end(); )
+        {
+            it->age += dt;
+            if (it->age >= it->lifeTime || !it->obj)
+            {
+                it = debrisPieces_.erase(it);
+                continue;
+            }
+
+            if (!it->settled)
+            {
+                it->vel.y -= 17.5f * dt;
+                it->vel.x *= (1.0f - 0.85f * dt);
+                it->vel.z *= (1.0f - 0.85f * dt);
+                it->pos = it->pos + it->vel * dt;
+                it->rot.x += it->angVel.x * dt;
+                it->rot.y += it->angVel.y * dt;
+                it->rot.z += it->angVel.z * dt;
+
+                if (it->pos.y <= 0.042f && it->vel.y < 0.0f)
+                {
+                    it->pos.y = 0.042f;
+                    it->bounceCount++;
+                    if (it->bounceCount == 1)
+                    {
+                        TacticalAudio::Play2D("Resources/Audio/SE_Impact_Wood.wav", 0.36f, 75, "crate_plank_bounce");
+                    }
+
+                    if (it->bounceCount >= 3 || std::abs(it->vel.y) < 0.95f)
+                    {
+                        it->settled = true;
+                        it->vel = { 0.0f, 0.0f, 0.0f };
+                        it->angVel = { 0.0f, 0.0f, 0.0f };
+                        it->rot.x = 0.0f;
+                        it->rot.z = 0.0f;
+                    }
+                    else
+                    {
+                        it->vel.y = -it->vel.y * 0.36f;
+                        it->vel.x *= 0.60f;
+                        it->vel.z *= 0.60f;
+                        it->angVel.x *= 0.45f;
+                        it->angVel.y *= 0.65f;
+                        it->angVel.z *= 0.45f;
+                        it->rot.x *= 0.45f;
+                        it->rot.z *= 0.45f;
+                    }
+                }
+            }
+
+            const float remain = it->lifeTime - it->age;
+            if (remain < 0.60f)
+            {
+                const float fade = (std::clamp)(remain / 0.60f, 0.0f, 1.0f);
+                it->obj->SetScale({ it->baseScale.x * fade, it->baseScale.y * fade, it->baseScale.z * fade });
+                it->obj->SetColor({ it->baseColor.x, it->baseColor.y, it->baseColor.z, fade });
+            }
+            it->obj->SetTranslate(it->pos);
+            it->obj->SetRotate(it->rot);
+            it->obj->Update();
+            ++it;
+        }
+        return;
+    }
+
+    float flinchRotX = 0.0f;
+    float flinchRotZ = 0.0f;
+    if (hitFlinchTimer_ > 0.0f)
+    {
+        hitFlinchTimer_ = (std::max)(0.0f, hitFlinchTimer_ - (1.0f / 60.0f));
+        const float ratio = hitFlinchTimer_ / 0.22f;
+        if (ratio > 0.0f)
+        {
+            const float osc = std::sin((1.0f - ratio) * DuckPartRig::kPi * (isTree_ ? 4.5f : 3.0f)) * ratio;
+            if (isTree_)
+            {
+                // 樹木被弾時は幹スケールを潰さず、樹冠がザワッと揺れる自然な角度振動のみを与える
+                flinchRotX =  hitFlinchDir_.z * 0.048f * osc;
+                flinchRotZ = -hitFlinchDir_.x * 0.048f * osc;
+            }
+            else
+            {
+                const float scaleMul = isBreakableSupplyCrate_ ? 1.0f : 0.35f;
+                const float tiltMul  = isBreakableSupplyCrate_ ? 0.14f : 0.045f;
+                object3d_->SetScale({
+                    baseScale_.x * (1.0f + 0.11f * scaleMul * ratio),
+                    baseScale_.y * (1.0f - 0.08f * scaleMul * ratio),
+                    baseScale_.z * (1.0f + 0.11f * scaleMul * ratio)
+                });
+                object3d_->SetRotate({
+                    rotation_.x + hitFlinchDir_.z * tiltMul * osc,
+                    rotation_.y,
+                    rotation_.z - hitFlinchDir_.x * tiltMul * osc
+                });
+                if (isBreakableSupplyCrate_)
+                {
+                    object3d_->SetColor({
+                        baseColor_.x * (1.0f + 0.32f * ratio),
+                        baseColor_.y * (1.0f + 0.24f * ratio),
+                        baseColor_.z * (1.0f + 0.12f * ratio),
+                        baseColor_.w
+                    });
+                }
+            }
+        }
+        else
+        {
+            object3d_->SetScale(baseScale_);
+            object3d_->SetRotate(rotation_);
+            object3d_->SetColor(baseColor_);
+        }
+    }
 
     if (isTree_)
     {
@@ -479,7 +853,7 @@ void Obstacle::Update()
         const float swayX = kSwayPrimaryAmpX * std::sin(t * kSwayPrimaryFreqX + treeSwayPhase_)
                           + kSwaySecondaryAmpX * std::sin(t * kSwaySecondaryFreqX + treeSwayPhase_ * kSwaySecondaryPhaseMul);
         const float swayZ = kSwayAmpZ * std::cos(t * kSwayFreqZ + treeSwayPhase_ * kSwayZPhaseMul);
-        object3d_->SetRotate({ rotation_.x + swayX, rotation_.y, rotation_.z + swayZ });
+        object3d_->SetRotate({ rotation_.x + swayX + flinchRotX, rotation_.y, rotation_.z + swayZ + flinchRotZ });
     }
     object3d_->Update();
 }
@@ -488,9 +862,36 @@ void Obstacle::Draw(const RenderContext& ctx)
 {
     if (!object3d_) return;
 
+    if (isBroken_)
+    {
+        if (debrisPieces_.empty()) return;
+        RenderContext debCtx = ctx;
+        const uint32_t plankTex = (woodCrateTexIndex_ != UINT32_MAX && woodCrateTexIndex_ != TextureManager::kInvalidTextureIndex)
+            ? woodCrateTexIndex_ : defaultTextureIndex_;
+        if (plankTex != TextureManager::kInvalidTextureIndex)
+        {
+            debCtx.textureHandle = TextureManager::GetInstance()->GetSrvHandleGPU(plankTex);
+        }
+        for (auto& p : debrisPieces_)
+        {
+            if (!p.obj) continue;
+            if (ctx.camera)
+            {
+                p.obj->SetCamera(ctx.camera);
+                p.obj->Update();
+            }
+            object3dCom_->Draw(p.obj.get(), debCtx, p.obj->GetModelData(), true);
+        }
+        return;
+    }
+
     RenderContext obsCtx = ctx;
     const Object3d::ModelData& modelData = object3d_->GetModelData();
-    const uint32_t texIdx = (modelData.material.textureIndex != TextureManager::kInvalidTextureIndex) ? modelData.material.textureIndex : defaultTextureIndex_;
+    uint32_t texIdx = (modelData.material.textureIndex != TextureManager::kInvalidTextureIndex) ? modelData.material.textureIndex : defaultTextureIndex_;
+    if (customTextureIndex_ != UINT32_MAX && customTextureIndex_ != TextureManager::kInvalidTextureIndex)
+    {
+        texIdx = customTextureIndex_;
+    }
     if (texIdx != TextureManager::kInvalidTextureIndex)
     {
         obsCtx.textureHandle = TextureManager::GetInstance()->GetSrvHandleGPU(texIdx);
@@ -501,6 +902,7 @@ void Obstacle::Draw(const RenderContext& ctx)
 
 void Obstacle::Finalize()
 {
+    debrisPieces_.clear();
     if (meshCollider_)
     {
         CollisionManager::GetInstance()->UnregisterCollider(meshCollider_.get());

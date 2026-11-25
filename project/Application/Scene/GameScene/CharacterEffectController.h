@@ -48,4 +48,8 @@ private:
 	// タイマー類（カプセル化）
 	float dodgeDustTimer_ = 0.0f;
 	float stepTimer_ = 0.0f;
+	float healFxTimer_ = 0.0f;
+	float enemyFxTimer_ = 0.0f;
+	float prevHpRatio_ = 1.0f;
+	bool wasHealingPrev_ = false;
 };

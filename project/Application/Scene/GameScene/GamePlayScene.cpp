@@ -26,6 +26,7 @@
 #include "GamePlayLevelLayout.h"
 #include "Application/Config/GameConfig.h"
 #include "Application/Config/AppDebugConfig.h"
+#include "Application/Config/AppFastObjLoader.h"
 #include "Application/Transition/StingerTransition.h"
 #include "Application/Transition/DeathTransition.h"
 #include "RaidStats.h"
@@ -208,7 +209,7 @@ namespace
 
 	constexpr size_t kJsonErrorBufferSize = 256;
 
-	enum class KeyEdgeId { Debug9, Debug8, DebugF1, DebugF3, DebugSuicide, ToggleCamY, ToggleMapM };
+	enum class KeyEdgeId { Debug9, Debug8, DebugF1, DebugF3, DebugSuicide, ToggleCamY, ToggleMapM, ToggleDemoF7 };
 	template <KeyEdgeId Id>
 	bool ConsumeKeyEdge(bool curDown) noexcept
 	{
@@ -418,8 +419,13 @@ void GamePlayScene::InitializeScene()
 	isFullMapOpen_ = false;
 	if (camera_)
 	{
+		camera_->StopShake();
+		camera_->SetFovY(0.70f);
+		camera_->SetNearZ(0.1f);
 		camera_->SetFarZ(kCameraFarZ);
-		camera_->SetTranslate(GameConfig::Camera::kDefaultFollowOffset * cameraZoom_);
+		const Vector3 initCamPos = GameConfig::Camera::kDefaultFollowOffset * cameraZoom_;
+		camera_->MoveTo(initCamPos, 0.0f);
+		camera_->SetTranslate(initCamPos);
 		camera_->SetRotate(GameConfig::Camera::kFollowRotation);
 		camera_->Update();
 	}
@@ -446,6 +452,25 @@ void GamePlayScene::InitializeScene()
 	// サブシステム初期化
 	lootSystem_ = std::make_unique<LootSystem>();
 	lootSystem_->Initialize();
+
+	// 物資木箱（最初の弾薬箱など）の3Dモデルに視認性の高い専用松材＆黄色ステンシル木箱テクスチャを適用
+	for (auto& obs : obstacles_)
+	{
+		if (!obs || obs->GetModelFilename().find("crate") == std::string::npos) continue;
+		const Vector3 oPos = obs->GetPosition();
+		for (const auto& prop : lootSystem_->GetProps())
+		{
+			if (!prop.isBreakableCrate) continue;
+			const float dx = prop.position.x - oPos.x;
+			const float dz = prop.position.z - oPos.z;
+			if (dx * dx + dz * dz <= 0.75f * 0.75f)
+			{
+				obs->ConfigureAsBreakableSupplyCrate();
+				break;
+			}
+		}
+	}
+
 	hud_ = std::make_unique<GamePlayHUD>();
 	hud_->Initialize();
 	combatSystem_ = std::make_unique<CombatSystem>(this);
@@ -455,6 +480,30 @@ void GamePlayScene::InitializeScene()
 	characterEffectController_ = std::make_unique<CharacterEffectController>(this);
 	characterEffectController_->Initialize();
 	RaidStats::GetInstance().Reset();
+	isAutoDemoPlay_ = RaidStats::GetInstance().autoDemoMode;
+	isBulletTimeActive_ = false;
+	demoRunElapsed_ = 0.0f;
+	demoSlowMoTimer_ = 0.0f;
+	demoShowcaseTimer_ = 0.6f;
+	demoPathRefreshTimer_ = 0.0f;
+	demoStuckTimer_ = 0.0f;
+	demoNodeProgressTimer_ = 0.0f;
+	demoBestNodeDistSq_ = 1.0e12f;
+	demoDodgeCooldown_ = 0.0f;
+	demoBarrelPauseTimer_ = 0.0f;
+	demoBypassTimer_ = 0.0f;
+	demoBypassSign_ = 1.0f;
+	bulletTimeMoteTimer_ = 0.0f;
+	demoShowcaseStage_ = 0;
+	demoPrevBrokenCount_ = 0;
+	demoLastNavGoal_ = { -9999.0f, 0.0f, -9999.0f };
+	demoNavPath_.clear();
+	if (player_)
+	{
+		demoLastPos_ = player_->GetPosition();
+		demoProgressAnchorPos_ = demoLastPos_;
+		demoSmoothedAim_ = demoLastPos_ + Vector3{ 0.0f, 0.70f, 8.0f };
+	}
 
 	showDebugGizmos_ = false;
 	showPerformanceTracker_ = false;
@@ -507,7 +556,7 @@ void GamePlayScene::InitializeEnvironment()
 
 	// 立体脱出ヘリパッド (extraction_pad.obj + extraction_pad.png)
 	{
-		Object3d::ModelData padModel = Object3d::LoadObjFile("Resources", "extraction_pad.obj");
+		Object3d::ModelData padModel = AppFastObjLoader::LoadObjCached("Resources", "extraction_pad.obj");
 		padModel.material.textureFilePath = "Resources/extraction_pad.png";
 		extractionPadTextureIndex_ = TextureManager::GetInstance()->Load("Resources/extraction_pad.png");
 		padModel.material.textureIndex = extractionPadTextureIndex_;
@@ -1176,7 +1225,7 @@ bool GamePlayScene::ComputePlayerCoverState(const Vector3& playerPos) const
 	const float coverReachSq = GameConfig::Math::Square(kAiCfg.coverReachDist);
 	for (const auto& obs : obstacles_)
 	{
-		if (!obs || !obs->GetCollider()) continue;
+		if (!obs || obs->IsBroken() || !obs->GetCollider() || !obs->GetCollider()->IsEnabled()) continue;
 		const auto* box = obs->GetCollider();
 		const Vector3 extents = box->GetExtents();
 		if (extents.y <= kAiCfg.minCoverExtentY) continue;
@@ -1339,6 +1388,581 @@ void GamePlayScene::UpdateEnemiesAndSquadTactics(float deltaTime, WindowAPI* win
 			}
 		}
 	}
+}
+
+void GamePlayScene::UpdateAutoDemoPlay(float realDeltaTime)
+{
+	if (!player_ || player_->IsDead()) return;
+
+	if (!isAutoDemoPlay_)
+	{
+		if (player_->IsDemoControlled())
+		{
+			Player::DemoControlState off{};
+			player_->SetDemoControl(off);
+		}
+		return;
+	}
+
+	if (isFullMapOpen_) isFullMapOpen_ = false;
+
+	const Vector3 pPos = player_->GetPosition();
+	demoRunElapsed_ += realDeltaTime;
+	if (demoDodgeCooldown_ > 0.0f) demoDodgeCooldown_ = (std::max)(0.0f, demoDodgeCooldown_ - realDeltaTime);
+	if (demoBarrelPauseTimer_ > 0.0f) demoBarrelPauseTimer_ = (std::max)(0.0f, demoBarrelPauseTimer_ - realDeltaTime);
+
+	const bool isDeathDemoPass = ((RaidStats::GetInstance().autoDemoCycleIndex & 1) == 0);
+	const bool firstCrateBroken = (!lootSystem_ || lootSystem_->GetProps().empty() || lootSystem_->GetProps()[0].isLooted);
+
+	// === 【1周目：即死デモパス】最初の木箱破壊＆ドラム缶爆発を落ち着いて見せた後（約11.5秒）にスナイパー致命弾で確実に1回死んで救難ジオラマへ繋ぐ ===
+	const bool readyForDemoDeath = firstCrateBroken ? (demoRunElapsed_ >= 11.5f) : (demoRunElapsed_ >= 16.0f);
+	if (isDeathDemoPass && readyForDemoDeath && !isDeathSequenceActive_)
+	{
+		Vector3 killerPos = pPos + Vector3{ 0.0f, 0.0f, kInputCfg.debugAttackerDist };
+		float bestEnemySq = 1.0e12f;
+		for (const auto& enemy : enemies_)
+		{
+			if (!enemy || enemy->IsDead()) continue;
+			const Vector3 ep = enemy->GetPosition();
+			const float dSq = (ep.x - pPos.x) * (ep.x - pPos.x) + (ep.z - pPos.z) * (ep.z - pPos.z);
+			if (dSq < bestEnemySq)
+			{
+				bestEnemySq = dSq;
+				killerPos = ep;
+			}
+		}
+		TacticalAudio::Play2D("Resources/Audio/SE_Gun_Rifle_1.wav", 0.85f);
+		TriggerCameraShake(0.32f, 0.45f);
+		player_->TakeDamage(
+			kInputCfg.lethalDamage,
+			"HOSTILE SENTRY (SVD SNIPER)",
+			"CRITICAL HIT // CHEST VITAL PENETRATION (7.62x54mmR)",
+			&killerPos);
+		return;
+	}
+
+	demoSlowMoTimer_ = 0.0f;
+
+	// --- 1. 進行目標地点（初期木箱 -> 標的[1] -> 標的[2] -> 標的[3] -> 標的[4] -> 北東緑スモーク脱出LZ：HUD誘導シェブロンと完全一致） ---
+	const Vector3 padGoal = goalRingTransform_.translate;
+	Vector3 rawGoal = padGoal;
+	bool headingToExtract = allTargetsDestroyed_;
+	int activeSequentialTargetIdx = -1;
+
+	if (!allTargetsDestroyed_)
+	{
+		bool foundCrateStep = false;
+		if (lootSystem_ && !lootSystem_->GetProps().empty())
+		{
+			const auto& firstProp = lootSystem_->GetProps()[0];
+			if (!firstProp.isLooted && firstProp.isBreakableCrate)
+			{
+				// フェンス(z≈1.6)や看板を避け、木箱(13.8, 0, 2.4)が真っ直ぐ見通せる舗装路上の好位置へ誘導
+				rawGoal = { 9.2f, 0.0f, 3.0f };
+				foundCrateStep = true;
+			}
+		}
+		if (!foundCrateStep)
+		{
+			// 直線距離ではなくステージ正規順（標的[1]東 -> [2]西 -> [3]北西 -> [4]北東）に1つずつ順番に攻略する
+			for (size_t i = 0; i < targets_.size(); ++i)
+			{
+				if (targets_[i] && !targets_[i]->IsDead())
+				{
+					activeSequentialTargetIdx = static_cast<int>(i);
+					rawGoal = targets_[i]->GetPosition();
+					break;
+				}
+			}
+		}
+	}
+
+	// 橋・北東ゲート土嚢・ヘリパッド手前の左右土嚢(NE_LZ_Sandbag_SW/SE)で角引っかかりが絶対起きないよう、広い舗装中央ルートを経由させる
+	Vector3 navGoal = rawGoal;
+	if (pPos.z < 26.2f && rawGoal.z > 33.8f)
+	{
+		const float bridgeX = (rawGoal.x < 0.0f || pPos.x < -2.0f) ? -14.0f : 14.0f;
+		navGoal = (std::abs(pPos.x - bridgeX) > 2.2f || pPos.z < 24.0f)
+			? Vector3{ bridgeX, 0.0f, 25.0f }
+			: Vector3{ bridgeX, 0.0f, 35.2f };
+	}
+	else if (pPos.z >= 26.2f && pPos.z <= 33.8f && rawGoal.z > 33.8f)
+	{
+		navGoal = { (pPos.x < 0.0f) ? -14.0f : 14.0f, 0.0f, 35.2f };
+	}
+	else if (pPos.z > 33.8f && rawGoal.z < 26.2f)
+	{
+		const float bridgeX = (rawGoal.x < 0.0f || pPos.x < 0.0f) ? -14.0f : 14.0f;
+		navGoal = (std::abs(pPos.x - bridgeX) > 2.2f || pPos.z > 36.0f)
+			? Vector3{ bridgeX, 0.0f, 35.0f }
+			: Vector3{ bridgeX, 0.0f, 24.8f };
+	}
+	else if (pPos.z > 33.8f && rawGoal.x > 8.0f && pPos.x < 7.2f)
+	{
+		// 北西ウイングから北東ウイングへ抜ける際、NorthNeck土嚢(-1.5, 42.65)とNE_GateCover土嚢(5.8, 47.2)の広い開口部を順番に通過
+		navGoal = (pPos.x < -2.8f)
+			? Vector3{ -1.5f, 0.0f, 47.6f }
+			: Vector3{  8.8f, 0.0f, 42.6f };
+	}
+	else if (headingToExtract && pPos.z > 33.8f && pPos.z < 55.2f &&
+	         !(pPos.x >= 12.2f && pPos.x <= 18.2f && pPos.z >= 49.2f))
+	{
+		// 脱出ヘリパッド手前の左右土嚢(9.5, 54.0 / 20.6, 53.8)や医療木箱(23.2, 54.2)に引っかからないよう、幅7.7mの中央正面ゲートへ一旦整列してから直進
+		navGoal = { 15.2f, 0.0f, 50.2f };
+	}
+
+	// 目標が切り替わった瞬間に古いA*経路を即座に破棄して次の地点へ迷わず向かわせる
+	const float goalDeltaSq = (navGoal.x - demoLastNavGoal_.x) * (navGoal.x - demoLastNavGoal_.x)
+	                        + (navGoal.z - demoLastNavGoal_.z) * (navGoal.z - demoLastNavGoal_.z);
+	if (goalDeltaSq > 1.0f)
+	{
+		demoLastNavGoal_ = navGoal;
+		demoPathRefreshTimer_ = 0.0f;
+		demoNavPath_.clear();
+		demoProgressAnchorPos_ = pPos;
+		demoNodeProgressTimer_ = 0.0f;
+		demoBypassTimer_ = 0.0f;
+	}
+
+	// --- 2. NavMesh A* 経路追従 ＋ 2D OBB障害物クリアランス滑り回避 ＋ 実変位スタック復帰 ---
+	demoPathRefreshTimer_ -= realDeltaTime;
+	if (demoPathRefreshTimer_ <= 0.0f || demoNavPath_.empty())
+	{
+		demoPathRefreshTimer_ = 0.45f;
+		demoNavPath_ = BaziruEngine::AI::NavMesh::GetInstance()->FindPath(pPos, navGoal);
+	}
+
+	while (demoNavPath_.size() > 1)
+	{
+		const float wx = demoNavPath_.front().x - pPos.x;
+		const float wz = demoNavPath_.front().z - pPos.z;
+		if (wx * wx + wz * wz <= 1.35f * 1.35f)
+		{
+			// ※ここで demoNodeProgressTimer_ をリセットしない（0.45秒ごとの再探索でスタック監視が消えるのを防ぐ）
+			demoNavPath_.erase(demoNavPath_.begin());
+		}
+		else
+		{
+			break;
+		}
+	}
+
+	Vector3 moveTarget = demoNavPath_.empty() ? navGoal : demoNavPath_.front();
+	Vector3 toMove = { moveTarget.x - pPos.x, 0.0f, moveTarget.z - pPos.z };
+	const float distToPad = std::sqrt((padGoal.x - pPos.x) * (padGoal.x - pPos.x) + (padGoal.z - pPos.z) * (padGoal.z - pPos.z));
+	const float distToRawGoal = std::sqrt((rawGoal.x - pPos.x) * (rawGoal.x - pPos.x) + (rawGoal.z - pPos.z) * (rawGoal.z - pPos.z));
+	const float distToGoal = std::sqrt((navGoal.x - pPos.x) * (navGoal.x - pPos.x) + (navGoal.z - pPos.z) * (navGoal.z - pPos.z));
+	const float moveLen = std::sqrt(toMove.x * toMove.x + toMove.z * toMove.z);
+
+	// 周囲の全障害物OBB（土嚢・コンテナ・木箱・ドラム缶・フェンス・樹木・監視塔脚）に対するクリアランス＆接線スライドステアリング
+	auto steerAroundObstacles = [&](const Vector3& rawDir) -> Vector3
+	{
+		const float rawLenSq = rawDir.x * rawDir.x + rawDir.z * rawDir.z;
+		if (rawLenSq < 1e-4f) return { 0.0f, 0.0f, 0.0f };
+		const float invRawLen = 1.0f / std::sqrt(rawLenSq);
+		Vector3 dir = { rawDir.x * invRawLen, 0.0f, rawDir.z * invRawLen };
+
+		const Vector3 goalVec = { navGoal.x - pPos.x, 0.0f, navGoal.z - pPos.z };
+		const float goalVecLen = std::sqrt((std::max)(goalVec.x * goalVec.x + goalVec.z * goalVec.z, 1e-4f));
+		const Vector3 goalDir = { goalVec.x / goalVecLen, 0.0f, goalVec.z / goalVecLen };
+
+		float bestUrgency = 0.0f;
+		Vector3 bestSteer = dir;
+
+		auto evalBox = [&](const BoxCollider* box)
+		{
+			if (!box || !box->IsEnabled()) return;
+			const Vector3 c = box->GetWorldPosition();
+			const Vector3 ext = box->GetExtents();
+			if (c.y - ext.y > 1.25f || c.y + ext.y < 0.14f) return;
+
+			const float reach = ext.x + ext.z + 2.4f;
+			if (std::abs(pPos.x - c.x) > reach || std::abs(pPos.z - c.z) > reach) return;
+
+			const Matrix4x4 R = MakeRotateYMatrix(box->GetWorldRotation().y);
+			const Vector3 axisX = { R.m[0][0], 0.0f, R.m[0][2] };
+			const Vector3 axisZ = { R.m[2][0], 0.0f, R.m[2][2] };
+
+			auto queryObb = [&](const Vector3& qPos, float margin, float weight)
+			{
+				const float rx = qPos.x - c.x;
+				const float rz = qPos.z - c.z;
+				const float lx = rx * axisX.x + rz * axisX.z;
+				const float lz = rx * axisZ.x + rz * axisZ.z;
+				const float cx = std::clamp(lx, -ext.x, ext.x);
+				const float cz = std::clamp(lz, -ext.z, ext.z);
+				const float dlx = lx - cx;
+				const float dlz = lz - cz;
+				const float dist = std::sqrt(dlx * dlx + dlz * dlz);
+				if (dist >= margin) return;
+
+				float nlx = 0.0f, nlz = 0.0f;
+				if (dist > 1e-4f)
+				{
+					nlx = dlx / dist;
+					nlz = dlz / dist;
+				}
+				else
+				{
+					if ((ext.x - std::abs(lx)) < (ext.z - std::abs(lz))) nlx = (lx >= 0.0f) ? 1.0f : -1.0f;
+					else                                                  nlz = (lz >= 0.0f) ? 1.0f : -1.0f;
+				}
+
+				const Vector3 outN = { nlx * axisX.x + nlz * axisZ.x, 0.0f, nlx * axisX.z + nlz * axisZ.z };
+				const float intoWall = -(dir.x * outN.x + dir.z * outN.z);
+				if (intoWall <= -0.22f) return;
+
+				const float urgency = ((margin - dist) / margin) * weight * (0.55f + 0.65f * (std::max)(0.0f, intoWall));
+				if (urgency <= bestUrgency) return;
+
+				// 障害物の面法線に対する左右2方向の接線のうち、目標方向＋近い角側へ向かう方を自動選択して滑らかに回り込む
+				const Vector3 tanPos = { -outN.z, 0.0f,  outN.x };
+				const Vector3 tanNeg = {  outN.z, 0.0f, -outN.x };
+				float scorePos = tanPos.x * goalDir.x + tanPos.z * goalDir.z;
+				float scoreNeg = tanNeg.x * goalDir.x + tanNeg.z * goalDir.z;
+
+				// 障害物の正面ど真ん中から進入した際も近い端へ抜けるようローカル偏心バイアスを加算
+				const Vector3 cornerHint = (std::abs(nlz) >= std::abs(nlx))
+					? Vector3{ axisX.x * ((lx >= 0.0f) ? 1.0f : -1.0f), 0.0f, axisX.z * ((lx >= 0.0f) ? 1.0f : -1.0f) }
+					: Vector3{ axisZ.x * ((lz >= 0.0f) ? 1.0f : -1.0f), 0.0f, axisZ.z * ((lz >= 0.0f) ? 1.0f : -1.0f) };
+				scorePos += (tanPos.x * cornerHint.x + tanPos.z * cornerHint.z) * 0.35f;
+				scoreNeg += (tanNeg.x * cornerHint.x + tanNeg.z * cornerHint.z) * 0.35f;
+
+				const Vector3 chosenTan = (scorePos >= scoreNeg) ? tanPos : tanNeg;
+				const float pushWeight = (dist < 0.52f) ? 0.85f : 0.42f;
+				Vector3 blended = {
+					chosenTan.x * 0.92f + outN.x * pushWeight,
+					0.0f,
+					chosenTan.z * 0.92f + outN.z * pushWeight
+				};
+				const float bLen = std::sqrt((std::max)(blended.x * blended.x + blended.z * blended.z, 1e-4f));
+				bestUrgency = urgency;
+				bestSteer = { blended.x / bLen, 0.0f, blended.z / bLen };
+			};
+
+			queryObb(pPos, 0.92f, 1.25f);
+			queryObb({ pPos.x + dir.x * 0.95f, 0.0f, pPos.z + dir.z * 0.95f }, 0.72f, 1.0f);
+		};
+
+		for (const auto& obs : obstacles_)
+		{
+			if (!obs || obs->IsBroken() || obs->IsRiverWalkBarrier()) continue;
+			if (obs->GetModelFilename().find("bridge") != std::string::npos) continue;
+			evalBox(obs->GetCollider());
+			for (const auto& extra : obs->GetExtraColliders())
+			{
+				evalBox(extra.get());
+			}
+		}
+
+		if (bestUrgency > 0.0f)
+		{
+			const float blend = std::clamp(bestUrgency * 1.35f, 0.35f, 1.0f);
+			Vector3 mixed = {
+				dir.x * (1.0f - blend) + bestSteer.x * blend,
+				0.0f,
+				dir.z * (1.0f - blend) + bestSteer.z * blend
+			};
+			const float mLen = std::sqrt((std::max)(mixed.x * mixed.x + mixed.z * mixed.z, 1e-4f));
+			return { mixed.x / mLen, 0.0f, mixed.z / mLen };
+		}
+		return dir;
+	};
+
+	Player::DemoControlState ctrl{};
+	ctrl.active = true;
+
+	const float stopRadius = headingToExtract ? 0.65f : 1.65f;
+	const bool wantGoalMove = (headingToExtract ? (distToPad > stopRadius) : (distToRawGoal > stopRadius)) && (moveLen > 0.08f);
+	if (wantGoalMove)
+	{
+		ctrl.moveDir = { toMove.x / moveLen, 0.0f, toMove.z / moveLen };
+	}
+
+	if (demoBypassTimer_ > 0.0f)
+	{
+		demoBypassTimer_ = (std::max)(0.0f, demoBypassTimer_ - realDeltaTime);
+		if ((ctrl.moveDir.x * ctrl.moveDir.x + ctrl.moveDir.z * ctrl.moveDir.z) > 0.05f)
+		{
+			// 1フレームだけでなく持続的に斜め横へ迂回させることで、幅広の土嚢やコンテナからも確実に抜け出す
+			const float cs = std::cos(1.22f * demoBypassSign_);
+			const float sn = std::sin(1.22f * demoBypassSign_);
+			ctrl.moveDir = { ctrl.moveDir.x * cs - ctrl.moveDir.z * sn, 0.0f, ctrl.moveDir.x * sn + ctrl.moveDir.z * cs };
+		}
+	}
+
+	// --- 3. 水平射線チェック補助ラムダ（実際の3D銃口原点を使用） ---
+	const Vector3 muzzleOrigin = player_->GetMuzzleWorldPosition();
+	auto hasClearLineOfFire = [&](const Vector3& targetPt, const Obstacle* allowedObs) -> bool
+	{
+		const float dx = targetPt.x - muzzleOrigin.x;
+		const float dz = targetPt.z - muzzleOrigin.z;
+		const float maxD = std::sqrt(dx * dx + dz * dz);
+		if (maxD < 0.9f) return true;
+		const float rx = dx / maxD;
+		const float rz = dz / maxD;
+
+		for (const auto& obs : obstacles_)
+		{
+			if (!obs || obs.get() == allowedObs || obs->IsBroken() || obs->IsRiverWalkBarrier()) continue;
+			auto* box = obs->GetCollider();
+			if (!box || !box->IsEnabled()) continue;
+			const Vector3 c = box->GetWorldPosition();
+			const Vector3 ext = box->GetExtents();
+			if (std::abs(muzzleOrigin.y - c.y) > ext.y) continue;
+
+			const float relX = muzzleOrigin.x - c.x;
+			const float relZ = muzzleOrigin.z - c.z;
+			const float rotY = box->GetWorldRotation().y;
+			const float cs = std::cos(-rotY);
+			const float sn = std::sin(-rotY);
+			const float loX = relX * cs + relZ * sn;
+			const float loZ = -relX * sn + relZ * cs;
+			const float ldX = rx * cs + rz * sn;
+			const float ldZ = -rx * sn + rz * cs;
+
+			float tMin = 0.0f, tMax = maxD - 0.85f;
+			auto slab = [&](float o, float d, float h) -> bool {
+				if (std::abs(d) < 1e-5f) return (o >= -h && o <= h);
+				float t1 = (-h - o) / d, t2 = (h - o) / d;
+				if (t1 > t2) std::swap(t1, t2);
+				tMin = (std::max)(tMin, t1);
+				tMax = (std::min)(tMax, t2);
+				return tMin <= tMax;
+			};
+			if (slab(loX, ldX, ext.x) && slab(loZ, ldZ, ext.z) && tMax > 0.15f)
+			{
+				return false;
+			}
+		}
+		return true;
+	};
+
+	// --- 4. 人間のお手本プレイらしい自然な優先順位（①交戦中の敵［敵の真横にドラム缶があれば誘爆キル！］ -> ②非戦闘・非脱出時の初期木箱 -> ③順番通りの標的） ---
+	Vector3 desiredAim = pPos + (((ctrl.moveDir.x * ctrl.moveDir.x + ctrl.moveDir.z * ctrl.moveDir.z) > 0.05f) ? (ctrl.moveDir * 7.5f) : Vector3{ 0.0f, 0.0f, 7.5f });
+	desiredAim.y = 0.70f;
+	bool wantFire = false;
+	bool foundCombatOrPropTarget = false;
+	bool intentionalHoldStill = (headingToExtract && distToPad <= 1.65f);
+
+	// (A) 最優先：視界・射線が通る敵キャラクターとの交戦（敵を放置してドラム缶や木箱を撃たない！）
+	{
+		float bestEnemySq = 22.5f * 22.5f;
+		Enemy* bestEnemy = nullptr;
+		for (const auto& enemy : enemies_)
+		{
+			if (!enemy || enemy->IsDead()) continue;
+			const Vector3 ep = enemy->GetPosition();
+			const float dSq = (ep.x - pPos.x) * (ep.x - pPos.x) + (ep.z - pPos.z) * (ep.z - pPos.z);
+			if (!intentionalHoldStill && enemy->GetAimTelegraphProgress() > 0.56f && dSq < 22.0f * 22.0f && demoDodgeCooldown_ <= 0.0f)
+			{
+				ctrl.triggerDodge = true;
+				demoDodgeCooldown_ = 2.6f;
+			}
+			if (dSq < bestEnemySq && (enemy->HasCurrentLineOfSight() || hasClearLineOfFire(ep + Vector3{ 0.0f, 0.68f, 0.0f }, nullptr)))
+			{
+				bestEnemySq = dSq;
+				bestEnemy = enemy.get();
+			}
+		}
+
+		if (bestEnemy)
+		{
+			const Vector3 ep = bestEnemy->GetPosition();
+			desiredAim = ep + Vector3{ 0.0f, 0.68f, 0.0f };
+
+			// 敵のすぐ近く（爆風キル圏内 6.8m 以内）に未爆発の赤ドラム缶がある時だけ、上手いプレイヤーのようにドラム缶を撃ち抜いて誘爆キルを狙う
+			for (const auto& obs : obstacles_)
+			{
+				if (!obs || obs->IsBroken() || !obs->IsExplosiveBarrel()) continue;
+				const Vector3 bp = obs->GetPosition();
+				const float bToPlayerSq = (bp.x - pPos.x) * (bp.x - pPos.x) + (bp.z - pPos.z) * (bp.z - pPos.z);
+				const float bToEnemySq  = (bp.x - ep.x) * (bp.x - ep.x) + (bp.z - ep.z) * (bp.z - ep.z);
+				if (bToPlayerSq > 4.8f * 4.8f && bToPlayerSq < 22.0f * 22.0f && bToEnemySq <= 6.8f * 6.8f &&
+				    hasClearLineOfFire({ bp.x, 0.72f, bp.z }, obs.get()))
+				{
+					desiredAim = { bp.x, 0.70f, bp.z };
+					break;
+				}
+			}
+
+			if (intentionalHoldStill)
+			{
+				// 脱出リング到着後はリング外へ転がり出て3秒カウントがリセットされないよう、パッド上で迎え撃つ
+				ctrl.moveDir = { 0.0f, 0.0f, 0.0f };
+			}
+			else if (headingToExtract)
+			{
+				// ヘリへ向かう途中は横ストレイフで土嚢に引っかかったり足が止まらないよう、ヘリ方向への前進を維持しながら応戦する
+				const float strafeSign = (std::sin(demoRunElapsed_ * 2.4f) >= 0.0f) ? 1.0f : -1.0f;
+				const Vector3 baseDir = ctrl.moveDir;
+				Vector3 runAndGun = {
+					baseDir.x * 0.86f + (-baseDir.z) * strafeSign * 0.24f,
+					0.0f,
+					baseDir.z * 0.86f + baseDir.x * strafeSign * 0.24f
+				};
+				const float rgLen = std::sqrt((std::max)(runAndGun.x * runAndGun.x + runAndGun.z * runAndGun.z, 0.01f));
+				ctrl.moveDir = { runAndGun.x / rgLen, 0.0f, runAndGun.z / rgLen };
+			}
+			else if (bestEnemySq < 15.5f * 15.5f && demoBypassTimer_ <= 0.0f)
+			{
+				// 通常交戦中は棒立ちで突っ込まず、人間らしく左右へ軽くストレイフしながら射撃する
+				const float toEx = ep.x - pPos.x;
+				const float toEz = ep.z - pPos.z;
+				const float eLen = std::sqrt((std::max)(toEx * toEx + toEz * toEz, 0.01f));
+				const float strafeSign = (std::sin(demoRunElapsed_ * 2.1f) >= 0.0f) ? 1.0f : -1.0f;
+				ctrl.moveDir = { (-toEz / eLen) * strafeSign * 0.65f, 0.0f, (toEx / eLen) * strafeSign * 0.65f };
+			}
+
+			wantFire = true;
+			foundCombatOrPropTarget = true;
+		}
+	}
+
+	// (B) 非戦闘・非脱出時のみ：射線が確実に通っている破壊可能物資木箱（初期弾薬箱など）を破壊・回収（土嚢越しの誤停止を完全防止）
+	if (!foundCombatOrPropTarget && !headingToExtract)
+	{
+		float bestCrateSq = (!firstCrateBroken ? (16.5f * 16.5f) : (7.5f * 7.5f));
+		for (const auto& obs : obstacles_)
+		{
+			if (!obs || obs->IsBroken() || !obs->IsBreakableSupplyCrate()) continue;
+			const Vector3 op = obs->GetPosition();
+			const float dSq = (op.x - pPos.x) * (op.x - pPos.x) + (op.z - pPos.z) * (op.z - pPos.z);
+			if (dSq < bestCrateSq && (dSq <= 1.7f * 1.7f || hasClearLineOfFire({ op.x, 0.70f, op.z }, obs.get())))
+			{
+				bestCrateSq = dSq;
+				desiredAim = { op.x, 0.70f, op.z };
+				wantFire = true;
+				foundCombatOrPropTarget = true;
+				if (!firstCrateBroken && dSq <= 7.0f * 7.0f)
+				{
+					ctrl.moveDir = { 0.0f, 0.0f, 0.0f };
+					intentionalHoldStill = true;
+				}
+			}
+		}
+	}
+
+	// (C) 非戦闘時：現在の順番のミッション標的（標的[1] -> [2] -> [3] -> [4]）を狙撃
+	if (!foundCombatOrPropTarget && activeSequentialTargetIdx >= 0 && activeSequentialTargetIdx < static_cast<int>(targets_.size()))
+	{
+		const auto& curTgt = targets_[activeSequentialTargetIdx];
+		if (curTgt && !curTgt->IsDead())
+		{
+			const Vector3 tp = curTgt->GetPosition();
+			const float dx = tp.x - pPos.x;
+			const float dz = tp.z - pPos.z;
+			const float dSq = dx * dx + dz * dz;
+			if (dSq < 23.0f * 23.0f && (dSq <= 3.2f * 3.2f || hasClearLineOfFire(tp + Vector3{ 0.0f, 0.72f, 0.0f }, nullptr)))
+			{
+				desiredAim = tp + Vector3{ 0.0f, 0.72f, 0.0f };
+				wantFire = true;
+				foundCombatOrPropTarget = true;
+			}
+			else if (dSq < 7.5f * 7.5f && !headingToExtract)
+			{
+				const float d = std::sqrt((std::max)(dSq, 0.01f));
+				ctrl.moveDir = { -dz / d, 0.0f, dx / d };
+			}
+		}
+	}
+
+	// 最終移動ベクトルに2D OBB障害物クリアランス回避を適用し、どの状況（通常移動・応戦ストレイフ・射線確保移動）でもObjectに引っかからないようにする
+	if (!intentionalHoldStill && (ctrl.moveDir.x * ctrl.moveDir.x + ctrl.moveDir.z * ctrl.moveDir.z) > 0.01f)
+	{
+		ctrl.moveDir = steerAroundObstacles(ctrl.moveDir);
+
+		// 実ワールド変位に基づく確実なスタック監視（0.45秒の再探索に邪魔されず、万が一の引っかかりも即座に解消）
+		const float anchorDx = pPos.x - demoProgressAnchorPos_.x;
+		const float anchorDz = pPos.z - demoProgressAnchorPos_.z;
+		if (anchorDx * anchorDx + anchorDz * anchorDz >= 0.85f * 0.85f)
+		{
+			demoProgressAnchorPos_ = pPos;
+			demoNodeProgressTimer_ = 0.0f;
+		}
+		else if (distToGoal > 1.2f)
+		{
+			demoNodeProgressTimer_ += realDeltaTime;
+			if (demoNodeProgressTimer_ >= 0.45f && demoBypassTimer_ <= 0.0f)
+			{
+				demoBypassSign_ = -demoBypassSign_;
+				demoBypassTimer_ = 0.72f;
+				demoPathRefreshTimer_ = 0.0f;
+			}
+			if (demoNodeProgressTimer_ >= 1.65f)
+			{
+				// 1.65秒以上前進できなかった場合は、通行可能な次のNavMeshノードへ滑らかに押し出して確実に完走させる
+				Vector3 safeStep = navGoal;
+				bool foundSafe = false;
+				for (const Vector3& wp : demoNavPath_)
+				{
+					const float sdx = wp.x - pPos.x;
+					const float sdz = wp.z - pPos.z;
+					if (sdx * sdx + sdz * sdz >= 1.4f * 1.4f &&
+					    BaziruEngine::AI::NavMesh::GetInstance()->IsWalkable(wp, 0.58f))
+					{
+						safeStep = wp;
+						foundSafe = true;
+						break;
+					}
+				}
+				if (!foundSafe)
+				{
+					const float gdx = navGoal.x - pPos.x;
+					const float gdz = navGoal.z - pPos.z;
+					const float gLen = std::sqrt((std::max)(gdx * gdx + gdz * gdz, 0.01f));
+					const Vector3 probe = { pPos.x + (gdx / gLen) * 2.2f, 0.0f, pPos.z + (gdz / gLen) * 2.2f };
+					if (BaziruEngine::AI::NavMesh::GetInstance()->IsWalkable(probe, 0.58f))
+					{
+						safeStep = probe;
+						foundSafe = true;
+					}
+				}
+				if (foundSafe)
+				{
+					player_->SetPosition({ safeStep.x, 0.0f, safeStep.z });
+					demoProgressAnchorPos_ = { safeStep.x, 0.0f, safeStep.z };
+				}
+				demoNavPath_.clear();
+				demoPathRefreshTimer_ = 0.0f;
+				demoNodeProgressTimer_ = 0.0f;
+			}
+		}
+	}
+	else
+	{
+		demoProgressAnchorPos_ = pPos;
+		demoNodeProgressTimer_ = 0.0f;
+	}
+	demoLastPos_ = pPos;
+
+	// 照準を自然に追従させ、射線が合ったタイミングで射撃する（何もない壁や木への不自然な空撃ちは一切行わない）
+	const float aimBlend = 1.0f - std::exp(-8.5f * realDeltaTime);
+	demoSmoothedAim_ = demoSmoothedAim_ + (desiredAim - demoSmoothedAim_) * aimBlend;
+	ctrl.aimWorldPoint = demoSmoothedAim_;
+
+	const float aimDx = desiredAim.x - pPos.x;
+	const float aimDz = desiredAim.z - pPos.z;
+	const float desiredYaw = std::atan2(aimDx, aimDz);
+	const float yawErr = std::abs(GameConfig::Math::WrapAngleSigned(desiredYaw - player_->GetRotation().y));
+	ctrl.fireHeld = wantFire && (yawErr < 0.22f);
+
+	// 体力低下時は [Q] 救急キットの二重螺旋エメラルド粒子を実演、非戦闘・残弾減少時は3Dマガジン排出リロードを実演（長距離以外は走らず落ち着いて歩く）
+	if (player_->GetHPRatio() < 0.68f && !player_->IsHealing())
+	{
+		ctrl.triggerHeal = true;
+		ctrl.fireHeld = false;
+	}
+	else if (!wantFire && player_->GetMagazineAmmo() <= 8 && !player_->IsReloading())
+	{
+		ctrl.triggerReload = true;
+	}
+	else if (!wantFire && distToGoal > 26.0f && !player_->IsHealing() && !player_->IsReloading())
+	{
+		ctrl.holsterSprint = true;
+	}
+
+	player_->SetDemoControl(ctrl);
 }
 
 void GamePlayScene::UpdateCharacters(float deltaTime)
@@ -1521,7 +2145,18 @@ void GamePlayScene::UpdateCameraAndAim(float realDeltaTime)
 		};
 
 		Vector3 desiredLookahead = { 0.0f, 0.0f, 0.0f };
-		if (!(isFullMapOpen_ || IsAppKeyDown(VK_TAB)) && directXCom && directXCom->GetWindowAPI())
+		if (isAutoDemoPlay_ && player_)
+		{
+			// F7自動デモプレイ中は照準先（ドラム缶・川面・コンテナ・敵）へカメラを滑らかに先読みパンして見せ場を画面中央に収める
+			const Vector3 aimDelta = demoSmoothedAim_ - playerPos;
+			const float dLen = std::sqrt(aimDelta.x * aimDelta.x + aimDelta.z * aimDelta.z);
+			if (dLen > 0.5f)
+			{
+				const float lookDist = (std::min)(dLen * 0.28f, GameConfig::Camera::kCursorLookaheadMax * 0.72f) * (1.0f - kCineCfg.overheadLookScale * s);
+				desiredLookahead = { (aimDelta.x / dLen) * lookDist, 0.0f, (aimDelta.z / dLen) * lookDist };
+			}
+		}
+		else if (!(isFullMapOpen_ || IsAppKeyDown(VK_TAB)) && directXCom && directXCom->GetWindowAPI())
 		{
 			WindowAPI* win = directXCom->GetWindowAPI();
 			const float cw = static_cast<float>(win->GetClientWidth());
@@ -1576,9 +2211,31 @@ void GamePlayScene::UpdateSceneLightingAndTexts(float deltaTime)
 		const float flarePulse = kCineCfg.flarePulseBase + kCineCfg.flarePulseAmp * std::sin(
 			RaidStats::GetInstance().raidTime * kCineCfg.flarePulseFreqRaid + clearSlowMoTimer_ * kCineCfg.flarePulseFreqSlow);
 		const float baseFlareInt = allTargetsDestroyed_ ? (isGameCleared_ ? kCineCfg.flareIntClear : kCineCfg.flareIntUnlocked) : kCineCfg.flareIntLocked;
-		light->SetPointLight(
-			kCineCfg.flareLightColor, goalRingTransform_.translate + kCineCfg.flareLightOffset,
-			baseFlareInt * flarePulse, allTargetsDestroyed_ ? kCineCfg.flareRadUnlocked : kCineCfg.flareRadLocked, kCineCfg.flareDecay);
+		const Vector3 flareWorldPos = goalRingTransform_.translate + kCineCfg.flareLightOffset;
+
+		// 銃口発砲瞬間はリアルな装薬燃焼光（アンバーゴールド動的PointLight）でプレイヤー周囲の地面・木箱・壁面を物理照明
+		bool appliedMuzzleLight = false;
+		if (lightFlashTimer_ > 0.0f && player_ && !player_->IsDead() && !isGameCleared_)
+		{
+			const Vector3 pPos = player_->GetPosition();
+			const float dxF = pPos.x - flareWorldPos.x;
+			const float dzF = pPos.z - flareWorldPos.z;
+			if (!(allTargetsDestroyed_ && (dxF * dxF + dzF * dzF < 12.0f * 12.0f)))
+			{
+				const float flashRatio = std::clamp(lightFlashTimer_ / 0.055f, 0.0f, 1.0f);
+				const Vector3 muzzleLightPos = player_->GetMuzzleWorldPosition() + Vector3{ 0.0f, 0.38f, 0.0f };
+				light->SetPointLight(
+					{ 1.0f, 0.78f, 0.40f, 1.0f }, muzzleLightPos,
+					2.85f * flashRatio, 9.2f, 1.65f);
+				appliedMuzzleLight = true;
+			}
+		}
+		if (!appliedMuzzleLight)
+		{
+			light->SetPointLight(
+				kCineCfg.flareLightColor, flareWorldPos,
+				baseFlareInt * flarePulse, allTargetsDestroyed_ ? kCineCfg.flareRadUnlocked : kCineCfg.flareRadLocked, kCineCfg.flareDecay);
+		}
 	}
 
 	for (auto it = floatingTexts_.begin(); it != floatingTexts_.end(); )
@@ -1594,6 +2251,34 @@ void GamePlayScene::Update()
 {
 	const float realDeltaTime = AdvanceDeltaTime();
 	float deltaTime = realDeltaTime;
+
+	// [F7] 自動デモプレイ実演モード切替（Debug / Release 両対応・イントロ中も即時受付）
+	if (!AppDebugState::IsImGuiCapturingTextInput() && ConsumeKeyEdge<KeyEdgeId::ToggleDemoF7>(IsAppKeyDown(VK_F7)))
+	{
+		isAutoDemoPlay_ = !isAutoDemoPlay_;
+		RaidStats::GetInstance().autoDemoMode = isAutoDemoPlay_;
+		if (isAutoDemoPlay_)
+		{
+			// 手動で [F7] をONにした際は必ず「1周目：即死＆救難ジオラマ実演 → 2周目：制圧＆脱出クリア実演」の順で開始
+			RaidStats::GetInstance().autoDemoCycleIndex = 0;
+			demoRunElapsed_ = 0.0f;
+			demoNodeProgressTimer_ = 0.0f;
+			demoBestNodeDistSq_ = 1.0e12f;
+		}
+		TacticalAudio::Play2D("Resources/Audio/SE_UI_Click.wav", kInputCfg.uiClickVol, kInputCfg.uiClickCooldownMs);
+		if (!isAutoDemoPlay_ && player_)
+		{
+			Player::DemoControlState off{};
+			player_->SetDemoControl(off);
+		}
+		else if (isAutoDemoPlay_ && player_)
+		{
+			demoProgressAnchorPos_ = player_->GetPosition();
+			demoBypassTimer_ = 0.0f;
+			demoSmoothedAim_ = player_->GetPosition() + Vector3{ 0.0f, 0.70f, 8.0f };
+			demoPathRefreshTimer_ = 0.0f;
+		}
+	}
 
 	// 軍用ヘリ急襲・ファストロープ降下演出中
 	if (helicopterIntro_ && helicopterIntro_->IsActive())
@@ -1650,6 +2335,52 @@ void GamePlayScene::Update()
 		deltaTime *= kCineCfg.slowTimeScale;
 	}
 
+	// [RMB長押し] 手動バレットタイム鑑賞 ＆ [F7自動デモ] 爆発・破壊クライマックス時の0.25xスロー演出
+	if (demoSlowMoTimer_ > 0.0f)
+	{
+		demoSlowMoTimer_ = (std::max)(0.0f, demoSlowMoTimer_ - realDeltaTime);
+	}
+	const bool manualBulletTime =
+		!isAutoDemoPlay_ && !isGameCleared_ && !isDeathSequenceActive_ && !isFullMapOpen_ &&
+		!AppDebugState::IsImGuiCapturingMouse() && player_ && !player_->IsDead() && mouseInput.PushButton(1);
+	isBulletTimeActive_ = (!isGameCleared_ && !isDeathSequenceActive_) && (manualBulletTime || demoSlowMoTimer_ > 0.0f);
+	if (isBulletTimeActive_)
+	{
+		deltaTime *= 0.25f;
+		bulletTimeMoteTimer_ += realDeltaTime;
+		if (bulletTimeMoteTimer_ >= 0.045f && appParticleManager_ && player_)
+		{
+			bulletTimeMoteTimer_ = 0.0f;
+			const Vector3 pPos = player_->GetPosition();
+			const uint32_t moteTex = (minovskyCircleTextureIndex_ != TextureManager::kInvalidTextureIndex)
+				? minovskyCircleTextureIndex_ : particleTextureB;
+			for (int i = 0; i < 2; ++i)
+			{
+				const float ang = (static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX)) * kTwoPi;
+				const float rad = 1.2f + (static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX)) * 5.8f;
+				AppParticle cm{};
+				cm.transform.Initialize();
+				cm.transform.SetTranslate({ pPos.x + std::cos(ang) * rad, 0.25f + (static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX)) * 1.6f, pPos.z + std::sin(ang) * rad });
+				cm.scaleAspect = { 0.85f, 1.25f };
+				cm.initialScale = 0.036f;
+				cm.targetScale = 0.012f;
+				cm.transform.SetScale({ 0.036f * 0.85f, 0.036f * 1.25f, 1.0f });
+				cm.velocity = { -std::sin(ang) * 0.65f, 0.55f, std::cos(ang) * 0.65f };
+				cm.color = (i == 0) ? Vector4{ 0.35f, 0.92f, 1.0f, 0.80f } : Vector4{ 1.0f, 0.86f, 0.38f, 0.76f };
+				cm.endColor = { 0.15f, 0.55f, 0.95f, 0.0f };
+				cm.hasColorShift = true;
+				cm.drag = 1.2f;
+				cm.lifeTime = 0.32f;
+				cm.fadeInRatio = 0.15f;
+				cm.twinkleSpeed = 20.0f;
+				cm.twinklePhase = ang;
+				cm.textureIndex = moteTex;
+				cm.slotLayer = 2;
+				appParticleManager_->AddParticle(cm);
+			}
+		}
+	}
+
 	// クリア演出中のヘリ回収クライマックス＆スローモーション処理
 	if (isGameCleared_)
 	{
@@ -1687,14 +2418,16 @@ void GamePlayScene::Update()
 	UpdateDebugInput();
 	if (!isGameCleared_)
 	{
+		UpdateAutoDemoPlay(realDeltaTime);
 		UpdateCharacters(deltaTime);
 		if (combatSystem_) combatSystem_->Update(deltaTime);
-		if (collisionSystem_) collisionSystem_->Update();
+		if (collisionSystem_) collisionSystem_->Update(deltaTime);
 		if (combatSystem_) combatSystem_->RemoveDeadBullets();
 		if (player_) player_->PostCollisionUpdate();
 	}
 	else if (combatSystem_)
 	{
+		combatSystem_->UpdateMuzzleFlashes3D(deltaTime);
 		combatSystem_->UpdateBullets(deltaTime);
 		combatSystem_->UpdateShellCasings(deltaTime);
 		combatSystem_->RemoveDeadBullets();
@@ -1706,6 +2439,42 @@ void GamePlayScene::Update()
 	if (smokeParticleManager_) smokeParticleManager_->Update(isGameCleared_ ? (realDeltaTime * kCineCfg.clearSmokeDtScale) : deltaTime, GetPlayerPosition());
 	if (lootSystem_)
 	{
+		// 全弾撃ち尽くし(0/0)時の詰み防止：密着状態で左クリックした際も銃床打撃で木箱を物理破壊して補給可能にする
+		if (player_ && !player_->IsDead() && player_->GetMagazineAmmo() <= 0 && player_->GetReserveAmmo() <= 0 &&
+		    mouseInput.TriggerButton(0))
+		{
+			const Vector3 pPos = player_->GetPosition();
+			const float meleeRangeSq = GameConfig::Math::Square(LootSystem::kInteractRadius);
+			for (auto& obs : obstacles_)
+			{
+				if (!obs || obs->IsBroken() || !obs->IsBreakableSupplyCrate()) continue;
+				const Vector3 oPos = obs->GetPosition();
+				const float dx = oPos.x - pPos.x;
+				const float dz = oPos.z - pPos.z;
+				if (dx * dx + dz * dz <= meleeRangeSq)
+				{
+					bool broken = false;
+					for (int hit = 0; hit < 4 && !broken; ++hit)
+					{
+						if (!lootSystem_->TryDamageBreakableCrate(
+							oPos, player_.get(), appParticleManager_.get(), floatingTexts_, broken,
+							smokeParticleManager_.get(), soilDustTextureIndex_, debrisChipTextureIndex_, sparkStreakTextureIndex_))
+						{
+							break;
+						}
+					}
+					if (broken)
+					{
+						const float len = std::sqrt(dx * dx + dz * dz);
+						const Vector3 smashDir = (len > 0.01f) ? Vector3{ dx / len, 0.0f, dz / len } : Vector3{ 0.0f, 0.0f, 1.0f };
+						obs->BreakObstacle(smashDir);
+						TriggerCameraShake(0.16f, 0.19f);
+					}
+					break;
+				}
+			}
+		}
+
 		lootSystem_->Update(
 			deltaTime, player_.get(), appParticleManager_.get(), floatingTexts_,
 			smokeParticleManager_.get(), soilDustTextureIndex_, debrisChipTextureIndex_, sparkStreakTextureIndex_);
@@ -1977,6 +2746,7 @@ void GamePlayScene::Draw(SceneRenderRequests& renderRequests)
 		combatSystem_->DrawShellCasings(ctx);
 		ID3D12PipelineState* tracerPSO = combatSystem_->GetAdditiveTracerPSO();
 		for (auto& bullet : combatSystem_->GetBullets()) { if (bullet) bullet->Draw(ctx, tracerPSO); }
+		combatSystem_->DrawMuzzleFlashes3D(ctx);
 	}
 
 	if (helicopterIntro_ && (helicopterIntro_->IsActive() || helicopterIntro_->IsExtractionVisible())) helicopterIntro_->Draw3D(ctx);
@@ -2039,6 +2809,9 @@ void GamePlayScene::Draw(SceneRenderRequests& renderRequests)
 		hudCtx.isOverheadCameraMode = isOverheadCameraMode_;
 		hudCtx.isFullMapOpen = isFullMapOpen_ || IsAppKeyDown(VK_TAB);
 		hudCtx.cameraZoom = cameraZoom_;
+		hudCtx.isAutoDemoPlay = isAutoDemoPlay_;
+		hudCtx.autoDemoCycleIndex = RaidStats::GetInstance().autoDemoCycleIndex;
+		hudCtx.isBulletTimeActive = isBulletTimeActive_;
 		hud_->Draw(hudCtx, kFixedDeltaTime);
 	}
 

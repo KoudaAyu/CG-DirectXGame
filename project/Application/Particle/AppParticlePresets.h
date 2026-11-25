@@ -126,14 +126,14 @@ namespace AppParticlePresets
 		constexpr DynamicsSpec kRicochetDyn = { 12.0f, 1.6f, 0.45f, 0.0f, 0.0f, 0.0f, 0.0f, 2 };
 
 		// EmitTargetDestroyGPUBurst & EmitLandingGPUBurst
-		constexpr float kTargetCoreInitScale = 0.42f, kTargetCoreTargetScale = 0.14f, kTargetCoreLife = 0.055f;
-		constexpr ColorShiftSpec kTargetCoreColor = { { 1.0f, 0.94f, 0.72f, 0.92f }, { 1.0f, 0.42f, 0.10f, 0.0f }, true };
-		constexpr int kTargetSparkCount = 38, kTargetHotColorStride = 3;
-		constexpr RangeF kTargetPitch = { -0.35f, 1.15f }, kTargetSpeed = { 4.2f, 11.5f }, kTargetLife = { 0.22f, 0.62f };
-		constexpr RangeF kTargetWidth = { 0.018f, 0.036f }, kTargetLen = { 0.09f, 0.24f };
-		constexpr float kTargetUpBoost = 1.6f, kTargetSpawnDirOffset = 0.08f, kTargetTargetScale = 0.25f, kTargetSpinSpeed = 9.0f;
-		constexpr Vector4 kTargetColorHot = { 1.0f, 0.97f, 0.84f, 1.0f }, kTargetColorWarm = { 1.0f, 0.76f, 0.28f, 0.96f }, kTargetEndColor = { 1.0f, 0.26f, 0.04f, 0.0f };
-		constexpr DynamicsSpec kTargetSparkDyn = { 12.8f, 1.6f, 0.48f, 0.0f, 0.0f, 0.0f, 0.0f, 2 };
+		constexpr float kTargetCoreInitScale = 0.72f, kTargetCoreTargetScale = 0.22f, kTargetCoreLife = 0.075f;
+		constexpr ColorShiftSpec kTargetCoreColor = { { 1.0f, 0.95f, 0.76f, 0.96f }, { 1.0f, 0.44f, 0.10f, 0.0f }, true };
+		constexpr int kTargetSparkCount = 54, kTargetHotColorStride = 3;
+		constexpr RangeF kTargetPitch = { -0.35f, 1.22f }, kTargetSpeed = { 4.8f, 13.5f }, kTargetLife = { 0.28f, 0.78f };
+		constexpr RangeF kTargetWidth = { 0.022f, 0.044f }, kTargetLen = { 0.12f, 0.32f };
+		constexpr float kTargetUpBoost = 1.85f, kTargetSpawnDirOffset = 0.09f, kTargetTargetScale = 0.26f, kTargetSpinSpeed = 9.0f;
+		constexpr Vector4 kTargetColorHot = { 1.0f, 0.98f, 0.86f, 1.0f }, kTargetColorWarm = { 1.0f, 0.78f, 0.30f, 0.98f }, kTargetEndColor = { 1.0f, 0.26f, 0.04f, 0.0f };
+		constexpr DynamicsSpec kTargetSparkDyn = { 12.6f, 1.45f, 0.54f, 0.0f, 0.0f, 0.0f, 0.0f, 2 };
 
 		constexpr int kLandingSparkCount = 14;
 		constexpr RangeF kLandingSpeed = { 2.2f, 5.0f }, kLandingLife = { 0.16f, 0.34f }, kLandingUpVel = { 0.65f, 2.05f };

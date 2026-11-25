@@ -3,6 +3,7 @@
 #include "BaseScene.h"
 #include "../GameScene/RaidStats.h"
 #include "Application/Audio/TacticalAudio.h"
+#include "Application/Particle/AppParticleManager.h"
 #include "Object3d.h"
 #include "Camera.h"
 #include <string>
@@ -132,4 +133,14 @@ private:
 	uint32_t logoTexIndex_ = UINT32_MAX;     // 本格専用グラフィックタイトルロゴ（gameover_logo.png）
 	uint32_t promptTexIndex_ = UINT32_MAX;   // 本格専用グラフィック操作バッジ（gameover_prompt.png）
 	uint32_t debriefTexIndex_ = UINT32_MAX;  // 本格専用タクティカル戦績カード（gameover_debrief.png）
+
+	// 3D 夜間救難ジオラマ用 GPUインスタンシング・パーティクル（霧雨・ハロゲン投光器ダスト・ローター夜霧）
+	std::unique_ptr<AppParticleManager> appParticleManager_;
+	std::unique_ptr<AppParticleManager> smokeParticleManager_;
+	uint32_t rainStreakTexIndex_ = UINT32_MAX;
+	uint32_t mistSmokeTexIndex_  = UINT32_MAX;
+	uint32_t moteCircleTexIndex_ = UINT32_MAX;
+	float rainEmitTimer_  = 0.0f;
+	float lightMoteTimer_ = 0.0f;
+	float rotorMistTimer_ = 0.0f;
 };

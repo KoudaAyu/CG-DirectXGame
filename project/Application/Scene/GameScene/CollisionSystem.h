@@ -1,7 +1,8 @@
 #pragma once
 #include <cstdint>
+#include <vector>
+#include "Vector.h"
 
-struct Vector3;
 class GamePlayScene;
 class Obstacle;
 
@@ -22,7 +23,7 @@ public:
 	/// <summary>
 	/// 各種衝突判定と補正処理をフレームごとに実行します
 	/// </summary>
-	void Update();
+	void Update(float deltaTime = 1.0f / 60.0f);
 
 private:
 	/// <summary>
@@ -54,8 +55,21 @@ private:
 	/// シーン内の全障害物（Obstacle）とレイの精密交差判定を行います（OBB法線・対象物取得対応）
 	/// </summary>
 	bool RaycastObstacles(const Vector3& rayStart, const Vector3& rayDir, float maxDist, float& outHitDist, Vector3& outHitPoint, Vector3* outHitNormal = nullptr, const Obstacle** outHitObstacle = nullptr);
+	void UpdateBarrelHazards(float deltaTime);
+	void DetonateFuelBarrel(Obstacle* barrelObs, const Vector3& blastDir);
 
 private:
+	struct ScorchedFirePatch
+	{
+		Vector3 pos{};
+		float remainTime = 0.0f;
+		float emitTimer = 0.0f;
+	};
+
 	GamePlayScene* scene_ = nullptr;    // ゲームプレイシーンへの参照
-	uint32_t impactFlashTexIndex_ = UINT32_MAX;
+	std::vector<ScorchedFirePatch> activeFirePatches_;
+	uint32_t impactFlashTexIndex_  = UINT32_MAX;
+	uint32_t woodSplinterTexIndex_ = UINT32_MAX;
+	uint32_t pineNeedleTexIndex_   = UINT32_MAX;
+	uint32_t ricochetStarTexIndex_ = UINT32_MAX;
 };

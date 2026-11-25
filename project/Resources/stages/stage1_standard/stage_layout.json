@@ -1,0 +1,3546 @@
+[
+    {
+        "name":  "Player_Spawn_Point",
+        "type":  "SpawnPoint",
+        "modelFilename":  "fence.obj",
+        "position":  {
+                         "x":  0,
+                         "y":  0,
+                         "z":  0
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  0,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "Goal_Extraction_Ring",
+        "type":  "GoalRing",
+        "modelFilename":  "fence.obj",
+        "position":  {
+                         "x":  15.5,
+                         "y":  0.01,
+                         "z":  59.5
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  0,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "Perim_SouthOuter_01",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_fence.obj",
+        "position":  {
+                         "x":  -18.51,
+                         "y":  0,
+                         "z":  27.15
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  3.1416,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1.224,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "Perim_SouthOuter_02",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_fence.obj",
+        "position":  {
+                         "x":  -23.222,
+                         "y":  -0.002,
+                         "z":  25.883
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  2.5073,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  0.883,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "Perim_SouthOuter_03",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_fence.obj",
+        "position":  {
+                         "x":  -26.778,
+                         "y":  0,
+                         "z":  23.267
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  2.5073,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  0.883,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "Perim_SouthOuter_04",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_fence.obj",
+        "position":  {
+                         "x":  -28.5,
+                         "y":  -0.002,
+                         "z":  19.41
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  1.5708,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1.064,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "Perim_SouthOuter_05",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_fence.obj",
+        "position":  {
+                         "x":  -28.5,
+                         "y":  0,
+                         "z":  14.09
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  1.5708,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1.064,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "Perim_SouthOuter_06",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_fence.obj",
+        "position":  {
+                         "x":  -27.027,
+                         "y":  -0.002,
+                         "z":  10.272
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  0.6947,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  0.795,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "Perim_SouthOuter_07",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_fence.obj",
+        "position":  {
+                         "x":  -23.973,
+                         "y":  0,
+                         "z":  7.728
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  0.6947,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  0.795,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "Perim_SouthOuter_08",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_fence.obj",
+        "position":  {
+                         "x":  -20.463,
+                         "y":  -0.002,
+                         "z":  6.5
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  0,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  0.843,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "Perim_SouthOuter_09",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_fence.obj",
+        "position":  {
+                         "x":  -16.25,
+                         "y":  0,
+                         "z":  6.5
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  0,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  0.843,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "Perim_SouthOuter_10",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_fence.obj",
+        "position":  {
+                         "x":  -12.037,
+                         "y":  -0.002,
+                         "z":  6.5
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  0,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  0.843,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "Perim_SouthOuter_11",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_fence.obj",
+        "position":  {
+                         "x":  -10,
+                         "y":  0,
+                         "z":  4.547
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  1.5708,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  0.809,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "Perim_SouthOuter_12",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_fence.obj",
+        "position":  {
+                         "x":  -10,
+                         "y":  -0.002,
+                         "z":  0.5
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  1.5708,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  0.809,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "Perim_SouthOuter_13",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_fence.obj",
+        "position":  {
+                         "x":  -10,
+                         "y":  0,
+                         "z":  -3.547
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  1.5708,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  0.809,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "Perim_SouthOuter_14",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_fence.obj",
+        "position":  {
+                         "x":  -8,
+                         "y":  -0.002,
+                         "z":  -7.5
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  0.7854,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1.159,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "Perim_SouthOuter_15",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_fence.obj",
+        "position":  {
+                         "x":  -4.047,
+                         "y":  0,
+                         "z":  -9.5
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  0,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  0.809,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "Perim_SouthOuter_16",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_fence.obj",
+        "position":  {
+                         "x":  0,
+                         "y":  -0.002,
+                         "z":  -9.5
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  0,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  0.809,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "Perim_SouthOuter_17",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_fence.obj",
+        "position":  {
+                         "x":  4.047,
+                         "y":  0,
+                         "z":  -9.5
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  0,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  0.809,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "Perim_SouthOuter_18",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_fence.obj",
+        "position":  {
+                         "x":  8,
+                         "y":  -0.002,
+                         "z":  -7.5
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  -0.7854,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1.159,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "Perim_SouthOuter_19",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_fence.obj",
+        "position":  {
+                         "x":  10,
+                         "y":  0,
+                         "z":  -3
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  -1.5708,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1.028,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "Perim_SouthOuter_20",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_fence.obj",
+        "position":  {
+                         "x":  12.203,
+                         "y":  -0.002,
+                         "z":  -0.5
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  0,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  0.909,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "Perim_SouthOuter_21",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_fence.obj",
+        "position":  {
+                         "x":  16.75,
+                         "y":  0,
+                         "z":  -0.5
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  0,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  0.909,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "Perim_SouthOuter_22",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_fence.obj",
+        "position":  {
+                         "x":  21.297,
+                         "y":  -0.002,
+                         "z":  -0.5
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  0,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  0.909,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "Perim_SouthOuter_23",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_fence.obj",
+        "position":  {
+                         "x":  25,
+                         "y":  0,
+                         "z":  1.5
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  -0.9273,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1.028,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "Perim_SouthOuter_24",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_fence.obj",
+        "position":  {
+                         "x":  26.5,
+                         "y":  -0.002,
+                         "z":  5.965
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  -1.5708,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1.014,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "Perim_SouthOuter_25",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_fence.obj",
+        "position":  {
+                         "x":  26.5,
+                         "y":  0,
+                         "z":  11.035
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  -1.5708,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1.014,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "Perim_SouthOuter_26",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_fence.obj",
+        "position":  {
+                         "x":  29,
+                         "y":  -0.002,
+                         "z":  15.5
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  -0.6747,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1.309,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "Perim_SouthOuter_27",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_fence.obj",
+        "position":  {
+                         "x":  31.5,
+                         "y":  0,
+                         "z":  20.5
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  -1.5708,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1.228,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "Perim_SouthOuter_28",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_fence.obj",
+        "position":  {
+                         "x":  30.03,
+                         "y":  -0.002,
+                         "z":  24.394
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  -2.5951,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  0.716,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "Perim_SouthOuter_29",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_fence.obj",
+        "position":  {
+                         "x":  26.97,
+                         "y":  0,
+                         "z":  26.256
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  -2.5951,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  0.716,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "Perim_SouthOuter_30",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_fence.obj",
+        "position":  {
+                         "x":  23.04,
+                         "y":  -0.002,
+                         "z":  27.15
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  3.1416,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1.012,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "Perim_SouthOuter_31",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_fence.obj",
+        "position":  {
+                         "x":  17.98,
+                         "y":  0,
+                         "z":  27.15
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  3.1416,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1.012,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "Bank_SouthInnerW_01",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_fence.obj",
+        "position":  {
+                         "x":  -10.49,
+                         "y":  -0.002,
+                         "z":  27.15
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  0,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  0.824,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "Bank_SouthInnerW_02",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_fence.obj",
+        "position":  {
+                         "x":  -7.023,
+                         "y":  0,
+                         "z":  25.402
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  0.8692,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  0.944,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "Bank_South_SandbagC1",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_sandbag_wall.obj",
+        "position":  {
+                         "x":  -3.7,
+                         "y":  0,
+                         "z":  23.6
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  0,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1.07,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "Bank_South_SandbagC2",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_sandbag_wall.obj",
+        "position":  {
+                         "x":  0,
+                         "y":  0,
+                         "z":  23.6
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  0,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1.07,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "Bank_South_SandbagC3",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_sandbag_wall.obj",
+        "position":  {
+                         "x":  3.7,
+                         "y":  0,
+                         "z":  23.6
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  0,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1.07,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "Bank_SouthInnerE_01",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_fence.obj",
+        "position":  {
+                         "x":  7.023,
+                         "y":  -0.002,
+                         "z":  25.402
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  -0.8692,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  0.944,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "Bank_SouthInnerE_02",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_fence.obj",
+        "position":  {
+                         "x":  10.49,
+                         "y":  0,
+                         "z":  27.15
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  0,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  0.824,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "Perim_NorthOuter_01",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_fence.obj",
+        "position":  {
+                         "x":  -18.76,
+                         "y":  -0.002,
+                         "z":  32.85
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  3.1416,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1.324,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "Perim_NorthOuter_02",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_fence.obj",
+        "position":  {
+                         "x":  -24.25,
+                         "y":  0,
+                         "z":  35.175
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  -2.3398,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1.322,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "Perim_NorthOuter_03",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_fence.obj",
+        "position":  {
+                         "x":  -26.5,
+                         "y":  -0.002,
+                         "z":  40.09
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  -1.5708,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1.064,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "Perim_NorthOuter_04",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_fence.obj",
+        "position":  {
+                         "x":  -26.5,
+                         "y":  0,
+                         "z":  45.41
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  -1.5708,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1.064,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "Perim_NorthOuter_05",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_fence.obj",
+        "position":  {
+                         "x":  -29,
+                         "y":  -0.002,
+                         "z":  50
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  -2.4669,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1.309,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "Perim_NorthOuter_06",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_fence.obj",
+        "position":  {
+                         "x":  -31.5,
+                         "y":  0,
+                         "z":  54.09
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  -1.5708,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  0.864,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "Perim_NorthOuter_07",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_fence.obj",
+        "position":  {
+                         "x":  -31.5,
+                         "y":  -0.002,
+                         "z":  58.41
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  -1.5708,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  0.864,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "Perim_NorthOuter_08",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_fence.obj",
+        "position":  {
+                         "x":  -29.25,
+                         "y":  0,
+                         "z":  62.5
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  -0.7266,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1.232,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "Perim_NorthOuter_09",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_fence.obj",
+        "position":  {
+                         "x":  -24.41,
+                         "y":  -0.002,
+                         "z":  64.5
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  0,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1.064,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "Perim_NorthOuter_10",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_fence.obj",
+        "position":  {
+                         "x":  -19.09,
+                         "y":  0,
+                         "z":  64.5
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  0,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1.064,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "Perim_NorthOuter_11",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_fence.obj",
+        "position":  {
+                         "x":  -14.75,
+                         "y":  -0.002,
+                         "z":  62
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  0.9601,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1.249,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "Perim_NorthOuter_12",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_fence.obj",
+        "position":  {
+                         "x":  -13,
+                         "y":  0,
+                         "z":  57.41
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  1.5708,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  0.864,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "Perim_NorthOuter_13",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_fence.obj",
+        "position":  {
+                         "x":  -13,
+                         "y":  -0.002,
+                         "z":  53.09
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  1.5708,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  0.864,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "Perim_NorthOuter_14",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_fence.obj",
+        "position":  {
+                         "x":  -10.802,
+                         "y":  0,
+                         "z":  51
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  0,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  0.907,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "Perim_NorthOuter_15",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_fence.obj",
+        "position":  {
+                         "x":  -6.268,
+                         "y":  -0.002,
+                         "z":  51
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  0,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  0.907,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "Perim_NorthOuter_16",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_fence.obj",
+        "position":  {
+                         "x":  -1.732,
+                         "y":  0,
+                         "z":  51
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  0,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  0.907,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "Perim_NorthOuter_17",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_fence.obj",
+        "position":  {
+                         "x":  2.802,
+                         "y":  -0.002,
+                         "z":  51
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  0,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  0.907,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "Perim_NorthOuter_18",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_fence.obj",
+        "position":  {
+                         "x":  5,
+                         "y":  0,
+                         "z":  53.59
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  -1.5708,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1.064,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "Perim_NorthOuter_19",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_fence.obj",
+        "position":  {
+                         "x":  5,
+                         "y":  -0.002,
+                         "z":  58.91
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  -1.5708,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1.064,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "Perim_NorthOuter_20",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_fence.obj",
+        "position":  {
+                         "x":  6.225,
+                         "y":  0,
+                         "z":  62.725
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  -0.7854,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  0.721,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "Perim_NorthOuter_21",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_fence.obj",
+        "position":  {
+                         "x":  8.775,
+                         "y":  -0.002,
+                         "z":  65.275
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  -0.7854,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  0.721,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "Perim_NorthOuter_22",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_fence.obj",
+        "position":  {
+                         "x":  12.715,
+                         "y":  0,
+                         "z":  66.5
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  0,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1.114,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "Perim_NorthOuter_23",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_fence.obj",
+        "position":  {
+                         "x":  18.285,
+                         "y":  -0.002,
+                         "z":  66.5
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  0,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1.114,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "Perim_NorthOuter_24",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_fence.obj",
+        "position":  {
+                         "x":  22.225,
+                         "y":  0,
+                         "z":  65.275
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  0.7854,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  0.721,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "Perim_NorthOuter_25",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_fence.obj",
+        "position":  {
+                         "x":  24.775,
+                         "y":  -0.002,
+                         "z":  62.725
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  0.7854,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  0.721,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "Perim_NorthOuter_26",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_fence.obj",
+        "position":  {
+                         "x":  26,
+                         "y":  0,
+                         "z":  59.41
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  1.5708,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  0.864,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "Perim_NorthOuter_27",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_fence.obj",
+        "position":  {
+                         "x":  26,
+                         "y":  -0.002,
+                         "z":  55.09
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  1.5708,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  0.864,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "Perim_NorthOuter_28",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_fence.obj",
+        "position":  {
+                         "x":  28,
+                         "y":  0,
+                         "z":  51
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  0.7854,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1.159,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "Perim_NorthOuter_29",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_fence.obj",
+        "position":  {
+                         "x":  30,
+                         "y":  -0.002,
+                         "z":  46.41
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  1.5708,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1.064,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "Perim_NorthOuter_30",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_fence.obj",
+        "position":  {
+                         "x":  30,
+                         "y":  0,
+                         "z":  41.09
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  1.5708,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1.064,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "Perim_NorthOuter_31",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_fence.obj",
+        "position":  {
+                         "x":  28.525,
+                         "y":  -0.002,
+                         "z":  37.111
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  2.3862,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  0.838,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "Perim_NorthOuter_32",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_fence.obj",
+        "position":  {
+                         "x":  25.475,
+                         "y":  0,
+                         "z":  34.239
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  2.3862,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  0.838,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "Perim_NorthOuter_33",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_fence.obj",
+        "position":  {
+                         "x":  21.915,
+                         "y":  -0.002,
+                         "z":  32.85
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  3.1416,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  0.862,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "Perim_NorthOuter_34",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_fence.obj",
+        "position":  {
+                         "x":  17.605,
+                         "y":  0,
+                         "z":  32.85
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  3.1416,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  0.862,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "Bank_NorthInnerW_01",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_fence.obj",
+        "position":  {
+                         "x":  -10.34,
+                         "y":  -0.002,
+                         "z":  32.85
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  0,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  0.884,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "Bank_NorthInnerW_02",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_fence.obj",
+        "position":  {
+                         "x":  -6.875,
+                         "y":  0,
+                         "z":  34.2
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  -0.7946,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  0.785,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "Bank_North_SandbagC1",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_sandbag_wall.obj",
+        "position":  {
+                         "x":  -3.7,
+                         "y":  0,
+                         "z":  35.6
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  3.1416,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1.07,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "Bank_North_SandbagC2",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_sandbag_wall.obj",
+        "position":  {
+                         "x":  0,
+                         "y":  0,
+                         "z":  35.6
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  3.1416,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1.07,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "Bank_North_SandbagC3",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_sandbag_wall.obj",
+        "position":  {
+                         "x":  3.7,
+                         "y":  0,
+                         "z":  35.6
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  3.1416,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1.07,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "Bank_NorthInnerE_01",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_fence.obj",
+        "position":  {
+                         "x":  6.875,
+                         "y":  -0.002,
+                         "z":  34.2
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  0.7946,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  0.785,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "Bank_NorthInnerE_02",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_fence.obj",
+        "position":  {
+                         "x":  10.34,
+                         "y":  0,
+                         "z":  32.85
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  0,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  0.884,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "Bridge_West",
+        "type":  "Obstacle",
+        "modelFilename":  "bridge.obj",
+        "position":  {
+                         "x":  -14,
+                         "y":  0,
+                         "z":  30
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  0,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "Bridge_East",
+        "type":  "Obstacle",
+        "modelFilename":  "bridge.obj",
+        "position":  {
+                         "x":  14,
+                         "y":  0,
+                         "z":  30
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  0,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "Hub_Bunker_West",
+        "type":  "Obstacle",
+        "modelFilename":  "container.obj",
+        "position":  {
+                         "x":  -5.3,
+                         "y":  0,
+                         "z":  10.2
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  1.78,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "Hub_Bunker_Center",
+        "type":  "Obstacle",
+        "modelFilename":  "container.obj",
+        "position":  {
+                         "x":  0,
+                         "y":  0,
+                         "z":  9.5
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  1.5708,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "Hub_Bunker_East",
+        "type":  "Obstacle",
+        "modelFilename":  "container.obj",
+        "position":  {
+                         "x":  5.3,
+                         "y":  0,
+                         "z":  10.2
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  1.36,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "Hub_CommandTower",
+        "type":  "Obstacle",
+        "modelFilename":  "watchtower.obj",
+        "position":  {
+                         "x":  0,
+                         "y":  0,
+                         "z":  13.4
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  0,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "Hub_Sandbag_FrontW",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_sandbag_wall.obj",
+        "position":  {
+                         "x":  -4.8,
+                         "y":  0,
+                         "z":  7.5
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  0.22,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "Hub_Sandbag_FrontE",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_sandbag_wall.obj",
+        "position":  {
+                         "x":  4.8,
+                         "y":  0,
+                         "z":  7.5
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  -0.22,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "Hub_LZ_Crate_SW",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_crate.obj",
+        "position":  {
+                         "x":  -6.6,
+                         "y":  0,
+                         "z":  -4.8
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  0.35,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "Hub_LZ_Barrel_SE",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_barrel_stack.obj",
+        "position":  {
+                         "x":  6.6,
+                         "y":  0,
+                         "z":  -4.8
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  -0.28,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "Promenade_Cover_East",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_sandbag_wall.obj",
+        "position":  {
+                         "x":  5.4,
+                         "y":  0,
+                         "z":  18.8
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  0.24,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "Promenade_Crate_Mid",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_crate.obj",
+        "position":  {
+                         "x":  0,
+                         "y":  0,
+                         "z":  20.2
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  0.38,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "Promenade_Cover_West",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_sandbag_wall.obj",
+        "position":  {
+                         "x":  -5.4,
+                         "y":  0,
+                         "z":  18.8
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  -0.24,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "SE_LootCrate_StarterAmmo",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_crate.obj",
+        "position":  {
+                         "x":  13.8,
+                         "y":  0,
+                         "z":  2.4
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  0.18,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "SE_Range_BarrelSouth",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_barrel_stack.obj",
+        "position":  {
+                         "x":  21.8,
+                         "y":  0,
+                         "z":  2
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  0.35,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "SE_Range_LowBench",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_sandbag_wall.obj",
+        "position":  {
+                         "x":  18.5,
+                         "y":  0,
+                         "z":  5.2
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  0,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1,
+                      "y":  0.42,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "SE_Range_DividerWest",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_fence.obj",
+        "position":  {
+                         "x":  13.6,
+                         "y":  0,
+                         "z":  10
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  1.5708,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "SE_Range_DividerEast",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_fence.obj",
+        "position":  {
+                         "x":  23.4,
+                         "y":  0,
+                         "z":  10
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  1.5708,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "Target_01_Range",
+        "type":  "Target",
+        "modelFilename":  "shooting_target.obj",
+        "position":  {
+                         "x":  18.5,
+                         "y":  0,
+                         "z":  13.2
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  0,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1,
+                      "y":  1,
+                      "z":  1
+                  },
+        "radius":  0.8
+    },
+    {
+        "name":  "SE_Range_BackstopCont",
+        "type":  "Obstacle",
+        "modelFilename":  "container.obj",
+        "position":  {
+                         "x":  18.5,
+                         "y":  0,
+                         "z":  16.8
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  1.5708,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "SE_Range_BackstopBarrel",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_barrel_stack.obj",
+        "position":  {
+                         "x":  22.8,
+                         "y":  0,
+                         "z":  16.2
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  -0.25,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "SE_Dock_CoverSandbag",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_sandbag_wall.obj",
+        "position":  {
+                         "x":  25.4,
+                         "y":  0,
+                         "z":  21
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  0.52,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "SE_LootCrate_Roubles",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_crate.obj",
+        "position":  {
+                         "x":  28.8,
+                         "y":  0,
+                         "z":  20.5
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  -0.28,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "SE_Dock_BarrelNorth",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_barrel_stack.obj",
+        "position":  {
+                         "x":  28.2,
+                         "y":  0,
+                         "z":  23.2
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  0.4,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "SW_Cover_SouthMain",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_sandbag_wall.obj",
+        "position":  {
+                         "x":  -15,
+                         "y":  0,
+                         "z":  11.8
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  0.14,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "SW_Cover_EastSide",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_sandbag_wall.obj",
+        "position":  {
+                         "x":  -10.2,
+                         "y":  0,
+                         "z":  15.2
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  1.32,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "SW_Cover_MidBarrel",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_barrel_stack.obj",
+        "position":  {
+                         "x":  -13.2,
+                         "y":  0,
+                         "z":  17.5
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  -0.25,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "SW_Flank_SouthSandbag",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_sandbag_wall.obj",
+        "position":  {
+                         "x":  -21.2,
+                         "y":  0,
+                         "z":  11
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  -0.35,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "SW_Flank_Container",
+        "type":  "Obstacle",
+        "modelFilename":  "container.obj",
+        "position":  {
+                         "x":  -20.5,
+                         "y":  0,
+                         "z":  16.6
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  0.1,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "SW_LootCrate_Medkit",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_crate.obj",
+        "position":  {
+                         "x":  -25.2,
+                         "y":  0,
+                         "z":  16.8
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  0.22,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "SW_Flank_BarrelNW",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_barrel_stack.obj",
+        "position":  {
+                         "x":  -25.6,
+                         "y":  0,
+                         "z":  20.2
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  -0.32,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "Enemy_Rookie_SWYard",
+        "type":  "EnemySpawn_Rookie",
+        "modelFilename":  "fence.obj",
+        "position":  {
+                         "x":  -15.2,
+                         "y":  0,
+                         "z":  22.2
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  3.1416,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "SW_North_Crate",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_crate.obj",
+        "position":  {
+                         "x":  -10.6,
+                         "y":  0,
+                         "z":  23.6
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  -0.3,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "Target_02_WestYard",
+        "type":  "Target",
+        "modelFilename":  "shooting_target.obj",
+        "position":  {
+                         "x":  -22.2,
+                         "y":  0,
+                         "z":  22.5
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  0.38,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1,
+                      "y":  1,
+                      "z":  1
+                  },
+        "radius":  0.8
+    },
+    {
+        "name":  "NorthNeck_Cont_S1",
+        "type":  "Obstacle",
+        "modelFilename":  "container.obj",
+        "position":  {
+                         "x":  -1.5,
+                         "y":  0,
+                         "z":  38.45
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  0,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "NorthNeck_Sandbag_S2",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_sandbag_wall.obj",
+        "position":  {
+                         "x":  -1.5,
+                         "y":  0,
+                         "z":  42.65
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  1.5708,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "NW_BridgeCover_Sandbag",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_sandbag_wall.obj",
+        "position":  {
+                         "x":  -14,
+                         "y":  0,
+                         "z":  36.8
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  3.1416,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "NW_West_Barrel",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_barrel_stack.obj",
+        "position":  {
+                         "x":  -23.5,
+                         "y":  0,
+                         "z":  39.2
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  0.28,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "NW_Watchtower",
+        "type":  "Obstacle",
+        "modelFilename":  "watchtower.obj",
+        "position":  {
+                         "x":  -6.2,
+                         "y":  0,
+                         "z":  39.2
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  0.2,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "NW_LootCrate_Ammo",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_crate.obj",
+        "position":  {
+                         "x":  -9.5,
+                         "y":  0,
+                         "z":  39
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  -0.18,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "Enemy_Patrol_NWPlaza",
+        "type":  "EnemySpawn_Patrol",
+        "modelFilename":  "fence.obj",
+        "position":  {
+                         "x":  -22.5,
+                         "y":  0,
+                         "z":  44
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  0,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "NW_Plaza_SandbagN",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_sandbag_wall.obj",
+        "position":  {
+                         "x":  -14.2,
+                         "y":  0,
+                         "z":  48.2
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  -0.2,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "Target_03_NWPlaza",
+        "type":  "Target",
+        "modelFilename":  "shooting_target.obj",
+        "position":  {
+                         "x":  -21.5,
+                         "y":  0,
+                         "z":  47.8
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  0.25,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1,
+                      "y":  1,
+                      "z":  1
+                  },
+        "radius":  0.8
+    },
+    {
+        "name":  "NW_Vault_GateContW",
+        "type":  "Obstacle",
+        "modelFilename":  "container.obj",
+        "position":  {
+                         "x":  -26.2,
+                         "y":  0,
+                         "z":  52.8
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  1.25,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "NW_Vault_GateContE",
+        "type":  "Obstacle",
+        "modelFilename":  "container.obj",
+        "position":  {
+                         "x":  -16.5,
+                         "y":  0,
+                         "z":  53.5
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  -0.32,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "NW_LootCrate_GoldDuck",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_crate.obj",
+        "position":  {
+                         "x":  -23.5,
+                         "y":  0,
+                         "z":  59.8
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  0.35,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "NW_Vault_BarrelW",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_barrel_stack.obj",
+        "position":  {
+                         "x":  -27.5,
+                         "y":  0,
+                         "z":  58.6
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  -0.25,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "NW_Vault_SandbagNE",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_sandbag_wall.obj",
+        "position":  {
+                         "x":  -19.2,
+                         "y":  0,
+                         "z":  60.6
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  -0.4,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "NE_GateCover_Sandbag",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_sandbag_wall.obj",
+        "position":  {
+                         "x":  5.8,
+                         "y":  0,
+                         "z":  47.2
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  1.5708,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "NE_BridgeCover_Sandbag",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_sandbag_wall.obj",
+        "position":  {
+                         "x":  14,
+                         "y":  0,
+                         "z":  36.8
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  3.1416,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "NE_SouthEast_Crate",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_crate.obj",
+        "position":  {
+                         "x":  22.5,
+                         "y":  0,
+                         "z":  37.8
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  0.32,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "NE_Command_Container",
+        "type":  "Obstacle",
+        "modelFilename":  "container.obj",
+        "position":  {
+                         "x":  24.8,
+                         "y":  0,
+                         "z":  43.2
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  0.16,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "NE_Bastion_BarrelE",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_barrel_stack.obj",
+        "position":  {
+                         "x":  27.2,
+                         "y":  0,
+                         "z":  47.2
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  -0.35,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "Enemy_Garrison_NECommand",
+        "type":  "EnemySpawn",
+        "modelFilename":  "fence.obj",
+        "position":  {
+                         "x":  14.5,
+                         "y":  0,
+                         "z":  45.2
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  -2.35,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "Target_04_NECommand",
+        "type":  "Target",
+        "modelFilename":  "shooting_target.obj",
+        "position":  {
+                         "x":  21.5,
+                         "y":  0,
+                         "z":  47.2
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  -0.38,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1,
+                      "y":  1,
+                      "z":  1
+                  },
+        "radius":  0.8
+    },
+    {
+        "name":  "NE_LootCrate_TraumaKit",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_crate.obj",
+        "position":  {
+                         "x":  23.2,
+                         "y":  0,
+                         "z":  54.2
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  -0.22,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "NE_LZ_Sandbag_SW",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_sandbag_wall.obj",
+        "position":  {
+                         "x":  9.5,
+                         "y":  0,
+                         "z":  54
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  0.38,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "NE_LZ_Sandbag_SE",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_sandbag_wall.obj",
+        "position":  {
+                         "x":  20.6,
+                         "y":  0,
+                         "z":  53.8
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  -0.35,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "NE_LZ_Barrel_NW",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_barrel_stack.obj",
+        "position":  {
+                         "x":  8.4,
+                         "y":  0,
+                         "z":  61.2
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  0.25,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "NE_LZ_Barrel_NE",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_barrel_stack.obj",
+        "position":  {
+                         "x":  22.8,
+                         "y":  0,
+                         "z":  61.5
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  -0.3,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "Enemy_Reinforce_NE_01",
+        "type":  "EnemySpawn_Reinforce",
+        "modelFilename":  "fence.obj",
+        "position":  {
+                         "x":  3.2,
+                         "y":  0,
+                         "z":  48.2
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  1.25,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1,
+                      "y":  1,
+                      "z":  1
+                  }
+    },
+    {
+        "name":  "Forest_Pine_01",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_pine_tree.obj",
+        "position":  {
+                         "x":  -26.5,
+                         "y":  0,
+                         "z":  -4.5
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  0.5,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1.28,
+                      "y":  1.45,
+                      "z":  1.28
+                  }
+    },
+    {
+        "name":  "Forest_Pine_02",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_pine_tree.obj",
+        "position":  {
+                         "x":  -19.5,
+                         "y":  0,
+                         "z":  -2.8
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  1.4,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1.32,
+                      "y":  1.5,
+                      "z":  1.32
+                  }
+    },
+    {
+        "name":  "Forest_Pine_03",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_pine_tree.obj",
+        "position":  {
+                         "x":  -14.2,
+                         "y":  0,
+                         "z":  -1.8
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  2.2,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1.22,
+                      "y":  1.38,
+                      "z":  1.22
+                  }
+    },
+    {
+        "name":  "Forest_Pine_04",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_pine_tree.obj",
+        "position":  {
+                         "x":  -14.5,
+                         "y":  0,
+                         "z":  3
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  0.8,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1.25,
+                      "y":  1.42,
+                      "z":  1.25
+                  }
+    },
+    {
+        "name":  "Forest_Pine_05",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_pine_tree.obj",
+        "position":  {
+                         "x":  -23.5,
+                         "y":  0,
+                         "z":  2.4
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  1.9,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1.3,
+                      "y":  1.48,
+                      "z":  1.3
+                  }
+    },
+    {
+        "name":  "Forest_Pine_06",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_pine_tree.obj",
+        "position":  {
+                         "x":  14.2,
+                         "y":  0,
+                         "z":  -4.2
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  1.1,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1.24,
+                      "y":  1.4,
+                      "z":  1.24
+                  }
+    },
+    {
+        "name":  "Forest_Pine_07",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_pine_tree.obj",
+        "position":  {
+                         "x":  20.5,
+                         "y":  0,
+                         "z":  -5.5
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  2.4,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1.32,
+                      "y":  1.5,
+                      "z":  1.32
+                  }
+    },
+    {
+        "name":  "Forest_Pine_08",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_pine_tree.obj",
+        "position":  {
+                         "x":  27.5,
+                         "y":  0,
+                         "z":  -4
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  0.4,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1.26,
+                      "y":  1.44,
+                      "z":  1.26
+                  }
+    },
+    {
+        "name":  "Forest_Pine_09",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_pine_tree.obj",
+        "position":  {
+                         "x":  14.5,
+                         "y":  0,
+                         "z":  -10.8
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  1.7,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1.28,
+                      "y":  1.46,
+                      "z":  1.28
+                  }
+    },
+    {
+        "name":  "Forest_Pine_10",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_pine_tree.obj",
+        "position":  {
+                         "x":  22.8,
+                         "y":  0,
+                         "z":  -11.5
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  2.8,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1.3,
+                      "y":  1.48,
+                      "z":  1.3
+                  }
+    },
+    {
+        "name":  "Forest_Pine_11",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_pine_tree.obj",
+        "position":  {
+                         "x":  -9.5,
+                         "y":  0,
+                         "z":  55.2
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  0.6,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1.3,
+                      "y":  1.48,
+                      "z":  1.3
+                  }
+    },
+    {
+        "name":  "Forest_Pine_12",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_pine_tree.obj",
+        "position":  {
+                         "x":  -3.8,
+                         "y":  0,
+                         "z":  54.6
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  1.8,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1.25,
+                      "y":  1.42,
+                      "z":  1.25
+                  }
+    },
+    {
+        "name":  "Forest_Pine_13",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_pine_tree.obj",
+        "position":  {
+                         "x":  1.4,
+                         "y":  0,
+                         "z":  55.4
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  2.5,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1.28,
+                      "y":  1.46,
+                      "z":  1.28
+                  }
+    },
+    {
+        "name":  "Forest_Pine_14",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_pine_tree.obj",
+        "position":  {
+                         "x":  -7.2,
+                         "y":  0,
+                         "z":  61
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  1.2,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1.35,
+                      "y":  1.54,
+                      "z":  1.35
+                  }
+    },
+    {
+        "name":  "Forest_Pine_15",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_pine_tree.obj",
+        "position":  {
+                         "x":  -0.8,
+                         "y":  0,
+                         "z":  61.8
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  0.3,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1.3,
+                      "y":  1.5,
+                      "z":  1.3
+                  }
+    },
+    {
+        "name":  "Forest_Pine_16",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_pine_tree.obj",
+        "position":  {
+                         "x":  -4.5,
+                         "y":  0,
+                         "z":  66.8
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  2.1,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1.32,
+                      "y":  1.52,
+                      "z":  1.32
+                  }
+    },
+    {
+        "name":  "Forest_Pine_17",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_pine_tree.obj",
+        "position":  {
+                         "x":  -2.6,
+                         "y":  0,
+                         "z":  25.8
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  0.9,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  0.95,
+                      "y":  1.12,
+                      "z":  0.95
+                  }
+    },
+    {
+        "name":  "Forest_Pine_18",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_pine_tree.obj",
+        "position":  {
+                         "x":  2.8,
+                         "y":  0,
+                         "z":  34
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  2,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  0.95,
+                      "y":  1.12,
+                      "z":  0.95
+                  }
+    },
+    {
+        "name":  "Forest_Pine_19",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_pine_tree.obj",
+        "position":  {
+                         "x":  -33.2,
+                         "y":  0,
+                         "z":  9
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  1.5,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1.3,
+                      "y":  1.48,
+                      "z":  1.3
+                  }
+    },
+    {
+        "name":  "Forest_Pine_20",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_pine_tree.obj",
+        "position":  {
+                         "x":  -33.5,
+                         "y":  0,
+                         "z":  17.5
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  2.6,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1.35,
+                      "y":  1.55,
+                      "z":  1.35
+                  }
+    },
+    {
+        "name":  "Forest_Pine_21",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_pine_tree.obj",
+        "position":  {
+                         "x":  -29.5,
+                         "y":  0,
+                         "z":  26
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  0.7,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1.22,
+                      "y":  1.38,
+                      "z":  1.22
+                  }
+    },
+    {
+        "name":  "Forest_Pine_22",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_pine_tree.obj",
+        "position":  {
+                         "x":  -31.2,
+                         "y":  0,
+                         "z":  36.5
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  1.9,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1.28,
+                      "y":  1.45,
+                      "z":  1.28
+                  }
+    },
+    {
+        "name":  "Forest_Pine_23",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_pine_tree.obj",
+        "position":  {
+                         "x":  -31.8,
+                         "y":  0,
+                         "z":  45
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  0.4,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1.32,
+                      "y":  1.5,
+                      "z":  1.32
+                  }
+    },
+    {
+        "name":  "Forest_Pine_24",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_pine_tree.obj",
+        "position":  {
+                         "x":  -36,
+                         "y":  0,
+                         "z":  56.5
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  2.2,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1.35,
+                      "y":  1.55,
+                      "z":  1.35
+                  }
+    },
+    {
+        "name":  "Forest_Pine_25",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_pine_tree.obj",
+        "position":  {
+                         "x":  31.2,
+                         "y":  0,
+                         "z":  2.5
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  0.8,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1.26,
+                      "y":  1.42,
+                      "z":  1.26
+                  }
+    },
+    {
+        "name":  "Forest_Pine_26",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_pine_tree.obj",
+        "position":  {
+                         "x":  31.5,
+                         "y":  0,
+                         "z":  10.5
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  2.1,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1.32,
+                      "y":  1.5,
+                      "z":  1.32
+                  }
+    },
+    {
+        "name":  "Forest_Pine_27",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_pine_tree.obj",
+        "position":  {
+                         "x":  36,
+                         "y":  0,
+                         "z":  20.5
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  1.3,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1.35,
+                      "y":  1.54,
+                      "z":  1.35
+                  }
+    },
+    {
+        "name":  "Forest_Pine_28",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_pine_tree.obj",
+        "position":  {
+                         "x":  30.2,
+                         "y":  0,
+                         "z":  34.5
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  2.7,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1.24,
+                      "y":  1.4,
+                      "z":  1.24
+                  }
+    },
+    {
+        "name":  "Forest_Pine_29",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_pine_tree.obj",
+        "position":  {
+                         "x":  34.8,
+                         "y":  0,
+                         "z":  44
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  0.9,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1.32,
+                      "y":  1.5,
+                      "z":  1.32
+                  }
+    },
+    {
+        "name":  "Forest_Pine_30",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_pine_tree.obj",
+        "position":  {
+                         "x":  31,
+                         "y":  0,
+                         "z":  57.5
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  1.6,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1.28,
+                      "y":  1.46,
+                      "z":  1.28
+                  }
+    },
+    {
+        "name":  "Forest_Pine_31",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_pine_tree.obj",
+        "position":  {
+                         "x":  -28,
+                         "y":  0,
+                         "z":  69
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  1.1,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1.32,
+                      "y":  1.5,
+                      "z":  1.32
+                  }
+    },
+    {
+        "name":  "Forest_Pine_32",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_pine_tree.obj",
+        "position":  {
+                         "x":  -19,
+                         "y":  0,
+                         "z":  69.5
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  2.3,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1.28,
+                      "y":  1.46,
+                      "z":  1.28
+                  }
+    },
+    {
+        "name":  "Forest_Pine_33",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_pine_tree.obj",
+        "position":  {
+                         "x":  10.5,
+                         "y":  0,
+                         "z":  71
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  0.7,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1.34,
+                      "y":  1.54,
+                      "z":  1.34
+                  }
+    },
+    {
+        "name":  "Forest_Pine_34",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_pine_tree.obj",
+        "position":  {
+                         "x":  20.5,
+                         "y":  0,
+                         "z":  70.8
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  1.9,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1.3,
+                      "y":  1.48,
+                      "z":  1.3
+                  }
+    },
+    {
+        "name":  "Forest_Pine_35",
+        "type":  "Obstacle",
+        "modelFilename":  "duckov_pine_tree.obj",
+        "position":  {
+                         "x":  27.5,
+                         "y":  0,
+                         "z":  66.5
+                     },
+        "rotation":  {
+                         "x":  0,
+                         "y":  2.8,
+                         "z":  0
+                     },
+        "scale":  {
+                      "x":  1.26,
+                      "y":  1.44,
+                      "z":  1.26
+                  }
+    }
+]

@@ -33,6 +33,7 @@ public:
     Vector3 GetPosition() const { return object3d_ ? object3d_->GetTranslate() : Vector3{ 0.0f, 0.0f, 0.0f }; }
     Vector3 GetPrevPosition() const { return prevPosition_; }
     Vector3 GetDirection() const { return direction_; }
+    void SetDirection(const Vector3& newDir);
     float GetDistanceTraveled() const { return distanceTraveled_; }
     bool ConsumeWakePulse(float deltaTime);
     bool IsNearMissTriggered() const { return nearMissTriggered_; }

@@ -211,10 +211,10 @@ namespace HudLayout
         	HudPalette::kEmeraldAccent };
         inline constexpr ObjectivePhaseSpec kPhaseExtractReady = { "FINAL", u8"脱出地点", u8"全標的を破壊完了！", u8"北東の緑スモークへ急行",
         	HudPalette::kEmeraldAccent };
-        inline constexpr ObjectivePhaseSpec kPhaseStarterLoot = { "STEP 1 / 5", u8"弾薬箱", u8"東棟の木箱へ進む", u8"[E]長押しで弾薬回収",
+        inline constexpr ObjectivePhaseSpec kPhaseStarterLoot = { "STEP 1 / 5", u8"弾薬箱", u8"東棟の木箱へ進む", u8"[左クリック] 射撃で木箱を破壊",
         	HudPalette::kCyanAccent };
         inline constexpr ObjectivePhaseSpec kPhaseTarget1 = {
-        	"STEP 2 / 5", u8"標的 [1]", u8"東棟の【標的[1]】を射撃", u8"[左クリック]射撃 / [R]装填", UI_COL32(255, 204, 62, 255) };
+        	"STEP 2 / 5", u8"標的 [1]", u8"東棟の【標的[1]】を射撃", u8"[左クリック]射撃 / [R]リロード", UI_COL32(255, 204, 62, 255) };
         inline constexpr ObjectivePhaseSpec kPhaseTarget2 = {
         	"STEP 3 / 5", u8"標的 [2]", u8"西棟の【標的[2]】を破壊", u8"土嚢遮蔽 / [SPACE]回避", UI_COL32(255, 166, 56, 255) };
         inline constexpr ObjectivePhaseSpec kPhaseBridgeTo3 = {
@@ -331,15 +331,19 @@ namespace HudLayout
         inline constexpr uint32_t kHolsterIconIdle = UI_COL32(174, 196, 214, 220), kHolsterTextHi = UI_COL32(118, 248, 255, 255);
         inline constexpr uint32_t kHolsterTextIdle = UI_COL32(186, 206, 224, 235);
 
-        // 足元ラジアル進捗リング
-        inline constexpr float kFeetOffsetY = 0.10f, kFeetRingRadius = 23.0f;
+        // 足元ラジアル進捗リング ＆ 頭上リロード／弾切れコールアウト
+        inline constexpr float kFeetOffsetY = 0.10f, kFeetRingRadius = 24.0f;
         inline constexpr int kFeetBgSegs = 32;
-        inline constexpr float kFeetBgThick = 4.2f, kFeetMinProg = 0.01f;
+        inline constexpr float kFeetBgThick = 4.4f, kFeetMinProg = 0.01f;
         inline constexpr int kFeetArcSegs = 28;
-        inline constexpr float kFeetArcThick = 3.0f;
-        inline constexpr uint32_t kFeetBgCol = UI_COL32(8, 14, 20, 175), kFeetHealCol = UI_COL32(58, 250, 152, 235);
-        inline constexpr uint32_t kFeetRelEjectCol = UI_COL32(255, 192, 62, 235), kFeetRelInsCol = UI_COL32(82, 232, 255, 235);
-        inline constexpr uint32_t kFeetRelBoltCol = UI_COL32(72, 252, 158, 245);
+        inline constexpr float kFeetArcThick = 3.2f;
+        inline constexpr uint32_t kFeetBgCol = UI_COL32(8, 14, 20, 185), kFeetHealCol = UI_COL32(58, 250, 152, 235);
+        inline constexpr uint32_t kFeetRelEjectCol = UI_COL32(255, 192, 62, 240), kFeetRelInsCol = UI_COL32(82, 232, 255, 240);
+        inline constexpr uint32_t kFeetRelBoltCol = UI_COL32(72, 252, 158, 248);
+
+        inline constexpr float kHeadPromptLiftY = 1.56f, kHeadReticleFadeStart = 54.0f, kHeadReticleFadeSpan = 42.0f;
+        inline constexpr float kHeadBobAmpPx = 2.2f, kHeadBobSpeed = 5.4f, kHeadAlertShakePx = 4.2f;
+        inline constexpr float kHeadPillFont = 13.5f, kHeadKeyFont = 12.5f, kHeadPillH = 22.0f, kHeadProgBarH = 3.2f, kHeadProgGapY = 2.5f;
     }
 
     // --- 脱出シーケンス・バナー・カウントダウン演出 HUD ---
@@ -628,12 +632,41 @@ namespace HudLayout
         inline constexpr uint32_t kHolsterCol = UI_COL32(210, 228, 242, 195);
 
         // リロード円形プログレス
-        inline constexpr float kReloadRadius = 12.5f;
-        inline constexpr int kReloadSegs = 28;
-        inline constexpr float kReloadBgThick = 3.8f, kReloadTrackThick = 2.0f, kReloadMinProg = 0.01f;
-        inline constexpr float kReloadArcThick = 2.4f, kReloadDotShadowR = 2.5f, kReloadDotFgR = 1.6f;
-        inline constexpr uint32_t kReloadBgCol = UI_COL32(10, 16, 22, 185), kReloadTrackCol = UI_COL32(190, 210, 225, 55);
+        inline constexpr float kReloadRadius = 14.5f, kReloadBusyExpandPx = 2.2f;
+        inline constexpr int kReloadSegs = 32;
+        inline constexpr float kReloadBgThick = 4.4f, kReloadTrackThick = 2.2f, kReloadMinProg = 0.01f;
+        inline constexpr float kReloadArcThick = 3.0f, kReloadDotShadowR = 2.6f, kReloadDotFgR = 1.7f;
+        inline constexpr uint32_t kReloadBgCol = UI_COL32(8, 14, 20, 205), kReloadTrackCol = UI_COL32(190, 210, 225, 68);
         inline constexpr uint32_t kReloadArcCol = UI_COL32(255, 202, 74, 242), kReloadDotCol = UI_COL32(255, 214, 102, 235);
+        inline constexpr uint32_t kReloadStageEjectCol = UI_COL32(255, 196, 62, 248);
+        inline constexpr uint32_t kReloadStageInsCol   = UI_COL32(78, 234, 255, 248);
+        inline constexpr uint32_t kReloadStageBoltCol  = UI_COL32(62, 252, 156, 252);
+
+        // レティクル直下：弾切れ [R] リロード ／ リロード進捗 ／ 装填完了プロンプト
+        inline constexpr int kReticleLowAmmoThreshold = 5;
+        inline constexpr float kPromptOffsetY = 25.0f, kPromptClampPadX = 18.0f, kPromptClampTopY = 54.0f, kPromptClampBotY = 44.0f;
+        inline constexpr float kPromptEmptyH = 24.0f, kPromptEmptyFont = 14.5f, kPromptKeyFont = 13.0f;
+        inline constexpr float kPromptSubH = 20.0f, kPromptSubFont = 12.5f, kPromptSubKeyFont = 11.5f;
+        inline constexpr float kPromptSlant = 3.8f, kPromptPadX = 8.0f, kPromptKeyPadW = 8.5f, kPromptKeyHTrim = 5.0f, kPromptKeyGapX = 6.0f;
+        inline constexpr float kPromptReloadBarH = 3.2f, kPromptReloadBarGapY = 2.2f;
+        inline constexpr float kEmptyBracketBaseOff = 11.5f, kEmptyBracketAlertAdd = 3.2f, kEmptyBracketArm = 3.4f;
+        inline constexpr float kAlertShakeAmpPx = 5.2f, kAlertShakeFreq = 36.0f, kEmptyPulseSpeed = 9.0f;
+        inline constexpr float kCompleteFlashDuration = 0.55f, kCompleteBracketOff = 12.0f, kCompleteBracketArm = 3.6f;
+
+        inline constexpr uint32_t kEmptyPillBg     = UI_COL32(28, 10, 14, 242);
+        inline constexpr uint32_t kEmptyPillBdLo   = UI_COL32(255, 72, 64, 235);
+        inline constexpr uint32_t kEmptyPillBdHi   = UI_COL32(255, 196, 62, 255);
+        inline constexpr uint32_t kEmptyKeyBg      = UI_COL32(58, 22, 18, 250);
+        inline constexpr uint32_t kEmptyKeyBd      = UI_COL32(255, 206, 68, 255);
+        inline constexpr uint32_t kEmptyKeyTx      = UI_COL32(255, 244, 196, 255);
+        inline constexpr uint32_t kEmptyTextCol    = UI_COL32(255, 236, 230, 255);
+        inline constexpr uint32_t kLowPillBg       = UI_COL32(24, 18, 10, 222);
+        inline constexpr uint32_t kLowPillBd       = UI_COL32(255, 186, 56, 225);
+        inline constexpr uint32_t kLowKeyBg        = UI_COL32(46, 34, 14, 240);
+        inline constexpr uint32_t kLowTextCol      = UI_COL32(255, 226, 138, 248);
+        inline constexpr uint32_t kReloadPillBg    = UI_COL32(9, 17, 25, 236);
+        inline constexpr uint32_t kCompletePillBg  = UI_COL32(10, 32, 22, 232);
+        inline constexpr uint32_t kCompleteCol     = UI_COL32(72, 252, 162, 250);
 
         // 通常射撃クロスヘア
         inline constexpr float kLockedKickThresh = 0.35f, kNormalKickThresh = 0.30f, kBaseGap = 5.2f;
@@ -820,7 +853,7 @@ namespace HudLayout
     // --- 画面右上：クエスト進行ガイド HUD ---
     namespace QuestTracker
     {
-        inline constexpr float kStepFont = 14.0f, kActionFont = 14.0f, kMinPanelW = 252.0f, kStepWidthPad = 40.0f;
+        inline constexpr float kStepFont = 14.0f, kActionFont = 14.0f, kMinPanelW = 258.0f, kStepWidthPad = 48.0f;
         inline constexpr float kActionWidthPad = 34.0f, kPanelH = 128.0f, kSlant = 6.5f, kRightMargin = 14.0f;
         inline constexpr float kTopY = 10.0f, kTopAccentThick = 2.2f;
 
@@ -845,7 +878,7 @@ namespace HudLayout
         inline constexpr uint32_t kStepDoneText = UI_COL32(138, 236, 178, 225), kStepIdleText = UI_COL32(176, 194, 210, 220);
         inline constexpr uint32_t kCalloutBg = UI_COL32(12, 22, 32, 238);
 
-        inline constexpr const char8_t* kStep1Text   = u8"1. 木箱で補給 ([E]長押し)";
+        inline constexpr const char8_t* kStep1Text   = u8"1. 木箱を射撃で破壊して補給";
         inline constexpr const char8_t* kStep2Format = u8"2. 標的を破壊 (%d/%d)";
         inline constexpr const char8_t* kStep3Text   = u8"3. 北東LZで3秒待機";
     }
@@ -856,15 +889,15 @@ namespace HudLayout
         inline constexpr int kSuggestReloadAmmo = 8, kItemCount = 6;
 
         inline constexpr ControlGuideItemSpec kItems[kItemCount] = {
-            { "WASD",  u8"移動", HudPalette::kCyanAccent         },
-            { "LMB",   u8"射撃", UI_COL32(255, 198, 58, 255)     },
-            { "SPACE", u8"回避", HudPalette::kCyanAccent         },
-            { "R",     u8"装填", UI_COL32(255, 186, 52, 255)     },
-            { "E",     u8"回収", HudPalette::kEmeraldAccent      },
-            { "M",     u8"地図", UI_COL32(255, 206, 68, 255)     },
+            { "WASD",  u8"移動",     HudPalette::kCyanAccent         },
+            { "LMB",   u8"射撃",     UI_COL32(255, 198, 58, 255)     },
+            { "SPACE", u8"回避",     HudPalette::kCyanAccent         },
+            { "R",     u8"リロード", UI_COL32(255, 186, 52, 255)     },
+            { "E",     u8"回収",     HudPalette::kEmeraldAccent      },
+            { "M",     u8"地図",     UI_COL32(255, 206, 68, 255)     },
         };
 
-        inline constexpr float kBarW = 516.0f, kBarH = 24.0f, kBarX = 384.0f, kBottomMargin = 8.0f, kDescFont = 13.0f;
+        inline constexpr float kBarW = 568.0f, kBarH = 24.0f, kBarX = 376.0f, kBottomMargin = 8.0f, kDescFont = 13.0f;
         inline constexpr float kBarRounding = 4.0f, kBarBorderThick = 1.0f, kInnerWidthTrim = 12.0f;
         inline constexpr float kCellStartPadX = 7.0f, kKeyFont = 12.0f, kKeyPadW = 8.0f, kKeyH = 17.0f;
         inline constexpr float kKeyRounding = 2.5f, kKeyBorderThick = 1.0f, kDescGapX = 4.0f, kGlowBaseAlpha = 145.0f;
@@ -874,6 +907,7 @@ namespace HudLayout
         inline constexpr uint32_t kKeyIdleBg = UI_COL32(22, 34, 46, 232), kKeyIdleBd = UI_COL32(102, 128, 148, 185);
         inline constexpr uint32_t kKeyIdleTx = UI_COL32(242, 248, 255, 255), kDescIdleTx = UI_COL32(204, 222, 238, 245);
         inline constexpr uint32_t kKeyActiveBg = UI_COL32(22, 68, 88, 245), kKeyHighlightBg = UI_COL32(34, 52, 32, 240);
+        inline constexpr uint32_t kKeyUrgentBg = UI_COL32(68, 20, 22, 248), kKeyUrgentCol = UI_COL32(255, 96, 78, 255);
     }
 
     // --- タクティカルレーダー・コンパウンドジオメトリ共通定数 (Radar) ---
@@ -1098,7 +1132,7 @@ namespace HudLayout
         };
 
         inline constexpr const char8_t* kGuideSteps[] = {
-            u8"1. 東棟で [E] 補給 ＆ 標的[1] 射撃",
+            u8"1. 東棟の木箱を破壊 ＆ 標的[1] 射撃",
             u8"2. 西棟で遮蔽・回避 ＆ 標的[2] 破壊",
             u8"3. 西か東の橋で北エリアへ渡河",
             u8"4. 北西の標的[3]・北東の標的[4] 破壊",

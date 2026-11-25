@@ -20,6 +20,7 @@ namespace CombatTuning
 		constexpr const char*  kProjectResourceDir   = "project/Resources/";
 		constexpr const char*  kBallisticsAtlasPath  = "Resources/duckov_ballistics_atlas.png";
 		constexpr const char*  kMuzzleFlashTexPath   = "Resources/duckov_muzzle_flash.png";
+		constexpr const char*  kMuzzleConeTexPath    = "Resources/duckov_muzzle_cone.png";
 		constexpr const char*  kMagazineTexPath      = "Resources/duckov_magazine_tex.png";
 		constexpr const char*  kCasingModelFile      = "duckov_shell_casing.obj";
 		constexpr const char*  kMagFullModelFile     = "duckov_magazine_full.obj";
@@ -127,64 +128,83 @@ namespace CombatTuning
 
 	namespace MuzzleBlast
 	{
+		// 0. 3D指向性A2コンペンセイター・マズルフラッシュコーン（射線方向へ正確に伸びるマッハショック炎）
+		constexpr size_t kMaxActiveMuzzleCones = 20;
+		constexpr float kConeLifeRifle = 0.058f, kConeLifeShotgun = 0.082f, kConeLifeEnemy = 0.052f;
+		constexpr Vector3 kConeScalePlayer  = { 1.05f, 1.05f, 1.15f };
+		constexpr Vector3 kConeScaleShotgun = { 1.55f, 1.55f, 1.68f };
+		constexpr Vector3 kConeScaleEnemy   = { 0.88f, 0.88f, 0.96f };
+		constexpr Vector4 kConeColorPlayer  = { 1.35f, 1.08f, 0.78f, 1.0f };
+		constexpr Vector4 kConeColorShotgun = { 1.50f, 1.14f, 0.80f, 1.0f };
+		constexpr Vector4 kConeColorEnemy   = { 1.30f, 0.82f, 0.48f, 1.0f };
+
 		// 1. クラウン直前の白熱マッハディスク閃光
-		constexpr float kCoreFwdOffset = 0.06f, kCoreScaleShotgun = 0.56f, kCoreScaleEnemy = 0.34f;
-		constexpr float kCoreScalePlayer = 0.40f, kCoreFwdSpeed = 1.5f;
-		constexpr Vector4 kCoreColorEnemy = { 1.0f, 0.72f, 0.36f, 0.95f }, kCoreColorPlayer = { 1.0f, 0.92f, 0.68f, 0.96f };
-		constexpr Vector4 kCoreEndColor = { 1.0f, 0.42f, 0.10f, 0.0f };
-		constexpr float kCoreLifeShotgun = 0.050f, kCoreLifeRifle = 0.034f, kCoreTargetScaleRatio = 0.35f;
+		constexpr float kCoreFwdOffset = 0.08f, kCoreScaleShotgun = 0.92f, kCoreScaleEnemy = 0.52f;
+		constexpr float kCoreScalePlayer = 0.66f, kCoreFwdSpeed = 2.0f;
+		constexpr Vector4 kCoreColorEnemy = { 1.0f, 0.76f, 0.38f, 0.98f }, kCoreColorPlayer = { 1.0f, 0.95f, 0.74f, 0.98f };
+		constexpr Vector4 kCoreEndColor = { 1.0f, 0.44f, 0.10f, 0.0f };
+		constexpr float kCoreLifeShotgun = 0.072f, kCoreLifeRifle = 0.054f, kCoreTargetScaleRatio = 0.38f;
 
-		// 2. 前方軸方向ジェット炎
-		constexpr int kJetCountShotgun = 7, kJetCountRifle = 3;
-		constexpr float kJetBaseFwdOffset = 0.10f, kJetStepFwdOffset = 0.07f, kJetBaseScaleShotgun = 0.38f;
-		constexpr float kJetBaseScaleRifle = 0.24f, kJetScaleJitterMin = 0.8f, kJetScaleJitterMax = 1.2f;
-		constexpr Vector2 kJetAspect = { 1.55f, 0.75f };
-		constexpr float kJetFwdSpeedMin = 6.5f, kJetFwdSpeedMax = 12.5f, kJetRightJitter = 0.9f, kJetUpJitter = 0.6f;
-		constexpr Vector4 kJetColorEnemy = { 1.0f, 0.58f, 0.22f, 0.86f }, kJetColorPlayer = { 1.0f, 0.80f, 0.36f, 0.88f };
-		constexpr Vector4 kJetEndColor = { 1.0f, 0.28f, 0.05f, 0.0f };
-		constexpr float kJetDrag = 8.0f, kJetLifeMin = 0.032f, kJetLifeMax = 0.055f, kJetTargetScaleRatio = 0.45f;
+		// 2. 前方軸方向ジェット炎（射線に沿って密に連なる高速燃焼ガス列）
+		constexpr int kJetCountShotgun = 10, kJetCountRifle = 6;
+		constexpr float kJetBaseFwdOffset = 0.12f, kJetStepFwdOffset = 0.11f, kJetBaseScaleShotgun = 0.52f;
+		constexpr float kJetBaseScaleRifle = 0.34f, kJetScaleJitterMin = 0.82f, kJetScaleJitterMax = 1.24f;
+		constexpr Vector2 kJetAspect = { 1.45f, 0.88f };
+		constexpr float kJetFwdSpeedMin = 8.0f, kJetFwdSpeedMax = 15.5f, kJetRightJitter = 0.75f, kJetUpJitter = 0.55f;
+		constexpr Vector4 kJetColorEnemy = { 1.0f, 0.62f, 0.24f, 0.92f }, kJetColorPlayer = { 1.0f, 0.84f, 0.42f, 0.94f };
+		constexpr Vector4 kJetEndColor = { 1.0f, 0.30f, 0.06f, 0.0f };
+		constexpr float kJetDrag = 7.5f, kJetLifeMin = 0.048f, kJetLifeMax = 0.078f, kJetTargetScaleRatio = 0.42f;
 
-		// 3. 左右サイドベント噴出炎
-		constexpr float kVentSideOffset = 0.05f, kVentScaleShotgun = 0.24f, kVentScaleRifle = 0.16f;
-		constexpr float kVentSideSpeedMin = 2.8f, kVentSideSpeedMax = 4.4f, kVentFwdSpeed = 1.6f;
-		constexpr Vector4 kVentStartColor = { 1.0f, 0.74f, 0.32f, 0.68f }, kVentEndColor = { 1.0f, 0.35f, 0.08f, 0.0f };
-		constexpr float kVentDrag = 9.0f, kVentLifeTime = 0.036f, kVentTargetScaleRatio = 0.4f;
+		// 3. 左右サイドベント噴出炎（マズルブレーキV字横噴射ガス）
+		constexpr float kVentSideOffset = 0.06f, kVentScaleShotgun = 0.36f, kVentScaleRifle = 0.25f;
+		constexpr float kVentSideSpeedMin = 3.6f, kVentSideSpeedMax = 6.2f, kVentFwdSpeed = 2.4f;
+		constexpr Vector4 kVentStartColor = { 1.0f, 0.80f, 0.38f, 0.84f }, kVentEndColor = { 1.0f, 0.36f, 0.08f, 0.0f };
+		constexpr float kVentDrag = 8.5f, kVentLifeTime = 0.054f, kVentTargetScaleRatio = 0.42f;
 
-		// 4. 未燃焼装薬の高速火の粉スパーク
-		constexpr int kSparkCountShotgun = 12, kSparkCountRifle = 5;
-		constexpr float kSparkFwdOffset = 0.08f, kSparkFwdSpeedMin = 10.0f, kSparkFwdSpeedMax = 18.5f;
-		constexpr float kSparkRightJitter = 2.4f, kSparkUpMin = -0.7f, kSparkUpMax = 1.9f;
-		constexpr Vector4 kSparkBrightColor = { 1.0f, 0.96f, 0.76f, 0.98f };
-		constexpr Vector4 kSparkAmberColor = { 1.0f, 0.80f, 0.34f, 0.94f }, kSparkEndColor = { 1.0f, 0.26f, 0.04f, 0.0f };
-		constexpr float kSparkWidthMin = 0.016f, kSparkWidthMax = 0.028f, kSparkLenMin = 0.09f, kSparkLenMax = 0.19f;
-		constexpr float kSparkLifeMin = 0.08f, kSparkLifeMax = 0.17f, kSparkGravity = 7.8f, kSparkDrag = 4.2f;
+		// 4. 未燃焼装薬の高速火の粉スパーク（前方の地面でリアルに跳ねる高温粒子）
+		constexpr int kSparkCountShotgun = 22, kSparkCountRifle = 11;
+		constexpr float kSparkFwdOffset = 0.10f, kSparkFwdSpeedMin = 11.5f, kSparkFwdSpeedMax = 22.0f;
+		constexpr float kSparkRightJitter = 2.8f, kSparkUpMin = -0.9f, kSparkUpMax = 2.4f;
+		constexpr Vector4 kSparkBrightColor = { 1.0f, 0.97f, 0.80f, 1.0f };
+		constexpr Vector4 kSparkAmberColor = { 1.0f, 0.82f, 0.36f, 0.96f }, kSparkEndColor = { 1.0f, 0.28f, 0.05f, 0.0f };
+		constexpr float kSparkWidthMin = 0.020f, kSparkWidthMax = 0.036f, kSparkLenMin = 0.13f, kSparkLenMax = 0.28f;
+		constexpr float kSparkLifeMin = 0.14f, kSparkLifeMax = 0.34f, kSparkGravity = 9.6f, kSparkDrag = 3.2f;
 
-		// 5. 銃口コルダイト硝煙＆薬室薄煙
-		constexpr int kSmokePuffShotgun = 5, kSmokePuffRifle = 3;
-		constexpr float kSmokeBaseFwdOffset = 0.10f, kSmokeStepFwdOffset = 0.11f, kSmokeInitMinShotgun = 0.13f;
-		constexpr float kSmokeInitMaxShotgun = 0.20f, kSmokeInitMinRifle = 0.08f, kSmokeInitMaxRifle = 0.13f;
-		constexpr float kSmokeEndMinShotgun = 0.66f, kSmokeEndMaxShotgun = 0.94f, kSmokeEndMinRifle = 0.40f, kSmokeEndMaxRifle = 0.62f;
-		constexpr Vector2 kSmokeAspect = { 1.32f, 0.90f };
-		constexpr float kSmokeFwdSpeedMin = 2.6f, kSmokeFwdSpeedMax = 5.2f, kSmokeRightJitter = 0.48f, kSmokeUpMin = 0.22f;
-		constexpr float kSmokeUpMax = 0.62f;
-		constexpr Vector3 kSmokeStartRGB = { 0.76f, 0.75f, 0.72f };
-		constexpr float kSmokeAlphaShotgun = 0.30f, kSmokeAlphaRifle = 0.21f;
+		// 5. 銃口コルダイト硝煙・マズルブラスト地表砂塵・薬室薄煙
+		constexpr int kSmokePuffShotgun = 7, kSmokePuffRifle = 4;
+		constexpr float kSmokeBaseFwdOffset = 0.12f, kSmokeStepFwdOffset = 0.14f, kSmokeInitMinShotgun = 0.16f;
+		constexpr float kSmokeInitMaxShotgun = 0.26f, kSmokeInitMinRifle = 0.11f, kSmokeInitMaxRifle = 0.18f;
+		constexpr float kSmokeEndMinShotgun = 0.82f, kSmokeEndMaxShotgun = 1.18f, kSmokeEndMinRifle = 0.52f, kSmokeEndMaxRifle = 0.82f;
+		constexpr Vector2 kSmokeAspect = { 1.32f, 0.92f };
+		constexpr float kSmokeFwdSpeedMin = 3.0f, kSmokeFwdSpeedMax = 6.2f, kSmokeRightJitter = 0.58f, kSmokeUpMin = 0.28f;
+		constexpr float kSmokeUpMax = 0.78f;
+		constexpr Vector3 kSmokeStartRGB = { 0.78f, 0.77f, 0.74f };
+		constexpr float kSmokeAlphaShotgun = 0.38f, kSmokeAlphaRifle = 0.29f;
 		constexpr Vector4 kSmokeEndColor = { 0.66f, 0.66f, 0.65f, 0.0f };
-		constexpr float kSmokeDrag = 3.5f, kSmokeCurlFreq = 1.6f, kSmokeCurlAmp = 0.20f, kSmokeLifeMin = 0.50f;
-		constexpr float kSmokeLifeMax = 0.82f, kSmokeAngularVel = 1.1f, kSmokeFadeInRatio = 0.10f;
+		constexpr float kSmokeDrag = 3.2f, kSmokeCurlFreq = 1.8f, kSmokeCurlAmp = 0.26f, kSmokeLifeMin = 0.62f;
+		constexpr float kSmokeLifeMax = 1.05f, kSmokeAngularVel = 1.3f, kSmokeFadeInRatio = 0.09f;
 
-		constexpr float kChamberBackOffset = 0.48f, kChamberRightOffset = 0.10f, kChamberInitScale = 0.055f, kChamberTargetScale = 0.28f;
-		constexpr Vector2 kChamberAspect = { 0.92f, 1.35f };
-		constexpr float kChamberRightSpeed = 0.52f, kChamberUpSpeed = 0.82f;
-		constexpr Vector4 kChamberStartColor = { 0.80f, 0.79f, 0.76f, 0.20f }, kChamberEndColor = { 0.70f, 0.70f, 0.69f, 0.0f };
-		constexpr float kChamberDrag = 2.4f, kChamberCurlFreq = 2.0f, kChamberCurlAmp = 0.14f, kChamberLifeTime = 0.44f;
-		constexpr float kChamberFadeInRatio = 0.12f;
+		constexpr float kGroundBlastDist = 0.55f, kGroundBlastY = 0.04f, kGroundBlastInitSc = 0.13f, kGroundBlastEndSc = 0.54f;
+		constexpr float kGroundBlastFwdSpd = 3.6f, kGroundBlastSideSpd = 1.4f, kGroundBlastLife = 0.44f, kGroundBlastAlpha = 0.26f;
+
+		constexpr float kChamberBackOffset = 0.48f, kChamberRightOffset = 0.11f, kChamberInitScale = 0.075f, kChamberTargetScale = 0.36f;
+		constexpr Vector2 kChamberAspect = { 0.95f, 1.38f };
+		constexpr float kChamberRightSpeed = 0.68f, kChamberUpSpeed = 0.96f;
+		constexpr Vector4 kChamberStartColor = { 0.82f, 0.81f, 0.78f, 0.28f }, kChamberEndColor = { 0.70f, 0.70f, 0.69f, 0.0f };
+		constexpr float kChamberDrag = 2.3f, kChamberCurlFreq = 2.2f, kChamberCurlAmp = 0.18f, kChamberLifeTime = 0.55f;
+		constexpr float kChamberFadeInRatio = 0.10f;
+
+		// 6. 連射後の銃身ヒートスモーク（加熱した銃口から立ち昇るリアルな余韻白煙）
+		constexpr float kHeatAddRifle = 0.22f, kHeatAddShotgun = 0.45f, kHeatDecayRate = 0.26f;
+		constexpr float kHeatSmokeMinThreshold = 0.22f, kHeatSmokeMinPostShotSec = 0.06f, kHeatSmokeBaseInterval = 0.065f;
+		constexpr float kHeatSmokeInitSc = 0.048f, kHeatSmokeTargetSc = 0.29f, kHeatSmokeUpVelMin = 0.58f, kHeatSmokeUpVelMax = 1.08f;
+		constexpr float kHeatSmokeDriftXZ = 0.22f, kHeatSmokeLifeMin = 0.78f, kHeatSmokeLifeMax = 1.28f, kHeatSmokeBaseAlpha = 0.26f;
 	}
 
 	namespace Firing
 	{
 		constexpr float kShotgunSoundRadius = 18.0f, kRifleSoundRadius = 14.0f, kSoundRingDuration = 0.6f;
-		constexpr float kShotgunLightFlashTime = 0.055f, kRifleLightFlashTime = 0.030f;
+		constexpr float kShotgunLightFlashTime = 0.075f, kRifleLightFlashTime = 0.052f;
 
 		constexpr float kShotgunShakeDuration = 0.16f, kShotgunShakeAmplitude = 0.38f;
 		constexpr const char* kShotgunSePath      = "Resources/Audio/SE_Gun_Shotgun.wav";
@@ -222,17 +242,17 @@ namespace CombatTuning
 		constexpr const char* kGrazeTextLabel     = "GRAZE";
 		constexpr Vector4 kGrazeTextColor = { 0.5f, 0.9f, 1.0f, 1.0f };
 
-		constexpr float kWakeBackOffset = 0.45f, kWakeInitScale = 0.055f, kWakeTargetScale = 0.19f;
-		constexpr Vector2 kWakeAspect = { 1.45f, 0.65f };
-		constexpr float kWakeHorizJitter = 0.12f, kWakeUpMin = 0.06f, kWakeUpMax = 0.18f, kWakeBackSpeed = 0.35f;
-		constexpr Vector4 kWakeColorEnemy = { 0.90f, 0.74f, 0.70f, 0.13f };
-		constexpr Vector4 kWakeColorPlayer = { 0.88f, 0.87f, 0.84f, 0.13f }, kWakeEndColor = { 0.78f, 0.78f, 0.78f, 0.0f };
-		constexpr float kWakeDrag = 2.0f, kWakeLifeTime = 0.22f, kWakeFadeInRatio = 0.08f;
+		constexpr float kWakeBackOffset = 0.42f, kWakeInitScale = 0.072f, kWakeTargetScale = 0.25f;
+		constexpr Vector2 kWakeAspect = { 1.48f, 0.68f };
+		constexpr float kWakeHorizJitter = 0.11f, kWakeUpMin = 0.06f, kWakeUpMax = 0.18f, kWakeBackSpeed = 0.35f;
+		constexpr Vector4 kWakeColorEnemy = { 0.92f, 0.74f, 0.70f, 0.19f };
+		constexpr Vector4 kWakeColorPlayer = { 0.90f, 0.89f, 0.86f, 0.19f }, kWakeEndColor = { 0.78f, 0.78f, 0.78f, 0.0f };
+		constexpr float kWakeDrag = 2.0f, kWakeLifeTime = 0.27f, kWakeFadeInRatio = 0.08f;
 
-		constexpr int kEmberChanceModulus = 3;
-		constexpr float kEmberBackOffset = 0.20f, kEmberHorizJitter = 0.65f, kEmberUpMin = -0.2f, kEmberUpMax = 0.45f;
-		constexpr Vector4 kEmberColorEnemy = { 1.0f, 0.42f, 0.16f, 0.76f };
-		constexpr Vector4 kEmberColorPlayer = { 1.0f, 0.88f, 0.46f, 0.76f }, kEmberEndColor = { 1.0f, 0.25f, 0.05f, 0.0f };
-		constexpr float kEmberWidth = 0.015f, kEmberLength = 0.048f, kEmberLifeTime = 0.11f, kEmberGravity = 4.5f, kEmberDrag = 3.5f;
+		constexpr int kEmberChanceModulus = 2;
+		constexpr float kEmberBackOffset = 0.18f, kEmberHorizJitter = 0.72f, kEmberUpMin = -0.25f, kEmberUpMax = 0.55f;
+		constexpr Vector4 kEmberColorEnemy = { 1.0f, 0.44f, 0.18f, 0.86f };
+		constexpr Vector4 kEmberColorPlayer = { 1.0f, 0.90f, 0.48f, 0.86f }, kEmberEndColor = { 1.0f, 0.26f, 0.05f, 0.0f };
+		constexpr float kEmberWidth = 0.018f, kEmberLength = 0.068f, kEmberLifeTime = 0.15f, kEmberGravity = 5.2f, kEmberDrag = 3.2f;
 	}
 }

@@ -114,6 +114,8 @@ public:
     bool IsReloading() const { return isReloading_; }
     float GetReloadProgress() const { return isReloading_ && kReloadDuration > 0.0f ? (kReloadDuration - reloadTimer_) / kReloadDuration : 0.0f; }
     float GetReloadCancelledTimer() const { return reloadCancelledTimer_; }
+    float GetEmptyTriggerAlertTimer() const { return emptyTriggerAlertTimer_; }
+    float GetReloadCompleteFlashTimer() const { return reloadCompleteFlashTimer_; }
 
     // --- 物資 & インベントリ関連 ---
     int GetMedkitCount() const { return medkitCount_; }
@@ -144,6 +146,22 @@ public:
     float GetRecoilKickAmount() const { return recoilKickVisual_; }
     bool IsInCover() const { return isInCover_; }
     void SetInCover(bool inCover) { isInCover_ = inCover; }
+
+    // --- [F7] 自動デモプレイ（オートパイロット実演）制御インターフェース ---
+    struct DemoControlState
+    {
+        bool active             = false;
+        Vector3 moveDir         = { 0.0f, 0.0f, 0.0f };
+        Vector3 aimWorldPoint   = { 0.0f, 0.70f, 10.0f };
+        bool fireHeld           = false;
+        bool triggerDodge       = false;
+        bool triggerReload      = false;
+        bool triggerHeal        = false;
+        bool holsterSprint      = false;
+    };
+    void SetDemoControl(const DemoControlState& ctrl) { demoCtrl_ = ctrl; }
+    const DemoControlState& GetDemoControl() const { return demoCtrl_; }
+    bool IsDemoControlled() const { return demoCtrl_.active; }
 
 private:
     static constexpr Vector3 kDefaultBulletSpawnOffset = { 0.42f, 0.707f, 0.98f };
@@ -225,6 +243,9 @@ private:
     bool wasDryReload_ = false;
     float reloadTimer_ = 0.0f;
     float reloadCancelledTimer_ = 0.0f;
+    float emptyTriggerAlertTimer_ = 0.0f;
+    float dryFireRepeatTimer_ = 0.0f;
+    float reloadCompleteFlashTimer_ = 0.0f;
 
     // --- 救急キット & 治療 ---
     int medkitCount_ = kDefaultMedkitCount;
@@ -255,4 +276,5 @@ private:
     // --- 死因レポート用 ---
     std::string causeOfDeath_ = "ENEMY GUNFIRE (7.62x39mm PS)";
     std::string lastAttackerName_ = "HOSTILE PATROL";
+    DemoControlState demoCtrl_{};
 };

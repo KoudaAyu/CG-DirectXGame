@@ -1,5 +1,6 @@
 #include "TitleScene.h"
 #include "TitleSceneTuning.h"
+#include "../GameScene/RaidStats.h"
 #include "KeyInput.h"
 #include "DirectXCom.h"
 #include "SceneManager.h"
@@ -19,6 +20,7 @@
 #include "Baziru3_Engine/Framework/Audio/AudioManager.h"
 #include "Application/Audio/TacticalAudio.h"
 #include "Application/Config/AppDebugConfig.h"
+#include "Application/Config/AppFastObjLoader.h"
 #include "Application/Transition/StingerTransition.h"
 #include <algorithm>
 #include <array>
@@ -42,7 +44,7 @@ namespace
 	{
 		const std::string key = directoryPath + "/" + filename;
 		if (auto it = sModelDataCache.find(key); it != sModelDataCache.end()) return it->second;
-		sModelDataCache[key] = Object3d::LoadObjFile(directoryPath, filename);
+		sModelDataCache[key] = AppFastObjLoader::LoadObjCached(directoryPath, filename);
 		return sModelDataCache[key];
 	}
 
@@ -85,6 +87,7 @@ namespace
 		std::vector<SceneryVertexBase> baseVertices;
 		uint32_t textureIndex = UINT32_MAX;
 		bool hasSway = false;
+		bool isFarForest = false;
 	};
 	std::vector<SceneryBatch> sScenery;
 
@@ -428,28 +431,42 @@ namespace
 	void AppendTreeInstance(Object3d::ModelData& dst, const Object3d::ModelData& src,
 		float tx, float ty, float tz, float scaleXZ, float scaleY, float yaw)
 	{
-		if (src.vertices.empty()) return;
-		const uint32_t vBase = static_cast<uint32_t>(dst.vertices.size());
+		const size_t srcVertCount = src.vertices.size();
+		if (srcVertCount == 0) return;
+
+		const size_t oldVertCount = dst.vertices.size();
+		const uint32_t vBase = static_cast<uint32_t>(oldVertCount);
 		const float cy = std::cos(yaw), sy = std::sin(yaw);
-		dst.vertices.reserve(dst.vertices.size() + src.vertices.size());
-		for (const auto& sv : src.vertices)
+
+		dst.vertices.resize(oldVertCount + srcVertCount);
+		const Sprite::VertexData* inVerts = src.vertices.data();
+		Sprite::VertexData* outVerts = dst.vertices.data() + oldVertCount;
+		for (size_t i = 0; i < srcVertCount; ++i)
 		{
-			Sprite::VertexData dv = sv;
+			const Sprite::VertexData& sv = inVerts[i];
+			Sprite::VertexData& dv = outVerts[i];
 			const float lx = sv.position.x * scaleXZ;
 			const float ly = sv.position.y * scaleY;
 			const float lz = sv.position.z * scaleXZ;
 			dv.position = { tx + lx * cy - lz * sy, ty + ly, tz + lx * sy + lz * cy, 1.0f };
+			dv.texcoord = sv.texcoord;
 			dv.normal = { sv.normal.x * cy - sv.normal.z * sy, sv.normal.y, sv.normal.x * sy + sv.normal.z * cy };
-			dst.vertices.push_back(dv);
 		}
-		if (!src.indices.empty())
+
+		const size_t srcIdxCount = src.indices.size();
+		const size_t oldIdxCount = dst.indices.size();
+		if (srcIdxCount > 0)
 		{
-			dst.indices.reserve(dst.indices.size() + src.indices.size());
-			for (uint32_t idx : src.indices) dst.indices.push_back(vBase + idx);
+			dst.indices.resize(oldIdxCount + srcIdxCount);
+			const uint32_t* inIdx = src.indices.data();
+			uint32_t* outIdx = dst.indices.data() + oldIdxCount;
+			for (size_t i = 0; i < srcIdxCount; ++i) outIdx[i] = vBase + inIdx[i];
 		}
 		else
 		{
-			for (uint32_t idx = 0; idx < static_cast<uint32_t>(src.vertices.size()); ++idx) dst.indices.push_back(vBase + idx);
+			dst.indices.resize(oldIdxCount + srcVertCount);
+			uint32_t* outIdx = dst.indices.data() + oldIdxCount;
+			for (uint32_t idx = 0; idx < static_cast<uint32_t>(srcVertCount); ++idx) outIdx[idx] = vBase + idx;
 		}
 	}
 
@@ -963,7 +980,7 @@ void TitleScene::InitializeSceneryAndPaths()
 	const uint32_t batchTex[kBatchCount] = {
 		sWhiteTexIndex, titleBirchTexIdx, titlePineTexIdx, titleBirchTexIdx,
 		(titleRockTexIdx != TextureManager::kInvalidTextureIndex ? titleRockTexIdx : sWhiteTexIndex),
-		sWhiteTexIndex, sWhiteTexIndex, sWhiteTexIndex,
+		sWhiteTexIndex, sWhiteTexIndex, sWhiteTexIndex, titleBirchTexIdx, titlePineTexIdx,
 	};
 	for (int bi = 0; bi < kBatchCount; ++bi)
 	{
@@ -971,6 +988,11 @@ void TitleScene::InitializeSceneryAndPaths()
 		batch[bi].material.textureIndex = batchTex[bi];
 		batch[bi].boundingRadius = kBatchBoundingRadius;
 	}
+	// 大量樹木の遠景バッチを事前確保して再アロケーションを抑制
+	batch[kFarLeaf].vertices.reserve(280000);
+	batch[kFarLeaf].indices.reserve(280000);
+	batch[kFarPine].vertices.reserve(680000);
+	batch[kFarPine].indices.reserve(680000);
 
 	uint32_t seed = kInitialSeed;
 
@@ -978,7 +1000,8 @@ void TitleScene::InitializeSceneryAndPaths()
 	{
 		if (IsInsideEnemyCamp(x, z) || !ResolveSceneryPlacement(x, z, kBroadleafRadius * s)) return;
 		const float yaw = HashRange(seed, 0.0f, kTwoPi);
-		AppendTreeInstance(batch[kLeaf], realisticBirchSrc, x, g, z, kBroadleafScaleXZ * s, kBroadleafScaleY * s, yaw);
+		const int targetBatch = (z < kNearSideSplitZ) ? kLeaf : kFarLeaf;
+		AppendTreeInstance(batch[targetBatch], realisticBirchSrc, x, g, z, kBroadleafScaleXZ * s, kBroadleafScaleY * s, yaw);
 	};
 
 	auto addPine = [&](float x, float z, float g, float s)
@@ -986,7 +1009,8 @@ void TitleScene::InitializeSceneryAndPaths()
 		if (IsInsideEnemyCamp(x, z) || !ResolveSceneryPlacement(x, z, kPineRadius * s)) return;
 		const float yaw = HashRange(seed, 0.0f, kTwoPi);
 		const bool useTall = (Hash01(seed) < kTallPineProb);
-		AppendTreeInstance(batch[kPine], useTall ? realisticTallPineSrc : realisticPineSrc, x, g, z, kPineScaleXZ * s, kPineScaleY * s, yaw);
+		const int targetBatch = (z < kNearSideSplitZ) ? kPine : kFarPine;
+		AppendTreeInstance(batch[targetBatch], useTall ? realisticTallPineSrc : realisticPineSrc, x, g, z, kPineScaleXZ * s, kPineScaleY * s, yaw);
 	};
 
 	auto addBush = [&](float x, float z, float g, float s)
@@ -1134,13 +1158,23 @@ void TitleScene::InitializeSceneryAndPaths()
 			sb.model->SetReflectionFactor(0.0f);
 			sb.model->SetFresnelF0(0.0f);
 		}
-		if (i != kRock && i != kTrunk)
+		if (i == kFarLeaf || i == kFarPine)
+		{
+			// 遠景樹林帯（約87万頂点）は毎フレームのCPU頂点書き換えを行わず、バッチ全体の微風トランスフォーム揺れで60FPSを維持
+			sb.isFarForest = true;
+			sb.hasSway = false;
+		}
+		else if (i != kRock && i != kTrunk)
 		{
 			sb.hasSway = true;
-			sb.baseVertices.reserve(batch[i].vertices.size());
-			for (const auto& v : batch[i].vertices)
+			const size_t vCount = batch[i].vertices.size();
+			sb.baseVertices.resize(vCount);
+			const Sprite::VertexData* srcVerts = batch[i].vertices.data();
+			SceneryVertexBase* dstBase = sb.baseVertices.data();
+			for (size_t vi = 0; vi < vCount; ++vi)
 			{
-				sb.baseVertices.push_back({ { v.position.x, v.position.y, v.position.z }, ComputeSceneryVertexSway(i, v) });
+				const Sprite::VertexData& v = srcVerts[vi];
+				dstBase[vi] = { { v.position.x, v.position.y, v.position.z }, ComputeSceneryVertexSway(i, v) };
 			}
 		}
 		sScenery.push_back(std::move(sb));
@@ -1341,11 +1375,23 @@ void TitleScene::Update()
 
 void TitleScene::UpdateStartAndTransition(float deltaTime)
 {
-	// SPACE/ENTER/マウス左クリックで出撃 (トランジション中は入力無効) 
+	// デフォルトで自動デモON（[F7] でデモON/OFF切替、SPACE/ENTER/左クリック または デモON時は5.5秒経過で自動出撃）
 	if (!isStarting_ && (!StingerTransition::GetInstance() || !StingerTransition::GetInstance()->IsTransitioning()))
 	{
-		const bool pressed = (input_ && (input_->TriggerKey(DIK_SPACE) || input_->TriggerKey(DIK_RETURN)))
+		if (input_ && input_->TriggerKey(DIK_F7))
+		{
+			RaidStats::GetInstance().autoDemoMode = !RaidStats::GetInstance().autoDemoMode;
+			if (RaidStats::GetInstance().autoDemoMode)
+			{
+				RaidStats::GetInstance().autoDemoCycleIndex = 0;
+			}
+			TacticalAudio::Play2D("Resources/Audio/SE_UI_Click.wav", Timing::kStartUiClickVolume);
+		}
+
+		const bool manualStart = (input_ && (input_->TriggerKey(DIK_SPACE) || input_->TriggerKey(DIK_RETURN)))
 			|| mouseInput_.TriggerButton(Timing::kLeftMouseButton);
+		const bool autoAttractStart = RaidStats::GetInstance().autoDemoMode && (sIntroTimer >= Timing::kIntroDuration + 2.5f);
+		const bool pressed = manualStart || autoAttractStart;
 		if (pressed && !sLogoLanded)
 		{
 			sIntroTimer = Timing::kIntroDuration;
@@ -1714,12 +1760,14 @@ void TitleScene::UpdateDynamicMeshes()
 {
 	if (riverModel_)
 	{
-		UpdateMappedVertices(riverModel_.get(), waterBaseVertices_.size(), [&](Object3d::VertexData* vData)
+		const size_t waterVertCount = waterBaseVertices_.size();
+		const WaterVertexBase* wbPtr = waterBaseVertices_.data();
+		UpdateMappedVertices(riverModel_.get(), waterVertCount, [&](Object3d::VertexData* vData)
 		{
 			const float flowU = bgTimer_ * Water::kFlowUvSpeed;
-			for (size_t i = 0; i < waterBaseVertices_.size(); ++i)
+			for (size_t i = 0; i < waterVertCount; ++i)
 			{
-				const auto& b = waterBaseVertices_[i];
+				const WaterVertexBase& b = wbPtr[i];
 				const WaterSurfaceSample s = EvaluateWaterSurface(b.basePosX, b.basePosZ, bgTimer_);
 				vData[i].position = { b.basePosX, Terrain::kWaterY + s.displacement.y, b.basePosZ, 1.0f };
 				vData[i].normal = s.normal;
@@ -1734,20 +1782,30 @@ void TitleScene::UpdateDynamicMeshes()
 	if (sShadowDecalsModel) sShadowDecalsModel->Update();
 	if (sPathDecalModel) sPathDecalModel->Update();
 
-	for (auto& s : sScenery)
+	for (size_t si = 0; si < sScenery.size(); ++si)
 	{
+		auto& s = sScenery[si];
 		if (s.hasSway)
 		{
-			UpdateMappedVertices(s.model.get(), s.baseVertices.size(), [&](Object3d::VertexData* vData)
+			const size_t swayVertCount = s.baseVertices.size();
+			const SceneryVertexBase* bvPtr = s.baseVertices.data();
+			UpdateMappedVertices(s.model.get(), swayVertCount, [&](Object3d::VertexData* vData)
 			{
-				for (size_t i = 0; i < s.baseVertices.size(); ++i)
+				for (size_t i = 0; i < swayVertCount; ++i)
 				{
-					const auto& bv = s.baseVertices[i];
+					const SceneryVertexBase& bv = bvPtr[i];
 					if (bv.swayFactor <= Wind::kMinSwayEpsilon) continue;
 					const Vector3 offset = EvaluateWind(bv.basePos, bgTimer_, bv.swayFactor);
 					vData[i].position = { bv.basePos.x + offset.x, bv.basePos.y + offset.y, bv.basePos.z + offset.z, 1.0f };
 				}
 			});
+		}
+		else if (s.isFarForest && s.model)
+		{
+			const float phase = static_cast<float>(si) * 0.9f;
+			const float swayX = 0.018f * std::sin(bgTimer_ * 1.25f + phase) + 0.007f * std::sin(bgTimer_ * 2.65f);
+			const float swayZ = 0.012f * std::cos(bgTimer_ * 1.05f + phase);
+			s.model->SetTranslate({ swayX, 0.0f, swayZ });
 		}
 		if (s.model) s.model->Update();
 	}

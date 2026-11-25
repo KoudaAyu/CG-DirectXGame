@@ -23,9 +23,15 @@ struct RaidStats
 
     void Reset()
     {
+        const bool keepAutoDemo = autoDemoMode;
+        const int keepDemoCycle = autoDemoCycleIndex;
         *this = RaidStats{};
+        autoDemoMode = keepAutoDemo;
+        autoDemoCycleIndex = keepDemoCycle;
     }
 
+    bool autoDemoMode = true;   // 起動時から自動デモON（[F7]で自動デモ⇔手動操作をいつでも切替）
+    int autoDemoCycleIndex = 0; // 0: 1周目(即死→GameOver救難演出) / 1: 2周目(全制圧→Clear脱出演出)
     float raidTime = 0.0f;
     float maxRaidTime = kDefaultMaxRaidTime;
     int enemiesKilled = 0;

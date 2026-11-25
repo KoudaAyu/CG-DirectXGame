@@ -74,6 +74,12 @@ public:
 	void DrawDroppedMagazines(const RenderContext& ctx);
 
 	/// <summary>
+	/// 銃口から射線方向へ伸びる3Dマズルフラッシュコーンの更新・加算描画
+	/// </summary>
+	void UpdateMuzzleFlashes3D(float deltaTime);
+	void DrawMuzzleFlashes3D(const RenderContext& ctx);
+
+	/// <summary>
 	/// 寿命が切れた、または着弾した不要な弾丸の削除処理
 	/// </summary>
 	void RemoveDeadBullets();
@@ -126,14 +132,28 @@ private:
 		bool settled = false;
 	};
 
+	struct MuzzleFlash3DInstance
+	{
+		std::unique_ptr<Object3d> obj;
+		Vector3 pos{};
+		Vector3 rot{};
+		Vector3 baseScale{ 1.0f, 1.0f, 1.0f };
+		Vector4 baseColor{ 1.0f, 1.0f, 1.0f, 1.0f };
+		float age = 0.0f;
+		float lifeTime = 0.055f;
+	};
+
 	/// <summary>
 	/// プレイヤーや敵キャラクターの射撃トリガー判定と弾丸生成処理
 	/// </summary>
 	/// <param name="deltaTime">経過時間</param>
 	void UpdateCombat(float deltaTime);
+	void UpdateBarrelHeatSmoke(float deltaTime);
 
 	void EnsureBallisticAssetsLoaded();
+	void SpawnMuzzleFlashCone3D(const Vector3& muzzlePos, const Vector3& dir, bool isShotgun, bool isEnemy);
 	void EmitRealisticMuzzleBlast(const Vector3& muzzlePos, const Vector3& dir, bool isShotgun, bool isEnemy);
+	void EmitRiverBallisticSplash(const Vector3& waterPos, const Vector3& bulletDir, bool fullPlunge);
 
 private:
 	GamePlayScene* scene_ = nullptr;                  // ゲームプレイシーンへの参照
@@ -144,9 +164,15 @@ private:
 	std::unique_ptr<Object3d> magFullMasterObj_;      // 残弾あり3D湾曲PMAGの共有マスターメッシュ
 	std::unique_ptr<Object3d> magEmptyMasterObj_;     // 空フォロワー3D湾曲PMAGの共有マスターメッシュ
 	std::vector<DroppedMagazineInstance> droppedMagazines_; // リロードで地面に落下・散乱する3Dマガジン
+	std::unique_ptr<Object3d> muzzleConeMasterObj_;   // 射線方向へ展開する3D A2マズルフラッシュコーン共有メッシュ
+	std::vector<MuzzleFlash3DInstance> muzzleFlashes3D_; // アクティブな3Dマズルフラッシュインスタンス
 	std::unordered_map<const Enemy*, bool> enemyMagDroppedState_; // 敵リロード1回につき1個だけマガジン排出する管理マップ
-	Microsoft::WRL::ComPtr<ID3D12PipelineState> additiveTracerPSO_; // 曳光火球用 加算合成PSO（デプス書き込みOFF）
+	Microsoft::WRL::ComPtr<ID3D12PipelineState> additiveTracerPSO_; // 曳光火球・3Dマズル炎用 加算合成PSO（デプス書き込みOFF）
 	uint32_t ballisticsAtlasTexIndex_ = UINT32_MAX;
 	uint32_t muzzleFlashTexIndex_ = UINT32_MAX;
+	uint32_t muzzleConeTexIndex_ = UINT32_MAX;
 	uint32_t magazineTexIndex_ = UINT32_MAX;
+	float barrelHeat_ = 0.0f;
+	float barrelSmokeTimer_ = 0.0f;
+	float timeSinceLastPlayerShot_ = 99.0f;
 };
